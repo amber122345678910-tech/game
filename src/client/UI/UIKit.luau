@@ -13,6 +13,44 @@ local UIKit = {}
 
 type Props = { [string]: any }
 
+----------------------------------------------------------------------
+-- Тип ввода. PreferredInput — новое API (2025), поэтому читаем его в pcall
+-- и при ошибке определяем по старым флагам.
+----------------------------------------------------------------------
+local hasPreferredInput = pcall(function()
+	return UserInputService.PreferredInput
+end)
+
+function UIKit.isTouch(): boolean
+	if hasPreferredInput then
+		return UserInputService.PreferredInput == Enum.PreferredInput.Touch
+	end
+	return UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled
+end
+
+function UIKit.isMouse(): boolean
+	if hasPreferredInput then
+		return UserInputService.PreferredInput == Enum.PreferredInput.KeyboardAndMouse
+	end
+	return UserInputService.KeyboardEnabled and UserInputService.MouseEnabled
+end
+
+-- Сигнал смены типа ввода (с запасным вариантом через LastInputTypeChanged).
+function UIKit.onInputTypeChanged(callback: () -> ())
+	if hasPreferredInput then
+		UserInputService:GetPropertyChangedSignal("PreferredInput"):Connect(callback)
+	else
+		local last = UIKit.isTouch()
+		UserInputService.LastInputTypeChanged:Connect(function()
+			local now = UIKit.isTouch()
+			if now ~= last then
+				last = now
+				callback()
+			end
+		end)
+	end
+end
+
 -- Создать инстанс: свойства задаются до Parent (быстрее), дети подключаются в конце.
 function UIKit.new(className: string, props: Props?, children: { Instance }?): any
 	local inst = Instance.new(className)
@@ -189,7 +227,7 @@ function UIKit.button(opts: ButtonOptions, onClick: (() -> ())?): TextButton
 
 	button.MouseEnter:Connect(function()
 		-- на тач-экранах MouseEnter может "залипнуть" без MouseLeave
-		if UserInputService.PreferredInput == Enum.PreferredInput.KeyboardAndMouse then
+		if UIKit.isMouse() then
 			UIKit.tween(scale, 0.12, { Scale = 1.05 })
 		end
 	end)
@@ -271,7 +309,7 @@ end
 
 local function computeScale(entry: ScaledEntry): number
 	local vp = viewportSize()
-	local touch = UserInputService.PreferredInput == Enum.PreferredInput.Touch
+	local touch = UIKit.isTouch()
 	if entry.mode == "hud" then
 		local s = math.min(vp.Y / 720, vp.X / 1100)
 		-- на телефоне не даём кнопкам стать меньше удобного для пальца размера
@@ -323,7 +361,7 @@ local function bindCamera()
 	refreshAll()
 end
 workspace:GetPropertyChangedSignal("CurrentCamera"):Connect(bindCamera)
-UserInputService:GetPropertyChangedSignal("PreferredInput"):Connect(refreshAll)
+UIKit.onInputTypeChanged(refreshAll)
 bindCamera()
 
 -- Плавное появление окна.

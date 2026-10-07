@@ -2,12 +2,12 @@
 -- Общее состояние клиента и сигналы между модулями интерфейса и контроллерами.
 
 local Players = game:GetService("Players")
-local UserInputService = game:GetService("UserInputService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Signal = require(Shared:WaitForChild("Signal"))
 local Remotes = require(Shared:WaitForChild("Remotes"))
+local UIKit = require(script.Parent:WaitForChild("UI"):WaitForChild("UIKit"))
 
 local player = Players.LocalPlayer
 
@@ -50,7 +50,7 @@ function ClientState.notify(text: string, kind: string?)
 end
 
 function ClientState.isTouch(): boolean
-	return UserInputService.PreferredInput == Enum.PreferredInput.Touch
+	return UIKit.isTouch()
 end
 
 function ClientState.setShopOpen(open: boolean)
@@ -131,7 +131,7 @@ Remotes.Notify.OnClientEvent:Connect(function(text: string, kind: string)
 	end
 end)
 
-UserInputService:GetPropertyChangedSignal("PreferredInput"):Connect(function()
+UIKit.onInputTypeChanged(function()
 	ClientState.InputChanged:Fire(ClientState.isTouch())
 end)
 

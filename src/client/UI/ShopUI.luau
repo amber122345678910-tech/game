@@ -438,7 +438,9 @@ local function setOpen(open: boolean)
 		overlay.Visible = true
 		-- на телефоне прячем джойстик, пока открыт магазин
 		if ClientState.isTouch() then
-			GuiService.TouchControlsEnabled = false
+			pcall(function()
+				GuiService.TouchControlsEnabled = false
+			end)
 		end
 		showTab(currentTab)
 		UIKit.popIn(window, windowScale)
@@ -450,7 +452,9 @@ local function setOpen(open: boolean)
 		pendingConfirm = nil
 		if wasOpen then
 			ClientState.ModalOpen = false
-			GuiService.TouchControlsEnabled = true
+			pcall(function()
+				GuiService.TouchControlsEnabled = true
+			end)
 		end
 		-- освобождаем превью
 		table.clear(cardUpdaters)
