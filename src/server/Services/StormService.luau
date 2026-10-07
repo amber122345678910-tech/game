@@ -521,10 +521,9 @@ local function finish(session: Session, reason: string)
 	end
 
 	cleanupPlot(session)
-	-- восстанавливаем бункер как был до шторма (если игрок ушёл из игры — участок всё равно очистится)
-	if player.Parent == Players then
-		PlotService.restoreLayout(plot, session.Snapshot)
-	end
+	-- восстанавливаем бункер как был до шторма — всегда, даже если игрок вышел из игры:
+	-- сразу после этого раскладка сохраняется в профиль, и в ней не должно быть разрушений
+	PlotService.restoreLayout(plot, session.Snapshot)
 	plot.Session = nil
 	sessions[player] = nil
 	if player.Parent == Players then

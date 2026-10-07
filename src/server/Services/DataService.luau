@@ -252,6 +252,9 @@ local function saveRecord(session: Session, release: boolean): boolean
 	inFlightSaves += 1
 	local ok = withRetries("Save " .. key, function()
 		ds:UpdateAsync(key, function(old: any)
+			-- хуки (например, раскладка бункера) — прямо в транзакции, чтобы инвентарь и
+			-- раскладка попали в запись согласованными
+			runPreSaveHooks(session.Player)
 			local record: StoredRecord = if typeof(old) == "table" then old else {}
 			local lock = record.Lock
 			if typeof(lock) ~= "table" or lock.Job ~= lockId then
