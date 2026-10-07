@@ -259,7 +259,7 @@ test("flood: sealed bunker below door seal does not leak", function()
 	local cells, records = boxBlocks()
 	local ext = Grid.computeExterior(cells)
 	local interior = Grid.computeInterior(cells, ext)
-	local doors = StormSim.boundaryDoors(records, interior)
+	local doors = StormSim.boundaryDoors(records, interior, cells)
 	eq(#doors, 1, "one boundary door")
 	local level = 5 -- железная дверь держит 7
 	local res = StormSim.flood(doors, interior, cells, Grid.computeExteriorBelow(cells, Grid.submergedLayers(level)), level, true, 6.5)
@@ -270,7 +270,7 @@ end)
 test("flood: roof hole is a roof leak, not a breach", function()
 	local cells, records = boxBlocks()
 	local interior = Grid.computeInterior(cells)
-	local doors = StormSim.boundaryDoors(records, interior)
+	local doors = StormSim.boundaryDoors(records, interior, cells)
 	-- ломаем один блок крыши
 	local roof
 	for _, r in records do
@@ -293,7 +293,7 @@ end)
 test("flood: wall hole below acid level is a breach", function()
 	local cells, records = boxBlocks()
 	local interior = Grid.computeInterior(cells)
-	local doors = StormSim.boundaryDoors(records, interior)
+	local doors = StormSim.boundaryDoors(records, interior, cells)
 	local wall
 	for _, r in records do
 		if r.y == 0 and not r.def.IsDoor and not wall then
@@ -327,7 +327,7 @@ test("flood: damaged wooden door leaks more", function()
 	end
 	local ext = Grid.computeExterior(cells)
 	local interior = Grid.computeInterior(cells, ext)
-	local doors = StormSim.boundaryDoors(records, interior)
+	local doors = StormSim.boundaryDoors(records, interior, cells)
 	local sub = Grid.computeExteriorBelow(cells, Grid.submergedLayers(3.5))
 	local healthy = StormSim.flood(doors, interior, cells, sub, 3.5, true, 3.5)
 	truthy(healthy.rate > 0, "3.5 > seal 3 leaks")
@@ -406,6 +406,28 @@ test("player in the door recess counts as inside the bunker", function()
 	local p = Config.stormParams(1)
 	local dmg = StormSim.playerAcidDamage(p, true, cells, interior, lx, 3, lz + 1.2, 2.5, 0, 1)
 	eq(dmg, 0, "no outside pool damage inside the recess")
+end)
+
+test("inner doors (closet/airlock) are not boundary doors and don't leak", function()
+	local cells, records = {}, {}
+	local function add(id, x, y, z)
+		local b = StormSim.newBlock(id, x, y, z, 0)
+		for _, c in b.cells do
+			cells[c] = b
+		end
+		table.insert(records, b)
+	end
+	for _, e in Prefabs.layout("starter") do
+		add(e.id, e.x, e.y, e.z)
+	end
+	-- дверь внутри комнаты (по бокам внутренность)
+	add("door_wood", 5, 0, 6)
+	local interior = Grid.computeInterior(cells)
+	local doors = StormSim.boundaryDoors(records, interior, cells)
+	eq(#doors, 1, "only the outer door is a boundary door")
+	local level = 3.5
+	local res = StormSim.flood(doors, interior, cells, Grid.computeExteriorBelow(cells, Grid.submergedLayers(level)), level, true, 3.5)
+	eq(#res.leaking, 1, "one leaking door")
 end)
 
 -- Регрессия баланса (та же логика StormSim, что на сервере)

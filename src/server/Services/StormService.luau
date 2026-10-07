@@ -125,9 +125,12 @@ local function doorInteriorDir(session: Session, rec: BlockRecord): (number?, nu
 	local candidates = if rec.rot % 2 == 0
 		then { { 0, 1 }, { 0, -1 }, { 1, 0 }, { -1, 0 } }
 		else { { 1, 0 }, { -1, 0 }, { 0, 1 }, { 0, -1 } }
+	local function isInterior(nx: number, nz: number): boolean
+		return Grid.inBounds(nx, rec.y, nz) and session.Interior[Grid.index(nx, rec.y, nz)] == true
+	end
 	for _, c in candidates do
-		local nx, nz = rec.x + c[1], rec.z + c[2]
-		if Grid.inBounds(nx, rec.y, nz) and session.Interior[Grid.index(nx, rec.y, nz)] then
+		-- внутренность с этой стороны и НЕ внутренность с противоположной
+		if isInterior(rec.x + c[1], rec.z + c[2]) and not isInterior(rec.x - c[1], rec.z - c[2]) then
 			return c[1], c[2]
 		end
 	end
@@ -484,6 +487,49 @@ local function cleanupPlot(session: Session)
 	model:SetAttribute("AcidLayout", "")
 end
 
+-- Если восстановленный блок появился там, где стоит игрок, — переносим его внутрь бункера.
+local function unstickPlayer(session: Session)
+	local player = session.Player
+	local character = player.Character
+	local root = character and character:FindFirstChild("HumanoidRootPart")
+	if player.Parent ~= Players or not character or not root or not root:IsA("BasePart") then
+		return
+	end
+	local plot = session.Plot
+	local lp = plot.Origin:PointToObjectSpace(root.Position)
+	local cx, cy, cz = StormSim.playerCell(lp.X, lp.Y, lp.Z)
+	local stuck = false
+	for dy = 0, 1 do
+		local y = math.max(cy, 0) + dy
+		if Grid.inBounds(cx, y, cz) then
+			local rec = plot.Cells[Grid.index(cx, y, cz)]
+			if rec and not rec.def.IsDoor then
+				stuck = true
+			end
+		end
+	end
+	if not stuck then
+		return
+	end
+	-- ближайшая внутренняя клетка на нижнем слое бункера
+	local best: Vector3? = nil
+	local bestDist = math.huge
+	for cell in session.Interior do
+		local x, y, z = Grid.coords(cell)
+		local above = Grid.index(x, y + 1, z)
+		if (y == 0 or plot.Cells[Grid.index(x, y - 1, z)]) and y + 1 < Grid.H and session.Interior[above] then
+			local lx, _, lz = Grid.cellCenterLocal(x, y, z)
+			local d = (Vector3.new(lx, 0, lz) - Vector3.new(lp.X, 0, lp.Z)).Magnitude
+			if d < bestDist then
+				bestDist = d
+				best = Vector3.new(lx, y * CELL + 3, lz)
+			end
+		end
+	end
+	local target = best or Vector3.new(0, 4, -29) -- иначе — к входу на участок
+	character:PivotTo(plot.Origin * CFrame.new(target))
+end
+
 local function finish(session: Session, reason: string)
 	if session.Ended then
 		return
@@ -524,6 +570,7 @@ local function finish(session: Session, reason: string)
 	-- восстанавливаем бункер как был до шторма — всегда, даже если игрок вышел из игры:
 	-- сразу после этого раскладка сохраняется в профиль, и в ней не должно быть разрушений
 	PlotService.restoreLayout(plot, session.Snapshot)
+	unstickPlayer(session)
 	plot.Session = nil
 	sessions[player] = nil
 	if player.Parent == Players then
@@ -668,13 +715,12 @@ function StormService.start(player: Player)
 
 	local exterior = Grid.computeExterior(plot.Cells)
 	local interior = Grid.computeInterior(plot.Cells, exterior)
+	-- колонки, где есть внутреннее пространство на любой высоте (бункер на фундаменте,
+	-- предметы на полу): там рисуем кислоту бункера, а не уличную
 	local interiorColumns: { [number]: boolean } = {}
-	for x = 0, Grid.W - 1 do
-		for z = 0, Grid.D - 1 do
-			if interior[Grid.index(x, 0, z)] then
-				interiorColumns[Grid.index2(x, z)] = true
-			end
-		end
+	for cell in interior do
+		local x, _, z = Grid.coords(cell)
+		interiorColumns[Grid.index2(x, z)] = true
 	end
 	local startHP = 0
 	for _, rec in plot.Records do
@@ -694,7 +740,7 @@ function StormService.start(player: Player)
 		StartHP = startHP,
 		Interior = interior,
 		InteriorColumns = interiorColumns,
-		BoundaryDoors = StormSim.boundaryDoors(plot.Records, interior),
+		BoundaryDoors = StormSim.boundaryDoors(plot.Records, interior, plot.Cells),
 		Submerged = {},
 		SubmergedKey = "",
 		PoolLevel = 0,

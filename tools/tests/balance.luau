@@ -35,7 +35,7 @@ function Balance.simulate(prefabId: string, level: number, seed: number)
 	end
 	local exterior = Grid.computeExterior(cells)
 	local interior = Grid.computeInterior(cells, exterior)
-	local doors = StormSim.boundaryDoors(records, interior)
+	local doors = StormSim.boundaryDoors(records, interior, cells)
 	local startHP = 0
 	for _, r in records do
 		startHP += r.maxHp

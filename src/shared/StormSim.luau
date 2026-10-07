@@ -117,32 +117,58 @@ function StormSim.poolTargets(records: { Block }, exterior: { [number]: boolean 
 	return targets
 end
 
--- Двери, отделяющие внутренний объём бункера от улицы.
-function StormSim.boundaryDoors(records: { Block }, interior: { [number]: boolean }): { Block }
+-- Двери, отделяющие внутренний объём бункера от улицы: с одной стороны (по горизонтали)
+-- внутренность, с другой — улица (пустая не внутренняя клетка или край сетки).
+-- Внутренние двери (тамбур, чулан) не считаются — у них внутренность с обеих сторон.
+function StormSim.boundaryDoors(records: { Block }, interior: { [number]: boolean }, cells: { [number]: Block }): { Block }
 	local doors: { Block } = {}
 	for _, rec in records do
 		if rec.def.IsDoor then
-			local touches = false
+			local touchesInside, touchesOutside = false, false
 			for _, cell in rec.cells do
 				local x, y, z = Grid.coords(cell)
 				for _, d in Grid.NEIGHBORS do
-					local nx, ny, nz = x + d[1], y + d[2], z + d[3]
-					if Grid.inBounds(nx, ny, nz) and interior[Grid.index(nx, ny, nz)] then
-						touches = true
-						break
+					if d[2] == 0 then
+						local nx, nz = x + d[1], z + d[3]
+						if not Grid.inBounds(nx, y, nz) then
+							touchesOutside = true -- край сетки = поле котлована
+						else
+							local i = Grid.index(nx, y, nz)
+							if interior[i] then
+								touchesInside = true
+							elseif cells[i] == nil then
+								touchesOutside = true
+							end
+						end
 					end
 				end
-				if touches then
-					break
-				end
 			end
-			if touches then
+			if touchesInside and touchesOutside then
 				table.insert(doors, rec)
 			end
 		end
 	end
 	return doors
 end
+
+-- С какой стороны двери улица: есть ли у двери соседняя клетка, куда дотекает лужа.
+local function doorFacesPool(rec: Block, submerged: { [number]: boolean }, level: number): boolean
+	for _, cell in rec.cells do
+		local x, y, z = Grid.coords(cell)
+		if y * CELL < level then
+			for _, d in Grid.NEIGHBORS do
+				if d[2] == 0 then
+					local nx, nz = x + d[1], z + d[3]
+					if not Grid.inBounds(nx, y, nz) or submerged[Grid.index(nx, y, nz)] then
+						return true
+					end
+				end
+			end
+		end
+	end
+	return false
+end
+StormSim.doorFacesPool = doorFacesPool
 
 -- Насколько дверь сейчас держит кислоту (повреждённая держит хуже).
 function StormSim.doorSeal(rec: Block): number
@@ -168,7 +194,7 @@ function StormSim.flood(
 	local cap = 0
 	local leaking: { Block } = {}
 	for _, rec in doors do
-		if rec.alive then
+		if rec.alive and doorFacesPool(rec, submerged, level) then
 			local excess = level - rec.y * CELL - StormSim.doorSeal(rec)
 			if excess > 0 then
 				rate += excess * S.DoorLeakFactor
