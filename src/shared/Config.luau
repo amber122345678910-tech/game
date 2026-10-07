@@ -77,6 +77,9 @@ Config.Build = {
 
 Config.Economy = {
 	StartingCoins = 100,
+	-- Для тестов в Roblox Studio: столько монет у нового игрока, чтобы сразу проверить магазин.
+	-- Поставь 100, чтобы проверить экономику как у обычного игрока.
+	StudioStartingCoins = 5000,
 	PrefabDiscount = 0.85,
 	MaxBuyAmount = 100,
 	MaxLevel = 100,

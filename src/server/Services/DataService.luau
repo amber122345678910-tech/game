@@ -77,7 +77,7 @@ local pendingRelease: { [number]: boolean } = {}
 local function defaultData(): ProfileData
 	return {
 		Version = Config.DataVersion,
-		Coins = Config.Economy.StartingCoins,
+		Coins = if RunService:IsStudio() then Config.Economy.StudioStartingCoins else Config.Economy.StartingCoins,
 		Inventory = {},
 		StormLevel = 1,
 		BestLevel = 1,
