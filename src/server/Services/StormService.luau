@@ -155,8 +155,9 @@ local function buildAcidLayout(session: Session): string
 	local half = 0.5 -- половина толщины полотна двери
 	for _, rec in session.BoundaryDoors do
 		local dx, dz = doorInteriorDir(session, rec)
-		if rec.y == 0 and dx and dz then
-			outsideCols[Grid.index2(rec.x, rec.z)] = nil
+		local column = Grid.index2(rec.x, rec.z)
+		if dx and dz and outsideCols[column] then
+			outsideCols[column] = nil
 			local cx, _, cz = Grid.cellCenterLocal(rec.x, 0, rec.z)
 			local x0, x1, z0, z1 = cx - CELL / 2, cx + CELL / 2, cz - CELL / 2, cz + CELL / 2
 			if dz ~= 0 then
@@ -519,7 +520,8 @@ local function unstickPlayer(session: Session)
 		local above = Grid.index(x, y + 1, z)
 		if (y == 0 or plot.Cells[Grid.index(x, y - 1, z)]) and y + 1 < Grid.H and session.Interior[above] then
 			local lx, _, lz = Grid.cellCenterLocal(x, y, z)
-			local d = (Vector3.new(lx, 0, lz) - Vector3.new(lp.X, 0, lp.Z)).Magnitude
+			-- расстояние с учётом этажа (иначе можно попасть в чужую комнату на другом уровне)
+			local d = (Vector3.new(lx, y * CELL + 3, lz) - lp).Magnitude
 			if d < bestDist then
 				bestDist = d
 				best = Vector3.new(lx, y * CELL + 3, lz)
@@ -715,12 +717,22 @@ function StormService.start(player: Player)
 
 	local exterior = Grid.computeExterior(plot.Cells)
 	local interior = Grid.computeInterior(plot.Cells, exterior)
-	-- колонки, где есть внутреннее пространство на любой высоте (бункер на фундаменте,
-	-- предметы на полу): там рисуем кислоту бункера, а не уличную
+	-- Колонка "внутренняя", если её нижняя пустая клетка — внутри бункера (бункер на фундаменте,
+	-- предметы на полу). Если нижняя пустая клетка — улица (под комнатой на сваях), туда
+	-- доходит уличная лужа, и колонка остаётся внешней.
 	local interiorColumns: { [number]: boolean } = {}
-	for cell in interior do
-		local x, _, z = Grid.coords(cell)
-		interiorColumns[Grid.index2(x, z)] = true
+	for x = 0, Grid.W - 1 do
+		for z = 0, Grid.D - 1 do
+			for y = 0, Grid.H - 1 do
+				local index = Grid.index(x, y, z)
+				if not plot.Cells[index] then
+					if interior[index] then
+						interiorColumns[Grid.index2(x, z)] = true
+					end
+					break
+				end
+			end
+		end
 	end
 	local startHP = 0
 	for _, rec in plot.Records do
