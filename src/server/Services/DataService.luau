@@ -38,6 +38,7 @@ type Session = {
 	Loaded: boolean,
 	Persistent: boolean, -- false = DataStore недоступен или чужая блокировка не снялась
 	Released: boolean,
+	LockId: string, -- уникален для каждой сессии игрока (не только для сервера)
 	ReplicateQueued: boolean,
 	Leaderstats: { Coins: IntValue, Level: IntValue }?,
 }
@@ -54,6 +55,10 @@ local store: DataStore? = nil
 local sessions: { [Player]: Session } = {}
 -- Идентификатор этого сервера для блокировки (в Studio game.JobId пустой, поэтому GUID).
 local SERVER_ID = HttpService:GenerateGUID(false)
+-- Сохранения, которые сейчас выполняются (BindToClose ждёт их все).
+local inFlightSaves = 0
+-- Игроки, чьё финальное сохранение ещё идёт (на случай быстрого перезахода на тот же сервер).
+local pendingRelease: { [number]: boolean } = {}
 
 local function defaultData(): ProfileData
 	return {
@@ -167,7 +172,7 @@ end
 
 -- Загрузка с блокировкой: пишем свою JobId в запись. Если запись заблокирована другим
 -- сервером недавно — ждём и пробуем снова, потом забираем блокировку.
-local function loadRecord(player: Player): (ProfileData?, boolean)
+local function loadRecord(player: Player, lockId: string): (ProfileData?, boolean)
 	local ds = store
 	if not ds then
 		return nil, false
@@ -184,7 +189,7 @@ local function loadRecord(player: Player): (ProfileData?, boolean)
 				local now = os.time()
 				if
 					typeof(lock) == "table"
-					and lock.Job ~= SERVER_ID
+					and lock.Job ~= lockId
 					and typeof(lock.Time) == "number"
 					and now - lock.Time < LOCK_TIMEOUT
 					and attempt < LOAD_RETRIES
@@ -203,7 +208,7 @@ local function loadRecord(player: Player): (ProfileData?, boolean)
 				loaded = data
 				return {
 					Data = data,
-					Lock = { Job = SERVER_ID, Time = now },
+					Lock = { Job = lockId, Time = now },
 				}
 			end)
 			return true
@@ -229,23 +234,38 @@ local function saveRecord(session: Session, release: boolean): boolean
 	end
 	local key = keyFor(session.Player)
 	local data = session.Data
+	local lockId = session.LockId
+	inFlightSaves += 1
 	local ok = withRetries("Save " .. key, function()
 		ds:UpdateAsync(key, function(old: any)
 			local record: StoredRecord = if typeof(old) == "table" then old else {}
 			local lock = record.Lock
-			if typeof(lock) ~= "table" or lock.Job ~= SERVER_ID then
+			if typeof(lock) ~= "table" or lock.Job ~= lockId then
 				-- Блокировку забрал (или снял) другой сервер — не перезаписываем его данные.
 				warn("[DataService] Session lock lost, skip save for " .. key)
 				return nil
 			end
 			return {
 				Data = data,
-				Lock = if release then nil else { Job = SERVER_ID, Time = os.time() },
+				Lock = if release then nil else { Job = lockId, Time = os.time() },
 			}
 		end)
 		return true
 	end)
+	inFlightSaves -= 1
 	return ok
+end
+
+-- Финальное сохранение с освобождением блокировки.
+local function releaseSession(session: Session)
+	if session.Released then
+		return
+	end
+	session.Released = true
+	local userId = session.Player.UserId
+	pendingRelease[userId] = true
+	saveRecord(session, true)
+	pendingRelease[userId] = nil
 end
 
 local function onPlayerAdded(player: Player)
@@ -255,20 +275,29 @@ local function onPlayerAdded(player: Player)
 		Loaded = false,
 		Persistent = false,
 		Released = false,
+		LockId = SERVER_ID .. ":" .. HttpService:GenerateGUID(false),
 		ReplicateQueued = false,
 		Leaderstats = nil,
 	}
 	sessions[player] = session
 
-	local data, persistent = loadRecord(player)
+	-- быстрый перезаход на этот же сервер: ждём, пока допишется прошлое сохранение
+	local waitStarted = os.clock()
+	while pendingRelease[player.UserId] and os.clock() - waitStarted < 30 do
+		task.wait(0.25)
+	end
+
+	local data, persistent = loadRecord(player, session.LockId)
 	if player.Parent ~= Players then
-		-- игрок ушёл во время загрузки
+		-- игрок ушёл во время загрузки: снимаем блокировку, данные не меняем
 		if persistent then
 			session.Data = data or session.Data
 			session.Persistent = true
-			saveRecord(session, true)
+			releaseSession(session)
 		end
-		sessions[player] = nil
+		if sessions[player] == session then
+			sessions[player] = nil
+		end
 		return
 	end
 	if data then
@@ -293,11 +322,12 @@ local function onPlayerRemoving(player: Player)
 	if not session then
 		return
 	end
-	if session.Loaded and not session.Released then
-		session.Released = true
-		saveRecord(session, true)
+	if session.Loaded then
+		releaseSession(session)
 	end
-	sessions[player] = nil
+	if sessions[player] == session then
+		sessions[player] = nil
+	end
 end
 
 function DataService.init()
@@ -352,19 +382,15 @@ function DataService.init()
 		if RunService:IsStudio() and not store then
 			return
 		end
-		local pending = 0
 		for _, session in sessions do
 			if session.Loaded and not session.Released then
-				session.Released = true
-				pending += 1
-				task.spawn(function()
-					saveRecord(session, true)
-					pending -= 1
-				end)
+				task.spawn(releaseSession, session)
 			end
 		end
+		-- ждём и свои сохранения, и уже начатые в PlayerRemoving
+		task.wait()
 		local started = os.clock()
-		while pending > 0 and os.clock() - started < 25 do
+		while inFlightSaves > 0 and os.clock() - started < 25 do
 			task.wait(0.1)
 		end
 	end)

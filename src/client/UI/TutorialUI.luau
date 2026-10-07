@@ -139,7 +139,8 @@ local function layout()
 		return
 	end
 	arrow.Visible = true
-	local pos = target.AbsolutePosition
+	-- в координатах своего ScreenGui (одинаково работает при любых отступах экрана)
+	local pos = target.AbsolutePosition - gui.AbsolutePosition
 	local size = target.AbsoluteSize
 	local center = pos + size / 2
 	local bob = math.sin(os.clock() * 6) * 8 * s

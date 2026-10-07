@@ -47,6 +47,7 @@ type Target = {
 	valid: boolean,
 	reason: string?,
 	part: BasePart?, -- для удаления
+	hitCell: number?, -- клетка блока, в который попал луч (если это блок)
 }
 
 -- состояние
@@ -60,6 +61,9 @@ local target: Target? = nil
 local touchTarget: Target? = nil -- выбранная тапом клетка (телефон)
 local mouseHeld = false
 local lastPlacedKey = ""
+-- протяжка: только в слое первой установки и не "через" только что поставленные блоки
+local dragY: number? = nil
+local dragPlaced: { [number]: boolean } = {}
 local lastReasonTime = 0
 
 local rayParams = RaycastParams.new()
@@ -196,13 +200,15 @@ local function computeTarget(ray: Ray): Target?
 		return nil
 	end
 	local def = Config.Blocks[id]
+	local hitCellAttr = result.Instance:GetAttribute("Cell")
+	local hitCell = if typeof(hitCellAttr) == "number" then hitCellAttr else nil
 	local p = origin:PointToObjectSpace(result.Position + result.Normal * (Grid.CELL * 0.5))
 	local x, y, z = Grid.localToCell(p.X, p.Y, p.Z)
 	if not Grid.inBounds(x, math.max(y, 0), z) then
 		return nil
 	end
 	y = math.max(y, 0)
-	local t: Target = { x = x, y = y, z = z, valid = true }
+	local t: Target = { x = x, y = y, z = z, valid = true, hitCell = hitCell }
 	if not Grid.inBounds(x, y + def.HeightCells - 1, z) then
 		t.valid = false
 		t.reason = "Слишком высоко"
@@ -292,6 +298,7 @@ local function act(t: Target?)
 	Remotes.PlaceBlock:FireServer(id, t.x, t.y, t.z, rot)
 	-- оптимистично помечаем клетки, чтобы протяжка мышью не слала дубли
 	lastPlacedKey = targetKey(t)
+	dragPlaced[Grid.index(t.x, t.y, t.z)] = true
 end
 
 local function setDeleteMode(on: boolean)
@@ -758,6 +765,8 @@ local function bindInput()
 		if input.UserInputType == Enum.UserInputType.MouseButton1 then
 			mouseHeld = true
 			lastPlacedKey = ""
+			table.clear(dragPlaced)
+			dragY = if target and not deleteMode then target.y else nil
 			act(target)
 		elseif input.UserInputType == Enum.UserInputType.Touch then
 			touches[input] = { start = input.Position, t0 = os.clock(), moved = false }
@@ -778,6 +787,8 @@ local function bindInput()
 	UserInputService.InputEnded:Connect(function(input)
 		if input.UserInputType == Enum.UserInputType.MouseButton1 then
 			mouseHeld = false
+			dragY = nil
+			table.clear(dragPlaced)
 			return
 		end
 		local info = touches[input]
@@ -825,8 +836,21 @@ local function renderStep()
 	if changed then
 		showTarget(t)
 	end
-	-- протяжка: ведём мышью с зажатой кнопкой — ставим в новые клетки
-	if mouseHeld and t and key ~= lastPlacedKey and (deleteMode or t.valid) then
+	-- протяжка (только установка): ведём мышью с зажатой кнопкой — ставим в новые клетки
+	-- того же слоя; лучи, попавшие в блоки этой же протяжки, игнорируем (иначе блоки
+	-- "росли" бы в сторону камеры). Удаление — только кликом.
+	if
+		mouseHeld
+		and not deleteMode
+		and t
+		and t.valid
+		and key ~= lastPlacedKey
+		and (dragY == nil or t.y == dragY)
+		and not (t.hitCell and dragPlaced[t.hitCell])
+	then
+		if dragY == nil then
+			dragY = t.y
+		end
 		act(t)
 		lastPlacedKey = key
 	end

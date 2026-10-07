@@ -359,6 +359,7 @@ local function clearAcid(fx: PlotFX)
 	table.clear(fx.inside)
 	fx.outsideLevel = 0
 	fx.insideLevel = 0
+	fx.layout = "" -- чтобы следующий шторм заново построил лужи
 end
 
 local function buildAcid(fx: PlotFX, layout: string)

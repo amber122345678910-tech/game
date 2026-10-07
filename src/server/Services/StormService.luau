@@ -468,8 +468,8 @@ local function finish(session: Session, reason: string)
 	PlotService.loadEntries(plot, session.Snapshot)
 	plot.Session = nil
 	sessions[player] = nil
-	cooldowns[player] = os.clock()
 	if player.Parent == Players then
+		cooldowns[player] = os.clock()
 		player:SetAttribute("InStorm", false)
 	end
 

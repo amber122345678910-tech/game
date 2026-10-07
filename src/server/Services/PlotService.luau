@@ -34,6 +34,7 @@ local PIT = Config.Plot.PitHalfSize
 
 local plots: { Plot } = {}
 local playerPlots: { [Player]: Plot } = {}
+local scheduleBunkerCheck: (plot: Plot) -> ()
 
 local HAIL_TINT = Color3.fromRGB(45, 45, 50)
 local ACID_TINT = Color3.fromRGB(95, 160, 35)
@@ -201,7 +202,16 @@ function PlotService.isInZone(plot: Plot, worldPos: Vector3): boolean
 end
 
 -- Проверка возможности поставить блок (без учёта инвентаря и шторма).
-function PlotService.canPlace(plot: Plot, def: Config.BlockDef, x: number, y: number, z: number): (boolean, string?)
+-- skipSupport: для доверенных раскладок (готовые бункеры, сохранения, восстановление после шторма)
+-- проверку опоры пропускаем — иначе результат зависел бы от порядка установки блоков.
+function PlotService.canPlace(
+	plot: Plot,
+	def: Config.BlockDef,
+	x: number,
+	y: number,
+	z: number,
+	skipSupport: boolean?
+): (boolean, string?)
 	local top = y + def.HeightCells - 1
 	if not Grid.inBounds(x, y, z) or not Grid.inBounds(x, top, z) then
 		return false, "Здесь нельзя строить"
@@ -212,7 +222,7 @@ function PlotService.canPlace(plot: Plot, def: Config.BlockDef, x: number, y: nu
 		end
 	end
 	-- Опора: на полу или рядом с другим блоком (без "висящих в воздухе" блоков).
-	if y > 0 then
+	if y > 0 and not skipSupport then
 		local supported = false
 		for dy = 0, def.HeightCells - 1 do
 			for _, d in Grid.NEIGHBORS do
@@ -231,6 +241,21 @@ function PlotService.canPlace(plot: Plot, def: Config.BlockDef, x: number, y: nu
 		end
 	end
 	return true, nil
+end
+
+-- Атрибут HasBunker (есть ли замкнутый бункер) пересчитываем один раз после серии изменений.
+local bunkerCheckQueued: { [Plot]: boolean } = {}
+scheduleBunkerCheck = function(plot: Plot)
+	if bunkerCheckQueued[plot] then
+		return
+	end
+	bunkerCheckQueued[plot] = true
+	task.defer(function()
+		bunkerCheckQueued[plot] = nil
+		if plot.Session == nil then
+			PlotService.getInterior(plot)
+		end
+	end)
 end
 
 local function createPart(plot: Plot, rec: BlockRecord): BasePart
@@ -279,12 +304,20 @@ local function createPart(plot: Plot, rec: BlockRecord): BasePart
 end
 
 -- Ставит блок без проверок инвентаря. Возвращает запись или nil.
-function PlotService.place(plot: Plot, blockId: string, x: number, y: number, z: number, rot: number): BlockRecord?
+function PlotService.place(
+	plot: Plot,
+	blockId: string,
+	x: number,
+	y: number,
+	z: number,
+	rot: number,
+	skipSupport: boolean?
+): BlockRecord?
 	local def = Config.getBlock(blockId)
 	if not def then
 		return nil
 	end
-	local ok = PlotService.canPlace(plot, def, x, y, z)
+	local ok = PlotService.canPlace(plot, def, x, y, z, skipSupport)
 	if not ok then
 		return nil
 	end
@@ -309,6 +342,7 @@ function PlotService.place(plot: Plot, blockId: string, x: number, y: number, z:
 	table.insert(plot.Records, rec)
 	plot.Version += 1
 	plot.InteriorCache = nil
+	scheduleBunkerCheck(plot)
 	return rec
 end
 
@@ -328,6 +362,7 @@ local function detach(plot: Plot, rec: BlockRecord)
 	end
 	plot.Version += 1
 	plot.InteriorCache = nil
+	scheduleBunkerCheck(plot)
 	rec.part:Destroy()
 end
 
@@ -357,6 +392,7 @@ function PlotService.clear(plot: Plot): { [string]: number }
 	plot.BlocksFolder:ClearAllChildren()
 	plot.Version += 1
 	plot.InteriorCache = nil
+	scheduleBunkerCheck(plot)
 	return counts
 end
 
@@ -379,15 +415,11 @@ function PlotService.serialize(plot: Plot): string
 	return Grid.serialize(PlotService.getEntries(plot))
 end
 
--- Загружает раскладку (без инвентаря). Блоки без опоры пропускаются.
+-- Загружает доверенную раскладку (без инвентаря и без проверки опоры).
 function PlotService.loadEntries(plot: Plot, entries: { Grid.Entry }): number
-	local sorted = table.clone(entries)
-	table.sort(sorted, function(a: Grid.Entry, b: Grid.Entry)
-		return a.y < b.y
-	end)
 	local placed = 0
-	for _, e in sorted do
-		if PlotService.place(plot, e.id, e.x, e.y, e.z, e.rot) then
+	for _, e in entries do
+		if PlotService.place(plot, e.id, e.x, e.y, e.z, e.rot, true) then
 			placed += 1
 		end
 	end

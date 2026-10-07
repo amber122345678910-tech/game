@@ -94,8 +94,11 @@ end
 
 -- Текст: TextScaled с ограничением максимального размера.
 function UIKit.label(props: Props): TextLabel
+	-- служебные ключи (не свойства TextLabel) вынимаем до создания инстанса
 	local maxSize = props.MaxTextSize or 32
+	local noStroke = props.NoStroke == true
 	props.MaxTextSize = nil
+	props.NoStroke = nil
 	local base: Props = {
 		BackgroundTransparency = 1,
 		FontFace = Theme.Font,
@@ -109,7 +112,7 @@ function UIKit.label(props: Props): TextLabel
 	end
 	local label = UIKit.new("TextLabel", base) :: TextLabel
 	UIKit.new("UITextSizeConstraint", { MaxTextSize = maxSize, MinTextSize = 8, Parent = label })
-	if props.NoStroke ~= true then
+	if not noStroke then
 		UIKit.textStroke(label, 2)
 	end
 	return label

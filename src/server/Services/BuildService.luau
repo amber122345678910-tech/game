@@ -180,15 +180,12 @@ function BuildService.replaceWithLayout(player: Player, entries: { Grid.Entry })
 	for id, n in counts do
 		DataService.addBlocks(player, id, n)
 	end
-	local sorted = table.clone(entries)
-	table.sort(sorted, function(a: Grid.Entry, b: Grid.Entry)
-		return a.y < b.y
-	end)
 	local placed = 0
-	for _, e in sorted do
+	for _, e in entries do
 		local def = Config.getBlock(e.id)
-		if def and PlotService.canPlace(plot, def, e.x, e.y, e.z) and DataService.takeBlocks(player, def.Id, 1) then
-			if PlotService.place(plot, def.Id, e.x, e.y, e.z, e.rot) then
+		-- раскладка готового бункера доверенная: опору не проверяем (порядок блоков не важен)
+		if def and PlotService.canPlace(plot, def, e.x, e.y, e.z, true) and DataService.takeBlocks(player, def.Id, 1) then
+			if PlotService.place(plot, def.Id, e.x, e.y, e.z, e.rot, true) then
 				placed += 1
 			else
 				DataService.addBlocks(player, def.Id, 1)

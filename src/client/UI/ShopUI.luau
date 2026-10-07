@@ -30,6 +30,7 @@ local coinsLabel: TextLabel
 local tabButtons: { [string]: TextButton } = {}
 local confirmFrame: Frame
 local currentTab = "Blocks"
+local pendingConfirm: (() -> ())? = nil
 local cardUpdaters: { () -> () } = {}
 local pending = false
 
@@ -155,25 +156,8 @@ local function showConfirm(text: string, onYes: () -> ())
 	if label and label:IsA("TextLabel") then
 		label.Text = text
 	end
-	confirmFrame:SetAttribute("Pending", true)
+	pendingConfirm = onYes
 	confirmFrame.Visible = true
-	local yes = confirmFrame:FindFirstChild("Yes")
-	local no = confirmFrame:FindFirstChild("No")
-	if yes and no and yes:IsA("TextButton") and no:IsA("TextButton") then
-		local c1: RBXScriptConnection
-		local c2: RBXScriptConnection
-		c1 = yes.Activated:Connect(function()
-			c1:Disconnect()
-			c2:Disconnect()
-			confirmFrame.Visible = false
-			onYes()
-		end)
-		c2 = no.Activated:Connect(function()
-			c1:Disconnect()
-			c2:Disconnect()
-			confirmFrame.Visible = false
-		end)
-	end
 end
 
 ----------------------------------------------------------------------
@@ -443,8 +427,8 @@ end
 local function setOpen(open: boolean)
 	if open then
 		if ClientState.ModalOpen and not window.Visible then
-			-- другое окно уже открыто
-			ClientState.setShopOpen(false)
+			-- другое окно уже открыто: магазин не открываем и флаг чужого окна не трогаем
+			ClientState.ShopOpen = false
 			return
 		end
 		if ClientState.BuildMode then
@@ -459,11 +443,15 @@ local function setOpen(open: boolean)
 		showTab(currentTab)
 		UIKit.popIn(window, windowScale)
 	else
+		local wasOpen = window.Visible
 		window.Visible = false
 		overlay.Visible = false
 		confirmFrame.Visible = false
-		ClientState.ModalOpen = false
-		GuiService.TouchControlsEnabled = true
+		pendingConfirm = nil
+		if wasOpen then
+			ClientState.ModalOpen = false
+			GuiService.TouchControlsEnabled = true
+		end
 		-- освобождаем превью
 		table.clear(cardUpdaters)
 		for _, child in content:GetChildren() do
@@ -623,7 +611,14 @@ function ShopUI.init()
 		AnchorPoint = Vector2.new(1, 1),
 		ZIndex = 21,
 		Parent = confirmFrame,
-	}, function() end)
+	}, function()
+		local callback = pendingConfirm
+		pendingConfirm = nil
+		confirmFrame.Visible = false
+		if callback then
+			callback()
+		end
+	end)
 	UIKit.button({
 		Name = "No",
 		Text = "Отмена",
@@ -633,7 +628,10 @@ function ShopUI.init()
 		AnchorPoint = Vector2.new(0, 1),
 		ZIndex = 21,
 		Parent = confirmFrame,
-	}, function() end)
+	}, function()
+		pendingConfirm = nil
+		confirmFrame.Visible = false
+	end)
 
 	ClientState.ShopToggled:Connect(setOpen)
 	ClientState.ShopTabRequested:Connect(function(tab)
