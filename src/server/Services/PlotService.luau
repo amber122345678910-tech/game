@@ -426,6 +426,33 @@ function PlotService.loadEntries(plot: Plot, entries: { Grid.Entry }): number
 	return placed
 end
 
+-- Восстановить участок до раскладки после шторма: целые блоки "чиним" на месте,
+-- разрушенные ставим заново (без пересоздания всех деталей и лишней репликации).
+function PlotService.restoreLayout(plot: Plot, entries: { Grid.Entry })
+	local wanted: { [number]: Grid.Entry } = {}
+	for _, e in entries do
+		wanted[Grid.index(e.x, e.y, e.z)] = e
+	end
+	for i = #plot.Records, 1, -1 do
+		local rec = plot.Records[i]
+		local key = Grid.index(rec.x, rec.y, rec.z)
+		local e = wanted[key]
+		if e and e.id == rec.id and e.rot == rec.rot then
+			wanted[key] = nil
+			if rec.hp < rec.maxHp then
+				rec.hp = rec.maxHp
+				rec.tintBucket = 4
+				rec.part.Color = rec.def.Color
+			end
+		else
+			detach(plot, rec)
+		end
+	end
+	for _, e in wanted do
+		PlotService.place(plot, e.id, e.x, e.y, e.z, e.rot, true)
+	end
+end
+
 -- Урон блоку. Возвращает true, если блок разрушен.
 function PlotService.damage(plot: Plot, rec: BlockRecord, amount: number, kind: "hail" | "acid"): boolean
 	if not rec.alive or amount <= 0 then

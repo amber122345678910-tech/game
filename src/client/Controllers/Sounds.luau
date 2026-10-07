@@ -3,7 +3,6 @@
 -- Если звук не загрузится (ID недоступен), игра продолжит работать, просто без этого звука.
 
 local SoundService = game:GetService("SoundService")
-local Debris = game:GetService("Debris")
 local ContentProvider = game:GetService("ContentProvider")
 
 local Sounds = {}
@@ -66,7 +65,10 @@ Sounds.Volumes = {
 local templates: { [string]: Sound } = {}
 local holder: Part? = nil
 local activeOneShots = 0
-local MAX_ONE_SHOTS = 12
+local MAX_ONE_SHOTS = 16
+-- Отдельный лимит для частых звуков, чтобы град не "забивал" остальные.
+local MAX_PER_NAME: { [string]: number } = { HailHit = 3, Place = 4 }
+local activeByName: { [string]: number } = {}
 
 local function getHolder(): Part
 	local h = holder
@@ -132,7 +134,13 @@ function Sounds.playAt(name: string, position: Vector3, volumeScale: number?)
 	if not base or activeOneShots >= MAX_ONE_SHOTS then
 		return
 	end
+	local limit = MAX_PER_NAME[name]
+	local current = activeByName[name] or 0
+	if limit and current >= limit then
+		return
+	end
 	activeOneShots += 1
+	activeByName[name] = current + 1
 	local att = Instance.new("Attachment")
 	att.Parent = getHolder()
 	att.WorldPosition = position
@@ -143,11 +151,20 @@ function Sounds.playAt(name: string, position: Vector3, volumeScale: number?)
 	s.RollOffMinDistance = 8
 	s.RollOffMaxDistance = 140
 	s.Parent = att
-	s:Play()
-	Debris:AddItem(att, 6)
-	task.delay(6, function()
+	-- слот освобождается, когда звук доиграл (или максимум через 6 с)
+	local released = false
+	local function release()
+		if released then
+			return
+		end
+		released = true
 		activeOneShots -= 1
-	end)
+		activeByName[name] = math.max(0, (activeByName[name] or 1) - 1)
+		att:Destroy()
+	end
+	s.Ended:Once(release)
+	s:Play()
+	task.delay(6, release)
 end
 
 -- Зацикленный 3D-звук на объекте (дождь, протечка). Вернёт Sound, чтобы потом удалить.

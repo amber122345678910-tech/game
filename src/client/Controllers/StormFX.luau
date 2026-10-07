@@ -21,7 +21,7 @@ local player = Players.LocalPlayer
 
 local StormFX = {}
 
-local FX_RANGE = 450 -- дальше этого расстояния эффекты чужих штормов не рисуем
+local FX_RANGE = 200 -- дальше этого расстояния (от камеры до участка) эффекты шторма не рисуем
 local ACID_SLAB = Config.Plot.PitDepth + 2 -- высота плиты кислоты
 local HAIL_POOL_SIZE = 140
 local DEBRIS_POOL_SIZE = 60
@@ -102,8 +102,8 @@ local function acquireHail(): Part?
 	return p
 end
 
-local function onHailBatch(plotId: number, impacts: { { number } })
-	if typeof(plotId) ~= "number" or typeof(impacts) ~= "table" then
+local function onHailBatch(plotId: number, flat: { number })
+	if typeof(plotId) ~= "number" or typeof(flat) ~= "table" then
 		return
 	end
 	local plot = ClientState.getPlotById(plotId)
@@ -116,12 +116,14 @@ local function onHailBatch(plotId: number, impacts: { { number } })
 		return
 	end
 	local now = os.clock()
-	for i, impact in impacts do
+	local count = #flat // 4
+	for i = 1, count do
 		-- при низком качестве рисуем часть градин (урон считает сервер всё равно)
-		if qualityScale < 1 and (i % 3 == 0) and qualityScale < 0.5 then
+		if qualityScale < 0.5 and i % 3 == 0 then
 			continue
 		end
-		local lx, lz, ly, big = impact[1], impact[2], impact[3], impact[4]
+		local o = (i - 1) * 4
+		local lx, lz, ly, big = flat[o + 1], flat[o + 2], flat[o + 3], flat[o + 4]
 		if typeof(lx) == "number" and typeof(lz) == "number" and typeof(ly) == "number" then
 			local part = acquireHail()
 			if part then
@@ -156,7 +158,7 @@ local function updateHail()
 		if alpha >= 1 then
 			-- удар
 			impactAttachment.WorldPosition = h.to
-			impactEmitter:Emit(if h.big then 8 else 3)
+			impactEmitter:Emit(math.max(1, math.floor((if h.big then 8 else 3) * qualityScale)))
 			if now - lastHailSound > 0.07 and soundBudget < 2 then
 				lastHailSound = now
 				soundBudget += 1
@@ -290,6 +292,8 @@ type PlotFX = {
 	rainWanted: boolean,
 	sleetWanted: boolean,
 	indoor: boolean,
+	near: boolean,
+	leakKey: string,
 }
 
 local plotFx: { [Model]: PlotFX } = {}
@@ -401,6 +405,11 @@ local function setAcid(fx: PlotFX, list: { AcidRect }, level: number)
 end
 
 local function refreshLeaks(fx: PlotFX)
+	-- звук живёт на первой точке протечки — пересоздаём вместе с точками
+	if fx.leakSound then
+		fx.leakSound:Destroy()
+		fx.leakSound = nil
+	end
 	for _, a in fx.leakAttachments do
 		a:Destroy()
 	end
@@ -436,6 +445,9 @@ local function refreshLeaks(fx: PlotFX)
 			table.insert(fx.leakAttachments, att)
 			table.insert(fx.leakEmitters, e)
 		end
+	end
+	if #fx.leakAttachments > 0 then
+		fx.leakSound = Sounds.loopAt("Leak", fx.leakAttachments[1], 0.8)
 	end
 end
 
@@ -477,6 +489,8 @@ local function ensureFx(model: Model): PlotFX?
 		rainWanted = false,
 		sleetWanted = false,
 		indoor = false,
+		near = true,
+		leakKey = "0",
 	}
 	-- тучи над участком
 	local cloudRng = Random.new(model:GetAttribute("PlotId") :: number? or 1)
@@ -499,6 +513,16 @@ local function ensureFx(model: Model): PlotFX?
 	return fx
 end
 
+-- Включение частиц: нужно по фазе, участок рядом и камера не под крышей.
+local function applyEmitters(fx: PlotFX)
+	local visible = fx.near and not fx.indoor
+	fx.rain.Enabled = fx.rainWanted and visible
+	fx.sleet.Enabled = fx.sleetWanted and visible
+	for _, e in fx.leakEmitters do
+		e.Enabled = fx.near
+	end
+end
+
 local function setPhaseFx(fx: PlotFX, phase: string)
 	fx.phase = phase
 	local stormOn = phase ~= ""
@@ -512,8 +536,7 @@ local function setPhaseFx(fx: PlotFX, phase: string)
 	fx.sleet.Rate = math.min(math.floor(120 * qualityScale), cap)
 	fx.rainWanted = isAcid
 	fx.sleetWanted = isHail
-	fx.rain.Enabled = isAcid and not fx.indoor
-	fx.sleet.Enabled = isHail and not fx.indoor
+	applyEmitters(fx)
 	if isAcid and not fx.rainSound then
 		fx.rainSound = Sounds.loopAt("Rain", fx.rainPart, 0.6)
 	elseif not isAcid and fx.rainSound then
@@ -522,11 +545,16 @@ local function setPhaseFx(fx: PlotFX, phase: string)
 	end
 	if not stormOn then
 		clearAcid(fx)
-		refreshLeaks(fx)
+		for _, a in fx.leakAttachments do
+			a:Destroy()
+		end
+		table.clear(fx.leakAttachments)
+		table.clear(fx.leakEmitters)
 		if fx.leakSound then
 			fx.leakSound:Destroy()
 			fx.leakSound = nil
 		end
+		fx.leakKey = "0"
 	end
 end
 
@@ -544,8 +572,7 @@ local function updatePlotFx(fx: PlotFX, dt: number)
 	local indoor = cameraIndoorPlot == model
 	if indoor ~= fx.indoor then
 		fx.indoor = indoor
-		fx.rain.Enabled = fx.rainWanted and not indoor
-		fx.sleet.Enabled = fx.sleetWanted and not indoor
+		applyEmitters(fx)
 		if indoor then
 			fx.rain:Clear()
 			fx.sleet:Clear()
@@ -569,14 +596,17 @@ local function updatePlotFx(fx: PlotFX, dt: number)
 	-- протечка
 	local count = model:GetAttribute("LeakCount")
 	local n = if typeof(count) == "number" then count else 0
-	if n ~= #fx.leakEmitters then
-		refreshLeaks(fx)
-		if n > 0 and not fx.leakSound and #fx.leakAttachments > 0 then
-			fx.leakSound = Sounds.loopAt("Leak", fx.leakAttachments[1], 0.8)
-		elseif n == 0 and fx.leakSound then
-			fx.leakSound:Destroy()
-			fx.leakSound = nil
+	local leakKey = tostring(n)
+	for i = 1, n do
+		local cf = model:GetAttribute("LeakCF" .. i)
+		if typeof(cf) == "CFrame" then
+			leakKey ..= string.format("|%.1f,%.1f", cf.Position.X, cf.Position.Z)
 		end
+	end
+	if leakKey ~= fx.leakKey then
+		fx.leakKey = leakKey
+		refreshLeaks(fx)
+		applyEmitters(fx)
 	end
 	local leak = model:GetAttribute("Leak")
 	local intensity = if typeof(leak) == "number" then leak else 0
@@ -767,8 +797,18 @@ function StormFX.init()
 					fx = ensureFx(child)
 					if fx then
 						local near = camera == nil or (camera.CFrame.Position - fx.origin.Position).Magnitude < FX_RANGE
-						if near or fx.phase ~= "" then
+						if near ~= fx.near then
+							fx.near = near
+							applyEmitters(fx)
+						end
+						if near then
 							updatePlotFx(fx, dt)
+						else
+							-- далеко: только следим за фазой (чтобы убрать эффекты после шторма)
+							local p = if hasStorm then phase :: string else ""
+							if p ~= fx.phase then
+								setPhaseFx(fx, p)
+							end
 						end
 					end
 				end

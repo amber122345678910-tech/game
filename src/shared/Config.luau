@@ -72,7 +72,7 @@ Config.Build = {
 	MaxActionsPerSecond = 14,
 	BurstActions = 20,
 	MaxPlaceDistance = 300, -- от персонажа до клетки (стады)
-	SaveDebounce = 6, -- через сколько секунд после изменения постройки сохраняем раскладку
+	SaveDebounce = 3, -- через сколько секунд после изменения постройки записываем раскладку в профиль
 }
 
 Config.Economy = {

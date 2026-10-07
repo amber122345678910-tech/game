@@ -24,6 +24,9 @@ type DoorState = {
 }
 
 local doors: { [BasePart]: DoorState } = {}
+local doorList: { BasePart } = {}
+local listAge = math.huge
+local listPlot: Model? = nil
 
 local function canOpen(plot: Model): boolean
 	local phase = plot:GetAttribute("Phase")
@@ -77,13 +80,24 @@ local function step()
 	if not plot or not root or not root:IsA("BasePart") then
 		return
 	end
-	local blocks = plot:FindFirstChild("Blocks")
-	if not blocks then
-		return
+	-- список дверей обновляем раз в секунду (а не перебираем все блоки каждые 0.15 с)
+	listAge += 0.15
+	if listAge >= 1 or listPlot ~= plot then
+		listAge = 0
+		listPlot = plot
+		table.clear(doorList)
+		local blocks = plot:FindFirstChild("Blocks")
+		if blocks then
+			for _, child in blocks:GetChildren() do
+				if child:IsA("BasePart") and child:GetAttribute("IsDoor") then
+					table.insert(doorList, child)
+				end
+			end
+		end
 	end
 	local allowed = canOpen(plot)
-	for _, child in blocks:GetChildren() do
-		if child:IsA("BasePart") and child:GetAttribute("IsDoor") then
+	for _, child in doorList do
+		if child.Parent then
 			local state = track(child)
 			local distance = (state.closedCFrame.Position - root.Position).Magnitude
 			if not allowed then

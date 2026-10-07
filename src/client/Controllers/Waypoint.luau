@@ -96,13 +96,22 @@ function Waypoint.deactivate()
 	setVisible(false)
 end
 
-local function update()
+local cachedTarget: Vector3? = nil
+local targetAge = math.huge
+
+local function update(dt: number)
 	if not active then
 		return
 	end
 	local character = player.Character
 	local root = character and character:FindFirstChild("HumanoidRootPart")
-	local target = targetPosition()
+	-- дверь ищем не каждый кадр, а раз в полсекунды
+	targetAge += dt
+	if targetAge >= 0.5 or cachedTarget == nil then
+		targetAge = 0
+		cachedTarget = targetPosition()
+	end
+	local target = cachedTarget
 	local camera = workspace.CurrentCamera
 	if not root or not root:IsA("BasePart") or not target or not camera then
 		setVisible(false)

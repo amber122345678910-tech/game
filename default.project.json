@@ -30,7 +30,7 @@
           "$className": "RemoteEvent"
         },
         "HailBatch": {
-          "$className": "RemoteEvent"
+          "$className": "UnreliableRemoteEvent"
         },
         "BlockBroken": {
           "$className": "RemoteEvent"

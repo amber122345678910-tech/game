@@ -12,7 +12,8 @@
 -- Сервер -> клиент:
 --   DataUpdated(snapshot: DataSnapshot)
 --   Notify(text: string, kind: "info" | "success" | "error" | "warning")
---   HailBatch(plotId: number, impacts: { { number } })  -- {lx, lz, impactY, big(0/1)} в локальных координатах участка
+--   HailBatch (UnreliableRemoteEvent, только визуал): (plotId: number, flat: { number })
+--     плоский массив по 4 числа на градину: lx, lz, impactY, big(0/1) — в локальных координатах участка
 --   BlockBroken(plotId: number, position: Vector3, color: Color3)
 --   StormResult(result: StormResult)
 
@@ -53,7 +54,7 @@ local Remotes = {
 	TutorialDone = event("TutorialDone"),
 	DataUpdated = event("DataUpdated"),
 	Notify = event("Notify"),
-	HailBatch = event("HailBatch"),
+	HailBatch = folder:WaitForChild("HailBatch") :: UnreliableRemoteEvent,
 	BlockBroken = event("BlockBroken"),
 	StormResult = event("StormResult"),
 	Purchase = folder:WaitForChild("Purchase") :: RemoteFunction,

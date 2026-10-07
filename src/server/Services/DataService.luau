@@ -47,6 +47,20 @@ local DataService = {}
 
 DataService.Loaded = Signal.new() :: Signal.Signal<Player, ProfileData>
 
+-- Вызываются синхронно перед каждым сохранением (например, дописать раскладку бункера).
+local preSaveHooks: { (Player) -> () } = {}
+function DataService.addPreSaveHook(fn: (Player) -> ())
+	table.insert(preSaveHooks, fn)
+end
+local function runPreSaveHooks(player: Player)
+	for _, fn in preSaveHooks do
+		local ok, err = pcall(fn, player)
+		if not ok then
+			warn("[DataService] pre-save hook failed: " .. tostring(err))
+		end
+	end
+end
+
 local AUTOSAVE_INTERVAL = 90
 local LOCK_TIMEOUT = 120 -- через сколько секунд чужая блокировка считается устаревшей
 local LOAD_RETRIES = 5
@@ -262,6 +276,7 @@ local function releaseSession(session: Session)
 		return
 	end
 	session.Released = true
+	runPreSaveHooks(session.Player)
 	local userId = session.Player.UserId
 	pendingRelease[userId] = true
 	saveRecord(session, true)
@@ -372,6 +387,7 @@ function DataService.init()
 			task.wait(AUTOSAVE_INTERVAL)
 			for _, session in sessions do
 				if session.Loaded and not session.Released then
+					runPreSaveHooks(session.Player)
 					task.spawn(saveRecord, session, false)
 				end
 			end

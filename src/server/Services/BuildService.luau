@@ -42,12 +42,35 @@ local function notify(player: Player, text: string, kind: string)
 	Remotes.Notify:FireClient(player, text, kind)
 end
 
--- Сохраняем раскладку в профиль сразу (дёшево), чтобы при выходе ничего не потерялось.
+-- Записать раскладку в профиль сейчас.
+local layoutDirty: { [Player]: boolean } = {}
 function BuildService.saveLayout(player: Player)
+	layoutDirty[player] = nil
 	local plot = PlotService.getPlot(player)
-	if plot and plot.Session == nil then
+	if not plot then
+		return
+	end
+	local session = plot.Session
+	if session ~= nil then
+		-- во время шторма блоки ломаются: сохраняем раскладку до шторма
+		DataService.setLayout(player, Grid.serialize(session.Snapshot))
+	else
 		DataService.setLayout(player, PlotService.serialize(plot))
 	end
+end
+
+-- Отложенная запись раскладки: серия правок -> одна сериализация. Перед любым сохранением
+-- DataService вызывает хук ниже, так что последние правки не теряются.
+local function markLayoutDirty(player: Player)
+	if layoutDirty[player] then
+		return
+	end
+	layoutDirty[player] = true
+	task.delay(Config.Build.SaveDebounce, function()
+		if layoutDirty[player] and player.Parent == Players then
+			BuildService.saveLayout(player)
+		end
+	end)
 end
 
 local function getBuildablePlot(player: Player): PlotService.Plot?
@@ -115,7 +138,7 @@ local function onPlace(player: Player, blockId: any, x: any, y: any, z: any, rot
 		DataService.addBlocks(player, def.Id, 1) -- вернуть блок
 		return
 	end
-	BuildService.saveLayout(player)
+	markLayoutDirty(player)
 end
 
 -- Не даём замуровать персонажа внутри блока.
@@ -150,7 +173,7 @@ local function onRemove(player: Player, x: any, y: any, z: any)
 	local rec = PlotService.remove(plot, x, y, z)
 	if rec then
 		DataService.addBlocks(player, rec.id, 1)
-		BuildService.saveLayout(player)
+		markLayoutDirty(player)
 	end
 end
 
@@ -207,6 +230,12 @@ function BuildService.init()
 	Remotes.ClearPlot.OnServerEvent:Connect(onClear)
 	Players.PlayerRemoving:Connect(function(player)
 		buckets[player] = nil
+	end)
+	DataService.addPreSaveHook(function(player)
+		if layoutDirty[player] then
+			BuildService.saveLayout(player)
+		end
+		layoutDirty[player] = nil
 	end)
 end
 

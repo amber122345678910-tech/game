@@ -76,6 +76,7 @@ local PHASE_DURATION: { [string]: number } = {
 }
 local TOTAL_DURATION = S.PrepTime + S.HailTime + S.CalmTime + S.AcidTime + S.ClearTime
 local MAX_LEAK_POINTS = 4
+local HAIL_FX_RANGE = 260 -- кому отправлять визуал града (стады от центра участка)
 
 local sessions: { [Player]: Session } = {}
 local cooldowns: { [Player]: number } = {}
@@ -269,7 +270,7 @@ end
 local function spawnHail(session: Session, dt: number)
 	local p = session.Params
 	session.HailBudget += p.HailRate * dt
-	local batch: { { number } } = {}
+	local batch: { number } = {}
 	local now = os.clock()
 	while session.HailBudget >= 1 do
 		session.HailBudget -= 1
@@ -277,11 +278,22 @@ local function spawnHail(session: Session, dt: number)
 		local lz = round1(session.Rng:NextNumber(-PIT + 1, PIT - 1))
 		local big = session.Rng:NextNumber() < p.HailBigChance
 		local impactY = surfaceHeight(session, lx, lz)
-		table.insert(batch, { lx, lz, round1(impactY), if big then 1 else 0 })
+		table.insert(batch, lx)
+		table.insert(batch, lz)
+		table.insert(batch, round1(impactY))
+		table.insert(batch, if big then 1 else 0)
 		table.insert(session.Pending, { t = now + S.FallTime, lx = lx, lz = lz, big = big })
 	end
 	if #batch > 0 then
-		Remotes.HailBatch:FireAllClients(session.Plot.Id, batch)
+		-- только визуал: ненадёжный канал и только тем, кто рядом с участком
+		local center = session.Plot.Origin.Position
+		for _, other in Players:GetPlayers() do
+			local character = other.Character
+			local root = character and character:FindFirstChild("HumanoidRootPart")
+			if root and root:IsA("BasePart") and (root.Position - center).Magnitude < HAIL_FX_RANGE then
+				Remotes.HailBatch:FireClient(other, session.Plot.Id, batch)
+			end
+		end
 	end
 end
 
@@ -509,9 +521,10 @@ local function finish(session: Session, reason: string)
 	end
 
 	cleanupPlot(session)
-	-- восстанавливаем бункер как был до шторма
-	PlotService.clear(plot)
-	PlotService.loadEntries(plot, session.Snapshot)
+	-- восстанавливаем бункер как был до шторма (если игрок ушёл из игры — участок всё равно очистится)
+	if player.Parent == Players then
+		PlotService.restoreLayout(plot, session.Snapshot)
+	end
 	plot.Session = nil
 	sessions[player] = nil
 	if player.Parent == Players then
@@ -745,7 +758,7 @@ function StormService.start(player: Player)
 			local ok, err2 = pcall(step, session, dt)
 			if not ok then
 				warn("[StormService] step error: " .. tostring(err2))
-				finish(session, "quit")
+				finish(session, "error")
 			end
 		end
 	end)

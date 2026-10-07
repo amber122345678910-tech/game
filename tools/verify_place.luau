@@ -85,7 +85,9 @@ for _, d in game:GetDescendants() do
 end
 
 -- События
-for _, name in { "PlaceBlock", "RemoveBlock", "ClearPlot", "StartStorm", "TutorialDone", "DataUpdated", "Notify", "HailBatch", "BlockBroken", "StormResult" } do
+local hail = find(RS, "Remotes.HailBatch")
+check(hail and hail.ClassName == "UnreliableRemoteEvent", "HailBatch must be an UnreliableRemoteEvent")
+for _, name in { "PlaceBlock", "RemoveBlock", "ClearPlot", "StartStorm", "TutorialDone", "DataUpdated", "Notify", "BlockBroken", "StormResult" } do
 	local r = find(RS, "Remotes." .. name)
 	check(r and r.ClassName == "RemoteEvent", "RemoteEvent missing: " .. name)
 end
