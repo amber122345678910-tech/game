@@ -117,6 +117,18 @@ local function rectString(x0: number, x1: number, z0: number, z1: number): strin
 	return string.format("%g,%g,%g,%g", x0, x1, z0, z1)
 end
 
+-- С какой стороны двери внутренность бункера: (dx, dz) по сетке или nil.
+local function doorInteriorDir(session: Session, rec: BlockRecord): (number?, number?)
+	local candidates = if rec.rot % 2 == 0 then { { 0, 1 }, { 0, -1 } } else { { 1, 0 }, { -1, 0 } }
+	for _, c in candidates do
+		local nx, nz = rec.x + c[1], rec.z + c[2]
+		if Grid.inBounds(nx, rec.y, nz) and session.Interior[Grid.index(nx, rec.y, nz)] then
+			return c[1], c[2]
+		end
+	end
+	return nil, nil
+end
+
 local function buildAcidLayout(session: Session): string
 	local outsideCols: { [number]: boolean } = {}
 	for x = 0, Grid.W - 1 do
@@ -130,6 +142,34 @@ local function buildAcidLayout(session: Session): string
 	local gx0, gz0 = Grid.ORIGIN_X, Grid.ORIGIN_Z
 	local gx1, gz1 = -Grid.ORIGIN_X, -Grid.ORIGIN_Z
 	local outside: { string } = {}
+	local inside: { string } = {}
+	-- Клетка двери делится плоскостью двери: снаружи — уличная кислота, внутри — уровень бункера.
+	local half = 0.5 -- половина толщины полотна двери
+	for _, rec in session.BoundaryDoors do
+		local dx, dz = doorInteriorDir(session, rec)
+		if rec.y == 0 and dx and dz then
+			outsideCols[Grid.index2(rec.x, rec.z)] = nil
+			local cx, _, cz = Grid.cellCenterLocal(rec.x, 0, rec.z)
+			local x0, x1, z0, z1 = cx - CELL / 2, cx + CELL / 2, cz - CELL / 2, cz + CELL / 2
+			if dz ~= 0 then
+				if dz > 0 then
+					table.insert(outside, rectString(x0, x1, z0, cz - half))
+					table.insert(inside, rectString(x0, x1, cz + half, z1))
+				else
+					table.insert(outside, rectString(x0, x1, cz + half, z1))
+					table.insert(inside, rectString(x0, x1, z0, cz - half))
+				end
+			else
+				if dx > 0 then
+					table.insert(outside, rectString(x0, cx - half, z0, z1))
+					table.insert(inside, rectString(cx + half, x1, z0, z1))
+				else
+					table.insert(outside, rectString(cx + half, x1, z0, z1))
+					table.insert(inside, rectString(x0, cx - half, z0, z1))
+				end
+			end
+		end
+	end
 	for _, r in Grid.greedyRects(outsideCols) do
 		table.insert(outside, rectString(gx0 + r.x0 * CELL, gx0 + (r.x1 + 1) * CELL, gz0 + r.z0 * CELL, gz0 + (r.z1 + 1) * CELL))
 	end
@@ -138,7 +178,6 @@ local function buildAcidLayout(session: Session): string
 	table.insert(outside, rectString(-PIT, PIT, gz1, PIT))
 	table.insert(outside, rectString(-PIT, gx0, gz0, gz1))
 	table.insert(outside, rectString(gx1, PIT, gz0, gz1))
-	local inside: { string } = {}
 	for _, r in Grid.greedyRects(session.InteriorColumns) do
 		table.insert(inside, rectString(gx0 + r.x0 * CELL, gx0 + (r.x1 + 1) * CELL, gz0 + r.z0 * CELL, gz0 + (r.z1 + 1) * CELL))
 	end
@@ -199,20 +238,16 @@ end
 
 -- Точка протечки двери: низ двери со стороны бункера, взгляд внутрь.
 local function leakCFrame(session: Session, rec: BlockRecord): CFrame?
-	local x, y, z = rec.x, rec.y, rec.z
-	local candidates = if rec.rot % 2 == 0 then { { 0, 1 }, { 0, -1 } } else { { 1, 0 }, { -1, 0 } }
-	for _, c in candidates do
-		local nx, nz = x + c[1], z + c[2]
-		if Grid.inBounds(nx, y, nz) and session.Interior[Grid.index(nx, y, nz)] then
-			local lx, _, lz = Grid.cellCenterLocal(x, y, z)
-			local dir = Vector3.new(c[1], 0, c[2])
-			local localPos = Vector3.new(lx, y * CELL + 0.3, lz) + dir * 0.6
-			local worldPos = session.Plot.Origin:PointToWorldSpace(localPos)
-			local worldDir = session.Plot.Origin:VectorToWorldSpace(dir)
-			return CFrame.lookAt(worldPos, worldPos + worldDir)
-		end
+	local dx, dz = doorInteriorDir(session, rec)
+	if not dx or not dz then
+		return nil
 	end
-	return nil
+	local lx, _, lz = Grid.cellCenterLocal(rec.x, rec.y, rec.z)
+	local dir = Vector3.new(dx, 0, dz)
+	local localPos = Vector3.new(lx, rec.y * CELL + 0.3, lz) + dir * 0.6
+	local worldPos = session.Plot.Origin:PointToWorldSpace(localPos)
+	local worldDir = session.Plot.Origin:VectorToWorldSpace(dir)
+	return CFrame.lookAt(worldPos, worldPos + worldDir)
 end
 
 ----------------------------------------------------------------------

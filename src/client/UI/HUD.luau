@@ -476,21 +476,17 @@ local function refreshStart()
 		and not ClientState.ModalOpen
 		and ClientState.Data ~= nil
 	startHolder.Visible = canShow
+	-- Кнопка видна на всём участке (сервер сам проверяет условия), а статус подсказывает,
+	-- что лучше сначала зайти в бункер. Так игрок никогда не "застрянет" без кнопки.
 	if inBunker then
-		-- зашёл в бункер — можно начинать
 		setText(statusLabel, "✅ Ты в бункере. Готов?")
 		statusLabel.TextColor3 = Theme.Green
-		startButton.Visible = true
 	elseif hasBunker then
-		-- бункер есть, но игрок снаружи: сначала зайти внутрь
-		setText(statusLabel, "🚪 Зайди в бункер, чтобы начать шторм")
+		setText(statusLabel, "🚪 Сначала зайди в бункер!")
 		statusLabel.TextColor3 = Theme.Yellow
-		startButton.Visible = false
 	else
-		-- замкнутого бункера нет: разрешаем, но предупреждаем
 		setText(statusLabel, "⚠ У тебя нет закрытого бункера!")
 		statusLabel.TextColor3 = Theme.Orange
-		startButton.Visible = true
 	end
 end
 
