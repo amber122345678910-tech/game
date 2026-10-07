@@ -1,0 +1,315 @@
+--!strict
+-- Чистая логика шторма (без Roblox-сервисов): какие блоки бьёт град, что разъедает кислота,
+-- как быстро кислота затекает внутрь бункера. Используется сервером (StormService)
+-- и тестами баланса (tools/tests), поэтому её можно проверить без запуска Roblox.
+
+local Config = require(script.Parent.Config)
+local Grid = require(script.Parent.Grid)
+
+-- Блок на сетке участка (сервер хранит в нём ещё и деталь part).
+export type Block = {
+	id: string,
+	def: Config.BlockDef,
+	x: number,
+	y: number,
+	z: number,
+	rot: number,
+	hp: number,
+	maxHp: number,
+	cells: { number },
+	alive: boolean,
+	part: any,
+	tintBucket: number,
+}
+
+export type FloodResult = {
+	rate: number, -- скорость подъёма кислоты внутри (стады/сек)
+	cap: number, -- максимум, до которого может подняться кислота внутри
+	leaking: { Block }, -- двери, через которые сейчас течёт
+	breach: boolean, -- пробоина ниже уровня кислоты
+	roofLeak: boolean, -- дыра выше уровня кислоты (затекает дождь)
+}
+
+local StormSim = {}
+
+local CELL = Grid.CELL
+
+-- Новый блок (без детали) — для тестов и загрузки.
+function StormSim.newBlock(id: string, x: number, y: number, z: number, rot: number): Block
+	local def = Config.Blocks[id]
+	return {
+		id = id,
+		def = def,
+		x = x,
+		y = y,
+		z = z,
+		rot = rot,
+		hp = def.HP,
+		maxHp = def.HP,
+		cells = Grid.footprint(x, y, z, def.HeightCells),
+		alive = true,
+		part = nil,
+		tintBucket = 4,
+	}
+end
+
+-- Куда попадёт градина в колонке сетки (cx, cz): верхний блок и высота удара.
+function StormSim.hailHit(cells: { [number]: Block }, cx: number, cz: number): (Block?, number)
+	local top = Grid.columnTop(cells, cx, cz)
+	if top then
+		return cells[Grid.index(cx, top, cz)], (top + 1) * CELL
+	end
+	return nil, 0
+end
+
+-- Верхние блоки всех колонок, которые разъедает кислотный дождь.
+function StormSim.rainTargets(cells: { [number]: Block }): { Block }
+	local targets: { Block } = {}
+	for x = 0, Grid.W - 1 do
+		for z = 0, Grid.D - 1 do
+			local top = Grid.columnTop(cells, x, z)
+			if top then
+				local rec = cells[Grid.index(x, top, z)]
+				if rec and rec.def.AcidMult > 0 then
+					table.insert(targets, rec)
+				end
+			end
+		end
+	end
+	return targets
+end
+
+-- Затопленные блоки, которые касаются кислоты снаружи (лужа поднимается до level).
+function StormSim.poolTargets(records: { Block }, exterior: { [number]: boolean }, level: number): { Block }
+	local targets: { Block } = {}
+	if level <= 0 then
+		return targets
+	end
+	for _, rec in records do
+		if rec.alive and rec.def.AcidMult > 0 and rec.y * CELL < level then
+			local wet = false
+			for _, cell in rec.cells do
+				local x, y, z = Grid.coords(cell)
+				if y * CELL < level then
+					for _, d in Grid.NEIGHBORS do
+						local nx, ny, nz = x + d[1], y + d[2], z + d[3]
+						if ny >= 0 and ny < Grid.H then
+							if nx < 0 or nx >= Grid.W or nz < 0 or nz >= Grid.D then
+								wet = true -- край сетки = поле котлована, там тоже кислота
+							elseif ny * CELL < level and exterior[Grid.index(nx, ny, nz)] then
+								wet = true
+							end
+						end
+						if wet then
+							break
+						end
+					end
+				end
+				if wet then
+					break
+				end
+			end
+			if wet then
+				table.insert(targets, rec)
+			end
+		end
+	end
+	return targets
+end
+
+-- Двери, отделяющие внутренний объём бункера от улицы.
+function StormSim.boundaryDoors(records: { Block }, interior: { [number]: boolean }): { Block }
+	local doors: { Block } = {}
+	for _, rec in records do
+		if rec.def.IsDoor then
+			local touches = false
+			for _, cell in rec.cells do
+				local x, y, z = Grid.coords(cell)
+				for _, d in Grid.NEIGHBORS do
+					local nx, ny, nz = x + d[1], y + d[2], z + d[3]
+					if Grid.inBounds(nx, ny, nz) and interior[Grid.index(nx, ny, nz)] then
+						touches = true
+						break
+					end
+				end
+				if touches then
+					break
+				end
+			end
+			if touches then
+				table.insert(doors, rec)
+			end
+		end
+	end
+	return doors
+end
+
+-- Насколько дверь сейчас держит кислоту (повреждённая держит хуже).
+function StormSim.doorSeal(rec: Block): number
+	local frac = math.max(rec.hp, 0) / rec.maxHp
+	return rec.def.Seal * math.sqrt(frac)
+end
+
+-- Скорость затопления бункера.
+-- interior — внутренние клетки на начало шторма;
+-- cells — текущие блоки (для поиска дыр в крыше);
+-- submerged — внешние клетки, куда дотекает лужа (Grid.computeExteriorBelow).
+function StormSim.flood(
+	doors: { Block },
+	interior: { [number]: boolean },
+	cells: { [number]: Block },
+	submerged: { [number]: boolean },
+	level: number,
+	acidRaining: boolean,
+	poolMax: number
+): FloodResult
+	local S = Config.Storm
+	local rate = 0
+	local cap = 0
+	local leaking: { Block } = {}
+	for _, rec in doors do
+		if rec.alive then
+			local excess = level - rec.y * CELL - StormSim.doorSeal(rec)
+			if excess > 0 then
+				rate += excess * S.DoorLeakFactor
+				cap = level
+				table.insert(leaking, rec)
+			end
+		end
+	end
+	local breach, roofLeak = false, false
+	local checkedColumns: { [number]: boolean } = {}
+	for cell in interior do
+		if submerged[cell] then
+			breach = true
+		end
+		-- дождь капает внутрь, только если над внутренним пространством открыто небо
+		local x, y, z = Grid.coords(cell)
+		local column = Grid.index2(x, z)
+		if not roofLeak and not checkedColumns[column] then
+			checkedColumns[column] = true
+			if not Grid.isCovered(cells, x, y, z) then
+				roofLeak = true
+			end
+		end
+		if breach and roofLeak then
+			break
+		end
+	end
+	if breach then
+		-- пробоина ниже уровня лужи: кислота хлынет внутрь
+		rate += S.BreachRate
+		cap = level
+	end
+	if roofLeak and acidRaining then
+		-- дыра выше лужи: внутрь капает только дождь
+		rate += S.RoofLeakRate
+		cap = math.max(cap, poolMax * S.RoofLeakCap)
+	end
+	return { rate = rate, cap = cap, leaking = leaking, breach = breach, roofLeak = roofLeak }
+end
+
+-- Урон игроку от одной градины.
+-- Под открытым небом — прямое попадание рядом; под крышей — часть удара по крыше рядом с игроком.
+function StormSim.hailPlayerDamage(
+	p: Config.StormParams,
+	cells: { [number]: Block },
+	hitRec: Block?,
+	impactY: number,
+	hlx: number,
+	hlz: number,
+	big: boolean,
+	plx: number,
+	ply: number,
+	plz: number
+): number
+	local covered = StormSim.isCovered(cells, plx, ply, plz)
+	local dx, dz = plx - hlx, plz - hlz
+	local dist = math.sqrt(dx * dx + dz * dz)
+	if not covered then
+		local radius = p.HailHitRadius * (if big then 1.5 else 1)
+		if dist <= radius and ply + 3 >= impactY then
+			return p.HailPlayerDamage * (if big then 2 else 1)
+		end
+		return 0
+	end
+	local tremor = Config.Storm.HailTremorRadius
+	if hitRec and dist <= tremor and impactY >= ply then
+		local damage = p.HailDamage * (if big then p.HailBigMult else 1)
+		return damage * hitRec.def.HailTransfer * (1 - dist / (tremor + 1))
+	end
+	return 0
+end
+
+-- Урон игроку от кислоты за шаг dt. Возвращает урон и его источник.
+function StormSim.playerAcidDamage(
+	p: Config.StormParams,
+	acidRaining: boolean,
+	cells: { [number]: Block },
+	interior: { [number]: boolean },
+	plx: number,
+	ply: number,
+	plz: number,
+	pool: number,
+	inside: number,
+	dt: number
+): (number, string?)
+	local S = Config.Storm
+	local total = 0
+	local kind: string? = nil
+	local feet = math.max(ply - 3, 0)
+	if acidRaining and not StormSim.isCovered(cells, plx, ply, plz) then
+		total += p.AcidRainPlayerDps * dt
+		kind = "rain"
+	end
+	local cx, cy, cz = StormSim.playerCell(plx, ply, plz)
+	local inBunker = Grid.inBounds(cx, cy, cz) and interior[Grid.index(cx, cy, cz)] == true
+	if inBunker then
+		if inside - feet > S.InsideDamageDepth then
+			total += p.InsidePlayerDps * dt
+			kind = "inside"
+		end
+	elseif pool - feet > 0.5 then
+		total += p.PoolPlayerDps * dt
+		kind = "pool"
+	end
+	return total, kind
+end
+
+-- Клетка игрока по локальной позиции корня персонажа (корень ~3 стада над полом).
+function StormSim.playerCell(lx: number, ly: number, lz: number): (number, number, number)
+	return Grid.localToCell(lx, ly - 1.5, lz)
+end
+
+-- Накрыт ли игрок блоками сверху. Вне сетки (поля котлована) — не накрыт.
+function StormSim.isCovered(cells: { [number]: Block }, lx: number, ly: number, lz: number): (boolean, number?, number?)
+	local cx, cy, cz = StormSim.playerCell(lx, ly, lz)
+	if cx < 0 or cx >= Grid.W or cz < 0 or cz >= Grid.D then
+		return false, nil, nil
+	end
+	return Grid.isCovered(cells, cx, math.max(cy, 0), cz), cx, cz
+end
+
+-- Урон блоку без побочных эффектов (для тестов). Возвращает true, если блок разрушен.
+function StormSim.applyDamage(cells: { [number]: Block }, records: { Block }, rec: Block, amount: number): boolean
+	if not rec.alive or amount <= 0 then
+		return false
+	end
+	rec.hp -= amount
+	if rec.hp > 0 then
+		return false
+	end
+	rec.alive = false
+	for _, c in rec.cells do
+		if cells[c] == rec then
+			cells[c] = nil
+		end
+	end
+	local i = table.find(records, rec)
+	if i then
+		table.remove(records, i)
+	end
+	return true
+end
+
+return StormSim

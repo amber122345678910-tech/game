@@ -1,0 +1,153 @@
+{
+  "name": "BunkerSimulator",
+  "tree": {
+    "$className": "DataModel",
+    "ReplicatedStorage": {
+      "Shared": {
+        "$path": "src/shared"
+      },
+      "Remotes": {
+        "$className": "Folder",
+        "PlaceBlock": {
+          "$className": "RemoteEvent"
+        },
+        "RemoveBlock": {
+          "$className": "RemoteEvent"
+        },
+        "ClearPlot": {
+          "$className": "RemoteEvent"
+        },
+        "StartStorm": {
+          "$className": "RemoteEvent"
+        },
+        "TutorialDone": {
+          "$className": "RemoteEvent"
+        },
+        "DataUpdated": {
+          "$className": "RemoteEvent"
+        },
+        "Notify": {
+          "$className": "RemoteEvent"
+        },
+        "HailBatch": {
+          "$className": "RemoteEvent"
+        },
+        "BlockBroken": {
+          "$className": "RemoteEvent"
+        },
+        "StormResult": {
+          "$className": "RemoteEvent"
+        },
+        "Purchase": {
+          "$className": "RemoteFunction"
+        }
+      }
+    },
+    "ServerScriptService": {
+      "Server": {
+        "$path": "src/server"
+      }
+    },
+    "StarterPlayer": {
+      "$properties": {
+        "CameraMaxZoomDistance": 120,
+        "CharacterWalkSpeed": 18
+      },
+      "StarterPlayerScripts": {
+        "Client": {
+          "$path": "src/client"
+        }
+      }
+    },
+    "Workspace": {
+      "$properties": {
+        "StreamingEnabled": false,
+        "SignalBehavior": "Deferred",
+        "PhysicsSteppingMethod": "Adaptive",
+        "PlayerCharacterDestroyBehavior": "Enabled",
+        "RejectCharacterDeletions": "Enabled"
+      },
+      "Map": {
+        "$path": "src/map/Map.rbxmx"
+      },
+      "Plots": {
+        "$path": "src/map/Plots.rbxmx"
+      }
+    },
+    "Lighting": {
+      "$properties": {
+        "ClockTime": 14.5,
+        "Brightness": 2.2,
+        "Ambient": [
+          0.27,
+          0.27,
+          0.3
+        ],
+        "OutdoorAmbient": [
+          0.52,
+          0.52,
+          0.56
+        ],
+        "EnvironmentDiffuseScale": 1,
+        "EnvironmentSpecularScale": 1,
+        "GlobalShadows": true,
+        "ShadowSoftness": 0.25,
+        "LightingStyle": "Soft",
+        "PrioritizeLightingQuality": false,
+        "Outlines": false
+      },
+      "Atmosphere": {
+        "$className": "Atmosphere",
+        "$properties": {
+          "Density": 0.28,
+          "Offset": 0.1,
+          "Color": [
+            0.78,
+            0.83,
+            0.9
+          ],
+          "Decay": [
+            0.42,
+            0.47,
+            0.55
+          ],
+          "Glare": 0.2,
+          "Haze": 1.2
+        }
+      },
+      "Sky": {
+        "$className": "Sky",
+        "$properties": {
+          "SunAngularSize": 14,
+          "MoonAngularSize": 9
+        }
+      },
+      "Bloom": {
+        "$className": "BloomEffect",
+        "$properties": {
+          "Intensity": 0.6,
+          "Size": 24,
+          "Threshold": 1.4
+        }
+      },
+      "BaseColorCorrection": {
+        "$className": "ColorCorrectionEffect",
+        "$properties": {
+          "Brightness": 0.02,
+          "Contrast": 0.08,
+          "Saturation": 0.12
+        }
+      }
+    },
+    "SoundService": {
+      "$properties": {
+        "RespectFilteringEnabled": true
+      }
+    },
+    "MaterialService": {
+      "$properties": {
+        "Use2022Materials": true
+      }
+    }
+  }
+}

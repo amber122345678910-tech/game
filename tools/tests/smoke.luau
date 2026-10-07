@@ -1,0 +1,5 @@
+local Loader = require("../lib/loader")
+local Config = Loader.load("src/shared/Config")
+local Grid = Loader.load("src/shared/Grid")
+local Prefabs = Loader.load("src/shared/Prefabs")
+print(#Config.BlockOrder, Grid.COUNT, Prefabs.price("stone"))
