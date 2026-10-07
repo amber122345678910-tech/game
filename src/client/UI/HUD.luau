@@ -36,6 +36,7 @@ local healthBar: Frame
 local healthText: TextLabel
 local acidText: TextLabel
 local warningLabel: TextLabel
+local warningHolder: Frame
 local toastHolder: Frame
 local vignette: { Frame } = {}
 local shopButton: TextButton
@@ -316,16 +317,24 @@ local function buildStormPanel()
 		LayoutOrder = 4,
 		Parent = stormPanel,
 	})
+	-- предупреждение — отдельно под панелью (в панели работает UIListLayout)
+	warningHolder = UIKit.new("Frame", {
+		Name = "WarningHolder",
+		AnchorPoint = Vector2.new(0.5, 0),
+		Position = UDim2.new(0.5, 0, 0, 190),
+		Size = UDim2.fromOffset(560, 40),
+		BackgroundTransparency = 1,
+		Parent = gui,
+	}) :: Frame
+	UIKit.autoScale(warningHolder, "hud")
 	warningLabel = UIKit.label({
 		Name = "Warning",
 		Text = "",
-		Size = UDim2.fromOffset(560, 40),
-		AnchorPoint = Vector2.new(0.5, 0),
-		Position = UDim2.new(0.5, 0, 1, 10),
+		Size = UDim2.fromScale(1, 1),
 		TextColor3 = Theme.Red,
 		MaxTextSize = 30,
 		Visible = false,
-		Parent = stormPanel,
+		Parent = warningHolder,
 	})
 	-- мигание предупреждения
 	task.spawn(function()
@@ -524,7 +533,9 @@ local function refreshStorm()
 	local plot = myPlot()
 	local active = ClientState.inStorm() and plot ~= nil
 	stormPanel.Visible = active
-	toastHolder.Position = UDim2.new(0.5, 0, 0, if active then 8 + math.floor(232 * UIKit.currentHudScale()) else 8)
+	local hudScale = UIKit.currentHudScale()
+	toastHolder.Position = UDim2.new(0.5, 0, 0, if active then 8 + math.floor(232 * hudScale) else 8)
+	warningHolder.Position = UDim2.new(0.5, 0, 0, 8 + math.floor(182 * hudScale))
 	if not active or not plot then
 		warningLabel.Visible = false
 		return

@@ -128,7 +128,13 @@ local function update(dt: number)
 	local bob = math.sin(os.clock() * 5) * 0.25
 	-- высота земли под персонажем: корень минус (HipHeight + половина корня)
 	local hum = character and character:FindFirstChildOfClass("Humanoid")
-	local groundOffset = if hum then hum.HipHeight + root.Size.Y / 2 else 3
+	local groundOffset = 3
+	if hum then
+		-- у R6 HipHeight = 0, а ноги длиной 2 стада
+		groundOffset = if hum.RigType == Enum.HumanoidRigType.R6
+			then root.Size.Y / 2 + 2
+			else hum.HipHeight + root.Size.Y / 2
+	end
 	local base = rootPos + dir * 5 + Vector3.new(0, -groundOffset + 0.6 + bob, 0)
 	local cf = CFrame.lookAt(base, base + dir)
 	-- стрелка: древко + два "пера" наконечника

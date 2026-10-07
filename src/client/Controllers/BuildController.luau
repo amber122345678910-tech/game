@@ -846,6 +846,7 @@ local function renderStep()
 		and t
 		and t.valid
 		and key ~= lastPlacedKey
+		and not dragPlaced[Grid.index(t.x, t.y, t.z)]
 		and (dragY == nil or t.y == dragY)
 		and not (t.hitCell and dragPlaced[t.hitCell])
 	then

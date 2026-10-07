@@ -55,19 +55,24 @@ end
 -- Превью
 ----------------------------------------------------------------------
 local function makeViewport(parent: Instance, size: UDim2, position: UDim2): (ViewportFrame, Camera)
-	local vp = UIKit.new("ViewportFrame", {
+	-- фон с градиентом отдельно: UIGradient на ViewportFrame затемнил бы и сам 3D-превью
+	local bg = UIKit.new("Frame", {
 		Size = size,
 		Position = position,
 		AnchorPoint = Vector2.new(0.5, 0),
-		BackgroundColor3 = Color3.fromRGB(70, 80, 105),
-		BackgroundTransparency = 0,
+		BackgroundColor3 = Color3.new(1, 1, 1),
+		Parent = parent,
+	}) :: Frame
+	UIKit.corner(bg, 10)
+	UIKit.gradient(bg, Color3.fromRGB(110, 125, 160), Color3.fromRGB(50, 56, 74))
+	local vp = UIKit.new("ViewportFrame", {
+		Size = UDim2.fromScale(1, 1),
+		BackgroundTransparency = 1,
 		Ambient = Color3.fromRGB(170, 170, 180),
 		LightColor = Color3.fromRGB(255, 250, 240),
 		LightDirection = Vector3.new(-1, -2, -1),
-		Parent = parent,
+		Parent = bg,
 	}) :: ViewportFrame
-	UIKit.corner(vp, 10)
-	UIKit.gradient(vp, Color3.fromRGB(110, 125, 160), Color3.fromRGB(50, 56, 74))
 	local camera = UIKit.new("Camera", { FieldOfView = 40, Parent = vp }) :: Camera
 	vp.CurrentCamera = camera
 	return vp, camera
