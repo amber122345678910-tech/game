@@ -155,7 +155,8 @@ do
 	local holes = {}
 	for _, cf in plotFrames do
 		local p = cf.Position
-		table.insert(holes, { x0 = p.X - PIT, x1 = p.X + PIT, z0 = p.Z - PIT, z1 = p.Z + PIT })
+		-- дыра по внешней грани стен котлована: внутренняя грань стены не совпадает с землёй
+		table.insert(holes, { x0 = p.X - PIT - 2, x1 = p.X + PIT + 2, z0 = p.Z - PIT - 2, z1 = p.Z + PIT + 2 })
 	end
 	local xs = { -WORLD_X, WORLD_X }
 	local zs = { -WORLD_Z, WORLD_Z }
@@ -428,7 +429,7 @@ for id, cf in plotFrames do
 		CanQuery = true,
 	}, model)
 	-- Стены котлована (верх чуть ниже земли, чтобы не было мерцания)
-	local wallH = DEPTH - 0.05
+	local wallH = DEPTH
 	local wy = wallH / 2
 	box(L(cf, 0, wy, -PIT - 1), Vector3.new(PIT * 2 + 4, wallH, 2), COLORS.PitWall, Enum.Material.Concrete, env, "Wall")
 	box(L(cf, 0, wy, PIT + 1), Vector3.new(PIT * 2 + 4, wallH, 2), COLORS.PitWall, Enum.Material.Concrete, env, "Wall")

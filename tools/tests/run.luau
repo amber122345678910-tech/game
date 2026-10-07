@@ -364,6 +364,50 @@ test("hail player damage: exposed direct hit vs roof tremor", function()
 	truthy(tremor > 0 and tremor < p.HailDamage, "tremor is a fraction of block damage")
 end)
 
+test("door auto-rotation follows the wall", function()
+	local solid = {}
+	-- стена вдоль X: блоки слева и справа от двери
+	solid[Grid.index(4, 0, 3)] = true
+	solid[Grid.index(6, 0, 3)] = true
+	solid[Grid.index(4, 1, 3)] = true
+	solid[Grid.index(6, 1, 3)] = true
+	eq(Grid.autoDoorRot(solid, 5, 0, 3, 1) % 2, 0, "wall along X -> rot 0/2")
+	local solid2 = {}
+	solid2[Grid.index(3, 0, 4)] = true
+	solid2[Grid.index(3, 0, 6)] = true
+	eq(Grid.autoDoorRot(solid2, 3, 0, 5, 0) % 2, 1, "wall along Z -> rot 1/3")
+	eq(Grid.autoDoorRot({}, 3, 0, 5, 2), 2, "no walls -> keep player's rotation")
+end)
+
+test("player in the door recess counts as inside the bunker", function()
+	local cells = {}
+	local records = {}
+	for _, e in Prefabs.layout("starter") do
+		local b = StormSim.newBlock(e.id, e.x, e.y, e.z, e.rot)
+		for _, c in b.cells do
+			cells[c] = b
+		end
+		table.insert(records, b)
+	end
+	local interior = Grid.computeInterior(cells)
+	local door
+	for _, r in records do
+		if r.def.IsDoor then
+			door = r
+		end
+	end
+	local lx, _, lz = Grid.cellCenterLocal(door.x, 0, door.z)
+	-- изнутри (z больше центра двери, внутренность бункера с +Z)
+	local inside = StormSim.playerCellIndex(cells, lx, 3, lz + 1.2)
+	truthy(inside and interior[inside], "inner recess is interior")
+	local outside = StormSim.playerCellIndex(cells, lx, 3, lz - 1.2)
+	truthy(outside and not interior[outside], "outer recess is outside")
+	-- урон от уличной лужи у двери изнутри не идёт
+	local p = Config.stormParams(1)
+	local dmg = StormSim.playerAcidDamage(p, true, cells, interior, lx, 3, lz + 1.2, 2.5, 0, 1)
+	eq(dmg, 0, "no outside pool damage inside the recess")
+end)
+
 -- Регрессия баланса (та же логика StormSim, что на сервере)
 _G.__BALANCE_LIB = true
 local Balance = require("./balance")

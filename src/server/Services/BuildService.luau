@@ -105,7 +105,12 @@ local function onPlace(player: Player, blockId: any, x: any, y: any, z: any, rot
 	if not DataService.takeBlocks(player, def.Id, 1) then
 		return
 	end
-	local rec = PlotService.place(plot, def.Id, x, y, z, Grid.normalizeRot(rot))
+	local finalRot = Grid.normalizeRot(rot)
+	if def.IsDoor then
+		-- дверь сама разворачивается вдоль стены
+		finalRot = Grid.autoDoorRot(plot.Cells, x, y, z, finalRot)
+	end
+	local rec = PlotService.place(plot, def.Id, x, y, z, finalRot)
 	if not rec then
 		DataService.addBlocks(player, def.Id, 1) -- вернуть блок
 		return

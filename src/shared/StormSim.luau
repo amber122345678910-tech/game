@@ -262,8 +262,8 @@ function StormSim.playerAcidDamage(
 		total += p.AcidRainPlayerDps * dt
 		kind = "rain"
 	end
-	local cx, cy, cz = StormSim.playerCell(plx, ply, plz)
-	local inBunker = Grid.inBounds(cx, cy, cz) and interior[Grid.index(cx, cy, cz)] == true
+	local cell = StormSim.playerCellIndex(cells, plx, ply, plz)
+	local inBunker = cell ~= nil and interior[cell] == true
 	if inBunker then
 		if inside - feet > S.InsideDamageDepth then
 			total += p.InsidePlayerDps * dt
@@ -279,6 +279,31 @@ end
 -- Клетка игрока по локальной позиции корня персонажа (корень ~3 стада над полом).
 function StormSim.playerCell(lx: number, ly: number, lz: number): (number, number, number)
 	return Grid.localToCell(lx, ly - 1.5, lz)
+end
+
+-- Индекс клетки игрока с учётом ниши двери: полотно стоит посередине клетки, поэтому
+-- игрок у двери изнутри относится к соседней внутренней клетке, а снаружи — к внешней.
+function StormSim.playerCellIndex(cells: { [number]: Block }, lx: number, ly: number, lz: number): number?
+	local cx, cy, cz = StormSim.playerCell(lx, ly, lz)
+	cy = math.max(cy, 0)
+	if not Grid.inBounds(cx, cy, cz) then
+		return nil
+	end
+	local index = Grid.index(cx, cy, cz)
+	local rec = cells[index]
+	if rec and rec.def.IsDoor then
+		local clx, _, clz = Grid.cellCenterLocal(rec.x, rec.y, rec.z)
+		local dx, dz = 0, 0
+		if rec.rot % 2 == 0 then
+			dz = if lz >= clz then 1 else -1
+		else
+			dx = if lx >= clx then 1 else -1
+		end
+		if Grid.inBounds(cx + dx, cy, cz + dz) then
+			return Grid.index(cx + dx, cy, cz + dz)
+		end
+	end
+	return index
 end
 
 -- Накрыт ли игрок блоками сверху. Вне сетки (поля котлована) — не накрыт.

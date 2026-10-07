@@ -370,7 +370,9 @@ local function buildAcid(fx: PlotFX, layout: string)
 	end
 	local outsideStr, insideStr = string.match(layout, "^O:(.-)|I:(.*)$")
 	local function make(rects: { { number } }, list: { AcidRect }, name: string)
-		for _, r in rects do
+		for _, raw in rects do
+			-- чуть меньше клеток, чтобы грани кислоты не совпадали со стенами (без мерцания)
+			local r = { raw[1] + 0.04, raw[2] - 0.04, raw[3] + 0.04, raw[4] - 0.04 }
 			-- постоянный размер: двигаем только CFrame (дешевле, чем менять Size каждый кадр)
 			local p = fxPart(name, Vector3.new(r[2] - r[1], ACID_SLAB, r[4] - r[3]), Config.AcidColor, Enum.Material.SmoothPlastic)
 			p.Reflectance = 0.08

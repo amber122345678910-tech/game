@@ -271,6 +271,28 @@ function Grid.greedyRects(cells: { [number]: any }): { Rect }
 	return rects
 end
 
+-- Поворот двери по стене: полотно вдоль той оси, где по бокам стоят блоки.
+-- rot 0/2 — полотно вдоль X (проход по Z), rot 1/3 — полотно вдоль Z (проход по X).
+function Grid.autoDoorRot(solid: { [number]: any }, x: number, y: number, z: number, fallback: number): number
+	local function at(nx: number, ny: number, nz: number): number
+		if Grid.inBounds(nx, ny, nz) and solid[Grid.index(nx, ny, nz)] then
+			return 1
+		end
+		return 0
+	end
+	local alongX, alongZ = 0, 0
+	for dy = 0, 1 do
+		alongX += at(x - 1, y + dy, z) + at(x + 1, y + dy, z)
+		alongZ += at(x, y + dy, z - 1) + at(x, y + dy, z + 1)
+	end
+	if alongX > alongZ then
+		return if fallback % 2 == 0 then fallback % 4 else 0
+	elseif alongZ > alongX then
+		return if fallback % 2 == 1 then fallback % 4 else 1
+	end
+	return fallback % 4
+end
+
 -- Поворот хранится как 0..3 (шаги по 90° вокруг Y).
 function Grid.normalizeRot(rot: any): number
 	if typeof(rot) ~= "number" or rot ~= rot then

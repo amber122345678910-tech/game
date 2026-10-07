@@ -116,8 +116,11 @@ local function update()
 		return
 	end
 	local dir = flat.Unit
-	local bob = math.sin(os.clock() * 5) * 0.4
-	local base = rootPos + dir * 5 + Vector3.new(0, -2.6 + bob, 0)
+	local bob = math.sin(os.clock() * 5) * 0.25
+	-- высота земли под персонажем: корень минус (HipHeight + половина корня)
+	local hum = character and character:FindFirstChildOfClass("Humanoid")
+	local groundOffset = if hum then hum.HipHeight + root.Size.Y / 2 else 3
+	local base = rootPos + dir * 5 + Vector3.new(0, -groundOffset + 0.6 + bob, 0)
 	local cf = CFrame.lookAt(base, base + dir)
 	-- стрелка: древко + два "пера" наконечника
 	arrowCFrames[1] = cf * CFrame.new(0, 0, 0.7)

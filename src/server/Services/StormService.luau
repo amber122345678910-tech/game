@@ -51,6 +51,7 @@ export type Session = {
 	WarnedZone: boolean,
 	AttrTimer: number,
 	LastLeakCount: number,
+	LastLeakKey: string,
 	LeakWarned: boolean,
 	FloodWarned: boolean,
 	Ended: boolean,
@@ -119,7 +120,10 @@ end
 
 -- С какой стороны двери внутренность бункера: (dx, dz) по сетке или nil.
 local function doorInteriorDir(session: Session, rec: BlockRecord): (number?, number?)
-	local candidates = if rec.rot % 2 == 0 then { { 0, 1 }, { 0, -1 } } else { { 1, 0 }, { -1, 0 } }
+	-- сначала по оси прохода двери, затем по другой (если дверь повёрнута не по стене)
+	local candidates = if rec.rot % 2 == 0
+		then { { 0, 1 }, { 0, -1 }, { 1, 0 }, { -1, 0 } }
+		else { { 1, 0 }, { -1, 0 }, { 0, 1 }, { 0, -1 } }
 	for _, c in candidates do
 		local nx, nz = rec.x + c[1], rec.z + c[2]
 		if Grid.inBounds(nx, rec.y, nz) and session.Interior[Grid.index(nx, rec.y, nz)] then
@@ -382,7 +386,14 @@ local function floodStep(session: Session, dt: number)
 	if model:GetAttribute("Leak") ~= leakRounded then
 		model:SetAttribute("Leak", leakRounded)
 	end
-	if #leakRecs ~= session.LastLeakCount then
+	-- точки протечки пересобираем, когда меняется сам набор текущих дверей
+	local keyParts = table.create(#leakRecs)
+	for _, rec in leakRecs do
+		table.insert(keyParts, tostring(rec.cells[1]))
+	end
+	local leakKey = table.concat(keyParts, ",")
+	if leakKey ~= session.LastLeakKey then
+		session.LastLeakKey = leakKey
 		session.LastLeakCount = #leakRecs
 		local n = 0
 		for _, rec in leakRecs do
@@ -685,6 +696,7 @@ function StormService.start(player: Player)
 		WarnedZone = false,
 		AttrTimer = 0,
 		LastLeakCount = 0,
+		LastLeakKey = "",
 		LeakWarned = false,
 		FloodWarned = false,
 		Ended = false,

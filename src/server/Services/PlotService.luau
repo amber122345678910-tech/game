@@ -476,12 +476,8 @@ function PlotService.playerCell(plot: Plot, player: Player): (number?, Vector3?)
 		return nil, nil
 	end
 	local lp = plot.Origin:PointToObjectSpace(root.Position)
-	-- корень R15 примерно в 3 стадах над полом: берём точку чуть ниже корня
-	local cx, cy, cz = Grid.localToCell(lp.X, lp.Y - 1.5, lp.Z)
-	if Grid.inBounds(cx, cy, cz) then
-		return Grid.index(cx, cy, cz), lp
-	end
-	return nil, lp
+	-- корень персонажа примерно в 3 стадах над полом; ниша двери учитывается
+	return StormSim.playerCellIndex(plot.Cells, lp.X, lp.Y, lp.Z), lp
 end
 
 function PlotService.updatePlayerZone(player: Player, plot: Plot)
