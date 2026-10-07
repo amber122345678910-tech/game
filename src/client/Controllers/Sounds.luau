@@ -109,6 +109,7 @@ function Sounds.playAt(name: string, position: Vector3, volumeScale: number?)
 	end
 	activeOneShots += 1
 	local att = Instance.new("Attachment")
+	att.Parent = getHolder()
 	att.WorldPosition = position
 	local s = base:Clone()
 	s.Volume = base.Volume * (volumeScale or 1)
@@ -117,7 +118,6 @@ function Sounds.playAt(name: string, position: Vector3, volumeScale: number?)
 	s.RollOffMinDistance = 8
 	s.RollOffMaxDistance = 140
 	s.Parent = att
-	att.Parent = getHolder()
 	s:Play()
 	Debris:AddItem(att, 6)
 	task.delay(6, function()

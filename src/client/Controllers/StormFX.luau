@@ -411,8 +411,9 @@ local function refreshLeaks(fx: PlotFX)
 		local cf = fx.model:GetAttribute("LeakCF" .. i)
 		if typeof(cf) == "CFrame" then
 			local att = Instance.new("Attachment")
-			att.WorldCFrame = cf
+			-- сначала родитель, потом мировые координаты (иначе смещение на CFrame родителя)
 			att.Parent = fx.rainPart
+			att.WorldCFrame = cf
 			local e = Instance.new("ParticleEmitter")
 			e.Texture = "rbxasset://textures/particles/sparkles_main.dds"
 			e.EmissionDirection = Enum.NormalId.Front

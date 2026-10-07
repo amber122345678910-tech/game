@@ -425,6 +425,11 @@ function PlotService.getInterior(plot: Plot): { [number]: boolean }
 	end
 	local interior = Grid.computeInterior(plot.Cells)
 	plot.InteriorCache = interior
+	-- клиенту: есть ли на участке замкнутый бункер (для кнопки СТАРТ)
+	local hasBunker = next(interior) ~= nil
+	if plot.Model:GetAttribute("HasBunker") ~= hasBunker then
+		plot.Model:SetAttribute("HasBunker", hasBunker)
+	end
 	return interior
 end
 

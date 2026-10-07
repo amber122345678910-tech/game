@@ -61,6 +61,13 @@ local TOAST_COLORS: { [string]: Color3 } = {
 	warning = Theme.Orange,
 }
 
+-- Присваиваем текст только при изменении (меньше перерисовки текста на телефонах).
+local function setText(label: TextLabel, text: string)
+	if label.Text ~= text then
+		label.Text = text
+	end
+end
+
 local function formatTime(seconds: number): string
 	local s = math.max(0, math.ceil(seconds))
 	return string.format("%d:%02d", s // 60, s % 60)
@@ -460,23 +467,37 @@ end
 local function refreshStart()
 	local inZone = player:GetAttribute("InPlotZone") == true
 	local inBunker = player:GetAttribute("InBunker") == true
-	local show = inZone
+	local plot = myPlot()
+	local hasBunker = plot ~= nil and plot:GetAttribute("HasBunker") == true
+	local canShow = inZone
 		and not ClientState.inStorm()
 		and not ClientState.BuildMode
 		and not ClientState.ModalOpen
 		and ClientState.Data ~= nil
-	startHolder.Visible = show
+	startHolder.Visible = canShow
 	if inBunker then
-		statusLabel.Text = "✅ Ты в бункере. Готов?"
+		-- зашёл в бункер — можно начинать
+		setText(statusLabel, "✅ Ты в бункере. Готов?")
 		statusLabel.TextColor3 = Theme.Green
+		startButton.Visible = true
+	elseif hasBunker then
+		-- бункер есть, но игрок снаружи: сначала зайти внутрь
+		setText(statusLabel, "🚪 Зайди в бункер, чтобы начать шторм")
+		statusLabel.TextColor3 = Theme.Yellow
+		startButton.Visible = false
 	else
-		statusLabel.Text = "⚠ Зайди внутрь бункера!"
+		-- замкнутого бункера нет: разрешаем, но предупреждаем
+		setText(statusLabel, "⚠ У тебя нет закрытого бункера!")
 		statusLabel.TextColor3 = Theme.Orange
+		startButton.Visible = true
 	end
 end
 
 local function setBar(fill: Frame, frac: number)
-	fill.Size = UDim2.fromScale(math.clamp(frac, 0, 1), 1)
+	local size = UDim2.fromScale(math.clamp(frac, 0, 1), 1)
+	if fill.Size ~= size then
+		fill.Size = size
+	end
 	fill.Visible = frac > 0.001
 end
 
@@ -513,36 +534,36 @@ local function refreshStorm()
 	end
 	local phase = plot:GetAttribute("Phase")
 	local phaseName = if typeof(phase) == "string" then Config.PhaseNames[phase] else nil
-	phaseLabel.Text = (PHASE_ICONS[phase :: any] or "") .. " " .. (phaseName or "")
+	setText(phaseLabel, (PHASE_ICONS[phase :: any] or "") .. " " .. (phaseName or ""))
 	local endsAt = plot:GetAttribute("PhaseEndsAt")
 	if typeof(endsAt) == "number" then
-		timerLabel.Text = formatTime(endsAt - workspace:GetServerTimeNow())
+		setText(timerLabel, formatTime(endsAt - workspace:GetServerTimeNow()))
 	end
 	local hp = plot:GetAttribute("BunkerHP")
 	local maxHp = plot:GetAttribute("BunkerMaxHP")
 	if typeof(hp) == "number" and typeof(maxHp) == "number" and maxHp > 0 then
 		setBar(bunkerBar, hp / maxHp)
-		bunkerText.Text = string.format("🧱 Бункер: %d%%", math.floor(hp / maxHp * 100 + 0.5))
+		setText(bunkerText, string.format("🧱 Бункер: %d%%", math.floor(hp / maxHp * 100 + 0.5)))
 	else
 		setBar(bunkerBar, 0)
-		bunkerText.Text = "🧱 Бункера нет!"
+		setText(bunkerText, "🧱 Бункера нет!")
 	end
 	local outside = plot:GetAttribute("OutsideAcid")
 	local inside = plot:GetAttribute("InsideAcid")
 	local o = if typeof(outside) == "number" then outside else 0
 	local i = if typeof(inside) == "number" then inside else 0
 	if o > 0 or i > 0 then
-		acidText.Text = string.format("☣ Кислота снаружи: %.1f  •  внутри: %.1f", o, i)
+		setText(acidText, string.format("☣ Кислота снаружи: %.1f  •  внутри: %.1f", o, i))
 	else
 		local level = plot:GetAttribute("StormLevel")
-		acidText.Text = "🌩 Уровень шторма " .. tostring(level or "")
+		setText(acidText, "🌩 Уровень шторма " .. tostring(level or ""))
 	end
 	local leak = plot:GetAttribute("Leak")
 	if i > Config.Storm.InsideDamageDepth then
-		warningLabel.Text = "⚠ БУНКЕР ЗАТАПЛИВАЕТ КИСЛОТОЙ!"
+		setText(warningLabel, "⚠ БУНКЕР ЗАТАПЛИВАЕТ КИСЛОТОЙ!")
 		warningLabel.Visible = true
 	elseif typeof(leak) == "number" and leak > 0 then
-		warningLabel.Text = "⚠ Кислота просачивается через дверь!"
+		setText(warningLabel, "⚠ Кислота просачивается через дверь!")
 		warningLabel.Visible = true
 	else
 		warningLabel.Visible = false
