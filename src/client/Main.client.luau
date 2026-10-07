@@ -31,6 +31,7 @@ task.spawn(function()
 	end
 end)
 
+Sounds.preload()
 UIKit.setClickSound(Sounds.get("Click"))
 
 local function safeInit(name: string, fn: () -> ())
@@ -55,5 +56,7 @@ ClientState.Notified:Connect(function(_, kind)
 		Sounds.playUI("Error")
 	elseif kind == "success" then
 		Sounds.playUI("Success")
+	elseif kind == "purchase" then
+		Sounds.playUI("Purchase")
 	end
 end)

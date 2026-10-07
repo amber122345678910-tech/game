@@ -9,6 +9,7 @@ local Config = require(Shared:WaitForChild("Config"))
 local Remotes = require(Shared:WaitForChild("Remotes"))
 
 local ClientState = require(script.Parent.Parent.ClientState)
+local Sounds = require(script.Parent.Parent.Controllers.Sounds)
 local Theme = require(script.Parent.Theme)
 local UIKit = require(script.Parent.UIKit)
 
@@ -76,6 +77,7 @@ local function show(result: Remotes.StormResult)
 	end
 	ClientState.ModalOpen = true
 	overlay.Visible = true
+	Sounds.playUI(if result.Survived then "Success" else "Error")
 	UIKit.popIn(window, windowScale)
 end
 

@@ -147,7 +147,7 @@ local function purchase(kind: string, id: string, amount: number, button: TextBu
 		ClientState.notify("Ошибка связи с сервером", "error")
 		return
 	end
-	ClientState.notify(if typeof(message) == "string" then message else "", if success == true then "success" else "error")
+	ClientState.notify(if typeof(message) == "string" then message else "", if success == true then "purchase" else "error")
 end
 
 local function showConfirm(text: string, onYes: () -> ())

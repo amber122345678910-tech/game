@@ -15,6 +15,7 @@ local Grid = require(Shared:WaitForChild("Grid"))
 local Remotes = require(Shared:WaitForChild("Remotes"))
 
 local ClientState = require(script.Parent.Parent.ClientState)
+local Sounds = require(script.Parent.Sounds)
 local Theme = require(script.Parent.Parent.UI.Theme)
 local UIKit = require(script.Parent.Parent.UI.UIKit)
 
@@ -132,8 +133,24 @@ local function bindPlot(model: Model)
 	for _, child in blocks:GetChildren() do
 		trackBlock(child)
 	end
-	table.insert(blockConns, blocks.ChildAdded:Connect(trackBlock))
-	table.insert(blockConns, blocks.ChildRemoved:Connect(untrackBlock))
+	table.insert(
+		blockConns,
+		blocks.ChildAdded:Connect(function(child)
+			trackBlock(child)
+			if active and child:IsA("BasePart") then
+				Sounds.playAt("Place", child.Position, 0.8)
+			end
+		end)
+	)
+	table.insert(
+		blockConns,
+		blocks.ChildRemoved:Connect(function(child)
+			untrackBlock(child)
+			if active and child:IsA("BasePart") then
+				Sounds.playAt("Place", child.Position, 0.5)
+			end
+		end)
+	)
 	local buildArea = model:FindFirstChild("BuildArea")
 	local list: { Instance } = { blocks }
 	if buildArea then

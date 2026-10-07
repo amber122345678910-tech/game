@@ -4,25 +4,49 @@
 
 local SoundService = game:GetService("SoundService")
 local Debris = game:GetService("Debris")
+local ContentProvider = game:GetService("ContentProvider")
 
 local Sounds = {}
 
--- Встроенные звуки клиента Roblox (rbxasset://) есть всегда.
--- Звуки каталога Roblox (rbxassetid://) — публичные звуки, загруженные самим Roblox.
+-- Звуки каталога Roblox (rbxassetid://) — публичные звуки, загруженные самим Roblox
+-- (из официальных примеров Roblox: Plant, crossfade-sounds, уроки по аудио).
 Sounds.Ids = {
-	Click = "",
-	Purchase = "",
-	Error = "",
-	Success = "",
-	Rain = "",
-	Thunder = "",
-	HailHit = "",
-	BlockBreak = "",
-	Leak = "",
-	DoorOpen = "",
-	DoorClose = "",
-	Place = "",
+	Click = "rbxassetid://9114216120",
+	Purchase = "rbxassetid://9118130272",
+	Error = "rbxassetid://54068096",
+	Success = "rbxassetid://9125571221",
+	Rain = "rbxassetid://9112854440",
+	Thunder = "rbxassetid://12222030",
+	HailHit = "rbxassetid://173745512",
+	BlockBreak = "rbxassetid://9120255257",
+	Leak = "rbxassetid://9120568250",
+	DoorOpen = "rbxassetid://5930776613",
+	DoorClose = "rbxassetid://5930776613",
+	Place = "rbxassetid://9119670627",
 } :: { [string]: string }
+
+-- Встроенные звуки клиента (rbxasset://) есть всегда — подставляются, если ID не загрузился.
+Sounds.Fallbacks = {
+	Click = "rbxasset://sounds/volume_slider.ogg",
+	Purchase = "rbxasset://sounds/volume_slider.ogg",
+	Error = "rbxasset://sounds/ouch.ogg",
+	Success = "rbxasset://sounds/volume_slider.ogg",
+	Rain = "rbxassetid://1516791621",
+	Thunder = "rbxasset://sounds/impact_explosion_03.mp3",
+	HailHit = "rbxasset://sounds/action_jump_land.mp3",
+	BlockBreak = "rbxasset://sounds/impact_explosion_03.mp3",
+	Leak = "rbxasset://sounds/impact_water.mp3",
+	DoorOpen = "rbxasset://sounds/action_jump_land.mp3",
+	DoorClose = "rbxasset://sounds/action_jump_land.mp3",
+	Place = "rbxasset://sounds/action_jump_land.mp3",
+} :: { [string]: string }
+
+-- Высота звука по умолчанию (например, градина — короткий высокий "клик" льда).
+Sounds.Pitch = {
+	HailHit = 1.6,
+	Thunder = 0.8,
+	DoorClose = 0.85,
+} :: { [string]: number }
 
 Sounds.Volumes = {
 	Click = 0.5,
@@ -83,6 +107,7 @@ local function template(name: string): Sound?
 	s.Name = name
 	s.SoundId = id
 	s.Volume = Sounds.Volumes[name] or 0.5
+	s.PlaybackSpeed = Sounds.Pitch[name] or 1
 	s.Parent = SoundService
 	templates[name] = s
 	return s
@@ -113,7 +138,7 @@ function Sounds.playAt(name: string, position: Vector3, volumeScale: number?)
 	att.WorldPosition = position
 	local s = base:Clone()
 	s.Volume = base.Volume * (volumeScale or 1)
-	s.PlaybackSpeed = 0.9 + math.random() * 0.2
+	s.PlaybackSpeed = base.PlaybackSpeed * (0.9 + math.random() * 0.2)
 	s.RollOffMode = Enum.RollOffMode.InverseTapered
 	s.RollOffMinDistance = 8
 	s.RollOffMaxDistance = 140
@@ -140,6 +165,35 @@ function Sounds.loopAt(name: string, parent: Instance, volumeScale: number?): So
 	s.Parent = parent
 	s:Play()
 	return s
+end
+
+-- Предзагрузка всех звуков; если какой-то не загрузился — меняем на встроенный.
+function Sounds.preload()
+	local list: { Instance } = {}
+	for name in Sounds.Ids do
+		local s = template(name)
+		if s then
+			table.insert(list, s)
+		end
+	end
+	task.spawn(function()
+		local ok, err = pcall(function()
+			ContentProvider:PreloadAsync(list, function(contentId: string, status: Enum.AssetFetchStatus)
+				if status == Enum.AssetFetchStatus.Success then
+					return
+				end
+				for name, s in templates do
+					local fallback = Sounds.Fallbacks[name]
+					if s.SoundId == contentId and fallback and fallback ~= contentId then
+						s.SoundId = fallback
+					end
+				end
+			end)
+		end)
+		if not ok then
+			warn("[Sounds] preload failed: " .. tostring(err))
+		end
+	end)
 end
 
 return Sounds

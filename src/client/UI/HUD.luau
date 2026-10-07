@@ -57,6 +57,7 @@ local PHASE_ICONS: { [string]: string } = {
 local TOAST_COLORS: { [string]: Color3 } = {
 	info = Theme.Blue,
 	success = Theme.Green,
+	purchase = Theme.Yellow,
 	error = Theme.Red,
 	warning = Theme.Orange,
 }
