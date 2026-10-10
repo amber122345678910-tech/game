@@ -310,14 +310,20 @@ end
 local function computeScale(entry: ScaledEntry): number
 	local vp = viewportSize()
 	local touch = UIKit.isTouch()
+	-- телефон: сенсор и низкий экран (в точках); планшеты выше 500
+	local phone = touch and math.min(vp.X, vp.Y) < 500
 	if entry.mode == "hud" then
 		local s = math.min(vp.Y / 720, vp.X / 1100)
-		-- на телефоне не даём кнопкам стать меньше удобного для пальца размера
-		return math.clamp(s, if touch then 0.72 else 0.62, 1.35)
+		if phone then
+			-- на телефоне панели компактнее, чтобы не закрывать полэкрана
+			return math.clamp(s * 0.9, 0.45, 0.8)
+		end
+		return math.clamp(s, if touch then 0.6 else 0.62, 1.35)
 	end
 	-- модальное окно целиком помещается на экран
-	local s = math.min(vp.X * 0.94 / entry.designW, vp.Y * 0.9 / entry.designH)
-	return math.clamp(s, 0.4, 1.3)
+	local fw, fh = if phone then 0.86 else 0.94, if phone then 0.84 else 0.9
+	local s = math.min(vp.X * fw / entry.designW, vp.Y * fh / entry.designH)
+	return math.clamp(s, 0.3, 1.3)
 end
 
 function UIKit.autoScale(object: GuiObject, mode: ScaleMode, designW: number?, designH: number?): UIScale
