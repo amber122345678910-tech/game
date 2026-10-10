@@ -43,6 +43,9 @@ local shopButton: TextButton
 local buildButton: TextButton
 local sideColumn: Frame
 local sideList: UIListLayout
+local banner: TextLabel
+local bannerPhase = ""
+local bannerToken = 0
 
 local displayedCoins = 0
 local targetCoins = 0
@@ -188,7 +191,7 @@ local function buildSideButtons()
 		Name = "SideButtons",
 		AnchorPoint = Vector2.new(0, 0.5),
 		Position = UDim2.new(0, 12, 0.45, 0),
-		Size = UDim2.fromOffset(92, 300),
+		Size = UDim2.fromOffset(92, 404),
 		BackgroundTransparency = 1,
 		Parent = gui,
 	}) :: Frame
@@ -207,6 +210,9 @@ local function buildSideButtons()
 	end)
 	local bunkerButton = sideButton(column, 3, "📍", "Бункер", Theme.Purple, function()
 		ClientState.WaypointRequested:Fire()
+	end)
+	sideButton(column, 4, "👥", "Друзья", Theme.Green, function()
+		ClientState.TeamRequested:Fire()
 	end)
 	ClientState.Elements.ShopButton = shopButton
 	ClientState.Elements.BuildButton = buildButton
@@ -482,7 +488,9 @@ local function refreshStart()
 	local inBunker = player:GetAttribute("InBunker") == true
 	local plot = myPlot()
 	local hasBunker = plot ~= nil and plot:GetAttribute("HasBunker") == true
+	-- гость в бункере друга шторм не запускает — это делает хозяин
 	local canShow = inZone
+		and not ClientState.isGuest()
 		and not ClientState.inStorm()
 		and not ClientState.BuildMode
 		and not ClientState.ModalOpen
@@ -541,11 +549,28 @@ local function refreshStorm()
 	warningHolder.Position = UDim2.new(0.5, 0, 0, 8 + math.floor(182 * hudScale))
 	if not active or not plot then
 		warningLabel.Visible = false
+		bannerPhase = ""
 		return
 	end
 	local phase = plot:GetAttribute("Phase")
 	local phaseName = if typeof(phase) == "string" then Config.PhaseNames[phase] else nil
 	setText(phaseLabel, (PHASE_ICONS[phase :: any] or "") .. " " .. (phaseName or ""))
+	-- крупная надпись в центре экрана при начале каждого бедствия
+	if typeof(phase) == "string" and phase ~= bannerPhase then
+		bannerPhase = phase
+		if phaseName and phase ~= Config.Phases.Prep and phase ~= Config.Phases.Calm then
+			bannerToken += 1
+			local token = bannerToken
+			banner.Text = (PHASE_ICONS[phase] or "") .. " " .. string.upper(phaseName)
+			banner.TextTransparency = 0
+			banner.Visible = true
+			task.delay(2.5, function()
+				if token == bannerToken then
+					UIKit.tween(banner, 0.6, { TextTransparency = 1 })
+				end
+			end)
+		end
+	end
 	local endsAt = plot:GetAttribute("PhaseEndsAt")
 	if typeof(endsAt) == "number" then
 		setText(timerLabel, formatTime(endsAt - workspace:GetServerTimeNow()))
@@ -613,6 +638,17 @@ function HUD.init()
 	buildStart()
 	buildStormPanel()
 	buildToasts()
+	banner = UIKit.label({
+		Name = "PhaseBanner",
+		Text = "",
+		Size = UDim2.fromScale(0.8, 0.12),
+		Position = UDim2.fromScale(0.5, 0.36),
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		TextColor3 = Theme.Yellow,
+		MaxTextSize = 64,
+		Visible = false,
+		Parent = gui,
+	})
 
 	ClientState.Notified:Connect(showToast)
 	ClientState.DataChanged:Connect(refreshData)
@@ -620,7 +656,7 @@ function HUD.init()
 		refreshData(ClientState.Data)
 	end
 
-	for _, attr in { "InPlotZone", "InBunker", "InStorm" } do
+	for _, attr in { "InPlotZone", "InBunker", "InStorm", "IsGuest" } do
 		player:GetAttributeChangedSignal(attr):Connect(function()
 			refreshStart()
 			refreshStorm()

@@ -38,6 +38,7 @@ ClientState.ShopTabChanged = Signal.new() :: Signal.Signal<string>
 
 -- Показать стрелку к бункеру
 ClientState.WaypointRequested = Signal.new() :: Signal.Signal<>
+ClientState.TeamRequested = Signal.new() :: Signal.Signal<>
 
 -- Элементы интерфейса, на которые может указывать обучение (по имени)
 ClientState.Elements = {} :: { [string]: GuiObject }
@@ -69,8 +70,10 @@ function ClientState.setBuildMode(on: boolean)
 	ClientState.BuildModeChanged:Fire(on)
 end
 
+-- Участок, где я сейчас играю: свой или друга (если я гость в его бункере).
 function ClientState.getPlotModel(): Model?
-	local plotId = player:GetAttribute("PlotId")
+	local active = player:GetAttribute("ActivePlotId")
+	local plotId = if typeof(active) == "number" then active else player:GetAttribute("PlotId")
 	if typeof(plotId) ~= "number" then
 		return nil
 	end
@@ -105,6 +108,11 @@ function ClientState.getOrigin(plot: Model): CFrame?
 		return origin
 	end
 	return nil
+end
+
+-- Я гость в бункере друга?
+function ClientState.isGuest(): boolean
+	return player:GetAttribute("IsGuest") == true
 end
 
 -- Идёт ли шторм на моём участке.

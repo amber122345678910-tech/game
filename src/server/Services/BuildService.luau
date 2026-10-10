@@ -73,8 +73,9 @@ local function markLayoutDirty(player: Player)
 	end)
 end
 
+-- Участок, где игрок строит: свой или друга (если он гость в чужом бункере).
 local function getBuildablePlot(player: Player): PlotService.Plot?
-	local plot = PlotService.getPlot(player)
+	local plot = PlotService.getActivePlot(player)
 	if not plot or not DataService.get(player) then
 		return nil
 	end
@@ -138,7 +139,8 @@ local function onPlace(player: Player, blockId: any, x: any, y: any, z: any, rot
 		DataService.addBlocks(player, def.Id, 1) -- вернуть блок
 		return
 	end
-	markLayoutDirty(player)
+	-- сохраняется раскладка хозяина участка (гость строит в чужом бункере)
+	markLayoutDirty(plot.Owner or player)
 end
 
 -- Не даём замуровать персонажа внутри блока.
@@ -176,7 +178,7 @@ local function onRemove(player: Player, x: any, y: any, z: any)
 		if not rec.def.Indestructible then
 			DataService.addBlocks(player, rec.id, 1)
 		end
-		markLayoutDirty(player)
+		markLayoutDirty(plot.Owner or player)
 	end
 end
 
@@ -186,6 +188,10 @@ local function onClear(player: Player)
 	end
 	local plot = getBuildablePlot(player)
 	if not plot then
+		return
+	end
+	if plot.Owner ~= player then
+		notify(player, "Разобрать весь бункер может только его хозяин", "error")
 		return
 	end
 	local counts = PlotService.clear(plot)

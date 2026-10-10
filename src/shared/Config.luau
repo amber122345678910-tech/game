@@ -58,7 +58,7 @@ Config.DataVersion = 1
 Config.DataStoreName = "BunkerSimulator_v1"
 
 -- Версия сборки (видна в углу экрана и в Output) — чтобы было понятно, какой файл открыт.
-Config.Version = "1.6"
+Config.Version = "1.7"
 
 -- Сетка постройки (локальные координаты участка). Клетка = куб 4x4x4.
 Config.Grid = {
@@ -365,7 +365,7 @@ Config.Phases = {
 -- Дополнительные бедствия: чем выше уровень, тем больше их в одном шторме.
 Config.ExtraDisasters = { "Wind", "Meteor", "Quake" }
 function Config.extraDisasterCount(level: number): number
-	return math.clamp(1 + (math.floor(level) - 1) // 3, 1, 3)
+	return #Config.ExtraDisasters -- все бедствия в каждом шторме (сила растёт с уровнем)
 end
 
 Config.PhaseNames = {

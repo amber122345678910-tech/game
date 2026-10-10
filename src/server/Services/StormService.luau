@@ -27,9 +27,18 @@ type PendingHail = {
 	meteor: boolean,
 }
 
+-- Участник шторма: хозяин участка и друзья-гости, которые были на участке при старте.
+type Participant = {
+	Player: Player,
+	OutOfZone: number,
+	WarnedZone: boolean,
+	Done: boolean,
+}
+
 export type Session = {
 	Plot: Plot,
-	Player: Player,
+	Player: Player, -- хозяин участка
+	Participants: { Participant },
 	Level: number,
 	Params: Config.StormParams,
 	Phase: string,
@@ -56,8 +65,6 @@ export type Session = {
 	AcidTick: number,
 	LastOutside: number,
 	LastInside: number,
-	OutOfZone: number,
-	WarnedZone: boolean,
 	AttrTimer: number,
 	LastLeakCount: number,
 	LastLeakKey: string,
@@ -112,11 +119,11 @@ local function getHumanoid(player: Player): Humanoid?
 	return nil
 end
 
-local function damagePlayer(session: Session, amount: number)
+local function damagePlayer(player: Player, amount: number)
 	if amount <= 0 then
 		return
 	end
-	local hum = getHumanoid(session.Player)
+	local hum = getHumanoid(player)
 	if hum then
 		hum:TakeDamage(amount)
 	end
@@ -274,13 +281,33 @@ end
 ----------------------------------------------------------------------
 -- Град
 ----------------------------------------------------------------------
-local function playerLocal(session: Session): Vector3?
-	local character = session.Player.Character
+local function playerLocal(session: Session, player: Player): Vector3?
+	local character = player.Character
 	local root = character and character:FindFirstChild("HumanoidRootPart")
 	if root and root:IsA("BasePart") then
 		return (session.Plot.Origin:PointToObjectSpace(root.Position))
 	end
 	return nil
+end
+
+-- Для каждого ещё играющего участника (с позицией в координатах участка).
+local function eachActive(session: Session, fn: (Player, Vector3) -> ())
+	for _, part in session.Participants do
+		if not part.Done then
+			local lp = playerLocal(session, part.Player)
+			if lp then
+				fn(part.Player, lp)
+			end
+		end
+	end
+end
+
+local function notifyAll(session: Session, text: string, kind: string)
+	for _, part in session.Participants do
+		if not part.Done and part.Player.Parent == Players then
+			notify(part.Player, text, kind)
+		end
+	end
 end
 
 local function spawnHail(session: Session, dt: number, meteor: boolean)
@@ -332,7 +359,7 @@ local function applyMeteor(session: Session, h: PendingHail)
 	local p = session.Params
 	local plot = session.Plot
 	local cx, _, cz = Grid.localToCell(h.lx, 0, h.lz)
-	local impactY
+	local impactY: number
 	if Grid.inBounds(cx, 0, cz) then
 		local hits
 		hits, impactY = StormSim.meteorHits(plot.Cells, cx, cz)
@@ -342,10 +369,9 @@ local function applyMeteor(session: Session, h: PendingHail)
 	else
 		impactY = surfaceHeight(session, h.lx, h.lz)
 	end
-	local lp = playerLocal(session)
-	if lp then
-		damagePlayer(session, StormSim.meteorPlayerDamage(p, plot.Cells, h.lx, h.lz, impactY, lp.X, lp.Y, lp.Z))
-	end
+	eachActive(session, function(player, lp)
+		damagePlayer(player, StormSim.meteorPlayerDamage(p, plot.Cells, h.lx, h.lz, impactY, lp.X, lp.Y, lp.Z))
+	end)
 end
 
 local function applyHail(session: Session, h: PendingHail)
@@ -367,12 +393,9 @@ local function applyHail(session: Session, h: PendingHail)
 			PlotService.damage(plot, rec, damage, "hail")
 		end
 	end
-	local lp = playerLocal(session)
-	if not lp then
-		return
-	end
-	local amount = StormSim.hailPlayerDamage(p, plot.Cells, hitRec, impactY, h.lx, h.lz, h.big, lp.X, lp.Y, lp.Z)
-	damagePlayer(session, amount)
+	eachActive(session, function(player, lp)
+		damagePlayer(player, StormSim.hailPlayerDamage(p, plot.Cells, hitRec, impactY, h.lx, h.lz, h.big, lp.X, lp.Y, lp.Z))
+	end)
 end
 
 local function processPending(session: Session)
@@ -458,15 +481,15 @@ local function floodStep(session: Session, dt: number)
 	if #leakRecs > 0 and not session.LeakWarned then
 		session.LeakWarned = true
 		local door = leakRecs[1].def
-		notify(
-			session.Player,
+		notifyAll(
+			session,
 			string.format("☣ Кислота просачивается через дверь! «%s» держит только %g ст. Купи дверь прочнее.", door.Name, door.Seal),
 			"warning"
 		)
 	end
 	if result.breach and not session.FloodWarned then
 		session.FloodWarned = true
-		notify(session.Player, "☣ Пробоина в стене! Бункер затапливает — ставь стены прочнее.", "error")
+		notifyAll(session, "☣ Пробоина в стене! Бункер затапливает — ставь стены прочнее.", "error")
 	end
 
 	-- атрибуты для визуала протечки (только при изменении)
@@ -498,23 +521,22 @@ local function floodStep(session: Session, dt: number)
 end
 
 local function playerAcidDamage(session: Session, dt: number)
-	local lp = playerLocal(session)
-	if not lp then
-		return
-	end
-	local amount = StormSim.playerAcidDamage(
-		session.Params,
-		session.Phase == PHASES.Acid,
-		session.Plot.Cells,
-		session.Interior,
-		lp.X,
-		lp.Y,
-		lp.Z,
-		session.PoolLevel,
-		session.InsideLevel,
-		dt
-	)
-	damagePlayer(session, amount)
+	local acidRaining = session.Phase == PHASES.Acid
+	eachActive(session, function(player, lp)
+		local amount = StormSim.playerAcidDamage(
+			session.Params,
+			acidRaining,
+			session.Plot.Cells,
+			session.Interior,
+			lp.X,
+			lp.Y,
+			lp.Z,
+			session.PoolLevel,
+			session.InsideLevel,
+			dt
+		)
+		damagePlayer(player, amount)
+	end)
 end
 
 ----------------------------------------------------------------------
@@ -527,20 +549,20 @@ local function setPhase(session: Session, phase: string)
 	model:SetAttribute("Phase", phase)
 	model:SetAttribute("PhaseEndsAt", workspace:GetServerTimeNow() + (PHASE_DURATION[phase] or 0))
 	if phase == PHASES.Hail then
-		notify(session.Player, "Начался град! Держись в бункере!", "warning")
+		notifyAll(session, "Начался град! Держись в бункере!", "warning")
 	elseif phase == PHASES.Wind then
 		local d = WIND_DIRS[session.Rng:NextInteger(1, #WIND_DIRS)]
 		session.WindX, session.WindZ = d[1], d[2]
 		model:SetAttribute("WindDir", Vector3.new(d[1], 0, d[2]))
-		notify(session.Player, "🌪 Ураган! Ветер ломает стены с наветренной стороны — дерево и стекло сдувает!", "warning")
+		notifyAll(session, "🌪 Ураган! Ветер ломает стены с наветренной стороны — дерево и стекло сдувает!", "warning")
 	elseif phase == PHASES.Meteor then
-		notify(session.Player, "☄ Метеоритный дождь! Метеориты пробивают крыши — прячься глубже!", "warning")
+		notifyAll(session, "☄ Метеоритный дождь! Метеориты пробивают крыши — прячься глубже!", "warning")
 	elseif phase == PHASES.Quake then
-		notify(session.Player, "🌍 Землетрясение! Высокие постройки трясёт сильнее всего, под землёй безопаснее.", "warning")
+		notifyAll(session, "🌍 Землетрясение! Высокие постройки трясёт сильнее всего, под землёй безопаснее.", "warning")
 	elseif phase == PHASES.Acid then
-		notify(session.Player, "Кислотный дождь! Кислота разъедает металл и собирается в лужу!", "warning")
+		notifyAll(session, "Кислотный дождь! Кислота разъедает металл и собирается в лужу!", "warning")
 	elseif phase == PHASES.Clear then
-		notify(session.Player, "Шторм уходит...", "info")
+		notifyAll(session, "Шторм уходит...", "info")
 	end
 end
 
@@ -574,8 +596,7 @@ local function cleanupPlot(session: Session)
 end
 
 -- Если восстановленный блок появился там, где стоит игрок, — переносим его внутрь бункера.
-local function unstickPlayer(session: Session)
-	local player = session.Player
+local function unstickPlayer(session: Session, player: Player)
 	local character = player.Character
 	local root = character and character:FindFirstChild("HumanoidRootPart")
 	if player.Parent ~= Players or not character or not root or not root:IsA("BasePart") then
@@ -618,6 +639,78 @@ local function unstickPlayer(session: Session)
 	character:PivotTo(plot.Origin * CFrame.new(target))
 end
 
+local function bunkerFrac(session: Session): number
+	local hpNow = 0
+	for _, rec in session.Plot.Records do
+		hpNow += math.max(rec.hp, 0)
+	end
+	return if session.StartHP > 0 then hpNow / session.StartHP else 0
+end
+
+local function anyActive(session: Session): boolean
+	for _, part in session.Participants do
+		if not part.Done then
+			return true
+		end
+	end
+	return false
+end
+
+-- Участник закончил шторм (выжил, погиб, ушёл): награда и результат только ему.
+local function endParticipant(session: Session, part: Participant, reason: string)
+	if part.Done then
+		return
+	end
+	part.Done = true
+	local player = part.Player
+	if sessions[player] == session then
+		sessions[player] = nil
+	end
+	local survived = reason == "survived"
+	local frac = bunkerFrac(session)
+	local progress = math.clamp(session.Elapsed / session.TotalDuration, 0, 1)
+	local data = DataService.get(player)
+	local reward = 0
+	if reason ~= "quit" and data then
+		reward = Config.computeReward(session.Level, survived, frac, progress)
+		data.StormsPlayed += 1
+		if survived then
+			data.StormsSurvived += 1
+			-- гость, переживший шторм уровнем выше своего, тоже поднимается
+			data.StormLevel = math.max(data.StormLevel, math.min(Config.Economy.MaxLevel, session.Level + 1))
+			data.BestLevel = math.max(data.BestLevel, data.StormLevel)
+		end
+		if reward > 0 then
+			data.Coins += reward
+		end
+		DataService.replicate(player)
+	end
+	if player.Parent ~= Players then
+		return
+	end
+	cooldowns[player] = os.clock()
+	player:SetAttribute("InStorm", false)
+	if reason == "quit" then
+		return
+	end
+	if survived then
+		local hum = getHumanoid(player)
+		if hum then
+			hum.Health = hum.MaxHealth
+		end
+	end
+	local result: Remotes.StormResult = {
+		Survived = survived,
+		Reward = reward,
+		Level = session.Level,
+		NewLevel = if data then data.StormLevel else session.Level,
+		BunkerPercent = math.floor(math.clamp(frac, 0, 1) * 100 + 0.5),
+		Duration = math.floor(session.Elapsed),
+		Reason = reason,
+	}
+	Remotes.StormResult:FireClient(player, result)
+end
+
 local function finish(session: Session, reason: string)
 	if session.Ended then
 		return
@@ -628,92 +721,72 @@ local function finish(session: Session, reason: string)
 	end
 	table.clear(session.Connections)
 
-	local player = session.Player
+	for _, part in session.Participants do
+		endParticipant(session, part, reason)
+	end
 	local plot = session.Plot
-	local survived = reason == "survived"
-	local hpNow = 0
-	for _, rec in plot.Records do
-		hpNow += math.max(rec.hp, 0)
-	end
-	local frac = if session.StartHP > 0 then hpNow / session.StartHP else 0
-	local progress = math.clamp(session.Elapsed / session.TotalDuration, 0, 1)
-
-	local data = DataService.get(player)
-	local reward = 0
-	if reason ~= "quit" and data then
-		reward = Config.computeReward(session.Level, survived, frac, progress)
-		data.StormsPlayed += 1
-		if survived then
-			data.StormsSurvived += 1
-			data.StormLevel = math.min(Config.Economy.MaxLevel, session.Level + 1)
-			data.BestLevel = math.max(data.BestLevel, data.StormLevel)
-		end
-		if reward > 0 then
-			data.Coins += reward
-		end
-		DataService.replicate(player)
-	end
-
 	cleanupPlot(session)
 	-- восстанавливаем бункер как был до шторма — всегда, даже если игрок вышел из игры:
 	-- сразу после этого раскладка сохраняется в профиль, и в ней не должно быть разрушений
 	PlotService.restoreLayout(plot, session.Snapshot)
-	unstickPlayer(session)
-	plot.Session = nil
-	sessions[player] = nil
-	if player.Parent == Players then
-		cooldowns[player] = os.clock()
-		player:SetAttribute("InStorm", false)
-	end
-
-	if reason ~= "quit" and player.Parent == Players then
-		if survived then
-			local hum = getHumanoid(player)
-			if hum then
-				hum.Health = hum.MaxHealth
-			end
+	for _, part in session.Participants do
+		if part.Player.Parent == Players then
+			unstickPlayer(session, part.Player)
 		end
-		local result: Remotes.StormResult = {
-			Survived = survived,
-			Reward = reward,
-			Level = session.Level,
-			NewLevel = if data then data.StormLevel else session.Level,
-			BunkerPercent = math.floor(math.clamp(frac, 0, 1) * 100 + 0.5),
-			Duration = math.floor(session.Elapsed),
-			Reason = reason,
-		}
-		Remotes.StormResult:FireClient(player, result)
+	end
+	plot.Session = nil
+end
+
+-- Участник выбыл; если не осталось никого — шторм заканчивается.
+local function dropParticipant(session: Session, part: Participant, reason: string)
+	if session.Ended or part.Done then
+		return
+	end
+	endParticipant(session, part, reason)
+	if not anyActive(session) then
+		finish(session, reason)
+	elseif reason == "died" then
+		notifyAll(session, part.Player.DisplayName .. " выбыл! Держитесь до конца шторма!", "warning")
 	end
 end
 
 local function step(session: Session, dt: number)
-	local player = session.Player
-	if player.Parent ~= Players then
+	-- хозяин вышел из игры: бункер восстанавливается, шторм прекращается для всех
+	if session.Player.Parent ~= Players then
 		finish(session, "quit")
-		return
-	end
-	if not getHumanoid(player) then
-		finish(session, "died")
 		return
 	end
 	session.Elapsed += dt
 
-	-- игрок должен оставаться на участке
-	local character = player.Character
-	local root = character and character:FindFirstChild("HumanoidRootPart")
-	if root and root:IsA("BasePart") and not PlotService.isInZone(session.Plot, root.Position) then
-		session.OutOfZone += dt
-		if not session.WarnedZone then
-			session.WarnedZone = true
-			notify(player, string.format("Вернись на свой участок! Иначе шторм закончится через %d сек.", S.LeaveGrace), "error")
+	for _, part in session.Participants do
+		if not part.Done then
+			local player = part.Player
+			if player.Parent ~= Players then
+				dropParticipant(session, part, "quit")
+			elseif not getHumanoid(player) then
+				dropParticipant(session, part, "died")
+			else
+				-- игрок должен оставаться на участке
+				local character = player.Character
+				local root = character and character:FindFirstChild("HumanoidRootPart")
+				if root and root:IsA("BasePart") and not PlotService.isInZone(session.Plot, root.Position) then
+					part.OutOfZone += dt
+					if not part.WarnedZone then
+						part.WarnedZone = true
+						notify(player, string.format("Вернись на участок! Иначе через %d сек. ты выбудешь из шторма.", S.LeaveGrace), "error")
+					end
+					if part.OutOfZone >= S.LeaveGrace then
+						dropParticipant(session, part, "left")
+					end
+				else
+					part.OutOfZone = 0
+					part.WarnedZone = false
+				end
+			end
+			if session.Ended then
+				return
+			end
 		end
-		if session.OutOfZone >= S.LeaveGrace then
-			finish(session, "left")
-			return
-		end
-	else
-		session.OutOfZone = 0
-		session.WarnedZone = false
 	end
 
 	-- смена фаз
@@ -747,10 +820,9 @@ local function step(session: Session, dt: number)
 		end
 	end
 	if phase == PHASES.Wind then
-		local lp = playerLocal(session)
-		if lp then
-			damagePlayer(session, StormSim.windPlayerDamage(session.Params, session.Plot.Cells, session.Interior, lp.X, lp.Y, lp.Z, dt))
-		end
+		eachActive(session, function(player, lp)
+			damagePlayer(player, StormSim.windPlayerDamage(session.Params, session.Plot.Cells, session.Interior, lp.X, lp.Y, lp.Z, dt))
+		end)
 	end
 	if #session.Pending > 0 then
 		processPending(session)
@@ -799,6 +871,9 @@ local function canStart(player: Player): (PlotService.Plot?, string?)
 	end
 	if plot.Session ~= nil or sessions[player] then
 		return nil, "Шторм уже идёт"
+	end
+	if PlotService.getHostPlot(player) then
+		return nil, "Ты в бункере друга — шторм запускает хозяин"
 	end
 	if os.clock() - (cooldowns[player] or 0) < 3 then
 		return nil, "Подожди пару секунд"
@@ -913,8 +988,7 @@ function StormService.start(player: Player)
 		AcidTick = 0,
 		LastOutside = 0,
 		LastInside = interiorBottom,
-		OutOfZone = 0,
-		WarnedZone = false,
+		Participants = {},
 		AttrTimer = 0,
 		LastLeakCount = 0,
 		LastLeakKey = "",
@@ -925,18 +999,41 @@ function StormService.start(player: Player)
 		Rng = rng,
 	}
 	plot.Session = session
-	sessions[player] = session
-	player:SetAttribute("InStorm", true)
 
-	local hum = getHumanoid(player)
-	if hum then
-		hum.Health = hum.MaxHealth
-		table.insert(
-			session.Connections,
-			hum.Died:Connect(function()
-				task.defer(finish, session, "died")
-			end)
-		)
+	-- участники: хозяин и друзья-гости, которые сейчас на участке
+	local players = { player }
+	for member in plot.Members do
+		local character = member.Character
+		local root = character and character:FindFirstChild("HumanoidRootPart")
+		if
+			member.Parent == Players
+			and sessions[member] == nil
+			and getHumanoid(member)
+			and root
+			and root:IsA("BasePart")
+			and PlotService.isInZone(plot, root.Position)
+		then
+			table.insert(players, member)
+		end
+	end
+	for _, pl in players do
+		local part: Participant = { Player = pl, OutOfZone = 0, WarnedZone = false, Done = false }
+		table.insert(session.Participants, part)
+		sessions[pl] = session
+		pl:SetAttribute("InStorm", true)
+		local hum = getHumanoid(pl)
+		if hum then
+			hum.Health = hum.MaxHealth
+			table.insert(
+				session.Connections,
+				hum.Died:Connect(function()
+					task.defer(dropParticipant, session, part, "died")
+				end)
+			)
+		end
+	end
+	if #players > 1 then
+		notifyAll(session, string.format("👥 Шторм для команды из %d игроков! Выживайте вместе.", #players), "info")
 	end
 
 	local model = plot.Model
@@ -952,9 +1049,9 @@ function StormService.start(player: Player)
 	setPhase(session, PHASES.Prep)
 
 	if Grid.countSet(interior) == 0 then
-		notify(player, "Внимание: у тебя нет закрытого бункера! Град и кислота достанут тебя.", "warning")
-	elseif not player:GetAttribute("InBunker") then
-		notify(player, "Быстрее заходи в бункер и закрой дверь!", "warning")
+		notifyAll(session, "Внимание: нет закрытого бункера! Град и кислота достанут вас.", "warning")
+	else
+		notifyAll(session, "Быстрее заходи в бункер и закрой дверь!", "warning")
 	end
 
 	task.spawn(function()
@@ -973,11 +1070,20 @@ function StormService.start(player: Player)
 	end)
 end
 
--- Прервать шторм игрока (выход из игры). Бункер восстанавливается.
+-- Игрок вышел из игры: хозяин — шторм прекращается (бункер восстанавливается), гость — выбывает.
 function StormService.abort(player: Player)
 	local session = sessions[player]
-	if session then
+	if not session then
+		return
+	end
+	if session.Player == player then
 		finish(session, "quit")
+		return
+	end
+	for _, part in session.Participants do
+		if part.Player == player then
+			dropParticipant(session, part, "quit")
+		end
 	end
 end
 

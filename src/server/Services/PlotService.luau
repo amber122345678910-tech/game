@@ -30,6 +30,7 @@ export type Plot = {
 	Version: number, -- увеличивается при любом изменении блоков
 	Dirt: { [number]: BlockRecord }, -- клетка -> земля
 	Dug: { [number]: boolean }, -- выкопанные подземные клетки
+	Members: { [Player]: boolean }, -- друзья, которые играют в этом бункере (строят и выживают вместе)
 }
 
 local PlotService = {}
@@ -39,6 +40,7 @@ local PIT = Config.Plot.PitHalfSize
 
 local plots: { Plot } = {}
 local playerPlots: { [Player]: Plot } = {}
+local guestOf: { [Player]: Plot } = {} -- игрок -> чужой участок, где он играет с другом
 local scheduleBunkerCheck: (plot: Plot) -> ()
 local resetTerrain: (plot: Plot, dug: { [number]: boolean }?) -> ()
 
@@ -111,6 +113,7 @@ function PlotService.init()
 					Version = 0,
 					Dirt = {},
 					Dug = {},
+					Members = {},
 				}
 				table.insert(plots, plot)
 				-- старое превью земли из редактора (если осталось) мешало копать — убираем
@@ -140,7 +143,7 @@ function PlotService.init()
 		end
 		accumulator = 0
 		for player, plot in playerPlots do
-			PlotService.updatePlayerZone(player, plot)
+			PlotService.updatePlayerZone(player, guestOf[player] or plot)
 		end
 	end)
 end
@@ -172,6 +175,7 @@ function PlotService.assign(player: Player): Plot?
 			plot.Owner = player
 			playerPlots[player] = plot
 			player:SetAttribute("PlotId", plot.Id)
+			player:SetAttribute("ActivePlotId", plot.Id)
 			updateOwnerAttributes(plot)
 			return plot
 		end
@@ -179,10 +183,50 @@ function PlotService.assign(player: Player): Plot?
 	return nil
 end
 
+----------------------------------------------------------------------
+-- Игра с другом: гость строит и выживает в бункере хозяина
+----------------------------------------------------------------------
+-- Участок, где игрок сейчас играет: чужой (если он гость) или свой.
+function PlotService.getActivePlot(player: Player): Plot?
+	return guestOf[player] or playerPlots[player]
+end
+
+function PlotService.getHostPlot(player: Player): Plot?
+	return guestOf[player]
+end
+
+function PlotService.removeGuest(player: Player)
+	local plot = guestOf[player]
+	if not plot then
+		return
+	end
+	guestOf[player] = nil
+	plot.Members[player] = nil
+	if player.Parent ~= nil then
+		local own = playerPlots[player]
+		player:SetAttribute("ActivePlotId", if own then own.Id else nil)
+		player:SetAttribute("IsGuest", false)
+	end
+end
+
+function PlotService.addGuest(plot: Plot, player: Player)
+	PlotService.removeGuest(player)
+	guestOf[player] = plot
+	plot.Members[player] = true
+	player:SetAttribute("ActivePlotId", plot.Id)
+	player:SetAttribute("IsGuest", true)
+end
+
 function PlotService.release(player: Player)
+	PlotService.removeGuest(player)
 	local plot = playerPlots[player]
 	if not plot then
 		return
+	end
+	-- хозяин ушёл: гости возвращаются к себе
+	for member in plot.Members do
+		PlotService.removeGuest(member)
+		Remotes.Notify:FireClient(member, "Хозяин бункера вышел из игры — ты снова на своём участке.", "info")
 	end
 	playerPlots[player] = nil
 	PlotService.clear(plot)

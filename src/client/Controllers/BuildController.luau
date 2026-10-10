@@ -926,12 +926,15 @@ function BuildController.init()
 			ClientState.setBuildMode(false)
 		end
 	end)
-	player:GetAttributeChangedSignal("PlotId"):Connect(function()
-		local model = ClientState.getPlotModel()
-		if model then
-			bindPlot(model)
-		end
-	end)
+	-- свой участок или участок друга (гость строит в его бункере)
+	for _, attr in { "PlotId", "ActivePlotId" } do
+		player:GetAttributeChangedSignal(attr):Connect(function()
+			local model = ClientState.getPlotModel()
+			if model then
+				bindPlot(model)
+			end
+		end)
+	end
 
 	-- B — включить/выключить строительство (всегда доступно)
 	ContextActionService:BindAction("ToggleBuild", function(_, state)

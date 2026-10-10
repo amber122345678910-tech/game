@@ -40,6 +40,18 @@
         },
         "Purchase": {
           "$className": "RemoteFunction"
+        },
+        "TeamInvite": {
+          "$className": "RemoteEvent"
+        },
+        "TeamRespond": {
+          "$className": "RemoteEvent"
+        },
+        "TeamLeave": {
+          "$className": "RemoteEvent"
+        },
+        "TeamInviteReceived": {
+          "$className": "RemoteEvent"
         }
       }
     },

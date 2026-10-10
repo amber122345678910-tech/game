@@ -9,6 +9,9 @@
 --   StartStorm()
 --   TutorialDone()
 --   Purchase (RemoteFunction): (kind: "block" | "prefab", id: string, amount: number) -> (ok: boolean, message: string)
+--   TeamInvite(targetUserId: number) — позвать игрока в свой бункер
+--   TeamRespond(fromUserId: number, accept: boolean) — ответ на приглашение
+--   TeamLeave() — уйти из чужого бункера / распустить команду
 -- Сервер -> клиент:
 --   DataUpdated(snapshot: DataSnapshot)
 --   Notify(text: string, kind: "info" | "success" | "error" | "warning")
@@ -16,6 +19,7 @@
 --     плоский массив по 4 числа на градину: lx, lz, impactY, big(0/1) — в локальных координатах участка
 --   BlockBroken(plotId: number, position: Vector3, color: Color3)
 --   StormResult(result: StormResult)
+--   TeamInviteReceived(fromUserId: number, fromName: string)
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
@@ -58,6 +62,10 @@ local Remotes = {
 	BlockBroken = event("BlockBroken"),
 	StormResult = event("StormResult"),
 	Purchase = folder:WaitForChild("Purchase") :: RemoteFunction,
+	TeamInvite = event("TeamInvite"),
+	TeamRespond = event("TeamRespond"),
+	TeamLeave = event("TeamLeave"),
+	TeamInviteReceived = event("TeamInviteReceived"),
 }
 
 return Remotes

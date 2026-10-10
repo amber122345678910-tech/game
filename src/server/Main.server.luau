@@ -10,6 +10,7 @@ local BuildService = require(Services:WaitForChild("BuildService"))
 local ShopService = require(Services:WaitForChild("ShopService"))
 local StormService = require(Services:WaitForChild("StormService"))
 local TutorialService = require(Services:WaitForChild("TutorialService"))
+local TeamService = require(Services:WaitForChild("TeamService"))
 
 local Shared = game:GetService("ReplicatedStorage"):WaitForChild("Shared")
 local Grid = require(Shared:WaitForChild("Grid"))
@@ -22,6 +23,7 @@ BuildService.init()
 ShopService.init()
 StormService.init()
 TutorialService.init()
+TeamService.init()
 
 -- Когда данные игрока загружены — выдаём участок и строим сохранённый бункер.
 DataService.Loaded:Connect(function(player, data)
