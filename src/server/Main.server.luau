@@ -15,6 +15,8 @@ local Shared = game:GetService("ReplicatedStorage"):WaitForChild("Shared")
 local Grid = require(Shared:WaitForChild("Grid"))
 local Remotes = require(Shared:WaitForChild("Remotes"))
 
+print(string.format("[BunkerSimulator] версия %s: под землёй %d слоёв", require(Shared:WaitForChild("Config")).Version, Grid.SURFACE))
+
 PlotService.init()
 BuildService.init()
 ShopService.init()

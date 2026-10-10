@@ -328,7 +328,7 @@ end
 local function refreshInfo()
 	local id = selected
 	if deleteMode then
-		infoLabel.Text = "🗑 Удаление: блоки возвращаются в инвентарь • землю можно копать вглубь"
+		infoLabel.Text = string.format("🗑 Удаление: блоки — в инвентарь • землю можно копать на %d блоков вниз", Grid.SURFACE)
 	elseif id then
 		local def = Config.Blocks[id]
 		infoLabel.Text = string.format("%s %s  •  ❤ %d  •  У тебя: %d", BLOCK_ICONS[id] or "", def.Name, def.HP, ClientState.blockCount(id))

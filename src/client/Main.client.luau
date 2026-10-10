@@ -47,6 +47,27 @@ if Players.LocalPlayer.Character then
 	task.spawn(onCharacter, Players.LocalPlayer.Character)
 end
 
+-- Маленькая метка версии в углу экрана
+do
+	local Config = require(game:GetService("ReplicatedStorage"):WaitForChild("Shared"):WaitForChild("Config"))
+	local gui = UIKit.new("ScreenGui", {
+		Name = "VersionTag",
+		ResetOnSpawn = false,
+		DisplayOrder = -1,
+		Parent = Players.LocalPlayer:WaitForChild("PlayerGui"),
+	}) :: ScreenGui
+	UIKit.label({
+		Text = "v" .. Config.Version,
+		Size = UDim2.fromOffset(60, 16),
+		AnchorPoint = Vector2.new(0, 1),
+		Position = UDim2.new(0, 6, 1, -4),
+		TextXAlignment = Enum.TextXAlignment.Left,
+		TextTransparency = 0.5,
+		MaxTextSize = 14,
+		Parent = gui,
+	})
+end
+
 Sounds.preload()
 UIKit.setClickSound(Sounds.get("Click"))
 
