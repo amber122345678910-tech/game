@@ -58,7 +58,7 @@ Config.DataVersion = 1
 Config.DataStoreName = "BunkerSimulator_v1"
 
 -- Версия сборки (видна в углу экрана и в Output) — чтобы было понятно, какой файл открыт.
-Config.Version = "1.5"
+Config.Version = "1.6"
 
 -- Сетка постройки (локальные координаты участка). Клетка = куб 4x4x4.
 Config.Grid = {

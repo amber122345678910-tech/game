@@ -426,18 +426,6 @@ for id, cf in plotFrames do
 	box(L(cf, mid, -slabH / 2, 0), Vector3.new(margin, slabH, GRID_HALF * 2), COLORS.PitFloor, Enum.Material.Concrete, env, "Floor")
 	-- дно подземной части сетки (коренная порода: глубже копать нельзя, но на ней можно строить)
 	box(L(cf, 0, -under - 1, 0), Vector3.new(GRID_HALF * 2, 2, GRID_HALF * 2), Color3.fromRGB(45, 42, 48), Enum.Material.Basalt, env, "Bedrock")
-	-- Земля в зоне строительства: в игре её заменяет сервер (по клетке, чтобы можно было копать),
-	-- а этот блок нужен только для вида карты в редакторе.
-	part({
-		Name = "TerrainPreview",
-		Size = Vector3.new(GRID_HALF * 2, under, GRID_HALF * 2),
-		CFrame = L(cf, 0, -under / 2, 0),
-		Color = COLORS.BuildArea,
-		Material = Enum.Material.Ground,
-		CanCollide = true,
-		CanTouch = false,
-		CanQuery = false,
-	}, model)
 	-- Стены котлована (верх чуть ниже земли, чтобы не было мерцания)
 	local wallH = DEPTH
 	local wy = wallH / 2

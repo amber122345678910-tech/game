@@ -113,10 +113,11 @@ function PlotService.init()
 					Dug = {},
 				}
 				table.insert(plots, plot)
-				-- превью земли из редактора заменяем настоящими клетками
-				local preview = child:FindFirstChild("TerrainPreview")
-				if preview then
-					preview:Destroy()
+				-- старое превью земли из редактора (если осталось) мешало копать — убираем
+				for _, d in child:GetDescendants() do
+					if d.Name == "TerrainPreview" then
+						d:Destroy()
+					end
 				end
 				resetTerrain(plot, nil)
 				updateOwnerAttributes(plot)
@@ -419,7 +420,7 @@ local function createDirtPart(plot: Plot, rec: BlockRecord)
 	p.BottomSurface = Enum.SurfaceType.Smooth
 	p.Material = def.Material
 	-- слои земли чуть темнее с глубиной
-	p.Color = def.Color:Lerp(Color3.new(0, 0, 0), (Grid.SURFACE - 1 - rec.y) / Grid.SURFACE * 0.5)
+	p.Color = def.Color:Lerp(Color3.new(0, 0, 0), (Grid.SURFACE - 1 - rec.y) / Grid.SURFACE * 0.3)
 	p.Size = Vector3.new(CELL, CELL, CELL)
 	p.CFrame = PlotService.blockCFrame(plot, rec.x, rec.y, rec.z, 0, 1)
 	p:SetAttribute("BlockId", def.Id)
