@@ -31,7 +31,8 @@ DataService.Loaded:Connect(function(player, data)
 		Remotes.Notify:FireClient(player, "Все участки заняты! Попробуй другой сервер.", "error")
 		return
 	end
-	local entries = Grid.deserialize(data.Layout)
+	local entries, dug = Grid.deserialize(data.Layout)
+	PlotService.resetTerrain(plot, dug)
 	if #entries > 0 then
 		PlotService.loadEntries(plot, entries)
 	end

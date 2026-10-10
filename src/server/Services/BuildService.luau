@@ -53,7 +53,7 @@ function BuildService.saveLayout(player: Player)
 	local session = plot.Session
 	if session ~= nil then
 		-- во время шторма блоки ломаются: сохраняем раскладку до шторма
-		DataService.setLayout(player, Grid.serialize(session.Snapshot))
+		DataService.setLayout(player, Grid.serialize(session.Snapshot, PlotService.getDug(plot)))
 	else
 		DataService.setLayout(player, PlotService.serialize(plot))
 	end
@@ -144,8 +144,8 @@ end
 -- Не даём замуровать персонажа внутри блока.
 function BuildService.isOccupiedByCharacter(plot: PlotService.Plot, x: number, y: number, z: number, heightCells: number): boolean
 	local lx, _, lz = Grid.cellCenterLocal(x, y, z)
-	local bottom = y * Grid.CELL
-	local top = (y + heightCells) * Grid.CELL
+	local bottom = Grid.layerBottom(y)
+	local top = Grid.layerBottom(y + heightCells)
 	for _, other in Players:GetPlayers() do
 		local character = other.Character
 		local root = character and character:FindFirstChild("HumanoidRootPart")
@@ -172,7 +172,10 @@ local function onRemove(player: Player, x: any, y: any, z: any)
 	end
 	local rec = PlotService.remove(plot, x, y, z)
 	if rec then
-		DataService.addBlocks(player, rec.id, 1)
+		-- выкопанная земля в инвентарь не попадает
+		if not rec.def.Indestructible then
+			DataService.addBlocks(player, rec.id, 1)
+		end
 		markLayoutDirty(player)
 	end
 end

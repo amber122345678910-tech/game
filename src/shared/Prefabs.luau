@@ -178,12 +178,16 @@ function Prefabs.layout(id: string): { Grid.Entry }
 	for x = x0, x0 + ow - 1 do
 		for z = z0, z0 + od - 1 do
 			add(def.Roof, x, def.WallH, z)
-			if def.RoofTop and def.WallH + 1 < Grid.H then
+			if def.RoofTop and def.WallH + 1 + Grid.SURFACE < Grid.H then
 				add(def.RoofTop, x, def.WallH + 1, z)
 			end
 		end
 	end
 
+	-- бункер стоит на поверхности участка (над подземными слоями)
+	for _, e in entries do
+		e.y += Grid.SURFACE
+	end
 	return entries
 end
 

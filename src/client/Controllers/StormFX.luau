@@ -22,7 +22,9 @@ local player = Players.LocalPlayer
 local StormFX = {}
 
 local FX_RANGE = 200 -- дальше этого расстояния (от камеры до участка) эффекты шторма не рисуем
-local ACID_SLAB = Config.Plot.PitDepth + 2 -- высота плиты кислоты
+local ACID_SLAB = Config.Plot.PitDepth + 2 + Config.Grid.Underground * Config.Grid.CellSize -- высота плиты кислоты
+local HAIL_COLOR = Color3.fromRGB(225, 240, 255)
+local METEOR_COLOR = Color3.fromRGB(255, 120, 30)
 local HAIL_POOL_SIZE = 140
 local DEBRIS_POOL_SIZE = 60
 local PARK = CFrame.new(0, -1000, 0)
@@ -86,6 +88,7 @@ type Hailstone = {
 	t0: number,
 	duration: number,
 	big: boolean,
+	meteor: boolean,
 	plotId: number,
 }
 
@@ -127,18 +130,26 @@ local function onHailBatch(plotId: number, flat: { number })
 		if typeof(lx) == "number" and typeof(lz) == "number" and typeof(ly) == "number" then
 			local part = acquireHail()
 			if part then
-				local isBig = big == 1
-				local size = if isBig then 1.6 else 0.7
+				local isMeteor = big == 2
+				local isBig = big == 1 or isMeteor
+				local size = if isMeteor then 3.2 elseif isBig then 1.6 else 0.7
 				part.Size = Vector3.new(size, size, size)
+				if isMeteor then
+					part.Material = Enum.Material.Neon
+					part.Color = METEOR_COLOR
+				end
 				local to = origin:PointToWorldSpace(Vector3.new(lx, ly + size / 2, lz))
-				local from = to + Vector3.new(4, Config.Storm.HailSpawnHeight, 2)
+				local from = if isMeteor
+					then to + Vector3.new(30, Config.Storm.HailSpawnHeight + 20, 14)
+					else to + Vector3.new(4, Config.Storm.HailSpawnHeight, 2)
 				table.insert(hailActive, {
 					part = part,
 					from = from,
 					to = to,
 					t0 = now,
-					duration = Config.Storm.FallTime,
+					duration = if isMeteor then Config.Storm.MeteorFallTime else Config.Storm.FallTime,
 					big = isBig,
+					meteor = isMeteor,
 					plotId = plotId,
 				})
 			end
@@ -158,8 +169,18 @@ local function updateHail()
 		if alpha >= 1 then
 			-- удар
 			impactAttachment.WorldPosition = h.to
-			impactEmitter:Emit(math.max(1, math.floor((if h.big then 8 else 3) * qualityScale)))
-			if now - lastHailSound > 0.07 and soundBudget < 2 then
+			if h.meteor then
+				impactEmitter.Color = ColorSequence.new(METEOR_COLOR)
+				impactEmitter:Emit(math.max(6, math.floor(30 * qualityScale)))
+				impactEmitter.Color = ColorSequence.new(HAIL_COLOR)
+				Sounds.playAt("BlockBreak", h.to, 1)
+				Sounds.playAt("Thunder", h.to, 0.5)
+				h.part.Material = Enum.Material.Ice
+				h.part.Color = HAIL_COLOR
+			else
+				impactEmitter:Emit(math.max(1, math.floor((if h.big then 8 else 3) * qualityScale)))
+			end
+			if not h.meteor and now - lastHailSound > 0.07 and soundBudget < 2 then
 				lastHailSound = now
 				soundBudget += 1
 				Sounds.playAt("HailHit", h.to, if h.big then 1 else 0.5)
@@ -389,11 +410,11 @@ local function buildAcid(fx: PlotFX, layout: string)
 	make(parseRects(insideStr or ""), fx.inside, "AcidInside")
 end
 
-local function setAcid(fx: PlotFX, list: { AcidRect }, level: number)
+local function setAcid(fx: PlotFX, list: { AcidRect }, level: number, floor: number)
 	for _, r in list do
 		if math.abs(r.shown - level) > 0.01 then
-			local visible = level >= 0.05
-			local wasVisible = r.shown >= 0.05
+			local visible = level >= floor + 0.05
+			local wasVisible = r.shown >= floor + 0.05
 			r.shown = level
 			-- верх плиты = уровень кислоты, низ спрятан под полом котлована
 			r.part.CFrame = fx.origin * CFrame.new((r.lx0 + r.lx1) / 2, level - ACID_SLAB / 2, (r.lz0 + r.lz1) / 2)
@@ -531,11 +552,21 @@ local function setPhaseFx(fx: PlotFX, phase: string)
 	end
 	local isAcid = phase == Config.Phases.Acid
 	local isHail = phase == Config.Phases.Hail
+	local isWind = phase == Config.Phases.Wind
 	local cap = if ClientState.isTouch() then 90 else 300
 	fx.rain.Rate = math.min(math.floor(300 * qualityScale), cap)
-	fx.sleet.Rate = math.min(math.floor(120 * qualityScale), cap)
+	fx.sleet.Rate = math.min(math.floor((if isWind then 220 else 120) * qualityScale), cap)
 	fx.rainWanted = isAcid
-	fx.sleetWanted = isHail
+	fx.sleetWanted = isHail or isWind
+	-- ураган: косые струи вдоль направления ветра
+	local windDir = fx.model:GetAttribute("WindDir")
+	if isWind and typeof(windDir) == "Vector3" then
+		fx.sleet.Acceleration = fx.origin:VectorToWorldSpace(windDir) * 160
+		fx.sleet.Color = ColorSequence.new(Color3.fromRGB(190, 175, 150))
+	else
+		fx.sleet.Acceleration = Vector3.zero
+		fx.sleet.Color = ColorSequence.new(HAIL_COLOR)
+	end
 	applyEmitters(fx)
 	if isAcid and not fx.rainSound then
 		fx.rainSound = Sounds.loopAt("Rain", fx.rainPart, 0.6)
@@ -578,21 +609,25 @@ local function updatePlotFx(fx: PlotFX, dt: number)
 			fx.sleet:Clear()
 		end
 	end
+	local out = model:GetAttribute("OutsideAcid")
+	local inn = model:GetAttribute("InsideAcid")
+	local depth = model:GetAttribute("InsideDepth")
+	local targetOut = if typeof(out) == "number" then out else 0
+	local targetIn = if typeof(inn) == "number" then inn else 0
+	-- низ бункера (может быть под землёй): кислота внутри видна только выше него
+	local insideFloor = targetIn - (if typeof(depth) == "number" then depth else 0)
 	local layout = model:GetAttribute("AcidLayout")
 	local l = if typeof(layout) == "string" then layout else ""
 	if l ~= fx.layout then
 		buildAcid(fx, l)
+		fx.insideLevel = targetIn
 	end
 	-- плавное приближение к серверному уровню кислоты
-	local out = model:GetAttribute("OutsideAcid")
-	local inn = model:GetAttribute("InsideAcid")
-	local targetOut = if typeof(out) == "number" then out else 0
-	local targetIn = if typeof(inn) == "number" then inn else 0
 	local k = math.min(dt * 2.5, 1)
 	fx.outsideLevel += (targetOut - fx.outsideLevel) * k
 	fx.insideLevel += (targetIn - fx.insideLevel) * k
-	setAcid(fx, fx.outside, fx.outsideLevel)
-	setAcid(fx, fx.inside, fx.insideLevel)
+	setAcid(fx, fx.outside, fx.outsideLevel, 0)
+	setAcid(fx, fx.inside, fx.insideLevel, insideFloor)
 	-- протечка
 	local count = model:GetAttribute("LeakCount")
 	local n = if typeof(count) == "number" then count else 0
@@ -632,6 +667,7 @@ local baseAtmosphereDensity = 0.28
 local baseBrightness = 2.2
 local lightingPhase = ""
 local nextLightning = 0
+local shaking = false
 
 local stormClouds: Clouds? = nil
 
@@ -649,6 +685,12 @@ local function applyLighting(phase: string)
 	local tint, brightness, saturation, density, sunBrightness
 	if phase == Config.Phases.Hail or phase == Config.Phases.Prep then
 		tint, brightness, saturation, density, sunBrightness = Color3.fromRGB(200, 212, 235), -0.08, -0.35, 0.45, 1.2
+	elseif phase == Config.Phases.Wind then
+		tint, brightness, saturation, density, sunBrightness = Color3.fromRGB(225, 215, 195), -0.08, -0.3, 0.6, 1.2
+	elseif phase == Config.Phases.Meteor then
+		tint, brightness, saturation, density, sunBrightness = Color3.fromRGB(255, 195, 165), -0.1, -0.1, 0.5, 1.0
+	elseif phase == Config.Phases.Quake then
+		tint, brightness, saturation, density, sunBrightness = Color3.fromRGB(235, 215, 190), -0.06, -0.2, 0.45, 1.3
 	elseif phase == Config.Phases.Calm then
 		tint, brightness, saturation, density, sunBrightness = Color3.fromRGB(215, 222, 235), -0.04, -0.2, 0.38, 1.5
 	elseif phase == Config.Phases.Acid then
@@ -820,6 +862,19 @@ function StormFX.init()
 		if lit and lit.phase == Config.Phases.Hail and os.clock() >= nextLightning then
 			nextLightning = os.clock() + rng:NextNumber(3, 7)
 			lightningFlash(lit)
+		end
+		-- землетрясение: тряска камеры (выключена при «уменьшении движения»)
+		local character = player.Character
+		local hum = character and character:FindFirstChildOfClass("Humanoid")
+		if hum then
+			if lit and lit.phase == Config.Phases.Quake and not GuiService.ReducedMotionEnabled then
+				local a = 0.35
+				hum.CameraOffset = Vector3.new(rng:NextNumber(-a, a), rng:NextNumber(-a, a), rng:NextNumber(-a, a))
+				shaking = true
+			elseif shaking then
+				hum.CameraOffset = Vector3.zero
+				shaking = false
+			end
 		end
 		local _ = accumulator
 	end)

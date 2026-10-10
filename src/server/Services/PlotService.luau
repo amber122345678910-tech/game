@@ -1,5 +1,8 @@
 --!strict
 -- Участки игроков: выдача участка, блоки на сетке, урон блокам, зоны (на участке / в бункере).
+-- Под поверхностью участка — земля (Grid.SURFACE слоёв). Земля лежит в Cells (твёрдая), но не в
+-- Records (это не постройка). Её можно копать в режиме удаления; выкопанные клетки — plot.Dug.
+-- Детали создаются только для открытой земли (у которой есть не-земляной сосед).
 
 local RunService = game:GetService("RunService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -25,6 +28,8 @@ export type Plot = {
 	Session: any?, -- активный шторм (StormService)
 	InteriorCache: { [number]: boolean }?,
 	Version: number, -- увеличивается при любом изменении блоков
+	Dirt: { [number]: BlockRecord }, -- клетка -> земля
+	Dug: { [number]: boolean }, -- выкопанные подземные клетки
 }
 
 local PlotService = {}
@@ -35,6 +40,7 @@ local PIT = Config.Plot.PitHalfSize
 local plots: { Plot } = {}
 local playerPlots: { [Player]: Plot } = {}
 local scheduleBunkerCheck: (plot: Plot) -> ()
+local resetTerrain: (plot: Plot, dug: { [number]: boolean }?) -> ()
 
 local HAIL_TINT = Color3.fromRGB(45, 45, 50)
 local ACID_TINT = Color3.fromRGB(95, 160, 35)
@@ -103,8 +109,16 @@ function PlotService.init()
 					Session = nil,
 					InteriorCache = nil,
 					Version = 0,
+					Dirt = {},
+					Dug = {},
 				}
 				table.insert(plots, plot)
+				-- превью земли из редактора заменяем настоящими клетками
+				local preview = child:FindFirstChild("TerrainPreview")
+				if preview then
+					preview:Destroy()
+				end
+				resetTerrain(plot, nil)
 				updateOwnerAttributes(plot)
 				child:SetAttribute("Phase", "")
 			else
@@ -171,6 +185,7 @@ function PlotService.release(player: Player)
 	end
 	playerPlots[player] = nil
 	PlotService.clear(plot)
+	resetTerrain(plot, nil)
 	plot.Owner = nil
 	updateOwnerAttributes(plot)
 end
@@ -178,7 +193,7 @@ end
 -- CFrame блока в мире (центр детали).
 function PlotService.blockCFrame(plot: Plot, x: number, y: number, z: number, rot: number, heightCells: number): CFrame
 	local lx, _, lz = Grid.cellCenterLocal(x, y, z)
-	local ly = (y + heightCells / 2) * CELL
+	local ly = Grid.layerBottom(y) + heightCells * CELL / 2
 	return plot.Origin * CFrame.new(lx, ly, lz) * CFrame.Angles(0, rot * math.pi / 2, 0)
 end
 
@@ -198,7 +213,7 @@ end
 function PlotService.isInZone(plot: Plot, worldPos: Vector3): boolean
 	local p = plot.Origin:PointToObjectSpace(worldPos)
 	local half = PIT + Config.Plot.ZoneMargin
-	return math.abs(p.X) <= half and math.abs(p.Z) <= half and p.Y >= -3 and p.Y <= Config.Plot.ZoneTop
+	return math.abs(p.X) <= half and math.abs(p.Z) <= half and p.Y >= -Grid.SURFACE * CELL - 3 and p.Y <= Config.Plot.ZoneTop
 end
 
 -- Проверка возможности поставить блок (без учёта инвентаря и шторма).
@@ -371,12 +386,145 @@ function PlotService.remove(plot: Plot, x: number, y: number, z: number): BlockR
 	if not Grid.inBounds(x, y, z) then
 		return nil
 	end
-	local rec = plot.Cells[Grid.index(x, y, z)]
+	local cell = Grid.index(x, y, z)
+	local rec = plot.Cells[cell]
 	if not rec then
 		return nil
 	end
+	if rec.def.Indestructible then
+		-- копать можно только открытую землю (её видно и можно выбрать)
+		if plot.Dirt[cell] ~= rec or rec.part == nil then
+			return nil
+		end
+		PlotService.dig(plot, cell)
+		return rec
+	end
 	detach(plot, rec)
 	return rec
+end
+
+----------------------------------------------------------------------
+-- Земля под участком
+----------------------------------------------------------------------
+local function createDirtPart(plot: Plot, rec: BlockRecord)
+	local def = rec.def
+	local p = Instance.new("Part")
+	p.Name = "Dirt"
+	p.Anchored = true
+	p.CanTouch = false
+	p.CanQuery = true
+	p.CanCollide = true
+	p.CastShadow = false
+	p.TopSurface = Enum.SurfaceType.Smooth
+	p.BottomSurface = Enum.SurfaceType.Smooth
+	p.Material = def.Material
+	-- слои земли чуть темнее с глубиной
+	p.Color = def.Color:Lerp(Color3.new(0, 0, 0), (Grid.SURFACE - 1 - rec.y) * 0.12)
+	p.Size = Vector3.new(CELL, CELL, CELL)
+	p.CFrame = PlotService.blockCFrame(plot, rec.x, rec.y, rec.z, 0, 1)
+	p:SetAttribute("BlockId", def.Id)
+	p:SetAttribute("Cell", Grid.index(rec.x, rec.y, rec.z))
+	p:SetAttribute("PlotId", plot.Id)
+	p.Parent = plot.BlocksFolder
+	rec.part = p
+end
+
+-- Земля открыта, если хотя бы один сосед в пределах сетки — не земля.
+local function exposeDirt(plot: Plot, cell: number)
+	local rec = plot.Dirt[cell]
+	if not rec or rec.part ~= nil then
+		return
+	end
+	for _, d in Grid.NEIGHBORS do
+		local nx, ny, nz = rec.x + d[1], rec.y + d[2], rec.z + d[3]
+		if Grid.inBounds(nx, ny, nz) and plot.Dirt[Grid.index(nx, ny, nz)] == nil then
+			createDirtPart(plot, rec)
+			return
+		end
+	end
+end
+
+local function updateDugAttribute(plot: Plot)
+	local count = 0
+	for _ in plot.Dug do
+		count += 1
+	end
+	plot.Model:SetAttribute("DugCount", count)
+end
+
+resetTerrain = function(plot: Plot, dug: { [number]: boolean }?)
+	for cell, rec in plot.Dirt do
+		if plot.Cells[cell] == rec then
+			plot.Cells[cell] = nil
+		end
+		if rec.part then
+			rec.part:Destroy()
+		end
+	end
+	table.clear(plot.Dirt)
+	table.clear(plot.Dug)
+	if dug then
+		for cell in dug do
+			plot.Dug[cell] = true
+		end
+	end
+	for _, cell in Grid.dirtCells(plot.Dug) do
+		local x, y, z = Grid.coords(cell)
+		local rec = StormSim.newBlock("dirt", x, y, z, 0)
+		plot.Dirt[cell] = rec
+		if plot.Cells[cell] == nil then
+			plot.Cells[cell] = rec
+		end
+	end
+	for cell in plot.Dirt do
+		exposeDirt(plot, cell)
+	end
+	updateDugAttribute(plot)
+	plot.Version += 1
+	plot.InteriorCache = nil
+	scheduleBunkerCheck(plot)
+end
+
+-- Загрузить землю по сохранённому набору выкопанных клеток.
+function PlotService.resetTerrain(plot: Plot, dug: { [number]: boolean }?)
+	resetTerrain(plot, dug)
+end
+
+-- Выкопать клетку земли (без проверок). Соседняя земля становится видимой.
+function PlotService.dig(plot: Plot, cell: number)
+	local rec = plot.Dirt[cell]
+	if not rec then
+		return
+	end
+	plot.Dirt[cell] = nil
+	plot.Dug[cell] = true
+	if plot.Cells[cell] == rec then
+		plot.Cells[cell] = nil
+	end
+	if rec.part then
+		rec.part:Destroy()
+		rec.part = nil
+	end
+	for _, d in Grid.NEIGHBORS do
+		local nx, ny, nz = rec.x + d[1], rec.y + d[2], rec.z + d[3]
+		if Grid.inBounds(nx, ny, nz) then
+			exposeDirt(plot, Grid.index(nx, ny, nz))
+		end
+	end
+	updateDugAttribute(plot)
+	plot.Version += 1
+	plot.InteriorCache = nil
+	scheduleBunkerCheck(plot)
+end
+
+-- Выкопанные клетки (отсортированный список, для сохранения).
+function PlotService.getDug(plot: Plot): { number }
+	local list: { number } = {}
+	for cell in plot.Dug do
+		table.insert(list, cell)
+	end
+	table.sort(list)
+	return list
 end
 
 -- Убирает все блоки. Возвращает количество убранных блоков по типам.
@@ -388,8 +536,11 @@ function PlotService.clear(plot: Plot): { [string]: number }
 		rec.part:Destroy()
 	end
 	table.clear(plot.Records)
+	-- земля остаётся на месте
 	table.clear(plot.Cells)
-	plot.BlocksFolder:ClearAllChildren()
+	for cell, rec in plot.Dirt do
+		plot.Cells[cell] = rec
+	end
 	plot.Version += 1
 	plot.InteriorCache = nil
 	scheduleBunkerCheck(plot)
@@ -412,7 +563,7 @@ function PlotService.getEntries(plot: Plot): { Grid.Entry }
 end
 
 function PlotService.serialize(plot: Plot): string
-	return Grid.serialize(PlotService.getEntries(plot))
+	return Grid.serialize(PlotService.getEntries(plot), PlotService.getDug(plot))
 end
 
 -- Загружает доверенную раскладку (без инвентаря и без проверки опоры).
@@ -455,7 +606,7 @@ end
 
 -- Урон блоку. Возвращает true, если блок разрушен.
 function PlotService.damage(plot: Plot, rec: BlockRecord, amount: number, kind: "hail" | "acid"): boolean
-	if not rec.alive or amount <= 0 then
+	if not rec.alive or amount <= 0 or rec.def.Indestructible then
 		return false
 	end
 	rec.hp -= amount

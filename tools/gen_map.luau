@@ -29,7 +29,7 @@ local COLORS = {
 	Path = Color3.fromRGB(184, 176, 160),
 	PitWall = Color3.fromRGB(122, 124, 128),
 	PitFloor = Color3.fromRGB(92, 94, 98),
-	BuildArea = Color3.fromRGB(110, 116, 124),
+	BuildArea = Color3.fromRGB(110, 82, 56),
 	Hazard = Color3.fromRGB(245, 196, 40),
 	HazardDark = Color3.fromRGB(40, 40, 44),
 	Ramp = Color3.fromRGB(150, 150, 154),
@@ -415,18 +415,28 @@ for id, cf in plotFrames do
 	env.Name = "Environment"
 	env.Parent = model
 
-	-- Пол котлована
-	box(L(cf, 0, -1, 0), Vector3.new(PIT * 2, 2, PIT * 2), COLORS.PitFloor, Enum.Material.Concrete, env, "Floor")
-	-- Зона строительства (видимая разметка; лучи строительства попадают в неё)
+	-- Пол котлована вокруг сетки (толстые плиты: заодно стены подземной части сетки)
+	local under = Config.Grid.Underground * Config.Grid.CellSize -- 12
+	local slabH = under + 2
+	local margin = PIT - GRID_HALF
+	local mid = (PIT + GRID_HALF) / 2
+	box(L(cf, 0, -slabH / 2, -mid), Vector3.new(PIT * 2, slabH, margin), COLORS.PitFloor, Enum.Material.Concrete, env, "Floor")
+	box(L(cf, 0, -slabH / 2, mid), Vector3.new(PIT * 2, slabH, margin), COLORS.PitFloor, Enum.Material.Concrete, env, "Floor")
+	box(L(cf, -mid, -slabH / 2, 0), Vector3.new(margin, slabH, GRID_HALF * 2), COLORS.PitFloor, Enum.Material.Concrete, env, "Floor")
+	box(L(cf, mid, -slabH / 2, 0), Vector3.new(margin, slabH, GRID_HALF * 2), COLORS.PitFloor, Enum.Material.Concrete, env, "Floor")
+	-- дно подземной части сетки
+	box(L(cf, 0, -under - 1, 0), Vector3.new(GRID_HALF * 2, 2, GRID_HALF * 2), COLORS.PitFloor, Enum.Material.Concrete, env, "Bedrock")
+	-- Земля в зоне строительства: в игре её заменяет сервер (по клетке, чтобы можно было копать),
+	-- а этот блок нужен только для вида карты в редакторе.
 	part({
-		Name = "BuildArea",
-		Size = Vector3.new(GRID_HALF * 2, 0.1, GRID_HALF * 2),
-		CFrame = L(cf, 0, 0.05, 0),
+		Name = "TerrainPreview",
+		Size = Vector3.new(GRID_HALF * 2, under, GRID_HALF * 2),
+		CFrame = L(cf, 0, -under / 2, 0),
 		Color = COLORS.BuildArea,
-		Material = Enum.Material.SmoothPlastic,
-		CanCollide = false,
+		Material = Enum.Material.Ground,
+		CanCollide = true,
 		CanTouch = false,
-		CanQuery = true,
+		CanQuery = false,
 	}, model)
 	-- Стены котлована (верх чуть ниже земли, чтобы не было мерцания)
 	local wallH = DEPTH

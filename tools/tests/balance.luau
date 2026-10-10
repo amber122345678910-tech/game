@@ -11,7 +11,6 @@ local StormSim = Loader.load("src/shared/StormSim")
 
 local quiet = table.find(process.args, "--quiet") ~= nil or _G.__BALANCE_LIB == true
 local S = Config.Storm
-local CELL = Grid.CELL
 local PIT = Config.Plot.PitHalfSize
 
 local Balance = {}
@@ -24,8 +23,13 @@ local function lcg(seed)
 	end
 end
 
-function Balance.simulate(prefabId: string, level: number, seed: number)
+-- Постройка готового бункера на земле участка.
+function Balance.build(prefabId: string)
 	local cells, records = {}, {}
+	for _, cell in Grid.dirtCells(nil) do
+		local x, y, z = Grid.coords(cell)
+		cells[cell] = StormSim.newBlock("dirt", x, y, z, 0)
+	end
 	for _, e in Prefabs.layout(prefabId) do
 		local b = StormSim.newBlock(e.id, e.x, e.y, e.z, e.rot)
 		for _, c in b.cells do
@@ -33,6 +37,37 @@ function Balance.simulate(prefabId: string, level: number, seed: number)
 		end
 		table.insert(records, b)
 	end
+	return cells, records
+end
+
+-- Фазы шторма как на сервере; дополнительные бедствия выбираются по сиду.
+function Balance.phases(level: number, seed: number)
+	local n = Config.extraDisasterCount(level)
+	local extras = {}
+	local list = Config.ExtraDisasters
+	for i = 1, n do
+		extras[list[(seed + i - 1) % #list + 1]] = true
+	end
+	local phases = { { "Prep", S.PrepTime }, { "Hail", S.HailTime } }
+	if extras.Wind then
+		table.insert(phases, { "Wind", S.WindTime })
+	end
+	if extras.Meteor then
+		table.insert(phases, { "Meteor", S.MeteorTime })
+	end
+	table.insert(phases, { "Calm", S.CalmTime })
+	table.insert(phases, { "Acid", S.AcidTime })
+	if extras.Quake then
+		table.insert(phases, { "Quake", S.QuakeTime })
+	end
+	table.insert(phases, { "Clear", S.ClearTime })
+	return phases
+end
+
+local WIND_DIRS = { { 1, 0 }, { -1, 0 }, { 0, 1 }, { 0, -1 } }
+
+function Balance.simulate(prefabId: string, level: number, seed: number)
+	local cells, records = Balance.build(prefabId)
 	local exterior = Grid.computeExterior(cells)
 	local interior = Grid.computeInterior(cells, exterior)
 	local doors = StormSim.boundaryDoors(records, interior, cells)
@@ -40,11 +75,12 @@ function Balance.simulate(prefabId: string, level: number, seed: number)
 	for _, r in records do
 		startHP += r.maxHp
 	end
+	local interiorBottom = 0
 	-- игрок в центре внутреннего пространства на полу
 	local best, bestD = nil, math.huge
 	for cell in interior do
 		local x, y, z = Grid.coords(cell)
-		if y == 0 then
+		if y == Grid.SURFACE then
 			local lx, _, lz = Grid.cellCenterLocal(x, y, z)
 			local d = lx * lx + lz * lz
 			if d < bestD then
@@ -53,28 +89,23 @@ function Balance.simulate(prefabId: string, level: number, seed: number)
 		end
 	end
 	assert(best, prefabId .. " has no floor interior")
-	local plx, ply, plz = best[1], 3, best[2]
+	local plx, ply, plz = best[1], Grid.layerBottom(Grid.SURFACE) + 3, best[2]
 	local playerHP = 100
 
 	local p = Config.stormParams(level)
 	local rand = lcg(seed)
 	local dt = 0.25
 	local t = 0
-	local phases = {
-		{ "Prep", S.PrepTime },
-		{ "Hail", S.HailTime },
-		{ "Calm", S.CalmTime },
-		{ "Acid", S.AcidTime },
-		{ "Clear", S.ClearTime },
-	}
+	local phases = Balance.phases(level, seed)
+	local wind = WIND_DIRS[seed % 4 + 1]
 	local pending = {}
-	local budget = 0
-	local pool, inside = 0, 0
+	local budget, meteorBudget = 0, 0
+	local pool, inside = 0, interiorBottom
 	local maxInside = 0
-	local acidTick = 0
+	local tick = 0
 	local firstLeak = nil
 	local breachSeen = false
-	local dmg = { hail = 0, rain = 0, inside = 0, pool = 0 }
+	local dmg = { hail = 0, rain = 0, inside = 0, pool = 0, wind = 0, meteor = 0 }
 
 	local function hurt(kind, amount)
 		playerHP -= amount
@@ -82,17 +113,27 @@ function Balance.simulate(prefabId: string, level: number, seed: number)
 	end
 
 	local function applyHail(h)
-		local damage = p.HailDamage * (if h.big then p.HailBigMult else 1)
 		local cx, _, cz = Grid.localToCell(h.lx, 0, h.lz)
+		if h.meteor then
+			local impactY = 0
+			if Grid.inBounds(cx, 0, cz) then
+				local hits
+				hits, impactY = StormSim.meteorHits(cells, cx, cz)
+				for _, hit in hits do
+					StormSim.applyDamage(cells, records, hit.rec, p.MeteorDamage * hit.mult)
+				end
+			end
+			hurt("meteor", StormSim.meteorPlayerDamage(p, cells, h.lx, h.lz, impactY, plx, ply, plz))
+			return
+		end
+		local damage = p.HailDamage * (if h.big then p.HailBigMult else 1)
 		local hitRec, impactY = nil, 0
 		if Grid.inBounds(cx, 0, cz) then
 			local rec, y = StormSim.hailHit(cells, cx, cz)
 			impactY = y
 			if rec then
 				hitRec = rec
-				if StormSim.applyDamage(cells, records, rec, damage) then
-					dirty = true
-				end
+				StormSim.applyDamage(cells, records, rec, damage)
 			end
 		end
 		hurt("hail", StormSim.hailPlayerDamage(p, cells, hitRec, impactY, h.lx, h.lz, h.big, plx, ply, plz))
@@ -101,6 +142,7 @@ function Balance.simulate(prefabId: string, level: number, seed: number)
 	for _, ph in phases do
 		local name, duration = ph[1], ph[2]
 		local pt = 0
+		tick = 0
 		while pt < duration and playerHP > 0 do
 			pt += dt
 			t += dt
@@ -112,6 +154,15 @@ function Balance.simulate(prefabId: string, level: number, seed: number)
 					local lz = -PIT + 1 + rand() * (2 * PIT - 2)
 					table.insert(pending, { t = t + S.FallTime, lx = lx, lz = lz, big = rand() < p.HailBigChance })
 				end
+			elseif name == "Meteor" then
+				meteorBudget += p.MeteorRate * dt
+				while meteorBudget >= 1 do
+					meteorBudget -= 1
+					local half = -Grid.ORIGIN_X + 4
+					local lx = -half + rand() * 2 * half
+					local lz = -half + rand() * 2 * half
+					table.insert(pending, { t = t + S.MeteorFallTime, lx = lx, lz = lz, big = true, meteor = true })
+				end
 			end
 			local i = 1
 			while i <= #pending do
@@ -121,22 +172,50 @@ function Balance.simulate(prefabId: string, level: number, seed: number)
 					i += 1
 				end
 			end
-			if name == "Acid" then
-				pool = p.PoolMax * math.clamp(pt / p.PoolRiseTime, 0, 1)
-				acidTick += dt
-				local ext = Grid.computeExterior(cells)
-				if acidTick >= 1 then
-					acidTick -= 1
+			if name == "Wind" or name == "Quake" then
+				tick += dt
+				if tick >= 1 then
+					tick -= 1
+					if name == "Wind" then
+						for _, rec in StormSim.windTargets(records, cells, interior, wind[1], wind[2]) do
+							StormSim.applyDamage(cells, records, rec, p.WindDps * StormSim.windFactor(rec.def))
+						end
+					else
+						for _, rec in table.clone(records) do
+							StormSim.applyDamage(cells, records, rec, StormSim.quakeDamage(p, rec))
+						end
+					end
+				end
+			end
+			if name == "Wind" then
+				local amount = StormSim.windPlayerDamage(p, cells, interior, plx, ply, plz, dt)
+				if amount > 0 then
+					hurt("wind", amount)
+				end
+			end
+			if name == "Acid" or name == "Quake" then
+				local raining = name == "Acid"
+				if raining then
+					pool = p.PoolMax * math.clamp(pt / p.PoolRiseTime, 0, 1)
+				else
+					pool = math.max(0, pool - S.QuakeDrainRate * dt)
+				end
+				if name == "Acid" then
+					tick += dt
+				end
+				if tick >= 1 and raining then
+					tick -= 1
 					for _, rec in StormSim.rainTargets(cells) do
 						StormSim.applyDamage(cells, records, rec, p.AcidRainDps * rec.def.AcidMult)
 					end
+				end
+				if raining and pt % 1 < dt or (not raining and pt % 1 < dt) then
 					for _, rec in StormSim.poolTargets(records, Grid.computeExteriorBelow(cells, Grid.submergedLayers(pool)), pool) do
 						StormSim.applyDamage(cells, records, rec, p.PoolDps * rec.def.AcidMult)
 					end
-					ext = Grid.computeExterior(cells)
 				end
 				local sub = Grid.computeExteriorBelow(cells, Grid.submergedLayers(pool))
-				local res = StormSim.flood(doors, interior, cells, sub, pool, true, p.PoolMax)
+				local res = StormSim.flood(doors, interior, cells, sub, pool, raining, p.PoolMax, interiorBottom)
 				if res.rate > 0 and inside < res.cap then
 					inside = math.min(res.cap, inside + res.rate * dt)
 				end
@@ -146,13 +225,13 @@ function Balance.simulate(prefabId: string, level: number, seed: number)
 				breachSeen = breachSeen or res.breach
 				maxInside = math.max(maxInside, inside)
 				-- урон игроку
-				local amount, kind = StormSim.playerAcidDamage(p, true, cells, interior, plx, ply, plz, pool, inside, dt)
+				local amount, kind = StormSim.playerAcidDamage(p, raining, cells, interior, plx, ply, plz, pool, inside, dt)
 				if amount > 0 then
 					hurt(kind or "rain", amount)
 				end
 			elseif name == "Clear" then
 				pool = math.max(0, pool - S.DrainRate * dt)
-				inside = math.max(0, inside - S.DrainRate * dt)
+				inside = math.max(interiorBottom, inside - S.DrainRate * dt)
 			end
 		end
 	end
@@ -174,7 +253,7 @@ end
 -- Наихудший из нескольких сидов
 function Balance.worst(prefabId, level)
 	local worst
-	for seed = 1, 2 do
+	for seed = 1, 3 do
 		local r = Balance.simulate(prefabId, level, seed * 7919)
 		if not worst or r.playerHP < worst.playerHP then
 			worst = r

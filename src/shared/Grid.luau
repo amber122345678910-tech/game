@@ -35,6 +35,19 @@ Grid.COUNT = W * D * H
 -- Минимальный угол сетки в локальных координатах участка.
 Grid.ORIGIN_X = -W * CELL / 2
 Grid.ORIGIN_Z = -D * CELL / 2
+-- Слои 0..SURFACE-1 — под землёй (земля, которую можно копать); слой SURFACE лежит на поверхности
+-- участка (локальная Y = 0). Локальная Y низа слоя y = (y - SURFACE) * CELL.
+Grid.SURFACE = Config.Grid.Underground
+local SURFACE = Grid.SURFACE
+
+-- Локальная высота низа слоя y.
+function Grid.layerBottom(y: number): number
+	return (y - SURFACE) * CELL
+end
+
+function Grid.isUnderground(y: number): boolean
+	return y < SURFACE
+end
 
 function Grid.inBounds(x: number, y: number, z: number): boolean
 	return x >= 0 and x < W and y >= 0 and y < H and z >= 0 and z < D
@@ -67,12 +80,12 @@ end
 
 -- Центр клетки в локальных координатах участка.
 function Grid.cellCenterLocal(x: number, y: number, z: number): (number, number, number)
-	return Grid.ORIGIN_X + (x + 0.5) * CELL, (y + 0.5) * CELL, Grid.ORIGIN_Z + (z + 0.5) * CELL
+	return Grid.ORIGIN_X + (x + 0.5) * CELL, (y - SURFACE + 0.5) * CELL, Grid.ORIGIN_Z + (z + 0.5) * CELL
 end
 
 -- Клетка, в которую попадает локальная точка (может быть вне границ — проверяйте inBounds).
 function Grid.localToCell(lx: number, ly: number, lz: number): (number, number, number)
-	return math.floor((lx - Grid.ORIGIN_X) / CELL), math.floor(ly / CELL), math.floor((lz - Grid.ORIGIN_Z) / CELL)
+	return math.floor((lx - Grid.ORIGIN_X) / CELL), math.floor(ly / CELL) + SURFACE, math.floor((lz - Grid.ORIGIN_Z) / CELL)
 end
 
 -- Клетки, которые занимает блок с высотой heightCells, поставленный в (x, y, z).
@@ -114,8 +127,8 @@ local NEIGHBORS = {
 }
 Grid.NEIGHBORS = NEIGHBORS
 
--- Внешние пустые клетки: достижимые из-за границы сетки (бока и небо) через пустые клетки.
--- Пол (y < 0) считается сплошным. Двери считаются сплошными (закрыты во время шторма).
+-- Внешние пустые клетки: достижимые из-за границы сетки (бока над землёй и небо) через пустые
+-- клетки. Под поверхностью края сетки — сплошная земля. Двери считаются сплошными.
 function Grid.computeExterior(solid: { [number]: any }): { [number]: boolean }
 	local exterior: { [number]: boolean } = {}
 	local queue: { number } = {}
@@ -129,7 +142,7 @@ function Grid.computeExterior(solid: { [number]: any }): { [number]: boolean }
 		end
 	end
 
-	for y = 0, H - 1 do
+	for y = SURFACE, H - 1 do
 		for x = 0, W - 1 do
 			push(x, y, 0)
 			push(x, y, D - 1)
@@ -178,7 +191,8 @@ function Grid.computeExteriorBelow(solid: { [number]: any }, maxLayer: number): 
 		end
 	end
 
-	for y = 0, top do
+	-- лужа заходит с боков только над поверхностью, но стекает вниз в открытые ямы
+	for y = SURFACE, top do
 		for x = 0, W - 1 do
 			push(x, y, 0)
 			push(x, y, D - 1)
@@ -202,12 +216,13 @@ function Grid.computeExteriorBelow(solid: { [number]: any }, maxLayer: number): 
 	return exterior
 end
 
--- Сколько слоёв сетки затоплено при уровне кислоты level (стады): слои y, у которых y*CELL < level.
+-- Верхний затопленный слой при уровне лужи level (локальная Y, 0 = поверхность):
+-- слои y, у которых низ ниже уровня. Без лужи — -1 (ничего не затоплено).
 function Grid.submergedLayers(level: number): number
 	if level <= 0 then
 		return -1
 	end
-	return math.ceil(level / CELL) - 1
+	return SURFACE + math.ceil(level / CELL) - 1
 end
 
 -- Внутренние клетки = пустые и не внешние (замкнутый объём бункера).
@@ -301,24 +316,50 @@ function Grid.normalizeRot(rot: any): number
 	return math.floor(rot) % 4
 end
 
--- Сериализация раскладки: "1|id,x,y,z,r;id,x,y,z,r;..."
-function Grid.serialize(entries: { Entry }): string
+-- Сериализация раскладки: "2|id,x,y,z,r;...|выкопанные клетки через запятую"
+function Grid.serialize(entries: { Entry }, dug: { number }?): string
 	local parts = table.create(#entries)
 	for _, e in entries do
 		table.insert(parts, string.format("%s,%d,%d,%d,%d", e.id, e.x, e.y, e.z, e.rot))
 	end
-	return "1|" .. table.concat(parts, ";")
+	local dugParts = {}
+	for _, i in dug or {} do
+		table.insert(dugParts, tostring(i))
+	end
+	return "2|" .. table.concat(parts, ";") .. "|" .. table.concat(dugParts, ",")
 end
 
 -- Десериализация с проверкой: неизвестные блоки, выход за границы и пересечения отбрасываются.
-function Grid.deserialize(data: any): { Entry }
+-- Возвращает блоки и множество выкопанных клеток. Формат "1" (до подземелья) сдвигается на SURFACE.
+function Grid.deserialize(data: any): ({ Entry }, { [number]: boolean })
 	local result: { Entry } = {}
+	local dug: { [number]: boolean } = {}
 	if typeof(data) ~= "string" then
-		return result
+		return result, dug
 	end
-	local version, body = string.match(data, "^(%d+)|(.*)$")
-	if version ~= "1" or body == nil then
-		return result
+	local version, rest = string.match(data, "^(%d+)|(.*)$")
+	if rest == nil or (version ~= "1" and version ~= "2") then
+		return result, dug
+	end
+	local body = rest
+	local yShift = 0
+	if version == "1" then
+		yShift = SURFACE
+	else
+		local entriesPart, dugPart = string.match(rest, "^(.-)|(.*)$")
+		if entriesPart == nil or dugPart == nil then
+			return result, dug
+		end
+		body = entriesPart
+		for token in string.gmatch(dugPart, "%d+") do
+			local i = tonumber(token)
+			if i and i >= 1 and i <= Grid.COUNT then
+				local _, y = Grid.coords(i)
+				if y < SURFACE then
+					dug[i] = true
+				end
+			end
+		end
 	end
 	local occupied: { [number]: boolean } = {}
 	for chunk in string.gmatch(body, "[^;]+") do
@@ -326,13 +367,18 @@ function Grid.deserialize(data: any): { Entry }
 		if id and sx and sy and sz and sr then
 			local def = Config.Blocks[id]
 			local x, y, z, r = tonumber(sx), tonumber(sy), tonumber(sz), tonumber(sr)
-			if def and x and y and z and r then
+			if y then
+				y += yShift
+			end
+			if def and def.Category ~= "Terrain" and x and y and z and r then
 				local top = y + def.HeightCells - 1
 				if Grid.inBounds(x, y, z) and Grid.inBounds(x, top, z) then
 					local cells = Grid.footprint(x, y, z, def.HeightCells)
 					local free = true
 					for _, c in cells do
-						if occupied[c] then
+						-- под землёй ставить можно только в выкопанные клетки
+						local _, cy = Grid.coords(c)
+						if occupied[c] or (cy < SURFACE and not dug[c]) then
 							free = false
 							break
 						end
@@ -347,7 +393,23 @@ function Grid.deserialize(data: any): { Entry }
 			end
 		end
 	end
-	return result
+	return result, dug
+end
+
+-- Подземные клетки, где по умолчанию лежит земля (кроме выкопанных).
+function Grid.dirtCells(dug: { [number]: boolean }?): { number }
+	local out: { number } = {}
+	for y = 0, SURFACE - 1 do
+		for z = 0, D - 1 do
+			for x = 0, W - 1 do
+				local i = Grid.index(x, y, z)
+				if not (dug and dug[i]) then
+					table.insert(out, i)
+				end
+			end
+		end
+	end
+	return out
 end
 
 -- Подсчёт блоков по типам в раскладке.

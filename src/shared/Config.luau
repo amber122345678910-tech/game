@@ -2,7 +2,7 @@
 -- Конфиг игры: блоки, сетка участка, параметры шторма, экономика.
 -- Все балансные числа живут здесь, чтобы их было легко менять в одном месте.
 
-export type BlockCategory = "Blocks" | "Doors"
+export type BlockCategory = "Blocks" | "Doors" | "Terrain"
 
 export type BlockDef = {
 	Id: string,
@@ -24,6 +24,8 @@ export type BlockDef = {
 	IsDoor: boolean,
 	Seal: number,
 	HeightCells: number,
+	-- Земля под участком: не ломается бедствиями, копается в режиме удаления.
+	Indestructible: boolean?,
 }
 
 export type StormParams = {
@@ -41,6 +43,12 @@ export type StormParams = {
 	PoolDps: number, -- урон в секунду затопленным внешним блокам (умножается на AcidMult)
 	PoolPlayerDps: number, -- урон игроку в кислоте снаружи
 	InsidePlayerDps: number, -- урон игроку в кислоте внутри бункера
+	WindDps: number, -- ураган: урон блокам с наветренной стороны (лёгкие материалы — больше)
+	WindPlayerDps: number, -- ураган: урон игроку под открытым небом
+	MeteorRate: number, -- метеоритов в секунду
+	MeteorDamage: number, -- урон верхнему блоку (ниже и вокруг — меньше)
+	MeteorPlayerDamage: number,
+	QuakeDps: number, -- землетрясение: урон наземным блокам (высокие — больше)
 	BaseReward: number,
 }
 
@@ -54,7 +62,8 @@ Config.Grid = {
 	CellSize = 4,
 	Width = 12, -- X
 	Depth = 12, -- Z (индекс 0 = передняя сторона, обращённая к лобби)
-	Height = 10, -- Y
+	Height = 13, -- Y: 3 слоя под землёй + 10 над землёй
+	Underground = 3, -- слоёв земли под поверхностью участка (можно копать)
 }
 
 -- Геометрия участка-котлована (локальные координаты, начало = центр пола котлована).
@@ -228,7 +237,7 @@ Config.Blocks = {
 		Transparency = 0,
 		Reflectance = 0,
 		IsDoor = true,
-		Seal = 3,
+		Seal = 3.5,
 		HeightCells = 2,
 	},
 	door_iron = {
@@ -267,14 +276,36 @@ Config.Blocks = {
 		Seal = 13.5,
 		HeightCells = 2,
 	},
+	-- Земля под участком (не продаётся, не в инвентаре)
+	dirt = {
+		Id = "dirt",
+		Name = "Земля",
+		Description = "Копается в режиме удаления.",
+		Category = "Terrain",
+		Order = 100,
+		HP = 1e6,
+		Price = 0,
+		AcidMult = 0,
+		HailTransfer = 0,
+		Color = Color3.fromRGB(110, 82, 56),
+		Material = Enum.Material.Ground,
+		Transparency = 0,
+		Reflectance = 0,
+		IsDoor = false,
+		Seal = 0,
+		HeightCells = 1,
+		Indestructible = true,
+	},
 } :: { [string]: BlockDef }
 
--- Порядок отображения в магазине и в хотбаре.
+-- Порядок отображения в магазине и в хотбаре (без земли).
 Config.BlockOrder = {} :: { string }
 do
 	local ids = {}
-	for id in Config.Blocks do
-		table.insert(ids, id)
+	for id, def in Config.Blocks do
+		if def.Category ~= "Terrain" then
+			table.insert(ids, id)
+		end
 	end
 	table.sort(ids, function(a, b)
 		return Config.Blocks[a].Order < Config.Blocks[b].Order
@@ -292,21 +323,27 @@ end
 -- Тайминги фаз шторма (секунды).
 Config.Storm = {
 	PrepTime = 5,
-	HailTime = 35,
-	CalmTime = 5,
-	AcidTime = 55,
+	HailTime = 30,
+	WindTime = 18,
+	MeteorTime = 15,
+	CalmTime = 4,
+	AcidTime = 50,
+	QuakeTime = 14,
 	ClearTime = 6,
 	FallTime = 0.6, -- время падения градины (визуал и задержка урона совпадают)
+	MeteorFallTime = 1.4,
+	MeteorRadius = 7, -- радиус поражения игрока метеоритом
 	HailSpawnHeight = 80, -- над полом котлована (визуал)
 	SimStep = 0.25, -- шаг симуляции кислоты
 	LeaveGrace = 5, -- сколько секунд можно быть вне участка до провала
-	DoorLeakFactor = 0.1, -- стадов/сек на каждый стад превышения Seal
+	DoorLeakFactor = 0.06, -- стадов/сек на каждый стад превышения Seal
 	BreachRate = 1.6, -- стадов/сек, если в затопленной части бункера дыра
 	RoofLeakRate = 0.05, -- стадов/сек, если в крыше дыра во время кислотного дождя
-	RoofLeakCap = 0.35, -- через крышу натечёт не больше PoolMax * RoofLeakCap
+	RoofLeakCap = 0.2, -- через крышу натечёт не больше PoolMax * RoofLeakCap
 	InsideDamageDepth = 1.5, -- урон внутри начинается, когда кислоты по колено
 	HailTremorRadius = 7, -- удары града по крыше в этом радиусе частично достаются игроку
 	DrainRate = 2.5, -- стадов/сек, скорость ухода кислоты в фазе Clear
+	QuakeDrainRate = 0.5, -- во время землетрясения лужа уходит медленно (и продолжает затекать)
 }
 
 -- Фазы шторма (значения атрибута Phase у участка).
@@ -317,7 +354,16 @@ Config.Phases = {
 	Calm = "Calm",
 	Acid = "Acid",
 	Clear = "Clear",
+	Wind = "Wind",
+	Meteor = "Meteor",
+	Quake = "Quake",
 }
+
+-- Дополнительные бедствия: чем выше уровень, тем больше их в одном шторме.
+Config.ExtraDisasters = { "Wind", "Meteor", "Quake" }
+function Config.extraDisasterCount(level: number): number
+	return math.clamp(1 + (math.floor(level) - 1) // 3, 1, 3)
+end
 
 Config.PhaseNames = {
 	Prep = "Шторм приближается",
@@ -325,26 +371,35 @@ Config.PhaseNames = {
 	Calm = "Затишье...",
 	Acid = "Кислотный дождь!",
 	Clear = "Шторм уходит",
+	Wind = "Ураган!",
+	Meteor = "Метеоритный дождь!",
+	Quake = "Землетрясение!",
 } :: { [string]: string }
 
 function Config.stormParams(level: number): StormParams
 	local n = math.clamp(math.floor(level), 1, Config.Economy.MaxLevel)
 	return {
 		Level = n,
-		HailRate = math.min(8 + n * 1.2, 36),
-		HailDamage = 4 + n * 1.1,
-		HailBigChance = math.min(0.06 + n * 0.01, 0.25),
+		HailRate = math.min(10 + n * 1.6, 45),
+		HailDamage = 5 + n * 1.4,
+		HailBigChance = math.min(0.1 + n * 0.012, 0.3),
 		HailBigMult = 3,
-		HailPlayerDamage = 6 + n * 0.8,
+		HailPlayerDamage = 8 + n,
 		HailHitRadius = 2.5,
-		AcidRainDps = 0.25 + n * 0.12,
-		AcidRainPlayerDps = 4 + n * 0.5,
-		PoolMax = math.min(1.5 + n * 1.0, Config.Plot.PitDepth - 1),
-		PoolRiseTime = 40,
-		PoolDps = 0.25 + n * 0.1,
-		PoolPlayerDps = 12 + n,
-		InsidePlayerDps = 6 + n * 0.4,
-		BaseReward = 50 + n * 30,
+		AcidRainDps = 0.35 + n * 0.16,
+		AcidRainPlayerDps = 6 + n * 0.6,
+		PoolMax = math.min(1.4 + n * 1.2, Config.Plot.PitDepth - 1),
+		PoolRiseTime = 32,
+		PoolDps = 0.35 + n * 0.13,
+		PoolPlayerDps = 15 + n,
+		InsidePlayerDps = 8 + n * 0.6,
+		WindDps = 0.5 + n * 0.45,
+		WindPlayerDps = 4 + n * 0.6,
+		MeteorRate = 0.2 + n * 0.06,
+		MeteorDamage = 15 + n * 9,
+		MeteorPlayerDamage = 30 + n * 3,
+		QuakeDps = 0.6 + n * 0.45,
+		BaseReward = 80 + n * 35,
 	}
 end
 

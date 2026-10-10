@@ -1,5 +1,7 @@
 --!strict
--- Шторм на участке игрока: Подготовка -> Град -> Затишье -> Кислотный дождь -> Шторм уходит.
+-- Шторм на участке игрока: Подготовка -> Град -> [Ураган] -> [Метеориты] -> Затишье ->
+-- Кислотный дождь -> [Землетрясение] -> Шторм уходит. Дополнительные бедствия выбираются
+-- случайно, их число растёт с уровнем (Config.extraDisasterCount).
 -- Сервер считает весь урон по данным сетки (без физики), клиент только рисует эффекты.
 
 local Players = game:GetService("Players")
@@ -22,6 +24,7 @@ type PendingHail = {
 	lx: number,
 	lz: number,
 	big: boolean,
+	meteor: boolean,
 }
 
 export type Session = {
@@ -30,6 +33,7 @@ export type Session = {
 	Level: number,
 	Params: Config.StormParams,
 	Phase: string,
+	PhaseOrder: { string },
 	PhaseTime: number,
 	Elapsed: number,
 	TotalDuration: number,
@@ -42,7 +46,12 @@ export type Session = {
 	SubmergedKey: string,
 	PoolLevel: number,
 	InsideLevel: number,
+	InteriorBottom: number,
 	HailBudget: number,
+	MeteorBudget: number,
+	WindX: number,
+	WindZ: number,
+	DisasterTick: number,
 	Pending: { PendingHail },
 	AcidTick: number,
 	LastOutside: number,
@@ -66,15 +75,17 @@ local PIT = Config.Plot.PitHalfSize
 local S = Config.Storm
 local PHASES = Config.Phases
 
-local PHASE_ORDER = { PHASES.Prep, PHASES.Hail, PHASES.Calm, PHASES.Acid, PHASES.Clear }
 local PHASE_DURATION: { [string]: number } = {
 	[PHASES.Prep] = S.PrepTime,
 	[PHASES.Hail] = S.HailTime,
+	[PHASES.Wind] = S.WindTime,
+	[PHASES.Meteor] = S.MeteorTime,
 	[PHASES.Calm] = S.CalmTime,
 	[PHASES.Acid] = S.AcidTime,
+	[PHASES.Quake] = S.QuakeTime,
 	[PHASES.Clear] = S.ClearTime,
 }
-local TOTAL_DURATION = S.PrepTime + S.HailTime + S.CalmTime + S.AcidTime + S.ClearTime
+local WIND_DIRS = { { 1, 0 }, { -1, 0 }, { 0, 1 }, { 0, -1 } }
 local MAX_LEAK_POINTS = 4
 local HAIL_FX_RANGE = 260 -- кому отправлять визуал града (стады от центра участка)
 
@@ -204,6 +215,7 @@ local function updateAcidVisuals(session: Session)
 	if inside ~= session.LastInside then
 		session.LastInside = inside
 		model:SetAttribute("InsideAcid", inside)
+		model:SetAttribute("InsideDepth", round1(math.max(session.InsideLevel - session.InteriorBottom, 0)))
 	end
 end
 
@@ -229,8 +241,8 @@ local function surfaceHeight(session: Session, lx: number, lz: number): number
 	local plot = session.Plot
 	local cx, _, cz = Grid.localToCell(lx, 0, lz)
 	if Grid.inBounds(cx, 0, cz) then
-		local top = Grid.columnTop(plot.Cells, cx, cz)
-		return if top then (top + 1) * CELL else 0
+		local _, y = StormSim.hailHit(plot.Cells, cx, cz)
+		return y
 	end
 	-- вне сетки: пандус / пол
 	local env = plot.Model:FindFirstChild("Environment")
@@ -253,7 +265,7 @@ local function leakCFrame(session: Session, rec: BlockRecord): CFrame?
 	end
 	local lx, _, lz = Grid.cellCenterLocal(rec.x, rec.y, rec.z)
 	local dir = Vector3.new(dx, 0, dz)
-	local localPos = Vector3.new(lx, rec.y * CELL + 0.3, lz) + dir * 0.6
+	local localPos = Vector3.new(lx, Grid.layerBottom(rec.y) + 0.3, lz) + dir * 0.6
 	local worldPos = session.Plot.Origin:PointToWorldSpace(localPos)
 	local worldDir = session.Plot.Origin:VectorToWorldSpace(dir)
 	return CFrame.lookAt(worldPos, worldPos + worldDir)
@@ -271,22 +283,37 @@ local function playerLocal(session: Session): Vector3?
 	return nil
 end
 
-local function spawnHail(session: Session, dt: number)
+local function spawnHail(session: Session, dt: number, meteor: boolean)
 	local p = session.Params
-	session.HailBudget += p.HailRate * dt
 	local batch: { number } = {}
 	local now = os.clock()
-	while session.HailBudget >= 1 do
-		session.HailBudget -= 1
-		local lx = round1(session.Rng:NextNumber(-PIT + 1, PIT - 1))
-		local lz = round1(session.Rng:NextNumber(-PIT + 1, PIT - 1))
-		local big = session.Rng:NextNumber() < p.HailBigChance
+	if meteor then
+		session.MeteorBudget += p.MeteorRate * dt
+	else
+		session.HailBudget += p.HailRate * dt
+	end
+	while (if meteor then session.MeteorBudget else session.HailBudget) >= 1 do
+		local lx, lz, big
+		if meteor then
+			session.MeteorBudget -= 1
+			-- метеориты целятся в сетку участка (с небольшим разбросом)
+			local half = -Grid.ORIGIN_X + 4
+			lx = round1(session.Rng:NextNumber(-half, half))
+			lz = round1(session.Rng:NextNumber(-half, half))
+			big = true
+		else
+			session.HailBudget -= 1
+			lx = round1(session.Rng:NextNumber(-PIT + 1, PIT - 1))
+			lz = round1(session.Rng:NextNumber(-PIT + 1, PIT - 1))
+			big = session.Rng:NextNumber() < p.HailBigChance
+		end
 		local impactY = surfaceHeight(session, lx, lz)
 		table.insert(batch, lx)
 		table.insert(batch, lz)
 		table.insert(batch, round1(impactY))
-		table.insert(batch, if big then 1 else 0)
-		table.insert(session.Pending, { t = now + S.FallTime, lx = lx, lz = lz, big = big })
+		table.insert(batch, if meteor then 2 elseif big then 1 else 0)
+		local fall = if meteor then S.MeteorFallTime else S.FallTime
+		table.insert(session.Pending, { t = now + fall, lx = lx, lz = lz, big = big, meteor = meteor })
 	end
 	if #batch > 0 then
 		-- только визуал: ненадёжный канал и только тем, кто рядом с участком
@@ -301,13 +328,37 @@ local function spawnHail(session: Session, dt: number)
 	end
 end
 
+local function applyMeteor(session: Session, h: PendingHail)
+	local p = session.Params
+	local plot = session.Plot
+	local cx, _, cz = Grid.localToCell(h.lx, 0, h.lz)
+	local impactY
+	if Grid.inBounds(cx, 0, cz) then
+		local hits
+		hits, impactY = StormSim.meteorHits(plot.Cells, cx, cz)
+		for _, hit in hits do
+			PlotService.damage(plot, hit.rec, p.MeteorDamage * hit.mult, "hail")
+		end
+	else
+		impactY = surfaceHeight(session, h.lx, h.lz)
+	end
+	local lp = playerLocal(session)
+	if lp then
+		damagePlayer(session, StormSim.meteorPlayerDamage(p, plot.Cells, h.lx, h.lz, impactY, lp.X, lp.Y, lp.Z))
+	end
+end
+
 local function applyHail(session: Session, h: PendingHail)
+	if h.meteor then
+		applyMeteor(session, h)
+		return
+	end
 	local p = session.Params
 	local plot = session.Plot
 	local damage = p.HailDamage * (if h.big then p.HailBigMult else 1)
 	local hitRec: BlockRecord? = nil
 	local cx, _, cz = Grid.localToCell(h.lx, 0, h.lz)
-	local impactY = 0
+	local impactY = Grid.layerBottom(Grid.SURFACE)
 	if Grid.inBounds(cx, 0, cz) then
 		local rec, y = StormSim.hailHit(plot.Cells, cx, cz)
 		impactY = y
@@ -362,6 +413,28 @@ local function acidDamageTick(session: Session)
 	end
 end
 
+----------------------------------------------------------------------
+-- Ураган и землетрясение (урон раз в секунду)
+----------------------------------------------------------------------
+local function windTick(session: Session)
+	local plot = session.Plot
+	local p = session.Params
+	for _, rec in StormSim.windTargets(plot.Records, plot.Cells, session.Interior, session.WindX, session.WindZ) do
+		PlotService.damage(plot, rec, p.WindDps * StormSim.windFactor(rec.def), "hail")
+	end
+end
+
+local function quakeTick(session: Session)
+	local plot = session.Plot
+	local p = session.Params
+	local list = table.clone(plot.Records)
+	for _, rec in list do
+		if rec.alive then
+			PlotService.damage(plot, rec, StormSim.quakeDamage(p, rec), "hail")
+		end
+	end
+end
+
 local function floodStep(session: Session, dt: number)
 	local result = StormSim.flood(
 		session.BoundaryDoors,
@@ -370,7 +443,8 @@ local function floodStep(session: Session, dt: number)
 		currentSubmerged(session),
 		session.PoolLevel,
 		session.Phase == PHASES.Acid,
-		session.Params.PoolMax
+		session.Params.PoolMax,
+		session.InteriorBottom
 	)
 	local rate = result.rate
 	if rate > 0 and session.InsideLevel < result.cap then
@@ -454,6 +528,15 @@ local function setPhase(session: Session, phase: string)
 	model:SetAttribute("PhaseEndsAt", workspace:GetServerTimeNow() + (PHASE_DURATION[phase] or 0))
 	if phase == PHASES.Hail then
 		notify(session.Player, "Начался град! Держись в бункере!", "warning")
+	elseif phase == PHASES.Wind then
+		local d = WIND_DIRS[session.Rng:NextInteger(1, #WIND_DIRS)]
+		session.WindX, session.WindZ = d[1], d[2]
+		model:SetAttribute("WindDir", Vector3.new(d[1], 0, d[2]))
+		notify(session.Player, "🌪 Ураган! Ветер ломает стены с наветренной стороны — дерево и стекло сдувает!", "warning")
+	elseif phase == PHASES.Meteor then
+		notify(session.Player, "☄ Метеоритный дождь! Метеориты пробивают крыши — прячься глубже!", "warning")
+	elseif phase == PHASES.Quake then
+		notify(session.Player, "🌍 Землетрясение! Высокие постройки трясёт сильнее всего, под землёй безопаснее.", "warning")
 	elseif phase == PHASES.Acid then
 		notify(session.Player, "Кислотный дождь! Кислота разъедает металл и собирается в лужу!", "warning")
 	elseif phase == PHASES.Clear then
@@ -479,6 +562,8 @@ local function cleanupPlot(session: Session)
 	model:SetAttribute("PhaseEndsAt", 0)
 	model:SetAttribute("OutsideAcid", 0)
 	model:SetAttribute("InsideAcid", 0)
+	model:SetAttribute("InsideDepth", 0)
+	model:SetAttribute("WindDir", nil)
 	model:SetAttribute("Leak", 0)
 	model:SetAttribute("LeakCount", 0)
 	for i = 1, MAX_LEAK_POINTS do
@@ -520,11 +605,12 @@ local function unstickPlayer(session: Session)
 		local above = Grid.index(x, y + 1, z)
 		if (y == 0 or plot.Cells[Grid.index(x, y - 1, z)]) and y + 1 < Grid.H and session.Interior[above] then
 			local lx, _, lz = Grid.cellCenterLocal(x, y, z)
+			local pos = Vector3.new(lx, Grid.layerBottom(y) + 3, lz)
 			-- расстояние с учётом этажа (иначе можно попасть в чужую комнату на другом уровне)
-			local d = (Vector3.new(lx, y * CELL + 3, lz) - lp).Magnitude
+			local d = (pos - lp).Magnitude
 			if d < bestDist then
 				bestDist = d
-				best = Vector3.new(lx, y * CELL + 3, lz)
+				best = pos
 			end
 		end
 	end
@@ -634,17 +720,37 @@ local function step(session: Session, dt: number)
 	session.PhaseTime += dt
 	local duration = PHASE_DURATION[session.Phase] or 0
 	if session.PhaseTime >= duration then
-		local index = table.find(PHASE_ORDER, session.Phase) or #PHASE_ORDER
-		if index >= #PHASE_ORDER then
+		local order = session.PhaseOrder
+		local index = table.find(order, session.Phase) or #order
+		if index >= #order then
 			finish(session, "survived")
 			return
 		end
-		setPhase(session, PHASE_ORDER[index + 1])
+		setPhase(session, order[index + 1])
 	end
 
 	local phase = session.Phase
 	if phase == PHASES.Hail then
-		spawnHail(session, dt)
+		spawnHail(session, dt, false)
+	elseif phase == PHASES.Meteor then
+		spawnHail(session, dt, true)
+	end
+	if phase == PHASES.Wind or phase == PHASES.Quake then
+		session.DisasterTick += dt
+		if session.DisasterTick >= 1 then
+			session.DisasterTick -= 1
+			if phase == PHASES.Wind then
+				windTick(session)
+			else
+				quakeTick(session)
+			end
+		end
+	end
+	if phase == PHASES.Wind then
+		local lp = playerLocal(session)
+		if lp then
+			damagePlayer(session, StormSim.windPlayerDamage(session.Params, session.Plot.Cells, session.Interior, lp.X, lp.Y, lp.Z, dt))
+		end
 	end
 	if #session.Pending > 0 then
 		processPending(session)
@@ -652,12 +758,15 @@ local function step(session: Session, dt: number)
 
 	if phase == PHASES.Acid then
 		session.PoolLevel = session.Params.PoolMax * math.clamp(session.PhaseTime / session.Params.PoolRiseTime, 0, 1)
+	elseif phase == PHASES.Quake then
+		session.PoolLevel = math.max(0, session.PoolLevel - S.QuakeDrainRate * dt)
 	elseif phase == PHASES.Clear then
 		session.PoolLevel = math.max(0, session.PoolLevel - S.DrainRate * dt)
-		session.InsideLevel = math.max(0, session.InsideLevel - S.DrainRate * dt)
+		session.InsideLevel = math.max(session.InteriorBottom, session.InsideLevel - S.DrainRate * dt)
 	end
 
-	if phase == PHASES.Acid then
+	-- во время землетрясения лужа медленно уходит, но продолжает затекать в бункер
+	if phase == PHASES.Acid or phase == PHASES.Quake then
 		session.AcidTick += dt
 		if session.AcidTick >= 1 then
 			session.AcidTick -= 1
@@ -738,6 +847,42 @@ function StormService.start(player: Player)
 	for _, rec in plot.Records do
 		startHP += rec.maxHp
 	end
+	-- низ бункера (локальная Y): может быть под землёй
+	local interiorBottom = 0
+	if next(interior) ~= nil then
+		interiorBottom = math.huge
+		for cell in interior do
+			local _, y = Grid.coords(cell)
+			interiorBottom = math.min(interiorBottom, Grid.layerBottom(y))
+		end
+	end
+	local rng = Random.new()
+	-- порядок фаз с дополнительными бедствиями
+	local pool = table.clone(Config.ExtraDisasters)
+	local picked: { [string]: boolean } = {}
+	for _ = 1, Config.extraDisasterCount(level) do
+		if #pool == 0 then
+			break
+		end
+		picked[table.remove(pool, rng:NextInteger(1, #pool)) :: string] = true
+	end
+	local order = { PHASES.Prep, PHASES.Hail }
+	if picked.Wind then
+		table.insert(order, PHASES.Wind)
+	end
+	if picked.Meteor then
+		table.insert(order, PHASES.Meteor)
+	end
+	table.insert(order, PHASES.Calm)
+	table.insert(order, PHASES.Acid)
+	if picked.Quake then
+		table.insert(order, PHASES.Quake)
+	end
+	table.insert(order, PHASES.Clear)
+	local total = 0
+	for _, ph in order do
+		total += PHASE_DURATION[ph] or 0
+	end
 
 	local session: Session = {
 		Plot = plot,
@@ -745,9 +890,10 @@ function StormService.start(player: Player)
 		Level = level,
 		Params = Config.stormParams(level),
 		Phase = "",
+		PhaseOrder = order,
 		PhaseTime = 0,
 		Elapsed = 0,
-		TotalDuration = TOTAL_DURATION,
+		TotalDuration = total,
 		Snapshot = PlotService.getEntries(plot),
 		StartHP = startHP,
 		Interior = interior,
@@ -756,12 +902,17 @@ function StormService.start(player: Player)
 		Submerged = {},
 		SubmergedKey = "",
 		PoolLevel = 0,
-		InsideLevel = 0,
+		InsideLevel = interiorBottom,
+		InteriorBottom = interiorBottom,
 		HailBudget = 0,
+		MeteorBudget = 0,
+		WindX = 1,
+		WindZ = 0,
+		DisasterTick = 0,
 		Pending = {},
 		AcidTick = 0,
 		LastOutside = 0,
-		LastInside = 0,
+		LastInside = interiorBottom,
 		OutOfZone = 0,
 		WarnedZone = false,
 		AttrTimer = 0,
@@ -771,7 +922,7 @@ function StormService.start(player: Player)
 		FloodWarned = false,
 		Ended = false,
 		Connections = {},
-		Rng = Random.new(),
+		Rng = rng,
 	}
 	plot.Session = session
 	sessions[player] = session
@@ -792,7 +943,8 @@ function StormService.start(player: Player)
 	model:SetAttribute("SessionOwner", player.UserId)
 	model:SetAttribute("StormLevel", level)
 	model:SetAttribute("OutsideAcid", 0)
-	model:SetAttribute("InsideAcid", 0)
+	model:SetAttribute("InsideAcid", interiorBottom)
+	model:SetAttribute("InsideDepth", 0)
 	model:SetAttribute("Leak", 0)
 	model:SetAttribute("LeakCount", 0)
 	model:SetAttribute("AcidLayout", buildAcidLayout(session))

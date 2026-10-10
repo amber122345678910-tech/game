@@ -50,8 +50,11 @@ local targetCoins = 0
 local PHASE_ICONS: { [string]: string } = {
 	Prep = "⚠",
 	Hail = "🌨",
+	Wind = "🌪",
+	Meteor = "☄",
 	Calm = "☁",
 	Acid = "☣",
+	Quake = "🌍",
 	Clear = "🌤",
 }
 
@@ -557,7 +560,7 @@ local function refreshStorm()
 		setText(bunkerText, "🧱 Бункера нет!")
 	end
 	local outside = plot:GetAttribute("OutsideAcid")
-	local inside = plot:GetAttribute("InsideAcid")
+	local inside = plot:GetAttribute("InsideDepth")
 	local o = if typeof(outside) == "number" then outside else 0
 	local i = if typeof(inside) == "number" then inside else 0
 	if o > 0 or i > 0 then

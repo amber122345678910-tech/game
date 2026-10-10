@@ -106,7 +106,7 @@ if plots then
 		check(typeof(origin) == "CFrame", plot.Name .. " has no Origin CFrame")
 		check(plot:FindFirstChild("Blocks") ~= nil, plot.Name .. " has no Blocks folder")
 		check(plot:FindFirstChild("Storm") ~= nil, plot.Name .. " has no Storm folder")
-		check(plot:FindFirstChild("BuildArea") ~= nil, plot.Name .. " has no BuildArea")
+		check(plot:FindFirstChild("TerrainPreview") ~= nil, plot.Name .. " has no TerrainPreview")
 		check(plot:FindFirstChild("Sign") ~= nil, plot.Name .. " has no Sign")
 		check(plot:FindFirstChild("Environment") ~= nil, plot.Name .. " has no Environment")
 		if typeof(id) == "number" then

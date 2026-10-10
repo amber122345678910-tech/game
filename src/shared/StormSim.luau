@@ -32,8 +32,6 @@ export type FloodResult = {
 
 local StormSim = {}
 
-local CELL = Grid.CELL
-
 -- Новый блок (без детали) — для тестов и загрузки.
 function StormSim.newBlock(id: string, x: number, y: number, z: number, rot: number): Block
 	local def = Config.Blocks[id]
@@ -57,9 +55,9 @@ end
 function StormSim.hailHit(cells: { [number]: Block }, cx: number, cz: number): (Block?, number)
 	local top = Grid.columnTop(cells, cx, cz)
 	if top then
-		return cells[Grid.index(cx, top, cz)], (top + 1) * CELL
+		return cells[Grid.index(cx, top, cz)], Grid.layerBottom(top + 1)
 	end
-	return nil, 0
+	return nil, Grid.layerBottom(0)
 end
 
 -- Верхние блоки всех колонок, которые разъедает кислотный дождь.
@@ -86,17 +84,18 @@ function StormSim.poolTargets(records: { Block }, exterior: { [number]: boolean 
 		return targets
 	end
 	for _, rec in records do
-		if rec.alive and rec.def.AcidMult > 0 and rec.y * CELL < level then
+		if rec.alive and rec.def.AcidMult > 0 and Grid.layerBottom(rec.y) < level then
 			local wet = false
 			for _, cell in rec.cells do
 				local x, y, z = Grid.coords(cell)
-				if y * CELL < level then
+				if Grid.layerBottom(y) < level then
 					for _, d in Grid.NEIGHBORS do
 						local nx, ny, nz = x + d[1], y + d[2], z + d[3]
 						if ny >= 0 and ny < Grid.H then
 							if nx < 0 or nx >= Grid.W or nz < 0 or nz >= Grid.D then
-								wet = true -- край сетки = поле котлована, там тоже кислота
-							elseif ny * CELL < level and exterior[Grid.index(nx, ny, nz)] then
+								-- край сетки над землёй = поле котлована, там тоже кислота
+								wet = ny >= Grid.SURFACE
+							elseif Grid.layerBottom(ny) < level and exterior[Grid.index(nx, ny, nz)] then
 								wet = true
 							end
 						end
@@ -155,11 +154,12 @@ end
 local function doorFacesPool(rec: Block, submerged: { [number]: boolean }, level: number): boolean
 	for _, cell in rec.cells do
 		local x, y, z = Grid.coords(cell)
-		if y * CELL < level then
+		if Grid.layerBottom(y) < level then
 			for _, d in Grid.NEIGHBORS do
 				if d[2] == 0 then
 					local nx, nz = x + d[1], z + d[3]
-					if not Grid.inBounds(nx, y, nz) or submerged[Grid.index(nx, y, nz)] then
+					local outside = not Grid.inBounds(nx, y, nz) and y >= Grid.SURFACE
+					if outside or (Grid.inBounds(nx, y, nz) and submerged[Grid.index(nx, y, nz)]) then
 						return true
 					end
 				end
@@ -187,7 +187,8 @@ function StormSim.flood(
 	submerged: { [number]: boolean },
 	level: number,
 	acidRaining: boolean,
-	poolMax: number
+	poolMax: number,
+	interiorBottom: number
 ): FloodResult
 	local S = Config.Storm
 	local rate = 0
@@ -195,7 +196,7 @@ function StormSim.flood(
 	local leaking: { Block } = {}
 	for _, rec in doors do
 		if rec.alive and doorFacesPool(rec, submerged, level) then
-			local excess = level - rec.y * CELL - StormSim.doorSeal(rec)
+			local excess = level - Grid.layerBottom(rec.y) - StormSim.doorSeal(rec)
 			if excess > 0 then
 				rate += excess * S.DoorLeakFactor
 				cap = level
@@ -230,7 +231,7 @@ function StormSim.flood(
 	if roofLeak and acidRaining then
 		-- дыра выше лужи: внутрь капает только дождь
 		rate += S.RoofLeakRate
-		cap = math.max(cap, poolMax * S.RoofLeakCap)
+		cap = math.max(cap, interiorBottom + poolMax * S.RoofLeakCap)
 	end
 	return { rate = rate, cap = cap, leaking = leaking, breach = breach, roofLeak = roofLeak }
 end
@@ -283,7 +284,7 @@ function StormSim.playerAcidDamage(
 	local S = Config.Storm
 	local total = 0
 	local kind: string? = nil
-	local feet = math.max(ply - 3, 0)
+	local feet = ply - 3
 	if acidRaining and not StormSim.isCovered(cells, plx, ply, plz) then
 		total += p.AcidRainPlayerDps * dt
 		kind = "rain"
@@ -343,7 +344,7 @@ end
 
 -- Урон блоку без побочных эффектов (для тестов). Возвращает true, если блок разрушен.
 function StormSim.applyDamage(cells: { [number]: Block }, records: { Block }, rec: Block, amount: number): boolean
-	if not rec.alive or amount <= 0 then
+	if not rec.alive or amount <= 0 or rec.def.Indestructible then
 		return false
 	end
 	rec.hp -= amount
@@ -361,6 +362,161 @@ function StormSim.applyDamage(cells: { [number]: Block }, records: { Block }, re
 		table.remove(records, i)
 	end
 	return true
+end
+
+----------------------------------------------------------------------
+-- Новые бедствия
+----------------------------------------------------------------------
+
+-- Насколько материал "лёгкий" для урагана (дерево и стекло сдувает сильнее, титан почти нет).
+function StormSim.windFactor(def: Config.BlockDef): number
+	return math.clamp(100 / def.HP, 0.2, 1.5)
+end
+
+-- Ураган дует в направлении (dx, dz): страдают наземные блоки, у которых с наветренной стороны
+-- пусто (улица или край сетки). Подземные блоки и стены, прикрытые соседями, не страдают.
+function StormSim.windTargets(
+	records: { Block },
+	cells: { [number]: Block },
+	interior: { [number]: boolean },
+	dx: number,
+	dz: number
+): { Block }
+	local targets: { Block } = {}
+	for _, rec in records do
+		if rec.alive and not rec.def.Indestructible and rec.y >= Grid.SURFACE then
+			for _, cell in rec.cells do
+				local x, y, z = Grid.coords(cell)
+				local wx, wz = x - dx, z - dz -- откуда дует ветер
+				local exposed = false
+				if not Grid.inBounds(wx, y, wz) then
+					exposed = true
+				else
+					local i = Grid.index(wx, y, wz)
+					exposed = cells[i] == nil and not interior[i]
+				end
+				if exposed then
+					table.insert(targets, rec)
+					break
+				end
+			end
+		end
+	end
+	return targets
+end
+
+-- Урон урагана игроку: под открытым небом на поверхности (в бункере и под землёй безопасно).
+function StormSim.windPlayerDamage(
+	p: Config.StormParams,
+	cells: { [number]: Block },
+	interior: { [number]: boolean },
+	plx: number,
+	ply: number,
+	plz: number,
+	dt: number
+): number
+	local _, cy = StormSim.playerCell(plx, ply, plz)
+	if cy < Grid.SURFACE then
+		return 0
+	end
+	local cell = StormSim.playerCellIndex(cells, plx, ply, plz)
+	if cell and interior[cell] then
+		return 0
+	end
+	return p.WindPlayerDps * dt
+end
+
+-- Землетрясение: чем выше блок над землёй, тем сильнее трясёт; подземные почти не страдают.
+function StormSim.quakeDamage(p: Config.StormParams, rec: Block): number
+	if rec.def.Indestructible then
+		return 0
+	end
+	if rec.y < Grid.SURFACE then
+		return p.QuakeDps * 0.2
+	end
+	return p.QuakeDps * (1 + 0.25 * (rec.y - Grid.SURFACE))
+end
+
+export type MeteorHit = { rec: Block, mult: number }
+
+-- Метеорит в колонку (cx, cz): верхний блок получает полный урон, два блока под ним —
+-- половину и четверть (пробивает крышу), верхние блоки соседних колонок — 40%.
+-- Земля останавливает метеорит. Возвращает поражённые блоки и высоту удара.
+function StormSim.meteorHits(cells: { [number]: Block }, cx: number, cz: number): ({ MeteorHit }, number)
+	local hits: { MeteorHit } = {}
+	local seen: { [Block]: boolean } = {}
+	local function add(rec: Block, mult: number)
+		if not seen[rec] and not rec.def.Indestructible then
+			seen[rec] = true
+			table.insert(hits, { rec = rec, mult = mult })
+		end
+	end
+	local top = Grid.columnTop(cells, cx, cz)
+	local impactY = Grid.layerBottom(0)
+	if top then
+		impactY = Grid.layerBottom(top + 1)
+		local mults = { 1, 0.5, 0.25 }
+		local depth = 1
+		local y = top
+		while y >= 0 and depth <= #mults do
+			local rec = cells[Grid.index(cx, y, cz)]
+			if rec then
+				if rec.def.Indestructible then
+					break
+				end
+				if not seen[rec] then
+					add(rec, mults[depth])
+					depth += 1
+				end
+			end
+			y -= 1
+		end
+	end
+	for _, d in { { 1, 0 }, { -1, 0 }, { 0, 1 }, { 0, -1 } } do
+		local nx, nz = cx + d[1], cz + d[2]
+		if nx >= 0 and nx < Grid.W and nz >= 0 and nz < Grid.D then
+			local nTop = Grid.columnTop(cells, nx, nz)
+			if nTop then
+				local rec = cells[Grid.index(nx, nTop, nz)]
+				if rec then
+					add(rec, 0.4)
+				end
+			end
+		end
+	end
+	return hits, impactY
+end
+
+-- Урон игроку от метеорита: взрыв рядом. Под крышей — гораздо меньше, под землёй — ничего.
+function StormSim.meteorPlayerDamage(
+	p: Config.StormParams,
+	cells: { [number]: Block },
+	mlx: number,
+	mlz: number,
+	impactY: number,
+	plx: number,
+	ply: number,
+	plz: number
+): number
+	local radius = Config.Storm.MeteorRadius
+	local dx, dz = plx - mlx, plz - mlz
+	local dist = math.sqrt(dx * dx + dz * dz)
+	if dist > radius then
+		return 0
+	end
+	local falloff = 1 - dist / (radius + 1)
+	local covered = StormSim.isCovered(cells, plx, ply, plz)
+	if not covered then
+		return p.MeteorPlayerDamage * falloff
+	end
+	local _, cy = StormSim.playerCell(plx, ply, plz)
+	if cy < Grid.SURFACE then
+		return 0
+	end
+	if impactY >= ply then
+		return p.MeteorPlayerDamage * 0.25 * falloff
+	end
+	return 0
 end
 
 return StormSim

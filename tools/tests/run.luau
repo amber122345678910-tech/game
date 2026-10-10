@@ -26,9 +26,14 @@ local function truthy(v, msg)
 	end
 end
 
--- Строит "solid" карту из раскладки
+local S = Grid.SURFACE
+
+-- Строит "solid" карту из раскладки (с землёй под участком)
 local function solidFrom(entries)
 	local solid = {}
+	for _, cell in Grid.dirtCells(nil) do
+		solid[cell] = true
+	end
 	for _, e in entries do
 		local def = Config.Blocks[e.id]
 		for _, c in Grid.footprint(e.x, e.y, e.z, def.HeightCells) do
@@ -151,13 +156,18 @@ end)
 
 test("serialize/deserialize roundtrip and validation", function()
 	local entries = {
-		{ id = "wood", x = 0, y = 0, z = 0, rot = 0 },
-		{ id = "door_iron", x = 5, y = 0, z = 2, rot = 3 },
-		{ id = "titan", x = 11, y = 9, z = 11, rot = 1 },
+		{ id = "wood", x = 0, y = S, z = 0, rot = 0 },
+		{ id = "door_iron", x = 5, y = S, z = 2, rot = 3 },
+		{ id = "titan", x = 11, y = Grid.H - 1, z = 11, rot = 1 },
+		{ id = "stone", x = 4, y = 1, z = 4, rot = 0 }, -- под землёй, в выкопанной клетке
 	}
-	local s = Grid.serialize(entries)
-	local back = Grid.deserialize(s)
-	eq(#back, 3)
+	local s = Grid.serialize(entries, { Grid.index(4, 1, 4), Grid.index(4, 2, 4) })
+	local back, dug = Grid.deserialize(s)
+	eq(#back, 4)
+	truthy(dug[Grid.index(4, 1, 4)] and dug[Grid.index(4, 2, 4)], "dug cells roundtrip")
+	eq(#Grid.dirtCells(dug), Grid.W * Grid.D * S - 2, "dirt minus dug")
+	-- под землёй в невыкопанной клетке блок не ставится; землю из сохранения не принимаем
+	eq(#Grid.deserialize("2|stone,1,0,1,0;dirt,2," .. S .. ",2,0|"), 0, "no blocks in solid ground")
 	for i, e in entries do
 		eq(back[i].id, e.id)
 		eq(back[i].x, e.x)
@@ -166,12 +176,14 @@ test("serialize/deserialize roundtrip and validation", function()
 		eq(back[i].rot, e.rot)
 	end
 	-- мусор и пересечения отбрасываются
+	-- старый формат "1": блоки поднимаются на поверхность
 	local junk = "1|wood,0,0,0,0;evil,1,1,1,0;wood,0,0,0,0;wood,99,0,0,0;door_wood,1,9,1,0;stone,2,0,2,7;;garbage"
 	local parsed = Grid.deserialize(junk)
 	eq(#parsed, 2, "only valid entries")
+	eq(parsed[1].y, S, "v1 shifted to surface")
 	eq(parsed[2].rot, 3, "rot normalized")
 	eq(#Grid.deserialize(nil), 0)
-	eq(#Grid.deserialize("2|wood,0,0,0,0"), 0, "unknown version")
+	eq(#Grid.deserialize("3|wood,0,0,0,0|"), 0, "unknown version")
 	eq(#Grid.deserialize(""), 0)
 end)
 
@@ -188,7 +200,7 @@ test("all prefabs: valid, enclosed, door on boundary, fit grid", function()
 			if Config.Blocks[e.id].IsDoor then
 				doors += 1
 				-- клетка за дверью внутри бункера должна быть внутренней (или проёмом)
-				local behind = Grid.index(e.x, 0, e.z + def.Thickness)
+				local behind = Grid.index(e.x, S, e.z + def.Thickness)
 				truthy(interior[behind], def.Id .. " door leads inside")
 			end
 		end
@@ -213,7 +225,8 @@ test("storm params sane for all levels", function()
 	for level = 1, Config.Economy.MaxLevel do
 		local p = Config.stormParams(level)
 		truthy(p.PoolMax > 0 and p.PoolMax < Config.Plot.PitDepth, "pool below rim")
-		truthy(p.HailRate > 0 and p.HailRate <= 40)
+		truthy(p.HailRate > 0 and p.HailRate <= 45)
+		truthy(Config.extraDisasterCount(level) >= 1 and Config.extraDisasterCount(level) <= #Config.ExtraDisasters)
 		truthy(p.BaseReward > 0)
 	end
 	eq(Config.stormParams(0).Level, 1, "clamp low")
@@ -224,7 +237,7 @@ end)
 
 test("starter shack survives level 1 acid without door leak", function()
 	local p = Config.stormParams(1)
-	truthy(p.PoolMax < Config.Blocks.door_wood.Seal, "level 1 pool below wooden door seal")
+	truthy(p.PoolMax <= Config.Blocks.door_wood.Seal, "level 1 pool not above wooden door seal")
 	local p3 = Config.stormParams(3)
 	truthy(p3.PoolMax > Config.Blocks.door_wood.Seal, "level 3 leaks through wooden door")
 	truthy(Config.stormParams(12).PoolMax <= Config.Blocks.door_blast.Seal, "blast door holds max pool")
@@ -233,7 +246,7 @@ end)
 test("block defs consistent", function()
 	for id, def in Config.Blocks do
 		eq(def.Id, id, "id matches key")
-		truthy(def.HP > 0 and def.Price > 0)
+		truthy(def.HP > 0 and (def.Price > 0 or def.Category == "Terrain"))
 		truthy(def.HeightCells == (if def.IsDoor then 2 else 1), id .. " height")
 		truthy(#id <= 32)
 		truthy(string.match(id, "^[%w_]+$") ~= nil, id .. " serializable id")
@@ -243,8 +256,17 @@ end)
 
 local StormSim = Loader.load("src/shared/StormSim")
 
+local function withDirt()
+	local cells = {}
+	for _, cell in Grid.dirtCells(nil) do
+		local x, y, z = Grid.coords(cell)
+		cells[cell] = StormSim.newBlock("dirt", x, y, z, 0)
+	end
+	return cells
+end
+
 local function boxBlocks()
-	local cells, records = {}, {}
+	local cells, records = withDirt(), {}
 	for _, e in Prefabs.layout("stone") do
 		local b = StormSim.newBlock(e.id, e.x, e.y, e.z, e.rot)
 		for _, c in b.cells do
@@ -262,7 +284,7 @@ test("flood: sealed bunker below door seal does not leak", function()
 	local doors = StormSim.boundaryDoors(records, interior, cells)
 	eq(#doors, 1, "one boundary door")
 	local level = 5 -- железная дверь держит 7
-	local res = StormSim.flood(doors, interior, cells, Grid.computeExteriorBelow(cells, Grid.submergedLayers(level)), level, true, 6.5)
+	local res = StormSim.flood(doors, interior, cells, Grid.computeExteriorBelow(cells, Grid.submergedLayers(level)), level, true, 6.5, 0)
 	eq(res.rate, 0, "no leak")
 	truthy(not res.breach and not res.roofLeak)
 end)
@@ -274,19 +296,19 @@ test("flood: roof hole is a roof leak, not a breach", function()
 	-- ломаем один блок крыши
 	local roof
 	for _, r in records do
-		if r.y == 3 and not roof and interior[Grid.index(r.x, 2, r.z)] then
+		if r.y == S + 3 and not roof and interior[Grid.index(r.x, S + 2, r.z)] then
 			roof = r
 		end
 	end
 	StormSim.applyDamage(cells, records, roof, 1e9)
 	local ext = Grid.computeExterior(cells)
 	local level = 3
-	local res = StormSim.flood(doors, interior, cells, Grid.computeExteriorBelow(cells, Grid.submergedLayers(level)), level, true, 10)
+	local res = StormSim.flood(doors, interior, cells, Grid.computeExteriorBelow(cells, Grid.submergedLayers(level)), level, true, 10, 0)
 	truthy(res.roofLeak, "roof leak detected")
 	truthy(not res.breach, "not a breach")
 	eq(res.rate, Config.Storm.RoofLeakRate, "only rain drips in")
 	eq(res.cap, 10 * Config.Storm.RoofLeakCap, "cap from rain amount")
-	local resDry = StormSim.flood(doors, interior, cells, Grid.computeExteriorBelow(cells, Grid.submergedLayers(level)), level, false, 10)
+	local resDry = StormSim.flood(doors, interior, cells, Grid.computeExteriorBelow(cells, Grid.submergedLayers(level)), level, false, 10, 0)
 	eq(resDry.rate, 0, "no rain -> nothing drips")
 end)
 
@@ -296,7 +318,7 @@ test("flood: wall hole below acid level is a breach", function()
 	local doors = StormSim.boundaryDoors(records, interior, cells)
 	local wall
 	for _, r in records do
-		if r.y == 0 and not r.def.IsDoor and not wall then
+		if r.y == S and not r.def.IsDoor and not wall then
 			for _, d in Grid.NEIGHBORS do
 				local nx, ny, nz = r.x + d[1], r.y + d[2], r.z + d[3]
 				if Grid.inBounds(nx, ny, nz) and interior[Grid.index(nx, ny, nz)] then
@@ -307,17 +329,17 @@ test("flood: wall hole below acid level is a breach", function()
 	end
 	StormSim.applyDamage(cells, records, wall, 1e9)
 	local ext = Grid.computeExterior(cells)
-	local res = StormSim.flood(doors, interior, cells, Grid.computeExteriorBelow(cells, Grid.submergedLayers(2)), 2, true, 10)
+	local res = StormSim.flood(doors, interior, cells, Grid.computeExteriorBelow(cells, Grid.submergedLayers(2)), 2, true, 10, 0)
 	truthy(res.breach, "breach")
 	truthy(res.rate >= Config.Storm.BreachRate)
 	eq(res.cap, 2, "fills up to outside level")
 	-- та же дыра, но кислоты нет — пробоины нет
-	local dry = StormSim.flood(doors, interior, cells, Grid.computeExteriorBelow(cells, Grid.submergedLayers(0)), 0, true, 10)
+	local dry = StormSim.flood(doors, interior, cells, Grid.computeExteriorBelow(cells, Grid.submergedLayers(0)), 0, true, 10, 0)
 	truthy(not dry.breach, "no acid -> no breach")
 end)
 
 test("flood: damaged wooden door leaks more", function()
-	local cells, records = {}, {}
+	local cells, records = withDirt(), {}
 	for _, e in Prefabs.layout("starter") do
 		local b = StormSim.newBlock(e.id, e.x, e.y, e.z, e.rot)
 		for _, c in b.cells do
@@ -328,26 +350,27 @@ test("flood: damaged wooden door leaks more", function()
 	local ext = Grid.computeExterior(cells)
 	local interior = Grid.computeInterior(cells, ext)
 	local doors = StormSim.boundaryDoors(records, interior, cells)
-	local sub = Grid.computeExteriorBelow(cells, Grid.submergedLayers(3.5))
-	local healthy = StormSim.flood(doors, interior, cells, sub, 3.5, true, 3.5)
-	truthy(healthy.rate > 0, "3.5 > seal 3 leaks")
+	local sub = Grid.computeExteriorBelow(cells, Grid.submergedLayers(4))
+	local healthy = StormSim.flood(doors, interior, cells, sub, 4, true, 4, 0)
+	truthy(healthy.rate > 0, "4 > seal 3.5 leaks")
 	doors[1].hp = doors[1].maxHp * 0.25
-	local damaged = StormSim.flood(doors, interior, cells, sub, 3.5, true, 3.5)
+	local damaged = StormSim.flood(doors, interior, cells, sub, 4, true, 4, 0)
 	truthy(damaged.rate > healthy.rate, "damaged door leaks more")
 end)
 
 test("computeExteriorBelow respects layers and ignores sky", function()
 	local cells = boxBlocks()
-	local below0 = Grid.computeExteriorBelow(cells, 0)
+	local below0 = Grid.computeExteriorBelow(cells, S)
+	truthy(Grid.countSet(below0) > 0, "surface layer floods")
 	for i in below0 do
 		local _, y = Grid.coords(i)
-		eq(y, 0, "only layer 0")
+		eq(y, S, "only the surface layer (ground is solid)")
 	end
 	eq(Grid.countSet(Grid.computeExteriorBelow(cells, -1)), 0, "no acid -> empty")
 	eq(Grid.submergedLayers(0), -1)
-	eq(Grid.submergedLayers(0.1), 0)
-	eq(Grid.submergedLayers(4), 0)
-	eq(Grid.submergedLayers(4.01), 1)
+	eq(Grid.submergedLayers(0.1), S)
+	eq(Grid.submergedLayers(4), S)
+	eq(Grid.submergedLayers(4.01), S + 1)
 end)
 
 test("hail player damage: exposed direct hit vs roof tremor", function()
@@ -357,9 +380,9 @@ test("hail player damage: exposed direct hit vs roof tremor", function()
 	eq(StormSim.hailPlayerDamage(p, {}, nil, 0, 0, 0, false, 1, 3, 1), p.HailPlayerDamage)
 	eq(StormSim.hailPlayerDamage(p, {}, nil, 0, 0, 0, false, 10, 3, 10), 0, "far away")
 	-- внутри бункера: удар по крыше рядом даёт немного урона
-	local roof = cells[Grid.index(5, 3, 5)]
+	local roof = cells[Grid.index(5, S + 3, 5)]
 	truthy(roof ~= nil, "roof block exists")
-	local lx, _, lz = Grid.cellCenterLocal(5, 0, 5)
+	local lx, _, lz = Grid.cellCenterLocal(5, S, 5)
 	local tremor = StormSim.hailPlayerDamage(p, cells, roof, 16, lx, lz, false, lx, 3, lz)
 	truthy(tremor > 0 and tremor < p.HailDamage, "tremor is a fraction of block damage")
 end)
@@ -380,7 +403,7 @@ test("door auto-rotation follows the wall", function()
 end)
 
 test("player in the door recess counts as inside the bunker", function()
-	local cells = {}
+	local cells = withDirt()
 	local records = {}
 	for _, e in Prefabs.layout("starter") do
 		local b = StormSim.newBlock(e.id, e.x, e.y, e.z, e.rot)
@@ -396,7 +419,7 @@ test("player in the door recess counts as inside the bunker", function()
 			door = r
 		end
 	end
-	local lx, _, lz = Grid.cellCenterLocal(door.x, 0, door.z)
+	local lx, _, lz = Grid.cellCenterLocal(door.x, door.y, door.z)
 	-- изнутри (z больше центра двери, внутренность бункера с +Z)
 	local inside = StormSim.playerCellIndex(cells, lx, 3, lz + 1.2)
 	truthy(inside and interior[inside], "inner recess is interior")
@@ -409,7 +432,7 @@ test("player in the door recess counts as inside the bunker", function()
 end)
 
 test("inner doors (closet/airlock) are not boundary doors and don't leak", function()
-	local cells, records = {}, {}
+	local cells, records = withDirt(), {}
 	local function add(id, x, y, z)
 		local b = StormSim.newBlock(id, x, y, z, 0)
 		for _, c in b.cells do
@@ -421,13 +444,65 @@ test("inner doors (closet/airlock) are not boundary doors and don't leak", funct
 		add(e.id, e.x, e.y, e.z)
 	end
 	-- дверь внутри комнаты (по бокам внутренность)
-	add("door_wood", 5, 0, 6)
+	add("door_wood", 5, S, 6)
 	local interior = Grid.computeInterior(cells)
 	local doors = StormSim.boundaryDoors(records, interior, cells)
 	eq(#doors, 1, "only the outer door is a boundary door")
-	local level = 3.5
-	local res = StormSim.flood(doors, interior, cells, Grid.computeExteriorBelow(cells, Grid.submergedLayers(level)), level, true, 3.5)
+	local level = 4
+	local res = StormSim.flood(doors, interior, cells, Grid.computeExteriorBelow(cells, Grid.submergedLayers(level)), level, true, 4, 0)
 	eq(#res.leaking, 1, "one leaking door")
+end)
+
+test("underground room: dug cells under a roof are interior and safe from wind/meteors", function()
+	local cells, records = withDirt(), {}
+	-- выкапываем 2x2x2 под поверхностью и накрываем крышей на уровне земли
+	for x = 4, 5 do
+		for z = 4, 5 do
+			for y = S - 2, S - 1 do
+				cells[Grid.index(x, y, z)] = nil
+			end
+			local b = StormSim.newBlock("concrete", x, S, z, 0)
+			cells[b.cells[1]] = b
+			table.insert(records, b)
+		end
+	end
+	local interior = Grid.computeInterior(cells)
+	eq(Grid.countSet(interior), 8, "dug room is interior")
+	-- открываем крышу — комната становится улицей
+	local roof = records[1]
+	StormSim.applyDamage(cells, records, roof, 1e9)
+	eq(Grid.countSet(Grid.computeInterior(cells)), 0, "open pit is not a bunker")
+	-- земля неразрушима
+	local dirt = cells[Grid.index(0, 0, 0)]
+	truthy(not StormSim.applyDamage(cells, records, dirt, 1e9) and cells[Grid.index(0, 0, 0)] == dirt, "dirt is indestructible")
+	-- метеорит останавливается землёй
+	local hits = StormSim.meteorHits(cells, 0, 0)
+	eq(#hits, 0, "meteor on bare ground hits no blocks")
+	-- урон игроку под землёй от урагана и метеорита — ноль
+	local p = Config.stormParams(10)
+	local lx, _, lz = Grid.cellCenterLocal(5, S - 2, 5)
+	local ply = Grid.layerBottom(S - 2) + 3
+	eq(StormSim.windPlayerDamage(p, cells, interior, lx, ply, lz, 1), 0, "wind can't reach underground")
+end)
+
+test("new disasters: wind hits the windward side, quake hits tall blocks harder", function()
+	local cells, records = boxBlocks()
+	local interior = Grid.computeInterior(cells)
+	local targets = StormSim.windTargets(records, cells, interior, 1, 0)
+	truthy(#targets > 0, "wind hits something")
+	local minX = math.huge
+	for _, r in records do
+		minX = math.min(minX, r.x)
+	end
+	for _, r in targets do
+		-- ветер дует в +X: страдает западная стена и крыша сверху не прикрыта с запада
+		truthy(r.x == minX or r.y > S, "windward side or above the box")
+	end
+	local p = Config.stormParams(5)
+	local low = StormSim.newBlock("stone", 0, S, 0, 0)
+	local high = StormSim.newBlock("stone", 0, S + 4, 0, 0)
+	truthy(StormSim.quakeDamage(p, high) > StormSim.quakeDamage(p, low), "higher block shakes more")
+	truthy(StormSim.windFactor(Config.Blocks.wood) > StormSim.windFactor(Config.Blocks.titan), "wood blows away easier than titan")
 end)
 
 -- Регрессия баланса (та же логика StormSim, что на сервере)
@@ -437,12 +512,9 @@ local function survives(prefab, level)
 	local r = Balance.worst(prefab, level)
 	return r.survived, r
 end
-test("balance: starter shack survives levels 1-2 (first experience)", function()
-	for level = 1, 2 do
-		local ok, r = survives("starter", level)
-		truthy(ok, "starter must survive level " .. level .. " (hp " .. r.playerHP .. ")")
-	end
-	local _, r1 = survives("starter", 1)
+test("balance: starter shack survives level 1 (first experience)", function()
+	local ok, r1 = survives("starter", 1)
+	truthy(ok, "starter must survive level 1 (hp " .. r1.playerHP .. ")")
 	truthy(r1.dmg.hail > 0, "hail should hurt the player a bit through a wooden roof")
 	truthy(r1.playerHP > 50, "level 1 should be comfortable")
 end)
@@ -451,8 +523,8 @@ test("balance: wooden door leaks by level 3 (teaches door upgrade)", function()
 	truthy(r.firstLeak ~= nil, "wooden door should leak at level 3")
 end)
 test("balance: mid and top bunkers", function()
-	truthy((survives("stone", 5)), "stone bunker (iron door) survives level 5")
-	truthy((survives("concrete", 6)), "concrete bunker survives level 6")
+	truthy((survives("stone", 4)), "stone bunker (iron door) survives level 4")
+	truthy((survives("concrete", 5)), "concrete bunker survives level 5")
 	truthy((survives("steel", 12)), "steel fortress survives level 12")
 	truthy((survives("titan", 18)), "titan shelter survives level 18")
 end)

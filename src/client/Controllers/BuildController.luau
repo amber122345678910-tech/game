@@ -234,7 +234,7 @@ end
 
 local function blockCFrame(x: number, y: number, z: number, height: number, r: number): CFrame
 	local lx, _, lz = Grid.cellCenterLocal(x, y, z)
-	return origin * CFrame.new(lx, (y + height / 2) * Grid.CELL, lz) * CFrame.Angles(0, r * math.pi / 2, 0)
+	return origin * CFrame.new(lx, Grid.layerBottom(y) + height * Grid.CELL / 2, lz) * CFrame.Angles(0, r * math.pi / 2, 0)
 end
 
 local function targetKey(t: Target?): string
@@ -322,7 +322,7 @@ end
 local function refreshInfo()
 	local id = selected
 	if deleteMode then
-		infoLabel.Text = "🗑 Режим удаления: блоки возвращаются в инвентарь"
+		infoLabel.Text = "🗑 Удаление: блоки возвращаются в инвентарь • землю можно копать вглубь"
 	elseif id then
 		local def = Config.Blocks[id]
 		infoLabel.Text = string.format("%s %s  •  ❤ %d  •  У тебя: %d", BLOCK_ICONS[id] or "", def.Name, def.HP, ClientState.blockCount(id))
