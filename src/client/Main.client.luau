@@ -31,6 +31,22 @@ task.spawn(function()
 	end
 end)
 
+-- Камера всегда следует за персонажем (на случай, если что-то её сбило) и без смещения тряски.
+local Players = game:GetService("Players")
+local function onCharacter(character: Model)
+	local hum = character:WaitForChild("Humanoid", 10)
+	local camera = workspace.CurrentCamera
+	if hum and hum:IsA("Humanoid") and camera then
+		hum.CameraOffset = Vector3.zero
+		camera.CameraType = Enum.CameraType.Custom
+		camera.CameraSubject = hum
+	end
+end
+Players.LocalPlayer.CharacterAdded:Connect(onCharacter)
+if Players.LocalPlayer.Character then
+	task.spawn(onCharacter, Players.LocalPlayer.Character)
+end
+
 Sounds.preload()
 UIKit.setClickSound(Sounds.get("Click"))
 

@@ -92,6 +92,7 @@
         "EnvironmentSpecularScale": 1,
         "GlobalShadows": true,
         "ShadowSoftness": 0.25,
+        "Technology": "Unified",
         "LightingStyle": "Soft",
         "PrioritizeLightingQuality": false,
         "Outlines": false

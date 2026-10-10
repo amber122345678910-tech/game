@@ -109,12 +109,17 @@ local function prefabPreview(parent: Instance, prefabId: string)
 	local layout = Prefabs.layout(prefabId)
 	local model = Instance.new("Model")
 	local minX, maxX, minZ, maxZ, maxY = math.huge, -math.huge, math.huge, -math.huge, 0
+	-- раскладка стоит на поверхности участка (над подземными слоями) — в превью опускаем на пол
+	local minY = math.huge
+	for _, e in layout do
+		minY = math.min(minY, e.y)
+	end
 	for _, e in layout do
 		minX = math.min(minX, e.x)
 		maxX = math.max(maxX, e.x)
 		minZ = math.min(minZ, e.z)
 		maxZ = math.max(maxZ, e.z)
-		maxY = math.max(maxY, e.y)
+		maxY = math.max(maxY, e.y - minY)
 	end
 	local cx, cz = (minX + maxX + 1) / 2, (minZ + maxZ + 1) / 2
 	for _, e in layout do
@@ -122,7 +127,7 @@ local function prefabPreview(parent: Instance, prefabId: string)
 		local p = previewPart(def)
 		local h = def.HeightCells
 		-- в превью z=0 (перед) смотрит на камеру
-		p.CFrame = CFrame.new((e.x + 0.5 - cx) * 4, (e.y + h / 2) * 4, (cz - (e.z + 0.5)) * 4)
+		p.CFrame = CFrame.new((e.x + 0.5 - cx) * 4, (e.y - minY + h / 2) * 4, (cz - (e.z + 0.5)) * 4)
 		p.Parent = model
 	end
 	model.Parent = vp

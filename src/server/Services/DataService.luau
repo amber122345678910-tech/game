@@ -328,7 +328,15 @@ local function onPlayerAdded(player: Player)
 	if not persistent then
 		task.delay(3, function()
 			if player.Parent == Players then
-				Remotes.Notify:FireClient(player, "Сохранения недоступны: прогресс не будет сохранён.", "warning")
+				if RunService:IsStudio() then
+					-- тест в Studio: это нормально, в опубликованной игре сохранения работают
+					local text = if game.PlaceId == 0
+						then "Тест в Studio: прогресс не сохраняется (это нормально). В опубликованной игре сохранения работают."
+						else "Тест в Studio: включи Game Settings → Security → «Enable Studio Access to API Services», чтобы проверить сохранения."
+					Remotes.Notify:FireClient(player, text, "info")
+				else
+					Remotes.Notify:FireClient(player, "Сохранения временно недоступны: прогресс этой игры может не сохраниться.", "warning")
+				end
 			end
 		end)
 	end
