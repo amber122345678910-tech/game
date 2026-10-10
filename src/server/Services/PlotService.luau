@@ -419,7 +419,7 @@ local function createDirtPart(plot: Plot, rec: BlockRecord)
 	p.BottomSurface = Enum.SurfaceType.Smooth
 	p.Material = def.Material
 	-- слои земли чуть темнее с глубиной
-	p.Color = def.Color:Lerp(Color3.new(0, 0, 0), (Grid.SURFACE - 1 - rec.y) * 0.12)
+	p.Color = def.Color:Lerp(Color3.new(0, 0, 0), (Grid.SURFACE - 1 - rec.y) / Grid.SURFACE * 0.5)
 	p.Size = Vector3.new(CELL, CELL, CELL)
 	p.CFrame = PlotService.blockCFrame(plot, rec.x, rec.y, rec.z, 0, 1)
 	p:SetAttribute("BlockId", def.Id)

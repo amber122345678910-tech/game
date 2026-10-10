@@ -167,7 +167,13 @@ test("serialize/deserialize roundtrip and validation", function()
 	truthy(dug[Grid.index(4, 1, 4)] and dug[Grid.index(4, 2, 4)], "dug cells roundtrip")
 	eq(#Grid.dirtCells(dug), Grid.W * Grid.D * S - 2, "dirt minus dug")
 	-- под землёй в невыкопанной клетке блок не ставится; землю из сохранения не принимаем
-	eq(#Grid.deserialize("2|stone,1,0,1,0;dirt,2," .. S .. ",2,0|"), 0, "no blocks in solid ground")
+	eq(#Grid.deserialize("3|stone,1,-1,1,0;dirt,2,0,2,0|"), 0, "no blocks in solid ground")
+	-- старый формат "2" (3 подземных слоя, клетки индексами) переносится на текущую глубину
+	local old, oldDug = Grid.deserialize("2|wood,0,3,0,0;stone,4,1,4,0|197")
+	eq(#old, 2, "v2 entries kept")
+	eq(old[1].y, S, "v2 surface block stays on the surface")
+	eq(old[2].y, S - 2, "v2 underground block keeps its depth")
+	truthy(oldDug[Grid.index(4, S - 2, 4)], "v2 dug cell moved")
 	for i, e in entries do
 		eq(back[i].id, e.id)
 		eq(back[i].x, e.x)
@@ -183,7 +189,7 @@ test("serialize/deserialize roundtrip and validation", function()
 	eq(parsed[1].y, S, "v1 shifted to surface")
 	eq(parsed[2].rot, 3, "rot normalized")
 	eq(#Grid.deserialize(nil), 0)
-	eq(#Grid.deserialize("3|wood,0,0,0,0|"), 0, "unknown version")
+	eq(#Grid.deserialize("9|wood,0,0,0,0|"), 0, "unknown version")
 	eq(#Grid.deserialize(""), 0)
 end)
 

@@ -316,17 +316,20 @@ function Grid.normalizeRot(rot: any): number
 	return math.floor(rot) % 4
 end
 
--- Сериализация раскладки: "2|id,x,y,z,r;...|выкопанные клетки через запятую"
+-- Сериализация раскладки: "3|id,x,y,z,r;...|x,y,z;..." — высота y считается от поверхности
+-- (0 = первый слой над землёй, -1 = верхний слой земли), чтобы сохранения не ломались,
+-- если меняется число подземных слоёв.
 function Grid.serialize(entries: { Entry }, dug: { number }?): string
 	local parts = table.create(#entries)
 	for _, e in entries do
-		table.insert(parts, string.format("%s,%d,%d,%d,%d", e.id, e.x, e.y, e.z, e.rot))
+		table.insert(parts, string.format("%s,%d,%d,%d,%d", e.id, e.x, e.y - SURFACE, e.z, e.rot))
 	end
 	local dugParts = {}
 	for _, i in dug or {} do
-		table.insert(dugParts, tostring(i))
+		local x, y, z = Grid.coords(i)
+		table.insert(dugParts, string.format("%d,%d,%d", x, y - SURFACE, z))
 	end
-	return "2|" .. table.concat(parts, ";") .. "|" .. table.concat(dugParts, ",")
+	return "3|" .. table.concat(parts, ";") .. "|" .. table.concat(dugParts, ";")
 end
 
 -- Десериализация с проверкой: неизвестные блоки, выход за границы и пересечения отбрасываются.
@@ -338,14 +341,18 @@ function Grid.deserialize(data: any): ({ Entry }, { [number]: boolean })
 		return result, dug
 	end
 	local version, rest = string.match(data, "^(%d+)|(.*)$")
-	if rest == nil or (version ~= "1" and version ~= "2") then
+	if rest == nil or (version ~= "1" and version ~= "2" and version ~= "3") then
 		return result, dug
 	end
 	local body = rest
 	local yShift = 0
 	if version == "1" then
+		-- до подземелья: y от поверхности
 		yShift = SURFACE
-	else
+	elseif version == "2" then
+		-- 3 подземных слоя, выкопанные клетки — индексами
+		local OLD_SURFACE = 3
+		yShift = SURFACE - OLD_SURFACE
 		local entriesPart, dugPart = string.match(rest, "^(.-)|(.*)$")
 		if entriesPart == nil or dugPart == nil then
 			return result, dug
@@ -353,10 +360,27 @@ function Grid.deserialize(data: any): ({ Entry }, { [number]: boolean })
 		body = entriesPart
 		for token in string.gmatch(dugPart, "%d+") do
 			local i = tonumber(token)
-			if i and i >= 1 and i <= Grid.COUNT then
-				local _, y = Grid.coords(i)
-				if y < SURFACE then
-					dug[i] = true
+			if i and i >= 1 then
+				local x, y, z = Grid.coords(i)
+				y += yShift
+				if Grid.inBounds(x, y, z) and y < SURFACE then
+					dug[Grid.index(x, y, z)] = true
+				end
+			end
+		end
+	else
+		yShift = SURFACE
+		local entriesPart, dugPart = string.match(rest, "^(.-)|(.*)$")
+		if entriesPart == nil or dugPart == nil then
+			return result, dug
+		end
+		body = entriesPart
+		for sx, sy, sz in string.gmatch(dugPart, "(%-?%d+),(%-?%d+),(%-?%d+)") do
+			local x, y, z = tonumber(sx), tonumber(sy), tonumber(sz)
+			if x and y and z then
+				y += SURFACE
+				if Grid.inBounds(x, y, z) and y < SURFACE then
+					dug[Grid.index(x, y, z)] = true
 				end
 			end
 		end

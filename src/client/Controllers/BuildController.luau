@@ -160,6 +160,12 @@ local function bindPlot(model: Model)
 	if buildArea then
 		table.insert(list, buildArea)
 	end
+	-- дно выкопанной ямы: на коренную породу тоже можно ставить блоки
+	local env = model:FindFirstChild("Environment")
+	local bedrock = env and env:FindFirstChild("Bedrock")
+	if bedrock then
+		table.insert(list, bedrock)
+	end
 	rayParams.FilterDescendantsInstances = list
 end
 

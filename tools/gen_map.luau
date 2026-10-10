@@ -416,7 +416,7 @@ for id, cf in plotFrames do
 	env.Parent = model
 
 	-- Пол котлована вокруг сетки (толстые плиты: заодно стены подземной части сетки)
-	local under = Config.Grid.Underground * Config.Grid.CellSize -- 12
+	local under = Config.Grid.Underground * Config.Grid.CellSize -- 32
 	local slabH = under + 2
 	local margin = PIT - GRID_HALF
 	local mid = (PIT + GRID_HALF) / 2
@@ -424,8 +424,8 @@ for id, cf in plotFrames do
 	box(L(cf, 0, -slabH / 2, mid), Vector3.new(PIT * 2, slabH, margin), COLORS.PitFloor, Enum.Material.Concrete, env, "Floor")
 	box(L(cf, -mid, -slabH / 2, 0), Vector3.new(margin, slabH, GRID_HALF * 2), COLORS.PitFloor, Enum.Material.Concrete, env, "Floor")
 	box(L(cf, mid, -slabH / 2, 0), Vector3.new(margin, slabH, GRID_HALF * 2), COLORS.PitFloor, Enum.Material.Concrete, env, "Floor")
-	-- дно подземной части сетки
-	box(L(cf, 0, -under - 1, 0), Vector3.new(GRID_HALF * 2, 2, GRID_HALF * 2), COLORS.PitFloor, Enum.Material.Concrete, env, "Bedrock")
+	-- дно подземной части сетки (коренная порода: глубже копать нельзя, но на ней можно строить)
+	box(L(cf, 0, -under - 1, 0), Vector3.new(GRID_HALF * 2, 2, GRID_HALF * 2), Color3.fromRGB(45, 42, 48), Enum.Material.Basalt, env, "Bedrock")
 	-- Земля в зоне строительства: в игре её заменяет сервер (по клетке, чтобы можно было копать),
 	-- а этот блок нужен только для вида карты в редакторе.
 	part({
