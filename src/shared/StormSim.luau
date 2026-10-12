@@ -246,9 +246,15 @@ export type InsideProfile = {
 	refArea: number, -- площадь основного этажа (скорости протечек заданы для него)
 }
 
--- Связные области внутреннего пространства; берём те, что примыкают к наружным дверям,
--- и самую большую (изолированные «карманы» на уровень кислоты не влияют).
-function StormSim.insideProfile(interior: { [number]: boolean }, doors: { Block }): (InsideProfile, { [number]: boolean })
+-- Связные области внутреннего пространства: комнаты за наружными дверями и всё, что
+-- соединено с ними внутренними дверями (тамбур, чулан, убежище этажом ниже). Изолированные
+-- «карманы» (запечатанные пустоты под землёй) на уровень кислоты не влияют. Если наружных
+-- дверей нет совсем — берём самую большую область.
+function StormSim.insideProfile(
+	interior: { [number]: boolean },
+	doors: { Block },
+	allBlocks: { Block }?
+): (InsideProfile, { [number]: boolean })
 	local component: { [number]: number } = {}
 	local sizes: { number } = {}
 	local count = 0
@@ -276,17 +282,9 @@ function StormSim.insideProfile(interior: { [number]: boolean }, doors: { Block 
 			sizes[count] = size
 		end
 	end
-	local chosen: { [number]: boolean } = {}
-	local largest, largestSize = 0, 0
-	for id, size in sizes do
-		if size > largestSize then
-			largest, largestSize = id, size
-		end
-	end
-	if largest > 0 then
-		chosen[largest] = true
-	end
-	for _, rec in doors do
+	-- области по обе стороны двери (по горизонтали)
+	local function sideIds(rec: Block): { number }
+		local ids: { number } = {}
 		for _, cell in rec.cells do
 			local x, y, z = Grid.coords(cell)
 			for _, d in Grid.NEIGHBORS do
@@ -294,10 +292,57 @@ function StormSim.insideProfile(interior: { [number]: boolean }, doors: { Block 
 				if d[2] == 0 and Grid.inBounds(nx, y, nz) then
 					local id = component[Grid.index(nx, y, nz)]
 					if id then
-						chosen[id] = true
+						table.insert(ids, id)
 					end
 				end
 			end
+		end
+		return ids
+	end
+	local chosen: { [number]: boolean } = {}
+	local any = false
+	for _, rec in doors do
+		for _, id in sideIds(rec) do
+			chosen[id] = true
+			any = true
+		end
+	end
+	if any and allBlocks then
+		-- присоединяем комнаты за внутренними дверями, пока список растёт
+		local changed = true
+		while changed do
+			changed = false
+			for _, rec in allBlocks do
+				if rec.alive and rec.def.IsDoor then
+					local ids = sideIds(rec)
+					local linked = false
+					for _, id in ids do
+						if chosen[id] then
+							linked = true
+							break
+						end
+					end
+					if linked then
+						for _, id in ids do
+							if not chosen[id] then
+								chosen[id] = true
+								changed = true
+							end
+						end
+					end
+				end
+			end
+		end
+	end
+	if not any then
+		local largest, largestSize = 0, 0
+		for id, size in sizes do
+			if size > largestSize then
+				largest, largestSize = id, size
+			end
+		end
+		if largest > 0 then
+			chosen[largest] = true
 		end
 	end
 	local region: { [number]: boolean } = {}
@@ -411,7 +456,8 @@ function StormSim.playerAcidDamage(
 	plz: number,
 	pool: number,
 	inside: number,
-	dt: number
+	dt: number,
+	region: { [number]: boolean }?
 ): (number, string?)
 	local S = Config.Storm
 	local total = 0
@@ -424,7 +470,8 @@ function StormSim.playerAcidDamage(
 	local cell = StormSim.playerCellIndex(cells, plx, ply, plz)
 	local inBunker = cell ~= nil and interior[cell] == true
 	if inBunker then
-		if inside - feet > S.InsideDamageDepth then
+		-- запечатанный «карман» вне затапливаемой области бункера остаётся сухим
+		if (region == nil or region[cell :: number]) and inside - feet > S.InsideDamageDepth then
 			total += p.InsidePlayerDps * dt
 			kind = "inside"
 		end

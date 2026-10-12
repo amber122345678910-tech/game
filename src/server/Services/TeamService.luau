@@ -43,7 +43,11 @@ end
 -- Отпустить гостей бункера: они возвращаются на свой участок (иначе остались бы
 -- запертыми за закрытой для них дверью чужого бункера).
 local function releaseMembers(plot: PlotService.Plot, message: string)
+	local members: { Player } = {}
 	for member in plot.Members do
+		table.insert(members, member)
+	end
+	for _, member in members do
 		PlotService.removeGuest(member)
 		local own = PlotService.getPlot(member)
 		if own then

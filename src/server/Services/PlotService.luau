@@ -237,9 +237,19 @@ function PlotService.release(player: Player)
 	if not plot then
 		return
 	end
-	-- хозяин ушёл: гости возвращаются к себе
+	-- хозяин ушёл: гости возвращаются к себе. Переносим их сразу — сейчас участок очистится
+	-- и выкопанная земля вернётся (иначе гость под землёй оказался бы замурован).
+	local members: { Player } = {}
 	for member in plot.Members do
+		table.insert(members, member)
+	end
+	for _, member in members do
 		PlotService.removeGuest(member)
+		local character = member.Character
+		if character then
+			local dest = playerPlots[member] or plot
+			character:PivotTo(dest.Origin * CFrame.new(0, 4, -29))
+		end
 		Remotes.Notify:FireClient(member, "Хозяин бункера вышел из игры — ты снова на своём участке.", "info")
 	end
 	playerPlots[player] = nil

@@ -58,6 +58,7 @@ export type Session = {
 	InsideLevel: number,
 	InsideVolume: number,
 	Profile: StormSim.InsideProfile,
+	FloodRegion: { [number]: boolean }, -- внутренние клетки, куда растекается кислота
 	InteriorBottom: number,
 	HailBudget: number,
 	MeteorBudget: number,
@@ -503,6 +504,11 @@ local function floodStep(session: Session, dt: number)
 	if rate > 0 then
 		-- скорость задана для основного этажа; кислота растекается по объёму всех этажей
 		local capVolume = StormSim.volumeFromLevel(session.Profile, result.cap)
+		if result.roofLeak and session.Phase == PHASES.Acid then
+			-- через крышу натекает объём PoolMax*RoofLeakCap над основным этажом,
+			-- где бы он ни скопился (яма под полом не «съедает» этот предел)
+			capVolume = math.max(capVolume, session.Params.PoolMax * S.RoofLeakCap * session.Profile.refArea)
+		end
 		if session.InsideVolume < capVolume then
 			session.InsideVolume = math.min(capVolume, session.InsideVolume + rate * dt * session.Profile.refArea)
 			session.InsideLevel = StormSim.levelFromVolume(session.Profile, session.InsideVolume)
@@ -568,7 +574,8 @@ local function playerAcidDamage(session: Session, dt: number)
 			lp.Z,
 			session.PoolLevel,
 			session.InsideLevel,
-			dt
+			dt,
+			session.FloodRegion
 		)
 		damagePlayer(player, amount)
 	end)
@@ -962,7 +969,7 @@ function StormService.start(player: Player)
 	end
 	local boundaryDoors = StormSim.boundaryDoors(plot.Records, interior, plot.Cells)
 	-- этажи бункера для затопления по объёму; низ (локальная Y) может быть под землёй
-	local profile = StormSim.insideProfile(interior, boundaryDoors)
+	local profile, floodRegion = StormSim.insideProfile(interior, boundaryDoors, plot.Records)
 	local interiorBottom = profile.bottom
 	local params = Config.stormParams(level)
 	-- колонки над подземной комнатой, где сверху улица: там тоже рисуется уличная лужа
@@ -1033,6 +1040,7 @@ function StormService.start(player: Player)
 		InsideLevel = interiorBottom,
 		InsideVolume = 0,
 		Profile = profile,
+		FloodRegion = floodRegion,
 		InteriorBottom = interiorBottom,
 		HailBudget = 0,
 		MeteorBudget = 0,

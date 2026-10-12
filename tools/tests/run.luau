@@ -548,6 +548,42 @@ test("inside flood by volume: a narrow sump does not make the bunker immune", fu
 	eq(profile3.bottom, profile2.bottom, "sealed pocket ignored")
 end)
 
+test("flood region: rooms behind inner doors join, sealed cavities do not", function()
+	local cells, records = withDirt(), {}
+	local function add(id, x, y, z, rot)
+		local b = StormSim.newBlock(id, x, y, z, rot or 0)
+		for _, c in b.cells do
+			cells[c] = b
+		end
+		table.insert(records, b)
+		return b
+	end
+	for _, e in Prefabs.layout("stone") do
+		add(e.id, e.x, e.y, e.z, e.rot)
+	end
+	local interior0 = Grid.computeInterior(cells)
+	local doors0 = StormSim.boundaryDoors(records, interior0, cells)
+	local base = StormSim.insideProfile(interior0, doors0, records)
+	-- большая запечатанная полость под землёй в стороне от бункера: не должна менять уровень
+	for x = 0, 3 do
+		for z = 8, 11 do
+			cells[Grid.index(x, 0, z)] = nil
+			cells[Grid.index(x, 1, z)] = nil
+		end
+	end
+	local interior = Grid.computeInterior(cells)
+	truthy(interior[Grid.index(0, 0, 8)], "cavity is interior")
+	local doors = StormSim.boundaryDoors(records, interior, cells)
+	local prof, region = StormSim.insideProfile(interior, doors, records)
+	eq(prof.bottom, base.bottom, "sealed cavity ignored even if large")
+	eq(prof.refArea, base.refArea)
+	truthy(not region[Grid.index(0, 0, 8)], "cavity outside the flood region")
+	-- игрок в полости: внутри бункера, но там сухо — урона нет
+	local p = Config.stormParams(5)
+	local lx, _, lz = Grid.cellCenterLocal(0, 0, 8)
+	eq(StormSim.playerAcidDamage(p, true, cells, interior, lx, Grid.layerBottom(0) + 3, lz, 5, 0, 1, region), 0, "dry pocket")
+end)
+
 test("no pool damage in a dug pit when the pool is empty", function()
 	local p = Config.stormParams(3)
 	local cells = withDirt()

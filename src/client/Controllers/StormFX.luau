@@ -437,7 +437,8 @@ local function setShallowAcid(fx: PlotFX, level: number)
 			r.shown = level
 			local floor = r.floor or 0
 			local height = level - floor
-			if height < 0.05 then
+			-- пока уличной лужи нет — не рисуем (даже если дно ниже уровня земли)
+			if level < 0.05 or height < 0.05 then
 				r.part.Transparency = 1
 			else
 				r.part.Size = Vector3.new(r.lx1 - r.lx0, height, r.lz1 - r.lz0)

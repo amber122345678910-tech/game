@@ -76,7 +76,7 @@ function Balance.simulate(prefabId: string, level: number, seed: number)
 		startHP += r.maxHp
 	end
 	-- затопление по объёму, как на сервере
-	local profile = StormSim.insideProfile(interior, doors)
+	local profile, region = StormSim.insideProfile(interior, doors, records)
 	local interiorBottom = profile.bottom
 	local volume = 0
 	-- игрок в центре внутреннего пространства на полу
@@ -221,6 +221,9 @@ function Balance.simulate(prefabId: string, level: number, seed: number)
 				local res = StormSim.flood(doors, interior, cells, sub, pool, raining, p.PoolMax, interiorBottom)
 				if res.rate > 0 then
 					local capVolume = StormSim.volumeFromLevel(profile, res.cap)
+					if res.roofLeak and raining then
+						capVolume = math.max(capVolume, p.PoolMax * S.RoofLeakCap * profile.refArea)
+					end
 					if volume < capVolume then
 						volume = math.min(capVolume, volume + res.rate * dt * profile.refArea)
 						inside = StormSim.levelFromVolume(profile, volume)
@@ -232,7 +235,7 @@ function Balance.simulate(prefabId: string, level: number, seed: number)
 				breachSeen = breachSeen or res.breach
 				maxInside = math.max(maxInside, inside)
 				-- урон игроку
-				local amount, kind = StormSim.playerAcidDamage(p, raining, cells, interior, plx, ply, plz, pool, inside, dt)
+				local amount, kind = StormSim.playerAcidDamage(p, raining, cells, interior, plx, ply, plz, pool, inside, dt, region)
 				if amount > 0 then
 					hurt(kind or "rain", amount)
 				end
