@@ -45,9 +45,10 @@ local function initModule(folder: Instance, name: string)
 		return
 	end
 	safeInit(name, function()
-		local m = require(module) :: any
+		local m = (require :: any)(module)
 		if type(m) == "table" and type(m.init) == "function" then
-			m.init()
+			local init: () -> () = m.init
+			init()
 		end
 	end)
 end

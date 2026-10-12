@@ -179,9 +179,7 @@ function InmateAI.new(def: Inmates.InmateDef, bodyIndex: number, spawnPos: Vecto
 	model.Parent = folder
 	self.Root:SetNetworkOwner(nil)
 	self:loadAnimations()
-	if def.Sounds.Voice ~= "" then
-		self.Voice = ServerSounds.loopOn(def.Sounds.Voice, self.Head, 0.55, 1, 90)
-	end
+	-- Голос пациента (зацикленный 3D-звук) вешает клиент: так он подчиняется настройкам громкости игрока.
 	humanoid.WalkSpeed = def.RoamSpeed * difficulty.SpeedMult
 	return self
 end
