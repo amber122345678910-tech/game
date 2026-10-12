@@ -580,6 +580,21 @@ export type ModalOptions = {
 	Accent: Color3?,
 }
 
+-- Сообщить ClientState об открытии/закрытии модального окна (курсор освобождается, пока открыто хоть одно).
+function UIKit.notifyModal(open: boolean)
+	local stateModule = script.Parent.Parent:FindFirstChild("ClientState")
+	if not stateModule then
+		return
+	end
+	local ok, state = pcall(require :: any, stateModule)
+	if ok and type(state) == "table" then
+		local fn: (() -> ())? = if open then (state :: any).pushModal else (state :: any).popModal
+		if fn then
+			fn()
+		end
+	end
+end
+
 function UIKit.modal(opts: ModalOptions): Modal
 	local accent = opts.Accent or Theme.Amber
 	local overlay = UIKit.new("TextButton", {
@@ -658,6 +673,7 @@ function UIKit.modal(opts: ModalOptions): Modal
 				return
 			end
 			self.IsOpen = true
+			UIKit.notifyModal(true)
 			self.Overlay.Visible = true
 			-- если прошлая анимация появления ещё идёт, не запускаем новую (иначе окно «усохнет»)
 			if os.clock() - self.OpenedAt < 0.3 then
@@ -672,6 +688,7 @@ function UIKit.modal(opts: ModalOptions): Modal
 				return
 			end
 			self.IsOpen = false
+			UIKit.notifyModal(false)
 			self.Window.Visible = false
 			self.Overlay.Visible = false
 			if self.OnClose then

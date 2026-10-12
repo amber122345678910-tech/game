@@ -78,9 +78,31 @@ ClientState.LightsChanged = Signal.new() :: Signal.Signal<string, boolean>
 ClientState.ResultReceived = Signal.new() :: Signal.Signal<Remotes.ResultSummary>
 ClientState.LeaderboardChanged = Signal.new() :: Signal.Signal<{ { Name: string, Nights: number } }>
 ClientState.SelectedChanged = Signal.new() :: Signal.Signal<number>
+ClientState.ModalChanged = Signal.new() :: Signal.Signal<boolean>
 ClientState.FlashlightChanged = Signal.new() :: Signal.Signal<boolean>
 ClientState.CrouchChanged = Signal.new() :: Signal.Signal<boolean>
 ClientState.SettingsChanged = Signal.new() :: Signal.Signal<{ [string]: any }>
+
+-- Открытые модальные окна: пока хоть одно открыто, курсор свободен (камера не захватывает мышь).
+ClientState.ModalCount = 0
+
+function ClientState.pushModal()
+	ClientState.ModalCount += 1
+	if ClientState.ModalCount == 1 then
+		ClientState.ModalChanged:Fire(true)
+	end
+end
+
+function ClientState.popModal()
+	ClientState.ModalCount = math.max(0, ClientState.ModalCount - 1)
+	if ClientState.ModalCount == 0 then
+		ClientState.ModalChanged:Fire(false)
+	end
+end
+
+function ClientState.isModalOpen(): boolean
+	return ClientState.ModalCount > 0
+end
 
 -- Сколько секунд осталось до конца текущей фазы (по серверному времени).
 function ClientState.phaseRemaining(): number

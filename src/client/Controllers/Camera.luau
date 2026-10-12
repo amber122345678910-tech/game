@@ -7,6 +7,7 @@
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
@@ -181,7 +182,45 @@ function Camera.setScriptable(cframe: CFrame?)
 		if hum and hum.Parent then
 			cam.CameraSubject = hum
 		end
-		player.CameraMode = Enum.CameraMode.LockFirstPerson
+		Camera.applyMode()
+	end
+end
+
+----------------------------------------------------------------------
+-- Режим камеры и курсора
+-- В матче (жив / повален / в укрытии) — строго первое лицо. В лобби, итогах и спектаторе — обычная
+-- камера, курсор свободен. Пока открыто модальное окно, идёт оповещение или зажат Alt — курсор свободен.
+----------------------------------------------------------------------
+local altHeld = false
+
+local function wantsFirstPerson(): boolean
+	if not ClientState.inMatch() then
+		return false
+	end
+	local status = ClientState.Status
+	return status == "Alive" or status == "Downed" or status == "Hiding"
+end
+
+function Camera.cursorFree(): boolean
+	return ClientState.isModalOpen() or altHeld or ClientState.Snapshot.Phase == "Alert" or not wantsFirstPerson()
+end
+
+function Camera.applyMode()
+	if scriptableCFrame then
+		return
+	end
+	if wantsFirstPerson() then
+		if player.CameraMode ~= Enum.CameraMode.LockFirstPerson then
+			player.CameraMode = Enum.CameraMode.LockFirstPerson
+		end
+		player.CameraMinZoomDistance = 0.5
+		player.CameraMaxZoomDistance = 0.5
+	else
+		player.CameraMaxZoomDistance = 14
+		player.CameraMinZoomDistance = 4
+		if player.CameraMode ~= Enum.CameraMode.Classic then
+			player.CameraMode = Enum.CameraMode.Classic
+		end
 	end
 end
 
@@ -201,10 +240,38 @@ function Camera.init()
 		task.spawn(bindCharacter, player.Character)
 	end
 
+	ClientState.StatusChanged:Connect(function()
+		Camera.applyMode()
+	end)
+	ClientState.StateChanged:Connect(function()
+		Camera.applyMode()
+	end)
+	ClientState.ModalChanged:Connect(function()
+		Camera.applyMode()
+	end)
+	UserInputService.InputBegan:Connect(function(input: InputObject, _processed: boolean)
+		if input.KeyCode == Enum.KeyCode.LeftAlt or input.KeyCode == Enum.KeyCode.RightAlt then
+			altHeld = true
+		end
+	end)
+	UserInputService.InputEnded:Connect(function(input: InputObject, _processed: boolean)
+		if input.KeyCode == Enum.KeyCode.LeftAlt or input.KeyCode == Enum.KeyCode.RightAlt then
+			altHeld = false
+		end
+	end)
+	Camera.applyMode()
+
 	RunService:BindToRenderStep(RENDER_NAME, Enum.RenderPriority.Camera.Value + 1, function(dt: number)
 		local cam = workspace.CurrentCamera
 		if not cam then
 			return
+		end
+		-- Свободный курсор поверх штатной камеры (она каждый кадр захватывает мышь в первом лице)
+		if scriptableCFrame == nil and wantsFirstPerson() and Camera.cursorFree() then
+			if UserInputService.MouseBehavior ~= Enum.MouseBehavior.Default then
+				UserInputService.MouseBehavior = Enum.MouseBehavior.Default
+			end
+			UserInputService.MouseIconEnabled = true
 		end
 		local shakeCf, hasShake = computeShake(dt)
 		local base = scriptableCFrame
