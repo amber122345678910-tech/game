@@ -67,20 +67,25 @@ local function buyPrefab(player: Player, id: any): (boolean, string)
 	end
 	BuildService.replaceWithLayout(player, Prefabs.layout(def.Id))
 	DataService.replicate(player)
-	-- если игрок оказался внутри стены нового бункера — переносим его к входу
-	local character = player.Character
-	local root = character and character:FindFirstChild("HumanoidRootPart")
-	if character and root and root:IsA("BasePart") then
-		local lp = PlotService.toLocal(plot, root.Position)
-		local cx, cy, cz = Grid.localToCell(lp.X, lp.Y - 1.5, lp.Z)
-		local stuck = false
-		for dy = 0, 1 do
-			if Grid.inBounds(cx, cy + dy, cz) and plot.Cells[Grid.index(cx, cy + dy, cz)] then
-				stuck = true
+	-- если кто-то (покупатель, гости, прохожие) оказался внутри стены нового бункера — к входу
+	for _, other in Players:GetPlayers() do
+		local character = other.Character
+		local root = character and character:FindFirstChild("HumanoidRootPart")
+		if character and root and root:IsA("BasePart") then
+			local lp = PlotService.toLocal(plot, root.Position)
+			local cx, cy, cz = Grid.localToCell(lp.X, lp.Y - 1.5, lp.Z)
+			local stuck = false
+			for dy = 0, 1 do
+				if Grid.inBounds(cx, cy + dy, cz) then
+					local rec = plot.Cells[Grid.index(cx, cy + dy, cz)]
+					if rec and not rec.def.Climbable then
+						stuck = true
+					end
+				end
 			end
-		end
-		if stuck then
-			character:PivotTo(plot.Origin * CFrame.new(0, 4, -29))
+			if stuck then
+				character:PivotTo(plot.Origin * CFrame.new(0, 4, -29))
+			end
 		end
 	end
 	return true, "Бункер «" .. def.Name .. "» построен на твоём участке!"

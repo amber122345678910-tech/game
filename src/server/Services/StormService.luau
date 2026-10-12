@@ -295,6 +295,21 @@ local function surfaceHeight(session: Session, lx: number, lz: number): number
 	return 0
 end
 
+-- Игрок вне сетки (поля котлована) стоит под пандусом или другим укрытием окружения?
+local function underEnvironment(session: Session, lp: Vector3): boolean
+	local cx, _, cz = Grid.localToCell(lp.X, 0, lp.Z)
+	if Grid.inBounds(cx, 0, cz) then
+		return false
+	end
+	local env = session.Plot.Model:FindFirstChild("Environment")
+	if not env then
+		return false
+	end
+	envParams.FilterDescendantsInstances = { env }
+	local origin = session.Plot.Origin:PointToWorldSpace(lp)
+	return workspace:Raycast(origin, session.Plot.Origin.UpVector * 30, envParams) ~= nil
+end
+
 -- Точка протечки двери: низ двери со стороны бункера, взгляд внутрь.
 local function leakCFrame(session: Session, rec: BlockRecord): CFrame?
 	local dx, dz = doorInteriorDir(session, rec)
@@ -401,7 +416,11 @@ local function applyMeteor(session: Session, h: PendingHail)
 		impactY = surfaceHeight(session, h.lx, h.lz)
 	end
 	eachActive(session, function(player, lp)
-		damagePlayer(player, StormSim.meteorPlayerDamage(p, plot.Cells, h.lx, h.lz, impactY, lp.X, lp.Y, lp.Z))
+		local amount = StormSim.meteorPlayerDamage(p, plot.Cells, h.lx, h.lz, impactY, lp.X, lp.Y, lp.Z)
+		if amount > 0 and underEnvironment(session, lp) then
+			amount *= 0.25 -- под пандусом достаётся только взрывной волной
+		end
+		damagePlayer(player, amount)
 	end)
 end
 
@@ -415,7 +434,7 @@ local function applyHail(session: Session, h: PendingHail)
 	local damage = p.HailDamage * (if h.big then p.HailBigMult else 1)
 	local hitRec: BlockRecord? = nil
 	local cx, _, cz = Grid.localToCell(h.lx, 0, h.lz)
-	local impactY = Grid.layerBottom(Grid.SURFACE)
+	local impactY: number
 	if Grid.inBounds(cx, 0, cz) then
 		local rec, y = StormSim.hailHit(plot.Cells, cx, cz)
 		impactY = y
@@ -423,6 +442,9 @@ local function applyHail(session: Session, h: PendingHail)
 			hitRec = rec
 			PlotService.damage(plot, rec, damage, "hail")
 		end
+	else
+		-- вне сетки — та же поверхность, куда градина падает на экране (пандус / пол)
+		impactY = surfaceHeight(session, h.lx, h.lz)
 	end
 	eachActive(session, function(player, lp)
 		damagePlayer(player, StormSim.hailPlayerDamage(p, plot.Cells, hitRec, impactY, h.lx, h.lz, h.big, lp.X, lp.Y, lp.Z))
@@ -540,6 +562,14 @@ local function floodStep(session: Session, dt: number)
 	if model:GetAttribute("Leak") ~= leakRounded then
 		model:SetAttribute("Leak", leakRounded)
 	end
+	local leakKind = if result.breach
+		then "breach"
+		elseif #leakRecs > 0 then "door"
+		elseif result.roofLeak and session.Phase == PHASES.Acid then "roof"
+		else ""
+	if model:GetAttribute("LeakKind") ~= leakKind then
+		model:SetAttribute("LeakKind", leakKind)
+	end
 	-- точки протечки пересобираем, когда меняется сам набор текущих дверей
 	local keyParts = table.create(#leakRecs)
 	for _, rec in leakRecs do
@@ -566,7 +596,8 @@ local function playerAcidDamage(session: Session, dt: number)
 	eachActive(session, function(player, lp)
 		local amount = StormSim.playerAcidDamage(
 			session.Params,
-			acidRaining,
+			-- под пандусом дождь не достаёт
+			acidRaining and not underEnvironment(session, lp),
 			session.Plot.Cells,
 			session.Interior,
 			lp.X,
@@ -629,6 +660,7 @@ local function cleanupPlot(session: Session)
 	model:SetAttribute("InsideDepth", 0)
 	model:SetAttribute("WindDir", nil)
 	model:SetAttribute("Leak", 0)
+	model:SetAttribute("LeakKind", "")
 	model:SetAttribute("LeakCount", 0)
 	for i = 1, MAX_LEAK_POINTS do
 		model:SetAttribute("LeakCF" .. i, nil)
@@ -652,7 +684,7 @@ local function unstickPlayer(session: Session, player: Player)
 		local y = math.max(cy, 0) + dy
 		if Grid.inBounds(cx, y, cz) then
 			local rec = plot.Cells[Grid.index(cx, y, cz)]
-			if rec and not rec.def.IsDoor then
+			if rec and not rec.def.IsDoor and not rec.def.Climbable then
 				stuck = true
 			end
 		end
@@ -1106,6 +1138,7 @@ function StormService.start(player: Player)
 	model:SetAttribute("InsideAcid", interiorBottom)
 	model:SetAttribute("InsideDepth", 0)
 	model:SetAttribute("Leak", 0)
+	model:SetAttribute("LeakKind", "")
 	model:SetAttribute("LeakCount", 0)
 	model:SetAttribute("AcidLayout", buildAcidLayout(session))
 	updateHPAttributes(session)

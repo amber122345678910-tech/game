@@ -509,17 +509,36 @@ function StormSim.playerCellIndex(cells: { [number]: Block }, lx: number, ly: nu
 		if Grid.inBounds(cx + dx, cy, cz + dz) then
 			return Grid.index(cx + dx, cy, cz + dz)
 		end
+	elseif rec and rec.def.Climbable then
+		-- лестница — тонкая ферма в центре клетки: игрок на ней стоит в соседней свободной
+		-- клетке со своей стороны
+		local clx, _, clz = Grid.cellCenterLocal(rec.x, rec.y, rec.z)
+		local ox, oz = lx - clx, lz - clz
+		local sx = if ox >= 0 then 1 else -1
+		local sz = if oz >= 0 then 1 else -1
+		local xFirst = math.abs(ox) >= math.abs(oz)
+		for pass = 1, 2 do
+			local useX = if pass == 1 then xFirst else not xFirst
+			local nx = if useX then cx + sx else cx
+			local nz = if useX then cz else cz + sz
+			if Grid.inBounds(nx, cy, nz) and cells[Grid.index(nx, cy, nz)] == nil then
+				return Grid.index(nx, cy, nz)
+			end
+		end
 	end
 	return index
 end
 
 -- Накрыт ли игрок блоками сверху. Вне сетки (поля котлована) — не накрыт.
 function StormSim.isCovered(cells: { [number]: Block }, lx: number, ly: number, lz: number): (boolean, number?, number?)
-	local cx, cy, cz = StormSim.playerCell(lx, ly, lz)
-	if cx < 0 or cx >= Grid.W or cz < 0 or cz >= Grid.D then
+	-- та же клетка, что и для зоны (с учётом ниши двери и лестницы): иначе стопка лестниц
+	-- в открытой яме работала бы как крыша
+	local index = StormSim.playerCellIndex(cells, lx, ly, lz)
+	if not index then
 		return false, nil, nil
 	end
-	return Grid.isCovered(cells, cx, math.max(cy, 0), cz), cx, cz
+	local cx, cy, cz = Grid.coords(index)
+	return Grid.isCovered(cells, cx, cy, cz), cx, cz
 end
 
 -- Урон блоку без побочных эффектов (для тестов). Возвращает true, если блок разрушен.

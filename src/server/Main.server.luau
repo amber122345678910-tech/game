@@ -36,6 +36,7 @@ DataService.Loaded:Connect(function(player, data)
 		return
 	end
 	local entries, dug = Grid.deserialize(data.Layout)
+	PlotService.evacuate(plot)
 	PlotService.resetTerrain(plot, dug)
 	if #entries > 0 then
 		PlotService.loadEntries(plot, entries)

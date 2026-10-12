@@ -584,6 +584,25 @@ test("flood region: rooms behind inner doors join, sealed cavities do not", func
 	eq(StormSim.playerAcidDamage(p, true, cells, interior, lx, Grid.layerBottom(0) + 3, lz, 5, 0, 1, region), 0, "dry pocket")
 end)
 
+test("ladder: a climbing player stands in the free cell next to it", function()
+	local cells = withDirt()
+	-- яма 1x2 глубиной 2 слоя, в одной клетке стопка лестниц
+	for y = S - 2, S - 1 do
+		cells[Grid.index(5, y, 5)] = nil
+		cells[Grid.index(6, y, 5)] = nil
+	end
+	for y = S - 2, S do
+		local b = StormSim.newBlock("ladder", 5, y, 5, 0)
+		cells[b.cells[1]] = b
+	end
+	-- игрок прижался к лестнице со стороны свободной клетки (+X)
+	local lx, _, lz = Grid.cellCenterLocal(5, S - 2, 5)
+	local px, py, pz = lx + 1.5, Grid.layerBottom(S - 2) + 3, lz
+	eq(StormSim.playerCellIndex(cells, px, py, pz), Grid.index(6, S - 2, 5), "mapped to the free neighbour")
+	-- стопка лестниц не работает как крыша над открытой ямой
+	truthy(not StormSim.isCovered(cells, px, py, pz), "open pit with a ladder is not covered")
+end)
+
 test("no pool damage in a dug pit when the pool is empty", function()
 	local p = Config.stormParams(3)
 	local cells = withDirt()

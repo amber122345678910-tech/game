@@ -366,10 +366,22 @@ local function prefabCard(def: Prefabs.PrefabDef): Frame
 			ClientState.notify("Стартовая хижина уже получена", "info")
 			return
 		end
-		local plot = ClientState.getPlotModel()
+		-- готовый бункер строится на СВОЁМ участке (даже если я сейчас в гостях)
+		local ownId = player:GetAttribute("PlotId")
+		local plot = if typeof(ownId) == "number" then ClientState.getPlotById(ownId) else nil
 		local blocks = plot and plot:FindFirstChild("Blocks")
-		local hasBuild = blocks ~= nil and #blocks:GetChildren() > 0
-		if hasBuild and not ClientState.TutorialActive then
+		local hasBuild = false
+		if blocks then
+			for _, child in blocks:GetChildren() do
+				-- земля под участком всегда лежит в Blocks и не разбирается
+				if child:GetAttribute("BlockId") ~= "dirt" then
+					hasBuild = true
+					break
+				end
+			end
+		end
+		-- без вопроса — только бесплатная хижина во время обучения
+		if hasBuild and not (def.Free and ClientState.TutorialActive) then
 			showConfirm("Текущая постройка будет разобрана, а её блоки вернутся в инвентарь. Построить «" .. def.Name .. "»?", function()
 				purchase("prefab", def.Id, 1, buy)
 			end)

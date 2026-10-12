@@ -4,6 +4,7 @@
 -- Records (это не постройка). Её можно копать в режиме удаления; выкопанные клетки — plot.Dug.
 -- Детали создаются только для открытой земли (у которой есть не-земляной сосед).
 
+local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
@@ -253,6 +254,7 @@ function PlotService.release(player: Player)
 		Remotes.Notify:FireClient(member, "Хозяин бункера вышел из игры — ты снова на своём участке.", "info")
 	end
 	playerPlots[player] = nil
+	PlotService.evacuate(plot)
 	PlotService.clear(plot)
 	resetTerrain(plot, nil)
 	plot.Owner = nil
@@ -283,6 +285,18 @@ function PlotService.isInZone(plot: Plot, worldPos: Vector3): boolean
 	local p = plot.Origin:PointToObjectSpace(worldPos)
 	local half = PIT + Config.Plot.ZoneMargin
 	return math.abs(p.X) <= half and math.abs(p.Z) <= half and p.Y >= -Grid.SURFACE * CELL - 3 and p.Y <= Config.Plot.ZoneTop
+end
+
+-- Перед перестройкой участка (загрузка, освобождение) уводим всех, кто в его зоне, к входу:
+-- иначе человека замурует вернувшейся землёй или появившимися блоками.
+function PlotService.evacuate(plot: Plot)
+	for _, p in Players:GetPlayers() do
+		local character = p.Character
+		local root = character and character:FindFirstChild("HumanoidRootPart")
+		if character and root and root:IsA("BasePart") and PlotService.isInZone(plot, root.Position) then
+			character:PivotTo(plot.Origin * CFrame.new(0, 4, -29))
+		end
+	end
 end
 
 -- Проверка возможности поставить блок (без учёта инвентаря и шторма).

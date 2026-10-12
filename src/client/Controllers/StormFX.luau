@@ -98,6 +98,7 @@ local moveParts: { BasePart } = {}
 local moveCFrames: { CFrame } = {}
 local impactAttachment: Attachment
 local impactEmitter: ParticleEmitter
+local meteorImpactEmitter: ParticleEmitter -- отдельный: цвет частиц читается каждый кадр
 local lastHailSound = 0
 
 local function acquireHail(): Part?
@@ -170,9 +171,7 @@ local function updateHail()
 			-- удар
 			impactAttachment.WorldPosition = h.to
 			if h.meteor then
-				impactEmitter.Color = ColorSequence.new(METEOR_COLOR)
-				impactEmitter:Emit(math.max(6, math.floor(30 * qualityScale)))
-				impactEmitter.Color = ColorSequence.new(HAIL_COLOR)
+				meteorImpactEmitter:Emit(math.max(6, math.floor(30 * qualityScale)))
 				Sounds.playAt("BlockBreak", h.to, 1)
 				Sounds.playAt("Thunder", h.to, 0.5)
 				h.part.Material = Enum.Material.Ice
@@ -847,6 +846,14 @@ function StormFX.init()
 	impactEmitter.LightEmission = 0.3
 	impactEmitter.LightInfluence = 0.5
 	impactEmitter.Parent = impactAttachment
+	meteorImpactEmitter = impactEmitter:Clone()
+	meteorImpactEmitter.Color = ColorSequence.new(METEOR_COLOR)
+	meteorImpactEmitter.Size = NumberSequence.new({
+		NumberSequenceKeypoint.new(0, 1.1),
+		NumberSequenceKeypoint.new(1, 0),
+	})
+	meteorImpactEmitter.LightEmission = 0.8
+	meteorImpactEmitter.Parent = impactAttachment
 
 	Remotes.HailBatch.OnClientEvent:Connect(onHailBatch)
 	Remotes.BlockBroken.OnClientEvent:Connect(onBlockBroken)

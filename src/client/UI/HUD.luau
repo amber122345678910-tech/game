@@ -524,21 +524,22 @@ local lastHealth = 100
 -- Раскладка под тип ввода: на телефоне кнопки рядом с монетами (вне зоны джойстика),
 -- кнопка СТАРТ смещена вправо от зоны джойстика.
 local function applyInputLayout()
-	local touch = ClientState.isTouch()
-	if touch then
+	-- 4 кнопки по 92 + отступы 12 = 404
+	if UIKit.isPhone() then
+		-- телефон: ряд под панелью монет (слева место занимает джойстик)
 		local y = 8 + math.floor(92 * UIKit.currentHudScale()) + 8
 		sideColumn.AnchorPoint = Vector2.new(0, 0)
 		sideColumn.Position = UDim2.new(0, 12, 0, y)
-		sideColumn.Size = UDim2.fromOffset(300, 92)
+		sideColumn.Size = UDim2.fromOffset(404, 92)
 		sideList.FillDirection = Enum.FillDirection.Horizontal
-		startHolder.Position = UDim2.new(0.6, 0, 1, -18)
 	else
+		-- ПК и планшет: колонка слева, не пересекается с панелью шторма по центру
 		sideColumn.AnchorPoint = Vector2.new(0, 0.5)
 		sideColumn.Position = UDim2.new(0, 12, 0.45, 0)
-		sideColumn.Size = UDim2.fromOffset(92, 300)
+		sideColumn.Size = UDim2.fromOffset(92, 404)
 		sideList.FillDirection = Enum.FillDirection.Vertical
-		startHolder.Position = UDim2.new(0.5, 0, 1, -18)
 	end
+	startHolder.Position = if ClientState.isTouch() then UDim2.new(0.6, 0, 1, -18) else UDim2.new(0.5, 0, 1, -18)
 end
 
 local function refreshStorm()
@@ -590,6 +591,11 @@ local function refreshStorm()
 			end)
 		end
 	end
+	-- пока видна крупная надпись бедствия, уведомления уходят ниже неё (иначе текст накладывается)
+	if banner.Visible then
+		local toastY = math.max(8 + math.floor(232 * hudScale), math.floor(gui.AbsoluteSize.Y * 0.42) + 8)
+		toastHolder.Position = UDim2.new(0.5, 0, 0, toastY)
+	end
 	local endsAt = plot:GetAttribute("PhaseEndsAt")
 	if typeof(endsAt) == "number" then
 		setText(timerLabel, formatTime(endsAt - workspace:GetServerTimeNow()))
@@ -613,12 +619,19 @@ local function refreshStorm()
 		local level = plot:GetAttribute("StormLevel")
 		setText(acidText, "🌩 Уровень шторма " .. tostring(level or ""))
 	end
-	local leak = plot:GetAttribute("Leak")
+	-- что именно протекает, сообщает сервер (дверь / пробоина / дыра в крыше)
+	local kind = plot:GetAttribute("LeakKind")
 	if i > Config.Storm.InsideDamageDepth then
 		setText(warningLabel, "⚠ БУНКЕР ЗАТАПЛИВАЕТ КИСЛОТОЙ!")
 		warningLabel.Visible = true
-	elseif typeof(leak) == "number" and leak > 0 then
+	elseif kind == "breach" then
+		setText(warningLabel, "⚠ Пробоина в стене — кислота хлещет внутрь!")
+		warningLabel.Visible = true
+	elseif kind == "door" then
 		setText(warningLabel, "⚠ Кислота просачивается через дверь!")
+		warningLabel.Visible = true
+	elseif kind == "roof" then
+		setText(warningLabel, "⚠ Дыра в крыше — внутрь капает кислотный дождь!")
 		warningLabel.Visible = true
 	else
 		warningLabel.Visible = false

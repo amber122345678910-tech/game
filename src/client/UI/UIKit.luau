@@ -326,6 +326,12 @@ local function computeScale(entry: ScaledEntry): number
 	return math.clamp(s, 0.3, 1.3)
 end
 
+-- Телефон: сенсорный экран и низкая сторона меньше 500 точек (планшеты больше).
+function UIKit.isPhone(): boolean
+	local vp = viewportSize()
+	return UIKit.isTouch() and math.min(vp.X, vp.Y) < 500
+end
+
 function UIKit.autoScale(object: GuiObject, mode: ScaleMode, designW: number?, designH: number?): UIScale
 	local scale = UIKit.new("UIScale", { Parent = object }) :: UIScale
 	local entry: ScaledEntry = {

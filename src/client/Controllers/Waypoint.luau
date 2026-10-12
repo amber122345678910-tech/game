@@ -82,9 +82,23 @@ local function setVisible(visible: boolean)
 	end
 end
 
+-- Подсказка по прибытии: гость шторм не запускает, а идущий шторм не перезапустить.
+local function arrivalHint(alreadyHere: boolean): string
+	if ClientState.isGuest() then
+		return if alreadyHere
+			then "Ты уже у бункера друга! Стройте вместе — шторм запускает хозяин."
+			else "Ты у бункера друга! Стройте вместе — шторм запускает хозяин."
+	elseif ClientState.plotStormRunning() then
+		return "Шторм на участке ещё идёт — дождись его окончания."
+	end
+	return if alreadyHere
+		then "Ты уже на своём участке! Зайди в бункер и нажми «Начать шторм»."
+		else "Ты у своего бункера! Зайди внутрь и нажми «Начать шторм»."
+end
+
 function Waypoint.activate()
 	if player:GetAttribute("InPlotZone") == true then
-		ClientState.notify("Ты уже на своём участке! Зайди в бункер и нажми «Начать шторм».", "info")
+		ClientState.notify(arrivalHint(true), "info")
 		return
 	end
 	active = true
@@ -144,7 +158,11 @@ local function update(dt: number)
 	workspace:BulkMoveTo(arrowParts, arrowCFrames, Enum.BulkMoveMode.FireCFrameChanged)
 
 	markerPart.CFrame = CFrame.new(target + Vector3.new(0, 10, 0))
-	markerLabel.Text = string.format("⬇ ТВОЙ БУНКЕР\n%d м", math.floor((target - rootPos).Magnitude / 3))
+	markerLabel.Text = string.format(
+		"%s\n%d м",
+		if ClientState.isGuest() then "⬇ БУНКЕР ДРУГА" else "⬇ ТВОЙ БУНКЕР",
+		math.floor((target - rootPos).Magnitude / 3)
+	)
 
 	-- указатель у края экрана, если маркер не виден
 	local screen, onScreen = camera:WorldToViewportPoint(target + Vector3.new(0, 10, 0))
@@ -227,7 +245,7 @@ function Waypoint.init()
 	player:GetAttributeChangedSignal("InPlotZone"):Connect(function()
 		if active and player:GetAttribute("InPlotZone") == true then
 			Waypoint.deactivate()
-			ClientState.notify("Ты у своего бункера! Зайди внутрь и нажми «Начать шторм».", "success")
+			ClientState.notify(arrivalHint(false), "success")
 		end
 	end)
 	ClientState.WaypointRequested:Connect(Waypoint.activate)

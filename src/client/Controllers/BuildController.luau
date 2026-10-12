@@ -67,6 +67,43 @@ local dragY: number? = nil
 local dragPlaced: { [number]: boolean } = {}
 local lastReasonTime = 0
 
+-- Копия серверного ограничителя частоты (BuildService.allow) с запасом: при быстрой протяжке
+-- запросы встают в очередь и уходят не быстрее, чем сервер их принимает (иначе он молча
+-- отбрасывал бы лишние, и в полу оставались бы дыры).
+type QueuedAction = { remove: boolean, id: string, x: number, y: number, z: number, rot: number }
+local actionQueue: { QueuedAction } = {}
+local SEND_RATE = Config.Build.MaxActionsPerSecond - 2
+local SEND_BURST = Config.Build.BurstActions - 2
+local sendTokens = SEND_BURST
+local sendLast = os.clock()
+
+local function takeSendToken(): boolean
+	local now = os.clock()
+	sendTokens = math.min(SEND_BURST, sendTokens + (now - sendLast) * SEND_RATE)
+	sendLast = now
+	if sendTokens < 1 then
+		return false
+	end
+	sendTokens -= 1
+	return true
+end
+
+local function flushActions()
+	while actionQueue[1] and takeSendToken() do
+		local q = table.remove(actionQueue, 1) :: QueuedAction
+		if q.remove then
+			Remotes.RemoveBlock:FireServer(q.x, q.y, q.z)
+		else
+			Remotes.PlaceBlock:FireServer(q.id, q.x, q.y, q.z, q.rot)
+		end
+	end
+end
+
+local function queueAction(q: QueuedAction)
+	table.insert(actionQueue, q)
+	flushActions()
+end
+
 local rayParams = RaycastParams.new()
 rayParams.FilterType = Enum.RaycastFilterType.Include
 
@@ -306,7 +343,7 @@ local function act(t: Target?)
 		return
 	end
 	if deleteMode then
-		Remotes.RemoveBlock:FireServer(t.x, t.y, t.z)
+		queueAction({ remove = true, id = "", x = t.x, y = t.y, z = t.z, rot = 0 })
 		return
 	end
 	local id = selected
@@ -317,7 +354,7 @@ local function act(t: Target?)
 		notifyReason(t.reason)
 		return
 	end
-	Remotes.PlaceBlock:FireServer(id, t.x, t.y, t.z, rot)
+	queueAction({ remove = false, id = id, x = t.x, y = t.y, z = t.z, rot = rot })
 	-- оптимистично помечаем клетки, чтобы протяжка мышью не слала дубли
 	lastPlacedKey = targetKey(t)
 	dragPlaced[Grid.index(t.x, t.y, t.z)] = true
@@ -825,8 +862,10 @@ end
 
 local function renderStep()
 	if not active then
+		table.clear(actionQueue)
 		return
 	end
+	flushActions()
 	if ClientState.isTouch() then
 		-- на телефоне призрак показывает выбранную тапом клетку
 		if touchTarget and not deleteMode and selected then

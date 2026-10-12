@@ -124,6 +124,8 @@ local function reconcile(raw: any): ProfileData
 end
 
 -- Ошибки, при которых повторять бессмысленно (нет доступа к API в Studio и т.п.).
+local saveWarned: { [Player]: boolean } = {}
+
 local function isFatalError(message: string): boolean
 	local lower = string.lower(message)
 	return string.find(lower, "studioaccesstoapisnotallowed", 1, true) ~= nil
@@ -140,7 +142,9 @@ local function withRetries<T>(label: string, fn: () -> T): (boolean, T?)
 			return true, result
 		end
 		warn(string.format("[DataService] %s failed (attempt %d): %s", label, attempt, tostring(result)))
-		if isFatalError(tostring(result)) then
+		-- «нет доступа к API» бывает только в Studio; на живом сервере такая же по тексту ошибка
+		-- может быть временным сбоем — тогда падает только этот вызов, а сохранения остаются
+		if RunService:IsStudio() and isFatalError(tostring(result)) then
 			store = nil
 			return false, nil
 		end
@@ -344,6 +348,7 @@ local function onPlayerAdded(player: Player)
 end
 
 local function onPlayerRemoving(player: Player)
+	saveWarned[player] = nil
 	local session = sessions[player]
 	if not session then
 		return
@@ -399,7 +404,19 @@ function DataService.init()
 			for _, session in sessions do
 				if session.Loaded and not session.Released then
 					runPreSaveHooks(session.Player)
-					task.spawn(saveRecord, session, false)
+					task.spawn(function()
+						local saved = saveRecord(session, false)
+						local player = session.Player
+						-- честно предупреждаем, если сохранение не прошло (следующее автосохранение повторит)
+						if not saved and session.Persistent and store and player.Parent == Players then
+							if not saveWarned[player] then
+								saveWarned[player] = true
+								Remotes.Notify:FireClient(player, "Сохранения временно недоступны: прогресс этой игры может не сохраниться.", "warning")
+							end
+						elseif saved then
+							saveWarned[player] = nil
+						end
+					end)
 				end
 			end
 		end

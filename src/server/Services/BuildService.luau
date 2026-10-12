@@ -16,6 +16,9 @@ local BuildService = {}
 
 type Bucket = { tokens: number, last: number }
 local buckets: { [Player]: Bucket } = {}
+-- кто поставил блок: гость получает обратно свои блоки, а блоки хозяина возвращаются хозяину
+local placedBy: { [PlotService.BlockRecord]: Player } = setmetatable({}, { __mode = "k" }) :: any
+local refundNoted: { [Player]: number } = {}
 
 -- Ограничение частоты действий (token bucket): защита от спама запросами.
 local function allow(player: Player): boolean
@@ -139,6 +142,7 @@ local function onPlace(player: Player, blockId: any, x: any, y: any, z: any, rot
 		DataService.addBlocks(player, def.Id, 1) -- вернуть блок
 		return
 	end
+	placedBy[rec] = player
 	-- сохраняется раскладка хозяина участка (гость строит в чужом бункере)
 	markLayoutDirty(plot.Owner or player)
 end
@@ -175,11 +179,18 @@ local function onRemove(player: Player, x: any, y: any, z: any)
 	local rec = PlotService.remove(plot, x, y, z)
 	if rec then
 		-- выкопанная земля в инвентарь не попадает
-		-- блок из чужого бункера возвращается хозяину участка (гость не может «растащить» бункер)
+		-- блок из чужого бункера возвращается хозяину участка (гость не может «растащить» бункер),
+		-- а свой блок гость получает обратно
 		if not rec.def.Indestructible then
 			local owner = plot.Owner
-			DataService.addBlocks(if owner and owner ~= player then owner else player, rec.id, 1)
+			local refundTo = if owner and owner ~= player and placedBy[rec] ~= player then owner else player
+			DataService.addBlocks(refundTo, rec.id, 1)
+			if refundTo ~= player and os.clock() - (refundNoted[player] or 0) > 15 then
+				refundNoted[player] = os.clock()
+				notify(player, "Блоки хозяина бункера возвращаются к нему в инвентарь", "info")
+			end
 		end
+		placedBy[rec] = nil
 		markLayoutDirty(plot.Owner or player)
 	end
 end
@@ -241,6 +252,7 @@ function BuildService.init()
 	Remotes.ClearPlot.OnServerEvent:Connect(onClear)
 	Players.PlayerRemoving:Connect(function(player)
 		buckets[player] = nil
+		refundNoted[player] = nil
 	end)
 	DataService.addPreSaveHook(function(player)
 		if layoutDirty[player] then
