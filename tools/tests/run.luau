@@ -257,7 +257,7 @@ test("block defs consistent", function()
 		truthy(#id <= 32)
 		truthy(string.match(id, "^[%w_]+$") ~= nil, id .. " serializable id")
 	end
-	eq(#Config.BlockOrder, 10)
+	eq(#Config.BlockOrder, 11)
 end)
 
 local StormSim = Loader.load("src/shared/StormSim")

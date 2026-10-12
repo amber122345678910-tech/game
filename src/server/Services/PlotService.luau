@@ -344,7 +344,8 @@ end
 
 local function createPart(plot: Plot, rec: BlockRecord): BasePart
 	local def = rec.def
-	local p = Instance.new("Part")
+	-- лестница — ферма (TrussPart): по ней персонажи умеют лазить сами
+	local p: BasePart = if def.Climbable then Instance.new("TrussPart") else Instance.new("Part")
 	p.Name = def.Id
 	p.Anchored = true
 	p.CanTouch = false
@@ -358,6 +359,8 @@ local function createPart(plot: Plot, rec: BlockRecord): BasePart
 	p.Reflectance = def.Reflectance
 	if def.IsDoor then
 		p.Size = Vector3.new(CELL, CELL * def.HeightCells, 1)
+	elseif def.Climbable then
+		p.Size = Vector3.new(2, CELL, 2)
 	else
 		p.Size = Vector3.new(CELL, CELL, CELL)
 	end

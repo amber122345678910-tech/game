@@ -26,6 +26,8 @@ export type BlockDef = {
 	HeightCells: number,
 	-- Земля под участком: не ломается бедствиями, копается в режиме удаления.
 	Indestructible: boolean?,
+	-- Лестница (ферма 2×4×2): по ней можно залезть, стоя в соседней клетке.
+	Climbable: boolean?,
 }
 
 export type StormParams = {
@@ -58,7 +60,7 @@ Config.DataVersion = 1
 Config.DataStoreName = "BunkerSimulator_v1"
 
 -- Версия сборки (видна в углу экрана и в Output) — чтобы было понятно, какой файл открыт.
-Config.Version = "1.9"
+Config.Version = "2.0"
 
 -- Сетка постройки (локальные координаты участка). Клетка = куб 4x4x4.
 Config.Grid = {
@@ -224,6 +226,25 @@ Config.Blocks = {
 		IsDoor = false,
 		Seal = 0,
 		HeightCells = 1,
+	},
+	ladder = {
+		Id = "ladder",
+		Name = "Лестница",
+		Description = "По ней можно залезть наверх (подходи сбоку). Нужна, чтобы выбираться из глубоких ям.",
+		Category = "Blocks",
+		Order = 8,
+		HP = 50,
+		Price = 5,
+		AcidMult = 1.5,
+		HailTransfer = 0.5,
+		Color = Color3.fromRGB(150, 150, 160),
+		Material = Enum.Material.DiamondPlate,
+		Transparency = 0,
+		Reflectance = 0,
+		IsDoor = false,
+		Seal = 0,
+		HeightCells = 1,
+		Climbable = true,
 	},
 	door_wood = {
 		Id = "door_wood",

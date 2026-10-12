@@ -89,6 +89,8 @@ local function previewPart(def: Config.BlockDef): Part
 	p.BottomSurface = Enum.SurfaceType.Smooth
 	if def.IsDoor then
 		p.Size = Vector3.new(4, 8, 1)
+	elseif def.Climbable then
+		p.Size = Vector3.new(2, 4, 2)
 	else
 		p.Size = Vector3.new(4, 4, 4)
 	end

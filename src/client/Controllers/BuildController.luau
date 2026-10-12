@@ -35,6 +35,7 @@ local BLOCK_ICONS: { [string]: string } = {
 	concrete = "🧱",
 	steel = "⚙",
 	titan = "💎",
+	ladder = "🪜",
 	door_wood = "🚪",
 	door_iron = "🚪",
 	door_blast = "🛡",
@@ -277,7 +278,10 @@ local function showTarget(t: Target?)
 		return
 	end
 	local def = Config.Blocks[id]
-	ghost.Size = if def.IsDoor then Vector3.new(Grid.CELL, Grid.CELL * 2, 1) else Vector3.new(Grid.CELL, Grid.CELL, Grid.CELL)
+	ghost.Size = if def.IsDoor
+		then Vector3.new(Grid.CELL, Grid.CELL * 2, 1)
+		elseif def.Climbable then Vector3.new(2, Grid.CELL, 2)
+		else Vector3.new(Grid.CELL, Grid.CELL, Grid.CELL)
 	local shownRot = if def.IsDoor then Grid.autoDoorRot(occupied, t.x, t.y, t.z, rot) else rot
 	ghost.CFrame = blockCFrame(t.x, t.y, t.z, def.HeightCells, shownRot)
 	local color = if t.valid then Theme.Green else Theme.Red
