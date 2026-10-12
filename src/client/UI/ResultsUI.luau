@@ -34,6 +34,12 @@ local function tipFor(result: Remotes.StormResult): string
 	if result.Reason == "left" then
 		return "Совет: не уходи со своего участка во время шторма."
 	end
+	if result.Reason == "hostleft" then
+		return "Хозяин бункера вышел из игры — награда за пройденную часть шторма твоя."
+	end
+	if result.Reason == "error" then
+		return "Шторм прервался из-за ошибки. Награда за пройденную часть начислена."
+	end
 	if result.Survived then
 		if result.BunkerPercent < 40 then
 			return "Бункер еле выстоял! Купи блоки прочнее в магазине."
@@ -53,6 +59,12 @@ local function show(result: Remotes.StormResult)
 		title.TextColor3 = Theme.Green
 	elseif result.Reason == "left" then
 		title.Text = "🏃 ТЫ УШЁЛ С УЧАСТКА"
+		title.TextColor3 = Theme.Orange
+	elseif result.Reason == "hostleft" then
+		title.Text = "🚪 ХОЗЯИН ВЫШЕЛ"
+		title.TextColor3 = Theme.Orange
+	elseif result.Reason == "error" then
+		title.Text = "⚠ ШТОРМ ПРЕРВАН"
 		title.TextColor3 = Theme.Orange
 	else
 		title.Text = "💀 БУНКЕР НЕ СПАС"

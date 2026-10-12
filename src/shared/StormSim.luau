@@ -236,6 +236,138 @@ function StormSim.flood(
 	return { rate = rate, cap = cap, leaking = leaking, breach = breach, roofLeak = roofLeak }
 end
 
+----------------------------------------------------------------------
+-- Затопление по объёму: уровень кислоты внутри зависит от площади каждого этажа бункера,
+-- поэтому узкая яма-«отстойник» заполняется быстро и не делает бункер неуязвимым.
+----------------------------------------------------------------------
+export type InsideProfile = {
+	bottom: number, -- локальная Y пола самого нижнего этажа области
+	areas: { number }, -- число внутренних клеток в каждом слое снизу вверх
+	refArea: number, -- площадь основного этажа (скорости протечек заданы для него)
+}
+
+-- Связные области внутреннего пространства; берём те, что примыкают к наружным дверям,
+-- и самую большую (изолированные «карманы» на уровень кислоты не влияют).
+function StormSim.insideProfile(interior: { [number]: boolean }, doors: { Block }): (InsideProfile, { [number]: boolean })
+	local component: { [number]: number } = {}
+	local sizes: { number } = {}
+	local count = 0
+	for start in interior do
+		if not component[start] then
+			count += 1
+			local size = 0
+			local stack = { start }
+			component[start] = count
+			while #stack > 0 do
+				local cell = table.remove(stack) :: number
+				size += 1
+				local x, y, z = Grid.coords(cell)
+				for _, d in Grid.NEIGHBORS do
+					local nx, ny, nz = x + d[1], y + d[2], z + d[3]
+					if Grid.inBounds(nx, ny, nz) then
+						local n = Grid.index(nx, ny, nz)
+						if interior[n] and not component[n] then
+							component[n] = count
+							table.insert(stack, n)
+						end
+					end
+				end
+			end
+			sizes[count] = size
+		end
+	end
+	local chosen: { [number]: boolean } = {}
+	local largest, largestSize = 0, 0
+	for id, size in sizes do
+		if size > largestSize then
+			largest, largestSize = id, size
+		end
+	end
+	if largest > 0 then
+		chosen[largest] = true
+	end
+	for _, rec in doors do
+		for _, cell in rec.cells do
+			local x, y, z = Grid.coords(cell)
+			for _, d in Grid.NEIGHBORS do
+				local nx, nz = x + d[1], z + d[3]
+				if d[2] == 0 and Grid.inBounds(nx, y, nz) then
+					local id = component[Grid.index(nx, y, nz)]
+					if id then
+						chosen[id] = true
+					end
+				end
+			end
+		end
+	end
+	local region: { [number]: boolean } = {}
+	local minY, maxY = math.huge, -math.huge
+	local perLayer: { [number]: number } = {}
+	for cell, id in component do
+		if chosen[id] then
+			region[cell] = true
+			local _, y = Grid.coords(cell)
+			perLayer[y] = (perLayer[y] or 0) + 1
+			minY = math.min(minY, y)
+			maxY = math.max(maxY, y)
+		end
+	end
+	if minY == math.huge then
+		return { bottom = 0, areas = {}, refArea = 0 }, region
+	end
+	local areas: { number } = {}
+	local refArea = 0
+	for y = minY, maxY do
+		local a = perLayer[y] or 0
+		table.insert(areas, a)
+		refArea = math.max(refArea, a)
+	end
+	return { bottom = Grid.layerBottom(minY), areas = areas, refArea = refArea }, region
+end
+
+-- Уровень кислоты (локальная Y) по объёму (клетки площади × стады).
+function StormSim.levelFromVolume(profile: InsideProfile, volume: number): number
+	local level = profile.bottom
+	local remaining = math.max(volume, 0)
+	local lastArea = 0
+	for _, area in profile.areas do
+		if area > 0 then
+			lastArea = area
+			local layerVolume = area * Grid.CELL
+			if remaining <= layerVolume then
+				return level + remaining / area
+			end
+			remaining -= layerVolume
+		end
+		level += Grid.CELL
+	end
+	if lastArea > 0 then
+		return level + remaining / lastArea
+	end
+	return level
+end
+
+-- Объём кислоты, при котором она поднимется до уровня level.
+function StormSim.volumeFromLevel(profile: InsideProfile, level: number): number
+	local height = level - profile.bottom
+	if height <= 0 then
+		return 0
+	end
+	local volume = 0
+	local lastArea = 0
+	for _, area in profile.areas do
+		if area > 0 then
+			lastArea = area
+		end
+		if height <= Grid.CELL then
+			return volume + area * height
+		end
+		volume += area * Grid.CELL
+		height -= Grid.CELL
+	end
+	return volume + lastArea * height
+end
+
 -- Урон игроку от одной градины.
 -- Под открытым небом — прямое попадание рядом; под крышей — часть удара по крыше рядом с игроком.
 function StormSim.hailPlayerDamage(
@@ -296,7 +428,8 @@ function StormSim.playerAcidDamage(
 			total += p.InsidePlayerDps * dt
 			kind = "inside"
 		end
-	elseif pool - feet > 0.5 then
+	elseif pool > 0 and pool - feet > 0.5 then
+		-- в выкопанной яме ноги ниже поверхности: без лужи урона нет
 		total += p.PoolPlayerDps * dt
 		kind = "pool"
 	end

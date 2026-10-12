@@ -75,7 +75,10 @@ function Balance.simulate(prefabId: string, level: number, seed: number)
 	for _, r in records do
 		startHP += r.maxHp
 	end
-	local interiorBottom = 0
+	-- затопление по объёму, как на сервере
+	local profile = StormSim.insideProfile(interior, doors)
+	local interiorBottom = profile.bottom
+	local volume = 0
 	-- игрок в центре внутреннего пространства на полу
 	local best, bestD = nil, math.huge
 	for cell in interior do
@@ -216,8 +219,12 @@ function Balance.simulate(prefabId: string, level: number, seed: number)
 				end
 				local sub = Grid.computeExteriorBelow(cells, Grid.submergedLayers(pool))
 				local res = StormSim.flood(doors, interior, cells, sub, pool, raining, p.PoolMax, interiorBottom)
-				if res.rate > 0 and inside < res.cap then
-					inside = math.min(res.cap, inside + res.rate * dt)
+				if res.rate > 0 then
+					local capVolume = StormSim.volumeFromLevel(profile, res.cap)
+					if volume < capVolume then
+						volume = math.min(capVolume, volume + res.rate * dt * profile.refArea)
+						inside = StormSim.levelFromVolume(profile, volume)
+					end
 				end
 				if #res.leaking > 0 and not firstLeak then
 					firstLeak = t
@@ -231,7 +238,8 @@ function Balance.simulate(prefabId: string, level: number, seed: number)
 				end
 			elseif name == "Clear" then
 				pool = math.max(0, pool - S.DrainRate * dt)
-				inside = math.max(interiorBottom, inside - S.DrainRate * dt)
+				volume = math.max(0, volume - S.DrainRate * dt * profile.refArea)
+				inside = StormSim.levelFromVolume(profile, volume)
 			end
 		end
 	end

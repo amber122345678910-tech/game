@@ -41,7 +41,7 @@ export type StormResult = {
 	NewLevel: number, -- текущий уровень после шторма
 	BunkerPercent: number, -- 0..100
 	Duration: number, -- секунд продержался
-	Reason: string, -- "survived" | "died" | "left" | "quit"
+	Reason: string, -- "survived" | "died" | "left" | "quit" | "hostleft" | "error"
 }
 
 local folder = ReplicatedStorage:WaitForChild("Remotes")

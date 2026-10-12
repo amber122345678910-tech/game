@@ -202,7 +202,7 @@ local function buildSideButtons()
 		ClientState.setShopOpen(not ClientState.ShopOpen)
 	end)
 	buildButton = sideButton(column, 2, "🔨", "Строить", Theme.Blue, function()
-		if ClientState.inStorm() then
+		if ClientState.inStorm() or ClientState.plotStormRunning() then
 			ClientState.notify("Во время шторма строить нельзя!", "error")
 			return
 		end
@@ -492,6 +492,7 @@ local function refreshStart()
 	local canShow = inZone
 		and not ClientState.isGuest()
 		and not ClientState.inStorm()
+		and not ClientState.plotStormRunning()
 		and not ClientState.BuildMode
 		and not ClientState.ModalOpen
 		and ClientState.Data ~= nil
@@ -550,6 +551,10 @@ local function refreshStorm()
 	if not active or not plot then
 		warningLabel.Visible = false
 		bannerPhase = ""
+		if banner.Visible then
+			bannerToken += 1
+			banner.Visible = false
+		end
 		return
 	end
 	local phase = plot:GetAttribute("Phase")
@@ -563,11 +568,25 @@ local function refreshStorm()
 			local token = bannerToken
 			banner.Text = (PHASE_ICONS[phase] or "") .. " " .. string.upper(phaseName)
 			banner.TextTransparency = 0
+			local stroke = banner:FindFirstChildOfClass("UIStroke")
+			if stroke then
+				stroke.Transparency = 0
+			end
 			banner.Visible = true
 			task.delay(2.5, function()
-				if token == bannerToken then
-					UIKit.tween(banner, 0.6, { TextTransparency = 1 })
+				if token ~= bannerToken then
+					return
 				end
+				-- обводка не следует за TextTransparency — гасим её отдельно
+				if stroke then
+					UIKit.tween(stroke, 0.6, { Transparency = 1 })
+				end
+				UIKit.tween(banner, 0.6, { TextTransparency = 1 })
+				task.delay(0.65, function()
+					if token == bannerToken then
+						banner.Visible = false
+					end
+				end)
 			end)
 		end
 	end

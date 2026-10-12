@@ -124,6 +124,9 @@ local function untrackBlock(child: Instance)
 	end
 end
 
+local boundBlocks: Instance? = nil
+local boundBedrock: Instance? = nil
+
 local function bindPlot(model: Model)
 	for _, c in blockConns do
 		c:Disconnect()
@@ -160,12 +163,14 @@ local function bindPlot(model: Model)
 	if buildArea then
 		table.insert(list, buildArea)
 	end
-	-- дно выкопанной ямы: на коренную породу тоже можно ставить блоки
+	-- окружение участка (пол, стены, пандус) только загораживает лучи, а на коренную
+	-- породу на дне выкопанной ямы можно ставить блоки
 	local env = model:FindFirstChild("Environment")
-	local bedrock = env and env:FindFirstChild("Bedrock")
-	if bedrock then
-		table.insert(list, bedrock)
+	if env then
+		table.insert(list, env)
 	end
+	boundBlocks = blocks
+	boundBedrock = if env then env:FindFirstChild("Bedrock") else nil
 	rayParams.FilterDescendantsInstances = list
 end
 
@@ -190,6 +195,12 @@ end
 local function computeTarget(ray: Ray): Target?
 	local result = workspace:Raycast(ray.Origin, ray.Direction * RAY_DISTANCE, rayParams)
 	if not result then
+		return nil
+	end
+	-- попали в пол/стену котлована — это не цель (луч не должен проходить сквозь них)
+	local hit = result.Instance
+	local blocksFolder = boundBlocks
+	if not (blocksFolder and hit:IsDescendantOf(blocksFolder)) and hit ~= boundBedrock and hit.Name ~= "BuildArea" then
 		return nil
 	end
 	if deleteMode then
@@ -662,7 +673,7 @@ end
 
 local function enter()
 	local model = ClientState.getPlotModel()
-	if not model or ClientState.inStorm() then
+	if not model or ClientState.inStorm() or ClientState.plotStormRunning() then
 		ClientState.setBuildMode(false)
 		return
 	end
@@ -929,6 +940,11 @@ function BuildController.init()
 	-- свой участок или участок друга (гость строит в его бункере)
 	for _, attr in { "PlotId", "ActivePlotId" } do
 		player:GetAttributeChangedSignal(attr):Connect(function()
+			-- участок сменился посреди стройки (ушёл к себе / принял приглашение) — выходим,
+			-- иначе призрак и клики считались бы по старому участку
+			if active then
+				ClientState.setBuildMode(false)
+			end
 			local model = ClientState.getPlotModel()
 			if model then
 				bindPlot(model)

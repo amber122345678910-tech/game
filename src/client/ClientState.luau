@@ -110,6 +110,13 @@ function ClientState.getOrigin(plot: Model): CFrame?
 	return nil
 end
 
+-- Идёт ли шторм на участке, где я играю (даже если я из него уже выбыл).
+function ClientState.plotStormRunning(): boolean
+	local plot = ClientState.getPlotModel()
+	local phase = if plot then plot:GetAttribute("Phase") else nil
+	return typeof(phase) == "string" and phase ~= ""
+end
+
 -- Я гость в бункере друга?
 function ClientState.isGuest(): boolean
 	return player:GetAttribute("IsGuest") == true

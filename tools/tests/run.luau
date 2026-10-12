@@ -511,6 +511,61 @@ test("new disasters: wind hits the windward side, quake hits tall blocks harder"
 	truthy(StormSim.windFactor(Config.Blocks.wood) > StormSim.windFactor(Config.Blocks.titan), "wood blows away easier than titan")
 end)
 
+test("inside flood by volume: a narrow sump does not make the bunker immune", function()
+	local cells, records = boxBlocks()
+	local interior = Grid.computeInterior(cells)
+	local doors = StormSim.boundaryDoors(records, interior, cells)
+	local profile = StormSim.insideProfile(interior, doors)
+	eq(profile.bottom, 0, "stone bunker floor on the surface")
+	-- одна площадь на всех этажах: уровень = объём / площадь
+	local v = StormSim.volumeFromLevel(profile, 2.5)
+	truthy(math.abs(StormSim.levelFromVolume(profile, v) - 2.5) < 1e-6, "level/volume roundtrip")
+	eq(StormSim.levelFromVolume(profile, 0), 0)
+	-- выкапываем узкую яму на 4 слоя под полом бункера
+	local floorCell
+	for cell in interior do
+		local x, y, z = Grid.coords(cell)
+		if y == S and not floorCell then
+			floorCell = { x, z }
+		end
+	end
+	for y = S - 4, S - 1 do
+		cells[Grid.index(floorCell[1], y, floorCell[2])] = nil
+	end
+	local interior2 = Grid.computeInterior(cells)
+	local profile2 = StormSim.insideProfile(interior2, doors)
+	eq(profile2.bottom, Grid.layerBottom(S - 4), "sump lowers the bottom")
+	eq(profile2.refArea, profile.refArea, "main floor area unchanged")
+	-- объём ямы мал: тот же объём кислоты поднимает уровень над полом почти так же
+	local level = StormSim.levelFromVolume(profile2, v + 4 * Grid.CELL)
+	truthy(math.abs(level - 2.5) < 1e-6, "sump fills first, then the room rises as before")
+	-- изолированный «карман» не влияет на уровень основного бункера
+	local pocketCells = table.clone(cells)
+	pocketCells[Grid.index(0, 0, 0)] = nil -- закрытая полость глубоко под землёй
+	local interior3 = Grid.computeInterior(pocketCells)
+	truthy(interior3[Grid.index(0, 0, 0)], "pocket counts as interior")
+	local profile3 = StormSim.insideProfile(interior3, doors)
+	eq(profile3.bottom, profile2.bottom, "sealed pocket ignored")
+end)
+
+test("no pool damage in a dug pit when the pool is empty", function()
+	local p = Config.stormParams(3)
+	local cells = withDirt()
+	-- яма 1x1 в 2 слоя, игрок на дне
+	cells[Grid.index(5, S - 1, 5)] = nil
+	cells[Grid.index(5, S - 2, 5)] = nil
+	local lx, _, lz = Grid.cellCenterLocal(5, S - 2, 5)
+	local ply = Grid.layerBottom(S - 2) + 3
+	eq(StormSim.playerAcidDamage(p, false, cells, {}, lx, ply, lz, 0, 0, 1), 0, "empty pool, no damage")
+	truthy(StormSim.playerAcidDamage(p, false, cells, {}, lx, ply, lz, 2, 0, 1) > 0, "acid in the pit hurts")
+end)
+
+test("terrain is not buildable or sellable", function()
+	eq(Config.getBuildableBlock("dirt"), nil, "dirt is not a buildable block")
+	truthy(Config.getBuildableBlock("wood") ~= nil, "wood is buildable")
+	eq(Config.getBuildableBlock(42), nil)
+end)
+
 -- Регрессия баланса (та же логика StormSim, что на сервере)
 _G.__BALANCE_LIB = true
 local Balance = require("./balance")

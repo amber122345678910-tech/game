@@ -71,7 +71,18 @@ local function refreshList()
 		end
 	end
 	emptyLabel.Visible = count == 0
-	leaveButton.Visible = ClientState.isGuest()
+	-- гость может вернуться к себе, хозяин — распустить команду (отпустить гостей)
+	local guests = player:GetAttribute("GuestCount")
+	local guestCount = if typeof(guests) == "number" then guests else 0
+	if ClientState.isGuest() then
+		UIKit.setButtonText(leaveButton, "🏠 Вернуться к себе")
+		leaveButton.Visible = true
+	elseif guestCount > 0 then
+		UIKit.setButtonText(leaveButton, string.format("👋 Распустить команду (%d)", guestCount))
+		leaveButton.Visible = true
+	else
+		leaveButton.Visible = false
+	end
 end
 
 local function setOpen(open: boolean)
@@ -233,11 +244,13 @@ function TeamUI.init()
 			task.defer(refreshList)
 		end
 	end)
-	player:GetAttributeChangedSignal("IsGuest"):Connect(function()
-		if window.Visible then
-			refreshList()
-		end
-	end)
+	for _, attr in { "IsGuest", "GuestCount" } do
+		player:GetAttributeChangedSignal(attr):Connect(function()
+			if window.Visible then
+				refreshList()
+			end
+		end)
+	end
 	Remotes.TeamInviteReceived.OnClientEvent:Connect(function(fromUserId: any, fromName: any)
 		if typeof(fromUserId) ~= "number" or typeof(fromName) ~= "string" then
 			return

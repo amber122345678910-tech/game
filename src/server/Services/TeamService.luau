@@ -8,6 +8,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Remotes = require(Shared:WaitForChild("Remotes"))
 
+local DataService = require(script.Parent.DataService)
 local PlotService = require(script.Parent.PlotService)
 local StormService = require(script.Parent.StormService)
 
@@ -36,6 +37,19 @@ local function teleportToPlot(player: Player, plot: PlotService.Plot)
 	local character = player.Character
 	if character and not StormService.isActive(player) then
 		character:PivotTo(plot.Origin * CFrame.new(0, 4, -29))
+	end
+end
+
+-- Отпустить гостей бункера: они возвращаются на свой участок (иначе остались бы
+-- запертыми за закрытой для них дверью чужого бункера).
+local function releaseMembers(plot: PlotService.Plot, message: string)
+	for member in plot.Members do
+		PlotService.removeGuest(member)
+		local own = PlotService.getPlot(member)
+		if own then
+			teleportToPlot(member, own)
+		end
+		notify(member, message, "info")
 	end
 end
 
@@ -101,8 +115,20 @@ local function onRespond(guest: Player, hostUserId: any, accept: any)
 		notify(guest, "Приглашение устарело — попроси позвать ещё раз", "error")
 		return
 	end
-	if StormService.isActive(guest) then
-		notify(guest, "Дождись конца своего шторма", "error")
+	if not DataService.get(guest) then
+		notify(guest, "Данные ещё загружаются — попробуй через пару секунд", "error")
+		list[hostUserId] = sentAt -- приглашение остаётся в силе: показываем его снова
+		Remotes.TeamInviteReceived:FireClient(guest, hostUserId, host.DisplayName)
+		return
+	end
+	local own = PlotService.getPlot(guest)
+	if StormService.isActive(guest) or (own and own.Session ~= nil) then
+		notify(guest, "Дождись конца шторма на своём участке", "error")
+		return
+	end
+	local currentHost = PlotService.getHostPlot(guest)
+	if currentHost and currentHost.Session ~= nil then
+		notify(guest, "Дождись конца шторма у друга", "error")
 		return
 	end
 	local plot = PlotService.getPlot(host)
@@ -110,17 +136,19 @@ local function onRespond(guest: Player, hostUserId: any, accept: any)
 		notify(guest, "Сейчас нельзя присоединиться", "error")
 		return
 	end
+	if plot.Session ~= nil then
+		notify(guest, "У друга идёт шторм — прими приглашение после него", "error")
+		list[hostUserId] = sentAt
+		Remotes.TeamInviteReceived:FireClient(guest, hostUserId, host.DisplayName)
+		return
+	end
 	if countMembers(plot) >= MAX_MEMBERS then
 		notify(guest, "В этом бункере уже максимум друзей", "error")
 		return
 	end
 	-- если у самого гостя были гости — они возвращаются к себе
-	local own = PlotService.getPlot(guest)
 	if own then
-		for member in own.Members do
-			PlotService.removeGuest(member)
-			notify(member, guest.DisplayName .. " ушёл(ла) в другой бункер — ты снова на своём участке.", "info")
-		end
+		releaseMembers(own, guest.DisplayName .. " ушёл(ла) в другой бункер — ты снова на своём участке.")
 	end
 	PlotService.addGuest(plot, guest)
 	teleportToPlot(guest, plot)
@@ -131,7 +159,7 @@ end
 local function onLeave(player: Player)
 	local hostPlot = PlotService.getHostPlot(player)
 	if hostPlot then
-		if StormService.isActive(player) then
+		if StormService.isActive(player) or hostPlot.Session ~= nil then
 			notify(player, "Нельзя уйти во время шторма", "error")
 			return
 		end
@@ -155,10 +183,7 @@ local function onLeave(player: Player)
 		notify(player, "Нельзя распустить команду во время шторма", "error")
 		return
 	end
-	for member in plot.Members do
-		PlotService.removeGuest(member)
-		notify(member, player.DisplayName .. " распустил(а) команду — ты снова на своём участке.", "info")
-	end
+	releaseMembers(plot, player.DisplayName .. " распустил(а) команду — ты снова на своём участке.")
 	notify(player, "Команда распущена", "info")
 end
 

@@ -175,7 +175,8 @@ function PlotService.assign(player: Player): Plot?
 			plot.Owner = player
 			playerPlots[player] = plot
 			player:SetAttribute("PlotId", plot.Id)
-			player:SetAttribute("ActivePlotId", plot.Id)
+			-- приглашение могли принять раньше, чем загрузились данные: гость остаётся у друга
+			player:SetAttribute("ActivePlotId", (guestOf[player] or plot).Id)
 			updateOwnerAttributes(plot)
 			return plot
 		end
@@ -195,6 +196,17 @@ function PlotService.getHostPlot(player: Player): Plot?
 	return guestOf[player]
 end
 
+local function updateGuestCount(plot: Plot)
+	local owner = plot.Owner
+	if owner then
+		local n = 0
+		for _ in plot.Members do
+			n += 1
+		end
+		owner:SetAttribute("GuestCount", n)
+	end
+end
+
 function PlotService.removeGuest(player: Player)
 	local plot = guestOf[player]
 	if not plot then
@@ -202,6 +214,7 @@ function PlotService.removeGuest(player: Player)
 	end
 	guestOf[player] = nil
 	plot.Members[player] = nil
+	updateGuestCount(plot)
 	if player.Parent ~= nil then
 		local own = playerPlots[player]
 		player:SetAttribute("ActivePlotId", if own then own.Id else nil)
@@ -213,6 +226,7 @@ function PlotService.addGuest(plot: Plot, player: Player)
 	PlotService.removeGuest(player)
 	guestOf[player] = plot
 	plot.Members[player] = true
+	updateGuestCount(plot)
 	player:SetAttribute("ActivePlotId", plot.Id)
 	player:SetAttribute("IsGuest", true)
 end
@@ -373,7 +387,7 @@ function PlotService.place(
 	rot: number,
 	skipSupport: boolean?
 ): BlockRecord?
-	local def = Config.getBlock(blockId)
+	local def = Config.getBuildableBlock(blockId)
 	if not def then
 		return nil
 	end

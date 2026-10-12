@@ -50,11 +50,14 @@ export type Session = {
 	StartHP: number,
 	Interior: { [number]: boolean },
 	InteriorColumns: { [number]: boolean },
+	ShallowFloors: { [number]: number }, -- колонка над подземной комнатой -> локальная Y дна уличной лужи
 	BoundaryDoors: { BlockRecord },
 	Submerged: { [number]: boolean },
 	SubmergedKey: string,
 	PoolLevel: number,
 	InsideLevel: number,
+	InsideVolume: number,
+	Profile: StormSim.InsideProfile,
 	InteriorBottom: number,
 	HailBudget: number,
 	MeteorBudget: number,
@@ -208,7 +211,33 @@ local function buildAcidLayout(session: Session): string
 	for _, r in Grid.greedyRects(session.InteriorColumns) do
 		table.insert(inside, rectString(gx0 + r.x0 * CELL, gx0 + (r.x1 + 1) * CELL, gz0 + r.z0 * CELL, gz0 + (r.z1 + 1) * CELL))
 	end
-	return "O:" .. table.concat(outside, ";") .. "|I:" .. table.concat(inside, ";")
+	-- уличная лужа над подземной комнатой: от земли/крыши над комнатой и выше (не сквозь неё)
+	local byFloor: { [number]: { [number]: boolean } } = {}
+	for column, floor in session.ShallowFloors do
+		local set = byFloor[floor]
+		if not set then
+			set = {}
+			byFloor[floor] = set
+		end
+		set[column] = true
+	end
+	local shallow: { string } = {}
+	for floor, set in byFloor do
+		for _, r in Grid.greedyRects(set) do
+			table.insert(
+				shallow,
+				string.format(
+					"%g,%g,%g,%g,%g",
+					gx0 + r.x0 * CELL,
+					gx0 + (r.x1 + 1) * CELL,
+					gz0 + r.z0 * CELL,
+					gz0 + (r.z1 + 1) * CELL,
+					floor
+				)
+			)
+		end
+	end
+	return "O:" .. table.concat(outside, ";") .. "|I:" .. table.concat(inside, ";") .. "|S:" .. table.concat(shallow, ";")
 end
 
 local function updateAcidVisuals(session: Session)
@@ -221,8 +250,9 @@ local function updateAcidVisuals(session: Session)
 	local inside = round1(session.InsideLevel)
 	if inside ~= session.LastInside then
 		session.LastInside = inside
-		model:SetAttribute("InsideAcid", inside)
+		-- глубина первой: клиент по ней вычисляет пол, когда меняется уровень
 		model:SetAttribute("InsideDepth", round1(math.max(session.InsideLevel - session.InteriorBottom, 0)))
+		model:SetAttribute("InsideAcid", inside)
 	end
 end
 
@@ -470,8 +500,13 @@ local function floodStep(session: Session, dt: number)
 		session.InteriorBottom
 	)
 	local rate = result.rate
-	if rate > 0 and session.InsideLevel < result.cap then
-		session.InsideLevel = math.min(result.cap, session.InsideLevel + rate * dt)
+	if rate > 0 then
+		-- скорость задана для основного этажа; кислота растекается по объёму всех этажей
+		local capVolume = StormSim.volumeFromLevel(session.Profile, result.cap)
+		if session.InsideVolume < capVolume then
+			session.InsideVolume = math.min(capVolume, session.InsideVolume + rate * dt * session.Profile.refArea)
+			session.InsideLevel = StormSim.levelFromVolume(session.Profile, session.InsideVolume)
+		end
 	end
 	local leakRecs: { BlockRecord } = {}
 	for i = 1, math.min(#result.leaking, MAX_LEAK_POINTS) do
@@ -711,7 +746,8 @@ local function endParticipant(session: Session, part: Participant, reason: strin
 	Remotes.StormResult:FireClient(player, result)
 end
 
-local function finish(session: Session, reason: string)
+-- quitter — игрок, который вышел из игры (ему "quit" без награды); остальным — reason.
+local function finish(session: Session, reason: string, quitter: Player?)
 	if session.Ended then
 		return
 	end
@@ -722,7 +758,7 @@ local function finish(session: Session, reason: string)
 	table.clear(session.Connections)
 
 	for _, part in session.Participants do
-		endParticipant(session, part, reason)
+		endParticipant(session, part, if part.Player == quitter then "quit" else reason)
 	end
 	local plot = session.Plot
 	cleanupPlot(session)
@@ -752,8 +788,9 @@ end
 
 local function step(session: Session, dt: number)
 	-- хозяин вышел из игры: бункер восстанавливается, шторм прекращается для всех
+	-- (оставшиеся получают награду за пройденную часть)
 	if session.Player.Parent ~= Players then
-		finish(session, "quit")
+		finish(session, "hostleft", session.Player)
 		return
 	end
 	session.Elapsed += dt
@@ -834,7 +871,8 @@ local function step(session: Session, dt: number)
 		session.PoolLevel = math.max(0, session.PoolLevel - S.QuakeDrainRate * dt)
 	elseif phase == PHASES.Clear then
 		session.PoolLevel = math.max(0, session.PoolLevel - S.DrainRate * dt)
-		session.InsideLevel = math.max(session.InteriorBottom, session.InsideLevel - S.DrainRate * dt)
+		session.InsideVolume = math.max(0, session.InsideVolume - S.DrainRate * dt * session.Profile.refArea)
+		session.InsideLevel = StormSim.levelFromVolume(session.Profile, session.InsideVolume)
 	end
 
 	-- во время землетрясения лужа медленно уходит, но продолжает затекать в бункер
@@ -922,13 +960,27 @@ function StormService.start(player: Player)
 	for _, rec in plot.Records do
 		startHP += rec.maxHp
 	end
-	-- низ бункера (локальная Y): может быть под землёй
-	local interiorBottom = 0
-	if next(interior) ~= nil then
-		interiorBottom = math.huge
-		for cell in interior do
-			local _, y = Grid.coords(cell)
-			interiorBottom = math.min(interiorBottom, Grid.layerBottom(y))
+	local boundaryDoors = StormSim.boundaryDoors(plot.Records, interior, plot.Cells)
+	-- этажи бункера для затопления по объёму; низ (локальная Y) может быть под землёй
+	local profile = StormSim.insideProfile(interior, boundaryDoors)
+	local interiorBottom = profile.bottom
+	local params = Config.stormParams(level)
+	-- колонки над подземной комнатой, где сверху улица: там тоже рисуется уличная лужа
+	local shallowFloors: { [number]: number } = {}
+	for column in interiorColumns do
+		local x, z = Grid.coords2(column)
+		local seenInterior = false
+		for y = 0, Grid.H - 1 do
+			local index = Grid.index(x, y, z)
+			if interior[index] then
+				seenInterior = true
+			elseif seenInterior and not plot.Cells[index] then
+				local floor = Grid.layerBottom(y)
+				if floor < params.PoolMax then
+					shallowFloors[column] = floor
+				end
+				break
+			end
 		end
 	end
 	local rng = Random.new()
@@ -963,7 +1015,7 @@ function StormService.start(player: Player)
 		Plot = plot,
 		Player = player,
 		Level = level,
-		Params = Config.stormParams(level),
+		Params = params,
 		Phase = "",
 		PhaseOrder = order,
 		PhaseTime = 0,
@@ -973,11 +1025,14 @@ function StormService.start(player: Player)
 		StartHP = startHP,
 		Interior = interior,
 		InteriorColumns = interiorColumns,
-		BoundaryDoors = StormSim.boundaryDoors(plot.Records, interior, plot.Cells),
+		ShallowFloors = shallowFloors,
+		BoundaryDoors = boundaryDoors,
 		Submerged = {},
 		SubmergedKey = "",
 		PoolLevel = 0,
 		InsideLevel = interiorBottom,
+		InsideVolume = 0,
+		Profile = profile,
 		InteriorBottom = interiorBottom,
 		HailBudget = 0,
 		MeteorBudget = 0,
@@ -1070,19 +1125,21 @@ function StormService.start(player: Player)
 	end)
 end
 
--- Игрок вышел из игры: хозяин — шторм прекращается (бункер восстанавливается), гость — выбывает.
+-- Игрок вышел из игры. Шторм на его участке прекращается всегда (даже если сам он уже
+-- выбыл, а друзья ещё держатся) — до того, как участок освободят; бункер восстанавливается.
+-- В чужом шторме игрок просто выбывает.
 function StormService.abort(player: Player)
+	local own = PlotService.getPlot(player)
+	local ownSession = if own then own.Session else nil
+	if ownSession and not ownSession.Ended then
+		finish(ownSession, "hostleft", player)
+	end
 	local session = sessions[player]
-	if not session then
-		return
-	end
-	if session.Player == player then
-		finish(session, "quit")
-		return
-	end
-	for _, part in session.Participants do
-		if part.Player == player then
-			dropParticipant(session, part, "quit")
+	if session and session ~= ownSession and not session.Ended then
+		for _, part in session.Participants do
+			if part.Player == player then
+				dropParticipant(session, part, "quit")
+			end
 		end
 	end
 end

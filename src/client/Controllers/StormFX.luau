@@ -290,6 +290,7 @@ type AcidRect = {
 	lz0: number,
 	lz1: number,
 	shown: number,
+	floor: number?, -- для луж над подземной комнатой: низ лужи (локальная Y)
 }
 
 type PlotFX = {
@@ -302,6 +303,7 @@ type PlotFX = {
 	clouds: { Part },
 	outside: { AcidRect },
 	inside: { AcidRect },
+	shallow: { AcidRect },
 	outsideLevel: number,
 	insideLevel: number,
 	layout: string,
@@ -380,8 +382,12 @@ local function clearAcid(fx: PlotFX)
 	for _, r in fx.inside do
 		r.part:Destroy()
 	end
+	for _, r in fx.shallow do
+		r.part:Destroy()
+	end
 	table.clear(fx.outside)
 	table.clear(fx.inside)
+	table.clear(fx.shallow)
 	fx.outsideLevel = 0
 	fx.insideLevel = 0
 	fx.layout = "" -- чтобы следующий шторм заново построил лужи
@@ -393,7 +399,10 @@ local function buildAcid(fx: PlotFX, layout: string)
 	if layout == "" then
 		return
 	end
-	local outsideStr, insideStr = string.match(layout, "^O:(.-)|I:(.*)$")
+	local outsideStr, insideStr, shallowStr = string.match(layout, "^O:(.-)|I:(.-)|S:(.*)$")
+	if not outsideStr then
+		outsideStr, insideStr = string.match(layout, "^O:(.-)|I:(.*)$")
+	end
 	local function make(rects: { { number } }, list: { AcidRect }, name: string)
 		for _, raw in rects do
 			-- чуть меньше клеток, чтобы грани кислоты не совпадали со стенами (без мерцания)
@@ -408,6 +417,35 @@ local function buildAcid(fx: PlotFX, layout: string)
 	end
 	make(parseRects(outsideStr or ""), fx.outside, "AcidOutside")
 	make(parseRects(insideStr or ""), fx.inside, "AcidInside")
+	-- лужи над подземными комнатами: "x0,x1,z0,z1,низ", высота меняется с уровнем
+	for chunk in string.gmatch(shallowStr or "", "[^;]+") do
+		local a, b, c, d, e = string.match(chunk, "^(%-?[%d%.]+),(%-?[%d%.]+),(%-?[%d%.]+),(%-?[%d%.]+),(%-?[%d%.]+)$")
+		local n1, n2, n3, n4, n5 = tonumber(a), tonumber(b), tonumber(c), tonumber(d), tonumber(e)
+		if n1 and n2 and n3 and n4 and n5 then
+			local p = fxPart("AcidShallow", Vector3.new(n2 - n1 - 0.08, 0.1, n4 - n3 - 0.08), Config.AcidColor, Enum.Material.SmoothPlastic)
+			p.Reflectance = 0.08
+			p.Transparency = 1
+			p.Parent = fx.folder
+			table.insert(fx.shallow, { part = p, lx0 = n1 + 0.04, lx1 = n2 - 0.04, lz0 = n3 + 0.04, lz1 = n4 - 0.04, shown = -1, floor = n5 })
+		end
+	end
+end
+
+local function setShallowAcid(fx: PlotFX, level: number)
+	for _, r in fx.shallow do
+		if math.abs(r.shown - level) > 0.01 then
+			r.shown = level
+			local floor = r.floor or 0
+			local height = level - floor
+			if height < 0.05 then
+				r.part.Transparency = 1
+			else
+				r.part.Size = Vector3.new(r.lx1 - r.lx0, height, r.lz1 - r.lz0)
+				r.part.CFrame = fx.origin * CFrame.new((r.lx0 + r.lx1) / 2, floor + height / 2, (r.lz0 + r.lz1) / 2)
+				r.part.Transparency = Config.AcidTransparency
+			end
+		end
+	end
 end
 
 local function setAcid(fx: PlotFX, list: { AcidRect }, level: number, floor: number)
@@ -499,6 +537,7 @@ local function ensureFx(model: Model): PlotFX?
 		clouds = {},
 		outside = {},
 		inside = {},
+		shallow = {},
 		outsideLevel = 0,
 		insideLevel = 0,
 		layout = "",
@@ -628,6 +667,7 @@ local function updatePlotFx(fx: PlotFX, dt: number)
 	fx.insideLevel += (targetIn - fx.insideLevel) * k
 	setAcid(fx, fx.outside, fx.outsideLevel, 0)
 	setAcid(fx, fx.inside, fx.insideLevel, insideFloor)
+	setShallowAcid(fx, fx.outsideLevel)
 	-- протечка
 	local count = model:GetAttribute("LeakCount")
 	local n = if typeof(count) == "number" then count else 0

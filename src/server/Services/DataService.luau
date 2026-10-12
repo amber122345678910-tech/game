@@ -112,7 +112,7 @@ local function reconcile(raw: any): ProfileData
 	d.StormsPlayed = num(raw.StormsPlayed, 0, 0, 1e9)
 	if typeof(raw.Inventory) == "table" then
 		for id, count in raw.Inventory do
-			if Config.getBlock(id) then
+			if Config.getBuildableBlock(id) then
 				local n = num(count, 0, 0, 1e6)
 				if n > 0 then
 					d.Inventory[id] = n
@@ -494,7 +494,7 @@ end
 
 function DataService.addBlocks(player: Player, blockId: string, count: number)
 	local data = DataService.get(player)
-	if not data or count <= 0 or not Config.getBlock(blockId) then
+	if not data or count <= 0 or not Config.getBuildableBlock(blockId) then
 		return
 	end
 	data.Inventory[blockId] = (data.Inventory[blockId] or 0) + math.floor(count)

@@ -93,7 +93,7 @@ local function onPlace(player: Player, blockId: any, x: any, y: any, z: any, rot
 	if typeof(blockId) ~= "string" or #blockId > 32 or not isInt(x) or not isInt(y) or not isInt(z) then
 		return
 	end
-	local def = Config.getBlock(blockId)
+	local def = Config.getBuildableBlock(blockId)
 	if not def then
 		return
 	end
@@ -175,8 +175,10 @@ local function onRemove(player: Player, x: any, y: any, z: any)
 	local rec = PlotService.remove(plot, x, y, z)
 	if rec then
 		-- выкопанная земля в инвентарь не попадает
+		-- блок из чужого бункера возвращается хозяину участка (гость не может «растащить» бункер)
 		if not rec.def.Indestructible then
-			DataService.addBlocks(player, rec.id, 1)
+			local owner = plot.Owner
+			DataService.addBlocks(if owner and owner ~= player then owner else player, rec.id, 1)
 		end
 		markLayoutDirty(plot.Owner or player)
 	end
@@ -219,7 +221,7 @@ function BuildService.replaceWithLayout(player: Player, entries: { Grid.Entry })
 	end
 	local placed = 0
 	for _, e in entries do
-		local def = Config.getBlock(e.id)
+		local def = Config.getBuildableBlock(e.id)
 		-- раскладка готового бункера доверенная: опору не проверяем (порядок блоков не важен)
 		if def and PlotService.canPlace(plot, def, e.x, e.y, e.z, true) and DataService.takeBlocks(player, def.Id, 1) then
 			if PlotService.place(plot, def.Id, e.x, e.y, e.z, e.rot, true) then

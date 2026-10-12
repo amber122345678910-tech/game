@@ -20,7 +20,7 @@ local lastPurchase: { [Player]: number } = {}
 local busy: { [Player]: boolean } = {}
 
 local function buyBlock(player: Player, id: any, amount: any): (boolean, string)
-	local def = Config.getBlock(id)
+	local def = Config.getBuildableBlock(id)
 	if not def then
 		return false, "Неизвестный товар"
 	end

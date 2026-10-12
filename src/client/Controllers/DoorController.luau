@@ -83,6 +83,12 @@ local function step()
 	-- список дверей обновляем раз в секунду (а не перебираем все блоки каждые 0.15 с)
 	listAge += 0.15
 	if listAge >= 1 or listPlot ~= plot then
+		if listPlot ~= plot then
+			-- сменился участок: двери прежнего закрываем (иначе они так и останутся открытыми)
+			for door, state in doors do
+				setOpen(door, state, false)
+			end
+		end
 		listAge = 0
 		listPlot = plot
 		table.clear(doorList)

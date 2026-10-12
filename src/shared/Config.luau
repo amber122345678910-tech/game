@@ -58,7 +58,7 @@ Config.DataVersion = 1
 Config.DataStoreName = "BunkerSimulator_v1"
 
 -- Версия сборки (видна в углу экрана и в Output) — чтобы было понятно, какой файл открыт.
-Config.Version = "1.7"
+Config.Version = "1.8"
 
 -- Сетка постройки (локальные координаты участка). Клетка = куб 4x4x4.
 Config.Grid = {
@@ -321,6 +321,15 @@ function Config.getBlock(id: any): BlockDef?
 		return nil
 	end
 	return Config.Blocks[id]
+end
+
+-- Блок, который можно купить, хранить в инвентаре и ставить (земля — нельзя).
+function Config.getBuildableBlock(id: any): BlockDef?
+	local def = Config.getBlock(id)
+	if def and def.Category ~= "Terrain" then
+		return def
+	end
+	return nil
 end
 
 -- Тайминги фаз шторма (секунды).
