@@ -190,7 +190,7 @@ check(Lighting.ClockTime < 1, "ClockTime should be midnight")
 for _, g in { "Music", "SFX", "Ambience", "UI" } do
 	check(SoundService:FindFirstChild(g) ~= nil, "SoundGroup missing " .. g)
 end
-check(SP.CameraMode == roblox.Enum.CameraMode.LockFirstPerson, "CameraMode should be LockFirstPerson")
+check(SP.CameraMode == roblox.Enum.CameraMode.Classic, "CameraMode should be Classic (first person is set by the client in matches)")
 
 print(string.format("Place: %d scripts checked, %d parts in Workspace", scriptCount, partCount))
 if #errors > 0 then

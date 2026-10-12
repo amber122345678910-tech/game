@@ -530,17 +530,17 @@ local DOORS = {
 	{ id = "GarageKitchen", kind = "Interior", axis = "z", c = 24, a = -9, b = -5, y = F1, roomA = "Kitchen", roomB = "Garage" },
 	{ id = "LaundryDoor", kind = "Interior", axis = "z", c = -12, a = 10.5, b = 14.5, y = F1, roomA = "BackHall", roomB = "Laundry" },
 	{ id = "BasementDoor", kind = "Interior", axis = "x", c = 9, a = -21.5, b = -17.5, y = F1, roomA = "Laundry", roomB = "Basement" },
-	{ id = "KidRoomDoor", kind = "Interior", axis = "z", c = -4, a = -14, b = -10, y = F2, roomA = "UpperHall", roomB = "KidRoom" },
-	{ id = "ParentsRoomDoor", kind = "Interior", axis = "z", c = 4, a = -14, b = -10, y = F2, roomA = "UpperHall", roomB = "ParentsRoom" },
-	{ id = "OfficeDoor", kind = "Interior", axis = "z", c = -4, a = 4, b = 8, y = F2, roomA = "UpperHall", roomB = "Office" },
-	{ id = "BathroomDoor", kind = "Interior", axis = "z", c = 4, a = 11.5, b = 15.5, y = F2, roomA = "UpperHall", roomB = "Bathroom" },
+	{ id = "KidRoomDoor", kind = "Interior", axis = "z", c = -4.5, a = -14, b = -10, y = F2, roomA = "UpperHall", roomB = "KidRoom" },
+	{ id = "ParentsRoomDoor", kind = "Interior", axis = "z", c = 4.5, a = -14, b = -10, y = F2, roomA = "UpperHall", roomB = "ParentsRoom" },
+	{ id = "OfficeDoor", kind = "Interior", axis = "z", c = -4.5, a = 4, b = 8, y = F2, roomA = "UpperHall", roomB = "Office" },
+	{ id = "BathroomDoor", kind = "Interior", axis = "z", c = 4.5, a = 11.5, b = 15.5, y = F2, roomA = "UpperHall", roomB = "Bathroom" },
 }
 -- Арки без дверей (проёмы 4x7.5)
 local ARCHES = {
-	{ axis = "z", c = -4, a = -8, b = -4, y = F1 }, -- Foyer -> Living
-	{ axis = "z", c = 4, a = -15, b = -11, y = F1 }, -- Foyer -> Kitchen
+	{ axis = "z", c = -4.5, a = -8, b = -4, y = F1 }, -- Foyer -> Living
+	{ axis = "z", c = 4.5, a = -15, b = -11, y = F1 }, -- Foyer -> Kitchen
 	{ axis = "x", c = -2, a = 12, b = 16, y = F1 }, -- Kitchen -> Dining
-	{ axis = "z", c = -4, a = 11.5, b = 15.5, y = F1 }, -- Foyer -> BackHall
+	{ axis = "z", c = -4.5, a = 11.5, b = 15.5, y = F1 }, -- Foyer -> BackHall
 }
 -- Окна 1-го этажа (с моделями). out: знак внешней нормали по перпендикулярной оси
 local WINDOWS = {
@@ -649,25 +649,23 @@ do
 	wall(S, "Wall", "x", 2, 24, 42, G, H1 + 1, ext, M.WoodPlanks)
 	wall(S, "Wall", "z", 42, -16, 2, G, H1 + 1, ext, M.WoodPlanks, openingsFor("z", 42))
 	do
-		local shades = { 0.0, 0.02, -0.02, 0.01 }
 		for i = 1, 4 do
 			local y0 = F1 + (i - 1) * 2
 			bbox(S, "GarageDoor", 27, 39, y0, y0 + 2, -16.2, -15.85, vary(C.Trim, 0.01), M.Metal, "solid")
 			bbox(S, "GarageDoorGroove", 27.2, 38.8, y0 + 1.9, y0 + 2.1, -16.25, -16.15, C.SidingDark, M.Metal, "deco")
-			local _ = shades
 		end
 		bbox(S, "GarageDoorHandle", 32.4, 33.6, 3.4, 3.8, -16.4, -16.2, C.MetalDark, M.Metal, "deco")
 	end
 	-- Внутренние стены 1-го этажа (y 0..10)
-	wall(S, "Wall", "z", -4, -16, 16, F1, H1, C.WallInt, M.SmoothPlastic, openingsFor("z", -4, F1))
-	wall(S, "Wall", "z", 4, -16, 16, F1, H1, C.WallInt, M.SmoothPlastic, openingsFor("z", 4, F1))
+	wall(S, "Wall", "z", -4.5, -16, 16, F1, H1, C.WallInt, M.SmoothPlastic, openingsFor("z", -4.5, F1))
+	wall(S, "Wall", "z", 4.5, -16, 16, F1, H1, C.WallInt, M.SmoothPlastic, openingsFor("z", 4.5, F1))
 	wall(S, "Wall", "x", 4, -24, -4, F1, H1, C.WallInt2, M.SmoothPlastic) -- Living / лестница в подвал
 	wall(S, "Wall", "x", 9, -24, -4, F1, H1, C.WallInt2, M.SmoothPlastic, openingsFor("x", 9, F1)) -- лестница в подвал / Laundry+BackHall
 	wall(S, "Wall", "x", -2, 4, 24, F1, H1, C.WallInt, M.SmoothPlastic, openingsFor("x", -2, F1)) -- Kitchen / Dining
 	wall(S, "Wall", "z", -12, 9, 16, F1, H1, C.WallInt2, M.SmoothPlastic, openingsFor("z", -12, F1)) -- Laundry / BackHall
 	-- Внутренние стены 2-го этажа (y 11..21)
-	wall(S, "Wall", "z", -4, -16, 16, F2, H2, C.WallKid, M.SmoothPlastic, openingsFor("z", -4, F2))
-	wall(S, "Wall", "z", 4, -16, 16, F2, H2, C.WallInt, M.SmoothPlastic, openingsFor("z", 4, F2))
+	wall(S, "Wall", "z", -4.5, -16, 16, F2, H2, C.WallKid, M.SmoothPlastic, openingsFor("z", -4.5, F2))
+	wall(S, "Wall", "z", 4.5, -16, 16, F2, H2, C.WallInt, M.SmoothPlastic, openingsFor("z", 4.5, F2))
 	wall(S, "Wall", "x", 0, -24, -4, F2, H2, C.WallKid, M.SmoothPlastic)
 	wall(S, "Wall", "x", 0, 4, 24, F2, H2, C.WallBath, M.SmoothPlastic)
 	-- Подвал (y -10..0) и шахта лестницы в подвал (y -11..0)
@@ -679,7 +677,7 @@ do
 	wall(S, "Wall", "x", 9, -24, -14, FB - 1, F1, C.WallBasement, M.Concrete)
 	wall(S, "Wall", "z", -24, 4, 9, FB - 1, F1, C.WallBasement, M.Concrete)
 	-- Плинтусы по комнатам 1-го этажа (декор)
-	for _, r in { { -23.5, -4.5, -15.5, 3.5 }, { 4.5, 23.5, -15.5, -2.5 }, { 4.5, 23.5, -1.5, 15.5 } } do
+	for _, r in { { -23.5, -5, -15.5, 3.5 }, { 5, 23.5, -15.5, -2.5 }, { 5, 23.5, -1.5, 15.5 } } do
 		local x0, x1, z0, z1 = r[1], r[2], r[3], r[4]
 		bbox(S, "Trim", x0, x1, F1, F1 + 0.4, z0, z0 + 0.15, C.Trim, M.SmoothPlastic, "deco")
 		bbox(S, "Trim", x0, x1, F1, F1 + 0.4, z1 - 0.15, z1, C.Trim, M.SmoothPlastic, "deco")
@@ -695,17 +693,15 @@ do
 	stairs(S, "Step", "+z", -10, 0, 4, 11, 1, 2, F1, F1, C.FloorWood2, M.WoodPlanks)
 	-- Балюстрада вдоль открытой стороны (x=0), наклонная сплошная панель + поручень
 	do
-		local len = math.sqrt(22 ^ 2 + 11 ^ 2)
-		local dirv = Vector3.new(0, 11, 22).Unit
-		local up = Vector3.new(0, 22, -11).Unit
-		local mid = Vector3.new(0, F1 + 5.5 + 2.2, 1)
+		local len = math.sqrt(20 ^ 2 + 10 ^ 2)
+		local up = Vector3.new(0, 20, -10).Unit
+		local mid = Vector3.new(0.3, F1 + 5 + 2.2, 0)
 		local cf = CFrame.fromMatrix(mid, Vector3.new(1, 0, 0), up)
 		box(S, "StairRail", cf, Vector3.new(0.3, 3.2, len), C.WoodDark, M.Wood, "solid", { CastShadow = false })
-		local _ = dirv
 		box(S, "StairRail", cf * CFrame.new(0, 1.8, 0), Vector3.new(0.5, 0.4, len), C.WoodLight, M.Wood, "deco")
 	end
 	-- Ограждение дыры на 2-м этаже: вдоль x=0 (z -2..10) и вдоль z=-2 (x 0..4)
-	for _, seg in { { 0, -2, 0, 10 }, { 0, -2, 4, -2 } } do
+	for _, seg in { { 0.3, -1.7, 0.3, 10 }, { 0.3, -1.7, 4, -1.7 } } do
 		local x0, z0, x1, z1 = seg[1], seg[2], seg[3], seg[4]
 		local cx, cz = (x0 + x1) / 2, (z0 + z1) / 2
 		local sx, sz = math.max(0.3, math.abs(x1 - x0)), math.max(0.3, math.abs(z1 - z0))
@@ -716,10 +712,9 @@ do
 	stairs(S, "Step", "+x", -17.5, 4.5, 8.5, 10, -1, 2, F1, FB - 1, C.Concrete, M.Concrete)
 	-- Поручень вдоль стены лестницы в подвал
 	do
-		local len = math.sqrt(20 ^ 2 + 10 ^ 2)
 		local up = Vector3.new(10, 20, 0).Unit
-		local cf = CFrame.fromMatrix(Vector3.new(-7.5, -5.5 + 3, 8.3), Vector3.new(0, 0, -1), up)
-		box(S, "StairRail", cf, Vector3.new(0.3, 0.3, len), C.MetalDark, M.Metal, "deco")
+		local cf = CFrame.fromMatrix(Vector3.new(-7, -2.25, 8.3), Vector3.new(0, 0, -1), up)
+		box(S, "StairRail", cf, Vector3.new(0.3, 0.3, 21.2), C.MetalDark, M.Metal, "deco")
 	end
 end
 
@@ -731,7 +726,6 @@ do
 	-- Чердак: два клина (фронтоны = треугольные грани клиньев)
 	local south = part({ ClassName = "WedgePart", Name = "Attic", Size = Vector3.new(50, 8.5, 17), CFrame = CFrame.new(0, ATTIC + 4.25, -8.5), Color = C.Siding, Material = M.WoodPlanks, CanTouch = false, CanQuery = false }, S)
 	local north = part({ ClassName = "WedgePart", Name = "Attic", Size = Vector3.new(50, 8.5, 17), CFrame = CFrame.new(0, ATTIC + 4.25, 8.5) * CFrame.Angles(0, rad(180), 0), Color = C.Siding, Material = M.WoodPlanks, CanTouch = false, CanQuery = false }, S)
-	local _ = south, north
 	-- Черепица: наклонные плиты на скатах
 	local slopeLen = math.sqrt(17 ^ 2 + 8.5 ^ 2)
 	for _, sgn in { -1, 1 } do
@@ -782,7 +776,6 @@ do
 	bbox(S, "Floor", -12, -4, G, F1, 16, 20, C.Concrete, M.Concrete)
 	bbox(S, "Step", -11, -5, G, F1 - 0.5, 20, 22, C.Concrete, M.Concrete)
 	-- Ступень у боковой двери гаража (x=42, z -6..-2)
-	bbox(S, "Step", 42.5, 44.5, G, F1 - 0.5, -6.5, -1.5, C.Concrete, M.Concrete)
 	bbox(S, "Floor", 42, 42.5, G, F1, -6, -2, C.Concrete, M.Concrete)
 end
 
@@ -966,23 +959,23 @@ end
 do
 	local y1, y2 = H1 - 0.5, H2 - 0.5
 	-- 1-й этаж
-	buildLight("Foyer", Vector3.new(0, y1, -8), { axis = "x", c = -16, along = 3.2, side = 1, floor = F1 }, Vector3.new(-2.9, F1 + 3.4, -10.4))
-	buildLight("Living", Vector3.new(-14, y1, -6), { axis = "z", c = -4, along = -9.5, side = -1, floor = F1 }, Vector3.new(-15, F1 + 1.8, -6))
-	buildLight("Kitchen", Vector3.new(14, y1, -9), { axis = "z", c = 4, along = -10, side = 1, floor = F1 }, Vector3.new(14, F1 + 3.4, -9))
+	buildLight("Foyer", Vector3.new(0, y1, -8), { axis = "x", c = -16, along = 3.2, side = 1, floor = F1 }, Vector3.new(-3.4, F1 + 3.4, -10.4))
+	buildLight("Living", Vector3.new(-14, y1, -6), { axis = "z", c = -4.5, along = -9.5, side = -1, floor = F1 }, Vector3.new(-15, F1 + 1.8, -6))
+	buildLight("Kitchen", Vector3.new(14, y1, -9), { axis = "z", c = 4.5, along = -10, side = 1, floor = F1 }, Vector3.new(14, F1 + 3.4, -9))
 	buildLight("Dining", Vector3.new(14, y1, 7), { axis = "x", c = -2, along = 17, side = 1, floor = F1 }, Vector3.new(14, F1 + 3.2, 6))
 	buildLight("Laundry", Vector3.new(-18, y1, 12.5), { axis = "z", c = -12, along = 15.2, side = -1, floor = F1 }, Vector3.new(-22, F1 + 3.7, 14.4))
-	buildLight("BackHall", Vector3.new(-8, y1, 12.5), { axis = "x", c = 16, along = -5, side = -1, floor = F1 }, Vector3.new(-8, F1 + 2.0, 10.3))
+	buildLight("BackHall", Vector3.new(-8, y1, 12.5), { axis = "x", c = 16, along = -5, side = -1, floor = F1 }, Vector3.new(-6.2, F1 + 2.1, 10.3))
 	buildLight("Garage", Vector3.new(33, y1, -7), { axis = "z", c = 24, along = -3.5, side = 1, floor = F1 }, Vector3.new(28.2, F1 + 3.45, 1.0), { style = "tube", color = Color3.fromRGB(236, 240, 230) })
 	-- 2-й этаж
-	buildLight("KidRoom", Vector3.new(-14, y2, -8), { axis = "z", c = -4, along = -9, side = -1, floor = F2 }, Vector3.new(-16, F2 + 3.25, -14.3))
-	buildLight("ParentsRoom", Vector3.new(14, y2, -8), { axis = "z", c = 4, along = -9, side = 1, floor = F2 }, Vector3.new(8, F2 + 3.6, -14.3))
-	buildLight("UpperHall", Vector3.new(0, y2, -6), { axis = "z", c = -4, along = 2, side = 1, floor = F2 }, Vector3.new(0, F2 + 3.4, -15.0))
-	buildLight("Office", Vector3.new(-14, y2, 8), { axis = "z", c = -4, along = 9, side = -1, floor = F2 }, Vector3.new(-18.6, F2 + 3.25, 13.6))
-	buildLight("Bathroom", Vector3.new(14, y2, 8), { axis = "z", c = 4, along = 10.5, side = 1, floor = F2 }, Vector3.new(6.8, F2 + 3.6, 1.5))
+	buildLight("KidRoom", Vector3.new(-14, y2, -8), { axis = "z", c = -4.5, along = -9, side = -1, floor = F2 }, Vector3.new(-16, F2 + 3.25, -14.3))
+	buildLight("ParentsRoom", Vector3.new(14, y2, -8), { axis = "z", c = 4.5, along = -9, side = 1, floor = F2 }, Vector3.new(12.5, F2 + 3.6, -14.3))
+	buildLight("UpperHall", Vector3.new(0, y2, -6), { axis = "z", c = -4.5, along = 2, side = 1, floor = F2 }, Vector3.new(0, F2 + 3.4, -15.0))
+	buildLight("Office", Vector3.new(-14, y2, 8), { axis = "z", c = -4.5, along = 9, side = -1, floor = F2 }, Vector3.new(-18.6, F2 + 3.25, 13.6))
+	buildLight("Bathroom", Vector3.new(14, y2, 8), { axis = "z", c = 4.5, along = 10.5, side = 1, floor = F2 }, Vector3.new(6.8, F2 + 3.6, 1.5))
 	-- Подвал: голая лампочка на проводе, холодный свет; выключатель на площадке лестницы
 	buildLight("Basement", Vector3.new(0, -2.4, 4), { axis = "x", c = 4, along = -20, side = 1, floor = F1 }, Vector3.new(5.5, FB + 3.25, 15.0), { style = "bare", wire = 1.0, range = 12, brightness = 0.8, color = C.ColdLight })
 	-- Крыльцо: фонарь у двери снаружи; выключатель внутри у входной двери
-	buildLight("Porch", Vector3.new(3.6, F1 + 6.5, -16.9), { axis = "x", c = -16, along = -3.2, side = 1, floor = F1 }, Vector3.new(-6, F1 + 3.3, -23), { style = "lantern", range = 14, brightness = 1.0 })
+	buildLight("Porch", Vector3.new(3.6, F1 + 6.5, -16.9), { axis = "x", c = -16, along = 2.5, side = 1, floor = F1 }, Vector3.new(-6, F1 + 3.3, -23), { style = "lantern", range = 14, brightness = 1.0 })
 	-- Сарай: одна лампочка
 	buildLight("Shed", Vector3.new(30, 6.2, 45), { axis = "x", c = 40, along = 27.5, side = 1, floor = G }, Vector3.new(34.05, 3.5, 44.5), { style = "bare", wire = 0.6, range = 14, brightness = 1.0 })
 end
@@ -1120,12 +1113,11 @@ local function rug(parent: Instance, cf: CFrame, w: number, d: number, color: Co
 	return m
 end
 
-local function lamp(parent: Instance, cf: CFrame, h: number, lit: boolean?)
+local function lamp(parent: Instance, cf: CFrame, h: number)
 	local m = model("Lamp", parent)
 	fbox(m, "Base", cf * CFrame.new(0, 0.1, 0), Vector3.new(0.8, 0.2, 0.8), C.MetalDark, M.Metal, true)
 	fbox(m, "Pole", cf * CFrame.new(0, h / 2, 0), Vector3.new(0.12, h, 0.12), C.MetalDark, M.Metal, true)
-	local shade = fbox(m, "Shade", cf * CFrame.new(0, h + 0.5, 0), Vector3.new(1.4, 1.0, 1.4), Color3.fromRGB(230, 214, 180), M.Fabric, true)
-	local _ = shade, lit
+	fbox(m, "Shade", cf * CFrame.new(0, h + 0.5, 0), Vector3.new(1.4, 1.0, 1.4), Color3.fromRGB(230, 214, 180), M.Fabric, true)
 	return m
 end
 
@@ -1207,44 +1199,44 @@ do
 	couch(Fu, CFrame.new(-12.6, y, -6) * CFrame.Angles(0, rad(90), 0), 7.5, C.Fabric)
 	table4(Fu, "CoffeeTable", CFrame.new(-17, y, -6), 4, 2.4, 1.4, C.Wood)
 	rug(Fu, CFrame.new(-17, y, -6), 9, 7.5, Color3.fromRGB(110, 70, 60))
-	armchair(Fu, CFrame.new(-9, y, 1) * CFrame.Angles(0, rad(180), 0), C.Fabric2) -- место Веспер
+	armchair(Fu, CFrame.new(-21.6, y, 1.6) * CFrame.Angles(0, rad(-135), 0), C.Fabric2) -- угол у окна; Веспер садится рядом
 	bookshelf(Fu, CFrame.new(-14, y, 2.9) * CFrame.Angles(0, rad(180), 0), 6, 7, C.WoodDark)
-	table4(Fu, "SideTable", CFrame.new(-21.5, y, 1.8), 1.6, 1.6, 2.2, C.WoodDark)
-	lamp(Fu, CFrame.new(-21.5, y + 2.2, 1.8), 1.8)
-	plant(Fu, CFrame.new(-22.5, y, -14.5), 2.4)
+	table4(Fu, "SideTable", CFrame.new(-22.5, y, -14.5), 1.6, 1.6, 2.2, C.WoodDark)
+	lamp(Fu, CFrame.new(-22.5, y + 2.2, -14.5), 1.8)
+	plant(Fu, CFrame.new(-6, y, -14.5), 2.4)
 	pictureFrame(Fu, CFrame.new(-14, y + 6.2, -15.42), 3, 2.2, Color3.fromRGB(70, 90, 120))
 	pictureFrame(Fu, CFrame.new(-6, y + 6.2, -15.42), 1.8, 2.4, Color3.fromRGB(120, 100, 70))
 	-- Часы на стене x=-4 (лицо к -X)
 	do
 		local m = model("Clock", Fu)
-		fbox(m, "Face", CFrame.new(-4.55, y + 7.5, -1) * CFrame.Angles(0, rad(90), 0), Vector3.new(1.6, 1.6, 0.12), C.Trim, M.SmoothPlastic, true, { Shape = Enum.PartType.Cylinder, CFrame = CFrame.new(-4.56, y + 7.5, -1) })
-		fbox(m, "Hand", CFrame.new(-4.62, y + 7.75, -1), Vector3.new(0.06, 0.55, 0.06), C.MetalDark, M.Metal, true)
-		fbox(m, "Hand", CFrame.new(-4.62, y + 7.5, -0.8), Vector3.new(0.06, 0.06, 0.45), C.MetalDark, M.Metal, true)
+		fbox(m, "Face", CFrame.new(-5.06, y + 7.5, -1), Vector3.new(0.12, 1.6, 1.6), C.Trim, M.SmoothPlastic, true, { Shape = Enum.PartType.Cylinder })
+		fbox(m, "Hand", CFrame.new(-5.14, y + 7.75, -1), Vector3.new(0.06, 0.55, 0.06), C.MetalDark, M.Metal, true)
+		fbox(m, "Hand", CFrame.new(-5.14, y + 7.5, -0.8), Vector3.new(0.06, 0.06, 0.45), C.MetalDark, M.Metal, true)
 	end
 	-- Foyer: консоль, вешалка, коврик
-	cabinet(Fu, "Console", CFrame.new(-2.9, y, -11.5) * CFrame.Angles(0, rad(90), 0), 3, 2.8, 1.1, C.WoodDark, 1)
-	fbox(Fu, "Bowl", CFrame.new(-2.9, y + 3.1, -11.5), Vector3.new(0.9, 0.3, 0.9), C.Metal, M.Metal, true)
+	cabinet(Fu, "Console", CFrame.new(-3.4, y, -11.5) * CFrame.Angles(0, rad(90), 0), 3, 2.8, 1.1, C.WoodDark, 1)
+	fbox(Fu, "Bowl", CFrame.new(-3.4, y + 3.1, -11.5), Vector3.new(0.9, 0.3, 0.9), C.Metal, M.Metal, true)
 	do
 		local m = model("CoatRack", Fu)
-		fbox(m, "Pole", CFrame.new(3.0, y + 3.2, -14.8), Vector3.new(0.3, 6.4, 0.3), C.WoodDark, M.Wood, true, { CanCollide = true })
-		fbox(m, "Base", CFrame.new(3.0, y + 0.1, -14.8), Vector3.new(1.2, 0.2, 1.2), C.WoodDark, M.Wood, true)
+		fbox(m, "Pole", CFrame.new(-3.4, y + 3.2, -14.8), Vector3.new(0.3, 6.4, 0.3), C.WoodDark, M.Wood, true, { CanCollide = true })
+		fbox(m, "Base", CFrame.new(-3.4, y + 0.1, -14.8), Vector3.new(1.2, 0.2, 1.2), C.WoodDark, M.Wood, true)
 		for i = 0, 3 do
 			local a = i * math.pi / 2
-			fbox(m, "Hook", CFrame.new(3.0 + math.cos(a) * 0.35, y + 6.0, -14.8 + math.sin(a) * 0.35) * CFrame.Angles(0, -a, 0), Vector3.new(0.5, 0.1, 0.1), C.MetalDark, M.Metal, true)
+			fbox(m, "Hook", CFrame.new(-3.4 + math.cos(a) * 0.35, y + 6.0, -14.8 + math.sin(a) * 0.35) * CFrame.Angles(0, -a, 0), Vector3.new(0.5, 0.1, 0.1), C.MetalDark, M.Metal, true)
 		end
-		fbox(m, "Coat", CFrame.new(2.7, y + 4.4, -14.6), Vector3.new(0.9, 3.0, 0.5), Color3.fromRGB(60, 70, 90), M.Fabric, true)
+		fbox(m, "Coat", CFrame.new(-3.1, y + 4.4, -14.5), Vector3.new(0.9, 3.0, 0.5), Color3.fromRGB(60, 70, 90), M.Fabric, true)
 	end
 	rug(Fu, CFrame.new(-1, y, -12), 3.5, 5, Color3.fromRGB(80, 60, 50))
-	pictureFrame(Fu, CFrame.new(-3.42, y + 6.5, -11.5) * CFrame.Angles(0, rad(90), 0), 2, 1.6, Color3.fromRGB(90, 110, 90))
+	pictureFrame(Fu, CFrame.new(-3.92, y + 6.5, -11.5) * CFrame.Angles(0, rad(90), 0), 2, 1.6, Color3.fromRGB(90, 110, 90))
 	-- Kitchen: столешницы вдоль фронтальной стены, мойка под окном, плита, верхние шкафы, холодильник, остров
 	do
 		local counterColor = Color3.fromRGB(96, 92, 86)
 		local cabColor = Color3.fromRGB(214, 206, 192)
 		-- нижние шкафы x 8..23.5 (минус плита x 19..22)
-		for _, seg in { { 8, 19 }, { 22, 23.5 } } do
+		for _, seg in { { 9.5, 19 }, { 22, 23.5 } } do
 			local w = seg[2] - seg[1]
 			cabinet(Fu, "Counter", CFrame.new((seg[1] + seg[2]) / 2, y, -14.5) * CFrame.Angles(0, rad(180), 0), w, 2.85, 2.0, cabColor, math.max(1, math.floor(w / 2.5)))
-			fbox(Fu, "Countertop", CFrame.new((seg[1] + seg[2]) / 2, y + 2.95, -14.4), Vector3.new(w + 0.1, 0.2, 2.2), counterColor, M.Granite)
+			fbox(Fu, "Countertop", CFrame.new((seg[1] + seg[2]) / 2, y + 2.95, -14.5), Vector3.new(w, 0.2, 2.0), counterColor, M.Granite)
 		end
 		-- мойка под окном
 		fbox(Fu, "Sink", CFrame.new(14, y + 2.9, -14.5), Vector3.new(2.6, 0.5, 1.6), C.Metal, M.Metal, true)
@@ -1261,7 +1253,7 @@ do
 			fbox(m, "OvenWindow", CFrame.new(20.5, y + 1.3, -13.45), Vector3.new(2.2, 1.0, 0.08), C.GlassDark, M.Glass, true)
 		end
 		-- верхние шкафы (не над окном x 11.5..16.5)
-		for _, seg in { { 8, 11 }, { 17, 23.5 } } do
+		for _, seg in { { 9.5, 11 }, { 17, 23.5 } } do
 			local w = seg[2] - seg[1]
 			fbox(Fu, "UpperCabinet", CFrame.new((seg[1] + seg[2]) / 2, y + 7.2, -14.8), Vector3.new(w, 2.6, 1.4), cabColor, M.Wood, true, { CastShadow = true })
 			for i = 1, math.max(1, math.floor(w / 2.5)) do
@@ -1271,24 +1263,24 @@ do
 		-- холодильник у восточной стены
 		do
 			local m = model("Fridge", Fu)
-			fbox(m, "Body", CFrame.new(22.4, y + 3.3, -12.4), Vector3.new(2.2, 6.6, 2.2), C.Appliance, M.Metal)
-			fbox(m, "Seam", CFrame.new(21.25, y + 4.4, -12.4), Vector3.new(0.04, 0.06, 2.1), C.MetalDark, M.Metal, true)
-			fbox(m, "Handle", CFrame.new(21.15, y + 4.9, -12.4), Vector3.new(0.1, 1.6, 0.12), C.MetalDark, M.Metal, true)
-			fbox(m, "Handle", CFrame.new(21.15, y + 2.4, -12.4), Vector3.new(0.1, 1.6, 0.12), C.MetalDark, M.Metal, true)
+			fbox(m, "Body", CFrame.new(22.5, y + 3.3, -12.5), Vector3.new(2.0, 6.6, 2.0), C.Appliance, M.Metal)
+			fbox(m, "Seam", CFrame.new(21.45, y + 4.4, -12.5), Vector3.new(0.04, 0.06, 1.9), C.MetalDark, M.Metal, true)
+			fbox(m, "Handle", CFrame.new(21.35, y + 4.9, -12.5), Vector3.new(0.1, 1.6, 0.12), C.MetalDark, M.Metal, true)
+			fbox(m, "Handle", CFrame.new(21.35, y + 2.4, -12.5), Vector3.new(0.1, 1.6, 0.12), C.MetalDark, M.Metal, true)
 		end
 		-- остров (укрытие для приседа, 3 стада)
 		do
 			local m = model("Island", Fu)
-			fbox(m, "Body", CFrame.new(14, y + 1.4, -8), Vector3.new(6, 2.8, 3), cabColor, M.Wood)
-			fbox(m, "Top", CFrame.new(14, y + 2.9, -8), Vector3.new(6.3, 0.2, 3.3), counterColor, M.Granite)
+			fbox(m, "Body", CFrame.new(14, y + 1.4, -8), Vector3.new(5.8, 2.8, 2.8), cabColor, M.Wood)
+			fbox(m, "Top", CFrame.new(14, y + 2.9, -8), Vector3.new(6, 0.2, 3), counterColor, M.Granite)
 			fbox(m, "Bowl", CFrame.new(12.6, y + 3.15, -8), Vector3.new(1.0, 0.3, 1.0), Color3.fromRGB(190, 60, 50), M.SmoothPlastic, true)
 			for _, dx in { -1.5, 1.5 } do
-				fbox(m, "Stool", CFrame.new(14 + dx, y + 1.2, -5.6), Vector3.new(1.1, 0.2, 1.1), C.WoodDark, M.Wood, true, { CanCollide = true })
+				fbox(m, "Stool", CFrame.new(14 + dx, y + 1.2, -5.6), Vector3.new(1.1, 0.2, 1.1), C.WoodDark, M.Wood, true)
 				fbox(m, "StoolLeg", CFrame.new(14 + dx, y + 0.6, -5.6), Vector3.new(0.3, 1.2, 0.3), C.MetalDark, M.Metal, true)
 			end
 		end
 		-- мусорка, часы над аркой
-		fbox(Fu, "TrashCan", CFrame.new(5.5, y + 1.2, -3.4), Vector3.new(1.2, 2.4, 1.2), C.MetalDark, M.Metal, false, { Shape = Enum.PartType.Cylinder, CFrame = CFrame.new(5.5, y + 1.2, -3.4) * CFrame.Angles(0, 0, rad(90)) })
+		fbox(Fu, "TrashCan", CFrame.new(22.9, y + 1.2, -3.2) * CFrame.Angles(0, 0, rad(90)), Vector3.new(2.4, 1.2, 1.2), C.MetalDark, M.Metal, false, { Shape = Enum.PartType.Cylinder })
 		do
 			local m = model("KitchenClock", Fu)
 			fbox(m, "Face", CFrame.new(8, y + 8.3, -2.56) * CFrame.Angles(0, rad(90), 0), Vector3.new(0.12, 1.4, 1.4), C.Trim, M.SmoothPlastic, true, { Shape = Enum.PartType.Cylinder })
@@ -1297,18 +1289,18 @@ do
 		end
 	end
 	-- Dining: стол, 6 стульев, буфет, витрина, ковёр
-	table4(Fu, "DiningTable", CFrame.new(14, y, 7), 8, 4, 2.8, C.Wood)
+	table4(Fu, "DiningTable", CFrame.new(14.25, y, 7), 7, 4, 2.8, C.Wood)
 	rug(Fu, CFrame.new(14, y, 7), 12, 8, Color3.fromRGB(80, 80, 100))
-	for _, cx in { 11.5, 14, 16.5 } do
+	for _, cx in { 11.75, 14.25, 16.75 } do
 		chair(Fu, CFrame.new(cx, y, 3.9) * CFrame.Angles(0, rad(180), 0), C.WoodDark)
 		chair(Fu, CFrame.new(cx, y, 10.1), C.WoodDark)
 	end
-	cabinet(Fu, "Sideboard", CFrame.new(11, y, 14.8) * CFrame.Angles(0, rad(180), 0), 6, 2.8, 1.3, C.WoodDark, 3)
-	fbox(Fu, "Vase", CFrame.new(10, y + 3.5, 14.8), Vector3.new(0.7, 1.2, 0.7), Color3.fromRGB(80, 110, 140), M.Glass, true)
+	cabinet(Fu, "Sideboard", CFrame.new(5.7, y, 12.5) * CFrame.Angles(0, rad(-90), 0), 5.5, 2.8, 1.3, C.WoodDark, 3)
+	fbox(Fu, "Vase", CFrame.new(5.7, y + 3.5, 11.5), Vector3.new(0.7, 1.2, 0.7), Color3.fromRGB(80, 110, 140), M.Glass, true)
 	pictureFrame(Fu, CFrame.new(11, y + 6.5, 15.42) * CFrame.Angles(0, rad(180), 0), 3.4, 2.4, Color3.fromRGB(110, 120, 90))
 	bookshelf(Fu, CFrame.new(21.5, y, 14.6) * CFrame.Angles(0, rad(180), 0), 3.5, 7, C.WoodDark)
-	plant(Fu, CFrame.new(5.6, y, 14.6), 2.8)
-	pictureFrame(Fu, CFrame.new(4.58, y + 6, 8) * CFrame.Angles(0, rad(-90), 0), 2.6, 2, Color3.fromRGB(90, 70, 60))
+	plant(Fu, CFrame.new(18.8, y, 14.9), 2.8)
+	pictureFrame(Fu, CFrame.new(5.08, y + 6, 6) * CFrame.Angles(0, rad(-90), 0), 2.6, 2, Color3.fromRGB(90, 70, 60))
 	-- Laundry: стиралка, сушилка, полка, корзина, швабра
 	for i, name in { "Washer", "Dryer" } do
 		local m = model(name, Fu)
@@ -1321,19 +1313,19 @@ do
 	for i = 1, 4 do
 		fbox(Fu, "Bottle", CFrame.new(-22 + i * 1.4, y + 6.8, 15.0), Vector3.new(0.6, 1.1, 0.6), Color3.fromHSV(rand(), 0.5, 0.8), M.SmoothPlastic, true)
 	end
-	cabinet(Fu, "Cabinet", CFrame.new(-14.5, y, 14.9) * CFrame.Angles(0, rad(180), 0), 3, 3, 1.2, C.WallInt, 2)
-	fbox(Fu, "Basket", CFrame.new(-16.8, y + 0.8, 14.6), Vector3.new(1.6, 1.6, 1.4), Color3.fromRGB(200, 190, 170), M.Fabric)
+	cabinet(Fu, "WallCabinet", CFrame.new(-15.5, y + 4.6, 14.9) * CFrame.Angles(0, rad(180), 0), 2.6, 3, 1.2, C.WallInt, 2)
+	fbox(Fu, "Basket", CFrame.new(-17.4, y + 0.8, 14.7), Vector3.new(1.2, 1.6, 1.2), Color3.fromRGB(200, 190, 170), M.Fabric)
 	fbox(Fu, "Mop", CFrame.new(-23.2, y + 2.6, 10.2) * CFrame.Angles(0, 0, rad(8)), Vector3.new(0.12, 5.2, 0.12), C.Wood, M.Wood, true)
 	fbox(Fu, "Bucket", CFrame.new(-22.6, y + 0.6, 10.3), Vector3.new(1.1, 1.2, 1.1), C.Metal, M.Metal, true)
 	-- BackHall: скамья, крючки, обувь, коврик
-	fbox(Fu, "Bench", CFrame.new(-8, y + 1.5, 10.2), Vector3.new(6, 0.3, 1.2), C.Wood, M.Wood)
-	fbox(Fu, "BenchLeg", CFrame.new(-10.6, y + 0.7, 10.2), Vector3.new(0.3, 1.4, 1.0), C.WoodDark, M.Wood, true)
+	fbox(Fu, "Bench", CFrame.new(-6.2, y + 1.5, 10.2), Vector3.new(2.4, 0.3, 1.2), C.Wood, M.Wood)
+	fbox(Fu, "BenchLeg", CFrame.new(-7.2, y + 0.7, 10.2), Vector3.new(0.3, 1.4, 1.0), C.WoodDark, M.Wood, true)
 	fbox(Fu, "BenchLeg", CFrame.new(-5.4, y + 0.7, 10.2), Vector3.new(0.3, 1.4, 1.0), C.WoodDark, M.Wood, true)
-	for i = 1, 4 do
-		fbox(Fu, "Hook", CFrame.new(-10.5 + i * 1.2, y + 6, 9.65), Vector3.new(0.15, 0.4, 0.3), C.MetalDark, M.Metal, true)
+	for i = 1, 3 do
+		fbox(Fu, "Hook", CFrame.new(-7.8 + i * 0.8, y + 6, 9.65), Vector3.new(0.15, 0.4, 0.3), C.MetalDark, M.Metal, true)
 	end
-	fbox(Fu, "Coat", CFrame.new(-8.1, y + 4.3, 9.9), Vector3.new(1.0, 3.0, 0.4), Color3.fromRGB(110, 60, 40), M.Fabric, true)
-	fbox(Fu, "Boots", CFrame.new(-9.5, y + 0.5, 11.2), Vector3.new(0.9, 1.0, 1.2), C.MetalDark, M.Fabric, true)
+	fbox(Fu, "Coat", CFrame.new(-6.2, y + 4.3, 9.9), Vector3.new(1.0, 3.0, 0.4), Color3.fromRGB(110, 60, 40), M.Fabric, true)
+	fbox(Fu, "Boots", CFrame.new(-5.8, y + 0.5, 11.3), Vector3.new(0.9, 1.0, 1.2), C.MetalDark, M.Fabric, true)
 	rug(Fu, CFrame.new(-8, y, 13), 5, 3.5, Color3.fromRGB(70, 70, 80))
 end
 
@@ -1370,17 +1362,17 @@ do
 		closet("ClosetKid", "KidRoom", CFrame.new(-10, y, -1.6), C.WoodLight)
 	end
 	desk(Fu, CFrame.new(-18, y, -14.3) * CFrame.Angles(0, rad(180), 0), 5, C.WoodLight)
-	chair(Fu, CFrame.new(-18, y, -12), C.WoodLight)
+	chair(Fu, CFrame.new(-18, y, -12.6), C.WoodLight)
 	fbox(Fu, "Laptop", CFrame.new(-18.6, y + 2.9, -14.5), Vector3.new(1.6, 0.12, 1.1), C.MetalDark, M.Metal, true)
 	fbox(Fu, "LaptopScreen", CFrame.new(-18.6, y + 3.5, -15.0) * CFrame.Angles(rad(-15), 0, 0), Vector3.new(1.6, 1.1, 0.08), C.GlassDark, M.Glass, true)
 	table4(Fu, "Nightstand", CFrame.new(-18.6, y, -1.6), 1.4, 1.4, 2.0, C.WoodLight)
 	lamp(Fu, CFrame.new(-18.6, y + 2.0, -1.6), 1.2)
-	boxCrate(Fu, CFrame.new(-7, y, -14.3), Vector3.new(2.6, 1.6, 1.6))
-	fbox(Fu, "ToyBall", CFrame.new(-9.5, y + 0.4, -13.5), Vector3.new(0.8, 0.8, 0.8), C.Red, M.SmoothPlastic, true, { Shape = Enum.PartType.Ball })
+	boxCrate(Fu, CFrame.new(-12, y, -14.5), Vector3.new(2.6, 1.6, 1.6))
+	fbox(Fu, "ToyBall", CFrame.new(-14, y + 0.4, -13.8), Vector3.new(0.8, 0.8, 0.8), C.Red, M.SmoothPlastic, true, { Shape = Enum.PartType.Ball })
 	rug(Fu, CFrame.new(-14, y, -8), 8, 6, Color3.fromRGB(80, 110, 150))
-	fbox(Fu, "WallShelf", CFrame.new(-5.0, y + 5.5, -6), Vector3.new(0.9, 0.15, 3.0), C.WoodLight, M.Wood, true, { CastShadow = true })
+	fbox(Fu, "WallShelf", CFrame.new(-5.5, y + 5.5, -6), Vector3.new(0.9, 0.15, 3.0), C.WoodLight, M.Wood, true, { CastShadow = true })
 	for i = 1, 3 do
-		fbox(Fu, "Toy", CFrame.new(-5.0, y + 5.95, -7 + i * 0.7), Vector3.new(0.6, 0.75, 0.5), Color3.fromHSV(rand(), 0.6, 0.85), M.SmoothPlastic, true)
+		fbox(Fu, "Toy", CFrame.new(-5.5, y + 5.95, -7 + i * 0.7), Vector3.new(0.6, 0.75, 0.5), Color3.fromHSV(rand(), 0.6, 0.85), M.SmoothPlastic, true)
 	end
 	pictureFrame(Fu, CFrame.new(-8, y + 6.5, -15.42), 2.4, 3.2, Color3.fromRGB(40, 60, 110))
 	pictureFrame(Fu, CFrame.new(-16, y + 6.6, -0.58) * CFrame.Angles(0, rad(180), 0), 3.0, 2.0, Color3.fromRGB(120, 80, 100))
@@ -1390,11 +1382,11 @@ do
 	table4(Fu, "Nightstand", CFrame.new(17.8, y, -1.6), 1.6, 1.6, 2.2, C.WoodDark)
 	lamp(Fu, CFrame.new(17.8, y + 2.2, -1.6), 1.3)
 	fbox(Fu, "Book", CFrame.new(10.2, y + 2.35, -1.6), Vector3.new(0.9, 0.3, 1.1), Color3.fromRGB(100, 50, 50), M.SmoothPlastic, true)
-	cabinet(Fu, "Dresser", CFrame.new(8, y, -14.3) * CFrame.Angles(0, rad(180), 0), 5, 3.2, 2.0, C.WoodDark, 2)
+	cabinet(Fu, "Dresser", CFrame.new(12.5, y, -14.3) * CFrame.Angles(0, rad(180), 0), 5, 3.2, 2.0, C.WoodDark, 2)
 	do
 		local m = model("Mirror", Fu)
-		fbox(m, "Frame", CFrame.new(8, y + 6.3, -15.42), Vector3.new(3.4, 3.0, 0.12), C.WoodDark, M.Wood, true)
-		fbox(m, "Glass", CFrame.new(8, y + 6.3, -15.34), Vector3.new(3.0, 2.6, 0.06), Color3.fromRGB(170, 190, 200), M.Glass, true, { Reflectance = 0.6 })
+		fbox(m, "Frame", CFrame.new(12.5, y + 6.3, -15.42), Vector3.new(3.4, 3.0, 0.12), C.WoodDark, M.Wood, true)
+		fbox(m, "Glass", CFrame.new(12.5, y + 6.3, -15.34), Vector3.new(3.0, 2.6, 0.06), Color3.fromRGB(170, 190, 200), M.Glass, true, { Reflectance = 0.6 })
 	end
 	closet("ClosetParents", "ParentsRoom", CFrame.new(22.4, y, -13) * CFrame.Angles(0, rad(90), 0), C.WoodDark)
 	armchair(Fu, CFrame.new(6.6, y, -3.5) * CFrame.Angles(0, rad(-90), 0), Color3.fromRGB(120, 110, 100))
@@ -1404,10 +1396,10 @@ do
 	cabinet(Fu, "HallTable", CFrame.new(0, y, -15.0) * CFrame.Angles(0, rad(180), 0), 2.6, 2.8, 1.0, C.WoodDark, 1)
 	fbox(Fu, "Vase", CFrame.new(0.7, y + 3.4, -15.0), Vector3.new(0.5, 0.9, 0.5), Color3.fromRGB(120, 90, 70), M.SmoothPlastic, true)
 	rug(Fu, CFrame.new(-2, y, 4), 2.6, 16, Color3.fromRGB(110, 60, 60))
-	pictureFrame(Fu, CFrame.new(-3.42, y + 6.3, -6) * CFrame.Angles(0, rad(90), 0), 2.2, 1.8, Color3.fromRGB(90, 90, 110))
-	pictureFrame(Fu, CFrame.new(3.42, y + 6.3, -6) * CFrame.Angles(0, rad(-90), 0), 2.2, 1.8, Color3.fromRGB(110, 100, 80))
-	pictureFrame(Fu, CFrame.new(-3.42, y + 6.3, 10) * CFrame.Angles(0, rad(90), 0), 1.8, 2.4, Color3.fromRGB(80, 110, 100))
-	plant(Fu, CFrame.new(-3, y, 14.6), 2.2)
+	pictureFrame(Fu, CFrame.new(-3.92, y + 6.3, -6) * CFrame.Angles(0, rad(90), 0), 2.2, 1.8, Color3.fromRGB(90, 90, 110))
+	pictureFrame(Fu, CFrame.new(3.92, y + 6.3, -6) * CFrame.Angles(0, rad(-90), 0), 2.2, 1.8, Color3.fromRGB(110, 100, 80))
+	pictureFrame(Fu, CFrame.new(-3.92, y + 6.3, 10) * CFrame.Angles(0, rad(90), 0), 1.8, 2.4, Color3.fromRGB(80, 110, 100))
+	plant(Fu, CFrame.new(-3.3, y, 14.6), 2.2)
 	-- Office
 	desk(Fu, CFrame.new(-16, y, 14.2), 6, C.WoodDark)
 	chair(Fu, CFrame.new(-16, y, 12) * CFrame.Angles(0, rad(180), 0), C.WoodDark)
@@ -1419,12 +1411,12 @@ do
 	bookshelf(Fu, CFrame.new(-22.9, y, 3) * CFrame.Angles(0, rad(-90), 0), 4, 8, C.WoodDark)
 	bookshelf(Fu, CFrame.new(-22.9, y, 13) * CFrame.Angles(0, rad(-90), 0), 4, 8, C.WoodDark)
 	closet("ClosetOffice", "Office", CFrame.new(-10, y, 1.6) * CFrame.Angles(0, rad(180), 0), C.WoodDark)
-	cabinet(Fu, "FilingCabinet", CFrame.new(-5.3, y, 13.5) * CFrame.Angles(0, rad(90), 0), 1.6, 4.2, 1.5, C.Metal, 3)
+	cabinet(Fu, "FilingCabinet", CFrame.new(-5.8, y, 13.5) * CFrame.Angles(0, rad(90), 0), 1.6, 4.2, 1.5, C.Metal, 3)
 	rug(Fu, CFrame.new(-14, y, 8), 7, 6, Color3.fromRGB(70, 80, 70))
-	pictureFrame(Fu, CFrame.new(-4.58, y + 6.6, 11) * CFrame.Angles(0, rad(-90), 0), 1.8, 1.4, Color3.fromRGB(200, 190, 170))
-	pictureFrame(Fu, CFrame.new(-4.58, y + 6.6, 13.5) * CFrame.Angles(0, rad(-90), 0), 1.8, 1.4, Color3.fromRGB(190, 200, 180))
-	fbox(Fu, "Globe", CFrame.new(-21, y + 3.4, 9.5), Vector3.new(1.2, 1.2, 1.2), Color3.fromRGB(60, 90, 140), M.SmoothPlastic, true, { Shape = Enum.PartType.Ball })
-	table4(Fu, "GlobeStand", CFrame.new(-21, y, 9.5), 1.2, 1.2, 2.8, C.WoodDark)
+	pictureFrame(Fu, CFrame.new(-5.08, y + 6.6, 11) * CFrame.Angles(0, rad(-90), 0), 1.8, 1.4, Color3.fromRGB(200, 190, 170))
+	pictureFrame(Fu, CFrame.new(-5.08, y + 6.6, 13.5) * CFrame.Angles(0, rad(-90), 0), 1.8, 1.4, Color3.fromRGB(190, 200, 180))
+	fbox(Fu, "Globe", CFrame.new(-22.6, y + 3.4, 8), Vector3.new(1.2, 1.2, 1.2), Color3.fromRGB(60, 90, 140), M.SmoothPlastic, true, { Shape = Enum.PartType.Ball })
+	table4(Fu, "GlobeStand", CFrame.new(-22.6, y, 8), 1.2, 1.2, 2.8, C.WoodDark)
 	-- Bathroom
 	do
 		local m = model("Bathtub", Fu)
@@ -1458,7 +1450,7 @@ do
 		fbox(m, "Head", CFrame.new(15, y + 7.4, 15.0), Vector3.new(0.8, 0.3, 0.8), C.Metal, M.Metal, true)
 		fbox(m, "Pipe", CFrame.new(15, y + 5.0, 15.3), Vector3.new(0.15, 5, 0.15), C.Metal, M.Metal, true)
 	end
-	cabinet(Fu, "LinenCabinet", CFrame.new(5.4, y, 6) * CFrame.Angles(0, rad(-90), 0), 3, 6, 1.6, C.WallInt, 2)
+	cabinet(Fu, "LinenCabinet", CFrame.new(5.9, y, 6) * CFrame.Angles(0, rad(-90), 0), 3, 6, 1.6, C.WallInt, 2)
 	rug(Fu, CFrame.new(18, y, 4), 2.8, 2.2, Color3.fromRGB(120, 140, 160))
 	fbox(Fu, "TowelRail", CFrame.new(19, y + 5.2, 15.3), Vector3.new(3, 0.12, 0.12), C.Metal, M.Metal, true)
 	fbox(Fu, "Towel", CFrame.new(18.3, y + 4.4, 15.2), Vector3.new(1.2, 1.8, 0.2), Color3.fromRGB(200, 120, 110), M.Fabric, true)
@@ -1683,10 +1675,10 @@ do
 	fbox(radio, "Antenna", CFrame.new(-11.8, y + 8.6, 3.1) * CFrame.Angles(0, 0, rad(-25)), Vector3.new(0.06, 1.6, 0.06), C.Metal, M.Metal, true)
 	-- Phone (домашний телефон) на стене кухни у арки
 	local phone = model("Phone", house)
-	local pbody = part({ Name = "Body", CFrame = CFrame.new(4.7, y + 5.2, -5), Size = Vector3.new(0.4, 1.7, 0.9), Color = Color3.fromRGB(226, 220, 200), Material = M.SmoothPlastic, CanCollide = false, CanQuery = true, CanTouch = false, CastShadow = false }, phone)
+	local pbody = part({ Name = "Body", CFrame = CFrame.new(5.2, y + 5.2, -5), Size = Vector3.new(0.4, 1.7, 0.9), Color = Color3.fromRGB(226, 220, 200), Material = M.SmoothPlastic, CanCollide = false, CanQuery = true, CanTouch = false, CastShadow = false }, phone)
 	phone.PrimaryPart = pbody
-	fbox(phone, "Handset", CFrame.new(4.95, y + 5.5, -5), Vector3.new(0.3, 1.5, 0.4), Color3.fromRGB(200, 196, 180), M.SmoothPlastic, true)
-	fbox(phone, "Cord", CFrame.new(4.75, y + 3.8, -5.3), Vector3.new(0.08, 1.4, 0.08), C.MetalDark, M.SmoothPlastic, true)
+	fbox(phone, "Handset", CFrame.new(5.45, y + 5.5, -5), Vector3.new(0.3, 1.5, 0.4), Color3.fromRGB(200, 196, 180), M.SmoothPlastic, true)
+	fbox(phone, "Cord", CFrame.new(5.25, y + 3.8, -5.3), Vector3.new(0.08, 1.4, 0.08), C.MetalDark, M.SmoothPlastic, true)
 	prompt(pbody, "Prompt", "Answer", "Phone", 0, 7)
 end
 
@@ -1770,25 +1762,26 @@ end
 -- Объёмы комнат (Rooms): RoomName, Floor, Outdoor
 ----------------------------------------------------------------------
 local ROOMS = {
-	{ "Foyer", -3.5, 3.5, -15.5, 15.5, F1, H1, 1, false },
-	{ "Living", -23.5, -4.5, -15.5, 3.5, F1, H1, 1, false },
-	{ "Kitchen", 4.5, 23.5, -15.5, -2.5, F1, H1, 1, false },
-	{ "Dining", 4.5, 23.5, -1.5, 15.5, F1, H1, 1, false },
+	{ "Foyer", -4, 4, -15.5, 15.5, F1, H1, 1, false },
+	{ "Living", -23.5, -5, -15.5, 3.5, F1, H1, 1, false },
+	{ "Kitchen", 5, 23.5, -15.5, -2.5, F1, H1, 1, false },
+	{ "Dining", 5, 23.5, -1.5, 15.5, F1, H1, 1, false },
 	{ "Laundry", -23.5, -12.5, 9.5, 15.5, F1, H1, 1, false },
-	{ "BackHall", -11.5, -4.5, 9.5, 15.5, F1, H1, 1, false },
+	{ "BackHall", -11.5, -5, 9.5, 15.5, F1, H1, 1, false },
 	{ "Garage", 24.5, 41.5, -15.5, 1.5, F1, H1, 1, false },
-	{ "KidRoom", -23.5, -4.5, -15.5, -0.5, F2, H2, 2, false },
-	{ "ParentsRoom", 4.5, 23.5, -15.5, -0.5, F2, H2, 2, false },
-	{ "UpperHall", -3.5, 3.5, -15.5, 15.5, F2, H2, 2, false },
-	{ "Office", -23.5, -4.5, 0.5, 15.5, F2, H2, 2, false },
-	{ "Bathroom", 4.5, 23.5, 0.5, 15.5, F2, H2, 2, false },
+	{ "KidRoom", -23.5, -5, -15.5, -0.5, F2, H2, 2, false },
+	{ "ParentsRoom", 5, 23.5, -15.5, -0.5, F2, H2, 2, false },
+	{ "UpperHall", -4, 4, -15.5, 15.5, F2, H2, 2, false },
+	{ "Office", -23.5, -5, 0.5, 15.5, F2, H2, 2, false },
+	{ "Bathroom", 5, 23.5, 0.5, 15.5, F2, H2, 2, false },
 	{ "Basement", -13.5, 13.5, -7.5, 15.5, FB, F1 - 1, 0, false },
 	{ "Porch", -8, 8, -24, -16, F1, H1, 3, true },
-	{ "FrontYard", -46, 46, -40, -16, G, G + 10, 3, true },
-	{ "BackYard", -46, 46, 16, 64, G, G + 10, 3, true },
+	{ "FrontYard", -46, 48, -40, -16, G, G + 10, 3, true },
+	{ "BackYard", -46, 48, 16, 64, G, G + 10, 3, true },
+	{ "BackAlley", -46, 48, 64, 80, G, G + 10, 3, true },
 	{ "WestYard", -46, -24, -16, 16, G, G + 10, 3, true },
-	{ "EastYard", 24, 46, 2, 16, G, G + 10, 3, true },
-	{ "EastSide", 42, 46, -16, 2, G, G + 10, 3, true },
+	{ "EastYard", 24, 48, 2, 16, G, G + 10, 3, true },
+	{ "EastSide", 42, 48, -16, 2, G, G + 10, 3, true },
 	{ "Street", -130, 130, -64, -40, G, G + 10, 3, true },
 	{ "Shed", 25.5, 34.5, 40.5, 49.5, G, 7, 3, false },
 }
@@ -1811,17 +1804,16 @@ local function navPart(parent: Instance, name: string, pos: Vector3, attrs: { [s
 end
 
 local WAYPOINTS = {
-	-- {x, y, z, room, floor}; y = верх пола + 0.5
-	-- Крыльцо и 1-й этаж
+	-- {x, y, z, room, floor}; y = верх пола + 0.5 (кроме точек на лестницах)
 	{ 0, F1, -20, "Porch", 3 },
 	{ 0, F1, -13, "Foyer", 1 }, { -2, F1, -7, "Foyer", 1 }, { -2, F1, 0, "Foyer", 1 }, { -2, F1, 7, "Foyer", 1 }, { -1, F1, 13.5, "Foyer", 1 },
-	{ -8, F1, -12, "Living", 1 }, { -16, F1, -12, "Living", 1 }, { -21, F1, -10, "Living", 1 }, { -8, F1, -4, "Living", 1 }, { -8, F1, -8, "Living", 1 }, { -20, F1, -3, "Living", 1 }, { -16, F1, 1, "Living", 1 },
-	{ 8, F1, -12, "Kitchen", 1 }, { 14, F1, -11.5, "Kitchen", 1 }, { 20, F1, -9, "Kitchen", 1 }, { 8, F1, -5, "Kitchen", 1 }, { 14, F1, -4.5, "Kitchen", 1 }, { 20, F1, -4.5, "Kitchen", 1 },
-	{ 14, F1, 1, "Dining", 1 }, { 8, F1, 7, "Dining", 1 }, { 20, F1, 7, "Dining", 1 }, { 8, F1, 12.5, "Dining", 1 }, { 16, F1, 12.5, "Dining", 1 },
+	{ -8, F1, -12, "Living", 1 }, { -16, F1, -12, "Living", 1 }, { -20, F1, -12, "Living", 1 }, { -8, F1, -4, "Living", 1 }, { -8, F1, -8, "Living", 1 }, { -18, F1, 0, "Living", 1 }, { -14, F1, 0, "Living", 1 }, { -8, F1, 0, "Living", 1 },
+	{ 7, F1, -10, "Kitchen", 1 }, { 14, F1, -11.5, "Kitchen", 1 }, { 20, F1, -9, "Kitchen", 1 }, { 8, F1, -5, "Kitchen", 1 }, { 14, F1, -4.5, "Kitchen", 1 }, { 20, F1, -4.5, "Kitchen", 1 },
+	{ 14, F1, 1, "Dining", 1 }, { 8, F1, 7, "Dining", 1 }, { 20, F1, 7, "Dining", 1 }, { 8.5, F1, 12.5, "Dining", 1 }, { 16, F1, 13.2, "Dining", 1 },
 	{ -8, F1, 13, "BackHall", 1 },
-	{ -16, F1, 12, "Laundry", 1 }, { -21, F1, 11.5, "Laundry", 1 },
+	{ -16, F1, 11.5, "Laundry", 1 }, { -21, F1, 11.5, "Laundry", 1 },
 	{ -20.5, F1, 6.5, "Laundry", 1 }, -- площадка у двери в подвал
-	{ 28, F1, -8, "Garage", 1 }, { 34, F1, -12, "Garage", 1 }, { 34, F1, -5, "Garage", 1 }, { 39, F1, -5, "Garage", 1 }, { 30, F1, -3, "Garage", 1 },
+	{ 28, F1, -8, "Garage", 1 }, { 34, F1, -12, "Garage", 1 }, { 34, F1, -5, "Garage", 1 }, { 39, F1, -5, "Garage", 1 }, { 29, F1, -4, "Garage", 1 },
 	-- Лестница в подвал (верх ступени k = -k, x = -17.5 + 2k - 1)
 	{ -12.5, -3, 6.5, "Basement", 1 }, { -6.5, -6, 6.5, "Basement", 0 }, { -0.5, -9, 6.5, "Basement", 0 },
 	-- Подвал
@@ -1829,22 +1821,65 @@ local WAYPOINTS = {
 	-- Лестница наверх (верх ступени k = k, z = -10 + 2k - 1)
 	{ 2, 3, -5, "Foyer", 1 }, { 2, 7, 3, "UpperHall", 2 }, { 2, 10, 9, "UpperHall", 2 },
 	-- 2-й этаж
-	{ 0, F2, -13, "UpperHall", 2 }, { -2, F2, -6, "UpperHall", 2 }, { -2, F2, 1, "UpperHall", 2 }, { -2, F2, 8, "UpperHall", 2 }, { 0, F2, 14, "UpperHall", 2 },
-	{ -9, F2, -12, "KidRoom", 2 }, { -14, F2, -8, "KidRoom", 2 }, { -14, F2, -3, "KidRoom", 2 }, { -20, F2, -11, "KidRoom", 2 },
-	{ 9, F2, -12, "ParentsRoom", 2 }, { 14, F2, -12, "ParentsRoom", 2 }, { 19, F2, -8, "ParentsRoom", 2 }, { 8, F2, -7, "ParentsRoom", 2 },
+	{ 0, F2, -12, "UpperHall", 2 }, { -2, F2, -6, "UpperHall", 2 }, { -2, F2, 1, "UpperHall", 2 }, { -2, F2, 8, "UpperHall", 2 }, { 0, F2, 14, "UpperHall", 2 },
+	{ -10, F2, -11, "KidRoom", 2 }, { -14, F2, -8, "KidRoom", 2 }, { -14, F2, -3, "KidRoom", 2 }, { -21.5, F2, -10, "KidRoom", 2 },
+	{ 9, F2, -11, "ParentsRoom", 2 }, { 14, F2, -12, "ParentsRoom", 2 }, { 19, F2, -8, "ParentsRoom", 2 }, { 8, F2, -7, "ParentsRoom", 2 },
 	{ -9, F2, 6, "Office", 2 }, { -14, F2, 8, "Office", 2 }, { -19, F2, 8, "Office", 2 }, { -10, F2, 12, "Office", 2 },
-	{ 9, F2, 13.5, "Bathroom", 2 }, { 10, F2, 8, "Bathroom", 2 }, { 16, F2, 7, "Bathroom", 2 }, { 18, F2, 11, "Bathroom", 2 },
-	-- Двор
-	{ 0, G, -30, "FrontYard", 3 }, { 0, G, -38, "FrontYard", 3 }, { -14, G, -28, "FrontYard", 3 }, { 14, G, -28, "FrontYard", 3 }, { -30, G, -30, "FrontYard", 3 }, { 33, G, -30, "FrontYard", 3 }, { 33, G, -20, "FrontYard", 3 }, { -34, G, -20, "FrontYard", 3 }, { 44, G, -20, "FrontYard", 3 },
-	{ 44, G, -8, "EastSide", 3 }, { 44, G, 4, "EastYard", 3 }, { 34, G, 10, "EastYard", 3 },
-	{ -34, G, -8, "WestYard", 3 }, { -34, G, 4, "WestYard", 3 }, { -34, G, 14, "WestYard", 3 },
-	{ -8, G, 23, "BackYard", 3 }, { 0, G, 22, "BackYard", 3 }, { 0, G, 32, "BackYard", 3 }, { 0, G, 44, "BackYard", 3 }, { 0, G, 56, "BackYard", 3 }, { 0, G, 62, "BackYard", 3 },
-	{ -18, G, 24, "BackYard", 3 }, { 18, G, 24, "BackYard", 3 }, { -20, G, 42, "BackYard", 3 }, { 22, G, 44, "BackYard", 3 }, { 30, G, 36, "BackYard", 3 }, { -36, G, 30, "BackYard", 3 }, { -36, G, 54, "BackYard", 3 }, { 38, G, 24, "BackYard", 3 }, { 22, G, 58, "BackYard", 3 }, { -14, G, 60, "BackYard", 3 }, { 12, G, 62, "BackYard", 3 },
-	{ 30, G, 45, "Shed", 3 },
-	-- Улица
-	{ -90, G, -52, "Street", 3 }, { -70, G, -52, "Street", 3 }, { -50, G, -52, "Street", 3 }, { -30, G, -52, "Street", 3 }, { -12, G, -52, "Street", 3 }, { 0, G, -46, "Street", 3 }, { 12, G, -52, "Street", 3 }, { 30, G, -52, "Street", 3 }, { 50, G, -52, "Street", 3 }, { 70, G, -52, "Street", 3 }, { 86, G, -48, "Street", 3 },
-	{ 0, G, 70, "BackYard", 3 },
+	{ 9, F2, 13.5, "Bathroom", 2 }, { 10, F2, 8, "Bathroom", 2 }, { 16, F2, 7, "Bathroom", 2 }, { 18.5, F2, 10, "Bathroom", 2 },
+	-- Сарай
+	{ 30.5, G, 42, "Shed", 3 },
+	{ 0, G, 70, "BackAlley", 3 },
 }
+-- Двор: сетка точек (шаг 10 по X, 8 по Z), минуя дом, крыльцо, сарай, площадку и стволы яблонь
+do
+	local function nearTree(x, z)
+		for _, t in TREE_SLOTS do
+			if math.abs(t.X - x) < 3.5 and math.abs(t.Z - z) < 3.5 then
+				return true
+			end
+		end
+		return false
+	end
+	local function addOut(x, z, room)
+		table.insert(WAYPOINTS, { x, G, z, room, 3 })
+	end
+	for _, z in { -37, -29, -21 } do
+		for x = -40, 40, 10 do
+			if not (z == -21 and math.abs(x) <= 10) then
+				addOut(x, z, "FrontYard")
+			end
+		end
+	end
+	for _, z in { -13, -5, 3, 11 } do
+		for _, x in { -40, -30 } do
+			addOut(x, z, "WestYard")
+		end
+	end
+	addOut(45, -9, "EastSide")
+	addOut(45, -1, "EastSide")
+	for _, z in { 5, 12 } do
+		for _, x in { 30, 38, 45 } do
+			addOut(x, z, "EastYard")
+		end
+	end
+	for _, z in { 21, 29, 37, 45, 53, 61 } do
+		for x = -40, 40, 10 do
+			local inShed = x >= 22 and x <= 38 and z >= 37 and z <= 53
+			local inStoop = z == 21 and x >= -14 and x <= -2
+			if not inShed and not inStoop and not nearTree(x, z) then
+				addOut(x, z, "BackYard")
+			end
+		end
+	end
+	addOut(-8, 24, "BackYard")
+	for x = -120, 90, 10 do
+		addOut(x, -52, "Street")
+	end
+	addOut(0, -46, "Street")
+	for _, pnt in { { 95, -42 }, { 104, -42 }, { 110, -46 }, { 112, -52 }, { 110, -58 }, { 104, -62 }, { 95, -62 } } do
+		addOut(pnt[1], pnt[2], "Street")
+	end
+end
 for i, w in WAYPOINTS do
 	navPart(waypointsF, "WP" .. i, Vector3.new(w[1], w[2] + 0.5, w[3]), { Room = w[4], Floor = w[5] })
 end
@@ -1860,7 +1895,7 @@ for _, d in DOORS do
 			pos = Vector3.new(d.c + d.out * 2.0, G + 0.5, mid)
 		end
 		if d.id == "GarageSide" then
-			pos = Vector3.new(43.5, G + 0.5, mid)
+			pos = Vector3.new(44.5, G + 0.5, mid)
 		end
 		navPart(entriesF, d.id, pos, { EntryId = d.id, Kind = "Door", TargetId = d.id, Room = d.roomB })
 	end
@@ -1876,13 +1911,13 @@ navPart(inmateSpawnsF, "StreetEast", Vector3.new(60, G + 0.55, -52), { Index = 2
 navPart(inmateSpawnsF, "BackGate", Vector3.new(0, G + 0.5, 70), { Index = 3 })
 navPart(inmateSpawnsF, "CulDeSac", Vector3.new(90, G + 0.55, -44), { Index = 4 })
 -- Места Веспер
-for _, v in { { "Living", -9, F1, 1 }, { "Dining", 7, F1, 12.5 }, { "KidRoom", -14, F2, -10 }, { "ParentsRoom", 20, F2, -7 }, { "Office", -18, F2, 8 }, { "Basement", 6, FB, 9 } } do
+for _, v in { { "Living", -19, F1, -0.5 }, { "Dining", 9, F1, 2 }, { "KidRoom", -14, F2, -10 }, { "ParentsRoom", 20, F2, -7 }, { "Office", -18, F2, 8 }, { "Basement", 6, FB, 9 } } do
 	navPart(vesperF, v[1], Vector3.new(v[2], v[3] + 0.5, v[4]), { Room = v[1] })
 end
 -- Спавны игроков: гостиная и холл
-for i, s in { { -8, -12 }, { -12, -13 }, { -17, -12 }, { -20, -3 }, { -9, -7 }, { -2, -12 }, { -2, -6 }, { -1, -14.5 }, { -16, 1 }, { -8, -1 } } do
+for i, s in { { -8, -12 }, { -12, -13 }, { -17, -12 }, { -18, 0 }, { -9, -7 }, { -2, -12 }, { -2, -6 }, { -1, -14.5 }, { -14, 0 }, { -8, -1 } } do
 	local p = navPart(spawnsF, "Spawn" .. i, Vector3.new(s[1], F1 + 0.5, s[2]), { Index = i })
-	p:SetAttribute("Room", if s[1] <= -4.5 then "Living" else "Foyer")
+	p:SetAttribute("Room", if s[1] <= -5 then "Living" else "Foyer")
 end
 -- Позиции прожекторов во дворе
 for i, p in { Vector3.new(-34, G, -30), Vector3.new(40, G, 12), Vector3.new(-36, G, 52) } do
@@ -1894,7 +1929,7 @@ end
 ----------------------------------------------------------------------
 -- Двор, участок, забор, сарай
 ----------------------------------------------------------------------
-local LOT = { x0 = -46, x1 = 46, z0 = -40, z1 = 64 }
+local LOT = { x0 = -46, x1 = 48, z0 = -40, z1 = 64 }
 local HOUSE_FOOT = { x0 = -24, x1 = 24, z0 = -16, z1 = 16 }
 local GARAGE_FOOT = { x0 = 24, x1 = 42, z0 = -16, z1 = 2 }
 do
@@ -2147,3 +2182,267 @@ do
 		bush(b[1], b[2], b[3])
 	end
 end
+
+----------------------------------------------------------------------
+-- Лобби: полицейский блокпост на тёмной дороге (смещение Config.Map.LobbyOrigin)
+----------------------------------------------------------------------
+local lobby = folder("Lobby")
+do
+	local O = LOBBY_ORIGIN
+	local S = folder("Structure", lobby)
+	local Fu = folder("Furniture", lobby)
+	local function L(x: number, y: number, z: number, yawDeg: number?): CFrame
+		return cfYaw(O.X + x, O.Y + y, O.Z + z, yawDeg)
+	end
+	local function lbbox(parent, name, x0, x1, y0, y1, z0, z1, color, material, kind, extra)
+		return bbox(parent, name, O.X + x0, O.X + x1, O.Y + y0, O.Y + y1, O.Z + z0, O.Z + z1, color, material, kind, extra)
+	end
+	-- Земля, дорога, обочины, разметка
+	lbbox(S, "Ground", -70, 70, -4, 0, -70, 70, C.Ground, M.Grass, "solid", { CanQuery = true })
+	lbbox(S, "Road", -14, 14, -0.3, 0.06, -70, 70, C.Asphalt, M.Asphalt)
+	lbbox(S, "Shoulder", -18, -14, -0.3, 0.03, -70, 70, C.Dirt, M.Ground)
+	lbbox(S, "Shoulder", 14, 18, -0.3, 0.03, -70, 70, C.Dirt, M.Ground)
+	for z = -66, 62, 12 do
+		lbbox(S, "RoadLine", -0.25, 0.25, 0.06, 0.09, z, z + 5, Color3.fromRGB(190, 170, 70), M.SmoothPlastic, "deco")
+	end
+	lbbox(S, "RoadLine", -13.6, -13.2, 0.06, 0.09, -70, 70, Color3.fromRGB(200, 200, 200), M.SmoothPlastic, "deco")
+	lbbox(S, "RoadLine", 13.2, 13.6, 0.06, 0.09, -70, 70, Color3.fromRGB(200, 200, 200), M.SmoothPlastic, "deco")
+	-- Невидимые стены вокруг лобби (±60)
+	for _, w in {
+		{ L(0, 15, -60), Vector3.new(122, 30, 1) },
+		{ L(0, 15, 60), Vector3.new(122, 30, 1) },
+		{ L(-60, 15, 0), Vector3.new(1, 30, 122) },
+		{ L(60, 15, 0), Vector3.new(1, 30, 122) },
+	} do
+		box(S, "Boundary", w[1], w[2], C.Ground, M.SmoothPlastic, "solid", { Transparency = 1, CanQuery = false, CastShadow = false })
+	end
+	-- Барьеры поперёк дороги (козлы с полосами), табличка ROAD CLOSED
+	for i, bx in { -8.5, 0, 8.5 } do
+		local m = model("Barrier", S)
+		for _, dz in { -0.6, 0.6 } do
+			for _, dx in { -3.6, 3.6 } do
+				box(m, "Leg", L(bx + dx, 1.6, -14 + dz) * CFrame.Angles(rad(dz * 25), 0, 0), Vector3.new(0.3, 3.4, 0.3), C.MetalDark, M.Metal, "deco")
+			end
+		end
+		local board = box(m, "Board", L(bx, 2.6, -14), Vector3.new(8, 1.2, 0.3), Color3.fromRGB(230, 230, 220), M.SmoothPlastic, "solid")
+		for k = 0, 3 do
+			box(m, "Stripe", L(bx - 3.2 + k * 2, 2.6, -14.17), Vector3.new(1.0, 1.2, 0.05), Color3.fromRGB(230, 110, 40), M.SmoothPlastic, "deco")
+		end
+		box(m, "LowerBar", L(bx, 1.0, -14), Vector3.new(8, 0.3, 0.3), C.MetalDark, M.Metal, "solid")
+		if i == 2 then
+			local sign = box(m, "Sign", L(bx, 4.4, -14), Vector3.new(6, 2.2, 0.3), Color3.fromRGB(230, 110, 40), M.SmoothPlastic, "deco")
+			label(sign, Enum.NormalId.Back, "ROAD CLOSED", Color3.fromRGB(20, 20, 20), nil, 40)
+			label(sign, Enum.NormalId.Front, "ROAD CLOSED", Color3.fromRGB(20, 20, 20), nil, 40)
+		end
+	end
+	-- Ограждающая лента на стойках вдоль обочин
+	for _, sx in { -13, 13 } do
+		for z = -10, 10, 10 do
+			box(S, "TapePost", L(sx, 1.8, z), Vector3.new(0.3, 3.6, 0.3), C.MetalDark, M.Metal, "deco")
+			box(S, "TapeBase", L(sx, 0.2, z), Vector3.new(1.4, 0.3, 1.4), C.MetalDark, M.Metal, "deco")
+		end
+		box(S, "Tape", L(sx, 3.1, 0), Vector3.new(0.08, 0.5, 20), C.Yellow, M.SmoothPlastic, "deco")
+	end
+	box(S, "Tape", L(0, 3.1, -10), Vector3.new(26, 0.5, 0.08), C.Yellow, M.SmoothPlastic, "deco")
+	-- Конусы
+	for _, c in { { -11, -20 }, { 11, -20 }, { -6, -18 }, { 6, -18 } } do
+		box(S, "Cone", L(c[1], 0.9, c[2]), Vector3.new(1.2, 1.8, 1.2), Color3.fromRGB(230, 110, 40), M.SmoothPlastic, "deco")
+		box(S, "ConeBase", L(c[1], 0.1, c[2]), Vector3.new(1.8, 0.2, 1.8), C.MetalDark, M.SmoothPlastic, "deco")
+	end
+	-- Патрульные машины (силуэты) с тусклыми красно-синими огнями
+	local function patrolCar(x: number, z: number, yaw: number)
+		local m = model("PatrolCar", S)
+		local function P(dx, dy, dz)
+			return L(x, 0, z, yaw) * CFrame.new(dx, dy, dz)
+		end
+		box(m, "Body", P(0, 2.0, 0), Vector3.new(5.2, 2.0, 11), C.Police, M.Metal, "solid")
+		box(m, "Cab", P(0, 3.8, -0.6), Vector3.new(4.4, 1.7, 5.4), C.Police, M.Metal, "solid")
+		box(m, "Stripe", P(0, 2.2, 0), Vector3.new(5.3, 0.5, 11.1), Color3.fromRGB(230, 230, 230), M.SmoothPlastic, "deco")
+		for _, sx in { -2.25, 2.25 } do
+			box(m, "Window", P(sx, 3.9, -0.6), Vector3.new(0.1, 1.2, 4.6), C.GlassDark, M.Glass, "deco", { Transparency = 0.2 })
+		end
+		box(m, "Windshield", P(0, 3.9, -3.35) * CFrame.Angles(rad(28), 0, 0), Vector3.new(4.2, 1.6, 0.12), C.GlassDark, M.Glass, "deco", { Transparency = 0.2 })
+		box(m, "RearGlass", P(0, 3.9, 2.15) * CFrame.Angles(rad(-28), 0, 0), Vector3.new(4.2, 1.6, 0.12), C.GlassDark, M.Glass, "deco", { Transparency = 0.2 })
+		for _, dz in { -3.4, 3.4 } do
+			for _, sx in { -2.3, 2.3 } do
+				box(m, "Wheel", P(sx, 1.0, dz), Vector3.new(0.7, 2.0, 2.0), Color3.fromRGB(26, 26, 28), M.SmoothPlastic, "deco", { Shape = Enum.PartType.Cylinder, CastShadow = true })
+			end
+		end
+		box(m, "LightBar", P(0, 4.8, -0.8), Vector3.new(3.6, 0.35, 0.8), C.MetalDark, M.Metal, "deco")
+		local red = box(m, "RedLight", P(-1.0, 4.85, -0.8), Vector3.new(1.4, 0.4, 0.7), Color3.fromRGB(220, 40, 40), M.Neon, "deco")
+		local blue = box(m, "BlueLight", P(1.0, 4.85, -0.8), Vector3.new(1.4, 0.4, 0.7), Color3.fromRGB(50, 90, 230), M.Neon, "deco")
+		pointLight(red, "Light", 16, 0.6, Color3.fromRGB(255, 60, 60), false)
+		pointLight(blue, "Light", 16, 0.6, Color3.fromRGB(70, 110, 255), false)
+		for _, sx in { -1.6, 1.6 } do
+			box(m, "Headlight", P(sx, 2.2, -5.55), Vector3.new(1.0, 0.6, 0.12), Color3.fromRGB(220, 220, 200), M.SmoothPlastic, "deco")
+			box(m, "TailLight", P(sx, 2.2, 5.55), Vector3.new(1.0, 0.5, 0.12), Color3.fromRGB(150, 30, 30), M.SmoothPlastic, "deco")
+		end
+		return m
+	end
+	patrolCar(-23, -2, 12)
+	patrolCar(23, 14, 195)
+	-- Прожектор на треноге, направлен на ReadyPad
+	do
+		local m = model("Floodlight", S)
+		local base = Vector3.new(O.X - 13, O.Y, O.Z + 20)
+		for i = 0, 2 do
+			local a = i * 2 * math.pi / 3
+			box(m, "Leg", CFrame.new(base + Vector3.new(math.cos(a) * 0.9, 3.0, math.sin(a) * 0.9)) * CFrame.Angles(0, -a, 0) * CFrame.Angles(0, 0, rad(-12)), Vector3.new(0.2, 6.2, 0.2), C.MetalDark, M.Metal, "deco")
+		end
+		box(m, "Mast", CFrame.new(base + Vector3.new(0, 7.5, 0)), Vector3.new(0.3, 4, 0.3), C.MetalDark, M.Metal, "deco")
+		local headPos = base + Vector3.new(0, 9.5, 0)
+		local headCF = lookCF(headPos, Vector3.new(O.X, O.Y + 0.5, O.Z + 6))
+		local head = box(m, "Head", headCF, Vector3.new(2.6, 1.8, 1.4), C.MetalDark, M.Metal, "deco", { CastShadow = true })
+		box(m, "Lens", headCF * CFrame.new(0, 0, -0.72), Vector3.new(2.2, 1.4, 0.1), C.Bulb, M.Neon, "deco")
+		spotLight(head, "Light", 50, 1.8, 70, Color3.fromRGB(255, 240, 215), Enum.NormalId.Front, true)
+		box(m, "Generator", L(-16, 1.2, 24), Vector3.new(3, 2.4, 2), C.Metal, M.DiamondPlate, "solid")
+	end
+	-- Уличные фонари лобби
+	for _, lp in { { -17, 36 }, { 17, -30 } } do
+		box(S, "LampPole", L(lp[1], 6, lp[2]), Vector3.new(0.5, 12, 0.5), C.MetalDark, M.Metal, "solid", { CanQuery = false })
+		local b = box(S, "LampBulb", L(lp[1], 12.2, lp[2]), Vector3.new(1.4, 0.5, 1.4), C.Bulb, M.Neon, "deco")
+		box(S, "LampHead", L(lp[1], 12.6, lp[2]), Vector3.new(1.8, 0.4, 1.8), C.MetalDark, M.Metal, "deco")
+		pointLight(b, "Light", 26, 0.9, Color3.fromRGB(255, 205, 150), true)
+	end
+	-- Деревья и кусты по краям
+	for _, t in { { -40, -40, 1.3 }, { 40, -30, 1.2 }, { -45, 10, 1.4 }, { 44, 40, 1.3 }, { -30, 50, 1.2 }, { 30, 52, 1.1 }, { -50, -10, 1.0 }, { 50, 0, 1.2 } } do
+		buildTree(S, Vector3.new(O.X + t[1], O.Y, O.Z + t[2]), t[3], true)
+	end
+	for _, b in { { -20, -8, 2.6 }, { 21, 30, 2.4 }, { -24, 44, 3 }, { 26, -40, 2.6 } } do
+		deco({ Name = "Bush", Shape = Enum.PartType.Ball, CFrame = L(b[1], b[3] * 0.4, b[2]), Size = Vector3.new(b[3], b[3] * 0.8, b[3]), Color = vary(C.Bush, 0.05), Material = M.Grass, CastShadow = true, CanCollide = true }, S)
+	end
+
+	-- ReadyPad: площадка на дороге с янтарной неоновой окантовкой + Prompt
+	local pad = part({ Name = "ReadyPad", CFrame = L(0, 0.16, 6), Size = Vector3.new(8, 0.2, 8), Color = Color3.fromRGB(30, 30, 34), Material = M.SmoothPlastic, CanCollide = true, CanQuery = true, CanTouch = false, CastShadow = false }, lobby)
+	prompt(pad, "Prompt", "Ready", "Ready Pad", 0, 7)
+	for _, e in { { 0, -4, 8.3, 0.3 }, { 0, 4, 8.3, 0.3 }, { -4, 0, 0.3, 8.3 }, { 4, 0, 0.3, 8.3 } } do
+		deco({ Name = "PadEdge", CFrame = L(e[1], 0.3, 6 + e[2]), Size = Vector3.new(e[3], 0.12, e[4]), Color = C.Neon, Material = M.Neon }, Fu)
+	end
+	deco({ Name = "PadMark", CFrame = L(0, 0.27, 6), Size = Vector3.new(3, 0.04, 3), Color = C.Neon, Material = M.Neon, Transparency = 0.5 }, Fu)
+
+	-- PerkKiosk: фургон-киоск с открытым боковым люком и прилавком, лицом к дороге (-X)
+	do
+		local k = model("PerkKiosk", lobby)
+		local kx, kz = 27, -24
+		lbbox(k, "Body", kx - 3, kx + 3, 1.2, 7.4, kz - 7, kz + 5, Color3.fromRGB(160, 150, 130), M.Metal)
+		lbbox(k, "Cab", kx - 3, kx + 3, 1.2, 5.6, kz + 5, kz + 9, Color3.fromRGB(160, 150, 130), M.Metal)
+		box(k, "Windshield", L(kx, 4.6, kz + 9.05) * CFrame.Angles(rad(-20), 0, 0), Vector3.new(5.2, 1.8, 0.15), C.GlassDark, M.Glass, "deco", { Transparency = 0.25 })
+		for _, dz in { kz - 4.5, kz + 6.5 } do
+			for _, sx in { -2.9, 2.9 } do
+				box(k, "Wheel", L(kx + sx, 1.2, dz), Vector3.new(0.8, 2.4, 2.4), Color3.fromRGB(26, 26, 28), M.SmoothPlastic, "deco", { Shape = Enum.PartType.Cylinder, CastShadow = true })
+			end
+		end
+		-- люк (поднятая створка-навес) и окно киоска
+		box(k, "Hatch", L(kx - 3.4, 7.2, kz - 1) * CFrame.Angles(0, 0, rad(-70)), Vector3.new(0.2, 4.4, 9), Color3.fromRGB(150, 140, 120), M.Metal, "deco", { CastShadow = true })
+		box(k, "Opening", L(kx - 3.05, 5.0, kz - 1), Vector3.new(0.12, 3.6, 9), Color3.fromRGB(28, 26, 24), M.SmoothPlastic, "deco")
+		local counter = part({ Name = "Counter", CFrame = L(kx - 3.9, 3.0, kz - 1), Size = Vector3.new(1.8, 0.3, 9.4), Color = C.Wood, Material = M.Wood, CanCollide = true, CanQuery = true, CanTouch = false }, k)
+		k.PrimaryPart = counter
+		lbbox(k, "CounterFront", kx - 4.8, kx - 3.0, 0, 2.85, kz - 5.7, kz + 3.7, C.WoodDark, M.WoodPlanks)
+		local sign = box(k, "Sign", L(kx - 3.4, 8.6, kz - 1), Vector3.new(0.3, 1.6, 7), C.MetalDark, M.Metal, "deco")
+		label(sign, Enum.NormalId.Left, "PERKS", C.Neon, nil, 40)
+		for i = 0, 5 do
+			local b = deco({ Name = "StringLight", CFrame = L(kx - 4.6, 7.0, kz - 5 + i * 1.6), Size = Vector3.new(0.3, 0.3, 0.3), Color = C.Bulb, Material = M.Neon, Shape = Enum.PartType.Ball }, k)
+			if i == 2 then
+				pointLight(b, "Light", 12, 0.6, Color3.fromRGB(255, 210, 150), false)
+			end
+		end
+		deco({ Name = "StringWire", CFrame = L(kx - 4.6, 7.2, kz - 1), Size = Vector3.new(0.06, 0.06, 9), Color = C.MetalDark, Material = M.Metal }, k)
+		for i = 1, 3 do
+			deco({ Name = "Jar", CFrame = L(kx - 3.6, 3.6, kz - 4 + i * 1.4), Size = Vector3.new(0.8, 0.9, 0.8), Color = Color3.fromHSV(0.08 + i * 0.1, 0.6, 0.8), Material = M.Glass, Transparency = 0.2 }, k)
+		end
+		prompt(counter, "Prompt", "Perks", "Kiosk", 0, 8)
+	end
+
+	-- Доска «как играть» (Board) и табло рекордов (Leaderboard): щиты на столбах лицом к дороге (+X)
+	local function noticeBoard(name: string, z: number, title: string, bodyName: string, bodyText: string)
+		local m = model(name, lobby)
+		local bx = -25
+		for _, dz in { -5.4, 5.4 } do
+			lbbox(m, "Post", bx - 0.4, bx + 0.4, 0, 10, z + dz - 0.4, z + dz + 0.4, C.WoodDark, M.Wood)
+		end
+		lbbox(m, "Backing", bx - 0.5, bx + 0.1, 2.6, 9.6, z - 5.6, z + 5.6, C.WoodDark, M.WoodPlanks)
+		lbbox(m, "Roof", bx - 1.2, bx + 1.2, 9.6, 10.1, z - 6.2, z + 6.2, C.Roof, M.Slate, "deco", { CastShadow = true })
+		local screen = part({ Name = "Screen", CFrame = L(bx + 0.25, 6.1, z, -90), Size = Vector3.new(10.4, 6.4, 0.3), Color = Color3.fromRGB(20, 22, 26), Material = M.SmoothPlastic, CanCollide = false, CanQuery = false, CanTouch = false, CastShadow = false }, m)
+		m.PrimaryPart = screen
+		local gui = Instance.new("SurfaceGui")
+		gui.Name = "Gui"
+		gui.Face = Enum.NormalId.Front
+		gui.SizingMode = Enum.SurfaceGuiSizingMode.PixelsPerStud
+		gui.PixelsPerStud = 50
+		gui.LightInfluence = 0.2
+		gui.Brightness = 1.2
+		gui.Parent = screen
+		local titleL = Instance.new("TextLabel")
+		titleL.Name = "Title"
+		titleL.Size = UDim2.fromScale(1, 0.18)
+		titleL.BackgroundColor3 = Color3.fromRGB(255, 170, 40)
+		titleL.BorderSizePixel = 0
+		titleL.TextColor3 = Color3.fromRGB(20, 18, 14)
+		titleL.TextScaled = true
+		titleL.FontFace = Font.new("rbxasset://fonts/families/BuilderSans.json", Enum.FontWeight.ExtraBold, Enum.FontStyle.Normal)
+		titleL.Text = title
+		titleL.Parent = gui
+		local body = Instance.new("TextLabel")
+		body.Name = bodyName
+		body.Position = UDim2.fromScale(0, 0.18)
+		body.Size = UDim2.fromScale(1, 0.82)
+		body.BackgroundColor3 = Color3.fromRGB(28, 30, 36)
+		body.BorderSizePixel = 0
+		body.TextColor3 = Color3.fromRGB(235, 232, 225)
+		body.TextScaled = true
+		body.TextWrapped = true
+		body.TextXAlignment = Enum.TextXAlignment.Left
+		body.TextYAlignment = Enum.TextYAlignment.Top
+		body.FontFace = Font.new("rbxasset://fonts/families/BuilderSans.json", Enum.FontWeight.Medium, Enum.FontStyle.Normal)
+		body.Text = bodyText
+		body.Parent = gui
+		local pad2 = Instance.new("UIPadding")
+		pad2.PaddingLeft = UDim.new(0.04, 0)
+		pad2.PaddingRight = UDim.new(0.04, 0)
+		pad2.PaddingTop = UDim.new(0.05, 0)
+		pad2.PaddingBottom = UDim.new(0.05, 0)
+		pad2.Parent = body
+		return m
+	end
+	noticeBoard("Board", -22, "HOW TO PLAY", "Text", Locale.t("HowToPlay"))
+	noticeBoard("Leaderboard", 22, "BEST NIGHTS", "Rows", "")
+
+	-- Спавны: SpawnLocation'ы на дороге
+	local spawns = folder("Spawns", lobby)
+	local idx = 0
+	for _, z in { 26, 32 } do
+		for _, x in { -6, -2, 2, 6 } do
+			idx += 1
+			local sp = part({
+				ClassName = "SpawnLocation",
+				Name = "Spawn" .. idx,
+				CFrame = L(x, 0.56, z),
+				Size = Vector3.new(4, 1, 4),
+				Transparency = 1,
+				CanCollide = false,
+				CanQuery = false,
+				CanTouch = true,
+				CastShadow = false,
+			}, spawns)
+			sp.Neutral = true
+			sp.Duration = 0
+			sp.Enabled = true
+			sp.AllowTeamChangeOnTouch = false
+		end
+	end
+end
+
+----------------------------------------------------------------------
+-- Запись
+----------------------------------------------------------------------
+fs.writeFile("src/map/House.rbxmx", roblox.serializeModel({ house }, true))
+fs.writeFile("src/map/Lobby.rbxmx", roblox.serializeModel({ lobby }, true))
+
+local function countFolder(root: Instance, name: string): number
+	local f = root:FindFirstChild(name)
+	return if f then countParts(f) else 0
+end
+print(string.format("House: %d parts (Structure %d, Furniture %d, Doors %d, Windows %d, HidingSpots %d, Lights %d), %d waypoints, %d rooms",
+	countParts(house), countFolder(house, "Structure"), countFolder(house, "Furniture"), countFolder(house, "Doors"), countFolder(house, "Windows"),
+	countFolder(house, "HidingSpots"), countFolder(house, "Lights"), #waypointsF:GetChildren(), #roomsF:GetChildren()))
+print(string.format("Lobby: %d parts", countParts(lobby)))
