@@ -1,54 +1,27 @@
 --!strict
--- Точка входа сервера: запускает все сервисы и связывает жизненный цикл игрока.
-
-local Players = game:GetService("Players")
+-- Точка входа сервера: порядок инициализации важен (World → Data → Player → House → Apples → Inmates → Items → Round).
 
 local Services = script.Parent:WaitForChild("Services")
-local DataService = require(Services:WaitForChild("DataService"))
-local PlotService = require(Services:WaitForChild("PlotService"))
-local BuildService = require(Services:WaitForChild("BuildService"))
-local ShopService = require(Services:WaitForChild("ShopService"))
-local StormService = require(Services:WaitForChild("StormService"))
-local TutorialService = require(Services:WaitForChild("TutorialService"))
-local TeamService = require(Services:WaitForChild("TeamService"))
-
 local Shared = game:GetService("ReplicatedStorage"):WaitForChild("Shared")
-local Grid = require(Shared:WaitForChild("Grid"))
-local Remotes = require(Shared:WaitForChild("Remotes"))
+local Config = require(Shared:WaitForChild("Config"))
 
-print(string.format("[BunkerSimulator] версия %s: под землёй %d слоёв", require(Shared:WaitForChild("Config")).Version, Grid.SURFACE))
+local World = require(Services:WaitForChild("World"))
+local DataService = require(Services:WaitForChild("DataService"))
+local PlayerService = require(Services:WaitForChild("PlayerService"))
+local HouseService = require(Services:WaitForChild("HouseService"))
+local AppleService = require(Services:WaitForChild("AppleService"))
+local InmateService = require(Services:WaitForChild("InmateService"))
+local ItemService = require(Services:WaitForChild("ItemService"))
+local RoundService = require(Services:WaitForChild("RoundService"))
 
-PlotService.init()
-BuildService.init()
-ShopService.init()
-StormService.init()
-TutorialService.init()
-TeamService.init()
+print(string.format("[AmberAlert] server v%s", Config.Version))
 
--- Когда данные игрока загружены — выдаём участок и строим сохранённый бункер.
-DataService.Loaded:Connect(function(player, data)
-	if player.Parent ~= Players then
-		return
-	end
-	local plot = PlotService.assign(player)
-	if not plot then
-		Remotes.Notify:FireClient(player, "Все участки заняты! Попробуй другой сервер.", "error")
-		return
-	end
-	local entries, dug = Grid.deserialize(data.Layout)
-	PlotService.resetTerrain(plot, dug)
-	if #entries > 0 then
-		PlotService.loadEntries(plot, entries)
-	end
-	-- сохраняем то, что реально загрузилось (на случай отброшенных блоков)
-	BuildService.saveLayout(player)
-end)
-
-Players.PlayerRemoving:Connect(function(player)
-	StormService.abort(player)
-	BuildService.saveLayout(player)
-	PlotService.release(player)
-end)
-
--- DataService подключается к PlayerAdded последним, чтобы все обработчики выше уже были готовы.
+World.init()
+PlayerService.init()
+HouseService.init()
+AppleService.init()
+InmateService.init()
+ItemService.init()
+RoundService.init()
+-- DataService подключается к PlayerAdded последним: к этому моменту все обработчики готовы
 DataService.init()

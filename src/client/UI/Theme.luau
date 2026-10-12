@@ -1,38 +1,37 @@
 --!strict
--- Цвета и шрифты интерфейса. BuilderSans поддерживает кириллицу.
+-- Палитра и шрифты интерфейса. Тёмный "аналоговый" хоррор: почти чёрные панели, тёплый янтарный акцент,
+-- красный только для опасности. BuilderSans поддерживает кириллицу, RobotoMono — для текста оповещений.
 
 local Theme = {
 	Font = Font.fromEnum(Enum.Font.BuilderSansExtraBold),
 	FontBold = Font.fromEnum(Enum.Font.BuilderSansBold),
 	FontBody = Font.fromEnum(Enum.Font.BuilderSansMedium),
+	FontMono = Font.fromEnum(Enum.Font.RobotoMono),
 
-	Panel = Color3.fromRGB(28, 32, 44),
-	PanelLight = Color3.fromRGB(44, 50, 68),
-	PanelStroke = Color3.fromRGB(10, 12, 18),
-	Card = Color3.fromRGB(52, 59, 80),
-	CardHover = Color3.fromRGB(64, 72, 98),
+	Panel = Color3.fromRGB(12, 13, 17),
+	PanelLight = Color3.fromRGB(24, 26, 34),
+	PanelStroke = Color3.fromRGB(3, 3, 5),
+	Card = Color3.fromRGB(30, 32, 42),
+	CardHover = Color3.fromRGB(42, 45, 58),
 
-	Text = Color3.fromRGB(255, 255, 255),
-	TextDim = Color3.fromRGB(190, 198, 215),
-	TextStroke = Color3.fromRGB(12, 14, 22),
+	Text = Color3.fromRGB(232, 229, 220),
+	TextDim = Color3.fromRGB(150, 152, 164),
+	TextStroke = Color3.fromRGB(0, 0, 0),
 
-	Green = Color3.fromRGB(64, 200, 92),
-	GreenDark = Color3.fromRGB(34, 140, 60),
-	Red = Color3.fromRGB(235, 70, 70),
-	RedDark = Color3.fromRGB(160, 36, 40),
-	Blue = Color3.fromRGB(60, 150, 255),
-	BlueDark = Color3.fromRGB(30, 96, 200),
-	Yellow = Color3.fromRGB(255, 200, 40),
-	YellowDark = Color3.fromRGB(205, 140, 10),
-	Orange = Color3.fromRGB(255, 140, 40),
-	Purple = Color3.fromRGB(150, 90, 255),
-	Acid = Color3.fromRGB(140, 255, 60),
-	AcidDark = Color3.fromRGB(70, 160, 30),
-	Gray = Color3.fromRGB(120, 126, 140),
-	GrayDark = Color3.fromRGB(80, 84, 96),
+	Amber = Color3.fromRGB(255, 170, 40),
+	AmberDark = Color3.fromRGB(170, 100, 10),
+	Red = Color3.fromRGB(205, 42, 42),
+	RedDark = Color3.fromRGB(120, 18, 18),
+	Green = Color3.fromRGB(90, 180, 100),
+	GreenDark = Color3.fromRGB(40, 110, 55),
+	Blue = Color3.fromRGB(80, 140, 230),
+	BlueDark = Color3.fromRGB(35, 80, 160),
+	Gray = Color3.fromRGB(110, 114, 128),
+	GrayDark = Color3.fromRGB(60, 62, 72),
+	Cash = Color3.fromRGB(120, 220, 130),
 
-	Corner = 14,
-	CornerSmall = 10,
+	Corner = 8,
+	CornerSmall = 6,
 }
 
 return Theme

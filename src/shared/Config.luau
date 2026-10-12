@@ -1,424 +1,387 @@
 --!strict
--- Конфиг игры: блоки, сетка участка, параметры шторма, экономика.
--- Все балансные числа живут здесь, чтобы их было легко менять в одном месте.
-
-export type BlockCategory = "Blocks" | "Doors" | "Terrain"
-
-export type BlockDef = {
-	Id: string,
-	Name: string,
-	Description: string,
-	Category: BlockCategory,
-	Order: number,
-	HP: number,
-	Price: number,
-	-- Множитель урона от кислоты (дождь + лужа). Металл разъедается сильнее.
-	AcidMult: number,
-	-- Доля урона от града, которая передаётся игроку, стоящему под этим блоком.
-	HailTransfer: number,
-	Color: Color3,
-	Material: Enum.Material,
-	Transparency: number,
-	Reflectance: number,
-	-- Двери: высота 2 клетки, Seal = сколько стадов кислоты дверь сдерживает.
-	IsDoor: boolean,
-	Seal: number,
-	HeightCells: number,
-	-- Земля под участком: не ломается бедствиями, копается в режиме удаления.
-	Indestructible: boolean?,
-}
-
-export type StormParams = {
-	Level: number,
-	HailRate: number, -- градин в секунду над всем участком
-	HailDamage: number, -- урон блоку от одной градины
-	HailBigChance: number,
-	HailBigMult: number,
-	HailPlayerDamage: number, -- урон игроку при прямом попадании
-	HailHitRadius: number, -- радиус попадания по игроку (стады)
-	AcidRainDps: number, -- урон в секунду верхним открытым блокам (умножается на AcidMult)
-	AcidRainPlayerDps: number, -- урон игроку под открытым небом во время кислотного дождя
-	PoolMax: number, -- максимальный уровень кислоты снаружи (стады от пола участка)
-	PoolRiseTime: number, -- за сколько секунд лужа достигает максимума
-	PoolDps: number, -- урон в секунду затопленным внешним блокам (умножается на AcidMult)
-	PoolPlayerDps: number, -- урон игроку в кислоте снаружи
-	InsidePlayerDps: number, -- урон игроку в кислоте внутри бункера
-	WindDps: number, -- ураган: урон блокам с наветренной стороны (лёгкие материалы — больше)
-	WindPlayerDps: number, -- ураган: урон игроку под открытым небом
-	MeteorRate: number, -- метеоритов в секунду
-	MeteorDamage: number, -- урон верхнему блоку (ниже и вокруг — меньше)
-	MeteorPlayerDamage: number,
-	QuakeDps: number, -- землетрясение: урон наземным блокам (высокие — больше)
-	BaseReward: number,
-}
+-- Конфиг игры: тайминги фаз, сложности, движение, укрытия, шум, экономика, предметы, перки, прогрессия.
+-- Все балансные числа — здесь, чтобы менять в одном месте. Подробное обоснование — docs/GDD.md.
 
 local Config = {}
 
+Config.Version = "0.1.0"
 Config.DataVersion = 1
-Config.DataStoreName = "BunkerSimulator_v1"
-
--- Версия сборки (видна в углу экрана и в Output) — чтобы было понятно, какой файл открыт.
-Config.Version = "1.7"
-
--- Сетка постройки (локальные координаты участка). Клетка = куб 4x4x4.
-Config.Grid = {
-	CellSize = 4,
-	Width = 12, -- X
-	Depth = 12, -- Z (индекс 0 = передняя сторона, обращённая к лобби)
-	Height = 18, -- Y: 8 слоёв под землёй + 10 над землёй
-	Underground = 8, -- слоёв земли под поверхностью участка (можно копать)
-}
-
--- Геометрия участка-котлована (локальные координаты, начало = центр пола котлована).
--- Локальная -Z = "перед" участка (смотрит на лобби).
-Config.Plot = {
-	PitHalfSize = 32, -- котлован 64x64 стадов
-	PitDepth = 14, -- глубина котлована (кислота поднимается максимум почти до края)
-	ZoneTop = 60, -- высота зоны участка над полом
-	ZoneMargin = 2, -- небольшой допуск зоны по краям
-}
-
+Config.DataStoreName = "AmberAlert_HollowCreek_v1"
+Config.LeaderboardStoreName = "AmberAlert_BestNights_v1"
 Config.MaxPlayers = 8
 
-Config.Build = {
-	MaxActionsPerSecond = 14,
-	BurstActions = 20,
-	MaxPlaceDistance = 300, -- от персонажа до клетки (стады)
-	SaveDebounce = 3, -- через сколько секунд после изменения постройки записываем раскладку в профиль
+----------------------------------------------------------------------
+-- Сложности
+----------------------------------------------------------------------
+export type DifficultyDef = {
+	Id: string,
+	Order: number,
+	Nights: number,
+	-- количество пациентов за ночь: Base до ночи ExtraFrom, затем Base + 1
+	InmatesBase: number,
+	ExtraFrom: number, -- 0 = никогда
+	PriceMult: number,
+	HpMult: number,
+	SpeedMult: number,
+	ReturnTakenAtDawn: boolean,
+	AmberPerNight: number,
+	Color: Color3,
 }
 
-Config.Economy = {
-	StartingCoins = 0,
-	-- Для тестов в Roblox Studio: столько монет у нового игрока, чтобы сразу проверить магазин.
-	-- Поставь 100, чтобы проверить экономику как у обычного игрока.
-	StudioStartingCoins = 0,
-	PrefabDiscount = 0.85,
-	MaxBuyAmount = 100,
-	MaxLevel = 100,
-}
+Config.Difficulties = {
+	Easy = { Id = "Easy", Order = 1, Nights = 5, InmatesBase = 1, ExtraFrom = 0, PriceMult = 0.8, HpMult = 0.85, SpeedMult = 0.95, ReturnTakenAtDawn = true, AmberPerNight = 6, Color = Color3.fromRGB(90, 180, 100) },
+	Normal = { Id = "Normal", Order = 2, Nights = 8, InmatesBase = 1, ExtraFrom = 6, PriceMult = 1, HpMult = 1, SpeedMult = 1, ReturnTakenAtDawn = true, AmberPerNight = 10, Color = Color3.fromRGB(255, 170, 40) },
+	Hard = { Id = "Hard", Order = 3, Nights = 12, InmatesBase = 1, ExtraFrom = 5, PriceMult = 1.25, HpMult = 1.3, SpeedMult = 1.08, ReturnTakenAtDawn = false, AmberPerNight = 16, Color = Color3.fromRGB(230, 100, 40) },
+	Nightmare = { Id = "Nightmare", Order = 4, Nights = 15, InmatesBase = 2, ExtraFrom = 8, PriceMult = 1.5, HpMult = 1.6, SpeedMult = 1.15, ReturnTakenAtDawn = false, AmberPerNight = 25, Color = Color3.fromRGB(205, 42, 42) },
+} :: { [string]: DifficultyDef }
 
-Config.Blocks = {
-	wood = {
-		Id = "wood",
-		Name = "Деревянные доски",
-		Description = "Дёшево, но слабо. Кислота разъедает средне.",
-		Category = "Blocks",
-		Order = 1,
-		HP = 60,
-		Price = 3,
-		AcidMult = 1.0,
-		HailTransfer = 0.3,
-		Color = Color3.fromRGB(163, 112, 67),
-		Material = Enum.Material.WoodPlanks,
-		Transparency = 0,
-		Reflectance = 0,
-		IsDoor = false,
-		Seal = 0,
-		HeightCells = 1,
-	},
-	glass = {
-		Id = "glass",
-		Name = "Бронестекло",
-		Description = "Хрупкое, зато кислота его не берёт.",
-		Category = "Blocks",
-		Order = 2,
-		HP = 45,
-		Price = 6,
-		AcidMult = 0,
-		HailTransfer = 0.35,
-		Color = Color3.fromRGB(170, 222, 255),
-		-- не Glass: за материалом Glass не рисуются частицы и прозрачные детали
-		Material = Enum.Material.SmoothPlastic,
-		Transparency = 0.45,
-		Reflectance = 0.15,
-		IsDoor = false,
-		Seal = 0,
-		HeightCells = 1,
-	},
-	stone = {
-		Id = "stone",
-		Name = "Каменный кирпич",
-		Description = "Надёжный и устойчивый к кислоте.",
-		Category = "Blocks",
-		Order = 3,
-		HP = 150,
-		Price = 8,
-		AcidMult = 0.6,
-		HailTransfer = 0.15,
-		Color = Color3.fromRGB(138, 138, 142),
-		Material = Enum.Material.Cobblestone,
-		Transparency = 0,
-		Reflectance = 0,
-		IsDoor = false,
-		Seal = 0,
-		HeightCells = 1,
-	},
-	metal = {
-		Id = "metal",
-		Name = "Листовой металл",
-		Description = "Крепкий против града, но кислота его разъедает!",
-		Category = "Blocks",
-		Order = 4,
-		HP = 240,
-		Price = 18,
-		AcidMult = 2.5,
-		HailTransfer = 0.1,
-		Color = Color3.fromRGB(168, 172, 178),
-		Material = Enum.Material.DiamondPlate,
-		Transparency = 0,
-		Reflectance = 0.05,
-		IsDoor = false,
-		Seal = 0,
-		HeightCells = 1,
-	},
-	concrete = {
-		Id = "concrete",
-		Name = "Бетон",
-		Description = "Тяжёлый бетон. Отлично держит кислоту.",
-		Category = "Blocks",
-		Order = 5,
-		HP = 360,
-		Price = 30,
-		AcidMult = 0.45,
-		HailTransfer = 0.06,
-		Color = Color3.fromRGB(196, 196, 190),
-		Material = Enum.Material.Concrete,
-		Transparency = 0,
-		Reflectance = 0,
-		IsDoor = false,
-		Seal = 0,
-		HeightCells = 1,
-	},
-	steel = {
-		Id = "steel",
-		Name = "Армированная сталь",
-		Description = "Очень прочная, но кислота её подтачивает.",
-		Category = "Blocks",
-		Order = 6,
-		HP = 600,
-		Price = 70,
-		AcidMult = 1.8,
-		HailTransfer = 0.03,
-		Color = Color3.fromRGB(92, 98, 108),
-		Material = Enum.Material.Metal,
-		Transparency = 0,
-		Reflectance = 0.1,
-		IsDoor = false,
-		Seal = 0,
-		HeightCells = 1,
-	},
-	titan = {
-		Id = "titan",
-		Name = "Титановый сплав",
-		Description = "Лучший материал: прочный и почти не боится кислоты.",
-		Category = "Blocks",
-		Order = 7,
-		HP = 1000,
-		Price = 160,
-		AcidMult = 0.25,
-		HailTransfer = 0,
-		Color = Color3.fromRGB(118, 150, 196),
-		Material = Enum.Material.Metal,
-		Transparency = 0,
-		Reflectance = 0.15,
-		IsDoor = false,
-		Seal = 0,
-		HeightCells = 1,
-	},
-	door_wood = {
-		Id = "door_wood",
-		Name = "Деревянная дверь",
-		Description = "Держит до 3 стадов кислоты, потом начинает течь.",
-		Category = "Doors",
-		Order = 10,
-		HP = 90,
-		Price = 15,
-		AcidMult = 1.0,
-		HailTransfer = 0.2,
-		Color = Color3.fromRGB(124, 84, 52),
-		Material = Enum.Material.Wood,
-		Transparency = 0,
-		Reflectance = 0,
-		IsDoor = true,
-		Seal = 3.5,
-		HeightCells = 2,
-	},
-	door_iron = {
-		Id = "door_iron",
-		Name = "Железная дверь",
-		Description = "Держит до 7 стадов кислоты.",
-		Category = "Doors",
-		Order = 11,
-		HP = 300,
-		Price = 90,
-		AcidMult = 1.5,
-		HailTransfer = 0.08,
-		Color = Color3.fromRGB(110, 114, 122),
-		Material = Enum.Material.DiamondPlate,
-		Transparency = 0,
-		Reflectance = 0.05,
-		IsDoor = true,
-		Seal = 7,
-		HeightCells = 2,
-	},
-	door_blast = {
-		Id = "door_blast",
-		Name = "Гермодверь",
-		Description = "Герметичная дверь бункера. Держит 13.5 стадов кислоты.",
-		Category = "Doors",
-		Order = 12,
-		HP = 900,
-		Price = 400,
-		AcidMult = 0.3,
-		HailTransfer = 0,
-		Color = Color3.fromRGB(214, 170, 52),
-		Material = Enum.Material.Metal,
-		Transparency = 0,
-		Reflectance = 0.1,
-		IsDoor = true,
-		Seal = 13.5,
-		HeightCells = 2,
-	},
-	-- Земля под участком (не продаётся, не в инвентаре)
-	dirt = {
-		Id = "dirt",
-		Name = "Земля",
-		Description = "Копается в режиме удаления.",
-		Category = "Terrain",
-		Order = 100,
-		HP = 1e6,
-		Price = 0,
-		AcidMult = 0,
-		HailTransfer = 0,
-		Color = Color3.fromRGB(110, 82, 56),
-		Material = Enum.Material.Ground,
-		Transparency = 0,
-		Reflectance = 0,
-		IsDoor = false,
-		Seal = 0,
-		HeightCells = 1,
-		Indestructible = true,
-	},
-} :: { [string]: BlockDef }
+Config.DefaultDifficulty = "Normal"
 
--- Порядок отображения в магазине и в хотбаре (без земли).
-Config.BlockOrder = {} :: { string }
-do
-	local ids = {}
-	for id, def in Config.Blocks do
-		if def.Category ~= "Terrain" then
-			table.insert(ids, id)
-		end
+function Config.getDifficulty(id: string?): DifficultyDef
+	return Config.Difficulties[id or ""] or Config.Difficulties[Config.DefaultDifficulty]
+end
+
+function Config.difficultyList(): { DifficultyDef }
+	local list: { DifficultyDef } = {}
+	for _, d in Config.Difficulties do
+		table.insert(list, d)
 	end
-	table.sort(ids, function(a, b)
-		return Config.Blocks[a].Order < Config.Blocks[b].Order
+	table.sort(list, function(a: DifficultyDef, b: DifficultyDef)
+		return a.Order < b.Order
 	end)
-	Config.BlockOrder = ids
+	return list
 end
 
-function Config.getBlock(id: any): BlockDef?
-	if typeof(id) ~= "string" then
-		return nil
+-- Сколько пациентов выходит в ночь night
+function Config.inmatesForNight(diff: DifficultyDef, night: number): number
+	local n = diff.InmatesBase
+	if diff.ExtraFrom > 0 and night >= diff.ExtraFrom then
+		n += 1
 	end
-	return Config.Blocks[id]
+	return n
 end
 
--- Тайминги фаз шторма (секунды).
-Config.Storm = {
-	PrepTime = 5,
-	HailTime = 30,
-	WindTime = 18,
-	MeteorTime = 15,
-	CalmTime = 4,
-	AcidTime = 50,
-	QuakeTime = 14,
-	ClearTime = 6,
-	FallTime = 0.6, -- время падения градины (визуал и задержка урона совпадают)
-	MeteorFallTime = 1.4,
-	MeteorRadius = 7, -- радиус поражения игрока метеоритом
-	HailSpawnHeight = 80, -- над полом котлована (визуал)
-	SimStep = 0.25, -- шаг симуляции кислоты
-	LeaveGrace = 5, -- сколько секунд можно быть вне участка до провала
-	DoorLeakFactor = 0.06, -- стадов/сек на каждый стад превышения Seal
-	BreachRate = 1.6, -- стадов/сек, если в затопленной части бункера дыра
-	RoofLeakRate = 0.05, -- стадов/сек, если в крыше дыра во время кислотного дождя
-	RoofLeakCap = 0.2, -- через крышу натечёт не больше PoolMax * RoofLeakCap
-	InsideDamageDepth = 1.5, -- урон внутри начинается, когда кислоты по колено
-	HailTremorRadius = 7, -- удары града по крыше в этом радиусе частично достаются игроку
-	DrainRate = 2.5, -- стадов/сек, скорость ухода кислоты в фазе Clear
-	QuakeDrainRate = 0.5, -- во время землетрясения лужа уходит медленно (и продолжает затекать)
-}
-
--- Фазы шторма (значения атрибута Phase у участка).
+----------------------------------------------------------------------
+-- Фазы матча (секунды)
+----------------------------------------------------------------------
 Config.Phases = {
-	None = "",
-	Prep = "Prep",
-	Hail = "Hail",
-	Calm = "Calm",
-	Acid = "Acid",
-	Clear = "Clear",
-	Wind = "Wind",
-	Meteor = "Meteor",
-	Quake = "Quake",
+	LobbyCountdown = 30,
+	LobbyMinPlayers = 1,
+	Day = 60,
+	FirstDay = 75,
+	Alert = 18,
+	NightBase = 100,
+	NightPerNight = 8,
+	NightMax = 180,
+	Dawn = 8,
+	Results = 20,
 }
 
--- Дополнительные бедствия: чем выше уровень, тем больше их в одном шторме.
-Config.ExtraDisasters = { "Wind", "Meteor", "Quake" }
-function Config.extraDisasterCount(level: number): number
-	return #Config.ExtraDisasters -- все бедствия в каждом шторме (сила растёт с уровнем)
+-- Игровые часы: день 07:00 → 21:00, ночь 21:00 → 06:00 (фаза Dawn — 06:00 → 07:00)
+Config.Clock = {
+	DayStartHour = 7,
+	NightStartHour = 21,
+	DawnHour = 6,
+}
+
+function Config.nightDuration(night: number): number
+	return math.min(Config.Phases.NightMax, Config.Phases.NightBase + Config.Phases.NightPerNight * (night - 1))
 end
 
-Config.PhaseNames = {
-	Prep = "Шторм приближается",
-	Hail = "Град!",
-	Calm = "Затишье...",
-	Acid = "Кислотный дождь!",
-	Clear = "Шторм уходит",
-	Wind = "Ураган!",
-	Meteor = "Метеоритный дождь!",
-	Quake = "Землетрясение!",
-} :: { [string]: string }
+----------------------------------------------------------------------
+-- Движение, фонарик, укрытия, шум, зрение
+----------------------------------------------------------------------
+Config.Movement = {
+	WalkSpeed = 12,
+	SprintSpeed = 22,
+	CrouchSpeed = 7,
+	HidingSpeed = 0,
+	StaminaMax = 100,
+	SprintDrain = 18, -- в секунду
+	RegenWalk = 12,
+	RegenIdle = 18,
+	ExhaustLock = 3, -- секунд нельзя бежать после нуля
+	CrouchCameraDrop = 1.6,
+	MaxLegalSpeed = 30, -- античит: выше — возврат на место
+	CrouchHeadDrop = 1.8, -- насколько ниже "голова" для проверки видимости
+}
 
-function Config.stormParams(level: number): StormParams
-	local n = math.clamp(math.floor(level), 1, Config.Economy.MaxLevel)
+Config.Flashlight = {
+	Angle = 50,
+	Range = 45,
+	Brightness = 1.7,
+	Battery = 150, -- секунд непрерывной работы
+	RevealDistance = 25, -- луч, направленный на пациента ближе этого, выдаёт игрока
+	LowBattery = 20,
+}
+
+Config.Hiding = {
+	BreathMax = 100,
+	BreathDrainNear = 12, -- в секунду, когда пациент ближе NearDistance
+	BreathRegen = 10,
+	NearDistance = 15,
+	HoldSeconds = 6, -- сколько можно задерживать дыхание
+	HoldCooldown = 4,
+	ReenterLock = 6, -- секунд после выхода нельзя прятаться снова
+	SearchChanceSeen = 1, -- пациент видел, как игрок спрятался
+	SearchChanceIdle = 0.12, -- проходит мимо без цели
+	SearchChanceAfterEscapes = 0.5, -- после двух побегов из этого укрытия
+	SearchRadius = 10,
+	BossWaitSeconds = 8,
+}
+
+Config.Noise = {
+	Sprint = 22,
+	Door = 18,
+	Window = 45,
+	Shot = 120,
+	Apple = 8,
+	Trap = 30,
+	Phone = 40,
+	Fall = 15,
+	Switch = 6,
+	Gasp = 25,
+	Breaking = 35,
+	Revive = 10,
+} :: { [string]: number }
+
+Config.Vision = {
+	SightLit = 40,
+	SightDark = 14,
+	CrouchMult = 0.6,
+	CatchDistance = 3.2,
+	EyeHeight = 4.5,
+	ChaseBoostAfter = 2, -- секунд непрерывной видимости
+	ChaseBoost = 1.25,
+	LoseSightAfter = 2.5, -- секунд без видимости → Search
+	FovCos = -0.2, -- косинус половины угла обзора (~100°); пациент "видит" и чуть сзади
+}
+
+Config.Downed = {
+	Duration = 60,
+	ReviveHold = 4,
+	InmateCooldownAfterCatch = 3,
+	DefibrillatorRange = 7,
+}
+
+Config.InventorySlots = 4
+
+----------------------------------------------------------------------
+-- Экономика
+----------------------------------------------------------------------
+Config.Economy = {
+	AppleValue = 25,
+	AppleInterval = 60,
+	StartingTrees = 3,
+	StartingApples = 3,
+	MaxTrees = 8,
+	MaxApplesPerTree = 3,
+	SprinklerBonus = 0.15,
+	MaxSprinklers = 3,
+	RakeInterval = 40,
+	TreePrices = { 400, 1250, 2500, 5000, 7500 },
+	StartingCash = 0,
+	StudioStartingCash = 3000,
+	ApplePickRange = 9,
+}
+
+export type ItemCategory = "Defense" | "Offense" | "Utility" | "Farm"
+export type ItemKind = "Placeable" | "Consumable" | "Weapon" | "Upgrade" | "Ammo"
+
+export type ItemDef = {
+	Id: string,
+	Category: ItemCategory,
+	Kind: ItemKind,
+	Order: number,
+	Price: number,
+	PriceStep: number, -- рост цены после каждой покупки
+	Stack: number, -- максимум в одном слоте
+	GiveCount: number, -- сколько единиц даёт покупка
+	Once: boolean, -- апгрейд покупается один раз на отряд
+	MaxOwned: number, -- 0 = без лимита (для Upgrade: сколько раз можно купить)
+	Charges: number, -- заряды (StunGun), патроны (Shotgun) — хранятся в слоте
+	Color: Color3,
+	-- боевые параметры
+	Stun: number,
+	Damage: number,
+	Range: number,
+	Slow: number, -- доля замедления
+	SlowTime: number,
+}
+
+local function item(def: { [string]: any }): ItemDef
 	return {
-		Level = n,
-		HailRate = math.min(10 + n * 1.6, 45),
-		HailDamage = 5 + n * 1.4,
-		HailBigChance = math.min(0.1 + n * 0.012, 0.3),
-		HailBigMult = 3,
-		HailPlayerDamage = 8 + n,
-		HailHitRadius = 2.5,
-		AcidRainDps = 0.35 + n * 0.16,
-		AcidRainPlayerDps = 6 + n * 0.6,
-		PoolMax = math.min(1.4 + n * 1.2, Config.Plot.PitDepth - 1),
-		PoolRiseTime = 32,
-		PoolDps = 0.35 + n * 0.13,
-		PoolPlayerDps = 15 + n,
-		InsidePlayerDps = 8 + n * 0.6,
-		WindDps = 0.5 + n * 0.45,
-		WindPlayerDps = 4 + n * 0.6,
-		MeteorRate = 0.2 + n * 0.06,
-		MeteorDamage = 15 + n * 9,
-		MeteorPlayerDamage = 30 + n * 3,
-		QuakeDps = 0.6 + n * 0.45,
-		BaseReward = 80 + n * 35,
+		Id = def.Id,
+		Category = def.Category,
+		Kind = def.Kind,
+		Order = def.Order or 0,
+		Price = def.Price or 0,
+		PriceStep = def.PriceStep or 0,
+		Stack = def.Stack or 1,
+		GiveCount = def.GiveCount or 1,
+		Once = def.Once == true,
+		MaxOwned = def.MaxOwned or 0,
+		Charges = def.Charges or 0,
+		Color = def.Color or Color3.fromRGB(200, 200, 200),
+		Stun = def.Stun or 0,
+		Damage = def.Damage or 0,
+		Range = def.Range or 0,
+		Slow = def.Slow or 0,
+		SlowTime = def.SlowTime or 0,
 	}
 end
 
--- Награда за шторм.
--- survived: выжил ли игрок; bunkerFrac: доля оставшегося HP бункера (0..1);
--- progress: доля пройденного шторма (0..1), используется при поражении.
-function Config.computeReward(level: number, survived: boolean, bunkerFrac: number, progress: number): number
-	local p = Config.stormParams(level)
-	if survived then
-		return math.floor(p.BaseReward * (0.6 + 0.4 * math.clamp(bunkerFrac, 0, 1)))
-	end
-	return math.floor(p.BaseReward * 0.4 * math.clamp(progress, 0, 1))
+Config.Items = {
+	Batteries = item({ Id = "Batteries", Category = "Utility", Kind = "Consumable", Order = 1, Price = 60, Stack = 3, Color = Color3.fromRGB(230, 200, 60) }),
+	Planks = item({ Id = "Planks", Category = "Defense", Kind = "Placeable", Order = 1, Price = 100, Stack = 9, GiveCount = 3, Color = Color3.fromRGB(150, 110, 70) }),
+	BearTrap = item({ Id = "BearTrap", Category = "Defense", Kind = "Placeable", Order = 2, Price = 250, PriceStep = 50, Stack = 3, Stun = 3, Damage = 35, Color = Color3.fromRGB(120, 120, 130) }),
+	GlueTrap = item({ Id = "GlueTrap", Category = "Defense", Kind = "Placeable", Order = 3, Price = 200, PriceStep = 50, Stack = 3, Slow = 0.6, SlowTime = 4, Color = Color3.fromRGB(230, 230, 120) }),
+	PepperSpray = item({ Id = "PepperSpray", Category = "Offense", Kind = "Weapon", Order = 1, Price = 300, Stack = 1, Charges = 1, Stun = 4, Range = 6, Color = Color3.fromRGB(220, 60, 50) }),
+	StunGun = item({ Id = "StunGun", Category = "Offense", Kind = "Weapon", Order = 2, Price = 600, Stack = 1, Charges = 3, Stun = 5, Range = 8, Color = Color3.fromRGB(80, 160, 230) }),
+	Shotgun = item({ Id = "Shotgun", Category = "Offense", Kind = "Weapon", Order = 3, Price = 1500, PriceStep = 100, Stack = 1, Charges = 1, Damage = 100, Stun = 1.5, Range = 60, Color = Color3.fromRGB(70, 60, 50) }),
+	Shells = item({ Id = "Shells", Category = "Offense", Kind = "Ammo", Order = 4, Price = 150, Stack = 5, GiveCount = 2, Color = Color3.fromRGB(200, 60, 40) }),
+	Defibrillator = item({ Id = "Defibrillator", Category = "Utility", Kind = "Consumable", Order = 2, Price = 500, Stack = 1, Range = 7, Color = Color3.fromRGB(240, 240, 240) }),
+	MotionLight = item({ Id = "MotionLight", Category = "Utility", Kind = "Upgrade", Order = 3, Price = 500, Once = true, MaxOwned = 1, Color = Color3.fromRGB(255, 240, 180) }),
+	Candles = item({ Id = "Candles", Category = "Utility", Kind = "Upgrade", Order = 4, Price = 200, Once = true, MaxOwned = 1, Color = Color3.fromRGB(255, 200, 120) }),
+	AppleTree = item({ Id = "AppleTree", Category = "Farm", Kind = "Upgrade", Order = 1, Price = 400, MaxOwned = 5, Color = Color3.fromRGB(110, 190, 90) }),
+	Sprinkler = item({ Id = "Sprinkler", Category = "Farm", Kind = "Upgrade", Order = 2, Price = 250, MaxOwned = 3, Color = Color3.fromRGB(90, 170, 230) }),
+	Rake = item({ Id = "Rake", Category = "Farm", Kind = "Upgrade", Order = 3, Price = 1300, Once = true, MaxOwned = 1, Color = Color3.fromRGB(170, 130, 80) }),
+} :: { [string]: ItemDef }
+
+function Config.getItem(id: string): ItemDef?
+	return Config.Items[id]
 end
 
--- Цвет кислоты (клиентские детали луж и эффекты).
-Config.AcidColor = Color3.fromRGB(105, 225, 50)
-Config.AcidTransparency = 0.3
+function Config.itemList(): { ItemDef }
+	local list: { ItemDef } = {}
+	for _, def in Config.Items do
+		table.insert(list, def)
+	end
+	table.sort(list, function(a: ItemDef, b: ItemDef)
+		if a.Category ~= b.Category then
+			return a.Category < b.Category
+		end
+		return a.Order < b.Order
+	end)
+	return list
+end
+
+----------------------------------------------------------------------
+-- Перки (мета, покупаются за Амбер в лобби)
+----------------------------------------------------------------------
+export type PerkDef = {
+	Id: string,
+	Order: number,
+	Costs: { number },
+	Values: { number },
+	Color: Color3,
+}
+
+Config.Perks = {
+	Sprinter = { Id = "Sprinter", Order = 1, Costs = { 40, 80, 140 }, Values = { 0.15, 0.3, 0.45 }, Color = Color3.fromRGB(80, 200, 120) },
+	Scavenger = { Id = "Scavenger", Order = 2, Costs = { 40, 90, 160 }, Values = { 0.1, 0.2, 0.3 }, Color = Color3.fromRGB(120, 220, 130) },
+	Trapper = { Id = "Trapper", Order = 3, Costs = { 60, 120, 200 }, Values = { 1, 2, 3 }, Color = Color3.fromRGB(150, 150, 160) },
+	Medic = { Id = "Medic", Order = 4, Costs = { 50, 100, 170 }, Values = { 3, 2.5, 2 }, Color = Color3.fromRGB(240, 240, 240) },
+	NightOwl = { Id = "NightOwl", Order = 5, Costs = { 50, 110, 190 }, Values = { 0.15, 0.25, 0.35 }, Color = Color3.fromRGB(120, 130, 220) },
+	LuckyStart = { Id = "LuckyStart", Order = 6, Costs = { 40, 100, 180 }, Values = { 150, 300, 500 }, Color = Color3.fromRGB(255, 170, 40) },
+} :: { [string]: PerkDef }
+
+function Config.perkList(): { PerkDef }
+	local list: { PerkDef } = {}
+	for _, p in Config.Perks do
+		table.insert(list, p)
+	end
+	table.sort(list, function(a: PerkDef, b: PerkDef)
+		return a.Order < b.Order
+	end)
+	return list
+end
+
+function Config.perkValue(id: string, level: number): number
+	local def = Config.Perks[id]
+	if not def or level <= 0 then
+		return 0
+	end
+	return def.Values[math.clamp(level, 1, #def.Values)]
+end
+
+----------------------------------------------------------------------
+-- Режиссёр напряжения
+----------------------------------------------------------------------
+Config.Director = {
+	Downed = 40,
+	Near = 25, -- пациент ближе NearDistance
+	NearDistance = 15,
+	Heard = 10,
+	Decay = 3, -- в секунду без контакта
+	PeakThreshold = 70,
+	SustainSeconds = 4,
+	RelaxMin = 30,
+	RelaxMax = 45,
+	RelaxHearMult = 0.5,
+	RelaxSightMult = 0.7,
+}
+
+----------------------------------------------------------------------
+-- Прогрессия
+----------------------------------------------------------------------
+Config.Progression = {
+	AmberWinBase = 50,
+	XpPerNight = 10,
+	XpWin = 100,
+	Titles = {
+		{ 0, "Newcomer" },
+		{ 5, "Resident" },
+		{ 10, "Night Owl" },
+		{ 20, "Warden" },
+		{ 35, "Hollow" },
+	} :: { { any } },
+}
+
+function Config.levelFromXp(xp: number): number
+	return math.floor(math.sqrt(math.max(0, xp) / 50))
+end
+
+function Config.xpForLevel(level: number): number
+	return level * level * 50
+end
+
+function Config.titleForLevel(level: number): string
+	local title = "Newcomer"
+	for _, entry in Config.Progression.Titles do
+		if level >= (entry[1] :: number) then
+			title = entry[2] :: string
+		end
+	end
+	return title
+end
+
+-- Бейджи и геймпассы: 0 = выключено. После публикации впиши ID из Creator Hub.
+Config.Badges = {
+	FirstNight = 0,
+	FirstWin = 0,
+	WinHard = 0,
+	WinNightmare = 0,
+	MetHollowMan = 0,
+	Survived10 = 0,
+} :: { [string]: number }
+
+Config.Passes = {
+	FlashlightColors = 0,
+	DoubleAmber = 0,
+	KeepItems = 0,
+	VIP = 0,
+} :: { [string]: number }
+
+----------------------------------------------------------------------
+-- Карта
+----------------------------------------------------------------------
+Config.Map = {
+	LobbyOrigin = Vector3.new(0, 0, 400),
+	HouseOrigin = Vector3.new(0, 0, 0),
+	FloorHeight = 11,
+	-- Если игрок ниже этой высоты — вернуть на спавн (провалился сквозь карту).
+	KillY = -60,
+}
 
 return Config

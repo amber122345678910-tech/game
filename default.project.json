@@ -1,74 +1,59 @@
 {
-  "name": "BunkerSimulator",
+  "name": "AmberAlert",
   "tree": {
     "$className": "DataModel",
     "ReplicatedStorage": {
-      "Shared": {
-        "$path": "src/shared"
-      },
+      "Shared": { "$path": "src/shared" },
       "Remotes": {
         "$className": "Folder",
-        "PlaceBlock": {
-          "$className": "RemoteEvent"
-        },
-        "RemoveBlock": {
-          "$className": "RemoteEvent"
-        },
-        "ClearPlot": {
-          "$className": "RemoteEvent"
-        },
-        "StartStorm": {
-          "$className": "RemoteEvent"
-        },
-        "TutorialDone": {
-          "$className": "RemoteEvent"
-        },
-        "DataUpdated": {
-          "$className": "RemoteEvent"
-        },
-        "Notify": {
-          "$className": "RemoteEvent"
-        },
-        "HailBatch": {
-          "$className": "UnreliableRemoteEvent"
-        },
-        "BlockBroken": {
-          "$className": "RemoteEvent"
-        },
-        "StormResult": {
-          "$className": "RemoteEvent"
-        },
-        "Purchase": {
-          "$className": "RemoteFunction"
-        },
-        "TeamInvite": {
-          "$className": "RemoteEvent"
-        },
-        "TeamRespond": {
-          "$className": "RemoteEvent"
-        },
-        "TeamLeave": {
-          "$className": "RemoteEvent"
-        },
-        "TeamInviteReceived": {
-          "$className": "RemoteEvent"
-        }
+        "Ready": { "$className": "RemoteEvent" },
+        "VoteDifficulty": { "$className": "RemoteEvent" },
+        "VoteSkipAlert": { "$className": "RemoteEvent" },
+        "Interact": { "$className": "RemoteEvent" },
+        "SellApples": { "$className": "RemoteEvent" },
+        "UseItem": { "$className": "RemoteEvent" },
+        "DropItem": { "$className": "RemoteEvent" },
+        "SetFlashlight": { "$className": "RemoteEvent" },
+        "SetCrouch": { "$className": "RemoteEvent" },
+        "SetSprint": { "$className": "RemoteEvent" },
+        "HoldBreath": { "$className": "RemoteEvent" },
+        "LookingAt": { "$className": "RemoteEvent" },
+        "SaveSettings": { "$className": "RemoteEvent" },
+        "BuyItem": { "$className": "RemoteFunction" },
+        "BuyPerk": { "$className": "RemoteFunction" },
+        "State": { "$className": "RemoteEvent" },
+        "Alert": { "$className": "RemoteEvent" },
+        "Inventory": { "$className": "RemoteEvent" },
+        "PlayerState": { "$className": "RemoteEvent" },
+        "Breath": { "$className": "RemoteEvent" },
+        "InmateEvent": { "$className": "RemoteEvent" },
+        "Noise": { "$className": "UnreliableRemoteEvent" },
+        "Notify": { "$className": "RemoteEvent" },
+        "Data": { "$className": "RemoteEvent" },
+        "Result": { "$className": "RemoteEvent" },
+        "FX": { "$className": "RemoteEvent" },
+        "LightsChanged": { "$className": "RemoteEvent" },
+        "Leaderboard": { "$className": "RemoteEvent" }
       }
     },
     "ServerScriptService": {
-      "Server": {
-        "$path": "src/server"
-      }
+      "Server": { "$path": "src/server" }
     },
     "StarterPlayer": {
       "$properties": {
-        "CameraMaxZoomDistance": 120,
-        "CharacterWalkSpeed": 18
+        "CameraMode": "LockFirstPerson",
+        "CameraMinZoomDistance": 0.5,
+        "CameraMaxZoomDistance": 0.5,
+        "CharacterWalkSpeed": 12,
+        "CharacterJumpPower": 0,
+        "CharacterJumpHeight": 0,
+        "EnableMouseLockOption": false,
+        "AutoJumpEnabled": false,
+        "HealthDisplayDistance": 0,
+        "NameDisplayDistance": 0
       },
       "StarterPlayerScripts": {
-        "Client": {
-          "$path": "src/client"
-        }
+        "Client": { "$path": "src/client" }
       }
     },
     "Workspace": {
@@ -79,88 +64,68 @@
         "PlayerCharacterDestroyBehavior": "Enabled",
         "RejectCharacterDeletions": "Enabled"
       },
-      "Map": {
-        "$path": "src/map/Map.rbxmx"
-      },
-      "Plots": {
-        "$path": "src/map/Plots.rbxmx"
-      }
+      "House": { "$path": "src/map/House.rbxmx" },
+      "Lobby": { "$path": "src/map/Lobby.rbxmx" }
     },
     "Lighting": {
       "$properties": {
-        "ClockTime": 14.5,
-        "Brightness": 2.2,
-        "Ambient": [
-          0.27,
-          0.27,
-          0.3
-        ],
-        "OutdoorAmbient": [
-          0.52,
-          0.52,
-          0.56
-        ],
-        "EnvironmentDiffuseScale": 1,
-        "EnvironmentSpecularScale": 1,
+        "ClockTime": 0,
+        "Brightness": 0.35,
+        "Ambient": [0.07, 0.08, 0.13],
+        "OutdoorAmbient": [0.055, 0.063, 0.118],
+        "ColorShift_Top": [0.0, 0.0, 0.0],
+        "EnvironmentDiffuseScale": 0.5,
+        "EnvironmentSpecularScale": 0.5,
         "GlobalShadows": true,
-        "ShadowSoftness": 0.25,
-        "Technology": "Unified",
-        "LightingStyle": "Soft",
-        "PrioritizeLightingQuality": false,
+        "ShadowSoftness": 0.3,
+        "ExposureCompensation": -0.3,
+        "Technology": "Future",
+        "LightingStyle": "Realistic",
+        "PrioritizeLightingQuality": true,
         "Outlines": false
       },
       "Atmosphere": {
         "$className": "Atmosphere",
         "$properties": {
-          "Density": 0.28,
+          "Density": 0.42,
           "Offset": 0.1,
-          "Color": [
-            0.78,
-            0.83,
-            0.9
-          ],
-          "Decay": [
-            0.42,
-            0.47,
-            0.55
-          ],
-          "Glare": 0.2,
-          "Haze": 1.2
+          "Color": [0.078, 0.086, 0.118],
+          "Decay": [0.039, 0.039, 0.063],
+          "Glare": 0,
+          "Haze": 1.4
         }
       },
       "Sky": {
         "$className": "Sky",
         "$properties": {
-          "SunAngularSize": 14,
-          "MoonAngularSize": 9
+          "SunAngularSize": 8,
+          "MoonAngularSize": 15,
+          "StarCount": 4500,
+          "CelestialBodiesShown": true
         }
       },
       "Bloom": {
         "$className": "BloomEffect",
-        "$properties": {
-          "Intensity": 0.6,
-          "Size": 24,
-          "Threshold": 1.4
-        }
+        "$properties": { "Intensity": 0.35, "Size": 32, "Threshold": 1.2 }
       },
       "BaseColorCorrection": {
         "$className": "ColorCorrectionEffect",
         "$properties": {
-          "Brightness": 0.02,
-          "Contrast": 0.08,
-          "Saturation": 0.12
+          "Brightness": -0.02,
+          "Contrast": 0.1,
+          "Saturation": -0.25,
+          "TintColor": [0.92, 0.94, 1.0]
         }
       }
     },
     "SoundService": {
-      "$properties": {
-        "RespectFilteringEnabled": true
-      }
+      "$properties": { "RespectFilteringEnabled": true, "AmbientReverb": "NoReverb" },
+      "Music": { "$className": "SoundGroup", "$properties": { "Volume": 0.8 } },
+      "SFX": { "$className": "SoundGroup", "$properties": { "Volume": 1 } },
+      "Ambience": { "$className": "SoundGroup", "$properties": { "Volume": 1 } },
+      "UI": { "$className": "SoundGroup", "$properties": { "Volume": 0.8 } }
     },
-    "MaterialService": {
-      "$properties": {
-        "Use2022Materials": true
-      }
-    }
+    "MaterialService": { "$properties": { "Use2022Materials": true } },
+    "Players": { "$properties": { "RespawnTime": 1.5 } }
   }
 }

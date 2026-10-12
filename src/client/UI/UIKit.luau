@@ -391,4 +391,295 @@ function UIKit.formatNumber(n: number): string
 	return tostring(math.floor(n))
 end
 
+----------------------------------------------------------------------
+-- Дополнения для «Amber Alert» (функции выше не менялись).
+-- Ленивый доступ к контроллерам, «тёмные» кнопки, полоски, модальные окна, пересчёт раскладки.
+----------------------------------------------------------------------
+
+-- Текст меняем только при отличии (меньше перерисовок текста на телефонах).
+function UIKit.setText(label: TextLabel, text: string)
+	if label.Text ~= text then
+		label.Text = text
+	end
+end
+
+-- Ленивый доступ к контроллерам (их пишет другой модуль): нет модуля — вернём nil и ничего не ломаем.
+local controllerCache: { [string]: any } = {}
+
+function UIKit.controller(name: string): any?
+	local cached = controllerCache[name]
+	if cached ~= nil then
+		return if cached == false then nil else cached
+	end
+	local folder = script.Parent.Parent:FindFirstChild("Controllers")
+	local module = if folder then folder:FindFirstChild(name) else nil
+	if not module or not module:IsA("ModuleScript") then
+		return nil -- не кэшируем: модуль может появиться позже
+	end
+	local ok, result = pcall(require, module)
+	if ok and type(result) == "table" then
+		controllerCache[name] = result
+		return result
+	end
+	controllerCache[name] = false
+	return nil
+end
+
+-- Звук интерфейса через Controllers.Sounds.playUI (если контроллер есть).
+function UIKit.playUI(name: string)
+	local sounds = UIKit.controller("Sounds")
+	if sounds and type(sounds.playUI) == "function" then
+		task.spawn(function()
+			pcall(sounds.playUI, name)
+		end)
+	end
+end
+
+-- Размер под тип ввода: на сенсорном экране цели нажатия крупнее (HUD на телефоне сильно уменьшен).
+function UIKit.touchPx(mouse: number, touch: number): number
+	return if UIKit.isTouch() then touch else mouse
+end
+
+-- Пиксели HUD с учётом текущего масштаба (для отступов между соседними HUD-панелями).
+function UIKit.hudPx(px: number): number
+	return math.floor(px * UIKit.currentHudScale() + 0.5)
+end
+
+-- Тонкая обводка вместо толстой чёрной рамки панели/кнопки.
+function UIKit.thinStroke(object: Instance, color: Color3?, transparency: number?, thickness: number?): UIStroke?
+	local stroke = object:FindFirstChildOfClass("UIStroke")
+	if stroke then
+		stroke.Thickness = thickness or 1
+		stroke.Color = color or Theme.GrayDark
+		stroke.Transparency = transparency or 0.3
+	end
+	return stroke
+end
+
+-- «Тёмная» кнопка: почти чёрная заливка, тонкая обводка акцентом, подпись акцентом, без обводки текста.
+function UIKit.styleDark(button: TextButton, accent: Color3?, fill: Color3?)
+	local color = accent or Theme.Amber
+	local base = fill or Theme.PanelLight
+	UIKit.setButtonColor(button, base, base:Lerp(Color3.new(0, 0, 0), 0.45))
+	UIKit.thinStroke(button, color, 0.25, 1.5)
+	local label = button:FindFirstChild("Label")
+	if label and label:IsA("TextLabel") then
+		label.TextColor3 = color
+		local textStroke = label:FindFirstChildOfClass("UIStroke")
+		if textStroke then
+			textStroke.Enabled = false
+		end
+	end
+	button:SetAttribute("Accent", color)
+end
+
+-- Включить/выключить кнопку: выключенная не реагирует и тускнеет.
+function UIKit.setButtonEnabled(button: TextButton, enabled: boolean)
+	button.Interactable = enabled
+	button:SetAttribute("Disabled", not enabled)
+	local label = button:FindFirstChild("Label")
+	if label and label:IsA("TextLabel") then
+		label.TextTransparency = if enabled then 0 else 0.55
+	end
+	local stroke = button:FindFirstChildOfClass("UIStroke")
+	if stroke then
+		stroke.Transparency = if enabled then 0.25 else 0.7
+	end
+end
+
+-- Тонкая полоска-индикатор: props идут контейнеру (Size, Position, AnchorPoint, Parent, LayoutOrder...).
+-- Возвращает (контейнер, заливку).
+function UIKit.bar(props: Props, color: Color3): (Frame, Frame)
+	local base: Props = {
+		Name = "Bar",
+		BackgroundColor3 = Color3.fromRGB(6, 6, 8),
+		BackgroundTransparency = 0.15,
+	}
+	for k, v in props do
+		base[k] = v
+	end
+	local holder = UIKit.new("Frame", base) :: Frame
+	UIKit.corner(holder, 3)
+	UIKit.new("UIStroke", { Thickness = 1, Color = Theme.GrayDark, Transparency = 0.35, Parent = holder })
+	local fill = UIKit.new("Frame", {
+		Name = "Fill",
+		Size = UDim2.fromScale(1, 1),
+		BackgroundColor3 = color,
+		Parent = holder,
+	}) :: Frame
+	UIKit.corner(fill, 3)
+	return holder, fill
+end
+
+function UIKit.setBar(fill: Frame, frac: number)
+	local size = UDim2.fromScale(math.clamp(frac, 0, 1), 1)
+	if fill.Size ~= size then
+		fill.Size = size
+	end
+	fill.Visible = frac > 0.001
+end
+
+-- Колбэк на смену размера экрана / типа ввода: пересчёт отступов между HUD-панелями и размеров под палец.
+local layoutCallbacks: { () -> () } = {}
+local layoutCameraConn: RBXScriptConnection? = nil
+local layoutBound = false
+
+local function fireLayout()
+	for _, fn in layoutCallbacks do
+		task.spawn(fn)
+	end
+end
+
+local function bindLayoutCamera()
+	if layoutCameraConn then
+		layoutCameraConn:Disconnect()
+		layoutCameraConn = nil
+	end
+	local camera = workspace.CurrentCamera
+	if camera then
+		layoutCameraConn = camera:GetPropertyChangedSignal("ViewportSize"):Connect(fireLayout)
+	end
+end
+
+function UIKit.onLayoutChanged(fn: () -> ())
+	table.insert(layoutCallbacks, fn)
+	if not layoutBound then
+		layoutBound = true
+		workspace:GetPropertyChangedSignal("CurrentCamera"):Connect(function()
+			bindLayoutCamera()
+			fireLayout()
+		end)
+		UIKit.onInputTypeChanged(fireLayout)
+		bindLayoutCamera()
+	end
+end
+
+-- Модальное окно: затемнение (тап закрывает) + центрированная панель с заголовком и крестиком.
+export type Modal = {
+	Overlay: TextButton,
+	Window: Frame,
+	Scale: UIScale,
+	Title: TextLabel,
+	Close: TextButton,
+	Body: Frame,
+	IsOpen: boolean,
+	OnClose: (() -> ())?,
+	Open: (self: Modal) -> (),
+	Hide: (self: Modal) -> (),
+}
+
+export type ModalOptions = {
+	Name: string,
+	Width: number,
+	Height: number,
+	Title: string?,
+	Parent: Instance,
+	OnClose: (() -> ())?,
+	NoClose: boolean?, -- без крестика и без закрытия по затемнению
+	Accent: Color3?,
+}
+
+function UIKit.modal(opts: ModalOptions): Modal
+	local accent = opts.Accent or Theme.Amber
+	local overlay = UIKit.new("TextButton", {
+		Name = opts.Name .. "Overlay",
+		Size = UDim2.fromScale(1, 1),
+		BackgroundColor3 = Color3.new(0, 0, 0),
+		BackgroundTransparency = 0.5,
+		Text = "",
+		AutoButtonColor = false,
+		Visible = false,
+		Parent = opts.Parent,
+	}) :: TextButton
+	local window = UIKit.panel({
+		Name = opts.Name,
+		Size = UDim2.fromOffset(opts.Width, opts.Height),
+		Position = UDim2.fromScale(0.5, 0.5),
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Visible = false,
+		Parent = opts.Parent,
+	})
+	UIKit.thinStroke(window, accent, 0.45, 1)
+	local scale = UIKit.autoScale(window, "modal", opts.Width, opts.Height)
+	local title = UIKit.label({
+		Name = "Title",
+		Text = opts.Title or "",
+		Size = UDim2.new(1, -140, 0, 40),
+		Position = UDim2.fromOffset(20, 12),
+		TextXAlignment = Enum.TextXAlignment.Left,
+		TextColor3 = accent,
+		MaxTextSize = 28,
+		NoStroke = true,
+		Parent = window,
+	})
+	UIKit.new("Frame", {
+		Name = "Rule",
+		Size = UDim2.new(1, -40, 0, 1),
+		Position = UDim2.new(0.5, 0, 0, 60),
+		AnchorPoint = Vector2.new(0.5, 0),
+		BackgroundColor3 = accent,
+		BackgroundTransparency = 0.6,
+		Parent = window,
+	})
+	local body = UIKit.new("Frame", {
+		Name = "Body",
+		Size = UDim2.new(1, -32, 1, -84),
+		Position = UDim2.fromOffset(16, 70),
+		BackgroundTransparency = 1,
+		Parent = window,
+	}) :: Frame
+	local closeSize = UIKit.touchPx(48, 64)
+	local close = UIKit.button({
+		Name = "Close",
+		Text = "✕",
+		Size = UDim2.fromOffset(closeSize, closeSize),
+		Position = UDim2.new(1, -10, 0, 8),
+		AnchorPoint = Vector2.new(1, 0),
+		TextSize = 26,
+		Parent = window,
+	})
+	UIKit.styleDark(close, Theme.Red)
+	close.Visible = opts.NoClose ~= true
+
+	local modal: Modal
+	modal = {
+		Overlay = overlay,
+		Window = window,
+		Scale = scale,
+		Title = title,
+		Close = close,
+		Body = body,
+		IsOpen = false,
+		OnClose = opts.OnClose,
+		Open = function(self: Modal)
+			self.IsOpen = true
+			self.Overlay.Visible = true
+			UIKit.popIn(self.Window, self.Scale)
+		end,
+		Hide = function(self: Modal)
+			if not self.IsOpen then
+				return
+			end
+			self.IsOpen = false
+			self.Window.Visible = false
+			self.Overlay.Visible = false
+			if self.OnClose then
+				self.OnClose()
+			end
+		end,
+	}
+	local function requestClose()
+		if opts.NoClose then
+			return
+		end
+		modal:Hide()
+	end
+	close.Activated:Connect(function()
+		UIKit.playClick()
+		requestClose()
+	end)
+	overlay.Activated:Connect(requestClose)
+	return modal
+end
+
 return UIKit
