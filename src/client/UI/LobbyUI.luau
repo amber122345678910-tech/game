@@ -70,7 +70,7 @@ local perkRows: { PerkRow } = {}
 local perkBalance: TextLabel
 local perkBusy = false
 local recordsModal: UIKit.Modal
-local recordsList: Frame
+local recordsList: ScrollingFrame
 local recordRows: { { Name: string, Nights: number } } = {}
 local howToModal: UIKit.Modal
 local howToText: TextLabel
@@ -102,8 +102,9 @@ local function openSettings()
 	local module = script.Parent:FindFirstChild("SettingsUI")
 	if module and module:IsA("ModuleScript") then
 		local ok, settings = pcall(require, module)
-		if ok and type(settings) == "table" and type(settings.open) == "function" then
-			settings.open()
+		local open: any = if ok and type(settings) == "table" then (settings :: any).open else nil
+		if type(open) == "function" then
+			(open :: any)()
 		end
 	end
 end
@@ -365,21 +366,30 @@ local function buildDifficulty()
 end
 
 local function buildReady()
+	-- кнопка уже несёт свой UIScale (пружинка), поэтому масштаб HUD вешаем на держатель
+	local holder = UIKit.new("Frame", {
+		Name = "ReadyHolder",
+		Size = UDim2.fromOffset(340, READY_TOUCH),
+		Position = UDim2.new(0.5, 0, 1, -16),
+		AnchorPoint = Vector2.new(0.5, 1),
+		BackgroundTransparency = 1,
+		Parent = gui,
+	}) :: Frame
+	UIKit.autoScale(holder, "hud")
 	readyButton = UIKit.button({
 		Name = "Ready",
 		Text = "",
 		Size = UDim2.fromOffset(320, READY_MOUSE),
-		Position = UDim2.new(0.5, 0, 1, -16),
+		Position = UDim2.new(0.5, 0, 1, 0),
 		AnchorPoint = Vector2.new(0.5, 1),
 		TextSize = 30,
-		Parent = gui,
+		Parent = holder,
 	}, function()
 		isReady = not isReady
 		Remotes.Ready:FireServer(isReady)
 		LobbyUI.refresh()
 	end)
-	UIKit.autoScale(readyButton, "hud")
-	table.insert(lobbyRoot, readyButton)
+	table.insert(lobbyRoot, holder)
 end
 
 local function buildLateJoin()

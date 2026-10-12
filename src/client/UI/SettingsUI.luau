@@ -26,7 +26,7 @@ local GEAR_MOUSE, GEAR_TOUCH = 44, 64
 
 local modal: UIKit.Modal
 local gearButton: TextButton
-local rowsHolder: Frame
+local rowsHolder: ScrollingFrame
 local refreshers: { () -> () } = {}
 local dirty = false
 
@@ -252,20 +252,29 @@ local function build()
 		DisplayOrder = 12,
 		Parent = player:WaitForChild("PlayerGui"),
 	}) :: ScreenGui
+	-- кнопка уже несёт свой UIScale (пружинка), поэтому масштаб HUD вешаем на держатель
+	local gearHolder = UIKit.new("Frame", {
+		Name = "GearHolder",
+		Size = UDim2.fromOffset(GEAR_TOUCH, GEAR_TOUCH),
+		Position = UDim2.new(1, -12, 0, 8),
+		AnchorPoint = Vector2.new(1, 0),
+		BackgroundTransparency = 1,
+		Parent = gearGui,
+	}) :: Frame
+	UIKit.autoScale(gearHolder, "hud")
 	gearButton = UIKit.button({
 		Name = "Gear",
 		Text = "⚙",
 		Size = UDim2.fromOffset(GEAR_MOUSE, GEAR_MOUSE),
-		Position = UDim2.new(1, -12, 0, 8),
+		Position = UDim2.new(1, 0, 0, 0),
 		AnchorPoint = Vector2.new(1, 0),
 		TextSize = 26,
-		Parent = gearGui,
+		Parent = gearHolder,
 	}, function()
 		SettingsUI.open()
 	end)
 	UIKit.styleDark(gearButton, Theme.TextDim)
 	gearButton.BackgroundTransparency = 0.2
-	UIKit.autoScale(gearButton, "hud")
 
 	local gui = UIKit.new("ScreenGui", {
 		Name = "SettingsUI",

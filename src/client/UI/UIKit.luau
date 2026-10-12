@@ -563,6 +563,7 @@ export type Modal = {
 	Close: TextButton,
 	Body: Frame,
 	IsOpen: boolean,
+	OpenedAt: number,
 	OnClose: (() -> ())?,
 	Open: (self: Modal) -> (),
 	Hide: (self: Modal) -> (),
@@ -650,11 +651,21 @@ function UIKit.modal(opts: ModalOptions): Modal
 		Close = close,
 		Body = body,
 		IsOpen = false,
+		OpenedAt = 0,
 		OnClose = opts.OnClose,
 		Open = function(self: Modal)
+			if self.IsOpen then
+				return
+			end
 			self.IsOpen = true
 			self.Overlay.Visible = true
-			UIKit.popIn(self.Window, self.Scale)
+			-- если прошлая анимация появления ещё идёт, не запускаем новую (иначе окно «усохнет»)
+			if os.clock() - self.OpenedAt < 0.3 then
+				self.Window.Visible = true
+			else
+				UIKit.popIn(self.Window, self.Scale)
+			end
+			self.OpenedAt = os.clock()
 		end,
 		Hide = function(self: Modal)
 			if not self.IsOpen then

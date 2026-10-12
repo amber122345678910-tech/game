@@ -644,6 +644,18 @@ local function relayout()
 	end
 	flashSlot.Size = UDim2.fromOffset(slotSize, slotSize)
 	flashSlot.Position = UDim2.fromOffset(width - slotSize, 0)
+	-- подсказки клавиш не нужны на сенсорном экране
+	local touch = UIKit.isTouch()
+	for _, slot in slots do
+		local key = slot:FindFirstChild("Key")
+		if key and key:IsA("TextLabel") then
+			key.Visible = not touch
+		end
+	end
+	local flashKey = flashSlot:FindFirstChild("Key")
+	if flashKey and flashKey:IsA("TextLabel") then
+		flashKey.Visible = not touch
+	end
 	staminaGroup.Position = UDim2.new(0.5, 0, 1, -(slotSize + 12))
 	local btn = UIKit.touchPx(BTN_MOUSE, BTN_TOUCH)
 	skipButton.Size = UDim2.fromOffset(340, btn)
@@ -884,8 +896,9 @@ function HUD.init()
 
 	-- Выносливость: сигнал контроллера (если он есть) плюс опрос раз в 0.1 с ниже.
 	local movement = UIKit.controller("Movement")
-	if movement and type(movement.StaminaChanged) == "table" and type(movement.StaminaChanged.Connect) == "function" then
-		movement.StaminaChanged:Connect(refreshStamina)
+	local staminaSignal: any = if movement then movement.StaminaChanged else nil
+	if type(staminaSignal) == "table" and type(staminaSignal.Connect) == "function" then
+		(staminaSignal :: any):Connect(refreshStamina)
 	end
 
 	local acc = 0

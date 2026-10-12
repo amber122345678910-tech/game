@@ -629,11 +629,8 @@ function ItemService.init()
 		if typeof(itemId) ~= "string" then
 			return false, "N_CantNow"
 		end
-		local ok, msg = ItemService.buy(player, itemId)
-		if ok then
-			Remotes.Notify:FireClient(player, msg, "success", { itemId })
-		end
-		return ok, msg
+		-- Клиент сам показывает уведомление по результату (без дубля)
+		return ItemService.buy(player, itemId)
 	end
 	Remotes.SellApples.OnServerEvent:Connect(sellApples)
 	Remotes.UseItem.OnServerEvent:Connect(function(player, slotIndex, aim)

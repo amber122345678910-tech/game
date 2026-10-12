@@ -19,7 +19,7 @@ local Tips = {}
 
 local SLOT_MOUSE, SLOT_TOUCH = 64, 96 -- как в HUD
 local DOCK_MARGIN = 10
-local ABOVE_HOTBAR = 140 -- над хотбаром, выносливостью и кнопкой «пропустить»
+local ABOVE_MOUSE, ABOVE_TOUCH = 140, 170 -- над хотбаром, выносливостью и кнопкой «пропустить»
 
 local holder: Frame
 local group: CanvasGroup
@@ -94,7 +94,7 @@ end
 
 local function relayout()
 	local slot = UIKit.touchPx(SLOT_MOUSE, SLOT_TOUCH)
-	holder.Position = UDim2.new(0.5, 0, 1, -UIKit.hudPx(DOCK_MARGIN + slot + ABOVE_HOTBAR))
+	holder.Position = UDim2.new(0.5, 0, 1, -UIKit.hudPx(DOCK_MARGIN + slot + UIKit.touchPx(ABOVE_MOUSE, ABOVE_TOUCH)))
 end
 
 function Tips.init()

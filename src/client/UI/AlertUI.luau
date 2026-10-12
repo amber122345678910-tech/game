@@ -61,7 +61,7 @@ local function startStatic()
 	if sounds and type(sounds.get) == "function" then
 		local ok, source = pcall(sounds.get, "TvStatic")
 		if ok and typeof(source) == "Instance" and source:IsA("Sound") then
-			local clone = source:Clone()
+			local clone = (source :: Sound):Clone()
 			clone.Name = "TvStaticLoop"
 			clone.Looped = true
 			clone.Volume = STATIC_VOLUME
@@ -348,6 +348,7 @@ local function fillCard(ids: { string })
 		table.insert(alerts, Locale.inmateAlert(id))
 		table.insert(rules, Locale.inmateRule(id))
 	end
+	cardBody.TextSize = if #ids > 1 then 15 else 18
 	cardBody.Text = table.concat(alerts, "\n\n")
 	cardRule.Text = Locale.t("AlertRule") .. ": " .. table.concat(rules, " / ")
 	relabelStatic()

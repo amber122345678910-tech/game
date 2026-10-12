@@ -490,11 +490,7 @@ function RoundService.init()
 		if typeof(perkId) ~= "string" then
 			return false, "N_CantNow"
 		end
-		local ok, msg = DataService.tryBuyPerk(player, perkId)
-		if ok then
-			Remotes.Notify:FireClient(player, msg, "success", { Locale.perk(perkId) })
-		end
-		return ok, msg
+		return DataService.tryBuyPerk(player, perkId)
 	end
 	HouseService.PerksRequested:Connect(function(player)
 		Remotes.FX:FireClient(player, "OpenPerks", nil)
