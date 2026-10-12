@@ -199,6 +199,26 @@ local EN: { [string]: string } = {
 	Inmate_HollowMan_Rule = "Boards and locks won't hold. Hide early, hold your breath.",
 	Inmate_HollowMan_Alert = "ALL UNITS. Patient 177, the Hollow Man, has left Pinehaven. Boarded windows and locked doors have not slowed the subject. It waits outside hiding places. If you hear the floor shake, hide early and stay silent. Do not engage.",
 	Inmate_Unknown_Name = "Unknown subject",
+	-- Интерфейс (добавлено клиентом)
+	ShopTitle = "Ray's garage",
+	SellApples = "Sell apples (%d) → $%d",
+	Owned = "Owned: %d",
+	Alive = "Alive: %d / %d",
+	Level = "Level %d",
+	XpProgress = "%d / %d XP",
+	HowToPlayTitle = "How to play",
+	Set_Tips = "Tutorial tips",
+	Lang_En = "English",
+	Lang_Ru = "Русский",
+	On = "On",
+	Off = "Off",
+	NoRecords = "No records yet",
+	RecordNights = "%d nights",
+	Votes = "%d votes",
+	BreathLabel = "Breath",
+	HoldBreathHintTouch = "Hold the button to hold your breath",
+	LeaveHideHint = "[E] Leave",
+	LeaveHideHintTouch = "Tap the prompt to leave",
 }
 
 local RU: { [string]: string } = {
@@ -385,6 +405,26 @@ local RU: { [string]: string } = {
 	Inmate_HollowMan_Rule = "Доски и замки не удержат. Прячься заранее, задержи дыхание.",
 	Inmate_HollowMan_Alert = "ВСЕМ ПОСТАМ. Пациент 177, Полый, покинул Пайнхейвен. Заколоченные окна и запертые двери его не задержали. Он ждёт у укрытий. Если пол дрожит — прячьтесь заранее и молчите. Не вступайте в контакт.",
 	Inmate_Unknown_Name = "Неизвестный объект",
+	-- Интерфейс (добавлено клиентом)
+	ShopTitle = "Гараж Рэя",
+	SellApples = "Продать яблоки (%d) → $%d",
+	Owned = "В наличии: %d",
+	Alive = "Живы: %d / %d",
+	Level = "Уровень %d",
+	XpProgress = "%d / %d опыта",
+	HowToPlayTitle = "Как играть",
+	Set_Tips = "Подсказки обучения",
+	Lang_En = "English",
+	Lang_Ru = "Русский",
+	On = "Вкл",
+	Off = "Выкл",
+	NoRecords = "Рекордов пока нет",
+	RecordNights = "Ночей: %d",
+	Votes = "Голосов: %d",
+	BreathLabel = "Дыхание",
+	HoldBreathHintTouch = "Удерживай кнопку, чтобы задержать дыхание",
+	LeaveHideHint = "[E] Выйти",
+	LeaveHideHintTouch = "Нажми подсказку, чтобы выйти",
 }
 
 local current: { [string]: string } = EN
