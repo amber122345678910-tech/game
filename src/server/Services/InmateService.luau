@@ -105,22 +105,27 @@ function InmateService.retreatAll()
 	end
 end
 
+-- Убрать всех пациентов (ловушки остаются до конца матча)
 function InmateService.clear()
 	running = false
 	for _, inmate in InmateService.Active do
 		inmate:despawn()
 	end
 	table.clear(InmateService.Active)
+	local folder = workspace:FindFirstChild("Inmates")
+	if folder then
+		folder:ClearAllChildren()
+	end
+end
+
+-- Убрать ловушки (новый матч)
+function InmateService.clearTraps()
 	for _, t in traps do
 		if t.Instance.Parent then
 			t.Instance:Destroy()
 		end
 	end
 	table.clear(traps)
-	local folder = workspace:FindFirstChild("Inmates")
-	if folder then
-		folder:ClearAllChildren()
-	end
 end
 
 function InmateService.activeIds(): { string }

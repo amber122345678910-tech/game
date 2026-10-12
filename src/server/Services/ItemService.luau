@@ -608,6 +608,7 @@ function ItemService.resetMatch(difficulty: Config.DifficultyDef)
 	for _, p in Players:GetPlayers() do
 		inventories[p] = {}
 	end
+	InmateService.clearTraps()
 	folderTraps():ClearAllChildren()
 	folderWorld():ClearAllChildren()
 	-- стартовые перки

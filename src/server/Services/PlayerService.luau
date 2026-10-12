@@ -54,6 +54,8 @@ PlayerService.Hid = Signal.new() :: Signal.Signal<Player, string, boolean> -- pl
 PlayerService.Unhid = Signal.new() :: Signal.Signal<Player, string, boolean> -- forced
 
 local records: { [Player]: Record } = {}
+-- Точки укрытий/спавнов лежат на полу; центр персонажа (HumanoidRootPart) — на ~3 стада выше.
+local CHAR_LIFT = Vector3.new(0, 3, 0)
 -- Заполняется InmateService: расстояние до ближайшего смертельного пациента для дыхания
 PlayerService.nearestLethalDistance = function(_position: Vector3): number
 	return math.huge
@@ -508,7 +510,7 @@ function PlayerService.hide(player: Player, hideId: string): boolean
 	r.Breath = Config.Hiding.BreathMax
 	r.HoldingBreath = false
 	r.HoldCooldownUntil = 0
-	teleport(r, hidePoint.CFrame)
+	teleport(r, hidePoint.CFrame + CHAR_LIFT)
 	spot:SetAttribute("Occupied", player.Name)
 	PlayerService.setStatus(player, "Hiding", hideId)
 	Remotes.Breath:FireClient(player, r.Breath)
@@ -535,7 +537,7 @@ function PlayerService.unhide(player: Player, forced: boolean, silent: boolean?)
 				flat = Vector3.new(0, 0, -1)
 			end
 			flat = flat.Unit
-			local exit = CFrame.lookAt(hidePoint.Position + flat * 3, hidePoint.Position + flat * 6)
+			local exit = CFrame.lookAt(hidePoint.Position + flat * 3 + CHAR_LIFT, hidePoint.Position + flat * 6 + CHAR_LIFT)
 			teleport(r, exit)
 		end
 		if not silent then
