@@ -543,12 +543,23 @@ local function floodStep(session: Session, dt: number)
 	-- подсказки "в момент события": объясняем механику, когда игрок её впервые видит
 	if #leakRecs > 0 and not session.LeakWarned then
 		session.LeakWarned = true
-		local door = leakRecs[1].def
-		notifyAll(
-			session,
-			string.format("☣ Кислота просачивается через дверь! «%s» держит только %g ст. Купи дверь прочнее.", door.Name, door.Seal),
-			"warning"
-		)
+		local rec = leakRecs[1]
+		local door = rec.def
+		-- сколько дверь держит СЕЙЧАС (повреждённая — меньше), в тех же единицах, что и HUD
+		local holds = Grid.layerBottom(rec.y) + StormSim.doorSeal(rec)
+		local text = if rec.hp < rec.maxHp
+			then string.format(
+				"☣ Кислота просачивается через дверь! «%s» повреждена и держит сейчас только %.1f ст. (целая — %g). Береги дверь или поставь прочнее.",
+				door.Name,
+				holds,
+				Grid.layerBottom(rec.y) + door.Seal
+			)
+			else string.format(
+				"☣ Кислота просачивается через дверь! «%s» держит только %.1f ст. Купи дверь прочнее.",
+				door.Name,
+				holds
+			)
+		notifyAll(session, text, "warning")
 	end
 	if result.breach and not session.FloodWarned then
 		session.FloodWarned = true
@@ -773,7 +784,11 @@ local function endParticipant(session: Session, part: Participant, reason: strin
 			hum.Health = hum.MaxHealth
 		end
 	end
+	-- где игрок был в конце: в бункере или снаружи (для честного совета на экране итогов)
+	local cell, lp = PlotService.playerCell(session.Plot, player)
+	local inside: boolean? = if lp then (cell ~= nil and session.Interior[cell] == true) else nil
 	local result: Remotes.StormResult = {
+		Inside = inside,
 		Survived = survived,
 		Reward = reward,
 		Level = session.Level,

@@ -69,6 +69,11 @@ local function onInvite(host: Player, targetUserId: any)
 	if not target or target == host then
 		return
 	end
+	local targetPlot = PlotService.getActivePlot(target)
+	if StormService.isActive(target) or (targetPlot and targetPlot.Session ~= nil) then
+		notify(host, target.DisplayName .. " сейчас в шторме — позови после него", "error")
+		return
+	end
 	local plot = PlotService.getPlot(host)
 	if not plot then
 		notify(host, "У тебя нет участка", "error")
@@ -127,7 +132,8 @@ local function onRespond(guest: Player, hostUserId: any, accept: any)
 	end
 	local own = PlotService.getPlot(guest)
 	if StormService.isActive(guest) or (own and own.Session ~= nil) then
-		notify(guest, "Дождись конца шторма на своём участке", "error")
+		notify(guest, "Дождись конца шторма и попроси позвать ещё раз", "error")
+		notify(host, guest.DisplayName .. " сейчас в шторме — позови после него", "info")
 		return
 	end
 	local currentHost = PlotService.getHostPlot(guest)

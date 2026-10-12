@@ -88,13 +88,31 @@ local function takeSendToken(): boolean
 	return true
 end
 
+-- Сколько блоков этого типа уже ждут отправки (их нет смысла считать доступными).
+local function queuedPlacements(id: string): number
+	local n = 0
+	for _, q in actionQueue do
+		if not q.remove and q.id == id then
+			n += 1
+		end
+	end
+	return n
+end
+
 local function flushActions()
-	while actionQueue[1] and takeSendToken() do
-		local q = table.remove(actionQueue, 1) :: QueuedAction
-		if q.remove then
-			Remotes.RemoveBlock:FireServer(q.x, q.y, q.z)
+	while actionQueue[1] do
+		local q = actionQueue[1]
+		if not q.remove and ClientState.blockCount(q.id) < 1 then
+			table.remove(actionQueue, 1) -- блоков не осталось: сервер всё равно откажет
+		elseif takeSendToken() then
+			table.remove(actionQueue, 1)
+			if q.remove then
+				Remotes.RemoveBlock:FireServer(q.x, q.y, q.z)
+			else
+				Remotes.PlaceBlock:FireServer(q.id, q.x, q.y, q.z, q.rot)
+			end
 		else
-			Remotes.PlaceBlock:FireServer(q.id, q.x, q.y, q.z, q.rot)
+			break
 		end
 	end
 end
@@ -280,7 +298,7 @@ local function computeTarget(ray: Ray): Target?
 		t.valid = false
 		t.reason = "Нужна опора"
 	end
-	if t.valid and ClientState.blockCount(id) < 1 then
+	if t.valid and ClientState.blockCount(id) - queuedPlacements(id) < 1 then
 		t.valid = false
 		t.reason = "Нет блоков — купи в магазине"
 	end
@@ -625,6 +643,7 @@ local function buildUI()
 		Parent = confirmClear,
 	}, function()
 		confirmClear.Visible = false
+		table.clear(actionQueue) -- неотправленные блоки не должны отстроить бункер после разборки
 		Remotes.ClearPlot:FireServer()
 	end)
 	UIKit.button({
@@ -861,11 +880,18 @@ local function bindInput()
 end
 
 local function renderStep()
+	-- протянутые клетки досылаем и после выхода из режима строительства (иначе они молча
+	-- терялись бы); во время шторма сервер их отклонит — тогда очередь сбрасываем
+	if actionQueue[1] then
+		if ClientState.inStorm() or ClientState.plotStormRunning() then
+			table.clear(actionQueue)
+		else
+			flushActions()
+		end
+	end
 	if not active then
-		table.clear(actionQueue)
 		return
 	end
-	flushActions()
 	if ClientState.isTouch() then
 		-- на телефоне призрак показывает выбранную тапом клетку
 		if touchTarget and not deleteMode and selected then
@@ -983,6 +1009,8 @@ function BuildController.init()
 	-- свой участок или участок друга (гость строит в его бункере)
 	for _, attr in { "PlotId", "ActivePlotId" } do
 		player:GetAttributeChangedSignal(attr):Connect(function()
+			-- координаты в очереди относятся к прежнему участку
+			table.clear(actionQueue)
 			-- участок сменился посреди стройки (ушёл к себе / принял приглашение) — выходим,
 			-- иначе призрак и клики считались бы по старому участку
 			if active then

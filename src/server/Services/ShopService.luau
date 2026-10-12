@@ -45,8 +45,11 @@ local function buyPrefab(player: Player, id: any): (boolean, string)
 	end
 	local data = DataService.get(player)
 	local plot = PlotService.getPlot(player)
-	if not data or not plot then
+	if not data then
 		return false, "Данные ещё загружаются"
+	end
+	if not plot then
+		return false, "Пока нет свободного участка — он появится, когда кто-нибудь выйдет"
 	end
 	if plot.Session ~= nil then
 		return false, "Во время шторма покупать бункеры нельзя"

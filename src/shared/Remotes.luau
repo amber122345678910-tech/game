@@ -42,6 +42,7 @@ export type StormResult = {
 	BunkerPercent: number, -- 0..100
 	Duration: number, -- секунд продержался
 	Reason: string, -- "survived" | "died" | "left" | "quit" | "hostleft" | "error"
+	Inside: boolean?, -- был ли игрок в бункере в конце (nil — неизвестно)
 }
 
 local folder = ReplicatedStorage:WaitForChild("Remotes")

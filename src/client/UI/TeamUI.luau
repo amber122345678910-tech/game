@@ -4,6 +4,7 @@
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Remotes = require(Shared:WaitForChild("Remotes"))
@@ -57,17 +58,22 @@ local function refreshList()
 				Parent = row,
 			})
 			local userId = other.UserId
-			UIKit.button({
-				Text = "Позвать",
-				Color = Theme.Green,
-				Size = UDim2.new(0.38, 0, 1, -12),
-				Position = UDim2.new(1, -8, 0.5, 0),
-				AnchorPoint = Vector2.new(1, 0.5),
-				TextSize = 22,
-				Parent = row,
-			}, function()
-				Remotes.TeamInvite:FireServer(userId)
-			end)
+			-- гость звать не может (сервер откажет) — кнопку не показываем
+			if not ClientState.isGuest() then
+				UIKit.button({
+					Text = "Позвать",
+					Color = Theme.Green,
+					Size = UDim2.new(0.38, 0, 1, -12),
+					Position = UDim2.new(1, -8, 0.5, 0),
+					AnchorPoint = Vector2.new(1, 0.5),
+					TextSize = 22,
+					Parent = row,
+				}, function()
+					Remotes.TeamInvite:FireServer(userId)
+					-- закрываем окно, чтобы был виден ответ сервера (на телефоне окно закрывает всё)
+					window.Visible = false
+				end)
+			end
 		end
 	end
 	emptyLabel.Visible = count == 0
@@ -167,7 +173,9 @@ function TeamUI.init()
 	}) :: ScrollingFrame
 	UIKit.list(listFrame, Enum.FillDirection.Vertical, 8, Enum.HorizontalAlignment.Center)
 	emptyLabel = UIKit.label({
-		Text = "На сервере больше никого нет.\nВ Studio: вкладка Test → Clients and Servers → 2 игрока.",
+		Text = if RunService:IsStudio()
+			then "На сервере больше никого нет.\nВ Studio: вкладка Test → Clients and Servers → 2 игрока."
+			else "На сервере больше никого нет.\nПозови друга в игру!",
 		Size = UDim2.new(1, -32, 0, 80),
 		Position = UDim2.new(0, 16, 0, 140),
 		TextColor3 = Theme.TextDim,

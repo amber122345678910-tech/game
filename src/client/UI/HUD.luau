@@ -359,13 +359,24 @@ local function buildStormPanel()
 end
 
 local function buildToasts()
+	-- уведомления — в отдельном слое поверх окон (магазин, друзья, итоги), но под обучением:
+	-- иначе результат покупки или приглашения не видно за открытым окном
+	local toastGui = UIKit.new("ScreenGui", {
+		Name = "BunkerToasts",
+		ResetOnSpawn = false,
+		ScreenInsets = Enum.ScreenInsets.CoreUISafeInsets,
+		SafeAreaCompatibility = Enum.SafeAreaCompatibility.None,
+		ZIndexBehavior = Enum.ZIndexBehavior.Sibling,
+		DisplayOrder = 10,
+		Parent = player:WaitForChild("PlayerGui"),
+	}) :: ScreenGui
 	toastHolder = UIKit.new("Frame", {
 		Name = "Toasts",
 		AnchorPoint = Vector2.new(0.5, 0),
 		Position = UDim2.new(0.5, 0, 0, 8),
 		Size = UDim2.fromOffset(560, 260),
 		BackgroundTransparency = 1,
-		Parent = gui,
+		Parent = toastGui,
 	}) :: Frame
 	UIKit.autoScale(toastHolder, "hud")
 	UIKit.list(toastHolder, Enum.FillDirection.Vertical, 6, Enum.HorizontalAlignment.Center, Enum.VerticalAlignment.Top)

@@ -46,6 +46,9 @@ local function tipFor(result: Remotes.StormResult): string
 		end
 		return "Следующий шторм будет сильнее — укрепи бункер!"
 	end
+	if result.Reason == "died" and result.Inside == false then
+		return "Совет: ты погиб снаружи. Заходи в бункер, пока идёт подготовка (5 сек) — потом дверь запирается."
+	end
 	local params = Config.stormParams(result.Level)
 	return string.format(
 		"Совет: на этом уровне кислоты до %.1f ст. Нужна дверь, которая держит больше, и закрытая крыша.",

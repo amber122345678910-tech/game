@@ -16,8 +16,21 @@ local BuildService = {}
 
 type Bucket = { tokens: number, last: number }
 local buckets: { [Player]: Bucket } = {}
--- кто поставил блок: гость получает обратно свои блоки, а блоки хозяина возвращаются хозяину
-local placedBy: { [PlotService.BlockRecord]: Player } = setmetatable({}, { __mode = "k" }) :: any
+-- Кто поставил блок: гость получает обратно свои блоки, а блоки хозяина возвращаются хозяину.
+-- Ключ — клетка и тип блока, а не запись: после шторма restoreLayout создаёт новые записи.
+type PlacedEntry = { userId: number, id: string }
+type PlotPlaced = { owner: Player?, cells: { [number]: PlacedEntry } }
+local placedBy: { [PlotService.Plot]: PlotPlaced } = {}
+
+local function placedCells(plot: PlotService.Plot): { [number]: PlacedEntry }
+	local t = placedBy[plot]
+	-- у участка новый хозяин (или тот же после перезахода) — старые отметки недействительны
+	if not t or t.owner ~= plot.Owner then
+		t = { owner = plot.Owner, cells = {} }
+		placedBy[plot] = t
+	end
+	return t.cells
+end
 local refundNoted: { [Player]: number } = {}
 
 -- Ограничение частоты действий (token bucket): защита от спама запросами.
@@ -142,7 +155,7 @@ local function onPlace(player: Player, blockId: any, x: any, y: any, z: any, rot
 		DataService.addBlocks(player, def.Id, 1) -- вернуть блок
 		return
 	end
-	placedBy[rec] = player
+	placedCells(plot)[Grid.index(rec.x, rec.y, rec.z)] = { userId = player.UserId, id = rec.id }
 	-- сохраняется раскладка хозяина участка (гость строит в чужом бункере)
 	markLayoutDirty(plot.Owner or player)
 end
@@ -181,16 +194,20 @@ local function onRemove(player: Player, x: any, y: any, z: any)
 		-- выкопанная земля в инвентарь не попадает
 		-- блок из чужого бункера возвращается хозяину участка (гость не может «растащить» бункер),
 		-- а свой блок гость получает обратно
+		local cells = placedCells(plot)
+		local key = Grid.index(rec.x, rec.y, rec.z)
+		local entry = cells[key]
+		cells[key] = nil
+		local ownBlock = entry ~= nil and entry.id == rec.id and entry.userId == player.UserId
 		if not rec.def.Indestructible then
 			local owner = plot.Owner
-			local refundTo = if owner and owner ~= player and placedBy[rec] ~= player then owner else player
+			local refundTo = if owner and owner ~= player and not ownBlock then owner else player
 			DataService.addBlocks(refundTo, rec.id, 1)
 			if refundTo ~= player and os.clock() - (refundNoted[player] or 0) > 15 then
 				refundNoted[player] = os.clock()
 				notify(player, "Блоки хозяина бункера возвращаются к нему в инвентарь", "info")
 			end
 		end
-		placedBy[rec] = nil
 		markLayoutDirty(plot.Owner or player)
 	end
 end
@@ -208,6 +225,7 @@ local function onClear(player: Player)
 		return
 	end
 	local counts = PlotService.clear(plot)
+	placedBy[plot] = nil
 	local total = 0
 	for id, n in counts do
 		DataService.addBlocks(player, id, n)
@@ -227,6 +245,7 @@ function BuildService.replaceWithLayout(player: Player, entries: { Grid.Entry })
 		return 0
 	end
 	local counts = PlotService.clear(plot)
+	placedBy[plot] = nil
 	for id, n in counts do
 		DataService.addBlocks(player, id, n)
 	end
