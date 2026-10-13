@@ -3,6 +3,7 @@
 //   node tools/eval.js                     — проверить текущий мозг (src/ + data/model.json)
 //   node tools/eval.js --src DIR --model F — проверить другую версию (например, старую)
 //   node tools/eval.js --show 40           — показать больше ошибок
+//   node tools/eval.js --eval data/test2.json --free data/test2_free.json — второй, совсем новый проверочный набор
 'use strict';
 const fs = require('fs'), path = require('path');
 const { load, offlineBrain, readModel } = require('./load');
@@ -16,16 +17,16 @@ const SHOW = +arg('show', 15);
 const JSON_OUT = arg('json', null);
 
 // ответы-тупики: Амиго честно не понял или ответил «научи меня»
-const DEAD = /(не знаю, что на это ответить|такого я ещё не встречал|не понял ни буквы|какой-то шифр|прошёлся кот|но я не уверен|нажми «Научить»|Научишь меня|не знаю такого слова|новое для меня слово|Этого я пока не знаю|ответа я пока не знаю|я пока не силён)/i;
+const DEAD = /(не знаю, что на это ответить|такого я ещё не встречал|не понял ни буквы|какой-то шифр|прошёлся кот|но я не уверен|нажми «Научить»|Научишь меня|не знаю такого слова|новое для меня слово|Этого я пока не знаю|ответа я пока не знаю|я пока не силён|пока не слышал|я пока не умею|Этого я пока не умею)/i;
 
 (async () => {
   const model = readModel(modelFile);
   const X = load(model, { src });
   const tags = new Set(model.tags);
-  const E = JSON.parse(fs.readFileSync(path.join(ROOT, 'data', 'eval.json'), 'utf8'));
-  const FREE = JSON.parse(fs.readFileSync(path.join(ROOT, 'data', 'eval_free.json'), 'utf8'));
+  const E = JSON.parse(fs.readFileSync(arg('eval', path.join(ROOT, 'data', 'eval.json')), 'utf8'));
+  const FREE = JSON.parse(fs.readFileSync(arg('free', path.join(ROOT, 'data', 'eval_free.json')), 'utf8'));
   // фразы, которые дословно есть в обучении, считаем отдельно
-  const seen = new Set(); for (const it of X.INTENTS) for (const p of it.p) if (p.indexOf('{') < 0) seen.add(X.Text.clean(p));
+  const seen = new Set(X.Data.build(X.INTENTS, [], { expand: 5, augment: 0 }).examples.map(e => e.text));
 
   // 1) сама нейросеть: угадывает ли тему
   const net = X.MLP.fromJSON(model.net);
@@ -45,7 +46,11 @@ const DEAD = /(не знаю, что на это ответить|такого �
   const brain = offlineBrain(X, model);
   const ALIAS = { set_name: ['set_name', 'remember'], remember: ['remember'], knowledge: ['knowledge', 'word', 'bot_know'], calc: ['calc'], statement: ['statement', 'user_doing', 'word'],
     user_doing: ['user_doing', 'statement'], bot_know: ['bot_know', 'knowledge', 'word'], make_game: ['make_game'], user_likes: ['user_likes'], pets: ['pets', 'user_has'] };
-  const fresh = () => { brain.ctx = null; brain.topic = null; brain.lastSpec = null; brain.lastAct = null; brain.settings.codexOn = false; brain.settings.voice = false; };
+  const fresh = () => {
+    brain.ctx = null; brain.topic = null; brain.lastSpec = null; brain.lastAct = null; brain.settings.codexOn = false; brain.settings.voice = false;
+    brain.profile = { name: '', facts: [], city: null, age: 0 }; if (brain.ensureProfile) brain.ensureProfile();
+    brain.prevUserText = ''; brain.lastBotText = ''; brain.lastIntent = null; brain.history = []; brain.mainCls = null;
+  };
   let routeOk = 0, dead = 0, n = 0;
   const routeFail = [], deadList = [];
   for (const e of E) {

@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 // Собирает новые обучающие данные (сгенерированные JSON-файлы) в модули src/03c_more.js, src/03e_lexicon.js, src/03f_content_more.js.
 //   node tools/merge_data.js <папка с json> [<файл с правками проверяющих>]
+//   node tools/merge_data.js data/gen data/gen/fixes.json   — так собираются нынешние данные Амиго
 // Файлы в папке: para_*.json, new_*.json, lex_*.json, bot_can.json, jokes.json, facts.json, riddles.json, quiz.json, kb.json, misc.json, starters.json.
 // Правки (fixes.json): { "lex_1.json": [{word, desc|null, emoji|null}], "facts.json": {remove:[{index}], fix:[{index, replacement}]}, ... }
 'use strict';
@@ -9,10 +10,18 @@ const { load } = require('./load');
 
 const ROOT = path.join(__dirname, '..'), SRC = path.join(ROOT, 'src');
 const dir = process.argv[2];
-const fixes = process.argv[3] && fs.existsSync(process.argv[3]) ? JSON.parse(fs.readFileSync(process.argv[3], 'utf8')) : {};
 if (!dir) { console.error('укажите папку с данными'); process.exit(1); }
+// файл с правками проверяющих обязателен, если указан: без него вернулись бы убранные ими ошибки
+if (process.argv[3] && !fs.existsSync(process.argv[3])) { console.error('нет файла с правками: ' + process.argv[3]); process.exit(1); }
+const fixes = process.argv[3] ? JSON.parse(fs.readFileSync(process.argv[3], 'utf8')) : {};
 const rd = f => { const p = path.join(dir, f); return fs.existsSync(p) ? JSON.parse(fs.readFileSync(p, 'utf8')) : null; };
 const files = re => fs.readdirSync(dir).filter(f => re.test(f)).sort();
+// неполная папка не должна молча стереть словарь или ответы: нужны все группы файлов
+const NEED = { 'para_*.json': /^para_\d+\.json$/, 'new_*.json': /^new_\d+\.json$/, 'lex_*.json': /^lex_\d+\.json$/, 'qa_*.json': /^qa_\w+\.json$/,
+  'bot_can.json': /^bot_can\.json$/, 'jokes.json': /^jokes\.json$/, 'facts.json': /^facts\.json$/, 'riddles.json': /^riddles\.json$/, 'quiz.json': /^quiz\.json$/,
+  'kb.json': /^kb\.json$/, 'misc.json': /^misc\.json$/, 'starters.json': /^starters\.json$/ };
+const missing = Object.entries(NEED).filter(([, re]) => !files(re).length).map(([k]) => k);
+if (missing.length) { console.error('В папке не хватает файлов: ' + missing.join(', ')); process.exit(1); }
 
 // модули 03c/03e/03f сами себя не должны учитывать: грузим мозг без них
 const GEN = ['03c_more.js', '03e_lexicon.js', '03f_content_more.js', '03g_qa.js'];
@@ -114,12 +123,12 @@ ${NEW.map(it => '  ' + js(it) + ',').join('\n')}
 fs.writeFileSync(path.join(SRC, '03c_more.js'), out);
 
 // ---------- 2. словарь ----------
-const LEX = {}; let nLex = 0, nFix = 0, nDel = 0;
+const LEX = {}, LEX_SEEN = {}; let nLex = 0, nFix = 0, nDel = 0;
 for (const f of files(/^lex_\d+\.json$/)) {
   const data = rd(f), fx = new Map((fixes[f] || []).map(x => [String(x.word).toLowerCase(), x]));
   for (const [cat, list] of Object.entries(data)) {
-    const seen = new Set();
-    LEX[cat] = [];
+    const seen = LEX_SEEN[cat] = LEX_SEEN[cat] || new Set();
+    LEX[cat] = LEX[cat] || [];
     for (const e of list) {
       if (!Array.isArray(e) || e.length < 3) continue;
       let [w, em, d, al] = e; w = String(w).toLowerCase().trim();
@@ -168,7 +177,7 @@ const kbOld = new Set(X.KB.flatMap(e => e.a.map(a => Text.clean(a))));
 const kb = applyFix('kb.json', rd('kb.json') || []).filter(e => e && Array.isArray(e.a) && e.a.length && e.s && !e.a.some(a => kbOld.has(Text.clean(a)))).map(e => ({ a: e.a.map(a => String(a).toLowerCase()), s: e.s }));
 const misc = rd('misc.json') || {};
 const M = k => uniq(applyFix('misc.json', misc[k] || [], k).filter(isStr));
-const recs = misc.recs || {};
+const recs = Object.fromEntries(Object.entries(misc.recs || {}).map(([k, v]) => [k, applyFix('misc.json', v, 'recs\\.' + k)]));
 const st = rd('starters.json') || {};
 const starters = applyFix('starters.json', st.starters || [], 'starters').filter(s => s && s.q && s.key && Array.isArray(s.acks) && s.acks.length);
 const askBack = st.ask_back || {};

@@ -8,7 +8,8 @@ const QA = (() => {
     'там тут из за от до по с со к ко для при через они он она оно мы вы их его ее её всё все весь вся так тоже еще ещё очень правда разве ' +
     'случилось происходит получается делает делают такими таким').split(/\s+/));
   let idx = null;
-  const content = text => [...new Set(Text.words(text).filter(w => !QSTOP.has(w) && !/^\d+$/.test(w)).map(Text.stem))];
+  const SYN = { звер: 'животн', зверюшк: 'животн', зверек: 'животн', км: 'километр', килом: 'километр', ребят: 'дет', ребенк: 'дет', малыш: 'дет', тачк: 'машин', комп: 'компьютер' };
+  const content = text => [...new Set(Text.words(text).filter(w => !QSTOP.has(w) && !/^\d+$/.test(w)).map(w => { const s = Text.stem(w); return SYN[s] || s; }))];
   function build() {
     idx = [];
     if (typeof QA_DATA === 'undefined') return;
@@ -17,7 +18,11 @@ const QA = (() => {
   function find(text) {
     if (!idx) build();
     if (!idx.length) return null;
-    const t = typeof Spell !== 'undefined' ? Spell.fix(text) : text;
+    // сначала ищем по словам как есть, и только если не нашли — с исправленными опечатками
+    const fixed = typeof Spell !== 'undefined' ? Spell.fix(text) : '';
+    return find1(text) || (fixed && fixed !== Text.clean(text) ? find1(fixed) : null);
+  }
+  function find1(t) {
     const f = Text.features(t, 4096), c = content(t);
     if (!c.length) return null;
     let best = null;
@@ -25,7 +30,7 @@ const QA = (() => {
       let inter = 0; for (const s of c) if (e.c.has(s)) inter++;
       if (!inter) continue;
       // почти все главные слова вопроса должны быть в найденной формулировке, и наоборот
-      if (inter / c.length < 0.75 || inter / e.c.size < 0.6 || (inter < 2 && (c.length > 1 || e.c.size > 1))) continue;
+      if (inter / c.length < 0.75 || inter / e.c.size < (inter >= 2 ? 0.5 : 0.6) || (inter < 2 && (c.length > 1 || e.c.size > 1))) continue;
       const cos = Text.cosine(f, e.f);
       if (cos < 0.35) continue;
       const score = cos + inter / Math.max(c.length, e.c.size);

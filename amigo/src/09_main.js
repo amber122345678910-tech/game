@@ -3,7 +3,7 @@
 (function main() {
   const saved = U.store.get(STORE_KEY, {}) || {};
   const brain = new Brain(AMIGO_MODEL, {
-    profile: saved.profile, settings: saved.settings, customs: saved.customs,
+    profile: saved.profile, settings: saved.settings, customs: saved.customs, codexMem: saved.codexMem,
     onSave: data => U.store.set(STORE_KEY, data),
   });
   const app = new App(brain);

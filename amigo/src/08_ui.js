@@ -46,6 +46,7 @@ class App {
     if (window.AmigoAndroid) {
       window.amigoOnSpeaking = on => { clearTimeout(this.talkT); this.avatar.classList.toggle('talk', !!on); };
       window.amigoOnBack = () => {
+        if (this.activeGame && this.activeGame.running) { this.activeGame.pause(); return true; }
         if (!$('settings').hidden) { this.openSettings(false); return true; }
         if (!$('brain').hidden && window.innerWidth < 1000) { this.toggleBrain(false); return true; }
         return false;
@@ -332,7 +333,13 @@ class App {
     const btn = this.el('btnMic');
     if (this.native('canListen')) {
       btn.hidden = false;
-      window.amigoOnSpeech = t => { btn.classList.remove('listening'); this.listening = false; if (t && String(t).trim()) this.send(String(t)); else this.toast('Я ничего не услышал. Попробуй ещё раз!'); };
+      window.amigoOnSpeech = t => {
+        btn.classList.remove('listening'); this.listening = false;
+        if (!t || !String(t).trim()) return this.toast('Я ничего не услышал. Попробуй ещё раз!');
+        // Амиго ещё думает над прошлым сообщением — оставим услышанное в поле ввода
+        if (this.busy) { this.input.value = String(t); this.autosize(); return this.toast('Я ещё думаю — отправь, когда отвечу 🙂'); }
+        this.send(String(t));
+      };
       btn.addEventListener('click', () => { if (this.listening) return; this.listening = true; btn.classList.add('listening'); this.native('listen'); });
       return;
     }
@@ -358,13 +365,23 @@ class App {
     });
   }
 
+  // уведомление, если Амиго свёрнут; на Android обычный Notification не работает — нужен service worker
+  notify(body) {
+    try {
+      if (!document.hidden || !('Notification' in window) || Notification.permission !== 'granted') return;
+      if ('serviceWorker' in navigator && navigator.serviceWorker.controller) navigator.serviceWorker.ready.then(r => r.showNotification('Амиго', { body, icon: 'icons/icon-192.png' })).catch(() => {});
+      else new Notification('Амиго', { body });
+    } catch (e) { /* нет уведомлений */ }
+  }
+
   // ---------- установка на телефон ----------
   initInstall() {
     const btn = this.el('btnInstall'), hint = this.el('installHint'), ver = this.el('appVersion');
     if (!btn) return;
     const standalone = (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) || window.navigator.standalone === true;
     const v = this.native('version');
-    if (ver) ver.textContent = `Версия ${v || AMIGO_VERSION} · ${U.num(this.brain.tags.length)} тем · ${U.num(Lex.size)} слов в словаре`;
+    const nt = this.brain.tags.length, nl = Lex.size;
+    if (ver) ver.textContent = `Версия ${v || AMIGO_VERSION} · ${U.num(nt)} ${U.plural(nt, 'тема', 'темы', 'тем')} · ${U.num(nl)} ${U.plural(nl, 'слово', 'слова', 'слов')} в словаре`;
     if (window.AmigoAndroid || standalone) { hint.textContent = 'Амиго уже установлен как приложение 🎉 Он работает и без интернета.'; return; }
     const ios = /iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
     if (ios) hint.textContent = 'На iPhone: открой Амиго в Safari, нажми «Поделиться» (квадрат со стрелкой) → «На экран „Домой“». Появится значок, как у приложения.';
@@ -400,7 +417,7 @@ class App {
   startTimer(sec, label) {
     const t = { id: Date.now() + Math.random(), end: Date.now() + sec * 1000, label };
     this.timers.push(t);
-    try { if ('Notification' in window && Notification.permission === 'default') Notification.requestPermission().catch(() => {}); } catch (e) { /* нет уведомлений */ }
+    try { if (!window.AmigoAndroid && 'Notification' in window && Notification.permission === 'default') Notification.requestPermission().catch(() => {}); } catch (e) { /* нет уведомлений */ }
     if (!this.timerTick) this.timerTick = setInterval(() => this.renderTimers(), 500);
     this.renderTimers();
   }
@@ -413,7 +430,7 @@ class App {
       this.addMsg('bot', text, { src: 'skill' });
       this.brain.history.push({ role: 'assistant', content: text });
       this.beep(); this.mood('wow', 3000); this.speak(text);
-      try { if ('Notification' in window && Notification.permission === 'granted' && document.hidden) new Notification('Амиго', { body: text.replace(/\*\*/g, '') }); } catch (e) { /* нет уведомлений */ }
+      this.notify(text.replace(/\*\*/g, ''));
     }
     box.innerHTML = '';
     for (const t of this.timers) {

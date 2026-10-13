@@ -18,9 +18,12 @@ const OPT = {
   D: +arg('D', 8192), H: +arg('H', 96), epochs: +arg('epochs', 16),
   expand: +arg('expand', 5), augment: +arg('augment', 2), holdout: +arg('holdout', 0),
   lr: +arg('lr', 0.01), batch: +arg('batch', 16), seed: +arg('seed', 7), dropout: +arg('dropout', 0.2), smooth: +arg('smooth', 0.1),
-  train: !args.includes('--no-train'), out: arg('out', path.join(ROOT, 'index.html')),
-  model: arg('model', path.join(ROOT, 'data', 'model.json')),
+  train: !args.includes('--no-train'), out: arg('out', null), model: arg('model', null),
 };
+// эксперименты с отложенными фразами не должны подменять настоящего Амиго
+if (OPT.holdout > 0 && (!OPT.out || !OPT.model)) { console.error('С --holdout укажите и --out, и --model (например, во временную папку), чтобы не испортить index.html и data/model.json.'); process.exit(1); }
+OPT.out = path.resolve(OPT.out || path.join(ROOT, 'index.html'));
+OPT.model = path.resolve(OPT.model || path.join(ROOT, 'data', 'model.json'));
 
 function log(...a) { console.log(...a); }
 
@@ -56,13 +59,14 @@ async function train() {
     val = { acc: +(ok / held.length).toFixed(4), n: held.length };
     log(`Проверка на отложенных фразах: ${(val.acc * 100).toFixed(2)}% из ${held.length}`);
   }
-  // проверка на независимом наборе data/eval.json (если он есть)
+  // проверка на независимом наборе data/eval.json (если он есть) — только на фразах, которых дословно нет в обучении
   const evalFile = path.join(ROOT, 'data', 'eval.json');
   if (fs.existsSync(evalFile)) {
-    const E = JSON.parse(fs.readFileSync(evalFile, 'utf8')).filter(e => e.intent && ds.tags.includes(e.intent));
+    const trained = new Set(Data.build(INTENTS, [], { expand: OPT.expand, augment: 0 }).examples.map(e => e.text));
+    const E = JSON.parse(fs.readFileSync(evalFile, 'utf8')).filter(e => e.intent && ds.tags.includes(e.intent) && !trained.has(Text.clean(e.text)));
     let ok = 0;
     for (const e of E) { const p = net.predict(Text.features(e.text, OPT.D)); let a = 0; for (let c = 1; c < p.length; c++) if (p[c] > p[a]) a = c; if (ds.tags[a] === e.intent) ok++; }
-    if (E.length) { const ev = { acc: +(ok / E.length).toFixed(4), n: E.length }; log(`Независимая проверка (data/eval.json): ${(ev.acc * 100).toFixed(2)}% из ${E.length}`); if (!val) val = ev; }
+    if (E.length) { const ev = { acc: +(ok / E.length).toFixed(4), n: E.length }; log(`Проверка на новых фразах (data/eval.json, без дословных повторов обучения): ${(ev.acc * 100).toFixed(2)}% из ${E.length}`); if (!val) val = ev; }
   }
   const codex = JSON.parse(fs.readFileSync(path.join(ROOT, 'data', 'codex_model.json'), 'utf8'));
   const model = {
@@ -90,19 +94,20 @@ function assemble(model) {
     log(`Модель сохранена: ${path.relative(ROOT, OPT.model)} (${(fs.statSync(OPT.model).size / 1024).toFixed(0)} КБ)`);
   } else {
     model = readModel(OPT.model);
-    // проверим, что модель подходит к данным
-    const X = load(null);
-    const tags = X.Data.build(X.INTENTS, [], { expand: 1, augment: 0 }).tags;
-    if (tags.join() !== model.tags.join()) { console.error('Модель не совпадает с темами в src/03_intents.js — запустите сборку с обучением.'); process.exit(1); }
   }
+  // модель должна подходить к темам в тех исходниках, которые сейчас попадут в index.html
+  // (если их поменяли, пока сеть училась, ответы перепутались бы)
+  const X = load(null);
+  const tags = X.Data.build(X.INTENTS, [], { noExamples: true }).tags;
+  if (tags.join() !== model.tags.join()) { console.error('Модель не совпадает с темами в src/ — запустите сборку с обучением: node tools/build.js'); process.exit(1); }
   const html = assemble(model);
   fs.writeFileSync(OPT.out, html);
   // новая версия для офлайн-кэша: телефон поймёт, что пора обновить Амиго
   const swFile = path.join(ROOT, 'sw.js');
-  if (OPT.out === path.join(ROOT, 'index.html') && fs.existsSync(swFile)) {
+  if (OPT.out === path.resolve(ROOT, 'index.html') && fs.existsSync(swFile)) {
     const ver = (fs.readFileSync(path.join(SRC, '00_util.js'), 'utf8').match(/AMIGO_VERSION = '([^']+)'/) || [])[1] || 'dev';
     const hash = require('crypto').createHash('sha1').update(html).digest('hex').slice(0, 8);
     fs.writeFileSync(swFile, fs.readFileSync(swFile, 'utf8').replace(/const VERSION = '[^']*';/, `const VERSION = 'amigo-${ver}-${hash}';`));
   }
-  log(`Готово: ${path.relative(ROOT, OPT.out)} (${(html.length / 1024).toFixed(0)} КБ)`);
+  log(`Готово: ${path.relative(ROOT, OPT.out)} (${(Buffer.byteLength(html) / 1024).toFixed(0)} КБ)`);
 })().catch(e => { console.error(e); process.exit(1); });

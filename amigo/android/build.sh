@@ -35,6 +35,11 @@ step() { echo "==> $*"; }
 
 [ -f "$WEB/index.html" ] || die "нет $WEB/index.html — сначала соберите веб-приложение: node tools/build.js"
 [ -f "$KEYSTORE" ] || die "нет ключа $KEYSTORE (как сделать новый — в README.md)"
+# index.html должен быть свежим: собран после последних правок в src/ и data/model.json
+grep -q "AmigoAndroid" "$WEB/index.html" || die "index.html старый (нет поддержки AmigoAndroid) — пересоберите: node tools/build.js --no-train"
+for f in "$WEB"/src/* "$WEB"/data/model.json; do
+  [ "$f" -nt "$WEB/index.html" ] && die "$(basename "$f") новее index.html — сначала пересоберите: node tools/build.js --no-train"
+done
 
 # ---------- Android SDK
 find_sdk() {

@@ -89,6 +89,12 @@ const Lex = (() => {
   function word(w, allowFuzzy = true) {
     w = Text.clean(w); if (!w || STOP.has(w) || /^\d+$/.test(w)) return null;
     let e = exact.get(w); if (e) return e;
+    // «кошек», «птиц», «мышей», «котов» — формы множественного числа, которые основа не ловит
+    if (w.length >= 3 && !VERBISH.test(w)) {
+      for (const v of [w + 'а', w.replace(/ек$/, 'ка'), w.replace(/ок$/, 'ка'), w.replace(/ей$/, 'ь'), w.replace(/ов$/, ''), w.replace(/ев$/, 'й'), w.replace(/ей$/, 'я')]) {
+        if (v !== w && v.length >= 3 && (e = exact.get(v))) return e;
+      }
+    }
     if (w.length >= 3) {
       const st = stemOf(w);
       e = byStem.get(st);
@@ -117,16 +123,27 @@ const Lex = (() => {
     }
     return out.sort((a, b) => a.i - b.i);
   }
-  // главное слово фразы: последнее найденное существительное обычно и есть тема («я видел огромную собаку»)
+  // главное слово фразы: первое найденное (а из многословных — самое длинное) обычно и есть тема:
+  // «у меня есть хомяк, его зовут Пончик» → хомяк, «я занимаюсь карате, у меня жёлтый пояс» → карате
   function main(text, opts) {
     const all = findAll(text, opts);
     if (!all.length) return null;
-    return all.reduce((best, x) => (x.n > best.n || (x.n === best.n && x.i > best.i) ? x : best), all[0]);
+    const long = all.filter(x => x.n > 1);
+    return long.length ? long.reduce((b, x) => (x.n > b.n ? x : b), long[0]) : all[0];
   }
 
   const cap = s => s ? s[0].toUpperCase() + s.slice(1) : s;
+  // как писать слово в ответе: «МКС», «Гарри Поттер», «Маша и Медведь», но «чёрная дыра»
+  const ABBR = new Set(['мкс', 'нло', 'днк', 'рнк', 'сша', 'ссср', 'оаэ', 'бтс', 'ии', 'пк', 'мчс', 'оон', 'фифа', 'нба', 'нхл', 'кхл', 'юар', 'кндр', 'вдв', 'гибдд', 'жкх', 'смс', 'мфц', 'ufo', 'gps', 'usb', 'wi-fi', 'вай-фай', 'нпс', 'нпц']);
+  const NAMED = new Set(['cartoons_movies_characters', 'games_toys']);
+  const SMALL = new Set(['и', 'в', 'на', 'из', 'с', 'о', 'по', 'де', 'да', 'ван', 'фон', 'of', 'the', 'and', 'us']);
+  function title(e) {
+    if (ABBR.has(e.w)) return e.w.toUpperCase();
+    if (NAMED.has(e.c) && e.w.indexOf(' ') > 0) return e.w.split(' ').map((x, i) => i && SMALL.has(x) ? x : cap(x)).join(' ');
+    return cap(e.w);
+  }
   // «🐱 Кошка — пушистое домашнее животное…»
-  function describe(e) { return `${e.e} ${cap(e.w)} — ${e.d}.`; }
+  function describe(e) { return `${e.e} ${title(e)} — ${e.d}.`; }
 
   // вопросы, чтобы продолжить разговор о слове (ключ — что запомнить из ответа)
   const FOLLOW = {
@@ -180,12 +197,13 @@ const Lex = (() => {
     tech_internet: ['Технологии — это моё! 🤖 {E} {W} — {d}.', '{E} {W} — {d}. Мне нравится, я ведь сам программа 😄'],
     geography: ['{E} {W} — {d}. Хотел бы я там побывать!'],
     games_toys: ['{E} {W} — {d}. Игры — это весело! Мне больше всего нравятся те, где надо думать.', 'Конечно! {E} {W} — {d}.'],
-    cartoons_movies_characters: ['{E} {W}? Знаю! {d}. Классная штука!', 'Мне нравится! {E} {W} — {d}.'],
+    cartoons_movies_characters: ['{E} {W}? Знаю: {d}. Классная штука!', 'Мне нравится! {E} {W} — {d}.'],
     emotions_abstract_holidays: ['{E} {W} — {d}. Это очень важно!'],
     user: ['{E} {W} — {d}. Это ты меня научил 😊'],
   };
   function fill(t, e) {
-    return t.replace(/\{E\}/g, e.e).replace(/\{e\}/g, e.e + ' ').replace(/\{W\}/g, cap(e.w)).replace(/\{w\}/g, e.w).replace(/\{d\}/g, e.d)
+    const w = ABBR.has(e.w) ? e.w.toUpperCase() : NAMED.has(e.c) ? title(e) : e.w;
+    return t.replace(/\{E\}/g, e.e).replace(/\{e\}/g, e.e + ' ').replace(/\{W\}/g, title(e)).replace(/\{w\}/g, w).replace(/\{d\}/g, e.d)
       .replace(/ {2,}/g, ' ');
   }
   function opinion(e, rnd = Math.random) {
@@ -193,7 +211,7 @@ const Lex = (() => {
     return fill(list[Math.floor(rnd() * list.length)], e);
   }
 
-  return { init, addUser, word, findAll, main, describe, followUp, opinion, fill, dist, get size() { return entries.length; }, STOP };
+  return { init, addUser, word, findAll, main, describe, title, followUp, opinion, fill, dist, get size() { return entries.length; }, STOP };
 })();
 Lex.init(Object.assign({}, typeof LEX_DATA !== 'undefined' ? LEX_DATA : {}, typeof LEX_EXTRA !== 'undefined' ? LEX_EXTRA : {}));
 
@@ -201,10 +219,14 @@ Lex.init(Object.assign({}, typeof LEX_DATA !== 'undefined' ? LEX_DATA : {}, type
 // Словарь собирается из всех обучающих фраз и словаря Амиго при первом использовании.
 const Spell = (() => {
   let freq = null, byFirst = null;
+  let tags = null; // основа слова → темы, в обучающих фразах которых она встречается
   function build() {
-    freq = new Map(); byFirst = new Map();
+    freq = new Map(); byFirst = new Map(); tags = new Map();
     const add = w => { if (w.length >= 3 && !/\d/.test(w)) freq.set(w, (freq.get(w) || 0) + 1); };
-    for (const it of INTENTS) for (const p of it.p) for (const w of Text.words(p.replace(/\{\w+\}/g, ' '))) add(w);
+    for (const it of INTENTS) for (const p of it.p) for (const w of Text.words(p.replace(/\{\w+\}/g, ' '))) {
+      add(w);
+      const st = Text.stem(w); if (!tags.has(st)) tags.set(st, new Set()); tags.get(st).add(it.tag);
+    }
     for (const k of Object.keys(FILL)) for (const v of FILL[k]) for (const w of Text.words(v)) add(w);
     const LD = Object.assign({}, typeof LEX_DATA !== 'undefined' ? LEX_DATA : {}, typeof LEX_EXTRA !== 'undefined' ? LEX_EXTRA : {});
     for (const c of Object.keys(LD)) for (const e of LD[c]) { for (const w of Text.words(e[0])) add(w); for (const a of e[3] || []) for (const w of Text.words(a)) add(w); }
@@ -213,21 +235,36 @@ const Spell = (() => {
   function known(w) { if (!freq) build(); return freq.has(w); }
   function fixWord(w) {
     if (!freq) build();
-    if (w.length < 4 || freq.has(w) || /\d/.test(w)) return w;
+    if (w.length < 4 || /\d/.test(w)) return w;
+    const short = w.length === 4; // в коротких словах исправляем только замену буквы: «дила» → «дела», но не «лает» → «лет»
+    // известная форма знакомого слова («лает», «поют») или имя — не трогаем
+    if (tags.has(Text.stem(w)) || (typeof FILL !== 'undefined' && FILL.name.includes(w)) || (typeof Lex !== 'undefined' && Lex.word(w, false))) return w;
+    // глагол в форме «молчат», «плачет», «бегут»: если основа без окончания знакома — это не опечатка
+    const vm = /^(.{3,}?)(ет|ут|ют|ат|ят|ит|ешь|ишь|ем|им)$/.exec(w);
+    if (vm && [...tags.keys()].some(k => k.length >= 3 && vm[1].startsWith(k))) return w;
+    // редкое слово могло попасть в обучение как опечатка («делаеш») — его тоже сравниваем с частыми соседями
+    const own = freq.get(w) || 0;
+    if (own > 2) return w;
     // первая буква тоже может быть опечаткой, поэтому смотрим и соседние группы
-    let best = w, bf = 0;
+    let best = w, bf = own ? own * 10 - 1 : 0;
     const cands = (byFirst.get(w[0]) || []).concat(w[1] ? (byFirst.get(w[1]) || []).filter(x => x[1] === w[0]) : []);
     for (const c of cands) {
-      if (Math.abs(c.length - w.length) > 1) continue;
-      if (Lex.dist(w, c, 1) <= 1) { const f = freq.get(c); if (f > bf) { bf = f; best = c; } }
+      if (Math.abs(c.length - w.length) > (short ? 0 : 1)) continue;
+      if (Lex.dist(w, c, 1) <= 1) { const f = freq.get(c); if (f > bf && (!short || f >= 10)) { bf = f; best = c; } }
     }
     return best;
   }
-  function fix(text) { return Text.words(text).map(fixWord).join(' '); }
+  // слова с большой буквы в середине фразы — скорее всего имена («Даша», «Граф»), их не исправляем
+  function fix(text) {
+    const raw = String(text).replace(/ё/g, 'е').replace(/Ё/g, 'Е').split(/[^A-Za-zА-Яа-я0-9]+/).filter(Boolean);
+    return raw.map((w, i) => (/^[А-ЯA-Z]/.test(w) && (i > 0 || raw.length <= 2)) ? w.toLowerCase() : fixWord(w.toLowerCase())).join(' ');
+  }
   // «кд чд» → «как дела что делаешь»
   function expand(text) {
     if (typeof SLANG_EXPAND === 'undefined') return Text.clean(text);
     return Text.words(text).map(w => SLANG_EXPAND[w] || w).join(' ');
   }
-  return { fix, fixWord, known, expand };
+  // встречалось ли это слово в обучающих фразах темы: если нет, уверенность сети по одному слову — догадка по буквам
+  function inTag(word, tag) { if (!freq) build(); const s = tags.get(Text.stem(Text.clean(word))); return !!(s && s.has(tag)); }
+  return { fix, fixWord, known, expand, inTag };
 })();

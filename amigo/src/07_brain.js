@@ -2,7 +2,11 @@
 // Мозг Амиго: нейросеть определяет тему, а дальше навыки, игры, память и обучение строят ответ.
 const BRAIN_TH = 0.3;            // ниже этой уверенности Амиго считает, что не понял
 const BRAIN_MARGIN = 0.08;       // и если две темы почти равны — тоже
-const CRISIS_RE = /(хочу|хочется|буду)\s+(умереть|сдохнуть|покончить)|не\s+хочу\s+(больше\s+)?жить|жить\s+не\s+хочу|покончить\s+с\s+собой|убить\s+себя|меня\s+(бьют|избивают|травят|буллят)|самоубий/;
+const CRISIS_RE = /(хочу|хочется|буду)\s+(умереть|сдохнуть|покончить)|не\s+хочу\s+(больше\s+)?жить|жить\s+не\s+хочу|покончить\s+с\s+собой|убить\s+себя|меня\s+(бьют|избивают|травят|буллят)|самоубий|суицид/;
+// осторожные косвенные слова о желании исчезнуть или навредить себе: лучше лишний раз дать телефон доверия, чем весело ответить
+const CRISIS_SOFT_RE = /(хочу|хочется|хотел[аи]?\s+бы)\s+(исчезнуть|пропасть\s+навсегда|не\s+просыпаться|уснуть\s+и\s+не\s+проснуться|не\s+существовать)|лучше\s+бы\s+(меня|я)\s+(вообще\s+)?(не\s+было|не\s+родил|не\s+существовал|умер)|всем\s+(будет\s+|станет\s+)?лучше\s+без\s+меня|не\s+вижу\s+смысла\s+(жить|в\s+жизни|дальше)|незачем\s+жить|надоело\s+жить|устал[а]?\s+жить|не\s+хочу\s+(просыпаться|существовать)|(режу|порезать|порежу|резать)\s+(себя|себе)|(причин\S*|сдела\S*)\s+себе\s+(больно|боль)|я\s+никому\s+не\s+нуж[еннаы]*|меня\s+(никто\s+не\s+любит|все\s+ненавидят)|ненавижу\s+себя|я\s+себя\s+ненавижу|меня\s+(трогают|обижают)\s+(дома|взрослые)|не\s+(нравится|хочется|охота|хочу)\s+жить|(не\s+люблю|ненавижу)\s+(себя|свою\s+жизнь|жизнь)|меня\s+(побил|побила|побили|ударил|ударила|ударили|избил|избила|избили|бьет|бьёт)/;
+// утрата и горе: «бабушка умерла», «мой кот умер», «собака потерялась» — отвечаем бережно, без энциклопедии
+const GRIEF_RE = /(умер|умерла|умерли|умирает|погиб|погибла|погибли|сдох|сдохла|не\s+стало|похорон|потерял(?:ся|ась|ись)|пропал[аи]?(?:\s|$)|убежал[аи]?(?:\s|$)|в\s+больниц|сильно\s+болеет|тяжело\s+болеет)/;
 const TEACH_RE = /^(?:запомни[:,]?\s*)?(?:когда|если)\s+я\s+(?:говорю|пишу|скажу|напишу)\s+[«"']?(.+?)[»"']?[,\s]+(?:то\s+)?(?:ты\s+)?(?:отвечай|ответь|говори|скажи|пиши)\s+[«"']?(.+?)[»"']?\s*$/i;
 const TEACH_RE2 = /^на\s+[«"'](.+?)[»"']\s+(?:отвечай|ответь|говори)\s+[«"']?(.+?)[»"']?\s*$/i;
 const NAME_RE = /(?:^|[\s,.!])(?:меня\s+зовут|мо[её]\s+имя(?:\s*[-—:]|\s+это)?|зови\s+меня|называй\s+меня|можешь\s+звать\s+меня)\s+([A-Za-zА-Яа-яЁё][A-Za-zА-Яа-яЁё-]{1,24})(?:\s+([A-Za-zА-Яа-яЁё][A-Za-zА-Яа-яЁё-]{1,24}))?/i;
@@ -63,7 +67,7 @@ class Brain {
   classify(text) {
     let best = this.classifyRaw(text);
     // сокращения и опечатки: пробуем «расшифрованный» вариант и берём тот, в котором сеть увереннее
-    const clean = Text.clean(text), exp = Spell.expand(text), fixed = Spell.fix(exp);
+    const clean = Text.clean(text), exp = Spell.expand(text), fixed = Spell.expand(Spell.fix(text));
     for (const v of [exp, fixed]) {
       if (!v || v === clean) continue;
       const b = this.classifyRaw(v);
@@ -85,7 +89,10 @@ class Brain {
       for (let h = 0; h < H; h++) if (this.net.W1[row + h] !== 0) { nz = true; break; }
       if (nz) known += x.val[k] * x.val[k];
     }
-    return { tag: top[0].tag, conf: top[0].p, margin: top[0].p - (top[1] ? top[1].p : 0), top, x, hid, p, known, text };
+    // насколько слова фразы знакомы Амиго (по обучающим фразам и словарю), а не по «ненулевым» весам сети
+    const ws = Text.words(text).filter(w => w.length >= 3 && !/^\d+$/.test(w));
+    const vocab = ws.length ? ws.filter(w => Spell.known(w) || Lex.word(w, false) || Lex.STOP.has(w) || (typeof SLANG_EXPAND !== 'undefined' && SLANG_EXPAND[w])).length / ws.length : 1;
+    return { tag: top[0].tag, conf: top[0].p, margin: top[0].p - (top[1] ? top[1].p : 0), top, x, hid, p, known, vocab, text };
   }
   // дообучение на фразах пользователя: новые выходы + повтор старых примеров, чтобы не забыть прежнее
   async fineTune(opt = {}) {
@@ -158,6 +165,17 @@ class Brain {
     return String(s).replace(/\{,name\}/g, n ? ', ' + n : '').replace(/\{name\}/g, n || 'друг')
       .replace(/\{hidden\}/g, String(this.net.H)).replace(/\{params\}/g, U.num(this.net.params)).replace(/\{intents\}/g, String(this.tags.length));
   }
+  // из готовых ответов темы выбираем тот, что ближе к словам пользователя («поссорились» → совет помириться)
+  pickReply(tag, list, text) {
+    const st = new Set(Text.words(text || '').filter(w => w.length > 3).map(Text.stem));
+    let best = -1, bs = 0;
+    if (st.size) list.forEach((r, i) => {
+      const s = typeof r === 'string' ? r : r.s;
+      let k = 0; for (const w of Text.words(s)) if (w.length > 3 && st.has(Text.stem(w))) k++;
+      if (k > bs) { bs = k; best = i; }
+    });
+    return best >= 0 && this.rnd() < 0.8 ? list[best] : list[this.deal('r:' + tag, list)];
+  }
   deal(kind, list) {
     let d = this.decks[kind];
     if (!d || !d.length) d = this.decks[kind] = U.shuffle(list.map((_, i) => i), this.rnd);
@@ -192,7 +210,13 @@ class Brain {
       if (/[\d+\-*/^()]/.test(text)) { const r = Skills.calc(text, true); if (r) return this.say(Skills.calcText(r), { src: 'skill', intent: 'calc' }); }
       return this.say(U.pick(['😊', '🙂 Напиши мне что-нибудь словами!', '👍'], this.rnd), { src: 'rule' });
     }
-    if (CRISIS_RE.test(t)) { this.ctx = null; return this.say(CRISIS_TEXT, { src: 'rule', intent: 'crisis', mood: 'care' }); }
+    if (CRISIS_RE.test(t) || CRISIS_SOFT_RE.test(t)) { this.ctx = null; return this.say(CRISIS_TEXT, { src: 'rule', intent: 'crisis', mood: 'care' }); }
+    if (GRIEF_RE.test(t) && !/(игр|персонаж|герой|мульт|фильм|сериал|книг|уровн)/.test(t)) {
+      this.ctx = null;
+      return this.say(U.pick(['Мне очень жаль 😔 Терять тех, кого любишь, очень больно. Хочешь рассказать об этом? Я рядом и выслушаю.',
+        'Ох… Это очень грустно 💛 Нормально грустить и плакать. Обязательно поговори с мамой, папой или другим взрослым, которому доверяешь — вместе легче.',
+        'Сочувствую тебе 😔 Если хочешь, расскажи, каким он был. А если очень тяжело — обними близких и поговори со взрослыми.'], this.rnd), { src: 'rule', intent: 'user_bad', mood: 'care' });
+    }
 
     // «когда я говорю X, отвечай Y»
     const tm = TEACH_RE.exec(text) || TEACH_RE2.exec(text);
@@ -204,6 +228,9 @@ class Brain {
 
     const cls = this.classify(text);
     if (!sub) this.mainCls = cls;
+    // сеть видит тревожную тему, пусть и не на первом месте — отвечаем бережно
+    const nameAwait = this.ctx && (this.ctx.type === 'ask_name' || (this.ctx.type === 'expect' && ['pet_name', 'best_friend'].includes(this.ctx.key)));
+    if (!(nameAwait && Text.words(text).length <= 2) && cls.top.some(x => x.tag === 'crisis' && x.p >= 0.3)) { this.ctx = null; return this.say(CRISIS_TEXT, { src: 'net', intent: 'crisis', conf: cls.conf, top: cls.top, mood: 'care' }); }
 
     if (this.ctx) {
       const r = await this.inCtx(text, t, cls, io);
@@ -224,6 +251,9 @@ class Brain {
     // «ты Claude?» — отвечает сам Амиго, честно и от своего имени
     if (WHO_AI_RE.test(t) && (YOU_RE.test(t) || t.split(' ').length <= 2)) return this.handle('are_you_claude', text, t, cls, io);
     if (OTHER_AI_RE.test(t) && YOU_RE.test(t)) return this.handle('compare_ai', text, t, cls, io);
+    // «ты меня любишь?», «ты меня помнишь?»
+    if (/(^|\s)ты\s+(меня\s+(любишь|обожаешь)|(любишь|обожаешь)\s+меня)(?![а-я])/.test(t)) return this.handle('love', text, t, cls, io);
+    if (/(^|\s)ты\s+(меня\s+(знаешь|помнишь)|(знаешь|помнишь)\s+меня)(?![а-я])/.test(t)) return this.handle(this.profile.name ? 'about_me' : 'ask_my_name', text, t, cls, io);
 
     // пример по математике
     const m = Skills.calc(text, false);
@@ -231,13 +261,21 @@ class Brain {
 
     // игры в чате
     const gameDesc = /(^|\s)(сделай|создай|придумай|напиши|запрограммируй|сочини|собери)\s+(мне\s+|нам\s+)?(\S+\s+)?(игр|игрушк)/.test(t) || /^(игр\S*|игрушк\S*)\s+(про|где|о|об|в\s+которой|с)\s/.test(t + ' ');
-    if (GameList.find(text) || gameDesc || (cls.tag === 'make_game' && cls.conf >= BRAIN_TH)) return this.makeGame(text, t, cls, io);
+    if (GameList.find(text) || gameDesc || (cls.tag === 'make_game' && (cls.conf >= 0.6 || (cls.conf >= BRAIN_TH && /игр|игрушк/.test(t))))) return this.makeGame(text, t, cls, io);
 
     // «меня зовут ...»
     const nm = NAME_RE.exec(text);
     if (nm) { const r = this.setName(nm[1], nm[2]); if (r) return r; }
     const ag = AGE_RE.exec(t);
-    if (ag) { this.profile.age = +ag[1]; this.save(); return this.say(`Запомнил: тебе ${ag[1]} ${U.plural(+ag[1], 'год', 'года', 'лет')} 🎂 Классный возраст!`, { src: 'rule', intent: 'remember' }); }
+    if (ag) {
+      this.profile.age = +ag[1];
+      // «я Маша, мне 8 лет» — заодно запомним имя
+      const nm2 = /(?:^|[\s,.!])я\s+([А-ЯЁA-Z][а-яёa-z-]{1,20})(?=[\s,.!]|$)/.exec(text);
+      let hello = '';
+      if (nm2 && !NOT_NAMES.has(nm2[1].toLowerCase()) && !Lex.word(nm2[1], false)) { this.profile.name = U.cap(nm2[1].toLowerCase()); hello = `Приятно познакомиться, ${this.profile.name}! `; }
+      this.save();
+      return this.say(`${hello}Запомнил: тебе ${ag[1]} ${U.plural(+ag[1], 'год', 'года', 'лет')} 🎂 Классный возраст!`, { src: 'rule', intent: 'remember' });
+    }
 
     // то, чему научил пользователь
     const taught = this.taughtMatch(text);
@@ -250,14 +288,23 @@ class Brain {
     // «я люблю …», «ты умеешь …?» — сеть угадывает семейство, а точный вид берём по словам
     const fr = Talk.frames(text)[0];
     // одно-два знакомых слова («телефон», «мой кот»), а сеть сомневается — расскажем про слово
-    if (lexHit && !fr && Text.words(text).length <= 2 && cls.conf < 0.6) return this.wordReply(lexHit, text, cls);
+    const nw = Text.words(text).length, whole = lexHit && lexHit.n === nw;
+    // «дракон», «мармелад»: если такого слова нет в фразах выбранной темы, сеть гадает по буквам — лучше рассказать про слово
+    const netGuess = whole && nw <= 2 && !Text.words(text).some(w => Spell.inTag(w, cls.tag));
+    if (lexHit && !fr && ((nw <= 2 && cls.conf < 0.6) || netGuess || (whole && nw <= 4 && (cls.conf < 0.6 || ['statement', 'user_doing', 'knowledge', 'gibberish', 'bot_know'].includes(cls.tag))))) return this.wordReply(lexHit, text, cls);
     if (fr && (TALK_FRAME_FAMILY.has(cls.tag) || cls.conf < 0.6) && cls.tag !== fr.type && !(cls.tag === 'love' && cls.conf >= 0.5)) return this.handle(fr.type, text, t, cls, io);
 
     // уверенность: чем больше знакомых признаков, тем меньше нужно запаса над второй темой
     let strong = cls.conf >= BRAIN_TH && cls.margin >= BRAIN_MARGIN && (cls.known >= 0.35 || (cls.conf >= 0.55 && cls.known >= 0.15));
+    // незнакомые слова («флуфик», «кукарямба») — сеть угадывает по буквам, верить ей нельзя
+    if (strong && cls.vocab < 0.5 && cls.conf < 0.9) strong = false;
+    // темы, которые запускают игру или прощание, — только при уверенной догадке
+    if (strong && ['guess_number', 'guess_my_number', 'rps', 'quiz', 'make_game', 'bye', 'goodnight', 'clear_chat', 'forget', 'codex_on', 'voice_on', 'voice_off', 'timer'].includes(cls.tag) && cls.conf < 0.5) strong = false;
     // «бессмыслица» по мнению сети, но слово похоже на настоящее — спросим, что это, а не скажем «шифр»
     if (strong && cls.tag === 'gibberish' && lexHit) return this.wordReply(lexHit, text, cls);
     if (strong && cls.tag === 'gibberish' && !Skills.isGibberish(text) && /[аеиоуыэюяaeiouy]/.test(t)) strong = false;
+    // «мне обидно, что меня не позвали на день рождения» — это не праздник, а грусть
+    if (strong && ['birthday', 'achievement', 'holidays_talk', 'user_good', 'laugh', 'news'].includes(cls.tag) && Talk.mood(text) < 0) return this.handle('user_bad', text, t, cls, io);
     if (strong) return this.handle(cls.tag, text, t, cls, io);
 
     // сеть не уверена: вопрос о мире → энциклопедия / супер-мозг / Википедия
@@ -272,6 +319,11 @@ class Brain {
   }
 
   notUnderstood(text, cls) {
+    // «щас», «так», «ну вот» — это не вопрос, а пауза в разговоре
+    if (Text.words(text).length <= 2 && Text.words(text).every(w => Lex.STOP.has(w) || (typeof SLANG_EXPAND !== 'undefined' && SLANG_EXPAND[w]))) {
+      return this.say(U.pick(['Угу 🙂 Я тут! О чём поболтаем?', 'Жду 🙂 Если хочешь, можем сыграть или поболтать.', 'Ага! Я слушаю 👂'], this.rnd),
+        { src: 'talk', intent: 'statement', conf: cls.conf, top: cls.top, chips: ['Давай поболтаем', 'Расскажи шутку', 'Сыграем'] });
+    }
     this.ctx = { type: 'teach_offer', phrase: text };
     const hint = cls.conf > 0.2 ? ` Похоже на тему «${cls.top[0].title}», но я не уверен.` : '';
     return this.say(U.pick([
@@ -318,7 +370,11 @@ class Brain {
         if (nm) return this.setName(nm[1], nm[2]);
         const ws = text.replace(/[.!,?]+/g, ' ').trim().split(/\s+/);
         const w = ws[0] === 'я' || ws[0] === 'Я' ? ws.slice(1) : ws;
-        if (w.length >= 1 && w.length <= 2 && /^[A-Za-zА-Яа-яЁё-]{2,25}$/.test(w[0]) && !NOT_NAMES.has(w[0].toLowerCase()) && !(sure && !['statement', 'set_name', 'gibberish'].includes(tag))) return this.setName(w[0], w[1]);
+        // имя: одно-два слова; знакомые имена и слова с большой буквы принимаем, даже если сеть думает о другом («Даша», «Петя», «Алиса»)
+        const w0 = w[0] ? w[0].toLowerCase().replace(/ё/g, 'е') : '';
+        const looksName = w0 && (FILL.name.includes(w0) || /^[А-ЯЁA-Z]/.test(w[0]));
+        const notName = !w0 || NOT_NAMES.has(w0) || Lex.STOP.has(w0) || Talk.mood(text) < 0 || quit || tag === 'no';
+        if (w.length >= 1 && w.length <= 2 && /^[A-Za-zА-Яа-яЁё-]{2,25}$/.test(w[0]) && !notName && (looksName || !(sure && !['statement', 'set_name', 'gibberish'].includes(tag)))) return this.setName(w[0], w[1]);
         return null;
       }
       case 'teach_phrase': {
@@ -338,6 +394,11 @@ class Brain {
       case 'teach': {
         this.ctx = null;
         if (/^(пропустить|отмена|не\s+надо|нет|неа|потом|не\s+буду|забей)(?![а-яa-z0-9])/.test(t)) return this.say('Хорошо, пропустим 🙂', { src: 'rule' });
+        // ответ не должен повторять вопрос или быть снова «ты не прав»
+        if (Text.clean(text) === Text.clean(c.phrase) || (cls.tag === 'bot_wrong' && cls.conf >= 0.6)) {
+          this.ctx = { type: 'teach', phrase: c.phrase };
+          return this.say('Хм, так я ничему не научусь 😄 Напиши, что именно мне нужно ответить, — или нажми «Отмена».', { src: 'rule', chips: ['Отмена'], mood: 'think' });
+        }
         this.learn(c.phrase, text);
         return this.say(U.pick([`Запомнил! Теперь на «${c.phrase}» я отвечу: «${text}» ✅`, `Ура, я стал умнее! На «${c.phrase}» теперь отвечаю «${text}» 🧠`], this.rnd),
           { src: 'rule', intent: 'teach', mood: 'learn', action: { type: 'learned' } });
@@ -512,7 +573,7 @@ class Brain {
     const it = this.byTag.get(tag) || {};
     const meta = { src: it.custom ? 'taught' : 'net', intent: tag, conf: cls && cls.conf, top: cls && cls.top };
     if (it.r && !it.act) {
-      const r = it.r[this.deal('r:' + tag, it.r)], o = typeof r === 'string' ? { s: r } : r;
+      const r = this.pickReply(tag, it.r, text), o = typeof r === 'string' ? { s: r } : r;
       if (o.offer) this.ctx = { type: 'offer', act: o.offer };
       return this.say(o.s, Object.assign(meta, { chips: o.chips || it.chips, mood: /грус|жаль|обид/.test(o.s) ? 'care' : 'happy' }));
     }
@@ -706,7 +767,8 @@ class Brain {
     if (/^(ты|тебе|тебя|амиго)$/i.test(topic)) return this.handle('who_are_you', text, Text.clean(text), cls, io);
     // «что такое X» — сначала мини-энциклопедия; «почему…», «сколько…» — сначала ответы на частые вопросы
     const kb = Skills.kbFind(topic || text), qa = QA.find(text);
-    if (kb && (topic || !qa)) return this.say(kb.s, Object.assign(meta, { src: 'memory' }));
+    const define = /^(?:(?:а|ну|слушай|амиго|скажи)[,\s]+)*(?:ты\s+)?(?:знаешь\s+)?(?:что\s+такое|что\s+это\s+такое|кто\s+такой|кто\s+такая|кто\s+такие|что\s+значит|что\s+означает|расскажи|объясни\s+что)/i.test(text.trim());
+    if (kb && (define || !qa)) return this.say(kb.s, Object.assign(meta, { src: 'memory' }));
     if (qa) return this.say(qa.a, Object.assign(meta, { src: 'memory' }));
     if (this.superMode()) { const a = await this.askSuper(text, io, cls); if (a) return a; }
     if (make) {
@@ -723,7 +785,7 @@ class Brain {
     this.ctx = { type: 'teach_offer', phrase: text };
     const hit = Lex.main(topic || text);
     if (hit) return this.say(`Точного ответа я пока не знаю 🤔 Но вот что знаю: ${Lex.describe(hit.entry)} Если знаешь больше — нажми «Научить», и я запомню!`,
-      Object.assign(meta, { src: 'memory', mood: 'think', chips: ['Научить'] }));
+      Object.assign(meta, { src: 'memory', mood: 'think', chips: ['Научить'], unsure: true }));
     return this.say(`Этого я пока не знаю 🤔 ${this.settings.online ? 'И в интернете не нашёл: может, нет связи. ' : ''}Если знаешь ответ, нажми «Научить», и я запомню!`,
       Object.assign(meta, { src: 'net', mood: 'think', chips: ['Научить'], unsure: true }));
   }
