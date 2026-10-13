@@ -103,10 +103,8 @@ local function getBuildablePlot(player: Player): PlotService.Plot?
 	return plot
 end
 
+-- Ограничитель частоты проверяется в обработчике события (см. init).
 local function onPlace(player: Player, blockId: any, x: any, y: any, z: any, rot: any)
-	if not allow(player) then
-		return
-	end
 	if typeof(blockId) ~= "string" or #blockId > 32 or not isInt(x) or not isInt(y) or not isInt(z) then
 		return
 	end
@@ -273,10 +271,14 @@ end
 
 function BuildService.init()
 	Remotes.PlaceBlock.OnServerEvent:Connect(function(player: Player, blockId: any, x: any, y: any, z: any, rot: any, seq: any)
-		onPlace(player, blockId, x, y, z, rot)
-		-- отвечаем на каждый запрос (и на отказ тоже), иначе клиент считал бы блок потраченным
+		local passed = allow(player)
+		if passed then
+			onPlace(player, blockId, x, y, z, rot)
+		end
+		-- отвечаем на каждый запрос (и на отказ тоже), иначе клиент считал бы блок потраченным;
+		-- отклонённые ограничителем подтверждаются с задержкой (защита от спама снимками)
 		if typeof(seq) == "number" and seq == seq and seq == math.floor(seq) and seq > 0 and seq < 2 ^ 31 then
-			DataService.ackPlace(player, seq)
+			DataService.ackPlace(player, seq, passed)
 		end
 	end)
 	Remotes.RemoveBlock.OnServerEvent:Connect(onRemove)

@@ -126,6 +126,7 @@ end
 -- Ошибки, при которых повторять бессмысленно (нет доступа к API в Studio и т.п.).
 local saveWarned: { [Player]: boolean } = {}
 local placeAck: { [Player]: number } = {}
+local ackFlushQueued: { [Player]: boolean } = {}
 
 local function isFatalError(message: string): boolean
 	local lower = string.lower(message)
@@ -351,6 +352,7 @@ end
 local function onPlayerRemoving(player: Player)
 	saveWarned[player] = nil
 	placeAck[player] = nil
+	ackFlushQueued[player] = nil
 	local session = sessions[player]
 	if not session then
 		return
@@ -488,11 +490,23 @@ end
 
 -- Сервер обработал запрос установки №seq (принял или отказал) — клиенту уйдёт свежий
 -- инвентарь с этим номером, и он перестанет считать блок «в пути».
-function DataService.ackPlace(player: Player, seq: number)
-	if seq > (placeAck[player] or 0) then
-		placeAck[player] = seq
+function DataService.ackPlace(player: Player, seq: number, passed: boolean)
+	if seq <= (placeAck[player] or 0) then
+		return -- номер не продвинулся: снимок не нужен
 	end
-	DataService.replicate(player)
+	placeAck[player] = seq
+	if passed then
+		DataService.replicate(player)
+	elseif not ackFlushQueued[player] then
+		-- запрос отклонён ограничителем частоты: подтверждаем не чаще 4 раз в секунду
+		ackFlushQueued[player] = true
+		task.delay(0.25, function()
+			ackFlushQueued[player] = nil
+			if player.Parent == Players then
+				DataService.replicate(player)
+			end
+		end)
+	end
 end
 
 function DataService.addCoins(player: Player, amount: number)
