@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Светлая тема. До Android 8.1 значки навигации всегда белые, поэтому полоска навигации тёмная. -->
+    <style name="AmigoTheme" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:windowBackground">@color/amigo_bg</item>
+        <item name="android:colorPrimary">@color/amigo_accent</item>
+        <item name="android:colorPrimaryDark">@color/amigo_bg</item>
+        <item name="android:colorAccent">@color/amigo_accent</item>
+        <item name="android:statusBarColor">@color/amigo_bg</item>
+        <item name="android:windowLightStatusBar">true</item>
+        <item name="android:navigationBarColor">@color/amigo_ink</item>
+    </style>
+</resources>

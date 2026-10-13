@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- те же цвета, что фон (bg) и текст (ink) в index.html -->
+    <color name="amigo_bg">#EDF2F0</color>
+    <color name="amigo_ink">#10302D</color>
+    <color name="amigo_accent">#E39A12</color>
+    <color name="ic_launcher_background">#EDF2F0</color>
+</resources>

@@ -1,0 +1,9 @@
+# сборка
+.gradle/
+build/
+app/build/
+local.properties
+.idea/
+*.iml
+# копия веб-приложения появляется только во время сборки
+app/src/main/assets/

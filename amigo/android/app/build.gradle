@@ -1,0 +1,75 @@
+plugins {
+    id 'com.android.application'
+}
+
+// Веб-приложение лежит на уровень выше проекта: amigo/index.html. В репозитории его копии в assets нет —
+// перед каждой сборкой она кладётся в app/build/generated/amigo-assets.
+def webRoot = rootProject.file('..')
+def webAssetsDir = layout.buildDirectory.dir('generated/amigo-assets')
+
+def copyWebAssets = tasks.register('copyWebAssets', Sync) {
+    from(webRoot) {
+        include 'index.html', 'manifest.webmanifest'
+        include 'icons/*.png', 'icons/*.svg'
+    }
+    into webAssetsDir
+    doFirst {
+        if (!new File(webRoot, 'index.html').exists()) {
+            throw new GradleException("Нет ${webRoot}/index.html — сначала соберите веб-приложение (node tools/build.js)")
+        }
+    }
+}
+
+android {
+    namespace = 'ru.amigo.chat'
+    compileSdk = 34
+
+    defaultConfig {
+        applicationId = 'ru.amigo.chat'
+        minSdk = 24
+        targetSdk = 34
+        versionCode = 2
+        versionName = '2.0'
+    }
+
+    signingConfigs {
+        // Ключ хобби-проекта лежит прямо в репозитории (см. README.md). Для Google Play сделайте свой.
+        release {
+            storeFile = rootProject.file('amigo-release.jks')
+            storePassword = 'amigo123'
+            keyAlias = 'amigo'
+            keyPassword = 'amigo123'
+        }
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled = false
+            signingConfig = signingConfigs.release
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_11
+        targetCompatibility = JavaVersion.VERSION_11
+    }
+
+    sourceSets {
+        main {
+            assets.srcDirs += webAssetsDir.get().asFile
+        }
+    }
+
+    dependenciesInfo {
+        includeInApk = false
+        includeInBundle = false
+    }
+
+    lint {
+        checkReleaseBuilds = false
+    }
+}
+
+tasks.named('preBuild') {
+    dependsOn copyWebAssets
+}

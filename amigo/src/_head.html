@@ -1,0 +1,461 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,interactive-widget=resizes-content">
+<title>Амиго</title>
+<meta name="description" content="Амиго — карманный друг-нейросеть: болтает, шутит, считает, играет и учится прямо на телефоне, даже без интернета.">
+<meta name="theme-color" content="#EDF2F0" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0C1715" media="(prefers-color-scheme: dark)">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Амиго">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Golos+Text:wght@400;500;600&family=JetBrains+Mono:wght@400;600&family=Unbounded:wght@500;700&display=swap">
+<style>
+/* Амиго — карманный друг-нейросеть: колонка чата и живая панель «Мозг» рядом (на телефоне — поверх). */
+:root {
+  --bg: #EDF2F0;          /* мятно-серый фон */
+  --surface: #FFFFFF;
+  --surface-2: #E2EBE8;
+  --ink: #10302D;         /* глубокий бирюзово-чёрный текст */
+  --muted: #58726E;
+  --line: #CBDAD6;
+  --accent: #E39A12;      /* календула — цвет самого Амиго */
+  --accent-soft: #F8E3B6;
+  --accent-ink: #2B1A00;
+  --user: #0F5E58;        /* сообщения пользователя */
+  --user-ink: #F1FAF8;
+  --coral: #D9465F;       /* сильные положительные связи нейронов */
+  --teal: #1F8F82;        /* отрицательные связи */
+  --eye: #FFFFFF;
+  --shadow: 0 1px 2px rgba(16, 48, 45, .08), 0 8px 24px rgba(16, 48, 45, .08);
+  --f-display: 'Unbounded', 'Golos Text', system-ui, sans-serif;
+  --f-body: 'Golos Text', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --f-mono: 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+  --r: 18px;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0C1715; --surface: #13221F; --surface-2: #1A2D29; --ink: #E3EEEB; --muted: #8DA7A2; --line: #26403B;
+    --accent: #F0B23C; --accent-soft: #3A2C10; --accent-ink: #231500; --user: #1C766E; --user-ink: #F1FAF8;
+    --coral: #F06D85; --teal: #3CB9A9; --eye: #FFFFFF; --shadow: 0 1px 2px rgba(0, 0, 0, .3), 0 8px 24px rgba(0, 0, 0, .25);
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0C1715; --surface: #13221F; --surface-2: #1A2D29; --ink: #E3EEEB; --muted: #8DA7A2; --line: #26403B;
+  --accent: #F0B23C; --accent-soft: #3A2C10; --accent-ink: #231500; --user: #1C766E; --user-ink: #F1FAF8;
+  --coral: #F06D85; --teal: #3CB9A9; --eye: #FFFFFF; --shadow: 0 1px 2px rgba(0, 0, 0, .3), 0 8px 24px rgba(0, 0, 0, .25);
+  color-scheme: dark;
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html { height: 100%; box-sizing: border-box; padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); background: var(--bg); }
+body { height: 100%; margin: 0; background: var(--bg); color: var(--ink); font: 16px/1.5 var(--f-body); -webkit-text-size-adjust: 100%; overflow: hidden; }
+button, input, select, textarea { font: inherit; color: inherit; }
+button { cursor: pointer; }
+:focus-visible { outline: 2.5px solid var(--accent); outline-offset: 2px; border-radius: 8px; }
+
+.app { height: 100%; display: grid; grid-template-columns: minmax(0, 1fr); }
+@media (min-width: 1000px) { .app.brain-open { grid-template-columns: minmax(0, 1fr) 420px; } }
+
+/* ---------- чат ---------- */
+.chat { display: flex; flex-direction: column; height: 100%; min-height: 0; width: 100%; max-width: 880px; margin: 0 auto; }
+.bar { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 16px; border-bottom: 1px solid var(--line); }
+.who { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.who-text { min-width: 0; }
+.name { margin: 0; font: 700 1.25rem/1.1 var(--f-display); letter-spacing: .01em; }
+.status { margin: 2px 0 0; font: 400 .72rem/1.3 var(--f-mono); color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+@media (max-width: 520px) { .status .wide { display: none; } }
+.status.busy::before { content: ''; display: inline-block; width: 7px; height: 7px; margin-right: 6px; border-radius: 50%; background: var(--accent); vertical-align: 1px; animation: blink 1s infinite; }
+.bar-actions { display: flex; align-items: center; gap: 4px; flex-shrink: 0; }
+.icon-btn { display: inline-grid; place-items: center; width: 40px; height: 40px; padding: 0; border: 0; border-radius: 12px; background: transparent; color: var(--ink); }
+.icon-btn:hover { background: var(--surface-2); }
+.icon-btn[aria-pressed="true"], .icon-btn[aria-expanded="true"] { background: var(--accent-soft); color: var(--ink); }
+.icon-btn svg { width: 22px; height: 22px; }
+.timers { display: flex; gap: 4px; }
+.timer-pill { display: inline-flex; align-items: center; gap: 4px; padding: 4px 10px; border: 1px solid var(--line); border-radius: 999px; background: var(--surface); font: 600 .78rem/1 var(--f-mono); font-variant-numeric: tabular-nums; }
+
+.log { flex: 1; min-height: 0; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 10px; overscroll-behavior: contain; }
+.msg { display: flex; flex-direction: column; gap: 4px; max-width: min(85%, 62ch); animation: rise .25s ease-out; }
+.msg.me { align-self: flex-end; align-items: flex-end; }
+.msg.bot { align-self: flex-start; }
+.bubble { padding: 10px 14px; border-radius: var(--r); overflow-wrap: anywhere; min-width: 0; }
+.bot .bubble { background: var(--surface); border: 1px solid var(--line); border-top-left-radius: 6px; box-shadow: var(--shadow); }
+.me .bubble { background: var(--user); color: var(--user-ink); border-top-right-radius: 6px; }
+.bubble strong { font-weight: 600; }
+.bubble code { font: .9em var(--f-mono); background: var(--surface-2); padding: 1px 5px; border-radius: 6px; }
+.bubble a { color: inherit; }
+.meta { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; padding-left: 4px; font: 400 .7rem/1.3 var(--f-mono); color: var(--muted); }
+.src { display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; flex-shrink: 0; }
+.src::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: var(--teal); }
+.src.claude::before { background: var(--coral); }
+.src.wiki::before, .src.web::before { background: var(--muted); }
+.src.memory::before, .src.taught::before { background: var(--accent); }
+.meta a { color: var(--muted); }
+.link-btn { white-space: nowrap; padding: 0; border: 0; background: none; color: var(--muted); font: inherit; text-decoration: underline; text-underline-offset: 2px; }
+.link-btn:hover { color: var(--ink); }
+.typing .bubble { display: inline-flex; gap: 5px; padding: 14px 16px; }
+.typing i { width: 7px; height: 7px; border-radius: 50%; background: var(--muted); animation: bounce 1.2s infinite; }
+.typing i:nth-child(2) { animation-delay: .15s; } .typing i:nth-child(3) { animation-delay: .3s; }
+.day-sep { align-self: center; font: .7rem var(--f-mono); color: var(--muted); padding: 4px 0; }
+
+.dock { border-top: 1px solid var(--line); background: var(--bg); padding: 8px 16px 12px; display: flex; flex-direction: column; gap: 8px; }
+.chips { display: flex; gap: 8px; overflow-x: auto; scrollbar-width: none; padding: 2px 0; }
+.chips::-webkit-scrollbar { display: none; }
+.chip { flex-shrink: 0; padding: 7px 14px; border: 1px solid var(--line); border-radius: 999px; background: var(--surface); font-size: .88rem; white-space: nowrap; }
+.chip:hover { border-color: var(--accent); background: var(--accent-soft); }
+.composer { display: flex; align-items: flex-end; gap: 6px; padding: 6px 6px 6px 14px; border: 1.5px solid var(--line); border-radius: 24px; background: var(--surface); }
+.composer:focus-within { border-color: var(--accent); }
+.composer textarea { flex: 1; min-width: 0; resize: none; border: 0; outline: none; background: transparent; padding: 8px 0; max-height: 140px; line-height: 1.4; }
+.composer textarea::placeholder { color: var(--muted); }
+.send { display: inline-grid; place-items: center; width: 42px; height: 42px; border: 0; border-radius: 50%; background: var(--accent); color: var(--accent-ink); flex-shrink: 0; }
+.send:disabled { opacity: .5; cursor: default; }
+.send svg { width: 20px; height: 20px; }
+.mic.listening { background: var(--coral); color: var(--surface); animation: pulse 1.2s infinite; }
+
+/* ---------- аватар ---------- */
+.avatar { width: 46px; height: 46px; flex-shrink: 0; }
+.avatar svg { width: 100%; height: 100%; overflow: visible; }
+.av-head { fill: var(--accent); }
+.av-line { stroke: var(--ink); stroke-width: 3.5; stroke-linecap: round; fill: none; }
+.av-node { fill: var(--coral); transform-origin: 50px 8px; }
+.av-white { fill: var(--eye); }
+.av-pupil { fill: var(--ink); transition: transform .3s; }
+.av-cheek { fill: var(--coral); opacity: .3; }
+.av-eye { transform-box: fill-box; transform-origin: center; animation: blinkEye 5s infinite; }
+.av-mouth { opacity: 0; transition: opacity .15s; }
+.avatar[data-mood="idle"] .m-smile, .avatar[data-mood="happy"] .m-grin, .avatar[data-mood="learn"] .m-smile, .avatar[data-mood="think"] .m-flat,
+.avatar[data-mood="care"] .m-soft, .avatar[data-mood="wow"] .m-o, .avatar[data-mood="dance"] .m-grin, .avatar[data-mood="sad"] .m-sad { opacity: 1; }
+.avatar.talk .av-mouth { opacity: 0 !important; }
+.avatar.talk .m-talk { opacity: 1 !important; animation: talk .28s infinite alternate; transform-box: fill-box; transform-origin: center; }
+.avatar[data-mood="think"] .av-pupil { transform: translate(-2px, -3px); }
+.avatar[data-mood="think"] .av-node, .avatar[data-mood="learn"] .av-node { animation: glow .9s infinite alternate; }
+.avatar[data-mood="happy"] .av-eye, .avatar[data-mood="dance"] .av-eye { animation: none; transform: scaleY(.6); }
+.avatar[data-mood="care"] .av-eye { animation: none; transform: scaleY(.75); }
+.avatar[data-mood="wow"] .av-eye { animation: none; transform: scale(1.12); }
+.avatar[data-mood="dance"] svg { animation: dance .5s infinite alternate ease-in-out; }
+
+/* ---------- панель «Мозг» ---------- */
+.brain { height: 100%; overflow-y: auto; background: var(--surface); border-left: 1px solid var(--line); padding: 0 16px 24px; display: flex; flex-direction: column; gap: 22px; }
+@media (max-width: 999px) {
+  .brain { position: fixed; inset: 0; z-index: 30; border-left: 0; padding-top: env(safe-area-inset-top, 0px); padding-bottom: calc(24px + env(safe-area-inset-bottom, 0px)); }
+}
+.brain-head { position: sticky; top: 0; z-index: 1; display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 12px 0 10px; background: var(--surface); border-bottom: 1px solid var(--line); }
+.brain-head h2 { margin: 0; font: 700 1.05rem/1.2 var(--f-display); }
+.brain-sec { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.eyebrow { margin: 0; font: 600 .7rem/1.2 var(--f-mono); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+.said { margin: 0; font-size: .92rem; color: var(--muted); }
+.said b { color: var(--ink); font-weight: 600; }
+.net-canvas, .loss-canvas { width: 100%; display: block; border-radius: 12px; background: var(--surface-2); }
+.net-canvas { aspect-ratio: 4 / 3.1; }
+.loss-canvas { aspect-ratio: 16 / 7; }
+.bars { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 7px; }
+.bars li { display: grid; grid-template-columns: minmax(0, 9.5em) minmax(0, 1fr) 3.2em; align-items: center; gap: 10px; font-size: .85rem; }
+.bar-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bar-track { height: 10px; border-radius: 99px; background: var(--surface-2); overflow: hidden; }
+.bar-fill { display: block; height: 100%; border-radius: 99px; background: var(--muted); transition: width .5s ease-out; }
+.bars li:first-child .bar-fill { background: var(--accent); }
+.bar-val { font: .78rem var(--f-mono); text-align: right; font-variant-numeric: tabular-nums; }
+.stats { margin: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1px; background: var(--line); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
+.stats div { background: var(--surface); padding: 10px 12px; min-width: 0; }
+.stats dt { font-size: .74rem; color: var(--muted); }
+.stats dd { margin: 2px 0 0; font: 600 1.05rem/1.2 var(--f-mono); font-variant-numeric: tabular-nums; }
+.legend { margin: 0; display: flex; gap: 14px; align-items: center; font: .74rem var(--f-mono); color: var(--muted); }
+.lg { display: inline-block; width: 14px; height: 3px; border-radius: 2px; margin-right: 5px; vertical-align: middle; }
+.lg-loss { background: var(--coral); } .lg-acc { background: var(--teal); }
+.progress { position: relative; height: 26px; border-radius: 8px; background: var(--surface-2); overflow: hidden; }
+.progress-bar { position: absolute; inset: 0 auto 0 0; width: 0; background: var(--accent-soft); transition: width .2s; }
+.progress span { position: relative; display: block; padding: 0 10px; font: .74rem/26px var(--f-mono); }
+.learned { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.learned li { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 12px; font-size: .88rem; }
+.learned .tq { color: var(--muted); }
+.learned .ta { font-weight: 600; overflow-wrap: anywhere; }
+.learned .empty { color: var(--muted); border-style: dashed; }
+.row { display: flex; flex-wrap: wrap; gap: 8px; }
+.btn { padding: 9px 16px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); font-size: .9rem; font-weight: 500; }
+.btn:hover { border-color: var(--accent); }
+.btn:disabled { opacity: .55; cursor: default; }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.btn.danger { color: var(--coral); }
+.btn.small { padding: 4px 10px; font-size: .8rem; border-radius: 8px; flex-shrink: 0; }
+
+/* ---------- настройки ---------- */
+.backdrop { position: fixed; inset: 0; z-index: 40; background: rgba(8, 20, 18, .45); }
+.settings { position: fixed; z-index: 41; left: 50%; bottom: 0; transform: translateX(-50%); width: min(560px, 100%); max-height: 88%; overflow-y: auto;
+  background: var(--surface); border: 1px solid var(--line); border-radius: 22px 22px 0 0; padding: 0 20px calc(20px + env(safe-area-inset-bottom, 0px)); box-shadow: var(--shadow); }
+@media (min-width: 700px) { .settings { top: 50%; bottom: auto; transform: translate(-50%, -50%); border-radius: 22px; padding-bottom: 20px; } }
+.set-head { position: sticky; top: 0; display: flex; align-items: center; justify-content: space-between; padding: 16px 0 10px; background: var(--surface); }
+.set-head h2 { margin: 0; font: 700 1.1rem var(--f-display); }
+.set-group { display: flex; flex-direction: column; gap: 12px; padding: 14px 0; border-top: 1px solid var(--line); }
+.set-group h3 { margin: 0; font: 600 .95rem var(--f-body); }
+.switch { display: flex; align-items: center; gap: 12px; cursor: pointer; }
+.switch input { appearance: none; -webkit-appearance: none; position: relative; width: 44px; height: 26px; margin: 0; flex-shrink: 0; border-radius: 99px; background: var(--line); transition: background .2s; cursor: pointer; }
+.switch input::after { content: ''; position: absolute; top: 3px; left: 3px; width: 20px; height: 20px; border-radius: 50%; background: var(--surface); box-shadow: 0 1px 2px rgba(0, 0, 0, .25); transition: transform .2s; }
+.switch input:checked { background: var(--accent); }
+.switch input:checked::after { transform: translateX(18px); }
+.field { display: flex; flex-direction: column; gap: 6px; font-size: .88rem; }
+.field > span { color: var(--muted); }
+.field input[type="password"], .field input[type="text"], .field select { width: 100%; padding: 10px 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--bg); }
+.field input[type="range"] { width: 100%; accent-color: var(--accent); }
+.stack { display: flex; flex-direction: column; gap: 12px; }
+.hint { margin: 0; font-size: .82rem; color: var(--muted); }
+.badge { display: inline-block; padding: 2px 8px; border-radius: 99px; background: var(--accent-soft); font: 600 .7rem var(--f-mono); }
+
+.toast { position: fixed; z-index: 50; left: 50%; bottom: calc(96px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); max-width: calc(100% - 32px);
+  padding: 10px 16px; border-radius: 14px; background: var(--ink); color: var(--bg); font-size: .9rem; box-shadow: var(--shadow); }
+
+@keyframes rise { from { transform: translateY(6px); opacity: .4; } to { transform: none; opacity: 1; } }
+@keyframes bounce { 0%, 60%, 100% { transform: translateY(0); opacity: .5; } 30% { transform: translateY(-4px); opacity: 1; } }
+@keyframes blink { 50% { opacity: .2; } }
+@keyframes blinkEye { 0%, 94%, 100% { transform: scaleY(1); } 97% { transform: scaleY(.1); } }
+@keyframes glow { from { opacity: .5; transform: scale(.85); } to { opacity: 1; transform: scale(1.25); } }
+@keyframes talk { from { transform: scaleY(.35); } to { transform: scaleY(1); } }
+@keyframes dance { from { transform: rotate(-12deg) translateY(0); } to { transform: rotate(12deg) translateY(-4px); } }
+@keyframes pulse { 50% { box-shadow: 0 0 0 6px transparent; } 0% { box-shadow: 0 0 0 0 var(--coral); } }
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
+
+/* ---------- код в ответах ---------- */
+.bubble pre { margin: 8px 0; padding: 10px 12px; border-radius: 10px; background: var(--surface-2); overflow: auto; max-height: 300px; font: .78rem/1.45 var(--f-mono); white-space: pre; }
+.bubble pre code { background: none; padding: 0; font: inherit; }
+.progress-text { font: .85rem var(--f-mono); color: var(--muted); }
+.send.stop svg { display: none; }
+.send.stop::after { content: ''; width: 12px; height: 12px; border-radius: 3px; background: currentColor; }
+
+/* ---------- игры в чате ---------- */
+.msg.game { width: 100%; max-width: min(100%, 540px); }
+.game-card { border: 1px solid var(--line); border-radius: 18px; background: var(--surface); box-shadow: var(--shadow); overflow: hidden; outline: none; }
+.game-top { display: flex; align-items: center; gap: 6px; padding: 6px 6px 6px 14px; border-bottom: 1px solid var(--line); min-width: 0; }
+.game-title { margin-right: auto; min-width: 0; font: 700 .9rem/1.2 var(--f-display); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.game-score, .game-best { font: 600 .74rem var(--f-mono); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.game-best { color: var(--muted); }
+.game-btn { display: inline-grid; place-items: center; width: 34px; height: 34px; padding: 0; border: 0; border-radius: 10px; background: transparent; font-size: 1rem; flex-shrink: 0; }
+.game-btn:hover { background: var(--surface-2); }
+.game-btn.attention { background: var(--accent-soft); animation: blink 1.4s 3; }
+.game-stage { position: relative; display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 12px; background: var(--surface-2); touch-action: none; user-select: none; -webkit-user-select: none; outline: none; }
+.game-stage:focus-visible { box-shadow: inset 0 0 0 2px var(--accent); }
+.game-stage.custom { padding: 0; touch-action: auto; }
+.game-canvas { display: block; width: 100%; height: auto; border-radius: 10px; box-shadow: 0 0 0 1px var(--line); }
+.game-frame { display: block; width: 100%; height: 460px; border: 0; background: var(--surface); }
+.game-overlay { position: absolute; inset: 0; z-index: 2; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; padding: 20px;
+  text-align: center; white-space: pre-line; font-weight: 500; background: var(--surface); background: color-mix(in srgb, var(--surface) 74%, transparent); }
+.game-overlay p { margin: 0; max-width: 32ch; }
+.game-info { min-height: 1.5em; padding: 6px 14px; font: .74rem/1.4 var(--f-mono); color: var(--muted); overflow-wrap: anywhere; }
+.game-info:empty { display: none; }
+.game-tools { display: flex; justify-content: center; }
+.game-pad { display: flex; justify-content: center; flex-wrap: wrap; gap: 8px; padding: 2px 12px 12px; }
+.game-pad button { min-width: 54px; height: 50px; padding: 0 10px; border: 1px solid var(--line); border-radius: 14px; background: var(--surface); font-size: 1.25rem; touch-action: none; user-select: none; -webkit-user-select: none; }
+.game-pad button:active { background: var(--accent-soft); }
+.game-pad.dpad { display: grid; grid-template-columns: repeat(3, 58px); grid-template-areas: ". up ." "left down right"; justify-content: center; }
+.game-pad.dpad .pad-up { grid-area: up; } .game-pad.dpad .pad-left { grid-area: left; } .game-pad.dpad .pad-down { grid-area: down; } .game-pad.dpad .pad-right { grid-area: right; }
+@media (hover: hover) and (pointer: fine) { .game-pad { display: none !important; } }
+.game-card:fullscreen { display: flex; flex-direction: column; border-radius: 0; }
+.game-card:fullscreen .game-stage { flex: 1; justify-content: center; }
+.game-card:fullscreen .game-canvas { width: auto; height: min(80vh, 100%); max-width: 100% !important; }
+.game-card:fullscreen .game-frame { height: 100%; flex: 1; }
+
+.g2048 { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; width: 100%; max-width: 340px; aspect-ratio: 1; padding: 8px; border-radius: 14px; background: var(--line); }
+.g2048 .t { display: grid; place-items: center; min-width: 0; border-radius: 8px; background: var(--surface); font: 700 1.7rem/1 var(--f-display); color: var(--ink); transition: background .12s; }
+.ttt { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; width: 100%; max-width: 300px; aspect-ratio: 1; }
+.ttt button { min-width: 0; border: 1px solid var(--line); border-radius: 14px; background: var(--surface); font: 700 2.4rem/1 var(--f-display); padding: 0; }
+.ttt .x { color: var(--user); } .ttt .o { color: var(--accent); } .ttt .win { background: var(--accent-soft); }
+.mines { display: grid; grid-template-columns: repeat(9, minmax(0, 1fr)); gap: 3px; width: 100%; max-width: 360px; }
+.mines button { aspect-ratio: 1; min-width: 0; padding: 0; border: 0; border-radius: 6px; background: var(--surface); box-shadow: inset 0 -3px 0 var(--line); font: 700 .95rem/1 var(--f-mono); }
+.mines .op { background: var(--bg); box-shadow: none; }
+.mines .boom { background: var(--coral); }
+.mines [data-n="1"] { color: var(--teal); } .mines [data-n="2"] { color: var(--user); } .mines [data-n="3"] { color: var(--coral); } .mines [data-n="4"], .mines [data-n="5"], .mines [data-n="6"] { color: var(--ink); }
+.memory { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; width: 100%; max-width: 340px; }
+.memory button { aspect-ratio: 1; min-width: 0; padding: 0; border: 0; border-radius: 12px; background: var(--user); font-size: 1.9rem; line-height: 1; transition: background .15s; }
+.memory .up { background: var(--surface); box-shadow: inset 0 0 0 2px var(--accent); }
+.memory .done { background: var(--accent-soft); }
+
+/* ---------- Кодекс ---------- */
+.codex-btn[aria-pressed="true"] { background: var(--user); color: var(--user-ink); }
+.codex-bar { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 10px; padding: 6px 6px 6px 12px; border: 1.5px solid var(--user); border-radius: 16px; background: var(--surface); }
+.codex-label { font: 700 .85rem var(--f-display); white-space: nowrap; }
+.codex-hint { flex: 1; min-width: 0; font: .72rem var(--f-mono); color: var(--muted); }
+.codex-close { width: 32px; height: 32px; margin-left: auto; }
+.codex-close svg { width: 18px; height: 18px; }
+.seg { display: inline-flex; padding: 3px; border-radius: 12px; background: var(--surface-2); }
+.seg button { padding: 6px 12px; border: 0; border-radius: 9px; background: transparent; font-size: .82rem; font-weight: 500; white-space: nowrap; }
+.seg button[aria-checked="true"] { background: var(--user); color: var(--user-ink); }
+.src.codex::before { background: var(--user); }
+.think-live { min-width: min(100%, 420px); }
+.think-head { font: 700 .85rem var(--f-display); margin-bottom: 6px; }
+.think-list { margin: 0; padding-left: 1.3em; display: flex; flex-direction: column; gap: 4px; font-size: .86rem; }
+.think-list li { color: var(--muted); }
+.think-list li.sub { list-style: none; margin-left: .2em; font: .78rem var(--f-mono); }
+.think-list li.now { color: var(--ink); font-weight: 600; }
+.think-list li.now::after { content: ' …'; animation: blink 1s infinite; }
+.think-log { border: 1px dashed var(--line); border-radius: 12px; padding: 6px 12px; background: var(--surface); font-size: .86rem; }
+.think-log summary { cursor: pointer; font-weight: 600; color: var(--muted); }
+.think-log[open] summary { margin-bottom: 6px; }
+.think-log .think-list li { color: var(--ink); }
+.code-copy { width: 100%; min-height: 140px; font: .72rem/1.4 var(--f-mono); border: 1px solid var(--line); border-radius: 10px; background: var(--surface-2); color: var(--ink); padding: 8px; }
+</style>
+</head>
+<body>
+<div class="app" id="app">
+  <main class="chat" aria-label="Чат с Амиго">
+    <header class="bar">
+      <div class="who">
+        <div class="avatar" id="avatar" data-mood="idle" aria-hidden="true">
+          <svg viewBox="0 0 100 100">
+            <path class="av-line" d="M50 19V10"/>
+            <circle class="av-node" cx="50" cy="8" r="6"/>
+            <rect class="av-head" x="9" y="19" width="82" height="74" rx="36"/>
+            <ellipse class="av-cheek" cx="24" cy="70" rx="7" ry="4.5"/>
+            <ellipse class="av-cheek" cx="76" cy="70" rx="7" ry="4.5"/>
+            <g class="av-eye"><ellipse class="av-white" cx="36" cy="52" rx="9.5" ry="11.5"/><circle class="av-pupil" cx="37" cy="54" r="5"/></g>
+            <g class="av-eye"><ellipse class="av-white" cx="64" cy="52" rx="9.5" ry="11.5"/><circle class="av-pupil" cx="65" cy="54" r="5"/></g>
+            <path class="av-line av-mouth m-smile" d="M39 73q11 9 22 0"/>
+            <path class="av-line av-mouth m-grin" d="M36 71q14 15 28 0z" style="fill:var(--ink)"/>
+            <path class="av-line av-mouth m-flat" d="M42 76h16"/>
+            <path class="av-line av-mouth m-soft" d="M42 74q8 5 16 0"/>
+            <path class="av-line av-mouth m-sad" d="M40 79q10-8 20 0"/>
+            <ellipse class="av-mouth m-o" cx="50" cy="75" rx="5.5" ry="6.5" style="fill:var(--ink)"/>
+            <ellipse class="av-mouth m-talk" cx="50" cy="75" rx="8" ry="5.5" style="fill:var(--ink)"/>
+          </svg>
+        </div>
+        <div class="who-text">
+          <h1 class="name">Амиго</h1>
+          <p class="status" id="status">нейросеть · просыпаюсь…</p>
+        </div>
+      </div>
+      <div class="bar-actions">
+        <span class="timers" id="timers"></span>
+        <button class="icon-btn" id="btnVoice" type="button" aria-pressed="false" aria-label="Читать ответы вслух" title="Читать ответы вслух">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5 6 9H3v6h3l5 4z"/><path class="wave" d="M15.5 8.5a5 5 0 0 1 0 7M18.5 5.5a9 9 0 0 1 0 13"/></svg>
+        </button>
+        <button class="icon-btn codex-btn" id="btnCodex" type="button" aria-pressed="false" aria-label="Режим Кодекс: Амиго программирует игры" title="Кодекс: Амиго сам программирует игры">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="M8 7 3 12l5 5M16 7l5 5-5 5M13.5 5l-3 14"/></svg>
+        </button>
+        <button class="icon-btn" id="btnBrain" type="button" aria-expanded="false" aria-controls="brain" aria-label="Мозг Амиго" title="Мозг Амиго: как работает нейросеть">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="5" cy="6" r="2"/><circle cx="5" cy="18" r="2"/><circle cx="12" cy="12" r="2.2"/><circle cx="19" cy="6" r="2"/><circle cx="19" cy="18" r="2"/><path d="M7 7l3.2 3.6M7 17l3.2-3.6M13.8 10.6 17 7M13.8 13.4 17 17M7 6h10M7 18h10"/></svg>
+        </button>
+        <button class="icon-btn" id="btnSettings" type="button" aria-label="Настройки" title="Настройки">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2.2"/><circle cx="10" cy="17" r="2.2"/></svg>
+        </button>
+      </div>
+    </header>
+    <div class="log" id="log" role="log" aria-live="polite" aria-label="Переписка"></div>
+    <div class="dock">
+      <div class="codex-bar" id="codexBar" hidden>
+        <span class="codex-label">🧑‍💻 Кодекс</span>
+        <div class="seg" role="radiogroup" aria-label="Уровень Кодекса">
+          <button type="button" role="radio" data-level="medium" aria-checked="false">Средний</button>
+          <button type="button" role="radio" data-level="high" aria-checked="true">Высокий</button>
+          <button type="button" role="radio" data-level="ultra" aria-checked="false">Ультра</button>
+        </div>
+        <span class="codex-hint" id="codexHint"></span>
+        <button class="icon-btn codex-close" id="codexClose" type="button" aria-label="Выключить Кодекс"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
+      </div>
+      <div class="chips" id="chips" aria-label="Подсказки"></div>
+      <form class="composer" id="composer" autocomplete="off">
+        <textarea id="input" rows="1" placeholder="Напиши Амиго…" aria-label="Сообщение для Амиго" enterkeyhint="send"></textarea>
+        <button class="icon-btn mic" id="btnMic" type="button" aria-label="Сказать голосом" title="Сказать голосом" hidden>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>
+        </button>
+        <button class="send" id="btnSend" type="submit" aria-label="Отправить">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h13M13 6l6 6-6 6"/></svg>
+        </button>
+      </form>
+    </div>
+  </main>
+
+  <aside class="brain" id="brain" aria-label="Мозг Амиго" hidden>
+    <header class="brain-head">
+      <h2>Мозг Амиго</h2>
+      <button class="icon-btn" id="btnBrainClose" type="button" aria-label="Закрыть панель"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
+    </header>
+    <section class="brain-sec">
+      <h3 class="eyebrow">Как я понял последнее сообщение</h3>
+      <p class="said" id="said">Напиши что-нибудь, и здесь будет видно, как сработали нейроны.</p>
+      <canvas id="netCanvas" class="net-canvas" role="img" aria-label="Схема нейросети: входы, скрытые нейроны и темы"></canvas>
+      <ol class="bars" id="bars"></ol>
+    </section>
+    <section class="brain-sec">
+      <h3 class="eyebrow">Устройство сети</h3>
+      <dl class="stats" id="stats"></dl>
+    </section>
+    <section class="brain-sec">
+      <h3 class="eyebrow">Обучение</h3>
+      <canvas id="lossCanvas" class="loss-canvas" role="img" aria-label="График обучения: ошибка и точность по эпохам"></canvas>
+      <p class="legend"><span><span class="lg lg-loss"></span>ошибка</span><span><span class="lg lg-acc"></span>точность</span><span id="lossNote"></span></p>
+      <div class="progress" id="trainProgress" hidden><div class="progress-bar" id="trainBar"></div><span id="trainText"></span></div>
+      <div class="row"><button class="btn" id="btnRetrain" type="button">Переобучить с нуля</button></div>
+    </section>
+    <section class="brain-sec">
+      <h3 class="eyebrow">Чему ты меня научил</h3>
+      <ul class="learned" id="taught"></ul>
+    </section>
+    <section class="brain-sec">
+      <h3 class="eyebrow">Что Кодекс выучил сам</h3>
+      <ul class="learned" id="codexMem"></ul>
+    </section>
+  </aside>
+
+  <div class="backdrop" id="backdrop" hidden></div>
+  <section class="settings" id="settings" role="dialog" aria-modal="true" aria-labelledby="setTitle" hidden>
+    <header class="set-head">
+      <h2 id="setTitle">Настройки</h2>
+      <button class="icon-btn" id="btnSetClose" type="button" aria-label="Закрыть настройки"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
+    </header>
+    <div class="set-group">
+      <h3>Голос</h3>
+      <label class="switch"><input type="checkbox" id="setVoice"><span>Читать ответы вслух</span></label>
+      <label class="field"><span>Скорость речи: <b id="rateVal">1</b></span><input type="range" id="setRate" min="0.6" max="1.6" step="0.1" value="1"></label>
+    </div>
+    <div class="set-group">
+      <h3>Кодекс 🧑‍💻</h3>
+      <p class="hint">В режиме Кодекс я сам программирую игры по твоему описанию. Включается кнопкой &lt;/&gt; наверху или словами «включи Кодекс».</p>
+      <label class="field"><span>Уровень</span><select id="setCodexLevel">
+        <option value="medium">Средний — простые игры</option>
+        <option value="high">Высокий — эффекты, бонусы, уровни, боссы</option>
+        <option value="ultra">Ультра — долго думаю, тестирую роботом, учусь новому</option>
+      </select></label>
+      <label class="switch"><input type="checkbox" id="setCodexAsk"><span>В Ультра можно спрашивать у Claude, КАК что-то сделать (сам Claude игру не пишет)</span></label>
+      <p class="hint" id="codexAskHint"></p>
+    </div>
+    <div class="set-group">
+      <h3>Интернет</h3>
+      <label class="switch"><input type="checkbox" id="setOnline"><span>Искать ответы в Википедии и узнавать погоду</span></label>
+      <p class="hint">Без интернета я тоже работаю: болтаю, считаю, играю и учусь.</p>
+    </div>
+    <div class="set-group">
+      <h3>Супер-мозг Claude <span class="badge" id="superBadge">выключен</span></h3>
+      <p class="hint" id="superHint"></p>
+      <label class="switch"><input type="checkbox" id="setSuper"><span>Спрашивать Claude, когда я сам не знаю ответа</span></label>
+      <div id="superSample" class="stack" hidden>
+        <label class="field"><span>Режим</span><select id="setTier"><option value="quick">Быстро</option><option value="smart">Умнее, но дольше</option></select></label>
+      </div>
+      <div id="superApi" class="stack">
+        <label class="field"><span>Ключ Anthropic API</span><input type="password" id="setKey" placeholder="sk-ant-…" autocomplete="off" spellcheck="false"></label>
+        <label class="field"><span>Модель</span><select id="setModel">
+          <option value="claude-opus-5-5">Claude Opus 5.5 — самая умная</option>
+          <option value="claude-sonnet-5-5">Claude Sonnet 5.5 — быстрее и дешевле</option>
+          <option value="claude-haiku-5-5">Claude Haiku 5.5 — самая быстрая</option>
+        </select></label>
+        <p class="hint">Ключ хранится только в этом браузере и отправляется только в Anthropic. Получить ключ: console.anthropic.com</p>
+      </div>
+    </div>
+    <div class="set-group" id="appGroup">
+      <h3>Приложение 📱</h3>
+      <p class="hint" id="installHint">Амиго можно установить на телефон как обычное приложение — он будет открываться с главного экрана и работать без интернета.</p>
+      <div class="row"><button class="btn" id="btnInstall" type="button" hidden>Установить Амиго</button></div>
+      <p class="hint" id="appVersion"></p>
+    </div>
+    <div class="set-group">
+      <h3>Память</h3>
+      <div class="row"><button class="btn" id="btnClear" type="button">Очистить чат</button><button class="btn danger" id="btnForgetAll" type="button">Забыть всё обо мне</button></div>
+      <p class="hint">Всё, что я запомнил, хранится только на этом устройстве.</p>
+    </div>
+  </section>
+  <div class="toast" id="toast" role="status" hidden></div>
+</div>
