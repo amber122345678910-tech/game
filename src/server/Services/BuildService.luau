@@ -32,6 +32,7 @@ local function placedCells(plot: PlotService.Plot): { [number]: PlacedEntry }
 	return t.cells
 end
 local refundNoted: { [Player]: number } = {}
+local ladderHinted: { [Player]: boolean } = {}
 
 -- Ограничение частоты действий (token bucket): защита от спама запросами.
 local function allow(player: Player): boolean
@@ -209,6 +210,11 @@ local function onRemove(player: Player, x: any, y: any, z: any)
 			end
 		end
 		markLayoutDirty(plot.Owner or player)
+		-- копнул глубже 2 слоёв: подсказываем про лестницу (из такой ямы не выпрыгнуть)
+		if rec.def.Indestructible and rec.y <= Grid.SURFACE - 2 and not ladderHinted[player] then
+			ladderHinted[player] = true
+			notify(player, "Глубоко копаешь! Из ямы глубже 2 блоков не выпрыгнуть — поставь 🪜 лестницу (подходи к ней сбоку).", "info")
+		end
 	end
 end
 
@@ -272,6 +278,7 @@ function BuildService.init()
 	Players.PlayerRemoving:Connect(function(player)
 		buckets[player] = nil
 		refundNoted[player] = nil
+		ladderHinted[player] = nil
 	end)
 	DataService.addPreSaveHook(function(player)
 		if layoutDirty[player] then

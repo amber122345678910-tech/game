@@ -172,7 +172,7 @@ local function updateHail()
 			impactAttachment.WorldPosition = h.to
 			if h.meteor then
 				meteorImpactEmitter:Emit(math.max(6, math.floor(30 * qualityScale)))
-				Sounds.playAt("BlockBreak", h.to, 1)
+				Sounds.playAt("MeteorHit", h.to, 1)
 				Sounds.playAt("Thunder", h.to, 0.5)
 				h.part.Material = Enum.Material.Ice
 				h.part.Color = HAIL_COLOR
@@ -310,6 +310,8 @@ type PlotFX = {
 	leakEmitters: { ParticleEmitter },
 	leakSound: Sound?,
 	rainSound: Sound?,
+	windSound: Sound?,
+	quakeSound: Sound?,
 	phase: string,
 	rainWanted: boolean,
 	sleetWanted: boolean,
@@ -545,6 +547,8 @@ local function ensureFx(model: Model): PlotFX?
 		leakEmitters = {},
 		leakSound = nil,
 		rainSound = nil,
+		windSound = nil,
+		quakeSound = nil,
 		phase = "",
 		rainWanted = false,
 		sleetWanted = false,
@@ -612,6 +616,20 @@ local function setPhaseFx(fx: PlotFX, phase: string)
 	elseif not isAcid and fx.rainSound then
 		fx.rainSound:Destroy()
 		fx.rainSound = nil
+	end
+	-- гул урагана и землетрясения
+	local isQuake = phase == Config.Phases.Quake
+	if isWind and not fx.windSound then
+		fx.windSound = Sounds.loopAt("Wind", fx.rainPart, 1)
+	elseif not isWind and fx.windSound then
+		fx.windSound:Destroy()
+		fx.windSound = nil
+	end
+	if isQuake and not fx.quakeSound then
+		fx.quakeSound = Sounds.loopAt("Quake", fx.rainPart, 1)
+	elseif not isQuake and fx.quakeSound then
+		fx.quakeSound:Destroy()
+		fx.quakeSound = nil
 	end
 	if not stormOn then
 		clearAcid(fx)

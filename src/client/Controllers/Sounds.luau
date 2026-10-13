@@ -22,6 +22,10 @@ Sounds.Ids = {
 	DoorOpen = "rbxassetid://5930776613",
 	DoorClose = "rbxassetid://5930776613",
 	Place = "rbxassetid://9119670627",
+	-- новые бедствия: те же проверенные звуки с другой высотой
+	Wind = "rbxassetid://9112854440", -- шум дождя, пониженный — гул урагана
+	Quake = "rbxassetid://12222030", -- гром, сильно пониженный — гул землетрясения
+	MeteorHit = "rbxassetid://9120255257", -- разрушение, пониженное — тяжёлый удар
 } :: { [string]: string }
 
 -- Встроенные звуки клиента (rbxasset://) есть всегда — подставляются, если ID не загрузился.
@@ -38,6 +42,9 @@ Sounds.Fallbacks = {
 	DoorOpen = "rbxasset://sounds/action_jump_land.mp3",
 	DoorClose = "rbxasset://sounds/action_jump_land.mp3",
 	Place = "rbxasset://sounds/action_jump_land.mp3",
+	Wind = "rbxassetid://1516791621",
+	Quake = "rbxasset://sounds/impact_explosion_03.mp3",
+	MeteorHit = "rbxasset://sounds/impact_explosion_03.mp3",
 } :: { [string]: string }
 
 -- Высота звука по умолчанию (например, градина — короткий высокий "клик" льда).
@@ -45,6 +52,9 @@ Sounds.Pitch = {
 	HailHit = 1.6,
 	Thunder = 0.8,
 	DoorClose = 0.85,
+	Wind = 0.55,
+	Quake = 0.35,
+	MeteorHit = 0.6,
 } :: { [string]: number }
 
 Sounds.Volumes = {
@@ -60,6 +70,9 @@ Sounds.Volumes = {
 	DoorOpen = 0.5,
 	DoorClose = 0.5,
 	Place = 0.5,
+	Wind = 0.7,
+	Quake = 0.9,
+	MeteorHit = 0.9,
 } :: { [string]: number }
 
 local templates: { [string]: Sound } = {}
