@@ -88,9 +88,12 @@ local function takeSendToken(): boolean
 	return true
 end
 
--- Сколько блоков этого типа уже ждут отправки (их нет смысла считать доступными).
+-- Отправлено, но сервер ещё не ответил (счётчик обнуляется, когда приходит инвентарь).
+local inFlight: { [string]: number } = {}
+
+-- Сколько блоков этого типа уже ждут отправки или ответа (их нет смысла считать доступными).
 local function queuedPlacements(id: string): number
-	local n = 0
+	local n = inFlight[id] or 0
 	for _, q in actionQueue do
 		if not q.remove and q.id == id then
 			n += 1
@@ -102,13 +105,14 @@ end
 local function flushActions()
 	while actionQueue[1] do
 		local q = actionQueue[1]
-		if not q.remove and ClientState.blockCount(q.id) < 1 then
+		if not q.remove and ClientState.blockCount(q.id) - (inFlight[q.id] or 0) < 1 then
 			table.remove(actionQueue, 1) -- блоков не осталось: сервер всё равно откажет
 		elseif takeSendToken() then
 			table.remove(actionQueue, 1)
 			if q.remove then
 				Remotes.RemoveBlock:FireServer(q.x, q.y, q.z)
 			else
+				inFlight[q.id] = (inFlight[q.id] or 0) + 1
 				Remotes.PlaceBlock:FireServer(q.id, q.x, q.y, q.z, q.rot)
 			end
 		else
@@ -945,6 +949,10 @@ local function renderStep()
 end
 
 function BuildController.init()
+	-- пришёл свежий инвентарь: отправленные установки уже учтены сервером
+	ClientState.DataChanged:Connect(function()
+		table.clear(inFlight)
+	end)
 	ghost = Instance.new("Part")
 	ghost.Name = "BuildGhost"
 	ghost.Anchored = true

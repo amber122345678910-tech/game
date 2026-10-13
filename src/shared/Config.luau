@@ -60,7 +60,7 @@ Config.DataVersion = 1
 Config.DataStoreName = "BunkerSimulator_v1"
 
 -- Версия сборки (видна в углу экрана и в Output) — чтобы было понятно, какой файл открыт.
-Config.Version = "2.2"
+Config.Version = "2.3"
 
 -- Сетка постройки (локальные координаты участка). Клетка = куб 4x4x4.
 Config.Grid = {
@@ -444,7 +444,7 @@ function Config.computeReward(level: number, survived: boolean, bunkerFrac: numb
 	if survived then
 		return math.floor(p.BaseReward * (0.6 + 0.4 * math.clamp(bunkerFrac, 0, 1)))
 	end
-	return math.floor(p.BaseReward * 0.4 * math.clamp(progress, 0, 1))
+	return math.floor(p.BaseReward * 0.6 * math.clamp(progress, 0, 1))
 end
 
 -- Цвет кислоты (клиентские детали луж и эффекты).

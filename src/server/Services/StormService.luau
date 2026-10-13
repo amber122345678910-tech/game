@@ -547,18 +547,27 @@ local function floodStep(session: Session, dt: number)
 		local door = rec.def
 		-- сколько дверь держит СЕЙЧАС (повреждённая — меньше), в тех же единицах, что и HUD
 		local holds = Grid.layerBottom(rec.y) + StormSim.doorSeal(rec)
-		local text = if rec.hp < rec.maxHp
-			then string.format(
+		local text: string
+		if holds <= 0 then
+			-- дверь на дне открытой ямы ниже земли: кислота стекает в яму при любом уровне
+			text = string.format(
+				"☣ Кислота просачивается через дверь! «%s» стоит в открытой яме ниже уровня земли — кислота стекает туда при любом уровне. Накрой яму крышей или подними вход.",
+				door.Name
+			)
+		elseif rec.hp < rec.maxHp then
+			text = string.format(
 				"☣ Кислота просачивается через дверь! «%s» повреждена и держит сейчас только %.1f ст. (целая — %g). Береги дверь или поставь прочнее.",
 				door.Name,
 				holds,
 				Grid.layerBottom(rec.y) + door.Seal
 			)
-			else string.format(
+		else
+			text = string.format(
 				"☣ Кислота просачивается через дверь! «%s» держит только %.1f ст. Купи дверь прочнее.",
 				door.Name,
 				holds
 			)
+		end
 		notifyAll(session, text, "warning")
 	end
 	if result.breach and not session.FloodWarned then

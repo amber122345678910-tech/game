@@ -20,6 +20,9 @@ local MAX_MEMBERS = 3 -- гостей в одном бункере
 -- invites[гость][UserId хозяина] = время приглашения
 local invites: { [Player]: { [number]: number } } = {}
 local lastInvite: { [Player]: number } = {}
+local REINVITE_COOLDOWN = 20 -- секунд между приглашениями одному и тому же игроку (и после отказа)
+-- sentTo[хозяин][UserId гостя] = когда было отправлено последнее приглашение
+local sentTo: { [Player]: { [number]: number } } = {}
 
 local function notify(player: Player, text: string, kind: string)
 	Remotes.Notify:FireClient(player, text, kind)
@@ -91,6 +94,17 @@ local function onInvite(host: Player, targetUserId: any)
 		notify(host, "В бункере уже максимум друзей", "error")
 		return
 	end
+	local sent = sentTo[host]
+	if not sent then
+		sent = {}
+		sentTo[host] = sent
+	end
+	local lastSent = sent[target.UserId]
+	if lastSent and os.clock() - lastSent < REINVITE_COOLDOWN then
+		notify(host, "Приглашение уже отправлено — подожди немного", "info")
+		return
+	end
+	sent[target.UserId] = os.clock()
 	local list = invites[target]
 	if not list then
 		list = {}
@@ -204,6 +218,7 @@ function TeamService.init()
 	Players.PlayerRemoving:Connect(function(player)
 		invites[player] = nil
 		lastInvite[player] = nil
+		sentTo[player] = nil
 	end)
 end
 
