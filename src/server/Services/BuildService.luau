@@ -272,7 +272,13 @@ function BuildService.replaceWithLayout(player: Player, entries: { Grid.Entry })
 end
 
 function BuildService.init()
-	Remotes.PlaceBlock.OnServerEvent:Connect(onPlace)
+	Remotes.PlaceBlock.OnServerEvent:Connect(function(player: Player, blockId: any, x: any, y: any, z: any, rot: any, seq: any)
+		onPlace(player, blockId, x, y, z, rot)
+		-- отвечаем на каждый запрос (и на отказ тоже), иначе клиент считал бы блок потраченным
+		if typeof(seq) == "number" and seq == seq and seq == math.floor(seq) and seq > 0 and seq < 2 ^ 31 then
+			DataService.ackPlace(player, seq)
+		end
+	end)
 	Remotes.RemoveBlock.OnServerEvent:Connect(onRemove)
 	Remotes.ClearPlot.OnServerEvent:Connect(onClear)
 	Players.PlayerRemoving:Connect(function(player)

@@ -125,6 +125,7 @@ end
 
 -- Ошибки, при которых повторять бессмысленно (нет доступа к API в Studio и т.п.).
 local saveWarned: { [Player]: boolean } = {}
+local placeAck: { [Player]: number } = {}
 
 local function isFatalError(message: string): boolean
 	local lower = string.lower(message)
@@ -349,6 +350,7 @@ end
 
 local function onPlayerRemoving(player: Player)
 	saveWarned[player] = nil
+	placeAck[player] = nil
 	local session = sessions[player]
 	if not session then
 		return
@@ -478,8 +480,19 @@ function DataService.replicate(player: Player)
 			stats.Coins.Value = math.min(session.Data.Coins, 2 ^ 31 - 1)
 			stats.Level.Value = session.Data.StormLevel
 		end
-		Remotes.DataUpdated:FireClient(player, snapshot(session.Data))
+		local snap = snapshot(session.Data)
+		snap.PlaceAck = placeAck[player]
+		Remotes.DataUpdated:FireClient(player, snap)
 	end)
+end
+
+-- Сервер обработал запрос установки №seq (принял или отказал) — клиенту уйдёт свежий
+-- инвентарь с этим номером, и он перестанет считать блок «в пути».
+function DataService.ackPlace(player: Player, seq: number)
+	if seq > (placeAck[player] or 0) then
+		placeAck[player] = seq
+	end
+	DataService.replicate(player)
 end
 
 function DataService.addCoins(player: Player, amount: number)

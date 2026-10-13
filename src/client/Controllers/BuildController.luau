@@ -88,12 +88,26 @@ local function takeSendToken(): boolean
 	return true
 end
 
--- Отправлено, но сервер ещё не ответил (счётчик обнуляется, когда приходит инвентарь).
-local inFlight: { [string]: number } = {}
+-- Отправлено, но сервер ещё не ответил: каждый запрос с номером, сервер подтверждает номер
+-- последнего обработанного вместе со свежим инвентарём (DataSnapshot.PlaceAck).
+type InFlight = { seq: number, id: string }
+local inFlight: { InFlight } = {}
+local placeSeq = 0
+local placeAck = 0
+
+local function inFlightCount(id: string): number
+	local n = 0
+	for _, f in inFlight do
+		if f.id == id and f.seq > placeAck then
+			n += 1
+		end
+	end
+	return n
+end
 
 -- Сколько блоков этого типа уже ждут отправки или ответа (их нет смысла считать доступными).
 local function queuedPlacements(id: string): number
-	local n = inFlight[id] or 0
+	local n = inFlightCount(id)
 	for _, q in actionQueue do
 		if not q.remove and q.id == id then
 			n += 1
@@ -105,15 +119,16 @@ end
 local function flushActions()
 	while actionQueue[1] do
 		local q = actionQueue[1]
-		if not q.remove and ClientState.blockCount(q.id) - (inFlight[q.id] or 0) < 1 then
+		if not q.remove and ClientState.blockCount(q.id) - inFlightCount(q.id) < 1 then
 			table.remove(actionQueue, 1) -- блоков не осталось: сервер всё равно откажет
 		elseif takeSendToken() then
 			table.remove(actionQueue, 1)
 			if q.remove then
 				Remotes.RemoveBlock:FireServer(q.x, q.y, q.z)
 			else
-				inFlight[q.id] = (inFlight[q.id] or 0) + 1
-				Remotes.PlaceBlock:FireServer(q.id, q.x, q.y, q.z, q.rot)
+				placeSeq += 1
+				table.insert(inFlight, { seq = placeSeq, id = q.id })
+				Remotes.PlaceBlock:FireServer(q.id, q.x, q.y, q.z, q.rot, placeSeq)
 			end
 		else
 			break
@@ -949,9 +964,20 @@ local function renderStep()
 end
 
 function BuildController.init()
-	-- пришёл свежий инвентарь: отправленные установки уже учтены сервером
-	ClientState.DataChanged:Connect(function()
-		table.clear(inFlight)
+	-- пришёл свежий инвентарь: установки до подтверждённого номера уже учтены сервером
+	ClientState.DataChanged:Connect(function(data)
+		local ack = data.PlaceAck
+		if typeof(ack) == "number" and ack > placeAck then
+			placeAck = ack
+		end
+		local i = 1
+		while i <= #inFlight do
+			if inFlight[i].seq <= placeAck then
+				table.remove(inFlight, i)
+			else
+				i += 1
+			end
+		end
 	end)
 	ghost = Instance.new("Part")
 	ghost.Name = "BuildGhost"

@@ -3,7 +3,7 @@
 -- (ReplicatedStorage/Remotes), поэтому клиент и сервер видят их сразу.
 --
 -- Клиент -> сервер:
---   PlaceBlock(blockId: string, x: number, y: number, z: number, rot: number)
+--   PlaceBlock(blockId: string, x: number, y: number, z: number, rot: number, seq: number)
 --   RemoveBlock(x: number, y: number, z: number)
 --   ClearPlot()
 --   StartStorm()
@@ -32,6 +32,7 @@ export type DataSnapshot = {
 	StarterClaimed: boolean,
 	StormsSurvived: number,
 	StormsPlayed: number,
+	PlaceAck: number?, -- номер последнего обработанного запроса PlaceBlock (для счётчика блоков «в пути»)
 }
 
 export type StormResult = {
