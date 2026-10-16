@@ -54,6 +54,8 @@ local COL = {
 local OUTLINE = Color3.fromRGB(16, 16, 24)
 local HAIR_OUTLINE = Color3.fromRGB(10, 10, 16)
 local MIN = 0.05 -- минимальный размер детали
+-- тонкие наклейки (черты лица, швы, кровь) не отбрасывают тень — без «ряби» теней на коже и ткани
+local THIN: Opts = { castShadow = false }
 
 ------------------------------------------------------------------------------------------
 -- Помощники
@@ -93,7 +95,7 @@ local function band(ctx: Ctx, bone: string, a: Vector3, b: Vector3, n: Vector3, 
 	local y = if len > 1e-6 then dir.Unit else V(0, 1, 0)
 	local z = (n - y * n:Dot(y)).Unit
 	local x = y:Cross(z)
-	return ellS(ctx, bone, CFrame.fromMatrix((a + b) / 2, x, y, z), V(w, len * (extend or 1.25), 0.012), color)
+	return ellS(ctx, bone, CFrame.fromMatrix((a + b) / 2, x, y, z), V(w, len * (extend or 1.25), 0.012), color, THIN)
 end
 
 type Ell = { c: Vector3, h: Vector3 } -- центр и полуоси (оси кости)
@@ -258,7 +260,7 @@ end
 
 -- Пятно на поверхности (точка p, нормаль n)
 local function spot(ctx: Ctx, bone: string, p: Vector3, n: Vector3, w: number, h: number, color: Color3, out: number, roll: number?)
-	ellS(ctx, bone, decal(p, n, out, roll), V(w, h, 0.012), color)
+	ellS(ctx, bone, decal(p, n, out, roll), V(w, h, 0.012), color, THIN)
 end
 
 ------------------------------------------------------------------------------------------
