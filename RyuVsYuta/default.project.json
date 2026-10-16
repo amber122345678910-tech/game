@@ -1,0 +1,47 @@
+{
+  "name": "RyuVsYuta",
+  "tree": {
+    "$className": "DataModel",
+    "ReplicatedStorage": {
+      "Cutscene": {
+        "$path": "src/shared"
+      }
+    },
+    "StarterPlayer": {
+      "StarterPlayerScripts": {
+        "CutsceneClient": {
+          "$path": "src/client"
+        }
+      }
+    },
+    "Players": {
+      "$properties": {
+        "CharacterAutoLoads": false
+      }
+    },
+    "Workspace": {
+      "$properties": {
+        "StreamingEnabled": false,
+        "SignalBehavior": "Deferred"
+      }
+    },
+    "SoundService": {
+      "$properties": {
+        "RespectFilteringEnabled": true,
+        "AmbientReverb": "NoReverb"
+      }
+    },
+    "MaterialService": {
+      "$properties": {
+        "Use2022Materials": true
+      }
+    },
+    "Lighting": {
+      "$properties": {
+        "Technology": "Future",
+        "LightingStyle": "Realistic",
+        "PrioritizeLightingQuality": true
+      }
+    }
+  }
+}
