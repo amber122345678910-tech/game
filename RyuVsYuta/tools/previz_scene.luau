@@ -54,7 +54,8 @@ end
 local groupIds = { Rika = 1, Yuta = 2, Ryu = 3 }
 local frames = {}
 for _, t in times do
-	local frame = Sequence.evaluate(t)
+	-- отрицательное время = фон стартового меню (часы меню = -t)
+	local frame = if t < 0 then Sequence.menuFrame(-t) else Sequence.evaluate(t)
 	local e = frame.env
 	local fc = e.fogColor
 	local fr = Previz.newFrame(string.format("t%05.2f_%s", t, frame.shotName), frame.camera.cf, frame.camera.fov, {
@@ -98,8 +99,8 @@ for _, t in times do
 	end
 	if frame.shotName ~= "End" then
 		fr.sprites = {}
-		local shot = if frame.shotName == "A" then "A" else "BC"
-		for _, c in FogCards.evaluate(t, shot, frame.camera.cf) do
+		local shot = if frame.shotName == "A" or frame.shotName == "Menu" then "A" else "BC"
+		for _, c in FogCards.evaluate(if t < 0 then 8.5 else t, shot, frame.camera.cf) do
 			local p = c.center
 			table.insert(fr.sprites, { center = { p.X, p.Y, p.Z }, w = c.w, h = c.h, roll = c.roll, alpha = c.alpha, color = { c.color.R, c.color.G, c.color.B } })
 		end

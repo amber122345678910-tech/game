@@ -243,20 +243,20 @@ end
 
 local function furSpike(bone: string, base: Vector3, dir: Vector3, len: number, w: number, color: Color3, dark: boolean, amp: number)
 	local d = dir.Unit
-	-- эллипсоид от a до b: центр чуть впереди корня, видимая часть сужается к кончику
-	local back = len * 0.55
-	local a = base - d * back
-	local b = base + d * len
-	local total = len + back
-	local hingeY = -total / 2 + back -- корень шипа в осях детали (ось Y вдоль шипа)
-	local fl = if amp > 0 then { amp = amp, freq = 2.3, hinge = V(0, hingeY, 0), axis = V(1, 0, 0) } else nil
-	lock(bone, a, b, w, w * 0.8, d:Cross(V(0, 1, 0)) + V(0, 0, 0.001), color, { flutter = fl })
+	local zh = d:Cross(V(0, 1, 0)) + V(0, 0, 0.001)
+	-- два эллипсоида: толстый пучок у корня и тонкое остриё дальше — ступенчатое сужение к кончику
+	local function stage(t0: number, t1: number, ww: number, col: Color3)
+		local a = base + d * (len * t0)
+		local b = base + d * (len * t1)
+		local mid = (t0 + t1) / 2
+		-- шарнир — корень шипа, выраженный в осях этой детали (ось Y вдоль шипа)
+		local fl = if amp > 0 then { amp = amp, freq = 2.3, hinge = V(0, -len * mid, 0), axis = V(1, 0, 0) } else nil
+		lock(bone, a, b, math.max(0.05, ww), math.max(0.05, ww * 0.8), zh, col, { flutter = fl })
+	end
+	stage(-0.45, 0.62, w, color)
+	stage(0.3, 1.0, w * 0.5, color)
 	if dark then
-		-- крошечный тёмный кончик (у четверти шипов)
-		local ta = base + d * (len * 0.8)
-		local tb = base + d * (len * 1.02)
-		local tfl = if amp > 0 then { amp = amp, freq = 2.3, hinge = V(0, -(len * 0.91), 0), axis = V(1, 0, 0) } else nil
-		lock(bone, ta, tb, 0.05, 0.05, d:Cross(V(0, 1, 0)) + V(0, 0, 0.001), C.furTip, { flutter = tfl })
+		stage(0.84, 1.05, 0.05, C.furTip) -- крошечный тёмный кончик (у четверти шипов)
 	end
 end
 
@@ -716,7 +716,7 @@ local function buildArm(side: string, s: number)
 		E(LA, frameOut(cc + r * 0.2 + V(0, rng:range(-0.03, 0.03), 0), r, 0), V(0.25, 0.4, 0.22), col)
 		E(LA, frameOut(cc + V(0, -0.12, 0) + r * 0.16, r, 0), V(0.22, 0.2, 0.2), C.furShadow)
 	end
-	for k = 1, 30 do
+	for k = 1, 28 do
 		local th = rad(rng:range(0, 360))
 		local r = V(math.sin(th), 0, math.cos(th))
 		local yy = rng:range(-0.17, 0.15)
@@ -724,45 +724,54 @@ local function buildArm(side: string, s: number)
 		local dir = r + V(0, rng:range(-0.55, 0.35) - (if yy < -0.08 then 0.4 else 0), 0)
 		furSpike(LA, base, dir, rng:range(0.13, 0.24), rng:range(0.07, 0.1), if k % 4 == 0 then C.furShade else C.fur, rng:next() < 0.25, 6)
 	end
-	for k = 0, 3 do
-		local th = rad(k * 90 + 45)
+	for k = 0, 1 do
+		local th = rad(k * 180 + 90 * s)
 		local r = V(math.sin(th), 0, math.cos(th))
 		furStrand(LA, cc + r * 0.28, r + V(0, -0.3, 0), 0.28, 0.18, V(0, -0.4, 0), 60 + k + (if s > 0 then 0 else 10))
 	end
 
 	-- КИСТЬ (для правой: ладонь -X, тыльная сторона +X; указательный спереди, -Z)
-	E(HA, at(Hd + V(0, -0.01, 0)), V(0.17, 0.15, 0.27), C.skin) -- запястье
-	E(HA, at(Hd + V(-0.005 * s, -0.22, 0)), V(0.15, 0.44, 0.42), C.skin) -- ладонь
-	E(HA, at(Hd + V(0.03 * s, -0.27, 0.0)), V(0.1, 0.34, 0.41), C.skin) -- тыл
-	E(HA, at(Hd + V(-0.04 * s, -0.17, -0.12)), V(0.13, 0.25, 0.15), C.skin) -- тенар
-	E(HA, at(Hd + V(-0.035 * s, -0.25, 0.14)), V(0.11, 0.3, 0.12), C.skin) -- гипотенар
+	E(HA, at(Hd + V(0, -0.01, 0)), V(0.16, 0.15, 0.27), C.skin) -- запястье
+	E(HA, at(Hd + V(0.0, -0.2, 0)), V(0.13, 0.4, 0.4), C.skin) -- пясть
+	E(HA, at(Hd + V(0.005 * s, -0.37, 0.0)), V(0.12, 0.14, 0.43), C.skin) -- ряд костяшек
+	E(HA, at(Hd + V(-0.035 * s, -0.17, -0.12)), V(0.12, 0.25, 0.15), C.skin) -- тенар
+	E(HA, at(Hd + V(-0.03 * s, -0.25, 0.13)), V(0.1, 0.3, 0.13), C.skin) -- гипотенар
+	-- едва заметные сухожилия на тыльной стороне
+	for _, f in { "Index", "Middle", "Ring" } do
+		local K = bp(f .. "1" .. side)
+		lock(HA, Hd + V(0.04 * s, -0.09, (K.Z - Hd.Z) * 0.4), K + V(0.042 * s, 0.07, 0), 0.05, 0.05, V(s, 0, 0), C.skinMid)
+	end
 	for _, f in FINGERS do
 		local b1, b2, b3 = f .. "1" .. side, f .. "2" .. side, f .. "3" .. side
 		local K, K2, K3 = bp(b1), bp(b2), bp(b3)
 		local w = FWIDTH[f]
-		local L3 = 0.125 * FSCALE[f]
-		-- костяшка и сухожилие на тыльной стороне
-		E(HA, at(K + V(0.04 * s, 0.025, 0)), V(0.08, 0.09, 0.1), C.skin)
-		lock(HA, Hd + V(0.055 * s, -0.08, (K.Z - Hd.Z) * 0.35), K + V(0.05 * s, 0.07, 0), 0.05, 0.05, V(s, 0, 0), C.skinShade)
-		-- фаланги с шарнирами-шарами
-		Seg(b1, K + V(0, 0.03, 0), K2, w, w * 0.92, C.skin, nil, 0, 1.08)
-		Ball(b2, K2, w * 0.95, C.skin)
-		Seg(b2, K2, K3, w * 0.93, w * 0.86, C.skin, nil, 0, 1.06)
-		Ball(b3, K3, w * 0.88, C.skin)
-		Seg(b3, K3, K3 - V(0, L3, 0), w * 0.86, w * 0.8, C.skin)
-		-- ноготь и складка сустава на тыльной стороне
-		E(b3, at(K3 + V(w * 0.3 * s, -L3 * 0.66, 0)), V(0.05, L3 * 0.52, w * 0.66), C.nail)
-		E(b2, at(K2 + V(w * 0.3 * s, 0.0, 0)), V(0.05, 0.05, w * 0.7), C.skinShade)
+		local L3 = 0.12 * FSCALE[f]
+		local tip = K3 - V(0, L3, 0)
+		-- костяшка
+		Ball(b1, K + V(0.012 * s, 0.01, 0), w * 1.08, C.skin)
+		-- фаланги: цилиндры с шарами в суставах (ровные трубки, без «сосисок»)
+		Cyl(b1, CFrame.new(K) * CFrame.fromMatrix(Vector3.zero, V(0, -1, 0), V(1, 0, 0), V(0, 0, 1)) * CFrame.new((K2 - K).Magnitude / 2, 0, 0), V((K2 - K).Magnitude, w, w), C.skin)
+		Ball(b2, K2, w * 0.97, C.skin)
+		Cyl(b2, CFrame.new(K2) * CFrame.fromMatrix(Vector3.zero, V(0, -1, 0), V(1, 0, 0), V(0, 0, 1)) * CFrame.new((K3 - K2).Magnitude / 2, 0, 0), V((K3 - K2).Magnitude, w * 0.93, w * 0.93), C.skin)
+		Ball(b3, K3, w * 0.9, C.skin)
+		Cyl(b3, CFrame.new(K3) * CFrame.fromMatrix(Vector3.zero, V(0, -1, 0), V(1, 0, 0), V(0, 0, 1)) * CFrame.new(L3 * 0.45, 0, 0), V(L3 * 0.9, w * 0.86, w * 0.86), C.skin)
+		E(b3, at(tip + V(0, 0.012, 0)), V(w * 0.84, w * 0.8, w * 0.86), C.skin) -- подушечка
+		-- ноготь и складки суставов на тыльной стороне
+		E(b3, at(K3 + V(w * 0.3 * s, -L3 * 0.68, 0)), V(0.05, L3 * 0.5, w * 0.66), C.nail)
+		E(b2, at(K2 + V(w * 0.27 * s, 0.0, 0)), V(0.05, 0.05, w * 0.62), C.skinMid)
+		E(b3, at(K3 + V(w * 0.25 * s, 0.0, 0)), V(0.05, 0.05, w * 0.55), C.skinMid)
 	end
 	-- большой палец
 	local t1, t2, t3 = "Thumb1" .. side, "Thumb2" .. side, "Thumb3" .. side
 	local T1, T2, T3 = bp(t1), bp(t2), bp(t3)
-	Seg(t1, T1 + V(0, 0.05, 0.02), T2, 0.13, 0.12, C.skin, nil, 0, 1.05)
+	Seg(t1, T1 + V(0, 0.06, 0.03), T2, 0.13, 0.12, C.skin, nil, 0, 1.08)
 	Ball(t2, T2, 0.11, C.skin)
-	Seg(t2, T2, T3, 0.105, 0.1, C.skin, nil, 0, 1.05)
-	Ball(t3, T3, 0.098, C.skin)
-	Seg(t3, T3, T3 - V(0, 0.12, 0), 0.095, 0.09, C.skin)
-	E(t3, atS(T3 + V(0.022, -0.078, -0.03), s, 0, -40, 0), V(0.062, 0.06, 0.05), C.nail)
+	Cyl(t2, CFrame.new(T2) * CFrame.fromMatrix(Vector3.zero, V(0, -1, 0), V(1, 0, 0), V(0, 0, 1)) * CFrame.new((T3 - T2).Magnitude / 2, 0, 0), V((T3 - T2).Magnitude, 0.105, 0.105), C.skin)
+	Ball(t3, T3, 0.1, C.skin)
+	Cyl(t3, CFrame.new(T3) * CFrame.fromMatrix(Vector3.zero, V(0, -1, 0), V(1, 0, 0), V(0, 0, 1)) * CFrame.new(0.05, 0, 0), V(0.1, 0.095, 0.095), C.skin)
+	E(t3, at(T3 - V(0, 0.105, 0)), V(0.092, 0.08, 0.094), C.skin)
+	E(t3, atS(T3 + V(0.02, -0.075, -0.028), s, 0, -40, 0), V(0.06, 0.06, 0.05), C.nail)
+	E(t2, atS(T2 + V(0.02, 0.0, -0.03), s, 0, -40, 0), V(0.05, 0.05, 0.07), C.skinMid)
 end
 
 ------------------------------------------------------------------------------------------

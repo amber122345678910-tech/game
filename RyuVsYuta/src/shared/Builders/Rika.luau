@@ -329,7 +329,7 @@ function Rika.build(origin: CFrame): Model
 
 	do
 		-- x полосы на заданной высоте (по передней части кривой)
-		local function stripeXAt(gamma: number, y: number): number
+		local function stripeXAt(gamma: number, y: number): number?
 			local prev: Vector3? = nil
 			for k = 0, 180 do
 				local p, _ = stripePoint(gamma, 20 + k * 0.7)
@@ -338,13 +338,15 @@ function Rika.build(origin: CFrame): Model
 				end
 				prev = p
 			end
-			return 0
+			return nil
 		end
+		-- x(gamma) растёт монотонно; «не нашли пересечения» = слишком большой угол
 		local function solveGamma(targetX: number, y: number): number
-			local lo, hi = 0, 60
+			local lo, hi = 0, 40
 			for _ = 1, 30 do
 				local mid = (lo + hi) / 2
-				if stripeXAt(mid, y) < targetX then
+				local x = stripeXAt(mid, y)
+				if x and x < targetX then
 					lo = mid
 				else
 					hi = mid
@@ -352,11 +354,6 @@ function Rika.build(origin: CFrame): Model
 			end
 			return (lo + hi) / 2
 		end
-		for k = 0, 12 do
-			local pp, _ = stripePoint(10, 20 + k * 10)
-			print("PSI", 20 + k * 10, pp)
-		end
-		print("XAT", stripeXAt(10, T.Y - 0.85), T)
 		local maskW = 1.68
 		local STRIPES = {
 			{ x = 0, w = 0.135 }, -- центральная, самая широкая, расходится вокруг глаза
@@ -372,7 +369,6 @@ function Rika.build(origin: CFrame): Model
 			local nrm: { Vector3 } = {}
 			local wid: { number } = {}
 			local function flush()
-				print("  run", #pts, pts[1], pts[#pts])
 				if #pts >= 2 then
 					band("Head", pts, nrm, wid, COL.stripe, 0.07, 0.012)
 				end
@@ -406,7 +402,6 @@ function Rika.build(origin: CFrame): Model
 				psi += if psi < 60 then 3 else 4.5
 			end
 			flush()
-			print("STRIPE", st.x, gamma)
 		end
 	end
 

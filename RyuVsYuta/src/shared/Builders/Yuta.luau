@@ -266,10 +266,10 @@ end
 ------------------------------------------------------------------------------------------
 
 local SKULL: Ell = { c = V(0, 0.53, 0.03), h = V(0.3, 0.35, 0.35) }
-local MASK: Ell = { c = V(0, 0.39, -0.08), h = V(0.215, 0.29, 0.25) }
-local LOWER: Ell = { c = V(0, 0.2, -0.1), h = V(0.11, 0.12, 0.17) }
-local CAP: Ell = { c = V(0, 0.62, 0.05), h = V(0.33, 0.3, 0.38) } -- шапка волос
-local CHIN: Ell = { c = V(0, 0.115, -0.165), h = V(0.07, 0.06, 0.07) }
+local MASK: Ell = { c = V(0, 0.37, -0.08), h = V(0.215, 0.32, 0.25) }
+local LOWER: Ell = { c = V(0, 0.18, -0.1), h = V(0.11, 0.13, 0.165) }
+local CAP: Ell = { c = V(0, 0.62, 0.05), h = V(0.32, 0.3, 0.38) } -- шапка волос
+local CHIN: Ell = { c = V(0, 0.085, -0.15), h = V(0.065, 0.065, 0.07) }
 local HEAD_C = V(0, 0.48, 0.03) -- центр для лучей по поверхности головы
 local FACE: { Ell } = { MASK, LOWER, CHIN, SKULL }
 
@@ -284,16 +284,16 @@ local function buildHead(ctx: Ctx)
 	-- шея (под высоким воротником видна только у подбородка)
 	Sculpt.ellipsoid(ctx, "Neck", CFrame.new(0, 0.22, 0.02), V(0.24, 0.68, 0.24), COL.skin)
 	-- тень под челюстью
-	Sculpt.ellipsoid(ctx, H, CFrame.new(0, 0.07, -0.02), V(0.18, 0.1, 0.16), COL.skinShade)
+	Sculpt.ellipsoid(ctx, H, CFrame.new(0, 0.04, -0.02), V(0.18, 0.1, 0.16), COL.skinShade)
 	for _, e in FACE do
 		ell(ctx, H, e.c, e.h * 2, COL.skin)
 	end
 	for _, s in { -1, 1 } do
 		-- линия челюсти: от угла к подбородку (узкое лицо)
-		Sculpt.segment(ctx, H, V(s * 0.165, 0.36, -0.03), V(s * 0.035, 0.11, -0.16), 0.08, 0.13, COL.skin)
+		Sculpt.segment(ctx, H, V(s * 0.165, 0.36, -0.03), V(s * 0.03, 0.08, -0.145), 0.08, 0.13, COL.skin)
 		-- ухо
-		Sculpt.ellipsoid(ctx, H, CFrame.new(s * 0.29, 0.38, 0.06) * CFrame.Angles(0, 0, rad(s * 8)), V(0.07, 0.17, 0.11), COL.skin)
-		ellS(ctx, H, CFrame.new(s * 0.318, 0.38, 0.055), V(0.02, 0.1, 0.055), COL.skinShade)
+		Sculpt.ellipsoid(ctx, H, CFrame.new(s * 0.28, 0.37, 0.06) * CFrame.Angles(rad(-10), 0, rad(s * 6)), V(0.06, 0.16, 0.1), COL.skin)
+		ellS(ctx, H, CFrame.new(s * 0.303, 0.37, 0.055) * CFrame.Angles(rad(-10), 0, 0), V(0.02, 0.09, 0.05), COL.skinShade)
 	end
 
 	for _, s in { -1, 1 } do
@@ -322,12 +322,12 @@ local function buildHead(ctx: Ctx)
 	mark(ctx, -0.022, 0.31, 0.008, 0.07, COL.skinShade, 0.004, -6)
 	mark(ctx, 0, 0.243, 0.04, 0.011, COL.skinShade, 0.004)
 	-- рот: маленький, спокойный
-	mark(ctx, 0, 0.17, 0.07, 0.01, COL.lip, 0.002)
-	mark(ctx, 0, 0.15, 0.032, 0.007, COL.skinShade, 0.002)
+	mark(ctx, 0, 0.158, 0.07, 0.01, COL.lip, 0.002)
+	mark(ctx, 0, 0.138, 0.032, 0.007, COL.skinShade, 0.002)
 	-- царапины и кровь на щеке и подбородке (после боя)
 	mark(ctx, -0.15, 0.28, 0.065, 0.009, COL.blood, 0.002, 28)
 	mark(ctx, -0.145, 0.255, 0.04, 0.008, COL.blood, 0.002, 18)
-	mark(ctx, 0.04, 0.105, 0.03, 0.012, COL.blood, 0.002, -20)
+	mark(ctx, 0.035, 0.08, 0.03, 0.012, COL.blood, 0.002, -20)
 end
 
 ------------------------------------------------------------------------------------------
