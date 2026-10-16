@@ -35,7 +35,22 @@ local state: State = {
 	ended = false,
 }
 
-local drivers: { [string]: CharacterDriver.Driver } = {}
+-- Роли сцены и модели, которые могут их играть: модель персонажа или обычный манекен Roblox
+local ROLES: { [string]: { models: string, dummies: string } } = {
+	Rika = { models = "Rika", dummies = "Rika" },
+	Yuta = { models = "Yuta", dummies = "YutaDummy" },
+	Ryu = { models = "Ryu", dummies = "RyuDummy" },
+}
+local allDrivers: { [string]: CharacterDriver.Driver } = {} -- по имени модели
+local drivers: { [string]: CharacterDriver.Driver } = {} -- активные, по роли
+local style = "models"
+local HIDDEN_STATE: Types.CharState = {
+	visible = false,
+	origin = CFrame.new(),
+	pose = {},
+	outline = 0,
+	flutter = 0,
+}
 local events: { Types.Event } = Sequence.events()
 local nextEvent = 1
 local lastFrame: Types.Frame? = nil
@@ -67,17 +82,48 @@ function Director.init()
 	local hidden = Instance.new("Folder")
 	hidden.Name = "HiddenCharacters"
 	hidden.Parent = ReplicatedStorage
-	for _, name in { "Rika", "Yuta", "Ryu" } do
+	for _, name in { "Rika", "Yuta", "Ryu", "YutaDummy", "RyuDummy" } do
 		local model = chars:WaitForChild(name, 30) :: Model?
 		if model then
-			local def = (Skeletons :: any)[name]
-			drivers[name] = CharacterDriver.new(model, def, hidden)
+			local rigName = model:GetAttribute("Rig")
+			local def = (Skeletons :: any)[if type(rigName) == "string" then rigName else name]
+			allDrivers[name] = CharacterDriver.new(model, def, hidden)
 		else
 			warn("[Cutscene] model not found: " .. name)
 		end
 	end
 	Env.init()
 	Effects.init()
+	Director.setStyle(style)
+end
+
+-- "models" — модели Рю и Юты; "dummies" — обычные манекены Roblox на их месте (Рика всегда модель)
+function Director.setStyle(newStyle: string)
+	style = newStyle
+	for role, opts in ROLES do
+		local want = if newStyle == "dummies" then opts.dummies else opts.models
+		for _, modelName in { opts.models, opts.dummies } do
+			local d = allDrivers[modelName]
+			if d and modelName ~= want then
+				d:update(HIDDEN_STATE, 0)
+			end
+		end
+		drivers[role] = allDrivers[want]
+	end
+	Effects.setActiveRyu(if newStyle == "dummies" then ROLES.Ryu.dummies else ROLES.Ryu.models)
+	local f = lastFrame
+	if f then
+		for role, d in drivers do
+			local cs = f.chars[role]
+			if cs then
+				d:update(cs, f.t)
+			end
+		end
+	end
+end
+
+function Director.style(): string
+	return style
 end
 
 local function fireEvents(fromT: number, toT: number)

@@ -67,15 +67,16 @@ check(Lighting:FindFirstChildOfClass("Sky") ~= nil, "Sky missing")
 
 local Rig = Loader.load("src/shared/Rig")
 local Skeletons = Loader.load("src/shared/Skeletons")
-local budget = { Rika = 1700, Ryu = 1000, Yuta = 600 }
+local budget = { Rika = 1700, Ryu = 1000, Yuta = 600, RyuDummy = 40, YutaDummy = 40 }
 local total = 0
-for _, name in { "Rika", "Yuta", "Ryu" } do
+for _, name in { "Rika", "Yuta", "Ryu", "YutaDummy", "RyuDummy" } do
 	local m = find(WS, "Cutscene.Characters." .. name)
 	check(m ~= nil, "character missing: " .. name)
 	if m then
 		local root = m:FindFirstChild("Root")
 		check(root ~= nil and root:IsA("BasePart"), name .. ": Root part missing")
-		local def = Skeletons[name]
+		local def = Skeletons[m:GetAttribute("Rig") or name]
+		check(def ~= nil, name .. ": unknown Rig attribute")
 		local ok, binding = pcall(Rig.bind, def, m, root.CFrame)
 		check(ok, name .. ": bind failed " .. tostring(binding))
 		local n, unanchored, collide, unbound = 0, 0, 0, 0
@@ -109,9 +110,11 @@ if rika then
 	local el = rika:FindFirstChild("EyeLight", true)
 	check(el ~= nil and el.ClassName == "PointLight", "Rika: EyeLight PointLight missing")
 end
-local ryu = find(WS, "Cutscene.Characters.Ryu")
-if ryu then
-	check(ryu:FindFirstChild("EnergyAnchor", true) ~= nil, "Ryu: EnergyAnchor missing")
+for _, rn in { "Ryu", "RyuDummy" } do
+	local ryu = find(WS, "Cutscene.Characters." .. rn)
+	if ryu then
+		check(ryu:FindFirstChild("EnergyAnchor", true) ~= nil, rn .. ": EnergyAnchor missing")
+	end
 end
 local env = find(WS, "Cutscene.Environment")
 check(env ~= nil, "Environment missing")

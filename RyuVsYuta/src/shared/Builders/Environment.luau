@@ -1514,7 +1514,8 @@ type CloudSpec = {
 	width: number,
 	top: number, -- высота верхушки
 	towers: number,
-	lumps: number?, -- комков на каждом ядре (детализация)
+	lumps: number?, -- светлых комков на каждом комке верхней кромки (детализация)
+	lobe: number?, -- размер комка основания (доля ширины)
 }
 
 type CloudCore = { p: Vector3, r: number, fr: number }
@@ -1534,55 +1535,87 @@ local function cumulus(ctx: Ctx, f: Instance, spec: CloudSpec)
 	local nl = spec.lumps or 3
 	local function lump(p: Vector3, d: number, flat: number, tone: number, name: string)
 		local cf = CFrame.new(p) * CFrame.Angles(0, rng:range(0, math.pi), 0)
-		local size = Vector3.new(d * rng:range(1.0, 1.15), d * flat, d * rng:range(0.95, 1.05))
+		local size = Vector3.new(d * rng:range(1.0, 1.18), d * flat, d * rng:range(0.9, 1.05))
 		local e = ellipsoid(ctx, f, cf, size, cloudTone(tone), Enum.Material.SmoothPlastic, name)
 		e.CastShadow = false
 	end
-	-- 1) основание
-	local nb = math.floor(W / 220) + 2
-	for i = 1, nb do
-		local t = (i - 0.5) / nb - 0.5
-		local s = W * rng:range(0.42, 0.55)
-		local p = base + right * (t * W * 0.8) + fwd * (rng:range(0, 0.1) * W) + up * (s * 0.08)
-		lump(p, s, rng:range(0.28, 0.36), rng:range(0.05, 0.2), "CloudBase")
-	end
-	-- 2) башни
+	-- силуэт: объединение «куполов» башен; полуширина купола на высоте y: hw * sqrt(1 - (y/h)^1.6)
+	type Dome = { x: number, h: number, hw: number }
+	local domes: { Dome } = {}
 	for k = 1, spec.towers do
 		local main = k == math.ceil(spec.towers / 2)
-		local lateral = if spec.towers == 1 then 0 else ((k - 1) / (spec.towers - 1) - 0.5) * W * 0.6
-		lateral += rng:range(-0.05, 0.05) * W
-		local topH = if main then Hc else Hc * rng:range(0.55, 0.85)
-		local r0 = W * (if main then rng:range(0.22, 0.27) else rng:range(0.17, 0.22))
-		local lean = rng:range(-0.18, 0.18)
-		local y = r0 * 0.55
-		local cores: { CloudCore } = {}
-		while true do
-			local fr = math.clamp(y / topH, 0, 1)
-			local r = r0 * (1 - 0.38 * fr) * rng:range(0.92, 1.08)
-			local p = base + right * (lateral + lean * y + rng:range(-0.12, 0.12) * r) + up * y
-			lump(p, r * 2, rng:range(0.86, 0.96), 0.2 + 0.42 * fr, "CloudCore")
-			table.insert(cores, { p = p, r = r, fr = fr })
-			if y + r * 0.9 >= topH or #cores >= 7 then
-				break
+		local x = if spec.towers == 1 then 0 else ((k - 1) / (spec.towers - 1) - 0.5) * W * 0.62
+		x += rng:range(-0.06, 0.06) * W
+		local h = if main then Hc else Hc * rng:range(0.5, 0.82)
+		local hw = W * (if main then rng:range(0.3, 0.36) else rng:range(0.22, 0.3))
+		table.insert(domes, { x = x, h = h, hw = hw })
+	end
+	-- широкое тёмное основание
+	table.insert(domes, { x = 0, h = Hc * 0.3, hw = W * 0.5 })
+	local function intervals(y: number): { { number } }
+		local list: { { number } } = {}
+		for _, d in domes do
+			if y < d.h then
+				local t = 1 - (y / d.h) ^ 1.6
+				local hw = d.hw * math.sqrt(math.max(0, t))
+				table.insert(list, { d.x - hw, d.x + hw })
 			end
-			y += r * rng:range(0.85, 1.05)
 		end
-		-- комки на поверхности ядер (верх и сторона к зрителю), на макушке — больше и ярче
-		for ci, c in cores do
-			local isTop = ci == #cores
-			local m = nl + (if isTop then 2 else 0)
-			for _ = 1, m do
-				local dir = (up * rng:range(0.15, 1.0) + right * rng:range(-1.0, 1.0) + fwd * rng:range(0.15, 0.9)).Unit
-				if isTop then
-					dir = (dir + up * 0.6).Unit
+		table.sort(list, function(a, b)
+			return a[1] < b[1]
+		end)
+		local merged: { { number } } = {}
+		for _, iv in list do
+			local last = merged[#merged]
+			if last and iv[1] <= last[2] then
+				last[2] = math.max(last[2], iv[2])
+			else
+				table.insert(merged, { iv[1], iv[2] })
+			end
+		end
+		return merged
+	end
+	-- ряды комков снизу вверх; комок у верхней кромки силуэта — светлее и получает «капусту» сверху
+	local rBase = W * (spec.lobe or 0.19)
+	local y = rBase * 0.45
+	local rows = 0
+	while y < Hc and rows < 12 do
+		rows += 1
+		local fr = y / Hc
+		local r = rBase * (1 - 0.5 * fr) * rng:range(0.92, 1.08)
+		local ivs = intervals(y)
+		local above = intervals(y + r * 1.2)
+		for _, iv in ivs do
+			local a, b = iv[1] + r * 0.55, iv[2] - r * 0.55
+			local n = math.max(1, math.floor((b - a) / (r * 1.25)) + 1)
+			for i = 1, n do
+				local x = if n == 1 then (a + b) / 2 else a + (b - a) * (i - 1) / (n - 1)
+				x += rng:range(-0.2, 0.2) * r
+				-- есть ли масса над этим комком (если нет — это верхняя кромка силуэта)
+				local covered = false
+				for _, av in above do
+					if x > av[1] + r * 0.3 and x < av[2] - r * 0.3 then
+						covered = true
+					end
 				end
-				local rr = c.r * rng:range(0.36, 0.58)
-				local p = c.p + dir * (c.r * rng:range(0.72, 0.88))
-				local facing = dir:Dot(up) * 0.55 + dir:Dot(fwd) * 0.3
-				local tone = 0.36 + 0.42 * c.fr + 0.3 * facing + rng:range(-0.06, 0.06)
-				lump(p, rr * 2, rng:range(0.85, 0.97), tone, "CloudLump")
+				local edge = math.min(x - iv[1], iv[2] - x) / r -- близость к боковой кромке
+				local depth = rng:range(-0.25, 0.3) * r + (if covered then -0.15 * r else 0.2 * r)
+				local p = base + right * x + fwd * depth + up * (y + rng:range(-0.12, 0.12) * r)
+				local tone = 0.12 + 0.5 * fr + (if covered then 0 else 0.2) - (if edge < 1 then 0.05 else 0) + rng:range(-0.07, 0.07)
+				lump(p, r * 2 * rng:range(0.95, 1.15), rng:range(0.82, 0.95), tone, "CloudLobe")
+				if not covered then
+					-- «цветная капуста»: светлые комки на верхней стороне кромки
+					for _ = 1, nl do
+						local dir = (up * rng:range(0.45, 1.0) + right * rng:range(-0.9, 0.9) + fwd * rng:range(0.1, 0.6)).Unit
+						local rr = r * rng:range(0.38, 0.58)
+						local q = p + dir * (r * rng:range(0.62, 0.82))
+						local tn = 0.55 + 0.35 * fr + 0.25 * dir:Dot(up) + rng:range(-0.05, 0.05)
+						lump(q, rr * 2, rng:range(0.85, 0.97), tn, "CloudLump")
+					end
+				end
 			end
 		end
+		y += r * rng:range(0.78, 0.92)
 	end
 end
 
@@ -1596,13 +1629,13 @@ local function buildClouds(ctx: Ctx, root: Instance)
 	end
 	-- главный клубящийся столб дыма за спиной Рю и громады по бокам (кадры B, C)
 	local hero: { CloudSpec } = {
-		{ pos = polar(2, 1050, 40), width = 940, top = 830, towers = 3, lumps = 3 },
-		{ pos = polar(-31, 1100, 70), width = 720, top = 650, towers = 2, lumps = 3 },
-		{ pos = polar(32, 1080, 60), width = 740, top = 720, towers = 3, lumps = 3 },
-		{ pos = polar(-14, 1560, 90), width = 700, top = 770, towers = 2, lumps = 2 },
-		{ pos = polar(17, 1620, 90), width = 660, top = 700, towers = 2, lumps = 2 },
-		{ pos = polar(-53, 1300, 100), width = 660, top = 560, towers = 2, lumps = 2 },
-		{ pos = polar(54, 1260, 90), width = 660, top = 600, towers = 2, lumps = 2 },
+		{ pos = polar(2, 1050, 40), width = 940, top = 830, towers = 3, lumps = 2, lobe = 0.17 },
+		{ pos = polar(-31, 1100, 70), width = 720, top = 650, towers = 2, lumps = 2 },
+		{ pos = polar(32, 1080, 60), width = 740, top = 720, towers = 3, lumps = 2 },
+		{ pos = polar(-14, 1560, 90), width = 700, top = 770, towers = 2, lumps = 1, lobe = 0.22 },
+		{ pos = polar(17, 1620, 90), width = 660, top = 700, towers = 2, lumps = 1, lobe = 0.22 },
+		{ pos = polar(-53, 1300, 100), width = 660, top = 560, towers = 2, lumps = 1, lobe = 0.22 },
+		{ pos = polar(54, 1260, 90), width = 660, top = 600, towers = 2, lumps = 1, lobe = 0.22 },
 	}
 	for _, s in hero do
 		cumulus(ctx, f, s)
@@ -1626,7 +1659,8 @@ local function buildClouds(ctx: Ctx, root: Instance)
 			width = rng:range(520, 850),
 			top = rng:range(380, 640),
 			towers = rng:int(1, 2),
-			lumps = 2,
+			lumps = 1,
+			lobe = 0.24,
 		})
 	end
 	for _, d in f:GetDescendants() do

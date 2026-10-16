@@ -44,7 +44,12 @@ UI.init({
 		UI.hideEnd()
 		Director.seek(t)
 	end,
+	onStyle = function(style: string)
+		Director.setStyle(style)
+		UI.setStyle(style)
+	end,
 }, Sequence.shotMarks(), Sequence.duration())
+UI.setStyle(Director.style())
 UI.seekKeys(function()
 	return Director.state().t
 end)

@@ -32,6 +32,13 @@ for _, name in { "Rika", "Yuta", "Ryu" } do
 	model.Parent = chars
 end
 
+-- обычные манекены Roblox на месте Рю и Юты (переключатель в меню)
+local Dummy = Loader.load("src/shared/Builders/Dummy")
+for _, name in { "Yuta", "Ryu" } do
+	local model = Dummy.build(Sequence.buildOrigin(name), name, name .. "Dummy")
+	model.Parent = chars
+end
+
 local Environment = Loader.load("src/shared/Builders/Environment")
 local env = Environment.build()
 env.Name = "Environment"

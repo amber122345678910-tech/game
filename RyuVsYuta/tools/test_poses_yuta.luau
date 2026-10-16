@@ -72,4 +72,27 @@ function P.calm(_def, _origin, M)
 	}, nil
 end
 
+-- на носках: пятки подняты, пальцы стоп согнуты, кисти — кулаки с опорой (проверка Toe и пальцев)
+function P.tiptoe(_def, _origin, M)
+	local a = M.angles
+	local pose = {
+		Root = CFrame.new(0, 0.18, 0),
+		FootL = a(-35, 0, 0),
+		ToeL = a(35, 0, 0),
+		FootR = a(-35, 0, 0),
+		ToeR = a(35, 0, 0),
+		UpperArmL = a(25, 0, -15),
+		LowerArmL = a(90, 0, 0),
+		HandL = a(0, 0, 20),
+	}
+	for _, f in { "Index", "Middle", "Ring", "Pinky" } do
+		pose[f .. "1L"] = a(0, 0, 75)
+		pose[f .. "2L"] = a(0, 0, 85)
+		pose[f .. "3L"] = a(0, 0, 60)
+	end
+	pose.Thumb1L = a(-20, 0, 30)
+	pose.Thumb2L = a(0, 0, 40)
+	return pose, nil
+end
+
 return P

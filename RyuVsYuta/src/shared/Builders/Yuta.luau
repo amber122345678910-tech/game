@@ -581,50 +581,62 @@ local function buildArm(ctx: Ctx, side: string)
 	Sculpt.ellipsoid(ctx, LA, CFrame.new(0, -0.41, 0.0), V(0.3, 0.12, 0.3), COL.jacketShade)
 	Sculpt.ellipsoid(ctx, LA, CFrame.new(0, -0.45, 0.0), V(0.2, 0.06, 0.21), COL.jacketInner)
 	-- открытое предплечье
-	Sculpt.ellipsoid(ctx, LA, CFrame.new(0, -0.6, 0.0), V(0.17, 0.5, 0.18), COL.skin)
-	Sculpt.ellipsoid(ctx, LA, CFrame.new(0, -0.83, 0.0), V(0.13, 0.32, 0.155), COL.skin)
+	Sculpt.ellipsoid(ctx, LA, CFrame.new(0, -0.6, 0.0), V(0.2, 0.52, 0.2), COL.skin)
+	Sculpt.ellipsoid(ctx, LA, CFrame.new(0, -0.83, 0.0), V(0.14, 0.32, 0.165), COL.skin)
 end
 
 local FINGERS = { "Index", "Middle", "Ring", "Pinky" }
 local FSCALE: { [string]: number } = { Index = 0.92, Middle = 1.0, Ring = 0.95, Pinky = 0.76 }
 local FWIDTH: { [string]: number } = { Index = 0.07, Middle = 0.072, Ring = 0.068, Pinky = 0.06 }
 
+-- Фаланга: цилиндр от сустава до сустава и шарик на дальнем конце (сгиб без щелей)
+local function phalanx(ctx: Ctx, bone: string, tip: Vector3, w: number, base: boolean?)
+	local len = tip.Magnitude
+	if len > 0.03 then
+		Sculpt.cylinder(ctx, bone, MathX.axisX(tip / 2, tip), V(len, w, w), COL.skin)
+	end
+	Sculpt.ball(ctx, bone, tip, w * 0.98, COL.skin)
+	if base then
+		Sculpt.ball(ctx, bone, V(0, 0, 0), w * 1.04, COL.skin)
+	end
+end
+
 local function buildHand(ctx: Ctx, side: string)
 	local sx = if side == "L" then -1 else 1
 	local HB = "Hand" .. side
-	-- запястье (шарнир), ладонь, костяшки; ладонь смотрит к телу (−sx), тыльная сторона — наружу
-	Sculpt.ellipsoid(ctx, HB, CFrame.new(0, -0.01, 0), V(0.12, 0.14, 0.16), COL.skin)
-	local palm = ell(ctx, HB, V(0, -0.18, 0.0), V(0.11, 0.4, 0.31), COL.skin)
-	Sculpt.ellipsoid(ctx, HB, CFrame.new(0, -0.32, 0.0), V(0.1, 0.1, 0.33), COL.skin)
-	-- подушка большого пальца
-	Sculpt.ellipsoid(ctx, HB, CFrame.new(-sx * 0.025, -0.12, -0.095), V(0.1, 0.2, 0.12), COL.skin)
+	-- запястье (шарнир)
+	Sculpt.ellipsoid(ctx, HB, CFrame.new(0, -0.01, 0), V(0.12, 0.14, 0.17), COL.skin)
+	-- ладонь: плоская, расширяется к костяшкам; ладонь смотрит к телу (−sx), тыльная сторона — наружу
+	Sculpt.ellipsoid(ctx, HB, CFrame.new(0, -0.15, 0), V(0.11, 0.38, 0.29), COL.skin)
+	Sculpt.ellipsoid(ctx, HB, CFrame.new(0, -0.255, 0), V(0.095, 0.17, 0.325), COL.skin)
+	-- подушка большого пальца и ребро ладони
+	Sculpt.ellipsoid(ctx, HB, CFrame.new(-sx * 0.02, -0.11, -0.085), V(0.11, 0.2, 0.13), COL.skin)
+	Sculpt.ellipsoid(ctx, HB, CFrame.new(-sx * 0.01, -0.15, 0.1), V(0.1, 0.24, 0.1), COL.skin)
 	-- тень ладони
+	local palm: Ell = { c = V(0, -0.165, 0), h = V(0.055, 0.17, 0.16) }
 	do
-		local p, n = hull({ palm }, palm.c, V(-sx, -0.1, 0))
-		spot(ctx, HB, p, n, 0.18, 0.2, COL.skinShade, -0.002)
+		local p, n = hull({ palm }, palm.c, V(-sx, -0.05, 0))
+		spot(ctx, HB, p, n, 0.17, 0.2, COL.skinShade, 0.0)
 		if side == "R" then
 			-- кровь на ладони
-			local q, m = hull({ palm }, palm.c, V(-sx, -0.25, 0.25))
-			spot(ctx, HB, q, m, 0.13, 0.08, COL.blood, 0.002, 30)
+			local q, m = hull({ palm }, palm.c, V(-sx, -0.25, 0.2))
+			spot(ctx, HB, q, m, 0.13, 0.08, COL.blood, 0.004, 30)
 		end
 	end
 	for _, f in FINGERS do
 		local s = FSCALE[f]
 		local w = FWIDTH[f]
-		local l1 = P.fingerLen[1] * s
-		local l2 = P.fingerLen[2] * s
-		local l3 = 0.095 * s
-		Sculpt.segment(ctx, f .. "1" .. side, V(0, 0.02, 0), V(0, -l1, 0), w, w, COL.skin, nil, 0, 1.25)
-		Sculpt.segment(ctx, f .. "2" .. side, V(0, 0.005, 0), V(0, -l2, 0), w * 0.93, w * 0.93, COL.skin, nil, 0, 1.3)
-		Sculpt.segment(ctx, f .. "3" .. side, V(0, 0.005, 0), V(0, -l3, 0), w * 0.86, w * 0.86, COL.skin, nil, 0, 1.25)
+		phalanx(ctx, f .. "1" .. side, V(0, -P.fingerLen[1] * s, 0), w, true)
+		phalanx(ctx, f .. "2" .. side, V(0, -P.fingerLen[2] * s, 0), w * 0.94)
+		phalanx(ctx, f .. "3" .. side, V(0, -0.07 * s, 0), w * 0.88)
 	end
 	local t1 = P.thumbLen[1]
-	Sculpt.segment(ctx, "Thumb1" .. side, V(0, 0.03, 0.01), V(0, -t1, -t1 * 0.35), 0.085, 0.085, COL.skin, nil, 0, 1.2)
-	Sculpt.segment(ctx, "Thumb2" .. side, V(0, 0.005, 0), V(0, -P.thumbLen[2], 0), 0.075, 0.075, COL.skin, nil, 0, 1.25)
-	Sculpt.segment(ctx, "Thumb3" .. side, V(0, 0.005, 0), V(0, -0.085, -0.005), 0.068, 0.068, COL.skin, nil, 0, 1.2)
+	phalanx(ctx, "Thumb1" .. side, V(0, -t1, -t1 * 0.35), 0.085, true)
+	phalanx(ctx, "Thumb2" .. side, V(0, -P.thumbLen[2], 0), 0.078)
+	phalanx(ctx, "Thumb3" .. side, V(0, -0.065, -0.005), 0.07)
 	if side == "L" then
-		-- кольцо Оримото: серебряный ободок на безымянном
-		Sculpt.cylinder(ctx, "Ring1L", CFrame.new(0, -0.075, 0) * CFrame.Angles(0, 0, math.pi / 2), V(0.05, 0.088, 0.088), COL.ring, {
+		-- кольцо Оримото: тонкий серебряный ободок на безымянном
+		ellS(ctx, "Ring1L", CFrame.new(0, -0.06, 0), V(0.084, 0.026, 0.084), COL.ring, {
 			material = Enum.Material.Metal,
 			reflectance = 0.35,
 			name = "OrimotoRing",
@@ -639,22 +651,24 @@ end
 local function buildLeg(ctx: Ctx, side: string)
 	local sx = if side == "L" then -1 else 1
 	local UL, LL, FT, TO = "UpperLeg" .. side, "LowerLeg" .. side, "Foot" .. side, "Toe" .. side
-	-- бедро
-	local thigh = ell(ctx, UL, V(sx * 0.01, -0.36, 0.0), V(0.48, 1.0, 0.5), COL.pants)
-	local thighLow = ell(ctx, UL, V(0, -0.98, -0.01), V(0.39, 0.9, 0.41), COL.pants)
-	local legU = { thigh, thighLow }
-	local TC = V(0, -0.7, 0)
+	-- бедро: объём сверху, ниже — прямая «труба» брючины до колена
+	local thigh = ell(ctx, UL, V(sx * 0.01, -0.42, 0.0), V(0.5, 1.1, 0.52), COL.pants)
+	Sculpt.cylinder(ctx, UL, CFrame.new(0, -1.035, -0.005) * CFrame.Angles(0, 0, math.pi / 2), V(0.77, 0.39, 0.39), COL.pants)
+	local legU: { Ell } = { thigh, { c = V(0, -1.035, -0.005), h = V(0.195, 0.6, 0.195) } }
+	local TC = V(0, -0.75, 0)
 	-- складки брюк
 	hullLine(ctx, UL, legU, TC, { V(-sx * 0.4, 0.9, -1), V(-sx * 0.2, 0.3, -1) }, 0.02, COL.pantsLine)
 	hullLine(ctx, UL, legU, TC, { V(sx * 0.6, -0.3, -1), V(sx * 0.1, -0.9, -1) }, 0.02, COL.pantsLine)
 	hullLine(ctx, UL, legU, TC, { V(-sx * 0.8, -0.9, 1), V(sx * 0.3, -1.3, 1) }, 0.02, COL.pantsLine)
-	-- колено (шарнир) и голень
-	local knee = ell(ctx, LL, V(0, 0.0, -0.01), V(0.38, 0.4, 0.4), COL.pants)
-	local calf = ell(ctx, LL, V(0, -0.44, 0.03), V(0.35, 0.95, 0.38), COL.pants)
-	Sculpt.ellipsoid(ctx, LL, CFrame.new(0, -0.93, 0.0), V(0.29, 0.74, 0.31), COL.pants)
+	-- колено (шарнир-шар того же диаметра, что и брючина) и голень
+	Sculpt.ball(ctx, LL, V(0, 0, -0.005), 0.39, COL.pants)
+	Sculpt.cylinder(ctx, LL, CFrame.new(0, -0.225, 0.0) * CFrame.Angles(0, 0, math.pi / 2), V(0.45, 0.375, 0.375), COL.pants)
+	local calf = ell(ctx, LL, V(0, -0.45, 0.02), V(0.37, 0.9, 0.4), COL.pants)
+	Sculpt.ellipsoid(ctx, LL, CFrame.new(0, -0.88, 0.0), V(0.3, 0.8, 0.32), COL.pants)
+	local legL: { Ell } = { { c = V(0, -0.1, 0), h = V(0.19, 0.4, 0.19) }, calf }
 	local KC = V(0, -0.2, 0.01)
-	hullLine(ctx, LL, { knee, calf }, KC, { V(sx * 0.7, 0.6, -1), V(-sx * 0.3, 0.3, -1) }, 0.02, COL.pantsLine)
-	hullLine(ctx, LL, { knee, calf }, KC, { V(-sx * 0.5, 0.5, 1), V(sx * 0.4, 0.35, 1) }, 0.02, COL.pantsLine)
+	hullLine(ctx, LL, legL, KC, { V(sx * 0.7, 0.6, -1), V(-sx * 0.3, 0.3, -1) }, 0.02, COL.pantsLine)
+	hullLine(ctx, LL, legL, KC, { V(-sx * 0.5, 0.5, 1), V(sx * 0.4, 0.35, 1) }, 0.02, COL.pantsLine)
 	-- край брючины: лёгкая сборка над кедами
 	Sculpt.ellipsoid(ctx, LL, CFrame.new(0, -1.13, 0.0), V(0.32, 0.16, 0.34), COL.pantsShade)
 	ellS(ctx, LL, CFrame.new(0, -1.05, 0.0), V(0.31, 0.02, 0.33), COL.pantsLine)

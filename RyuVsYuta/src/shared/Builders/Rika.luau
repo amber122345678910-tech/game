@@ -27,7 +27,7 @@ local COL = {
 	skinCore = hex("#2E2B3C"), -- глубокая тень (горло)
 	mask = hex("#F1F0F2"),
 	stripe = hex("#3D4157"),
-	sclera = hex("#C7CCD2"),
+	sclera = hex("#DCE0E6"),
 	irisRing = hex("#6E1A1A"),
 	eye = hex("#E2242F"),
 	pupil = hex("#1A1214"),
@@ -199,7 +199,7 @@ function Rika.build(origin: CFrame): Model
 	local RA = 0.5 -- радиус дуги зубов
 	local EYE_Y = -1.63 -- центр глаза
 	local EYE_HH = 0.45 -- полувысота щели
-	local EYE_HW = 0.185 -- полуширина щели
+	local EYE_HW = 0.165 -- полуширина щели
 
 	local maskVols: { Vol } = {}
 	do
@@ -207,17 +207,12 @@ function Rika.build(origin: CFrame): Model
 			table.insert(maskVols, { cf = cf, r = r })
 			ellCF(bone, cf, r * 2, COL.mask)
 		end
-		-- купол: шире всего на ~38% высоты, макушка чуть нависает вперёд
-		maskVol("Head", CFrame.new(M(0, -0.85, 0.0)) * R(-8, 0, 0), V(0.84, 0.85, 0.79))
-		-- нижняя часть луковицы: стопка эллипсоидов по профилю, сужается в «рыло» над зубами
-		for _, yc in { -1.15, -1.45, -1.75, -2.02 } do
-			local s = (-0.85 - yc) / 1.4
-			local k = (1 - s ^ 1.6) ^ 0.8
-			local a = if yc < -1.9 then 0.36 else 0.45
-			maskVol("Head", CFrame.new(M(0, yc, -0.1 * s)), V(0.38 + 0.46 * k, a, 0.5 + 0.29 * k))
-		end
+		-- луковица: одно гладкое «яйцо» узким концом вниз, макушка чуть нависает вперёд
+		maskVol("Head", CFrame.new(M(0, -1.1, 0.0)) * R(-8, 0, 0), V(0.84, 1.12, 0.79))
+		-- рыло: нижняя часть чуть выдаётся вперёд над зубами
+		maskVol("Head", CFrame.new(M(0, -1.9, -0.12)) * R(12, 0, 0), V(0.46, 0.5, 0.6))
 		-- скулы: мост от рыла к уголкам рта
-		maskVol("Head", CFrame.new(M(0, -2.12, -0.02)), V(0.55, 0.2, 0.52))
+		maskVol("Head", CFrame.new(M(0, -2.13, -0.02)), V(0.53, 0.17, 0.5))
 	end
 
 	-- Зубы на дуге ~150°
@@ -245,8 +240,8 @@ function Rika.build(origin: CFrame): Model
 			ellCF("Jaw", cf, r * 2, COL.mask)
 		end
 		chinVol(CFrame.new(M(0, -2.86, 0.02)), V(0.45, 0.2, 0.44))
-		chinVol(CFrame.new(M(0, -3.03, -0.08)), V(0.33, 0.22, 0.36))
-		chinVol(CFrame.new(M(0, -3.2, -0.17)), V(0.16, 0.14, 0.2))
+		chinVol(CFrame.new(M(0, -3.0, -0.1)), V(0.32, 0.26, 0.34))
+		chinVol(CFrame.new(M(0, -3.18, -0.2)) * R(-25, 0, 0), V(0.14, 0.2, 0.17))
 
 		-- зубы: тело-брусок + скруглённый край; крайние уходят назад в щёки
 		local N_TEETH = 7
@@ -275,24 +270,19 @@ function Rika.build(origin: CFrame): Model
 			local s = smile(alpha)
 			local h = 0.1 + (if i % 2 == 0 then 0.06 else 0.0) + 0.02 * rng:next()
 			local cf = arcCF(alpha, TEETH_TOP + 0.035 * s + 0.06 - h * 0.3, RA + 0.04)
-			ellCF("Head", cf * R(0, 0, (if i % 2 == 0 then 1 else -1) * 18), V(0.17, h + 0.08, 0.05), COL.mask)
+			ellCF("Head", cf * R(0, 0, (if i % 2 == 0 then 1 else -1) * 22), V(0.15, h + 0.06, 0.035), COL.mask)
 		end
 		for i = 0, 8 do
 			local alpha = -78 + i * 19.5
 			local s = smile(alpha)
 			local h = 0.08 + (if i % 2 == 1 then 0.05 else 0.0) + 0.02 * rng:next()
 			local cf = arcCF(alpha, TEETH_BOTTOM + 0.075 * s - 0.04 + h * 0.3, RA + 0.035)
-			ellCF("Jaw", cf * R(0, 0, (if i % 2 == 0 then 1 else -1) * 18), V(0.17, h + 0.06, 0.05), COL.mask)
+			ellCF("Jaw", cf * R(0, 0, (if i % 2 == 0 then 1 else -1) * 22), V(0.15, h + 0.05, 0.035), COL.mask)
 		end
 		-- тёмные дёсны в уголках рта
 		for _, sx in { -1, 1 } do
 			ellCF("Head", arcCF(sx * 82, BITE + 0.15, RA - 0.04), V(0.13, 0.36, 0.16), COL.gum)
 			ellCF("Jaw", arcCF(sx * 82, BITE - 0.08, RA - 0.04), V(0.13, 0.3, 0.16), COL.gum)
-		end
-		-- складка на подбородке
-		local p, n = castIn(chinVols, M(0, -3.08, -3), V(0, 0, 1))
-		if p and n then
-			ellCF("Jaw", surfFrame(p, n, V(0, 1, 0)), V(0.05, 0.14, 0.04), COL.skinMid)
 		end
 	end
 
@@ -407,7 +397,7 @@ function Rika.build(origin: CFrame): Model
 
 	do
 		-- Глаз: тёмная прорезь шва, склера, радужка (Neon "Eye"), зрачок, блик, толстые веки-кромки
-		ellCF("Head", eyeCF * CFrame.new(0, 0, 0.012), V(EYE_HW * 2 + 0.1, EYE_HH * 2 * 0.92, 0.07), COL.stripe)
+		ellCF("Head", eyeCF * CFrame.new(0, 0, 0.012), V(EYE_HW * 2 + 0.04, EYE_HH * 2 * 0.9, 0.07), COL.stripe)
 		ellCF("Head", eyeCF * CFrame.new(0, 0, 0.026), V(EYE_HW * 2 * 0.86, EYE_HH * 2 * 0.78, 0.07), COL.sclera)
 		for _, sy in { -1, 1 } do
 			ellCF("Head", eyeCF * CFrame.new(0, sy * EYE_HH * 0.55, 0.024), V(EYE_HW * 0.95, EYE_HH * 0.75, 0.06), COL.sclera)
@@ -428,9 +418,9 @@ function Rika.build(origin: CFrame): Model
 				local p, n = castOut(maskVols, LQ, (q - LQ).Unit)
 				table.insert(pts, p)
 				table.insert(nrm, n)
-				table.insert(wid, 0.05 + 0.025 * (1 - v * v))
+				table.insert(wid, 0.04 + 0.02 * (1 - v * v))
 			end
-			band("Head", pts, nrm, wid, COL.stripe, 0.08, 0.03)
+			band("Head", pts, nrm, wid, COL.stripe, 0.07, 0.03)
 		end
 		-- красный свет глаза (яркость анимирует сцена)
 		Sculpt.light(ctx, "Head", (eyeCF * CFrame.new(0, irisY, 0.5)).Position - H, "PointLight", {
@@ -485,8 +475,8 @@ function Rika.build(origin: CFrame): Model
 
 		for _, sx in { -1, 1 } do
 			-- грудные мышцы: крупные, с тенью-складкой снизу
-			ell("Chest", C + V(sx * 0.66, 0.18, -0.7), V(1.55, 1.1, 0.72), COL.skinLit, R(6, 0, sx * 14))
-			ell("Chest", C + V(sx * 0.7, -0.27, -0.6), V(1.38, 0.34, 0.55), COL.skinMid, R(0, 0, sx * 10))
+			ell("Chest", C + V(sx * 0.68, 0.22, -0.78), V(1.6, 0.95, 0.46), COL.skinLit, R(-8, -sx * 14, sx * 12))
+			ell("Chest", C + V(sx * 0.7, -0.2, -0.72), V(1.4, 0.26, 0.4), COL.skinMid, R(0, -sx * 14, sx * 8))
 			-- лопатки
 			ell("Chest", C + V(sx * 0.62, 0.15, 0.95), V(0.85, 1.05, 0.45), COL.skinLit, R(0, 0, sx * 12))
 			-- зубчатые мышцы и рёбра на боках
@@ -501,9 +491,6 @@ function Rika.build(origin: CFrame): Model
 			-- трапеции: высокие бугры по бокам головы
 			seg("Chest", C + V(sx * 0.22, 1.35, 0.32), C + V(sx * 1.75, 1.02, 0.12), 0.95, 1.35, COL.skin)
 			ell("Chest", C + V(sx * 0.75, 1.52, 0.38), V(1.05, 0.62, 1.05), COL.skinMid, R(0, 0, -sx * 18))
-			-- ключицы
-			local cl = "Clavicle" .. (if sx < 0 then "L" else "R")
-			seg(cl, C + V(sx * 0.35, 1.05, -0.62), C + V(sx * 1.45, 1.02, -0.45), 0.13, 0.13, COL.skinLit)
 			-- мышцы спины вдоль позвоночника
 			seg("Spine", S + V(sx * 0.24, -0.75, 0.62), S + V(sx * 0.24, 0.8, 0.72), 0.36, 0.3, COL.skin)
 		end
@@ -582,7 +569,7 @@ function Rika.build(origin: CFrame): Model
 		local tw = { 1.7, 1.5, 1.3, 1.1, 0.92, 0.75, 0.58, 0.42, 0.28, 0.16, 0.06 }
 		local th = { 1.0, 0.82, 0.68, 0.58, 0.5, 0.42, 0.34, 0.26, 0.18, 0.11, 0.05 }
 		for i = 1, #tail - 1 do
-			tube("Root", tail[i], tail[i + 1], (tw[i] + tw[i + 1]) / 2, (th[i] + th[i + 1]) / 2, if i % 3 == 0 then COL.massDeep else COL.mass, 1.6)
+			tube("Root", tail[i], tail[i + 1], (tw[i] + tw[i + 1]) / 2, (th[i] + th[i + 1]) / 2, COL.mass, 1.6)
 		end
 		-- рваные дымные лоскуты по краям массы и хвоста
 		local tatters = {
@@ -678,14 +665,14 @@ function Rika.build(origin: CFrame): Model
 	-- ГРИВА: объёмное ядро (эллипсоиды) + пряди-«языки пламени» (Beam)
 	------------------------------------------------------------------------------------------
 	do
-		ell("Head", T + V(0, -0.4, 0.85), V(2.5, 2.4, 1.9), COL.maneSoft)
-		ell("Head", T + V(0, -1.9, 1.05), V(2.2, 2.2, 1.4), COL.maneShade)
-		ell("Mane", T + V(0, 0.8, 1.05), V(2.0, 2.2, 1.9), COL.mane)
-		ell("Mane", T + V(0, 1.6, 0.55), V(0.7, 1.0, 0.7), COL.maneShade)
+		-- ядро: компактный объём за и над маской; силуэт «сердца» дорисовывают ленты
+		ell("Head", T + V(0, -0.5, 0.85), V(2.3, 2.3, 1.7), COL.maneSoft)
+		ell("Head", T + V(0, -1.9, 1.05), V(2.0, 2.0, 1.3), COL.maneShade)
+		ell("Mane", T + V(0, 0.7, 0.95), V(2.3, 2.3, 1.9), COL.mane)
 		for _, sx in { -1, 1 } do
-			ell("Mane", T + V(sx * 0.8, 1.25, 0.85), V(2.0, 2.3, 1.9), COL.mane, R(0, 0, -sx * 15))
-			ell("Head", T + V(sx * 1.3, -0.3, 0.6), V(1.6, 2.2, 1.6), COL.mane, R(0, 0, sx * 12))
-			ell("Head", T + V(sx * 1.05, -1.6, 0.55), V(1.1, 1.9, 1.3), COL.maneSoft, R(0, 0, -sx * 8))
+			ell("Mane", T + V(sx * 0.72, 1.3, 0.85), V(1.6, 1.9, 1.6), COL.mane, R(0, 0, -sx * 15))
+			ell("Head", T + V(sx * 1.12, -0.45, 0.55), V(1.3, 2.0, 1.4), COL.mane, R(0, 0, sx * 10))
+			ell("Head", T + V(sx * 0.95, -1.7, 0.5), V(0.95, 1.7, 1.2), COL.maneSoft, R(0, 0, -sx * 8))
 		end
 	end
 
@@ -739,43 +726,53 @@ function Rika.build(origin: CFrame): Model
 	end
 
 	do
-		-- 1) «пламя» над головой: ленты вверх с крюками наружу, по краям — силуэт «сердца»
+		-- 1) «пламя» над головой: веер широких лент; по центру короче (ямка «сердца»), по бокам
+		--    длиннее и загибаются наружу-вниз, на самом верху — несколько острых «вспышек»
+		local crown = T + V(0, 0.95, 0.95)
+		for i = 0, 11 do
+			local u = -1 + i * (2 / 11) -- -1..1 слева направо
+			local a = deg(u * 85)
+			local sx = if u < 0 then -1 else 1
+			local root = crown + V(math.sin(a) * 1.0, math.cos(a) * 0.85, 0.1 + 0.25 * math.abs(u))
+			local dir = V(math.sin(a) * 0.9, math.cos(a) + 0.15, 0.35)
+			local au = math.abs(u)
+			-- длина: ямка в центре, пики на ±0.45, по краям короче
+			local len = 1.25 + 1.0 * math.exp(-((au - 0.45) / 0.3) ^ 2) - 0.2 * au
+			local hook = 25 + 45 * au
+			local c0 = if i % 3 == 1 then COL.maneShade else COL.maneSoft
+			lock("Mane", root, dir, V(sx, -0.2, 0), len, { -12, -6, 10, 25, hook }, 0.62 - 0.12 * au, c0, COL.mane, 0.15 + 0.2 * au)
+		end
 		for _, sx in { -1, 1 } do
-			lock("Mane", T + V(sx * 1.25, 1.2, 0.6), V(sx * 0.55, 1, 0.2), V(sx, 0, 0), 1.9, { 0, 8, 25, 45, 60 }, 0.55, COL.maneSoft, COL.mane, 0.25)
-			lock("Mane", T + V(sx * 0.85, 1.9, 0.75), V(sx * 0.25, 1, 0.25), V(sx, 0, 0), 1.4, { 0, 10, 25, 45, 55 }, 0.5, COL.maneSoft, COL.mane, 0.3)
-			lock("Mane", T + V(sx * 0.35, 1.8, 0.9), V(sx * 0.05, 1, 0.3), V(-sx, 0, 0), 1.0, { 0, 10, 25, 40 }, 0.4, COL.maneShade, COL.mane, 0.35)
-			lock("Mane", T + V(sx * 0.5, 1.2, 1.5), V(sx * 0.2, 0.75, 0.7), V(0, 1, 0), 1.9, { 0, -5, 10, 30, 45 }, 0.5, COL.maneShade, COL.maneSoft, 0.2)
-			lock("Mane", T + V(sx * 1.0, 2.2, 0.8), V(sx * 0.3, 1, 0.05), V(sx, 0, 0), 0.8, { 0, 15, 35, 50 }, 0.2, COL.mane, COL.mane, 0.15)
+			lock("Mane", T + V(sx * 0.6, 2.05, 0.8), V(sx * 0.2, 1, 0.1), V(sx, 0, 0), 0.9, { 0, 10, 30, 50 }, 0.22, COL.mane, COL.mane, 0.1)
+			lock("Mane", T + V(sx * 1.1, 1.75, 0.7), V(sx * 0.5, 1, 0.1), V(sx, 0, 0), 0.8, { 0, 15, 35, 55 }, 0.2, COL.mane, COL.mane, 0.1)
+			-- назад-вверх (объём сбоку и сзади)
+			lock("Mane", T + V(sx * 0.45, 1.0, 1.55), V(sx * 0.25, 0.8, 0.7), V(0, 1, 0), 2.0, { -8, -4, 12, 30, 45 }, 0.55, COL.maneShade, COL.maneSoft, 0.2)
+			lock("Mane", T + V(sx * 0.95, 0.1, 1.2), V(sx * 0.6, 0.45, 0.8), V(0, 1, 0), 2.1, { -10, -4, 15, 35, 50 }, 0.55, COL.maneShade, COL.maneSoft, 0.25)
 		end
 		-- 2) слева на экране (+X персонажа): 3 горизонтальные пряди на высоте маски (кончики загибаются вверх),
 		--    2 спадают на плечо (кончики отгибаются наружу)
-		lock("Head", T + V(0.75, -0.7, 0.3), V(1, -0.1, 0.25), V(0, 1, 0), 2.1, { -5, 0, 15, 45, 70 }, 0.5, COL.maneSoft, COL.mane, 0.3)
-		lock("Head", T + V(0.8, -1.1, 0.25), V(1, -0.2, 0.2), V(0, 1, 0), 2.4, { -8, -2, 18, 50, 70 }, 0.55, COL.maneSoft, COL.mane, 0.25)
-		lock("Head", T + V(0.75, -1.5, 0.3), V(1, -0.25, 0.3), V(0, 1, 0), 1.8, { -5, 5, 20, 45, 60 }, 0.45, COL.maneShade, COL.mane, 0.35)
-		lock("Head", T + V(0.7, -1.9, 0.35), V(0.45, -1, 0.1), V(1, 0, 0), 1.9, { 0, 5, 15, 35, 50 }, 0.45, COL.maneShade, COL.mane, 0.4)
-		lock("Head", T + V(0.55, -2.2, 0.5), V(0.35, -1, 0.2), V(1, 0, 0), 1.6, { 0, 8, 20, 40, 45 }, 0.4, COL.maneDeep, COL.maneSoft, 0.45)
-		-- 3) справа на экране (-X): 4 длинные пряди веером с крюками вверх и 2 короткие завитка у щеки
-		lock("Head", T + V(-0.75, -1.0, 0.3), V(-1, 0.15, 0.2), V(0, 1, 0), 2.4, { -10, -5, 10, 40, 75 }, 0.55, COL.maneSoft, COL.mane, 0.25)
-		lock("Head", T + V(-0.8, -1.4, 0.3), V(-1, 0, 0.25), V(0, 1, 0), 2.7, { -10, -6, 12, 45, 75 }, 0.6, COL.maneSoft, COL.mane, 0.2)
-		lock("Head", T + V(-0.75, -1.8, 0.35), V(-1, -0.15, 0.25), V(0, 1, 0), 2.4, { -12, -4, 15, 45, 70 }, 0.5, COL.maneShade, COL.mane, 0.3)
-		lock("Head", T + V(-0.7, -2.1, 0.4), V(-1, -0.35, 0.3), V(0, 1, 0), 2.0, { -10, 0, 20, 45, 60 }, 0.45, COL.maneShade, COL.maneSoft, 0.35)
-		lock("Head", T + V(-0.7, -1.35, -0.05), V(-0.6, -0.6, -0.2), V(0, 1, 0), 1.1, { 0, 30, 60, 70 }, 0.3, COL.maneSoft, COL.mane, 0.4)
-		lock("Head", T + V(-0.65, -1.95, 0.0), V(-0.5, -0.8, -0.2), V(0, 1, 0), 1.0, { 5, 30, 55, 60 }, 0.28, COL.maneShade, COL.mane, 0.45)
+		lock("Head", T + V(0.8, -0.65, 0.35), V(1, 0.05, 0.25), V(0, 1, 0), 2.2, { -14, -8, 6, 30, 55 }, 0.62, COL.maneSoft, COL.mane, 0.25)
+		lock("Head", T + V(0.85, -1.1, 0.3), V(1, -0.12, 0.2), V(0, 1, 0), 2.5, { -14, -8, 8, 35, 60 }, 0.66, COL.maneSoft, COL.mane, 0.2)
+		lock("Head", T + V(0.8, -1.55, 0.35), V(1, -0.3, 0.3), V(0, 1, 0), 1.9, { -10, -4, 12, 32, 50 }, 0.52, COL.maneShade, COL.mane, 0.3)
+		lock("Head", T + V(0.75, -1.95, 0.4), V(0.5, -1, 0.15), V(1, 0, 0), 2.0, { 0, 6, 14, 30, 45 }, 0.5, COL.maneShade, COL.mane, 0.4)
+		lock("Head", T + V(0.55, -2.25, 0.55), V(0.35, -1, 0.25), V(1, 0, 0), 1.7, { 0, 8, 18, 32, 40 }, 0.45, COL.maneDeep, COL.maneSoft, 0.45)
+		-- 3) справа на экране (-X): 4 длинные пряди веером с крюками вверх и 2 коротких завитка у щеки
+		lock("Head", T + V(-0.8, -0.8, 0.35), V(-1, 0.2, 0.2), V(0, 1, 0), 2.5, { -16, -10, 4, 30, 60 }, 0.62, COL.maneSoft, COL.mane, 0.25)
+		lock("Head", T + V(-0.85, -1.25, 0.3), V(-1, 0, 0.25), V(0, 1, 0), 2.8, { -14, -8, 8, 36, 64 }, 0.68, COL.maneSoft, COL.mane, 0.2)
+		lock("Head", T + V(-0.8, -1.7, 0.35), V(-1, -0.18, 0.25), V(0, 1, 0), 2.5, { -14, -6, 10, 34, 58 }, 0.58, COL.maneShade, COL.mane, 0.3)
+		lock("Head", T + V(-0.75, -2.05, 0.4), V(-1, -0.4, 0.3), V(0, 1, 0), 2.1, { -10, 0, 16, 36, 50 }, 0.5, COL.maneShade, COL.maneSoft, 0.35)
+		lock("Head", T + V(-0.72, -1.35, -0.05), V(-0.6, -0.65, -0.2), V(0, 1, 0), 1.1, { 0, 25, 50, 60 }, 0.32, COL.maneSoft, COL.mane, 0.4)
+		lock("Head", T + V(-0.68, -1.95, 0.0), V(-0.5, -0.8, -0.2), V(0, 1, 0), 1.0, { 5, 25, 50, 55 }, 0.3, COL.maneShade, COL.mane, 0.45)
 		-- 4) тонкие волоски между большими прядями
 		for i = 1, 6 do
 			local sx = if i % 2 == 0 then 1 else -1
 			local y = rng:range(-1.8, 0.8)
-			lock("Head", T + V(sx * 0.8, y, 0.4), V(sx, rng:range(-0.1, 0.6), 0.3), V(0, 1, 0), rng:range(1.2, 2.0), { 0, 10, 25, 45 }, rng:range(0.07, 0.12), COL.mane, COL.mane, 0.1)
+			lock("Head", T + V(sx * 0.85, y, 0.45), V(sx, rng:range(-0.1, 0.6), 0.3), V(0, 1, 0), rng:range(1.4, 2.2), { -5, 5, 20, 40 }, rng:range(0.08, 0.13), COL.mane, COL.mane, 0.1)
 		end
-		-- 5) сзади: пряди уходят назад-вверх (объём сбоку и сзади)
-		for i = 1, 6 do
-			local u = (i - 3.5) / 2.5
-			lock("Mane", T + V(u * 0.9, rng:range(-1.6, 0.2), 1.3), V(u * 0.4, 0.45, 1), V(0, 1, 0), rng:range(1.8, 2.6), { -5, 5, 15, 30, 40 }, rng:range(0.4, 0.55), COL.maneShade, COL.maneSoft, rng:range(0.15, 0.45))
-		end
-		-- 6) по спине и плечам
+		-- 5) по спине и плечам
 		for _, sx in { -1, 1 } do
-			lock("Head", T + V(sx * 0.5, -2.4, 0.9), V(sx * 0.4, -1, 0.6), V(sx, 0, 0), 1.8, { 0, 5, 15, 30 }, 0.45, COL.maneShade, COL.maneSoft, 0.5)
-			lock("Head", T + V(sx * 0.15, -2.5, 1.1), V(sx * 0.15, -1, 0.8), V(sx, 0, 0), 2.0, { 0, 5, 12, 25 }, 0.4, COL.maneDeep, COL.maneShade, 0.55)
+			lock("Head", T + V(sx * 0.5, -2.4, 0.9), V(sx * 0.4, -1, 0.6), V(sx, 0, 0), 1.8, { 0, 5, 15, 30 }, 0.5, COL.maneShade, COL.maneSoft, 0.5)
+			lock("Head", T + V(sx * 0.15, -2.5, 1.1), V(sx * 0.15, -1, 0.8), V(sx, 0, 0), 2.0, { 0, 5, 12, 25 }, 0.45, COL.maneDeep, COL.maneShade, 0.55)
 		end
 	end
 

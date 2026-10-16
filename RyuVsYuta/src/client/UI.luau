@@ -19,6 +19,7 @@ export type Callbacks = {
 	onRestart: () -> (),
 	onSpeed: (number) -> (),
 	onSeek: (number) -> (),
+	onStyle: (string) -> (), -- "models" | "dummies"
 }
 
 export type ShotMark = { name: string, title: string, start: number, finish: number }
@@ -53,6 +54,12 @@ local timeLabel: TextLabel
 local timelineBar: Frame
 local timelineFill: Frame
 local speedButtons: { [number]: TextButton } = {}
+local styleButtons: { TextButton } = {}
+local currentStyle = "models"
+local STYLE_TEXT: { [string]: string } = {
+	models = "РЮ И ЮТА: МОДЕЛИ ПЕРСОНАЖЕЙ",
+	dummies = "РЮ И ЮТА: ОБЫЧНЫЕ МАНЕКЕНЫ ROBLOX",
+}
 local endScreen: Frame
 local callbacks: Callbacks
 local duration = 1
@@ -136,7 +143,7 @@ local function buildStart(parent: Instance)
 		Name = "Column",
 		AnchorPoint = Vector2.new(0.5, 0.5),
 		Position = UDim2.fromScale(0.5, 0.56),
-		Size = UDim2.fromOffset(640, 360),
+		Size = UDim2.fromOffset(640, 420),
 		BackgroundTransparency = 1,
 		ZIndex = 21,
 	}, startScreen)
@@ -214,9 +221,29 @@ local function buildStart(parent: Instance)
 		Color = ColorSequence.new(Color3.fromRGB(44, 40, 70), Color3.fromRGB(14, 12, 22)),
 	}, startButton)
 
+	-- кто играет Рю и Юту: модели или обычные персонажи Roblox (Рика — всегда модель)
+	local styleBtn = make("TextButton", {
+		Name = "Style",
+		LayoutOrder = 6,
+		Size = UDim2.fromOffset(380, 34),
+		BackgroundColor3 = Color3.fromRGB(26, 24, 38),
+		AutoButtonColor = true,
+		FontFace = font(Enum.FontWeight.Bold),
+		Text = "⇄  " .. STYLE_TEXT[currentStyle],
+		TextColor3 = COLORS.text,
+		TextSize = 14,
+		ZIndex = 22,
+	}, column)
+	corner(styleBtn, 8)
+	stroke(styleBtn, Color3.fromRGB(90, 86, 120), 1, 0.3)
+	styleBtn.Activated:Connect(function()
+		callbacks.onStyle(if currentStyle == "models" then "dummies" else "models")
+	end)
+	table.insert(styleButtons, styleBtn)
+
 	local loadBack = make("Frame", {
 		Name = "Loading",
-		LayoutOrder = 6,
+		LayoutOrder = 7,
 		Size = UDim2.fromOffset(380, 6),
 		BackgroundColor3 = Color3.fromRGB(40, 38, 56),
 		BorderSizePixel = 0,
@@ -233,7 +260,7 @@ local function buildStart(parent: Instance)
 	corner(loadingFill, 3)
 	loadingLabel = make("TextLabel", {
 		Name = "LoadingText",
-		LayoutOrder = 7,
+		LayoutOrder = 8,
 		Size = UDim2.fromOffset(640, 20),
 		BackgroundTransparency = 1,
 		FontFace = font(Enum.FontWeight.Regular),
@@ -245,7 +272,7 @@ local function buildStart(parent: Instance)
 
 	make("TextLabel", {
 		Name = "Hint",
-		LayoutOrder = 8,
+		LayoutOrder = 9,
 		Size = UDim2.fromOffset(640, 40),
 		BackgroundTransparency = 1,
 		FontFace = font(Enum.FontWeight.Regular),
@@ -323,10 +350,15 @@ local function buildControls(parent: Instance)
 			callbacks.onSpeed(s)
 		end)
 	end
+	local styleSmall = smallButton(row, "Style", "⇄ Манекены", 104, 6)
+	styleSmall.Activated:Connect(function()
+		callbacks.onStyle(if currentStyle == "models" then "dummies" else "models")
+	end)
+	table.insert(styleButtons, styleSmall)
 	timeLabel = make("TextLabel", {
 		Name = "Time",
 		LayoutOrder = 10,
-		Size = UDim2.new(1, -420, 1, 0),
+		Size = UDim2.new(1, -540, 1, 0),
 		BackgroundTransparency = 1,
 		FontFace = font(Enum.FontWeight.Medium),
 		Text = "",
@@ -675,6 +707,17 @@ end
 
 function UI.hideEnd()
 	endScreen.Visible = false
+end
+
+function UI.setStyle(style: string)
+	currentStyle = style
+	for i, b in styleButtons do
+		if i == 1 then
+			b.Text = "⇄  " .. (STYLE_TEXT[style] or style)
+		else
+			b.Text = if style == "models" then "⇄ Манекены" else "⇄ Модели"
+		end
+	end
 end
 
 function UI.setSpeed(s: number)

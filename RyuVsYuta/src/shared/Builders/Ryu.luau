@@ -333,8 +333,8 @@ local function buildHead()
 		sLine(S, 0.08 * s, 0.383, 0.19 * s, 0.391, 0.05, 0.05, -0.022, C.skinLine)
 		sLine(S, 0.075 * s, 0.452, 0.2 * s, 0.449, 0.05, 0.05, -0.022, C.skinShade)
 		-- брови: тонкие тёмные, лёгкий излом
-		sLine(S, 0.035 * s, 0.488, 0.13 * s, 0.5, 0.05, 0.05, -0.014, C.brow)
-		sLine(S, 0.125 * s, 0.5, 0.25 * s, 0.477, 0.05, 0.05, -0.016, C.brow)
+		sLine(S, 0.035 * s, 0.488, 0.13 * s, 0.5, 0.05, 0.05, -0.019, C.brow)
+		sLine(S, 0.125 * s, 0.5, 0.25 * s, 0.477, 0.05, 0.05, -0.02, C.brow)
 		-- скуловая тень от скулы к уголку рта
 		sLine(S, 0.225 * s, 0.29, 0.18 * s, 0.13, 0.05, 0.05, -0.022, C.skinShade)
 		-- носогубная складка (короткая, от крыла носа)
@@ -359,11 +359,6 @@ local function buildHead()
 	sLine(S, -0.065, my - 0.06, 0.065, my - 0.06, 0.05, 0.05, -0.021, C.skinShade)
 	for _, s in { 1, -1 } do
 		sLine(S, 0.16 * s, my + 0.02, 0.18 * s, my + 0.045, 0.05, 0.05, -0.018, C.skinLine)
-	end
-	-- штрихи щетины/ссадин: правая челюсть и левая щека
-	for i = 0, 1 do
-		sLine(S, 0.16 + i * 0.025, 0.0 + i * 0.012, 0.172 + i * 0.025, -0.04 + i * 0.012, 0.05, 0.05, -0.022, C.stubble)
-		sLine(S, -0.17 - i * 0.022, 0.24 - i * 0.012, -0.182 - i * 0.022, 0.205 - i * 0.012, 0.05, 0.05, -0.022, C.stubble)
 	end
 	sLine(S, 0, -0.04, 0, -0.1, 0.05, 0.05, -0.022, C.skinShade) -- ямка подбородка
 end
@@ -628,41 +623,47 @@ local function buildCollar()
 		{ p = V(0.39, 0.15, -0.44), n = V(0.4, -0.4, -0.85), s = V(0.22, 0.26, 0.16) },
 	}
 	local nStrand = 0
+	local up = V(0, 1, 0)
 	for _, s in { 1, -1 } do
 		for ni, node in nodes do
 			if not (s < 0 and ni == 1) then
 				local p = CH + mx(node.p, s)
 				local n = mx(node.n, s).Unit
-				-- ядро: белый сгусток, сиреневая тень снизу
-				E("Chest", frameOut(p - V(0, node.s.Y * 0.16, 0) - n * 0.03, n, 0), node.s * V(0.95, 0.75, 0.9), C.furShadow)
-				E("Chest", frameOut(p + n * 0.03 + V(0, node.s.Y * 0.06, 0), n, 0), node.s, C.fur)
-				local up = V(0, 1, 0)
 				local side = n:Cross(up)
 				if side.Magnitude < 1e-3 then
 					side = V(1, 0, 0)
 				end
 				side = side.Unit
-				local count = if ni <= 4 then 11 else 6
-				for _ = 1, count do
-					local u = rng:range(-1, 1)
-					local v = rng:range(-1, 1)
-					local base = p + n * (node.s.Z * 0.32) + side * (u * node.s.X * 0.42) + up * (v * node.s.Y * 0.38)
-					local dir = n + side * (u * 0.7 + rng:range(-0.25, 0.25)) + up * (v * 0.8 + rng:range(-0.1, 0.35))
-					if ni <= 3 then
-						dir += up * 0.4 -- стоячая часть тянется вверх
+				local up2 = side:Cross(n).Unit
+				local core = node.s * 0.78
+				-- ядро: компактный белый сгусток, сиреневая тень снизу
+				E("Chest", frameOut(p - up2 * (core.Y * 0.18) - n * 0.03, n, 0), core * V(0.95, 0.75, 0.9), C.furShadow)
+				E("Chest", frameOut(p + n * 0.02 + up2 * (core.Y * 0.05), n, 0), core, C.fur)
+				-- длинные острые пучки веером от ядра
+				local standing = ni <= 3
+				local count = if ni <= 4 then 12 else 7
+				for k = 1, count do
+					local a = rng:range(-1, 1)
+					local b = rng:range(-1, 1)
+					if standing then
+						b = b * 0.8 + 0.35
 					end
-					local len = rng:range(0.2, 0.34) * (if ni >= 6 then 0.7 else 1)
-					local w = rng:range(0.075, 0.11)
-					local col = if rng:next() < 0.3 then C.furShade else C.fur
+					local dir = (n + side * (a * 1.1) + up2 * (b * 1.1)).Unit
+					local radial = math.sqrt(a * a + b * b)
+					local base = p + n * (core.Z * 0.3) + side * (a * core.X * 0.38) + up2 * (b * core.Y * 0.36)
+					local len = rng:range(0.24, 0.4) * (1 - radial * 0.18) * (if ni >= 6 then 0.75 else 1)
+					local w = rng:range(0.09, 0.13) * (if ni >= 6 then 0.85 else 1)
+					local col = if k % 4 == 0 then C.furShade else C.fur
 					furSpike("Chest", base, dir, len, w, col, rng:next() < 0.25, 5)
 				end
-				if ni <= 5 then
-					for k = 1, 2 do
-						local u = (k - 1.5) * 1.1
-						local root = p + n * (node.s.Z * 0.22) + side * (u * node.s.X * 0.3) + V(0, node.s.Y * 0.12, 0)
-						local dir = n + V(0, if ni <= 3 then 0.6 else 0.1, 0) + side * (u * 0.4)
+				-- пряди только на стоячей части (видны сбоку, на силуэте)
+				if standing then
+					for k = 1, 3 do
+						local u = (k - 2) * 0.9
+						local root = p + n * (core.Z * 0.2) + side * (u * core.X * 0.3) + up2 * (core.Y * 0.25)
+						local dir = n * 0.6 + up * 0.9 + side * (u * 0.5)
 						nStrand += 1
-						furStrand("Chest", root, dir, rng:range(0.26, 0.36), 0.2, V(0, -0.2, 0) + side * (u * 0.3), 20 + nStrand)
+						furStrand("Chest", root, dir, rng:range(0.3, 0.42), 0.2, side * (u * 0.3) - n * 0.1, 20 + nStrand)
 					end
 				end
 			end
@@ -672,7 +673,7 @@ local function buildCollar()
 			local n1, n2 = nodes[ni], nodes[ni + 1]
 			local p = CH + mx((n1.p + n2.p) / 2, s)
 			local n = mx(n1.n + n2.n, s).Unit
-			E("Chest", frameOut(p + n * 0.03, n, 0), (n1.s + n2.s) / 2 * V(0.9, 0.85, 0.9), if ni % 2 == 0 then C.furShade else C.fur)
+			E("Chest", frameOut(p + n * 0.02, n, 0), (n1.s + n2.s) / 2 * V(0.72, 0.68, 0.72), if ni % 2 == 0 then C.furShade else C.fur)
 		end
 	end
 end

@@ -35,15 +35,21 @@ local camWispsNear: ParticleEmitter
 local dustPart: Part
 local dustBurst: ParticleEmitter
 local dustRing: ParticleEmitter
-local energy = {
-	anchor = nil :: BasePart?,
-	arcs = {} :: { Arc },
-	sparks = nil :: ParticleEmitter?,
-	glow = nil :: ParticleEmitter?,
-	burst = nil :: ParticleEmitter?,
-	light = nil :: PointLight?,
-	hairGlow = nil :: Highlight?,
+type EnergyState = {
+	anchor: BasePart?,
+	arcs: { Arc },
+	sparks: ParticleEmitter?,
+	glow: ParticleEmitter?,
+	burst: ParticleEmitter?,
+	light: PointLight?,
+	hairGlow: Highlight?,
 }
+local function newEnergy(): EnergyState
+	return { anchor = nil, arcs = {}, sparks = nil, glow = nil, burst = nil, light = nil, hairGlow = nil }
+end
+-- энергия своя у каждой модели Рю (персонаж и манекен); активна одна
+local energyStates: { [string]: EnergyState } = {}
+local energy: EnergyState = newEnergy()
 local eye = {
 	part = nil :: BasePart?,
 	light = nil :: PointLight?,
@@ -113,14 +119,16 @@ local function upgradeTextures()
 	setTexture(camWispsNear, "wisps")
 	setTexture(dustBurst, "dustBurst")
 	setTexture(dustRing, "dustRing")
-	if energy.sparks then
-		setTexture(energy.sparks, "sparkStreak")
-	end
-	if energy.glow then
-		setTexture(energy.glow, "radialGlow")
-	end
-	if energy.burst then
-		setTexture(energy.burst, "electricBurst")
+	for _, st in energyStates do
+		if st.sparks then
+			setTexture(st.sparks, "sparkStreak")
+		end
+		if st.glow then
+			setTexture(st.glow, "radialGlow")
+		end
+		if st.burst then
+			setTexture(st.burst, "electricBurst")
+		end
 	end
 	if eye.glow then
 		eye.glow.Image = TextureLoader.get("radialGlow")
@@ -304,11 +312,12 @@ local function newArcBeam(name: string, a0: Attachment, a1: Attachment, parent: 
 	return b
 end
 
-local function initEnergy(ryu: Instance)
+local function initEnergy(ryu: Instance): EnergyState
+	local energy = newEnergy()
 	local anchor = findDeep(ryu, "EnergyAnchor")
 	if not (anchor and anchor:IsA("BasePart")) then
-		warn("[Cutscene] Ryu EnergyAnchor not found")
-		return
+		warn("[Cutscene] EnergyAnchor not found in " .. ryu.Name)
+		return energy
 	end
 	energy.anchor = anchor
 	local holder = invisiblePart("EnergyHolder", Vector3.new(0.2, 0.2, 0.2))
@@ -413,6 +422,39 @@ local function initEnergy(ryu: Instance)
 		h.Parent = m
 		energy.hairGlow = h
 	end
+	return energy
+end
+
+-- Погасить энергию неактивной модели
+local function silence(st: EnergyState)
+	for _, seg in st.arcs do
+		seg.core.Transparency = NumberSequence.new(1)
+		seg.glow.Transparency = NumberSequence.new(1)
+	end
+	if st.sparks then
+		st.sparks.Rate = 0
+		st.sparks:Clear()
+	end
+	if st.glow then
+		st.glow.Rate = 0
+	end
+	if st.light then
+		st.light.Brightness = 0
+	end
+	if st.hairGlow then
+		st.hairGlow.FillTransparency = 1
+	end
+end
+
+-- Какая модель играет Рю: "Ryu" (персонаж) или "RyuDummy" (манекен Roblox)
+function Effects.setActiveRyu(modelName: string)
+	for name, st in energyStates do
+		if name ~= modelName then
+			silence(st)
+		end
+	end
+	energy = energyStates[modelName] or newEnergy()
+	lastArcTick = -1
 end
 
 function Effects.init()
@@ -427,10 +469,13 @@ function Effects.init()
 	if rika then
 		initEye(rika)
 	end
-	local ryu = chars and chars:FindFirstChild("Ryu")
-	if ryu then
-		initEnergy(ryu)
+	for _, name in { "Ryu", "RyuDummy" } do
+		local ryu = chars and chars:FindFirstChild(name)
+		if ryu then
+			energyStates[name] = initEnergy(ryu)
+		end
 	end
+	energy = energyStates.Ryu or newEnergy()
 	TextureLoader.onReady(upgradeTextures)
 	TextureLoader.start()
 end
