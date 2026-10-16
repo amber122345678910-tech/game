@@ -237,6 +237,49 @@ local function ellParts(bone: string, o: Vector3, list: { Ell }, color: Color3)
 	end
 end
 
+-- Эллипсоид с поворотом (для объёмов, по которым надо «прицелиться» лучом)
+type REll = { cf: CFrame, size: Vector3 }
+
+local function rayEll(e: REll, o: Vector3, d: Vector3): number?
+	local r = e.size / 2
+	local lo = e.cf:PointToObjectSpace(o) / r
+	local ld = e.cf:VectorToObjectSpace(d) / r
+	local a = ld:Dot(ld)
+	local b = 2 * lo:Dot(ld)
+	local c = lo:Dot(lo) - 1
+	local disc = b * b - 4 * a * c
+	if disc < 0 then
+		return nil
+	end
+	local t = (-b - math.sqrt(disc)) / (2 * a)
+	if t < 0 then
+		return nil
+	end
+	return t
+end
+
+local function normalEll(e: REll, p: Vector3): Vector3
+	local r = e.size / 2
+	local lp = e.cf:PointToObjectSpace(p)
+	return e.cf:VectorToWorldSpace(V(lp.X / (r.X * r.X), lp.Y / (r.Y * r.Y), lp.Z / (r.Z * r.Z))).Unit
+end
+
+-- Первая точка пересечения луча со списком эллипсоидов и нормаль в ней
+local function castOn(list: { REll }, o: Vector3, d: Vector3): (Vector3, Vector3)
+	local bestT = math.huge
+	local bestE: REll? = nil
+	for _, e in list do
+		local t = rayEll(e, o, d)
+		if t and t < bestT then
+			bestT = t
+			bestE = e
+		end
+	end
+	assert(bestE, "castOn: луч мимо")
+	local p = o + d * bestT
+	return p, normalEll(bestE, p)
+end
+
 ------------------------------------------------------------------------------------------
 -- Мех: шипы (сужающиеся эллипсоиды) с тёмными кончиками и пряди-Beam
 ------------------------------------------------------------------------------------------
@@ -400,41 +443,63 @@ local function buildHair()
 		lock("Head", H + mx(V(0.36, 0.5, -0.04), s), H + mx(V(0.33, 0.37, 0.33), s), 0.05, 0.05, V(s, 0, 0), C.hairSheen)
 	end
 
-	-- ПОМПАДУР: корпус у макушки, «ствол» со вздутием, перехват, круглый торец с тёмным «дулом»
+	-- ПОМПАДУР-«ПУШКА»: корпус у макушки, «ствол» со вздутием, лёгкий перехват, круглый торец с тёмным «дулом»,
+	-- бока, сметённые от висков вверх-вперёд (спереди силуэт — купол, а не цилиндр)
 	local P = "Pompadour"
-	E(P, at(H + V(0, 0.76, 0.12), -4, 0, 0), V(0.75, 0.34, 0.68), C.hair)
-	E(P, at(H + V(0, 0.79, -0.3), 10, 0, 0), V(0.6, 0.38, 0.8), C.hair)
-	E(P, at(H + V(0, 0.83, -0.58), 12, 0, 0), V(0.47, 0.34, 0.4), C.hair)
-	E(P, at(H + V(0, 0.85, -0.74), 12, 0, 0), V(0.45, 0.32, 0.32), C.hair)
-	E(P, at(H + V(0, 0.72, -0.6), 12, 0, 0), V(0.36, 0.12, 0.3), C.hairShadow) -- нижняя сторона валика
-	-- «дуло»: тёмный приплюснутый диск с ободком на торце
-	E(P, at(H + V(0, 0.892, -0.872), 18, 0, 0), V(0.18, 0.1, 0.05), C.muzzle)
-	-- два плоских «зачёса» сверху, сходящихся к шву
-	for _, s in { 1, -1 } do
-		lock(P, H + mx(V(0.1, 0.985, -0.64), s), H + mx(V(0.17, 0.915, 0.14), s), 0.24, 0.1, V(0.25 * s, 1, 0), C.hair)
-		-- блики вдоль верхнего бока
-		lock(P, H + mx(V(0.17, 0.99, -0.55), s), H + mx(V(0.24, 0.94, -0.05), s), 0.05, 0.05, V(0.5 * s, 1, 0), C.hairSheen)
-		lock(P, H + mx(V(0.235, 0.89, -0.66), s), H + mx(V(0.3, 0.85, -0.25), s), 0.05, 0.05, V(s, 0.6, 0), C.hairSheen)
-	end
-	-- шов по центру (ломаная) с 4 зазубринами «ёлочкой»
-	local seam = {
-		H + V(0.0, 0.98, 0.04),
-		H + V(0.006, 1.0, -0.1),
-		H + V(-0.005, 1.016, -0.24),
-		H + V(0.005, 1.03, -0.38),
-		H + V(0.0, 1.035, -0.5),
+	local pomp: { REll } = {
+		{ cf = at(H + V(0, 0.75, 0.1), -4, 0, 0), size = V(0.76, 0.36, 0.7) }, -- корпус у макушки
+		{ cf = at(H + V(0, 0.79, -0.3), 10, 0, 0), size = V(0.62, 0.38, 0.84) }, -- ствол
+		{ cf = at(H + V(0, 0.835, -0.72), 12, 0, 0), size = V(0.46, 0.34, 0.36) }, -- торец
+		{ cf = at(H + V(0.2, 0.72, -0.36), 4, 8, -14), size = V(0.26, 0.3, 0.62) }, -- бока от висков
+		{ cf = at(H + V(-0.2, 0.72, -0.36), 4, -8, 14), size = V(0.26, 0.3, 0.62) },
 	}
+	for _, e in pomp do
+		E(P, e.cf, e.size, C.hair)
+	end
+	E(P, at(H + V(0, 0.71, -0.6), 12, 0, 0), V(0.36, 0.12, 0.3), C.hairShadow) -- нижняя сторона валика
+	-- два плоских «зачёса» сверху, сходящихся к центральному шву
+	for _, s in { 1, -1 } do
+		local a, b = H + mx(V(0.095, 0.975, -0.66), s), H + mx(V(0.17, 0.92, 0.12), s)
+		local e: REll = { cf = frameY((a + b) / 2, b - a, V(0.3 * s, 1, 0)), size = V(0.22, (b - a).Magnitude, 0.1) }
+		E(P, e.cf, e.size, C.hair)
+		table.insert(pomp, e)
+	end
+	-- блики вдоль верхних боков (по поверхности)
+	local function onTop(x: number, z: number): (Vector3, Vector3)
+		return castOn(pomp, H + V(x, 1.6, z), V(0, -1, 0))
+	end
+	for _, s in { 1, -1 } do
+		local a1, n1 = onTop(0.2 * s, -0.55)
+		local a2 = onTop(0.25 * s, -0.08)
+		lock(P, a1 + n1 * 0.008, a2 + n1 * 0.008, 0.05, 0.05, n1, C.hairSheen)
+		local b1, m1 = castOn(pomp, H + V(0.6 * s, 0.86, -0.62), V(-s, -0.15, 0).Unit)
+		local b2 = castOn(pomp, H + V(0.6 * s, 0.84, -0.22), V(-s, -0.15, 0).Unit)
+		lock(P, b1 + m1 * 0.006, b2 + m1 * 0.006, 0.05, 0.05, m1, C.hairSheen)
+	end
+	-- «дуло» на торце: тёмный приплюснутый диск
+	local mp, mn = castOn(pomp, H + V(0, 0.9, -1.4), V(0, 0, 1))
+	E(P, frameOut(mp + mn * 0.002, mn, 0), V(0.17, 0.09, 0.05), C.muzzle)
+	-- центральный шов: тонкая ломаная по верху (от 20% до 75% длины) с 4 зазубринами «ёлочкой»
+	local seamZ = { 0.0, -0.13, -0.26, -0.39, -0.52 }
+	local seamX = { 0.0, 0.006, -0.005, 0.005, 0.0 }
+	local seam: { Vector3 } = {}
+	local seamN: { Vector3 } = {}
+	for i, z in seamZ do
+		local p, n = onTop(seamX[i], z)
+		seam[i] = p
+		seamN[i] = n
+	end
 	for i = 1, #seam - 1 do
-		lock(P, seam[i], seam[i + 1], 0.05, 0.05, V(0, 1, 0), C.crease)
+		lock(P, seam[i] - seamN[i] * 0.016, seam[i + 1] - seamN[i + 1] * 0.016, 0.05, 0.05, seamN[i], C.crease)
 	end
 	local barbs = { { 2, 1 }, { 3, -1 }, { 4, 1 }, { 4, -1 } }
 	for _, bb in barbs do
-		local p = seam[bb[1]]
-		local s = bb[2]
-		lock(P, p, p + V(0.055 * s, -0.012, 0.05), 0.05, 0.05, V(0, 1, 0), C.crease)
+		local i, sx = bb[1], bb[2]
+		local q = onTop(seamX[i] + 0.05 * sx, seamZ[i] + 0.045)
+		lock(P, seam[i] - seamN[i] * 0.018, q - seamN[i] * 0.018, 0.05, 0.05, seamN[i], C.crease)
 	end
 	-- невидимый якорь энергии у «дула» (-Z вперёд)
-	B(P, at(H + V(0, 0.883, -0.92)), V(0.3, 0.3, 0.3), C.muzzle, { transparency = 1, name = "EnergyAnchor", castShadow = false })
+	B(P, CFrame.new(mp + V(0, 0, -0.04)), V(0.3, 0.3, 0.3), C.muzzle, { transparency = 1, name = "EnergyAnchor", castShadow = false })
 
 	-- выбившиеся пряди: из-под валика на лоб и пара торчащих сзади
 	local function hairStrand(pts: { Vector3 }, w: number, seed: number)

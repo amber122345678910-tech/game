@@ -626,38 +626,38 @@ function Rika.build(origin: CFrame): Model
 			seg(LA, JE + V(0, -1.2, 0), JE + V(0, -2.15, 0), 0.58, 0.48, COL.skin)
 			-- кисть: ладонь смотрит к телу (-sx), тыл наружу (+sx)
 			ball(HB, JH, 0.52, COL.skin)
-			ell(HB, JH + V(0, -0.27, 0), V(0.3, 0.66, 0.68), COL.skin)
-			ell(HB, JH + V(sx * 0.05, -0.28, 0), V(0.2, 0.6, 0.62), COL.skinLit)
-			ell(HB, JH + V(-sx * 0.07, -0.2, -0.2), V(0.24, 0.4, 0.28), COL.skinMid)
-			ell(HB, JH + V(-sx * 0.05, -0.33, 0.2), V(0.2, 0.42, 0.22), COL.skinMid)
+			ell(HB, JH + V(0, -0.3, 0), V(0.33, 0.74, 0.8), COL.skin)
+			ell(HB, JH + V(sx * 0.06, -0.31, 0), V(0.22, 0.68, 0.74), COL.skinLit)
+			ell(HB, JH + V(-sx * 0.08, -0.22, -0.23), V(0.26, 0.45, 0.32), COL.skinMid)
+			ell(HB, JH + V(-sx * 0.06, -0.36, 0.23), V(0.22, 0.46, 0.25), COL.skinMid)
 			for _, f in FINGERS do
 				local s = FSCALE[f]
 				local j1 = J(f .. "1" .. side)
 				local j2 = J(f .. "2" .. side)
 				local j3 = J(f .. "3" .. side)
-				local tip = j3 + V(0, -0.17 * s, 0)
+				local tip = j3 + V(0, -0.2 * s, 0)
 				-- сухожилие на тыле кисти
 				seg(HB, JH + V(sx * 0.1, -0.08, j1.Z * 0.5), j1 + V(sx * 0.1, 0.06, 0), 0.06, 0.06, COL.skinLit)
 				-- узловатые фаланги
-				ball(f .. "1" .. side, j1 + V(sx * 0.02, 0, 0), 0.19, COL.skinLit)
-				seg(f .. "1" .. side, j1, j2, 0.155, 0.15, COL.skin)
-				ball(f .. "2" .. side, j2, 0.155, COL.skin)
-				seg(f .. "2" .. side, j2, j3, 0.14, 0.135, COL.skin)
-				ball(f .. "3" .. side, j3, 0.14, COL.skin)
-				seg(f .. "3" .. side, j3, tip, 0.125, 0.12, COL.skin)
+				ball(f .. "1" .. side, j1 + V(sx * 0.02, 0, 0), 0.21, COL.skinLit)
+				seg(f .. "1" .. side, j1, j2, 0.175, 0.17, COL.skin)
+				ball(f .. "2" .. side, j2, 0.175, COL.skin)
+				seg(f .. "2" .. side, j2, j3, 0.16, 0.155, COL.skin)
+				ball(f .. "3" .. side, j3, 0.16, COL.skin)
+				seg(f .. "3" .. side, j3, tip, 0.145, 0.14, COL.skin)
 				-- короткий чёрный коготь-колпачок
-				ell(f .. "3" .. side, tip + V(sx * 0.015, -0.03, 0), V(0.13, 0.17, 0.125), COL.claw)
+				ell(f .. "3" .. side, tip + V(sx * 0.018, -0.035, 0), V(0.15, 0.19, 0.145), COL.claw)
 			end
 			local t1 = J("Thumb1" .. side)
 			local t2 = J("Thumb2" .. side)
 			local t3 = J("Thumb3" .. side)
-			local ttip = t3 + V(0, -0.17, -0.02)
-			seg("Thumb1" .. side, t1 + V(0, 0.05, 0.05), t2, 0.22, 0.2, COL.skin)
-			ball("Thumb2" .. side, t2, 0.17, COL.skin)
-			seg("Thumb2" .. side, t2, t3, 0.165, 0.16, COL.skin)
-			ball("Thumb3" .. side, t3, 0.15, COL.skin)
-			seg("Thumb3" .. side, t3, ttip, 0.14, 0.135, COL.skin)
-			ell("Thumb3" .. side, ttip + V(sx * 0.01, -0.03, -0.01), V(0.14, 0.17, 0.13), COL.claw)
+			local ttip = t3 + V(0, -0.2, -0.02)
+			seg("Thumb1" .. side, t1 + V(0, 0.05, 0.05), t2, 0.25, 0.23, COL.skin)
+			ball("Thumb2" .. side, t2, 0.19, COL.skin)
+			seg("Thumb2" .. side, t2, t3, 0.185, 0.18, COL.skin)
+			ball("Thumb3" .. side, t3, 0.17, COL.skin)
+			seg("Thumb3" .. side, t3, ttip, 0.16, 0.155, COL.skin)
+			ell("Thumb3" .. side, ttip + V(sx * 0.012, -0.035, -0.01), V(0.16, 0.19, 0.15), COL.claw)
 		end
 	end
 
@@ -665,14 +665,14 @@ function Rika.build(origin: CFrame): Model
 	-- ГРИВА: объёмное ядро (эллипсоиды) + пряди-«языки пламени» (Beam)
 	------------------------------------------------------------------------------------------
 	do
-		-- ядро: компактный объём за и над маской; силуэт «сердца» дорисовывают ленты
-		ell("Head", T + V(0, -0.5, 0.85), V(2.3, 2.3, 1.7), COL.maneSoft)
+		-- ядро: большой объём за и над маской (силуэт «сердца»), края дорисовывают ленты
+		ell("Mane", T + V(0, 1.0, 0.95), V(3.2, 2.6, 2.1), COL.mane)
+		ell("Head", T + V(0, -0.5, 0.95), V(2.6, 2.4, 1.8), COL.maneSoft)
 		ell("Head", T + V(0, -1.9, 1.05), V(2.0, 2.0, 1.3), COL.maneShade)
-		ell("Mane", T + V(0, 0.7, 0.95), V(2.3, 2.3, 1.9), COL.mane)
 		for _, sx in { -1, 1 } do
-			ell("Mane", T + V(sx * 0.72, 1.3, 0.85), V(1.6, 1.9, 1.6), COL.mane, R(0, 0, -sx * 15))
-			ell("Head", T + V(sx * 1.12, -0.45, 0.55), V(1.3, 2.0, 1.4), COL.mane, R(0, 0, sx * 10))
-			ell("Head", T + V(sx * 0.95, -1.7, 0.5), V(0.95, 1.7, 1.2), COL.maneSoft, R(0, 0, -sx * 8))
+			ell("Mane", T + V(sx * 0.9, 1.6, 0.85), V(1.9, 2.0, 1.8), COL.mane, R(0, 0, -sx * 15))
+			ell("Mane", T + V(sx * 1.5, 0.2, 0.7), V(1.6, 2.2, 1.6), COL.mane, R(0, 0, sx * 10))
+			ell("Head", T + V(sx * 1.1, -1.5, 0.55), V(1.1, 1.9, 1.3), COL.maneSoft, R(0, 0, -sx * 8))
 		end
 	end
 
@@ -713,7 +713,7 @@ function Rika.build(origin: CFrame): Model
 			stiffness = stiff,
 			seed = seed,
 			segments = 10,
-			zOffset = -0.05,
+			zOffset = -0.5,
 		})
 		Sculpt.strand(ctx, bone, pts, {
 			widths = widths,
@@ -726,28 +726,40 @@ function Rika.build(origin: CFrame): Model
 	end
 
 	do
-		-- 1) «пламя» над головой: веер широких лент; по центру короче (ямка «сердца»), по бокам
-		--    длиннее и загибаются наружу-вниз, на самом верху — несколько острых «вспышек»
-		local crown = T + V(0, 0.95, 0.95)
-		for i = 0, 11 do
-			local u = -1 + i * (2 / 11) -- -1..1 слева направо
-			local a = deg(u * 85)
-			local sx = if u < 0 then -1 else 1
-			local root = crown + V(math.sin(a) * 1.0, math.cos(a) * 0.85, 0.1 + 0.25 * math.abs(u))
-			local dir = V(math.sin(a) * 0.9, math.cos(a) + 0.15, 0.35)
-			local au = math.abs(u)
-			-- длина: ямка в центре, пики на ±0.45, по краям короче
-			local len = 1.25 + 1.0 * math.exp(-((au - 0.45) / 0.3) ^ 2) - 0.2 * au
-			local hook = 25 + 45 * au
-			local c0 = if i % 3 == 1 then COL.maneShade else COL.maneSoft
-			lock("Mane", root, dir, V(sx, -0.2, 0), len, { -12, -6, 10, 25, hook }, 0.62 - 0.12 * au, c0, COL.mane, 0.15 + 0.2 * au)
+		-- 1) «пламя» над головой: два веера широких лент вокруг ядра. Длина задаёт силуэт «сердца»:
+		--    ямка по центру, пики-лопасти, по бокам языки загибаются наружу; второй веер — тенью сзади.
+		local F = T + V(0, -0.5, 0.65)
+		for layer = 1, 2 do
+			local back = layer == 2
+			local n = if back then 9 else 12
+			for i = 0, n - 1 do
+				local u = -1 + (i + (if back then 0.5 else 0)) * (2 / (n - 1)) -- -1..1 слева направо
+				u = math.clamp(u, -1, 1)
+				local au = math.abs(u)
+				local sx = if u < 0 then -1 else 1
+				local a = deg(u * 100)
+				local r0 = 1.55 + 0.25 * math.cos(a)
+				local root = F + V(math.sin(a) * r0 * 1.15, math.cos(a) * r0, (if back then 0.75 else 0.35) + 0.2 * au)
+				local dir = V(math.sin(a) * 1.0, math.cos(a) + 0.35, if back then 0.55 else 0.3)
+				local len = (if back then 1.6 else 1.3) + 1.1 * math.exp(-((au - 0.42) / 0.28) ^ 2) + 0.5 * math.exp(-((au - 0.9) / 0.15) ^ 2)
+				local hook = 30 + 50 * au
+				local c0 = if back then COL.maneShade else (if i % 3 == 1 then COL.maneShade else COL.maneSoft)
+				local c1 = if back then COL.maneSoft else COL.mane
+				local w = (if back then 0.7 else 0.78) - 0.18 * au
+				lock("Mane", root, dir, V(sx, -0.25, 0), len, { -14, -8, 8, 24, hook }, w, c0, c1, 0.12 + 0.25 * au)
+			end
 		end
+		-- ленты по передней стороне ядра над маской: «волосы», а не шар
+		for i = 0, 7 do
+			local u = -1 + i * (2 / 7)
+			local sx = if u < 0 then -1 else 1
+			local root = T + V(u * 1.05, -0.15 + 0.15 * math.abs(u), 0.35 + 0.15 * math.abs(u))
+			lock("Mane", root, V(u * 0.5, 1, 0.12), V(sx, 0, 0), 2.1 + 0.3 * (1 - math.abs(u)), { -6, 0, 10, 22, 40 }, 0.5, COL.maneSoft, COL.mane, 0.3)
+		end
+		-- острые «вспышки» на верхнем крае
 		for _, sx in { -1, 1 } do
-			lock("Mane", T + V(sx * 0.6, 2.05, 0.8), V(sx * 0.2, 1, 0.1), V(sx, 0, 0), 0.9, { 0, 10, 30, 50 }, 0.22, COL.mane, COL.mane, 0.1)
-			lock("Mane", T + V(sx * 1.1, 1.75, 0.7), V(sx * 0.5, 1, 0.1), V(sx, 0, 0), 0.8, { 0, 15, 35, 55 }, 0.2, COL.mane, COL.mane, 0.1)
-			-- назад-вверх (объём сбоку и сзади)
-			lock("Mane", T + V(sx * 0.45, 1.0, 1.55), V(sx * 0.25, 0.8, 0.7), V(0, 1, 0), 2.0, { -8, -4, 12, 30, 45 }, 0.55, COL.maneShade, COL.maneSoft, 0.2)
-			lock("Mane", T + V(sx * 0.95, 0.1, 1.2), V(sx * 0.6, 0.45, 0.8), V(0, 1, 0), 2.1, { -10, -4, 15, 35, 50 }, 0.55, COL.maneShade, COL.maneSoft, 0.25)
+			lock("Mane", T + V(sx * 0.55, 2.35, 0.9), V(sx * 0.15, 1, 0.1), V(sx, 0, 0), 1.0, { 0, 10, 30, 50 }, 0.24, COL.mane, COL.mane, 0.1)
+			lock("Mane", T + V(sx * 1.55, 1.9, 0.75), V(sx * 0.6, 1, 0.1), V(sx, 0, 0), 0.9, { 0, 15, 35, 55 }, 0.22, COL.mane, COL.mane, 0.1)
 		end
 		-- 2) слева на экране (+X персонажа): 3 горизонтальные пряди на высоте маски (кончики загибаются вверх),
 		--    2 спадают на плечо (кончики отгибаются наружу)
