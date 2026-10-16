@@ -461,10 +461,10 @@ local function buildTorso(ctx: Ctx)
 	local yBot = 0.46
 	for i = 0, N - 1 do
 		local a = (i + 0.5) / N * math.pi * 2
-		local top = 0.86 + 0.07 * (1 - math.cos(a)) / 2
+		local top = 0.84 + 0.08 * (1 - math.cos(a)) / 2
 		local h = top - yBot
 		local yc = (top + yBot) / 2
-		local rx0, rz0, rx1, rz1 = 0.235, 0.215, 0.285, 0.265
+		local rx0, rz0, rx1, rz1 = 0.235, 0.215, 0.3, 0.28
 		local rx, rz = (rx0 + rx1) / 2, (rz0 + rz1) / 2
 		local pos = V(rx * math.sin(a), yc, 0.02 - rz * math.cos(a))
 		local nrm = V(math.sin(a) / rx, 0, -math.cos(a) / rz).Unit
@@ -476,18 +476,18 @@ local function buildTorso(ctx: Ctx)
 		Sculpt.box(ctx, "Chest", CFrame.fromMatrix(pos, xA, up, zA), V(w, h, 0.05), COL.jacket)
 	end
 	-- тень внутри воротника
-	Sculpt.ellipsoid(ctx, "Chest", CFrame.new(0, 0.82, 0.03), V(0.5, 0.04, 0.47), COL.jacketInner)
+	Sculpt.ellipsoid(ctx, "Chest", CFrame.new(0, 0.8, 0.03), V(0.52, 0.04, 0.49), COL.jacketInner)
 	-- край клапана воротника (его левая сторона) и верхняя пуговица
 	do
 		local a = rad(-38)
 		local nrm = V(math.sin(a), 0, -math.cos(a))
 		local function onCollar(y: number): Vector3
 			local t = (y - yBot) / 0.44
-			local rx = 0.235 + 0.05 * t + 0.027
-			local rz = 0.215 + 0.05 * t + 0.027
+			local rx = 0.235 + 0.065 * t + 0.027
+			local rz = 0.215 + 0.065 * t + 0.027
 			return V(rx * math.sin(a), y, 0.02 - rz * math.cos(a))
 		end
-		ribbon(ctx, "Chest", { onCollar(0.47), onCollar(0.66), onCollar(0.86) }, { nrm, nrm, nrm }, 0.018, COL.jacketLine, 0.0)
+		ribbon(ctx, "Chest", { onCollar(0.47), onCollar(0.66), onCollar(0.84) }, { nrm, nrm, nrm }, 0.018, COL.jacketLine, 0.0)
 		Sculpt.ball(ctx, "Chest", onCollar(0.75) + V(-0.03, 0, -0.01), 0.05, COL.button, { material = Enum.Material.Metal })
 	end
 	-- косая застёжка: от основания воротника к его левому боку, вниз до пояса
@@ -560,7 +560,7 @@ local function buildArm(ctx: Ctx, side: string)
 	local sx = if side == "L" then -1 else 1
 	local UA, LA = "UpperArm" .. side, "LowerArm" .. side
 	-- плечо и пышный рукав (расширяется к локтю)
-	Sculpt.ellipsoid(ctx, UA, CFrame.new(-sx * 0.02, -0.12, 0.01), V(0.47, 0.5, 0.47), COL.jacket)
+	Sculpt.ellipsoid(ctx, UA, CFrame.new(-sx * 0.03, -0.17, 0.01), V(0.47, 0.44, 0.47), COL.jacket)
 	-- рукав-труба (висит прямо), сверху и снизу скруглён плечом и локтем
 	Sculpt.cylinder(ctx, UA, CFrame.new(sx * 0.01, -0.6, 0.01) * CFrame.Angles(0, 0, math.pi / 2), V(0.78, 0.43, 0.43), COL.jacket)
 	local sleeve = { { c = V(sx * 0.01, -0.56, 0.01), h = V(0.215, 0.6, 0.215) } }

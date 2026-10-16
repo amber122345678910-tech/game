@@ -1602,7 +1602,8 @@ local function cumulus(ctx: Ctx, f: Instance, spec: CloudSpec)
 				local depth = rng:range(-0.25, 0.3) * r + (if covered then -0.15 * r else 0.2 * r)
 				local p = base + right * x + fwd * depth + up * (y + rng:range(-0.12, 0.12) * r)
 				local tone = 0.12 + 0.5 * fr + (if covered then 0 else 0.2) - (if edge < 1 then 0.05 else 0) + rng:range(-0.07, 0.07)
-				lump(p, r * 2 * rng:range(0.95, 1.15), rng:range(0.82, 0.95), tone, "CloudLobe")
+				local big = if i % 2 == 0 then rng:range(0.8, 1.0) else rng:range(1.05, 1.3)
+				lump(p, r * 2 * big, rng:range(0.82, 0.95), tone, "CloudLobe")
 				if not covered then
 					-- «цветная капуста»: светлые комки на верхней стороне кромки
 					for _ = 1, nl do
@@ -1628,14 +1629,17 @@ local function buildClouds(ctx: Ctx, root: Instance)
 		return Vector3.new(math.sin(a) * R, baseY, -120 - math.cos(a) * R)
 	end
 	-- главный клубящийся столб дыма за спиной Рю и громады по бокам (кадры B, C)
+	-- Как в кадре B (t_042..t_050): две огромные клубящиеся громады слева и справа, между ними над головой
+	-- Рю — провал синего неба; ниже — сплошная масса дыма; по краям и вдали — громады пониже.
 	local hero: { CloudSpec } = {
-		{ pos = polar(2, 1050, 40), width = 940, top = 830, towers = 3, lumps = 2, lobe = 0.17 },
-		{ pos = polar(-31, 1100, 70), width = 720, top = 650, towers = 2, lumps = 2 },
-		{ pos = polar(32, 1080, 60), width = 740, top = 720, towers = 3, lumps = 2 },
-		{ pos = polar(-14, 1560, 90), width = 700, top = 770, towers = 2, lumps = 1, lobe = 0.22 },
-		{ pos = polar(17, 1620, 90), width = 660, top = 700, towers = 2, lumps = 1, lobe = 0.22 },
-		{ pos = polar(-53, 1300, 100), width = 660, top = 560, towers = 2, lumps = 1, lobe = 0.22 },
-		{ pos = polar(54, 1260, 90), width = 660, top = 600, towers = 2, lumps = 1, lobe = 0.22 },
+		{ pos = polar(-17, 1000, 40), width = 860, top = 820, towers = 2, lumps = 2, lobe = 0.22 },
+		{ pos = polar(17, 1040, 50), width = 900, top = 780, towers = 2, lumps = 2, lobe = 0.22 },
+		{ pos = polar(0, 1180, 30), width = 760, top = 420, towers = 2, lumps = 2, lobe = 0.24 },
+		{ pos = polar(-40, 1150, 70), width = 700, top = 640, towers = 2, lumps = 1, lobe = 0.24 },
+		{ pos = polar(41, 1120, 60), width = 720, top = 660, towers = 2, lumps = 1, lobe = 0.24 },
+		{ pos = polar(-4, 1750, 90), width = 800, top = 900, towers = 1, lumps = 1, lobe = 0.26 },
+		{ pos = polar(-62, 1350, 100), width = 660, top = 520, towers = 2, lumps = 1, lobe = 0.26 },
+		{ pos = polar(63, 1300, 90), width = 660, top = 560, towers = 2, lumps = 1, lobe = 0.26 },
 	}
 	for _, s in hero do
 		cumulus(ctx, f, s)
