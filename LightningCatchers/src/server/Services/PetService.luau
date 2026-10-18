@@ -124,7 +124,7 @@ local function announce(player: Player, kind: string)
 	if rarity.Rank < BANNER_RANK then
 		return
 	end
-	r:FireAllClients(string.format("🐾 %s вылупил питомца «%s» — %s!", player.DisplayName, def.Name, rarity.Name), def.Rarity, rarity.Color)
+	r:FireAllClients(string.format("🐾 %s питомец «%s»! Хозяин: %s", rarity.Name, def.Name, player.DisplayName), def.Rarity, rarity.Color)
 end
 
 -- Вылупить питомца из кокона: списать cost осколков, Pity, статистика, баннер, сигнал.

@@ -531,7 +531,7 @@ local function rebirth(player: Player, _payload: any): (boolean, any)
 	local mult = string.sub(Format.mult(Economy.rebirthMult(rebirths)), 2)
 	local banner = bannerRemote
 	if banner then
-		banner:FireAllClients(string.format("%s перезапустил генератор! ×%s", player.DisplayName, mult), "rare", Config.Colors.gold.Color)
+		banner:FireAllClients(string.format("♻ Генератор перезапущен! %s теперь ×%s", player.DisplayName, mult), "rare", Config.Colors.gold.Color)
 	end
 	effect(player, { Kind = "rebirth", Value = rebirths, UserId = player.UserId })
 	EconomyService.Purchased:Fire(player, "Rebirth", rebirths)

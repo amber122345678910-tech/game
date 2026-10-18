@@ -463,12 +463,12 @@ end
 ----------------------------------------------------------------------
 
 local function onPerun(player: Player, msg: Net.StrikeMsg)
-	banner(string.format("☠ ЧЁРНАЯ МОЛНИЯ ПЕРУНА у %s!", player.DisplayName), "perun")
+	banner(string.format("☠ ЧЁРНАЯ МОЛНИЯ ПЕРУНА! Ловец: %s", player.DisplayName), "perun")
 	effectAll({ Kind = "perun", Pos = msg.Pos, UserId = player.UserId, Zone = msg.Zone })
 end
 
 local function onPerunCaught(player: Player, zone: number, grade: string)
-	banner(string.format("☠ %s поймал Чёрную молнию Перуна!", player.DisplayName), "perun")
+	banner(string.format("☠ Чёрная молния Перуна поймана! Ловец: %s", player.DisplayName), "perun")
 	-- ИДЕАЛЬНО — Перунов фульгурит уже выпал через dropHook (шанс 100%), ХОРОШО — даём здесь
 	if grade ~= "perfect" then
 		FulguriteService.grant(player, "black", zone, "perun")
