@@ -1,0 +1,128 @@
+{
+  "name": "LightningCatchers",
+  "tree": {
+    "$className": "DataModel",
+    "ReplicatedStorage": {
+      "Shared": {
+        "$path": "src/shared"
+      },
+      "Remotes": {
+        "$className": "Folder",
+        "DataSync": { "$className": "RemoteEvent" },
+        "StrikeSpawn": { "$className": "RemoteEvent" },
+        "StrikeResult": { "$className": "RemoteEvent" },
+        "Catch": { "$className": "RemoteEvent" },
+        "ShardSpawn": { "$className": "RemoteEvent" },
+        "ShardCollect": { "$className": "RemoteEvent" },
+        "Notify": { "$className": "RemoteEvent" },
+        "Banner": { "$className": "RemoteEvent" },
+        "Effect": { "$className": "RemoteEvent" },
+        "BoltFX": { "$className": "UnreliableRemoteEvent" },
+        "Request": { "$className": "RemoteFunction" }
+      }
+    },
+    "ServerScriptService": {
+      "Server": {
+        "$path": "src/server"
+      }
+    },
+    "StarterPlayer": {
+      "$properties": {
+        "CameraMaxZoomDistance": 90,
+        "CameraMinZoomDistance": 8,
+        "CharacterWalkSpeed": 18,
+        "CharacterJumpPower": 50
+      },
+      "StarterPlayerScripts": {
+        "Client": {
+          "$path": "src/client"
+        }
+      }
+    },
+    "Workspace": {
+      "$properties": {
+        "StreamingEnabled": false,
+        "SignalBehavior": "Deferred",
+        "PhysicsSteppingMethod": "Adaptive",
+        "PlayerCharacterDestroyBehavior": "Enabled",
+        "RejectCharacterDeletions": "Enabled",
+        "Gravity": 196.2
+      },
+      "Map": {
+        "$path": "src/map/Map.rbxmx"
+      }
+    },
+    "Lighting": {
+      "$properties": {
+        "Technology": "Unified",
+        "LightingStyle": "Realistic",
+        "PrioritizeLightingQuality": false,
+        "ClockTime": 19.6,
+        "GeographicLatitude": 30,
+        "Brightness": 1.6,
+        "ExposureCompensation": 0.25,
+        "Ambient": [0.28, 0.3, 0.42],
+        "OutdoorAmbient": [0.44, 0.47, 0.63],
+        "ColorShift_Top": [0.6, 0.67, 1.0],
+        "ColorShift_Bottom": [0.2, 0.2, 0.35],
+        "EnvironmentDiffuseScale": 0.45,
+        "EnvironmentSpecularScale": 0.6,
+        "GlobalShadows": true,
+        "ShadowSoftness": 0.4,
+        "FogEnd": 100000
+      },
+      "Atmosphere": {
+        "$className": "Atmosphere",
+        "$properties": {
+          "Density": 0.33,
+          "Offset": 0.08,
+          "Color": [0.47, 0.55, 0.75],
+          "Decay": [0.24, 0.27, 0.47],
+          "Glare": 0.1,
+          "Haze": 1.6
+        }
+      },
+      "Sky": {
+        "$className": "Sky",
+        "$properties": {
+          "StarCount": 3000,
+          "CelestialBodiesShown": true,
+          "MoonAngularSize": 12,
+          "SunAngularSize": 10
+        }
+      },
+      "Bloom": {
+        "$className": "BloomEffect",
+        "$properties": {
+          "Intensity": 0.9,
+          "Size": 32,
+          "Threshold": 0.92
+        }
+      },
+      "ColorCorrection": {
+        "$className": "ColorCorrectionEffect",
+        "$properties": {
+          "Brightness": 0.02,
+          "Contrast": 0.1,
+          "Saturation": 0.08,
+          "TintColor": [0.88, 0.91, 1.0]
+        }
+      }
+    },
+    "SoundService": {
+      "$properties": {
+        "RespectFilteringEnabled": true
+      }
+    },
+    "MaterialService": {
+      "$properties": {
+        "Use2022Materials": true
+      }
+    },
+    "StarterGui": {
+      "$properties": {
+        "ResetPlayerGuiOnSpawn": false
+      }
+    }
+  }
+}

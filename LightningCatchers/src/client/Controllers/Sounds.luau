@@ -94,6 +94,9 @@ function Sounds.play(name: string, pitch: number?, volumeScale: number?, vary: n
 	local rnd = if v > 0 then 1 + (math.random() * 2 - 1) * v else 1
 	s.PlaybackSpeed = (def.Pitch or 1) * (pitch or 1) * rnd
 	s.Volume = (def.Volume or 0.5) * (volumeScale or 1)
+	if def.Start and def.Start > 0 and s.SoundId == def.Id then
+		s.TimePosition = def.Start
+	end
 	s.Parent = SoundService
 	activeOneShots += 1
 	s.Ended:Once(function()
