@@ -40,7 +40,7 @@ function Prng.new(seed: number): Prng
 		s = 0x9E3779B9
 	end
 	local self: Prng = {
-		state = bit32.bor(s, 1),
+		state = s, -- xorshift требует только ненулевое состояние
 		next = nextValue,
 		range = range,
 		int = int,

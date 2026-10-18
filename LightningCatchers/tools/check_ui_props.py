@@ -66,7 +66,7 @@ def table_keys(src, start):
         i += 1
     return keys, i
 
-BUTTON_KEYS = {"Text", "Color", "ColorDark", "Size", "Position", "AnchorPoint", "TextSize", "Parent", "LayoutOrder", "Name", "ZIndex"}
+BUTTON_KEYS = {"Text", "Icon", "Color", "ColorDark", "Size", "Position", "AnchorPoint", "TextSize", "Parent", "LayoutOrder", "Name", "ZIndex", "Silent"}
 errors = []
 checked = 0
 for path in sorted((ROOT / "src").rglob("*.luau")):
