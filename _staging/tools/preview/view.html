@@ -1,0 +1,183 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><style>html,body{margin:0;background:#000;overflow:hidden}</style>
+<script type="importmap">{"imports":{"three":"./node_modules/three/build/three.module.js","three/addons/":"./node_modules/three/examples/jsm/"}}</script>
+</head><body>
+<script type="module">
+import * as THREE from 'three';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+
+const params = new URLSearchParams(location.search);
+const W = +(params.get('w') || 1280), H = +(params.get('h') || 720);
+const scene = await (await fetch(params.get('scene'))).json();
+
+const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+renderer.setSize(W, H);
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.0;
+document.body.appendChild(renderer.domElement);
+
+const s = new THREE.Scene();
+const L = scene.lighting || {};
+const clock = L.clockTime ?? 14;
+// Sun direction from ClockTime (Roblox: sun rises east (+X?) at 6, noon overhead at 12)
+const ang = ((clock - 6) / 12) * Math.PI;
+const sunDir = new THREE.Vector3(Math.cos(ang), Math.sin(ang), 0.35).normalize();
+const night = sunDir.y < 0.05;
+const moonDir = new THREE.Vector3(-sunDir.x, -sunDir.y, 0.35).normalize();
+const lightDir = night ? moonDir : sunDir;
+
+const c3 = a => new THREE.Color().setRGB(a[0], a[1], a[2], THREE.SRGBColorSpace);
+const ambient = c3(L.ambient || [0.5, 0.5, 0.5]);
+const outdoor = c3(L.outdoorAmbient || [0.5, 0.5, 0.5]);
+const skyTop = night ? new THREE.Color(0x060a1c) : new THREE.Color(0x3d7fd9);
+const skyHorizon = night ? new THREE.Color(0x1a2448) : new THREE.Color(0xbcd8f2);
+const atm = L.atmosphere;
+const fogColor = atm ? c3(atm.color) : skyHorizon;
+
+// Sky dome
+{
+  const g = new THREE.SphereGeometry(5000, 32, 16);
+  const m = new THREE.ShaderMaterial({ side: THREE.BackSide, depthWrite: false, fog: false,
+    uniforms: { top: { value: skyTop }, hor: { value: skyHorizon.clone().lerp(fogColor, 0.5) } },
+    vertexShader: 'varying vec3 vp; void main(){ vp = normalize(position); gl_Position = projectionMatrix*modelViewMatrix*vec4(position,1.0);}',
+    fragmentShader: 'uniform vec3 top; uniform vec3 hor; varying vec3 vp; float h(vec2 p){return fract(sin(dot(p,vec2(12.9898,78.233)))*43758.5453);} void main(){ float t = clamp(vp.y*1.6,0.0,1.0); vec3 c = mix(hor, top, pow(t,0.6)); ' + (night ? 'vec2 q = floor(vp.xz/(abs(vp.y)+0.3)*400.0); float st = step(0.9975, h(q)) * smoothstep(0.05,0.3,vp.y); c += vec3(st);' : '') + ' gl_FragColor = vec4(c,1.0);}'
+  });
+  s.add(new THREE.Mesh(g, m));
+}
+if (atm && atm.density > 0) s.fog = new THREE.FogExp2(fogColor, atm.density * 0.004);
+
+const brightness = L.brightness ?? 2;
+s.add(new THREE.HemisphereLight(outdoor.clone().lerp(skyTop, 0.3), ambient.clone().multiplyScalar(0.6), night ? 0.7 : 1.1));
+s.add(new THREE.AmbientLight(ambient, night ? 0.25 : 0.35));
+const dl = new THREE.DirectionalLight(night ? 0x8fa6ff : 0xfff1dd, night ? 0.35 * brightness : 1.1 * brightness);
+s.add(dl); s.add(dl.target);
+
+// Bounds
+const bmin = new THREE.Vector3(Infinity, Infinity, Infinity), bmax = new THREE.Vector3(-Infinity, -Infinity, -Infinity);
+for (const p of scene.parts) { bmin.min(new THREE.Vector3(p.cf[0], p.cf[1], p.cf[2])); bmax.max(new THREE.Vector3(p.cf[0], p.cf[1], p.cf[2])); }
+const center = bmin.clone().add(bmax).multiplyScalar(0.5);
+const radius = bmax.clone().sub(bmin).length() / 2;
+dl.position.copy(center).add(lightDir.clone().multiplyScalar(radius * 2 + 100));
+dl.target.position.copy(center);
+dl.castShadow = true;
+dl.shadow.mapSize.set(4096, 4096);
+const sc = dl.shadow.camera; sc.left = -radius; sc.right = radius; sc.top = radius; sc.bottom = -radius; sc.near = 1; sc.far = radius * 5 + 400;
+dl.shadow.bias = -0.0004; dl.shadow.normalBias = 0.5;
+
+// Geometries (unit size; scaled per instance)
+function wedgeGeo() {
+  // Roblox WedgePart: slope from top-back (+Z) edge down to bottom-front (-Z) edge
+  const g = new THREE.BufferGeometry();
+  const v = [
+    // bottom
+    -0.5,-0.5,-0.5,  0.5,-0.5,-0.5,  0.5,-0.5,0.5,  -0.5,-0.5,-0.5,  0.5,-0.5,0.5,  -0.5,-0.5,0.5,
+    // back (+Z)
+    -0.5,-0.5,0.5,  0.5,-0.5,0.5,  0.5,0.5,0.5,  -0.5,-0.5,0.5,  0.5,0.5,0.5,  -0.5,0.5,0.5,
+    // slope
+    -0.5,-0.5,-0.5,  -0.5,0.5,0.5,  0.5,0.5,0.5,  -0.5,-0.5,-0.5,  0.5,0.5,0.5,  0.5,-0.5,-0.5,
+    // sides
+    -0.5,-0.5,-0.5,  -0.5,-0.5,0.5,  -0.5,0.5,0.5,
+    0.5,-0.5,-0.5,  0.5,0.5,0.5,  0.5,-0.5,0.5,
+  ];
+  g.setAttribute('position', new THREE.Float32BufferAttribute(v, 3));
+  g.computeVertexNormals();
+  return g;
+}
+function cornerWedgeGeo() {
+  // Roblox CornerWedgePart: apex at (+X? , +Y, -Z). Vertices: bottom square, apex at (0.5,0.5,-0.5)
+  const g = new THREE.BufferGeometry();
+  const A = [0.5, 0.5, -0.5];
+  const b0 = [-0.5,-0.5,-0.5], b1 = [0.5,-0.5,-0.5], b2 = [0.5,-0.5,0.5], b3 = [-0.5,-0.5,0.5];
+  const tri = (a,b,c) => [...a,...b,...c];
+  const v = [ ...tri(b0,b2,b1), ...tri(b0,b3,b2), ...tri(b0,b1,A), ...tri(b1,b2,A), ...tri(b2,b3,A), ...tri(b3,b0,A) ];
+  g.setAttribute('position', new THREE.Float32BufferAttribute(v, 3));
+  g.computeVertexNormals();
+  return g;
+}
+const GEO = {
+  Block: new THREE.BoxGeometry(1, 1, 1),
+  Ball: new THREE.SphereGeometry(0.5, 20, 14),
+  Cylinder: new THREE.CylinderGeometry(0.5, 0.5, 1, 24).rotateZ(Math.PI / 2), // Roblox cylinder axis = X
+  Wedge: wedgeGeo(),
+  CornerWedge: cornerWedgeGeo(),
+};
+
+const ROUGH = { Neon: 1, Glass: 0.05, Ice: 0.15, Glacier: 0.25, Metal: 0.35, DiamondPlate: 0.4, Foil: 0.2, SmoothPlastic: 0.45, Plastic: 0.6, Marble: 0.3 };
+const METAL = { Metal: 0.8, DiamondPlate: 0.8, Foil: 0.9, CorrodedMetal: 0.5 };
+const matCache = new Map();
+function material(mat, transparent, opacity) {
+  const key = mat + '|' + (transparent ? opacity.toFixed(2) : '1');
+  if (matCache.has(key)) return matCache.get(key);
+  let m;
+  if (mat === 'Neon') {
+    m = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent, opacity, toneMapped: false, depthWrite: !transparent });
+  } else if (mat === 'ForceField') {
+    m = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: Math.min(opacity, 0.35), blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false });
+  } else {
+    m = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: ROUGH[mat] ?? 0.85, metalness: METAL[mat] ?? 0, transparent: transparent || mat === 'Glass', opacity: mat === 'Glass' ? Math.min(opacity, 0.55) : opacity, depthWrite: !(transparent || mat === 'Glass') });
+  }
+  matCache.set(key, m);
+  return m;
+}
+
+// Group by shape+material+opacity for instancing
+const groups = new Map();
+for (const p of scene.parts) {
+  if (p.transparency >= 0.999) continue;
+  const op = 1 - p.transparency;
+  const transparent = p.transparency > 0.01;
+  const key = p.shape + '|' + p.material + '|' + (transparent ? op.toFixed(2) : '1');
+  if (!groups.has(key)) groups.set(key, { shape: p.shape, material: p.material, transparent, op, list: [] });
+  groups.get(key).list.push(p);
+}
+const mtx = new THREE.Matrix4(), scl = new THREE.Vector3();
+for (const g of groups.values()) {
+  const geo = GEO[g.shape] || GEO.Block;
+  const mesh = new THREE.InstancedMesh(geo, material(g.material, g.transparent, g.op), g.list.length);
+  g.list.forEach((p, i) => {
+    const c = p.cf;
+    let sx = p.size[0], sy = p.size[1], sz = p.size[2];
+    if (g.shape === 'Ball') { const d = Math.min(sx, sy, sz); sx = sy = sz = d; }
+    if (g.shape === 'Cylinder') { const d = Math.min(sy, sz); sy = sz = d; }
+    // CFrame components: x,y,z, r00,r01,r02, r10,r11,r12, r20,r21,r22 (row-major)
+    mtx.set(c[3] * sx, c[4] * sy, c[5] * sz, c[0],
+            c[6] * sx, c[7] * sy, c[8] * sz, c[1],
+            c[9] * sx, c[10] * sy, c[11] * sz, c[2],
+            0, 0, 0, 1);
+    mesh.setMatrixAt(i, mtx);
+    const col = c3(p.color);
+    if (g.material === 'Neon') col.multiplyScalar(2.2);
+    mesh.setColorAt(i, col);
+  });
+  mesh.castShadow = !g.transparent && g.material !== 'Neon';
+  mesh.receiveShadow = g.material !== 'Neon';
+  if (g.transparent) mesh.renderOrder = 1;
+  s.add(mesh);
+}
+
+// Point lights (strongest N)
+const lights = (scene.lights || []).slice().sort((a, b) => b.brightness * b.range - a.brightness * a.range).slice(0, +(params.get('maxLights') || 48));
+for (const l of lights) {
+  const pl = new THREE.PointLight(c3(l.color), l.brightness * 6, l.range * 1.4, 1.6);
+  pl.position.set(l.pos[0], l.pos[1], l.pos[2]);
+  s.add(pl);
+}
+
+const cam = scene.camera || { pos: [center.x + radius, center.y + radius * 0.6, center.z + radius], look: [center.x, center.y, center.z], fov: 70 };
+const camera = new THREE.PerspectiveCamera(cam.fov || 70, W / H, 0.5, 12000);
+camera.position.set(...cam.pos);
+camera.lookAt(new THREE.Vector3(...cam.look));
+
+const composer = new EffectComposer(renderer);
+composer.addPass(new RenderPass(s, camera));
+const bloom = L.bloom || { intensity: 0.6, size: 24, threshold: 1.4 };
+composer.addPass(new UnrealBloomPass(new THREE.Vector2(W, H), Math.min(1.6, bloom.intensity * 1.2), 0.5, 0.92));
+composer.addPass(new OutputPass());
+composer.render();
+document.title = 'done ' + scene.parts.length;
+</script></body></html>

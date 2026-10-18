@@ -1,0 +1,10 @@
+{
+  "name": "map-preview",
+  "private": true,
+  "type": "module",
+  "description": "Offline 3D preview of the generated map (three.js in headless Chromium)",
+  "dependencies": {
+    "playwright-core": "1.56.1",
+    "three": "0.169.0"
+  }
+}

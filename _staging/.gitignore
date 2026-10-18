@@ -1,0 +1,6 @@
+.tools/
+sourcemap.json
+*.rbxl.lock
+node_modules/
+tools/scratch/
+tools/preview/tmp-*/
