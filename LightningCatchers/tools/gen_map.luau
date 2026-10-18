@@ -6,59 +6,95 @@ local fs = require("@lune/fs")
 local roblox = require("@lune/roblox")
 local Loader = require("./lib/loader")
 local B = require("./lib/builder")
-local Island = require("./map/island")
+local ZonesMap = require("./map/zones")
+local Hub = require("./map/hub")
+local Bridges = require("./map/bridges")
+local Sky = require("./map/sky")
 
 local Instance = roblox.Instance
 local Vector3 = roblox.Vector3
-local Enum = roblox.Enum
-local M = Enum.Material
+local CFrame = roblox.CFrame
 
-local Config = Loader.load("src/shared/Config")
-local Zones = Loader.load("src/shared/Zones")
+local ctx = {
+	Config = Loader.load("src/shared/Config"),
+	Zones = Loader.load("src/shared/Zones"),
+	Format = Loader.load("src/shared/Format"),
+	Pets = Loader.load("src/shared/Pets"),
+	Fulgurite = Loader.load("src/shared/Fulgurite"),
+	Models = Loader.load("src/shared/Models"),
+}
+
+-- Поставить модель из Models.luau как статичный декор: якорь, без сварок, без коллизий
+function ctx.place(model, cf, parent)
+	for _, d in model:GetDescendants() do
+		if d:IsA("WeldConstraint") then
+			d:Destroy()
+		end
+	end
+	for _, d in model:GetDescendants() do
+		if d:IsA("BasePart") then
+			d.CFrame = cf * d.CFrame
+			d.Anchored = true
+			d.CanCollide = false
+			d.CanQuery = false
+			d.CanTouch = false
+			B.count += 1
+		end
+	end
+	model.Parent = parent
+	return model
+end
 
 local root = Instance.new("Model")
 root.Name = "Map"
-
-local walls = B.folder(root, "Walls")
+ctx.Root = root
+ctx.Walls = B.folder(root, "Walls")
+ctx.Markers = B.folder(root, "Markers")
 local islands = B.folder(root, "Islands")
 
-for i, z in Config.Zones do
-	local g = Zones.Geo[i]
-	Island.body(islands, {
-		name = "Island_" .. i,
-		center = g.Center,
-		radius = z.Radius,
-		seed = 100 + i * 31,
-		top = z.Grass,
-		topMaterial = z.GrassMaterial,
-		dirt = B.rgb(118, 84, 58),
-		rock = z.Rock,
-		depth = 64,
-		openings = { g.ToHub },
-		walls = { radius = z.Radius + 0.8 },
-		wallParent = walls,
-	})
+local counts = {}
+local function section(name, fn)
+	local before = B.count
+	fn()
+	table.insert(counts, string.format("  %-10s %5d", name, B.count - before))
 end
 
-local hubOpen = {}
-for _, g in Zones.Geo do
-	table.insert(hubOpen, g.Dir)
+for i = 1, #ctx.Config.Zones do
+	section("Остров " .. i, function()
+		ZonesMap.build(ctx, i, islands)
+	end)
 end
-Island.body(islands, {
-	name = "Hub",
-	center = Zones.HubCenter,
-	radius = Config.Hub.Radius,
-	seed = 7,
-	top = B.rgb(150, 146, 140),
-	topMaterial = M.Cobblestone,
-	dirt = B.rgb(110, 90, 70),
-	rock = B.rgb(120, 118, 128),
-	depth = 70,
-	openings = hubOpen,
-	walls = { radius = Config.Hub.Radius + 0.8 },
-	wallParent = walls,
-})
 
-print(string.format("Деталей: %d", B.count))
+section("Хаб", function()
+	Hub.build(ctx, islands)
+end)
+section("Мосты", function()
+	Bridges.build(ctx, root)
+end)
+section("Небо", function()
+	Sky.build(ctx)
+end)
+
+-- Метки: точки появления и подстанции
+section("Метки", function()
+	local Zones, Config = ctx.Zones, ctx.Config
+	for zone = 0, #Config.Zones do
+		local p = Zones.spawnFor(zone)
+		local look = if zone == 0 then -B.flat(p) else Zones.Geo[zone].Dir
+		B.marker(ctx.Markers, "Spawn_" .. zone, B.facing(p, look))
+	end
+	local s0 = B.marker(ctx.Markers, "SellPad_0", CFrame.new(Zones.HubCenter), Vector3.new(2, 1, 2))
+	s0:SetAttribute("Radius", Zones.HubSellRadius)
+	for zone = 1, #Config.Zones do
+		local s = B.marker(ctx.Markers, "SellPad_" .. zone, CFrame.new(Zones.Geo[zone].SellPad), Vector3.new(2, 1, 2))
+		s:SetAttribute("Radius", Zones.SellPadRadius)
+	end
+end)
+
+print("Деталей по разделам:")
+for _, line in counts do
+	print(line)
+end
+print(string.format("Всего деталей: %d", B.count))
 fs.writeFile("src/map/Map.rbxmx", roblox.serializeModel({ root }, true))
 print("src/map/Map.rbxmx записан")

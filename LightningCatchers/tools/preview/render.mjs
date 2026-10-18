@@ -3,6 +3,7 @@
 import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
+import os from 'node:os';
 import { chromium } from 'playwright-core';
 
 const here = path.dirname(new URL(import.meta.url).pathname);
@@ -27,7 +28,8 @@ const browser = await chromium.launch({ executablePath: process.env.CHROME_PATH 
 const page = await browser.newPage({ viewport: { width: +w, height: +h } });
 page.on('console', m => { if (m.type() === 'error') console.error('page:', m.text()); });
 page.on('pageerror', e => console.error('pageerror:', e.message));
-const tmpDir = fs.mkdtempSync(path.join(here, 'tmp-'));
+// временная папка вне дерева проекта (несколько рендеров могут идти параллельно)
+const tmpDir = fs.mkdtempSync(path.join(process.env.PREVIEW_TMP || os.tmpdir(), 'lc-preview-'));
 for (const cam of cams) {
   const sc = { ...base, camera: cam.pos ? cam : base.camera };
   if (cam.clockTime !== undefined) sc.lighting = { ...(base.lighting || {}), clockTime: cam.clockTime };

@@ -500,4 +500,687 @@ function UIKit.bump(scale: UIScale, amount: number?)
 	UIKit.tween(scale, 0.25, { Scale = base }, Enum.EasingStyle.Back)
 end
 
+----------------------------------------------------------------------
+-- Звуки интерфейса (как и клик, подставляются контроллером звуков)
+----------------------------------------------------------------------
+local soundHandler: ((name: string) -> ())? = nil
+function UIKit.setSoundHandler(fn: (name: string) -> ())
+	soundHandler = fn
+end
+function UIKit.playSound(name: string)
+	local fn = soundHandler
+	if fn then
+		fn(name)
+	end
+end
+
+----------------------------------------------------------------------
+-- Прокрутка, полоска прогресса, значок-уведомление
+----------------------------------------------------------------------
+function UIKit.scroll(props: Props): ScrollingFrame
+	local base: Props = {
+		BackgroundTransparency = 1,
+		ScrollBarThickness = 8,
+		ScrollBarImageColor3 = Theme.Electric,
+		ScrollBarImageTransparency = 0.25,
+		ScrollingDirection = Enum.ScrollingDirection.Y,
+		CanvasSize = UDim2.new(),
+		AutomaticCanvasSize = Enum.AutomaticSize.Y,
+		ElasticBehavior = Enum.ElasticBehavior.WhenScrollable,
+		VerticalScrollBarInset = Enum.ScrollBarInset.ScrollBar,
+		Selectable = false,
+		Active = true,
+	}
+	for k, v in props do
+		base[k] = v
+	end
+	return UIKit.new("ScrollingFrame", base) :: ScrollingFrame
+end
+
+export type BarOptions = {
+	Size: UDim2,
+	Position: UDim2?,
+	AnchorPoint: Vector2?,
+	Color: Color3?,
+	Back: Color3?,
+	TextSize: number?,
+	LayoutOrder: number?,
+	Name: string?,
+	Parent: Instance?,
+}
+
+export type Bar = {
+	Frame: Frame,
+	Fill: Frame,
+	Label: TextLabel,
+	set: (fraction: number, text: string?, instant: boolean?) -> (),
+	setColor: (color: Color3) -> (),
+}
+
+-- Полоска прогресса: тёмная "таблетка" с цветной заливкой и подписью по центру
+function UIKit.bar(opts: BarOptions): Bar
+	local frame = UIKit.new("Frame", {
+		Name = opts.Name or "Bar",
+		Size = opts.Size,
+		Position = opts.Position or UDim2.new(),
+		AnchorPoint = opts.AnchorPoint or Vector2.zero,
+		BackgroundColor3 = opts.Back or Theme.PanelDark,
+		LayoutOrder = opts.LayoutOrder or 0,
+	}) :: Frame
+	UIKit.round(frame)
+	UIKit.stroke(frame, 2.5, Theme.Stroke)
+	local fill = UIKit.new("Frame", {
+		Name = "Fill",
+		Size = UDim2.fromScale(0, 1),
+		BackgroundColor3 = Color3.new(1, 1, 1),
+		Visible = false,
+		ZIndex = 1,
+		Parent = frame,
+	}) :: Frame
+	UIKit.round(fill)
+	local grad = UIKit.gradient(fill, Color3.new(1, 1, 1), Color3.new(1, 1, 1))
+	local function setColor(color: Color3)
+		grad.Color = ColorSequence.new(color:Lerp(Color3.new(1, 1, 1), 0.3), color)
+	end
+	setColor(opts.Color or Theme.Green)
+	local label = UIKit.label({
+		Name = "Label",
+		Text = "",
+		Size = UDim2.new(1, -12, 1, -2),
+		Position = UDim2.fromScale(0.5, 0.5),
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		MaxTextSize = opts.TextSize or 20,
+		ZIndex = 2,
+		Parent = frame,
+	})
+	local current = -1
+	local function set(fraction: number, text: string?, instant: boolean?)
+		local f = math.clamp(if fraction == fraction then fraction else 0, 0, 1)
+		if text then
+			label.Text = text
+		end
+		if math.abs(f - current) < 0.0005 then
+			return
+		end
+		current = f
+		fill.Visible = f > 0.002
+		if instant then
+			fill.Size = UDim2.fromScale(f, 1)
+		else
+			UIKit.tween(fill, 0.25, { Size = UDim2.fromScale(f, 1) })
+		end
+	end
+	if opts.Parent then
+		frame.Parent = opts.Parent
+	end
+	return { Frame = frame, Fill = fill, Label = label, set = set, setColor = setColor }
+end
+
+-- Красный кружок с "!" в правом верхнем углу (что-то можно забрать или купить)
+function UIKit.badge(parent: GuiObject, text: string?, size: number?): Frame
+	local s = size or 26
+	local badge = UIKit.new("Frame", {
+		Name = "Badge",
+		Size = UDim2.fromOffset(s, s),
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Position = UDim2.new(1, -math.floor(s * 0.25), 0, math.floor(s * 0.25)),
+		BackgroundColor3 = Theme.Red,
+		ZIndex = 8,
+		Visible = false,
+		Parent = parent,
+	}) :: Frame
+	UIKit.round(badge)
+	UIKit.stroke(badge, 2, Theme.Stroke)
+	UIKit.label({
+		Name = "Label",
+		Text = text or "!",
+		Size = UDim2.fromScale(0.78, 0.78),
+		Position = UDim2.fromScale(0.5, 0.5),
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		MaxTextSize = math.floor(s * 0.8),
+		ZIndex = 9,
+		Parent = badge,
+	})
+	return badge
+end
+
+-- Карточка внутри окна: светлее панели, с градиентом и обводкой
+function UIKit.card(props: Props): Frame
+	local base: Props = {
+		BackgroundColor3 = Color3.new(1, 1, 1),
+		Active = false,
+	}
+	for k, v in props do
+		base[k] = v
+	end
+	local frame = UIKit.new("Frame", base) :: Frame
+	UIKit.corner(frame, Theme.CornerSmall)
+	UIKit.stroke(frame, 2.5, Theme.Stroke)
+	local grad = UIKit.gradient(frame, Theme.CardHover, Theme.Card)
+	grad.Name = "CardGrad"
+	return frame
+end
+
+-- Перекрасить карточку (например, в цвет редкости)
+function UIKit.tintCard(card: GuiObject, top: Color3, bottom: Color3)
+	local grad = card:FindFirstChild("CardGrad")
+	if grad and grad:IsA("UIGradient") then
+		grad.Color = ColorSequence.new(top, bottom)
+	end
+end
+
+----------------------------------------------------------------------
+-- 3D-превью (ViewportFrame) и камера вокруг модели
+----------------------------------------------------------------------
+function UIKit.viewport(props: Props): (ViewportFrame, Camera)
+	local base: Props = {
+		BackgroundTransparency = 1,
+		Ambient = Color3.fromRGB(150, 160, 200),
+		LightColor = Color3.fromRGB(255, 250, 240),
+		LightDirection = Vector3.new(-0.6, -1, -0.8),
+	}
+	for k, v in props do
+		base[k] = v
+	end
+	local vp = UIKit.new("ViewportFrame", base) :: ViewportFrame
+	local camera = Instance.new("Camera")
+	camera.FieldOfView = 32
+	camera.Parent = vp
+	vp.CurrentCamera = camera
+	return vp, camera
+end
+
+-- Центр модели и расстояние камеры, чтобы модель целиком помещалась в кадр
+function UIKit.frameModel(model: Model, fov: number, zoom: number?): (Vector3, number)
+	local cf, size = model:GetBoundingBox()
+	local radius = math.max(0.5, size.Magnitude / 2)
+	local dist = radius / math.sin(math.rad(fov / 2)) * (zoom or 1)
+	return cf.Position, dist
+end
+
+-- Камера на орбите вокруг точки: yaw — поворот вокруг вертикали (0 — смотрим модели в лицо,
+-- перёд моделей смотрит в −Z), pitch — насколько сверху
+function UIKit.orbit(camera: Camera, center: Vector3, dist: number, yaw: number, pitch: number?)
+	camera.CFrame = CFrame.new(center)
+		* CFrame.Angles(0, yaw + math.pi, 0)
+		* CFrame.Angles(-(pitch or 0.3), 0, 0)
+		* CFrame.new(0, 0, dist)
+end
+
+----------------------------------------------------------------------
+-- Окна: затемнённый фон, рамка с заголовком, крестик, вкладки, подтверждение.
+-- Одновременно открыто только одно окно — открытие нового закрывает текущее.
+----------------------------------------------------------------------
+export type TabDef = { Id: string, Text: string }
+
+export type WindowOptions = {
+	Name: string,
+	Title: string,
+	Icon: string?,
+	Width: number?, -- размер макета (масштабируется под экран)
+	Height: number?,
+	Accent: Color3?,
+	Tabs: { TabDef }?,
+	DisplayOrder: number?,
+	Parent: Instance?,
+	OnOpen: ((tab: string?) -> ())?,
+	OnClose: (() -> ())?,
+	OnTab: ((id: string) -> ())?,
+}
+
+export type Window = {
+	Name: string,
+	Gui: ScreenGui,
+	Root: Frame, -- масштабируемая рамка окна
+	Scale: UIScale,
+	Header: Frame, -- полоса заголовка (сюда можно добавить счётчик валюты)
+	Body: Frame, -- область содержимого под заголовком и вкладками
+	Pages: { [string]: Frame }, -- по странице на вкладку
+	open: (tab: string?) -> (),
+	close: (instant: boolean?) -> (),
+	isOpen: () -> boolean,
+	tab: () -> string?,
+	setTab: (id: string) -> (),
+	setTabBadge: (id: string, on: boolean) -> (),
+	setTitle: (text: string) -> (),
+	confirm: (text: string, yesText: string, onYes: () -> (), yesColor: Color3?) -> (),
+}
+
+UIKit.HeaderHeight = 80
+UIKit.TabHeight = 70
+
+local currentWindow: Window? = nil
+
+-- "Pets:cocoons" -> ("Pets", "cocoons")
+function UIKit.parseWindowName(name: string): (string, string?)
+	local base, tab = string.match(name, "^([^:]+):(.+)$")
+	if base and tab then
+		return base, tab
+	end
+	return name, nil
+end
+
+function UIKit.currentWindow(): string?
+	local w = currentWindow
+	return if w then w.Name else nil
+end
+
+function UIKit.closeWindows()
+	local w = currentWindow
+	if w then
+		w.close()
+	end
+end
+
+-- Счётчик валюты в заголовке окна (левее крестика): возвращает подпись для числа
+function UIKit.headerCounter(win: Window, icon: string, color: Color3, width: number?): TextLabel
+	local w = width or 190
+	-- заголовок уступает место счётчику (текст ужмётся сам)
+	local title = win.Header:FindFirstChild("Title")
+	if title and title:IsA("GuiObject") then
+		title.Size = UDim2.new(1, -(110 + w + 12), 0.78, 0)
+	end
+	local pill = UIKit.new("Frame", {
+		Name = "Counter",
+		Size = UDim2.fromOffset(w, 48),
+		AnchorPoint = Vector2.new(1, 0.5),
+		Position = UDim2.new(1, -80, 0.5, 0),
+		BackgroundColor3 = Theme.PanelDark,
+		ZIndex = 2,
+		Parent = win.Header,
+	}) :: Frame
+	UIKit.round(pill)
+	UIKit.stroke(pill, 2.5, Theme.Stroke)
+	UIKit.label({
+		Name = "Icon",
+		Text = icon,
+		Size = UDim2.fromOffset(36, 36),
+		Position = UDim2.new(0, 8, 0.5, 0),
+		AnchorPoint = Vector2.new(0, 0.5),
+		MaxTextSize = 30,
+		NoStroke = true,
+		ZIndex = 3,
+		Parent = pill,
+	})
+	return UIKit.label({
+		Name = "Value",
+		Text = "0",
+		FontFace = Theme.FontNumber,
+		TextColor3 = color,
+		Size = UDim2.new(1, -56, 1, -10),
+		Position = UDim2.new(0, 46, 0.5, 0),
+		AnchorPoint = Vector2.new(0, 0.5),
+		MaxTextSize = 30,
+		ZIndex = 3,
+		Parent = pill,
+	})
+end
+
+function UIKit.window(opts: WindowOptions): Window
+	local w = opts.Width or 880
+	local h = opts.Height or 560
+	local accent = opts.Accent or Theme.ElectricDark
+	local parent: Instance = opts.Parent
+		or (game:GetService("Players").LocalPlayer :: Player):WaitForChild("PlayerGui")
+	local white = Color3.new(1, 1, 1)
+	local black = Color3.new(0, 0, 0)
+
+	local gui = UIKit.new("ScreenGui", {
+		Name = "Window_" .. opts.Name,
+		ResetOnSpawn = false,
+		IgnoreGuiInset = true,
+		ZIndexBehavior = Enum.ZIndexBehavior.Sibling,
+		DisplayOrder = opts.DisplayOrder or 20,
+		Enabled = false,
+		Parent = parent,
+	}) :: ScreenGui
+	local backdrop = UIKit.new("TextButton", {
+		Name = "Backdrop",
+		Size = UDim2.fromScale(1, 1),
+		BackgroundColor3 = Color3.fromRGB(4, 6, 18),
+		BackgroundTransparency = 1,
+		AutoButtonColor = false,
+		Text = "",
+		Selectable = false,
+		Parent = gui,
+	}) :: TextButton
+	local root = UIKit.new("Frame", {
+		Name = "Window",
+		Size = UDim2.fromOffset(w, h),
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Position = UDim2.fromScale(0.5, 0.5),
+		BackgroundTransparency = 1,
+		Active = true,
+		Visible = false,
+		Parent = gui,
+	}) :: Frame
+	local scale = UIKit.autoScale(root, "modal", w, h)
+	-- на низких экранах (телефон) окно сдвигается вниз из-под верхней панели Roblox,
+	-- насколько позволяет свободное место снизу
+	local function placeRoot()
+		local inset = game:GetService("GuiService"):GetGuiInset().Y
+		local s = (scale:GetAttribute("BaseScale") :: number?) or scale.Scale
+		local margin = math.max(0, (viewportSize().Y - h * s) / 2)
+		local shift = math.clamp(inset - margin, 0, margin)
+		root.Position = UDim2.new(0.5, 0, 0.5, math.floor(shift))
+	end
+	placeRoot()
+	scale:GetAttributeChangedSignal("BaseScale"):Connect(placeRoot)
+
+	local panel = UIKit.panel({
+		Name = "Panel",
+		Size = UDim2.fromScale(1, 1),
+		BackgroundColor3 = white,
+		Parent = root,
+	})
+	UIKit.gradient(panel, Theme.PanelLight, Theme.PanelDark)
+	-- внутренняя светящаяся рамка — "двойной" бортик, как в симуляторах
+	local inner = UIKit.new("Frame", {
+		Name = "Inner",
+		Size = UDim2.new(1, -10, 1, -10),
+		Position = UDim2.fromOffset(5, 5),
+		BackgroundTransparency = 1,
+		Parent = panel,
+	}) :: Frame
+	UIKit.corner(inner, Theme.Corner - 4)
+	UIKit.stroke(inner, 2, accent:Lerp(white, 0.35), 0.55)
+
+	local header = UIKit.new("Frame", {
+		Name = "Header",
+		Size = UDim2.new(1, -16, 0, UIKit.HeaderHeight - 10),
+		Position = UDim2.fromOffset(8, 8),
+		BackgroundColor3 = white,
+		Parent = panel,
+	}) :: Frame
+	UIKit.corner(header, Theme.CornerSmall)
+	UIKit.stroke(header, 2.5, Theme.Stroke)
+	UIKit.gradient(header, accent:Lerp(white, 0.2), accent:Lerp(black, 0.35))
+	local headerShine = UIKit.new("Frame", {
+		Name = "Shine",
+		Size = UDim2.new(1, -12, 0.4, 0),
+		Position = UDim2.fromOffset(6, 3),
+		BackgroundColor3 = white,
+		BackgroundTransparency = 0.82,
+		Parent = header,
+	})
+	UIKit.corner(headerShine, Theme.CornerSmall - 4)
+	local title = UIKit.label({
+		Name = "Title",
+		Text = if opts.Icon then opts.Icon .. "  " .. opts.Title else opts.Title,
+		Size = UDim2.new(1, -110, 0.78, 0),
+		Position = UDim2.new(0, 18, 0.5, 0),
+		AnchorPoint = Vector2.new(0, 0.5),
+		TextXAlignment = Enum.TextXAlignment.Left,
+		MaxTextSize = 40,
+		ZIndex = 2,
+		Parent = header,
+	})
+
+	local win: Window
+	local opened = false
+	local selectedTab: string? = nil
+	local tabButtons: { [string]: TextButton } = {}
+	local tabBadges: { [string]: Frame } = {}
+	local pages: { [string]: Frame } = {}
+
+	local closeButton = UIKit.button({
+		Name = "Close",
+		Text = "✕",
+		Color = Theme.Red,
+		Size = UDim2.fromOffset(66, 66),
+		AnchorPoint = Vector2.new(1, 0.5),
+		Position = UDim2.new(1, -2, 0.5, 2),
+		TextSize = 36,
+		ZIndex = 3,
+		Parent = header,
+	}, function()
+		win.close()
+	end)
+	closeButton.Name = "Close"
+
+	local top = UIKit.HeaderHeight + 4
+	local tabs = opts.Tabs
+	if tabs and #tabs > 0 then
+		local row = UIKit.new("Frame", {
+			Name = "Tabs",
+			Size = UDim2.new(1, -32, 0, UIKit.TabHeight - 6),
+			Position = UDim2.fromOffset(16, top),
+			BackgroundTransparency = 1,
+			Parent = panel,
+		}) :: Frame
+		UIKit.list(row, Enum.FillDirection.Horizontal, 10, Enum.HorizontalAlignment.Left)
+		local tabW = math.min(230, math.floor((w - 32 - 10 * (#tabs - 1)) / #tabs))
+		for i, t in tabs do
+			local b = UIKit.button({
+				Name = "Tab_" .. t.Id,
+				Text = t.Text,
+				Color = Theme.GrayDark,
+				Size = UDim2.new(0, tabW, 1, 0),
+				LayoutOrder = i,
+				TextSize = 26,
+				Parent = row,
+			}, function()
+				win.setTab(t.Id)
+			end)
+			tabButtons[t.Id] = b
+			tabBadges[t.Id] = UIKit.badge(b, "!", 24)
+		end
+		top += UIKit.TabHeight
+	end
+
+	local body = UIKit.new("Frame", {
+		Name = "Body",
+		Size = UDim2.new(1, -32, 1, -(top + 14)),
+		Position = UDim2.fromOffset(16, top + 2),
+		BackgroundTransparency = 1,
+		Parent = panel,
+	}) :: Frame
+	if tabs then
+		for _, t in tabs do
+			pages[t.Id] = UIKit.new("Frame", {
+				Name = "Page_" .. t.Id,
+				Size = UDim2.fromScale(1, 1),
+				BackgroundTransparency = 1,
+				Visible = false,
+				Parent = body,
+			}) :: Frame
+		end
+	end
+
+	-- подтверждение ("Точно удалить?")
+	local overlay = UIKit.new("TextButton", {
+		Name = "Confirm",
+		Size = UDim2.fromScale(1, 1),
+		BackgroundColor3 = black,
+		BackgroundTransparency = 0.35,
+		AutoButtonColor = false,
+		Text = "",
+		Selectable = false,
+		ZIndex = 20,
+		Visible = false,
+		Parent = root,
+	}) :: TextButton
+	UIKit.corner(overlay, Theme.Corner)
+	local box = UIKit.panel({
+		Name = "Box",
+		Size = UDim2.fromOffset(500, 250),
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Position = UDim2.fromScale(0.5, 0.5),
+		BackgroundColor3 = Theme.PanelLight,
+		ZIndex = 21,
+		Parent = overlay,
+	})
+	local boxScale = UIKit.new("UIScale", { Scale = 1, Parent = box }) :: UIScale
+	local confirmLabel = UIKit.label({
+		Name = "Text",
+		Text = "",
+		Size = UDim2.new(1, -40, 0, 120),
+		Position = UDim2.fromOffset(20, 18),
+		MaxTextSize = 30,
+		ZIndex = 22,
+		Parent = box,
+	})
+	local confirmYes: (() -> ())? = nil
+	local yesButton = UIKit.button({
+		Name = "Yes",
+		Text = "Да",
+		Color = Theme.Red,
+		Size = UDim2.fromOffset(200, 68),
+		AnchorPoint = Vector2.new(1, 1),
+		Position = UDim2.new(0.5, -10, 1, -18),
+		ZIndex = 22,
+		Parent = box,
+	}, function()
+		overlay.Visible = false
+		local fn = confirmYes
+		confirmYes = nil
+		if fn then
+			fn()
+		end
+	end)
+	UIKit.button({
+		Name = "No",
+		Text = "Нет",
+		Color = Theme.Gray,
+		Size = UDim2.fromOffset(200, 68),
+		AnchorPoint = Vector2.new(0, 1),
+		Position = UDim2.new(0.5, 10, 1, -18),
+		ZIndex = 22,
+		Parent = box,
+	}, function()
+		overlay.Visible = false
+		confirmYes = nil
+	end)
+	overlay.Activated:Connect(function()
+		overlay.Visible = false
+		confirmYes = nil
+	end)
+
+	local function setTab(id: string)
+		if not pages[id] then
+			return
+		end
+		local changed = selectedTab ~= id
+		selectedTab = id
+		for tid, b in tabButtons do
+			if tid == id then
+				UIKit.setButtonColor(b, Theme.Electric, Theme.ElectricDark)
+			else
+				UIKit.setButtonColor(b, Theme.GrayDark)
+			end
+		end
+		for pid, page in pages do
+			page.Visible = pid == id
+		end
+		if changed and opts.OnTab then
+			opts.OnTab(id)
+		end
+	end
+
+	local function close(instant: boolean?)
+		if not opened then
+			return
+		end
+		opened = false
+		if currentWindow == win then
+			currentWindow = nil
+		end
+		overlay.Visible = false
+		confirmYes = nil
+		UIKit.modalClosed()
+		if instant then
+			root.Visible = false
+			gui.Enabled = false
+		else
+			UIKit.tween(backdrop, 0.15, { BackgroundTransparency = 1 })
+			UIKit.popOut(root, scale, function()
+				-- окно могли снова открыть, пока шла анимация закрытия
+				if opened then
+					root.Visible = true
+				else
+					gui.Enabled = false
+				end
+			end)
+		end
+		if opts.OnClose then
+			opts.OnClose()
+		end
+	end
+
+	local function open(tab: string?)
+		local cur = currentWindow
+		if cur and cur ~= win then
+			cur.close(true)
+		end
+		if tab and pages[tab] then
+			setTab(tab)
+		elseif not selectedTab and tabs and tabs[1] then
+			setTab(tabs[1].Id)
+		end
+		if opened then
+			return
+		end
+		opened = true
+		currentWindow = win
+		gui.Enabled = true
+		backdrop.BackgroundTransparency = 1
+		UIKit.tween(backdrop, 0.2, { BackgroundTransparency = 0.45 })
+		UIKit.popIn(root, scale)
+		UIKit.modalOpened()
+		UIKit.playSound("Whoosh")
+		if opts.OnOpen then
+			opts.OnOpen(selectedTab)
+		end
+	end
+
+	local function confirm(text: string, yesText: string, onYes: () -> (), yesColor: Color3?)
+		confirmLabel.Text = text
+		UIKit.setButtonText(yesButton, yesText)
+		UIKit.setButtonColor(yesButton, yesColor or Theme.Red)
+		confirmYes = onYes
+		overlay.Visible = true
+		boxScale.Scale = 0.8
+		UIKit.tween(boxScale, 0.22, { Scale = 1 }, Enum.EasingStyle.Back)
+	end
+
+	backdrop.Activated:Connect(function()
+		if overlay.Visible then
+			overlay.Visible = false
+			confirmYes = nil
+			return
+		end
+		close()
+	end)
+
+	win = {
+		Name = opts.Name,
+		Gui = gui,
+		Root = root,
+		Scale = scale,
+		Header = header,
+		Body = body,
+		Pages = pages,
+		open = open,
+		close = close,
+		isOpen = function(): boolean
+			return opened
+		end,
+		tab = function(): string?
+			return selectedTab
+		end,
+		setTab = setTab,
+		setTabBadge = function(id: string, on: boolean)
+			local b = tabBadges[id]
+			if b then
+				b.Visible = on
+			end
+		end,
+		setTitle = function(text: string)
+			title.Text = text
+		end,
+		confirm = confirm,
+	}
+	return win
+end
+
 return UIKit

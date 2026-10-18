@@ -38,6 +38,13 @@ local Theme = {
 	Good = Color3.fromRGB(120, 230, 255),
 	Miss = Color3.fromRGB(255, 120, 120),
 
+	Gold = Color3.fromRGB(255, 196, 40),
+	GoldDark = Color3.fromRGB(190, 120, 20),
+	Zap = Color3.fromRGB(255, 240, 120),
+	Supercell = Color3.fromRGB(90, 230, 120),
+	Ball = Color3.fromRGB(255, 150, 70),
+	Rainbow = Color3.fromRGB(255, 120, 210),
+
 	Corner = 16,
 	CornerSmall = 12,
 }

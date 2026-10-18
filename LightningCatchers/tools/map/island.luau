@@ -98,7 +98,7 @@ function Island.body(parent, opts)
 		if t <= 0 then
 			return 1
 		end
-		return math.max(0.06, (1 - t) ^ 0.75)
+		return math.max(0.06, (1 - t) ^ (opts.coneExp or 1.05))
 	end
 	local R0 = innerR - 1.2
 	-- обрыв
@@ -125,25 +125,30 @@ function Island.body(parent, opts)
 		local r0 = R0 * profile(t0) * (if j == 1 then 0.97 else 1)
 		local r1 = R0 * profile(t1)
 		local yMid = coneTop - (j - 0.5) * layerH
-		local count = math.max(5, math.floor(N * (r0 / R0) * 0.55 + 0.5))
+		local count = math.max(5, math.floor(N * (r0 / R0) * (opts.coneDensity or 0.5) + 0.5))
 		local slope = math.atan2(r0 - r1, layerH)
-		local col = B.shade(rock, 0.12 + 0.75 * t1)
+		-- полосы породы: слои чуть отличаются оттенком (тёплый/холодный), ниже — темнее и холоднее
+		local band = if j % 2 == 0 then (opts.rock2 or B.tint(rock, 0.08)) else rock
+		local col = B.shade(band, 0.08 + 0.7 * t1)
 		local rot = rng:range(0, math.pi * 2)
+		local maxTop = y0 - 1.5 -- ни один камень не должен торчать сквозь верх
+		local rr = (r0 + r1) / 2
+		local d = math.clamp(rr * 0.42, 5, 16)
 		for q = 1, count do
 			local th = rot + (q / count) * math.pi * 2 + rng:range(-0.12, 0.12)
 			local out = Vector3.new(math.cos(th), 0, math.sin(th))
-			local rr = (r0 + r1) / 2
-			local d = math.max(4, rr * 0.6)
 			local w = 2 * math.pi * rr / count * rng:range(1.25, 1.6)
-			local h = layerH * rng:range(1.25, 1.7)
-			local pos = C + out * (rr - d / 2 + rng:range(-0.6, 1.2)) + Vector3.new(0, yMid - C.Y + rng:range(-1, 1), 0)
-			local cf = B.facing(pos, out) * CFrame.Angles(-slope + rng:range(-0.08, 0.08), rng:range(-0.15, 0.15), rng:range(-0.12, 0.12))
+			local h = layerH * rng:range(1.3, 1.8)
+			local tilt = -slope + rng:range(-0.08, 0.08)
+			local hv = (h / 2) * math.cos(tilt) + (d / 2) * math.abs(math.sin(tilt)) + 0.5
+			local y = math.min(yMid + rng:range(-1, 1), maxTop - hv)
+			local pos = C + out * (rr - d / 2 + rng:range(-0.6, 1.2)) + Vector3.new(0, y - C.Y, 0)
+			local cf = B.facing(pos, out) * CFrame.Angles(tilt, rng:range(-0.15, 0.15), rng:range(-0.12, 0.12))
 			B.block(m, cf, Vector3.new(w, h, d), B.vary(col, rng, 0.05), B.deco({ Material = rockMat, Shadow = j <= 2 }))
 		end
 		-- заполнение середины (видно только снизу)
-		if j % 2 == 0 or j == layers then
-			B.cylY(m, Vector3.new(C.X, yMid, C.Z), layerH * 1.3, math.max(4, r1 * 1.4), B.shade(rock, 0.2 + 0.7 * t1), B.deco({ Material = rockMat, Shadow = false }))
-		end
+		local fillD = math.max(4, (rr - d * 0.7) * 2)
+		B.cylY(m, Vector3.new(C.X, math.min(yMid, maxTop - layerH * 0.65), C.Z), layerH * 1.3, fillD, B.shade(band, 0.2 + 0.7 * t1), B.deco({ Material = rockMat, Shadow = false }))
 	end
 	-- сталактиты: центральный шип и висящие камни по нижним слоям
 	local bottomY = coneTop - coneDepth
@@ -159,13 +164,29 @@ function Island.body(parent, opts)
 		end
 	end
 	stalactite(Vector3.new(C.X, bottomY + 2, C.Z), depth * 0.35, R0 * 0.16, B.shade(rock, 0.85))
-	local hangs = opts.stalactites or 7
+	local hangs = opts.stalactites or 5
 	for _ = 1, hangs do
 		local t = rng:range(0.35, 0.85)
 		local rr = R0 * profile(t) * rng:range(0.45, 0.8)
 		local th = rng:range(0, math.pi * 2)
 		local pos = C + Vector3.new(math.cos(th) * rr, coneTop - C.Y - t * coneDepth, math.sin(th) * rr)
 		stalactite(pos, rng:range(8, 16) * (R / 90), rng:range(3, 5) * (R / 90), B.shade(rock, 0.4 + 0.5 * t))
+	end
+
+	-- обломки, парящие под островом (без коллизий) — подчёркивают, что остров летает
+	for _ = 1, opts.floaters or 4 do
+		local th = rng:range(0, math.pi * 2)
+		local rr = R0 * rng:range(0.35, 0.95)
+		local y = coneTop - coneDepth * rng:range(0.55, 1.05) - rng:range(4, 14)
+		local pos = Vector3.new(C.X + math.cos(th) * rr, y, C.Z + math.sin(th) * rr)
+		local s = rng:range(3, 6) * (R / 90)
+		local cf = CFrame.new(pos) * CFrame.Angles(rng:range(-0.5, 0.5), rng:range(0, 6.28), rng:range(-0.5, 0.5))
+		B.block(m, cf, Vector3.new(s * 1.3, s, s * 1.1), B.vary(B.shade(rock, 0.45), rng, 0.05), B.deco({ Material = rockMat, Shadow = false, Name = "Floater" }))
+		B.wedge(m, cf * CFrame.new(0, -s * 0.9, 0) * CFrame.Angles(math.pi, 0, 0), Vector3.new(s * 1.1, s * 0.9, s * 0.9), B.vary(B.shade(rock, 0.6), rng, 0.05), B.deco({ Material = rockMat, Shadow = false, Name = "Floater" }))
+		if opts.topMaterial and rng:chance(0.5) then
+			-- клочок травы/песка/снега сверху обломка
+			B.block(m, cf * CFrame.new(0, s * 0.55, 0), Vector3.new(s * 1.2, 0.5, s * 1.0), opts.top, B.deco({ Material = opts.topMaterial, Shadow = false, Name = "Floater" }))
+		end
 	end
 
 	-- 5) «подтёки» травы по кромке (трава свисает с обрыва)
@@ -201,7 +222,7 @@ function Island.body(parent, opts)
 	if opts.walls then
 		local wr = opts.walls.radius or (R + 0.8)
 		local wh = opts.walls.height or 16
-		local segs = opts.walls.segments or 36
+		local segs = opts.walls.segments or 28
 		local wallParent = opts.wallParent or m
 		local half = math.rad(opts.openHalfDeg or 10)
 		for q = 0, segs - 1 do

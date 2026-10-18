@@ -96,19 +96,25 @@ function Fulgurite.rarityOf(color: Config.ColorId, quality: number, mut: MutId?)
 	return "common"
 end
 
+local MAX_PARTS = 90 -- ограничение числа деталей (телефоны)
+
+-- Отрезок стекла: трубка + светящаяся сердцевина + «узелок» оплавленного стекла на стыке
 local function segment(parts: { PartSpec }, a: Vector3, b: Vector3, thickness: number)
 	local cf, len = Geom.axisCFrame(a, b)
-	if len < 0.05 then
+	if len < 0.05 or #parts >= MAX_PARTS - 2 then
 		return
 	end
-	table.insert(parts, { CFrame = cf, Size = Vector3.new(len + thickness * 0.4, thickness, thickness), Kind = "glass", Shape = "Cylinder" } :: PartSpec)
-	if thickness >= 0.35 then
+	table.insert(parts, { CFrame = cf, Size = Vector3.new(len + thickness * 0.3, thickness, thickness), Kind = "glass", Shape = "Cylinder" } :: PartSpec)
+	if thickness >= 0.3 then
 		table.insert(parts, {
 			CFrame = cf,
-			Size = Vector3.new(len, thickness * 0.38, thickness * 0.38),
+			Size = Vector3.new(len + thickness * 0.2, thickness * 0.36, thickness * 0.36),
 			Kind = "core",
 			Shape = "Cylinder",
 		} :: PartSpec)
+	end
+	if thickness >= 0.32 then
+		table.insert(parts, { CFrame = CFrame.new(b), Size = Vector3.one * thickness * 1.18, Kind = "glass", Shape = "Ball" } :: PartSpec)
 	end
 end
 
@@ -116,71 +122,105 @@ local function rotateAround(v: Vector3, axis: Vector3, angle: number): Vector3
 	return (CFrame.fromAxisAngle(axis, angle) * CFrame.new(v)).Position
 end
 
--- Ветка: рекурсивно, с сужением и случайными отклонениями
-local function branch(parts: { PartSpec }, rng: Prng.Prng, pos: Vector3, dir: Vector3, len: number, thick: number, depth: number, style: string)
+-- Перпендикуляр к направлению (для изломов «как у молнии»)
+local function perpendicular(d: Vector3, rng: Prng.Prng): Vector3
+	local r = Vector3.new(rng:range(-1, 1), rng:range(-0.3, 0.3), rng:range(-1, 1))
+	local p = d:Cross(r)
+	if p.Magnitude < 1e-3 then
+		p = d:Cross(Vector3.xAxis)
+	end
+	return p.Unit
+end
+
+-- Ветка: ломаная с резкими изломами, сужается к кончику; может ветвиться (рекурсивно).
+-- limit — сколько деталей разрешено набрать к концу этой ветки (бюджет делится между ветками).
+local function branch(parts: { PartSpec }, rng: Prng.Prng, pos: Vector3, dir: Vector3, len: number, thick: number, depth: number, style: string, limit: number)
 	local p = pos
 	local d = dir.Unit
-	local steps = if style == "spiral" then 5 else 3
+	local steps = if style == "spiral" then 5 else 4
+	local side = if rng:chance(0.5) then 1 else -1
+	local t = thick
 	for i = 1, steps do
-		local jitter = Vector3.new(rng:range(-0.45, 0.45), rng:range(-0.1, 0.25), rng:range(-0.45, 0.45))
-		if style == "spiral" then
-			d = rotateAround(d, Vector3.yAxis, 0.7)
-			jitter *= 0.4
+		if #parts >= math.min(limit, MAX_PARTS - 3) then
+			break
 		end
-		d = (d + jitter).Unit
-		local nextP = p + d * (len / steps)
-		segment(parts, p, nextP, thick * (1 - 0.12 * i))
+		if style == "spiral" then
+			d = rotateAround(d, Vector3.yAxis, 0.75)
+		end
+		-- излом: в сторону, поочерёдно влево/вправо, с лёгкой тягой вверх
+		local kink = perpendicular(d, rng) * rng:range(0.35, 0.75) * side
+		side = -side
+		local lift = Vector3.new(0, if style == "star" then 0.05 else 0.22, 0)
+		local stepDir = (d + kink * (if style == "spiral" then 0.4 else 1) + lift).Unit
+		local nextP = p + stepDir * (len / steps) * rng:range(0.8, 1.2)
+		if nextP.Y < 0.4 then
+			nextP = Vector3.new(nextP.X, 0.4 + rng:range(0, 0.3), nextP.Z)
+		end
+		segment(parts, p, nextP, t)
 		p = nextP
-		if depth > 0 and #parts < 70 and rng:chance(if style == "bush" then 0.55 else 0.38) then
-			local side = Vector3.new(rng:range(-1, 1), rng:range(0.2, 0.9), rng:range(-1, 1))
-			branch(parts, rng, p, side, len * 0.62, thick * 0.66, depth - 1, style)
+		t = math.max(0.16, t * 0.82)
+		if depth > 0 and #parts < limit - 8 and rng:chance(if style == "bush" then 0.6 else 0.45) then
+			local sideDir = (d + perpendicular(d, rng) * rng:range(0.8, 1.3) + Vector3.new(0, rng:range(0.1, 0.6), 0)).Unit
+			branch(parts, rng, p, sideDir, len * 0.6, t * 0.75, depth - 1, style, limit)
 		end
 	end
 	-- светящийся кончик
-	table.insert(parts, { CFrame = CFrame.new(p), Size = Vector3.one * math.max(0.3, thick * 0.9), Kind = "tip", Shape = "Ball" } :: PartSpec)
+	if #parts < MAX_PARTS then
+		table.insert(parts, { CFrame = CFrame.new(p), Size = Vector3.one * math.max(0.3, t * 1.25), Kind = "tip", Shape = "Ball" } :: PartSpec)
+	end
 end
 
 -- Сгенерировать фульгурит
 function Fulgurite.generate(seed: number, color: Config.ColorId, mut: MutId?): Spec
 	local rng = Prng.new(seed)
+	-- порядок первых вызовов rng не менять: от него зависят форма, качество и редкость
 	local shape = Fulgurite.Shapes[rng:int(1, #Fulgurite.Shapes)]
 	local quality = rng:next()
 	local rarity = Fulgurite.rarityOf(color, quality, mut)
 	local rank = Pets.Rarities[rarity].Rank
 	local parts: { PartSpec } = {}
-	-- основание: тёмный оплавленный камень
-	table.insert(parts, { CFrame = CFrame.new(0, 0.25, 0) * CFrame.Angles(0, 0, math.pi / 2), Size = Vector3.new(0.5, 3.4, 3.4), Kind = "base", Shape = "Cylinder" } :: PartSpec)
+	-- основание: тёмный оплавленный камень (2-3 глыбы) и лужица стекла
+	local yaw = rng:range(0, math.pi * 2)
+	table.insert(parts, { CFrame = CFrame.new(0, 0.3, 0) * CFrame.Angles(0, yaw, 0), Size = Vector3.new(2.8, 0.6, 2.3), Kind = "base", Shape = "Block" } :: PartSpec)
+	table.insert(parts, { CFrame = CFrame.new(0.2, 0.32, 0.1) * CFrame.Angles(0.12, yaw + 0.8, -0.1), Size = Vector3.new(2.2, 0.6, 2.0), Kind = "base", Shape = "Block" } :: PartSpec)
+	table.insert(parts, { CFrame = CFrame.new(-0.9, 0.25, -0.6) * CFrame.Angles(0.2, yaw + 2.1, 0.15), Size = Vector3.new(1.1, 0.7, 1.0), Kind = "base", Shape = "Block" } :: PartSpec)
+	table.insert(parts, { CFrame = CFrame.new(0, 0.62, 0) * CFrame.Angles(0, 0, math.pi / 2), Size = Vector3.new(0.12, 2.1, 2.1), Kind = "glass", Shape = "Cylinder" } :: PartSpec)
 	local depth = 1 + math.min(3, rank - 1)
 	local height = 3.2 + rank * 0.55 + quality
+	local function share(i: number, n: number): number
+		return 4 + math.floor((MAX_PARTS - 4) * i / n)
+	end
 	if shape == "crown" then
-		local n = 5 + rank
+		local n = 4 + math.min(rank, 4)
 		for i = 1, n do
-			local a = (i / n) * math.pi * 2
-			local dir = Vector3.new(math.cos(a) * 0.55, 1, math.sin(a) * 0.55)
-			branch(parts, rng, Vector3.new(math.cos(a) * 0.9, 0.5, math.sin(a) * 0.9), dir, height * 0.7, 0.45, depth - 1, shape)
+			local a = (i / n) * math.pi * 2 + rng:range(-0.15, 0.15)
+			local dir = Vector3.new(math.cos(a) * 0.6, 1, math.sin(a) * 0.6)
+			branch(parts, rng, Vector3.new(math.cos(a) * 0.7, 0.55, math.sin(a) * 0.7), dir, height * rng:range(0.65, 0.8), 0.5, depth - 1, shape, share(i, n))
 		end
 	elseif shape == "star" then
-		local n = 4 + rank
+		local n = 4 + math.min(rank, 3)
 		for i = 1, n do
-			local a = (i / n) * math.pi * 2
-			local dir = Vector3.new(math.cos(a), rng:range(0.5, 1.4), math.sin(a))
-			branch(parts, rng, Vector3.new(0, 0.6, 0), dir, height * 0.65, 0.5, depth - 1, shape)
+			local a = (i / n) * math.pi * 2 + rng:range(-0.2, 0.2)
+			local dir = Vector3.new(math.cos(a), rng:range(0.45, 1.2), math.sin(a))
+			branch(parts, rng, Vector3.new(0, 0.6, 0), dir, height * 0.7, 0.55, depth - 1, shape, share(i, n))
 		end
+		-- центральный столбик
+		segment(parts, Vector3.new(0, 0.6, 0), Vector3.new(rng:range(-0.2, 0.2), height * 0.45, rng:range(-0.2, 0.2)), 0.6)
 	elseif shape == "tree" then
-		branch(parts, rng, Vector3.new(0, 0.5, 0), Vector3.yAxis, height, 0.75, depth, shape)
-		for _ = 1, 2 do
-			branch(parts, rng, Vector3.new(0, height * 0.55, 0), Vector3.new(rng:range(-1, 1), 0.8, rng:range(-1, 1)), height * 0.5, 0.45, depth - 1, shape)
+		branch(parts, rng, Vector3.new(0, 0.55, 0), Vector3.yAxis, height, 0.85, depth, shape, share(1, 3))
+		for i = 2, 3 do
+			branch(parts, rng, Vector3.new(rng:range(-0.2, 0.2), height * 0.5, rng:range(-0.2, 0.2)), Vector3.new(rng:range(-1, 1), 0.8, rng:range(-1, 1)), height * 0.5, 0.5, depth - 1, shape, share(i, 3))
 		end
 	elseif shape == "spiral" then
-		branch(parts, rng, Vector3.new(0.6, 0.5, 0), Vector3.new(0.3, 1, 0), height * 1.15, 0.6, depth - 1, shape)
-		branch(parts, rng, Vector3.new(-0.6, 0.5, 0), Vector3.new(-0.3, 1, 0), height * 0.9, 0.5, depth - 1, shape)
+		branch(parts, rng, Vector3.new(0.6, 0.55, 0), Vector3.new(0.35, 1, 0), height * 1.15, 0.65, depth - 1, shape, share(1, 2))
+		branch(parts, rng, Vector3.new(-0.6, 0.55, 0), Vector3.new(-0.35, 1, 0), height * 0.95, 0.55, depth - 1, shape, share(2, 2))
 	else -- bush
-		for _ = 1, 2 + math.floor(rank / 2) do
-			branch(parts, rng, Vector3.new(rng:range(-0.6, 0.6), 0.5, rng:range(-0.6, 0.6)), Vector3.new(rng:range(-0.5, 0.5), 1, rng:range(-0.5, 0.5)), height * 0.75, 0.55, depth, shape)
+		local n = 2 + math.floor(rank / 2)
+		for i = 1, n do
+			branch(parts, rng, Vector3.new(rng:range(-0.6, 0.6), 0.55, rng:range(-0.6, 0.6)), Vector3.new(rng:range(-0.5, 0.5), 1, rng:range(-0.5, 0.5)), height * 0.75, 0.6, depth, shape, share(i, n))
 		end
 	end
-	-- ограничение числа деталей (телефоны)
-	while #parts > 90 do
+	while #parts > MAX_PARTS do
 		table.remove(parts)
 	end
 	return {

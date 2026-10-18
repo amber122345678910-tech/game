@@ -12,6 +12,7 @@ import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 const params = new URLSearchParams(location.search);
 const W = +(params.get('w') || 1280), H = +(params.get('h') || 720);
 const scene = await (await fetch(params.get('scene'))).json();
+if (!Array.isArray(scene.parts)) scene.parts = [];
 
 const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
 renderer.setSize(W, H);
@@ -52,8 +53,11 @@ const fogColor = atm ? c3(atm.color) : skyHorizon;
 if (atm && atm.density > 0) s.fog = new THREE.FogExp2(fogColor, atm.density * 0.004);
 
 const brightness = L.brightness ?? 2;
-s.add(new THREE.HemisphereLight(outdoor.clone().lerp(skyTop, 0.3), ambient.clone().multiplyScalar(0.6), night ? 0.7 : 1.1));
-s.add(new THREE.AmbientLight(ambient, night ? 0.25 : 0.35));
+// Калибровка под Roblox: там цвет детали в тени ≈ цвет × OutdoorAmbient (в гамма-пространстве).
+// three.js делит рассеянный свет на π и тонмапит, поэтому интенсивности заметно выше «физических».
+const NB = +(params.get('nightBoost') || 4.2);
+s.add(new THREE.HemisphereLight(outdoor.clone(), ambient.clone().multiplyScalar(0.7), night ? 0.85 * NB : 1.1));
+s.add(new THREE.AmbientLight(ambient, night ? 0.3 * NB : 0.35));
 const dl = new THREE.DirectionalLight(night ? 0x8fa6ff : 0xfff1dd, night ? 0.35 * brightness : 1.1 * brightness);
 s.add(dl); s.add(dl.target);
 
@@ -161,7 +165,7 @@ for (const g of groups.values()) {
 }
 
 // Point lights (strongest N)
-const lights = (scene.lights || []).slice().sort((a, b) => b.brightness * b.range - a.brightness * a.range).slice(0, +(params.get('maxLights') || 48));
+const lights = (Array.isArray(scene.lights) ? scene.lights : []).slice().sort((a, b) => b.brightness * b.range - a.brightness * a.range).slice(0, +(params.get('maxLights') || 48));
 for (const l of lights) {
   const pl = new THREE.PointLight(c3(l.color), l.brightness * 6, l.range * 1.4, 1.6);
   pl.position.set(l.pos[0], l.pos[1], l.pos[2]);
