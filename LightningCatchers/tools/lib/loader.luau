@@ -65,6 +65,11 @@ function Loader.load(path: string): any
 		NumberSequence = roblox.NumberSequence,
 		ColorSequence = roblox.ColorSequence,
 		NumberRange = roblox.NumberRange,
+		ColorSequenceKeypoint = roblox.ColorSequenceKeypoint,
+		NumberSequenceKeypoint = roblox.NumberSequenceKeypoint,
+		Instance = roblox.Instance, -- для src/shared/Models.luau (строители моделей)
+		Font = roblox.Font,
+		BrickColor = roblox.BrickColor,
 		task = task,
 	}, { __index = _G })
 	local fn = luau.load(source, { debugName = file, environment = env, injectGlobals = true })
