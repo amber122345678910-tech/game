@@ -23,6 +23,7 @@ local ORDER = {
 	"DailyService",
 	"LeaderboardService",
 	"TutorialService",
+	"KioskService",
 	"RequestService",
 }
 

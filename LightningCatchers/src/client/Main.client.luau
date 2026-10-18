@@ -79,7 +79,8 @@ applySettings(ClientState.data)
 -- Juice создаёт свои объекты при загрузке модуля
 startModule("Juice", Controllers:WaitForChild("Juice"))
 
-for _, name in { "WorldFX", "StrikeController", "CatchController", "CharacterFX", "PetsFX" } do
+-- EventFX: шаровая молния, радужный луч, подарки и окна киосков хаба (ProximityPrompt → OpenWindow)
+for _, name in { "WorldFX", "StrikeController", "CatchController", "CharacterFX", "PetsFX", "EventFX" } do
 	startModule(name, Controllers:WaitForChild(name))
 end
 
