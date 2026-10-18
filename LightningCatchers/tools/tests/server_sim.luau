@@ -585,15 +585,8 @@ local tipWeld = rod and rod.Tip:FindFirstChildOfClass("Weld")
 local tipOffset = if tipWeld then tipWeld.C0.Position elseif rod then rod.Handle.CFrame:PointToObjectSpace(rod.Tip.Position) else Vector3.zero
 check(rod and tipOffset.Magnitude > 1 and tipOffset.Unit:Dot(rod.Grip.UpVector) > 0.95, "хват вертикальный (кончик вверх)")
 check(rod and rod:GetAttribute("Tier") == 0, "уровень громоотвода 0")
-check(rod and rod.ToolTip == "Медный громоотвод" and jar and jar:FindFirstChild("Strap") ~= nil, "модели из общего Models")
-if not (rod and rod.ToolTip == "Медный громоотвод" and jar and jar:FindFirstChild("Strap")) then
-	local names = {}
-	for _, c in (jar and jar:GetChildren() or {}) do
-		table.insert(names, c.Name)
-	end
-	print("   rod tooltip:", rod and rod.ToolTip, "jar:", table.concat(names, ","))
-end
 local jar = A.Character:FindFirstChild("Jar")
+check(rod and rod.ToolTip == "Медный громоотвод" and jar and jar:FindFirstChild("Strap") ~= nil, "модели из общего Models")
 local jarLight = jar and jar.Core and jar.Core:FindFirstChildOfClass("PointLight")
 check(jarLight ~= nil and jarLight.Enabled == false, "банка с ядром и выключенным светом")
 local jarWeld = jar and jar.PrimaryPart and jar.PrimaryPart:FindFirstChild("JarWeld")
