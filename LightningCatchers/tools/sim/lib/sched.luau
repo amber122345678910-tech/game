@@ -363,6 +363,22 @@ function Sched.runUntil(t, onFrame)
 	end
 end
 
+-- Suspended threads per realm and what they wait on (leak detection)
+function Sched.threadCensus()
+	local out = {}
+	for co, info in threadInfo do
+		if coroutine.status(co) == "suspended" and not cancelled[co] then
+			local r = threadRealm[co]
+			if r and not r.dead then
+				local what = string.gsub(info.what or "?", "%(.*", "")
+				local key = r.name .. " | " .. what
+				out[key] = (out[key] or 0) + 1
+			end
+		end
+	end
+	return out
+end
+
 -- Threads that are still suspended waiting on something (for the end-of-run report)
 function Sched.blockedThreads()
 	local list = {}

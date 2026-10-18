@@ -224,6 +224,35 @@ function Runtime.removePlayer(pd, reason)
 end
 Services.removePlayer = Runtime.removePlayer
 
+-- Device changes: screen rotation / window resize and input switching (fire the change events the UI listens to)
+function Runtime.setViewport(realm, size)
+	realm.viewport = size
+	local camD = realm.camera and DATA[realm.camera]
+	if camD then
+		camD.viewport = size
+		Engine.fireChanged(camD, "ViewportSize", realm)
+	end
+	local gui = Engine.findChild(realm.playerD, "PlayerGui", realm)
+	if gui then
+		Engine.forSubtree(DATA[gui], function(x)
+			if x.sigs and (x.sigs["prop:AbsoluteSize"] or x.sigs["prop:AbsolutePosition"] or x.sigs.Changed) and x.cls.isA.GuiBase2d then
+				Engine.fireChanged(x, "AbsoluteSize", realm)
+				Engine.fireChanged(x, "AbsolutePosition", realm)
+			end
+		end)
+	end
+end
+
+function Runtime.setPreferredInput(realm, touch)
+	realm.touch = touch
+	realm.preferredInput = if touch then Enum.PreferredInput.Touch else Enum.PreferredInput.KeyboardAndMouse
+	realm.lastInput = if touch then Enum.UserInputType.Touch else Enum.UserInputType.MouseMovement
+	local uis = DATA[svc("UserInputService")]
+	Engine.fireChanged(uis, "PreferredInput", realm)
+	Engine.fireChanged(uis, "TouchEnabled", realm)
+	Engine.fireEvent(uis, "LastInputTypeChanged", realm, realm.lastInput)
+end
+
 -- Server shutdown: run BindToClose callbacks (each in its own thread) and wait up to 30 s
 function Runtime.shutdown()
 	local threads = {}

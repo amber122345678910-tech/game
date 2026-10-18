@@ -16,17 +16,19 @@ Report.Categories = {
 	check = { "Scenario checks that failed", "error" },
 	emu = { "HARNESS GAPS: engine API the game used that the sim does not emulate", "error" },
 	member_probe = { "Unknown members read inside pcall (deliberate probes, informational)", "info" },
+	swallowed = { "Code errors swallowed by a game pcall without any warn() (silent failures)", "warning" },
 	deprecated = { "Deprecated API used", "warning" },
 	nan = { "NaN/inf written into a property", "warning" },
 	warn = { "Other warn() output from game code", "warning" },
 	note = { "Notes", "info" },
 }
-Report.Order = { "runtime", "caught", "member", "proptype", "yield", "remote", "check", "emu", "nan", "deprecated", "warn", "member_probe", "note" }
+Report.Order = { "runtime", "caught", "member", "proptype", "yield", "remote", "check", "emu", "swallowed", "nan", "deprecated", "warn", "member_probe", "note" }
 
 local entries = {} -- key -> entry
 local order = {}
 Report.entries = entries
 Report.log = {}
+Report.recentSwallowed = {}
 Report.ROOT = "/home/user/game/LightningCatchers/"
 
 local SIM_DIR = "tools/sim/"
@@ -153,6 +155,9 @@ end
 function Report.errorCount()
 	local n = 0
 	for _, e in order do
+		if e.category == "swallowed" then
+			continue
+		end
 		local cat = Report.Categories[e.category]
 		if cat and cat[2] == "error" then
 			n += 1
@@ -179,10 +184,26 @@ function Report.render(metricsText)
 	w("==================================================================================")
 	w(" LIGHTNING CATCHERS — HEADLESS RUNTIME SIM REPORT")
 	w("==================================================================================")
+	-- a swallowed error that the game also printed with warn() is not "silent"
+	local caughtText = {}
+	for _, e in order do
+		if e.category == "caught" or e.category == "runtime" then
+			table.insert(caughtText, e.message)
+		end
+	end
+	local function alsoWarned(msg)
+		local needle = string.sub(msg, 1, 80)
+		for _, t in caughtText do
+			if string.find(t, needle, 1, true) then
+				return true
+			end
+		end
+		return false
+	end
 	for _, cat in Report.Order do
 		local list = {}
 		for _, e in order do
-			if e.category == cat then
+			if e.category == cat and not (cat == "swallowed" and alsoWarned(e.message)) then
 				table.insert(list, e)
 			end
 		end

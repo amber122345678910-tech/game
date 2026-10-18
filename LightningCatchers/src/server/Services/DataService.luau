@@ -45,7 +45,7 @@ DataService.BeforeSave = Signal.new() :: Signal.Signal<Player>
 local STORE_NAME = "PlayerData_v1"
 local AUTOSAVE_INTERVAL = 75
 local LOCK_STALE_AFTER = 150 -- замок без обновления дольше этого считается брошенным
-local LOCK_WAIT_TRIES = 6 -- сколько раз подождать чужой свежий замок (по 4 секунды)
+local LOCK_WAIT_TRIES = 3 -- сколько раз подождать чужой свежий замок (по 4 секунды), потом забрать
 local RETRIES = 5
 
 local store: DataStore? = nil

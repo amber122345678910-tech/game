@@ -132,10 +132,26 @@ function ConnMethods.Disconnect(c)
 end
 
 -- opts: { immediate = bool (run handlers synchronously, e.g. RunService), name, onConnect(realm) }
+Engine.allSignals = setmetatable({}, { __mode = "k" })
 function Engine.newSignal(name, opts)
 	local s = setmetatable({ name = name, conns = {}, waiters = {}, opts = opts or false }, SignalMT)
 	Engine.SIGTYPE[s] = "RBXScriptSignal"
+	Engine.allSignals[s] = true
 	return s
+end
+
+-- Live connections per realm and signal name (leak detection)
+function Engine.connectionCensus()
+	local out = {}
+	for s in Engine.allSignals do
+		for _, c in s.conns do
+			if c.connected and c.realm and not c.realm.dead then
+				local key = c.realm.name .. " | " .. string.gsub(tostring(s.name), "^.-%.", "")
+				out[key] = (out[key] or 0) + 1
+			end
+		end
+	end
+	return out
 end
 local newSignal = Engine.newSignal
 
@@ -342,6 +358,13 @@ local function visibleTo(d, R)
 	if h and h[R.id] then
 		return false
 	end
+	local ra = d.replicateAt
+	if ra then
+		if Sched.now < ra then
+			return false -- not replicated to clients yet
+		end
+		d.replicateAt = nil
+	end
 	return true
 end
 Engine.visibleTo = visibleTo
@@ -350,6 +373,9 @@ Engine.visibleTo = visibleTo
 local function eventFilter(d)
 	if d.owner ~= 0 then
 		return Engine.realmById(d.owner)
+	end
+	if d.replicateAt and Sched.now < d.replicateAt then
+		return Engine.realmById(0) -- only the server sees it yet
 	end
 	return nil
 end
@@ -1078,6 +1104,7 @@ local ATTR_TYPES = {
 	Rect = true, Font = true, EnumItem = true,
 }
 
+Engine.attrNoteSeen = {}
 function Engine.setAttribute(d, name, value, R)
 	R = R or Sched.CUR
 	if type(name) ~= "string" then
@@ -1095,6 +1122,11 @@ function Engine.setAttribute(d, name, value, R)
 	local rid = if R then R.id else 0
 	local old
 	if rid > 0 and d.owner == 0 then
+		local nk = d.class .. "." .. name
+		if not Engine.attrNoteSeen[nk] then
+			Engine.attrNoteSeen[nk] = true
+			Engine.record("note", string.format("client set attribute %q on replicated %s %q — this change stays on that client (does not replicate)", name, d.class, Engine.fullName(d)))
+		end
 		d.overlay = d.overlay or {}
 		local o = d.overlay[rid]
 		if not o then

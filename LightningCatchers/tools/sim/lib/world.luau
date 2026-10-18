@@ -145,6 +145,9 @@ local function replicate(v, receiver, path, seen, ctx)
 	elseif tv == "Instance" then
 		local d = DATA[v]
 		if receiver and not Engine.visibleTo(d, receiver) then
+			if d.serverOnly then
+				issue("remote", string.format("%s: Instance %s lives in a server-only container and arrives as nil on the client (%s)", path, Engine.fullName(d), ctx))
+			end
 			return nil
 		end
 		if d.destroyed or not Engine.inGame(d) then

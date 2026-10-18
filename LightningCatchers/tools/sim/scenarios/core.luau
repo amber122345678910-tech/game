@@ -137,6 +137,65 @@ function Core.run(S, cfg)
 		return DataService and DataService.get(b.pd.proxy)
 	end
 
+	-- data invariants that must always hold on the server
+	local function invariants(b, label)
+		local d = serverData(b)
+		if not d then
+			return
+		end
+		local Config = b:sharedModule("Config")
+		local Economy = b:sharedModule("Economy")
+		local problems = {}
+		local function num(name, v, lo, hi)
+			if type(v) ~= "number" or v ~= v or v == math.huge or v == -math.huge then
+				table.insert(problems, name .. " is not a finite number (" .. tostring(v) .. ")")
+			elseif lo and v < lo then
+				table.insert(problems, string.format("%s = %s < %s", name, tostring(v), tostring(lo)))
+			elseif hi and v > hi then
+				table.insert(problems, string.format("%s = %s > %s", name, tostring(v), tostring(hi)))
+			end
+		end
+		num("Volts", d.Volts, 0)
+		num("Shards", d.Shards, 0)
+		num("TotalVolts", d.TotalVolts, 0)
+		num("Charge", d.Charge, 0, Economy.jarCapacity(d.Upgrades.Jar) * Config.Overcharge.MaxFill + 1e-6)
+		num("Zone", d.Zone, 1, #Config.Zones)
+		num("LastZone", d.LastZone, 0, d.Zone)
+		num("Rebirths", d.Rebirths, 0)
+		for id, def in Config.Upgrades do
+			num("Upgrades." .. id, d.Upgrades[id], 0, def.MaxLevel)
+		end
+		local petIds = {}
+		for _, p in d.Pets do
+			petIds[p.Id] = true
+		end
+		for _, id in d.Equipped do
+			if not petIds[id] then
+				table.insert(problems, "Equipped pet " .. tostring(id) .. " is not owned")
+			end
+		end
+		if #d.Equipped > Economy.petSlots(d.Rebirths) then
+			table.insert(problems, string.format("%d pets equipped > %d slots", #d.Equipped, Economy.petSlots(d.Rebirths)))
+		end
+		local fIds = {}
+		for _, f in d.Fulgs do
+			fIds[f.Id] = true
+		end
+		for _, id in d.EquippedFulgs do
+			if not fIds[id] then
+				table.insert(problems, "Equipped fulgurite " .. tostring(id) .. " is not owned")
+			end
+		end
+		local seen = {}
+		for _, id in d.Equipped do
+			if seen[id] then
+				table.insert(problems, "pet " .. tostring(id) .. " equipped twice")
+			end
+			seen[id] = true
+		end
+		check(string.format("%s data invariants hold (%s)", b.name, label), #problems == 0, table.concat(problems, "; "))
+	end
+
 	local function grant(b, volts, shards)
 		local Economy = serverModule("EconomyService")
 		inServer(function()
@@ -180,12 +239,29 @@ function Core.run(S, cfg)
 	end)
 
 	local function runTo(t)
+		if t < Sched.now - 0.05 then
+			Report.add("note", "scenario", string.format("timeline overlap: a step wanted %s but the clock is already at %s", Report.fmtTime(t), Report.fmtTime(Sched.now)), {})
+		end
 		Sched.runUntil(t)
 	end
 
 	----------------------------------------------------------------
 	-- Island 1: play
 	----------------------------------------------------------------
+	runTo(at("social", 40))
+	for _, b in bots do
+		local fc = Engine.getAttribute(b.pd, "FriendCount", nil)
+		check(b.name .. " FriendCount attribute = 1 (the other bot is a friend)", fc == 1, "FriendCount=" .. tostring(fc))
+		local ls = Engine.findChild(b.pd, "leaderstats", nil)
+		check(b.name .. " has leaderstats", ls ~= nil)
+		if ls then
+			local sd = serverData(b)
+			for _, c in Engine.childrenOf(DATA[ls], nil) do
+				local cd = DATA[c]
+				Report.logLine(string.format("leaderstats %s.%s = %s (data Volts %s)", b.name, cd.props.Name, tostring(cd.props.Value), tostring(sd and sd.Volts)))
+			end
+		end
+	end
 	runTo(at("cheatIsland2", 150))
 	local Economy = b1:sharedModule("Economy")
 	for _, b in bots do
@@ -208,6 +284,7 @@ function Core.run(S, cfg)
 	end
 	runTo(at("hatch", 180))
 	for _, b in bots do
+		invariants(b, "after island 2 unlock")
 		check(b.name .. " teleported to island 2", b:zone() == 2, "Zone attribute = " .. tostring(b:zone()))
 		b.allowUnlock = false
 		local home = b:homePos(2)
@@ -275,6 +352,7 @@ function Core.run(S, cfg)
 	for q = 1, 3 do
 		req(b1, "ClaimQuest", q)
 	end
+	req(b2, "RedeemCode", "перун", "перун (lowercase Cyrillic, first use)")
 	-- BotTwo: daily + code through the Daily window
 	b2:run(function()
 		b2:state().OpenWindow:Fire("Daily")
@@ -314,12 +392,74 @@ function Core.run(S, cfg)
 		end)(), ",")) or "")
 		local sd2 = serverData(b2)
 		check("BotTwo redeemed ГРОЗА through the UI", sd2 ~= nil and sd2.Codes and sd2.Codes["ГРОЗА"] == true)
+		check("lowercase Cyrillic code \"перун\" is accepted", sd2 ~= nil and sd2.Codes and sd2.Codes["ПЕРУН"] == true)
+	end
+
+	----------------------------------------------------------------
+	-- Hub, kiosks (ProximityPrompts), back to island 2
+	----------------------------------------------------------------
+	runTo(at("hub", 202))
+	for _, b in bots do
+		b.active = false
+		req(b, "Teleport", 0)
+	end
+	runTo(at("hub", 202) + 2)
+	local hubStrikes = {}
+	for _, b in bots do
+		check(b.name .. " teleported to the hub", b:zone() == 0, "Zone attribute = " .. tostring(b:zone()))
+		hubStrikes[b] = b.metrics.strikes
+	end
+	local kiosks = { "Kiosk_Shop", "Kiosk_Hatchery", "Kiosk_Gallery", "Kiosk_Rebirth", "Kiosk_Daily" }
+	for i, k in kiosks do
+		local pos = b1:markerPos(k)
+		if pos then
+			b1:teleport(pos - Vector3.new(0, 1, 0))
+		else
+			Report.add("check", "scenario", "map marker missing: " .. k, {})
+		end
+		runTo(at("hub", 202) + 2 + i * 1.2)
+		local marker = Runtime.find("Workspace.Map.Markers." .. k, nil)
+		local prompt = marker and Engine.findChild(DATA[marker], "KioskPrompt", nil)
+		if prompt then
+			local shown = b1.realm.shownPrompts and b1.realm.shownPrompts[DATA[prompt]]
+			check("BotOne sees the " .. k .. " prompt when standing at it", shown == true)
+			Runtime.triggerPrompt(b1.realm, DATA[prompt])
+		else
+			check("ProximityPrompt exists on " .. k, false)
+		end
+		runTo(at("hub", 202) + 2 + i * 1.2 + 0.6)
+		local open = 0
+		for _, c in Engine.childrenOf(b1:playerGui(), b1.realm) do
+			local cd = DATA[c]
+			if string.sub(cd.props.Name, 1, 7) == "Window_" and readProp(cd, "Enabled", b1.realm) ~= false then
+				open += 1
+			end
+		end
+		check("triggering " .. k .. " opened a window on the client", open > 0)
+		b1:run(function()
+			b1:clientModule("Client.UI.UIKit").closeWindows()
+		end)
+	end
+	-- the hub SellPad (ring around the Tesla tower)
+	b2:teleport(b2:markerPos("SellPad_0") or Vector3.new(0, 0, 0))
+	runTo(at("hub", 202) + 12)
+	for _, b in bots do
+		check(b.name .. " gets no rings while in the hub", b.metrics.strikes == hubStrikes[b], string.format("%d rings arrived in the hub", b.metrics.strikes - hubStrikes[b]))
+		req(b, "Teleport", 2)
+	end
+	runTo(at("hub", 202) + 14)
+	for _, b in bots do
+		local home = b:homePos(2)
+		if home then
+			b:teleport(home)
+		end
+		b.active = true
 	end
 
 	----------------------------------------------------------------
 	-- Every window: open and close
 	----------------------------------------------------------------
-	runTo(at("windows", 205))
+	runTo(at("windows", 218))
 	local windows = { "Shop", "Shop:upgrades", "Shop:islands", "Shop:drone", "Upgrades", "Islands", "Drone", "Pets", "Pets:mine", "Pets:cocoons", "Hatchery", "Collection", "Collection:fulgs", "Collection:index", "Gallery", "Index", "Teleport", "Rebirth", "Daily", "Quests", "Settings" }
 	for i, w in windows do
 		for _, b in bots do
@@ -327,7 +467,7 @@ function Core.run(S, cfg)
 				b:state().OpenWindow:Fire(w)
 			end)
 		end
-		runTo(at("windows", 205) + i * 0.7)
+		runTo(at("windows", 218) + i * 0.7)
 		for _, b in bots do
 			local open = 0
 			local g = b:playerGui()
@@ -344,13 +484,33 @@ function Core.run(S, cfg)
 				b:clientModule("Client.UI.UIKit").closeWindows()
 			end)
 		end
-		runTo(at("windows", 205) + i * 0.7 + 0.35)
+		runTo(at("windows", 218) + i * 0.7 + 0.35)
 	end
+
+	----------------------------------------------------------------
+	-- Device changes: rotate BotTwo's phone, switch BotOne to touch and back, resize BotOne's window
+	----------------------------------------------------------------
+	runTo(at("devices", 234))
+	Runtime.setViewport(b2.realm, Vector2.new(390, 844))
+	Runtime.setPreferredInput(b1.realm, true)
+	runTo(at("devices", 234) + 0.5)
+	b2:run(function()
+		b2:state().OpenWindow:Fire("Shop")
+	end)
+	runTo(at("devices", 234) + 1)
+	Runtime.setViewport(b2.realm, Vector2.new(844, 390))
+	Runtime.setPreferredInput(b1.realm, false)
+	Runtime.setViewport(b1.realm, Vector2.new(1920, 1080))
+	runTo(at("devices", 234) + 1.5)
+	Runtime.setViewport(b1.realm, Vector2.new(1366, 768))
+	b2:run(function()
+		b2:clientModule("Client.UI.UIKit").closeWindows()
+	end)
 
 	----------------------------------------------------------------
 	-- Settings
 	----------------------------------------------------------------
-	runTo(at("settings", 222))
+	runTo(at("settings", 237))
 	do
 		local d = b1:data()
 		if d then
@@ -367,7 +527,7 @@ function Core.run(S, cfg)
 			b2:state().OpenWindow:Fire("Settings")
 		end)
 	end
-	runTo(at("settings", 222) + 1)
+	runTo(at("settings", 237) + 1)
 	do
 		local win = b2:findGui("Window_Settings")
 		if win then
@@ -378,7 +538,7 @@ function Core.run(S, cfg)
 			end
 		end
 	end
-	runTo(at("settings", 222) + 4)
+	runTo(at("settings", 237) + 4)
 	b2:run(function()
 		b2:clientModule("Client.UI.UIKit").closeWindows()
 	end)
@@ -396,74 +556,16 @@ function Core.run(S, cfg)
 	end
 
 	----------------------------------------------------------------
-	-- Hub, kiosks (ProximityPrompts), back to island 2
-	----------------------------------------------------------------
-	runTo(at("hub", 232))
-	for _, b in bots do
-		b.active = false
-		req(b, "Teleport", 0)
-	end
-	runTo(at("hub", 232) + 2)
-	for _, b in bots do
-		check(b.name .. " teleported to the hub", b:zone() == 0, "Zone attribute = " .. tostring(b:zone()))
-	end
-	local kiosks = { "Kiosk_Shop", "Kiosk_Hatchery", "Kiosk_Gallery", "Kiosk_Rebirth", "Kiosk_Daily" }
-	for i, k in kiosks do
-		local pos = b1:markerPos(k)
-		if pos then
-			b1:teleport(pos - Vector3.new(0, 1, 0))
-		else
-			Report.add("check", "scenario", "map marker missing: " .. k, {})
-		end
-		runTo(at("hub", 232) + 2 + i * 1.2)
-		local marker = Runtime.find("Workspace.Map.Markers." .. k, nil)
-		local prompt = marker and Engine.findChild(DATA[marker], "KioskPrompt", nil)
-		if prompt then
-			local shown = b1.realm.shownPrompts and b1.realm.shownPrompts[DATA[prompt]]
-			check("BotOne sees the " .. k .. " prompt when standing at it", shown == true)
-			Runtime.triggerPrompt(b1.realm, DATA[prompt])
-		else
-			check("ProximityPrompt exists on " .. k, false)
-		end
-		runTo(at("hub", 232) + 2 + i * 1.2 + 0.6)
-		local open = 0
-		for _, c in Engine.childrenOf(b1:playerGui(), b1.realm) do
-			local cd = DATA[c]
-			if string.sub(cd.props.Name, 1, 7) == "Window_" and readProp(cd, "Enabled", b1.realm) ~= false then
-				open += 1
-			end
-		end
-		check("triggering " .. k .. " opened a window on the client", open > 0)
-		b1:run(function()
-			b1:clientModule("Client.UI.UIKit").closeWindows()
-		end)
-	end
-	-- the hub SellPad (ring around the Tesla tower)
-	b2:teleport(b2:markerPos("SellPad_0") or Vector3.new(0, 0, 0))
-	runTo(at("hub", 232) + 12)
-	for _, b in bots do
-		req(b, "Teleport", 2)
-	end
-	runTo(at("hub", 232) + 14)
-	for _, b in bots do
-		local home = b:homePos(2)
-		if home then
-			b:teleport(home)
-		end
-		b.active = true
-	end
-
-	----------------------------------------------------------------
 	-- UI fuzz: click every visible button of every window (BotTwo, phone)
 	----------------------------------------------------------------
-	runTo(at("fuzz", 255))
+	runTo(at("fuzz", 305))
 	local fuzzWindows = { "Shop", "Pets", "Collection", "Teleport", "Rebirth", "Daily", "Settings" }
 	local clicked = 0
 	for i, w in fuzzWindows do
 		b2:run(function()
 			b2:state().OpenWindow:Fire(w)
 		end)
-		runTo(at("fuzz", 255) + i * 3)
+		runTo(at("fuzz", 305) + i * 3)
 		local win = nil
 		for _, c in Engine.childrenOf(b2:playerGui(), b2.realm) do
 			local cd = DATA[c]
@@ -481,7 +583,7 @@ function Core.run(S, cfg)
 				end
 			end
 		end
-		runTo(at("fuzz", 255) + i * 3 + 2)
+		runTo(at("fuzz", 305) + i * 3 + 2)
 		b2:run(function()
 			b2:clientModule("Client.UI.UIKit").closeWindows()
 		end)
@@ -503,31 +605,41 @@ function Core.run(S, cfg)
 		end
 	end
 	check("UI fuzz clicked buttons", clicked > 10, "clicked " .. clicked)
+	req(b2, "Teleport", 2)
+	runTo(Sched.now + 1)
+	do
+		local home = b2:homePos(2)
+		if home then
+			b2:teleport(home)
+		end
+	end
 
 	----------------------------------------------------------------
 	-- Rebirth (cheat: island 4 + enough Volts)
 	----------------------------------------------------------------
-	runTo(at("rebirth", 300))
+	runTo(at("rebirth", 335))
+	b1.allowBuy = false
 	do
 		local sd = serverData(b1)
 		local cost = Economy.rebirthCost(sd and sd.Rebirths or 0)
 		setZoneCheat(b1, 4)
 		grant(b1, cost + 1000)
 	end
-	runTo(at("rebirth", 300) + 1)
+	runTo(at("rebirth", 335) + 1)
 	b1:run(function()
 		b1:state().OpenWindow:Fire("Rebirth")
 	end)
-	runTo(at("rebirth", 300) + 2)
+	runTo(at("rebirth", 335) + 2)
 	b1:run(function()
 		b1:clientModule("Client.UI.UIKit").closeWindows()
 	end)
 	req(b1, "Rebirth", nil)
-	runTo(at("rebirth", 300) + 5)
+	runTo(at("rebirth", 335) + 5)
 	do
 		local sd = serverData(b1)
 		check("BotOne rebirthed (Rebirths=1, Zone=1, Volts reset)", sd ~= nil and sd.Rebirths == 1 and sd.Zone == 1, sd and string.format("Rebirths=%d Zone=%d Volts=%d", sd.Rebirths, sd.Zone, sd.Volts) or "")
 		check("BotOne is back on island 1 after rebirth", b1:zone() == 1, "Zone attribute = " .. tostring(b1:zone()))
+		b1.allowBuy = true
 		local home = b1:homePos(1)
 		if home then
 			b1:teleport(home)
@@ -538,22 +650,24 @@ function Core.run(S, cfg)
 	-- Tesla drone (cheat: island 3 + Volts), play on island 3
 	----------------------------------------------------------------
 	local Config = b1:sharedModule("Config")
-	runTo(at("drone", 312))
+	runTo(at("drone", 345))
+	b2.allowBuy = false
 	setZoneCheat(b2, 3)
 	grant(b2, Config.Drone.Cost + 500)
-	runTo(at("drone", 312) + 1)
+	runTo(at("drone", 345) + 1)
 	req(b2, "BuyDrone", nil)
-	runTo(at("drone", 312) + 2)
+	runTo(at("drone", 345) + 2)
 	req(b2, "ToggleDrone", false)
-	runTo(at("drone", 312) + 3)
+	runTo(at("drone", 345) + 3)
 	req(b2, "ToggleDrone", true)
 	req(b2, "Teleport", 3)
-	runTo(at("drone", 312) + 5)
+	runTo(at("drone", 345) + 5)
 	do
 		local sd = serverData(b2)
 		check("BotTwo bought the drone", sd ~= nil and sd.Drone == true and sd.DroneOn == true, sd and string.format("Drone=%s DroneOn=%s", tostring(sd.Drone), tostring(sd.DroneOn)) or "")
 		check("BotTwo teleported to island 3", b2:zone() == 3, "Zone attribute = " .. tostring(b2:zone()))
 		b2.skill.overcharge = 1.0
+		b2.allowBuy = true
 		local home = b2:homePos(3)
 		if home then
 			b2:teleport(home)
@@ -563,7 +677,7 @@ function Core.run(S, cfg)
 	----------------------------------------------------------------
 	-- Closed island barrier (BotOne only has island 1 after the rebirth)
 	----------------------------------------------------------------
-	runTo(at("barrier", 325))
+	runTo(at("barrier", 358))
 	do
 		local Zones = b1:sharedModule("Zones")
 		local gate = b1:markerPos("Gate_2")
@@ -572,7 +686,7 @@ function Core.run(S, cfg)
 			b1.active = false
 			local dir = Vector3.new(c2.X - gate.X, 0, c2.Z - gate.Z).Unit
 			b1:teleport(Vector3.new(gate.X, Zones.groundY(0), gate.Z) + dir * 6 - Vector3.new(0, 0, 0))
-			runTo(at("barrier", 325) + 1.5)
+			runTo(at("barrier", 358) + 1.5)
 			local p = b1:pos()
 			local gateDist = (Vector3.new(gate.X, 0, gate.Z) - Vector3.new(c2.X, 0, c2.Z)).Magnitude
 			local myDist = p and (Vector3.new(p.X, 0, p.Z) - Vector3.new(c2.X, 0, c2.Z)).Magnitude or 0
@@ -582,7 +696,7 @@ function Core.run(S, cfg)
 			check("map marker Gate_2 exists", false)
 		end
 		req(b1, "Teleport", 1)
-		runTo(at("barrier", 325) + 3)
+		runTo(at("barrier", 358) + 3)
 		local home = b1:homePos(1)
 		if home then
 			b1:teleport(home)
@@ -593,7 +707,7 @@ function Core.run(S, cfg)
 	----------------------------------------------------------------
 	-- Falling into the void (BotTwo on island 3)
 	----------------------------------------------------------------
-	runTo(at("void", 335))
+	runTo(at("void", 366))
 	do
 		b2.active = false
 		local p = b2:pos()
@@ -603,7 +717,7 @@ function Core.run(S, cfg)
 				r.proxy.CFrame = CFrame.new(p.X + 40, Config.VoidY - 30, p.Z)
 			end)
 		end
-		runTo(at("void", 335) + 1.5)
+		runTo(at("void", 366) + 1.5)
 		local q = b2:pos()
 		check("fell into the void: the server returned BotTwo onto the island", q ~= nil and q.Y > Config.VoidY + 10, "Y=" .. tostring(q and q.Y))
 		check("fell into the void: still on island 3", b2:zone() == 3, "Zone=" .. tostring(b2:zone()))
@@ -613,7 +727,7 @@ function Core.run(S, cfg)
 	----------------------------------------------------------------
 	-- Death and respawn (BotOne)
 	----------------------------------------------------------------
-	runTo(at("death", 345))
+	runTo(at("death", 372))
 	do
 		local oldChar = b1.pd.props.Character
 		inServer(function()
@@ -622,7 +736,7 @@ function Core.run(S, cfg)
 				hum.Health = 0
 			end
 		end)
-		runTo(at("death", 345) + 9)
+		runTo(at("death", 372) + 9)
 		local char = b1.pd.props.Character
 		check("BotOne respawned after dying", char ~= nil and char ~= oldChar)
 		if char then
@@ -646,11 +760,11 @@ function Core.run(S, cfg)
 	----------------------------------------------------------------
 	-- Island 5 (runner rings, Perun possible) for a minute, then back to island 3
 	----------------------------------------------------------------
-	runTo(at("island5", 380))
+	runTo(at("island5", 390))
 	setZoneCheat(b2, 5)
-	runTo(at("island5", 380) + 0.5)
+	runTo(at("island5", 390) + 0.5)
 	req(b2, "Teleport", 5)
-	runTo(at("island5", 380) + 2)
+	runTo(at("island5", 390) + 2)
 	check("BotTwo teleported to island 5", b2:zone() == 5, "Zone=" .. tostring(b2:zone()))
 	do
 		local home = b2:homePos(5)
@@ -658,9 +772,9 @@ function Core.run(S, cfg)
 			b2:teleport(home)
 		end
 	end
-	runTo(at("island5", 380) + 70)
+	runTo(at("island5", 390) + 70)
 	req(b2, "Teleport", 3)
-	runTo(at("island5", 380) + 72)
+	runTo(at("island5", 390) + 72)
 	do
 		local home = b2:homePos(3)
 		if home then
@@ -668,12 +782,233 @@ function Core.run(S, cfg)
 		end
 	end
 
+	----------------------------------------------------------------
+	-- Collections: fulgurites (equip/unequip/delete), delete a pet, Collection window with previews
+	----------------------------------------------------------------
+	for _, b in { b1, b2 } do
+		local sd = serverData(b)
+		if sd and #sd.Fulgs > 0 then
+			local f = sd.Fulgs[1]
+			local equipped = table.find(sd.EquippedFulgs, f.Id) ~= nil
+			if equipped then
+				req(b, "UnequipFulg", f.Id)
+				runTo(Sched.now + 0.5)
+			end
+			req(b, "EquipFulg", f.Id)
+			runTo(Sched.now + 1)
+			local sd2 = serverData(b)
+			check(b.name .. " equipped a fulgurite", sd2 ~= nil and table.find(sd2.EquippedFulgs, f.Id) ~= nil)
+			if #sd.Fulgs > 1 then
+				local last = sd.Fulgs[#sd.Fulgs]
+				req(b, "DeleteFulg", last.Id)
+			end
+		else
+			Report.logLine(b.name .. ": no fulgurites to equip (" .. (sd and #sd.Fulgs or -1) .. ")")
+		end
+		b:run(function()
+			b:state().OpenWindow:Fire("Collection:fulgs")
+		end)
+		runTo(Sched.now + 1.5)
+		b:run(function()
+			b:state().OpenWindow:Fire("Collection:index")
+		end)
+		runTo(Sched.now + 1)
+		b:run(function()
+			b:clientModule("Client.UI.UIKit").closeWindows()
+		end)
+	end
+	do
+		local sd = serverData(b2)
+		if sd and #sd.Pets > 1 then
+			local victim = nil
+			for _, p in sd.Pets do
+				if not table.find(sd.Equipped, p.Id) then
+					victim = p
+				end
+			end
+			if victim then
+				local n = #sd.Pets
+				req(b2, "DeletePet", victim.Id)
+				runTo(Sched.now + 1)
+				local sd2 = serverData(b2)
+				check("BotTwo deleted an unequipped pet", sd2 ~= nil and #sd2.Pets == n - 1)
+			end
+		end
+	end
+
+	----------------------------------------------------------------
+	-- Malicious client: fuzz every remote with malformed payloads (BotOne)
+	----------------------------------------------------------------
+	do
+		b1.active = false
+		local Net = b1:sharedModule("Net")
+		local before = Services.deepCopy(serverData(b1))
+		local inst = Runtime.find("Workspace", nil)
+		local payloads = {
+			{ nil, "nil" }, { true, "true" }, { -1, "-1" }, { 0, "0" }, { 1e12, "1e12" }, { 0 / 0, "NaN" }, { math.huge, "inf" },
+			{ "", "empty" }, { "Rod", "\"Rod\"" }, { string.rep("Ж", 3000), "long string" }, { {}, "{}" }, { { 1, 2 }, "{1,2}" },
+			{ { Id = 1, Kind = "gromik" }, "table" }, { Vector3.new(1, 2, 3), "Vector3" }, { inst, "Instance" }, { 2.5, "2.5" },
+		}
+		local actions = {}
+		for name in Net.Actions do
+			table.insert(actions, name)
+		end
+		table.sort(actions)
+		local sent = 0
+		b1:run(function()
+			local fn = Runtime.find("ReplicatedStorage.Remotes.Request", b1.realm)
+			for _, a in actions do
+				for _, p in payloads do
+					sent += 1
+					-- stay under the rate limit so every request reaches its handler
+					Sched.wait(0.13)
+					local ok, x, y = pcall(function()
+						return fn:InvokeServer(a, p[1])
+					end)
+					if ok and x == true and a ~= "SetSettings" and a ~= "Teleport" and a ~= "TutorialStep" and a ~= "ToggleDrone" and a ~= "EquipBest" then
+						Report.logLine(string.format("fuzz: %s(%s) was ACCEPTED -> %s", a, p[2], tostring(y)))
+					end
+				end
+				-- unknown action / wrong types for the action itself
+			end
+			fn:InvokeServer(nil, nil)
+			fn:InvokeServer(123, "x")
+			fn:InvokeServer({}, {})
+			fn:InvokeServer("NoSuchAction", 1)
+		end)
+		local catchEv = Runtime.find("ReplicatedStorage.Remotes.Catch", b1.realm)
+		local shardEv = Runtime.find("ReplicatedStorage.Remotes.ShardCollect", b1.realm)
+		b1:run(function()
+			local now = Sched.EPOCH + Sched.now
+			local args = {
+				{}, { "1", 1, now }, { 1e9, 1, now }, { 0 / 0, 1, now }, { 1, 0 / 0, now }, { 1, 1, 0 / 0 }, { 1, 1, math.huge },
+				{ 1, -5, now }, { 1, 99, now }, { 1, 1, "x" }, { 1, 1, now - 1e6 }, { {}, {}, {} }, { inst, inst, inst },
+			}
+			for _, a in args do
+				Sched.wait(0.05)
+				catchEv:FireServer(table.unpack(a, 1, 3))
+			end
+			for _, a in { nil, "x", -1, 1e12, 0 / 0, {}, inst } do
+				Sched.wait(0.05)
+				shardEv:FireServer(a)
+			end
+		end)
+		runTo(Sched.now + #actions * #payloads * 0.13 + 6)
+		invariants(b1, "after remote fuzz")
+		local after = serverData(b1)
+		if before and after then
+			check("remote fuzz did not create Volts out of nothing", after.Volts <= before.Volts + 50000, string.format("Volts %s -> %s", tostring(before.Volts), tostring(after.Volts)))
+			check("remote fuzz did not create shards out of nothing", after.Shards <= before.Shards + 500, string.format("Shards %s -> %s", tostring(before.Shards), tostring(after.Shards)))
+		end
+		req(b1, "Teleport", 1)
+		runTo(Sched.now + 1)
+		local home = b1:homePos(1)
+		if home then
+			b1:teleport(home)
+		end
+		b1.active = true
+	end
+
 	local census1 = Runtime.census()
+	local conns1 = Engine.connectionCensus()
+	local threads1 = Sched.threadCensus()
 
 	----------------------------------------------------------------
 	-- Long play: events (Supercell at 4:00, Ball lightning at 10:00)
 	----------------------------------------------------------------
-	local leaveAt = math.max(at("leave", totalMinutes * 60 - 80), at("island5", 380) + 90)
+	local leaveAt = math.max(at("leave", totalMinutes * 60 - 80), at("island5", 390) + 180)
+	----------------------------------------------------------------
+	-- Edge players: late joiner during an event (tablet), instant leave, quick rejoin under the session lock
+	----------------------------------------------------------------
+	do
+		local lateAt = math.max(Sched.now + 1, leaveAt - 110)
+		runTo(lateAt)
+		local skill3 = { perfect = 0.45, good = 0.35, ignore = 0.05, seed = 37, overcharge = 1.0 }
+		local b5 = join(1003, "BotThree", Vector2.new(1024, 768), true, skill3)
+		table.insert(bots, b5)
+		-- a player that leaves before its data has loaded
+		local ghost = Runtime.addPlayer({ userId = 1004, name = "Ghost", viewport = Vector2.new(1366, 768) })
+		Sched.step()
+		Runtime.removePlayer(ghost.playerD, "instant leave")
+		runTo(lateAt + 12)
+		local d5 = b5:data()
+		check("late joiner BotThree received DataSync", d5 ~= nil)
+		local gs2 = Runtime.find("ReplicatedStorage.GameState", b5.realm)
+		check("late joiner sees GameState", gs2 ~= nil)
+		if gs2 then
+			local ev = Engine.getAttribute(DATA[gs2], "Event", b5.realm)
+			Report.logLine("late joiner sees Event=" .. tostring(ev))
+		end
+		b5.active = true
+		b5.allowBuy = true
+		local home = b5:homePos(1)
+		if home then
+			b5:teleport(home)
+		end
+		runTo(lateAt + 30)
+		local sd5 = serverData(b5)
+		check("late joiner BotThree caught rings", sd5 ~= nil and sd5.Stats.Catches > 0, sd5 and ("catches=" .. sd5.Stats.Catches) or "")
+		local volts5 = sd5 and sd5.Volts
+		-- quick rejoin: leave and come back 0.3 s later, while the leave-save still holds the session lock
+		b5.active = false
+		Runtime.removePlayer(b5.pd, "quick leave")
+		Sched.runUntil(Sched.now + 0.3)
+		local b6 = join(1003, "BotThree", Vector2.new(1024, 768), true, skill3)
+		table.insert(bots, b6)
+		local t0 = Sched.now
+		while Sched.now < t0 + 40 and not b6:data() do
+			Sched.step()
+		end
+		local d6 = b6:data()
+		check("quick rejoin loads data (session lock waited out)", d6 ~= nil, string.format("waited %.1f s", Sched.now - t0))
+		if d6 and volts5 then
+			check("quick rejoin keeps progress", d6.Volts >= volts5 - 1e-6, string.format("Volts %s vs %s before", tostring(d6.Volts), tostring(volts5)))
+		end
+		Report.logLine(string.format("quick rejoin: data after %.1f s", Sched.now - t0))
+		b6.active = true
+		local home6 = b6:homePos(1)
+		if home6 then
+			b6:teleport(home6)
+		end
+		-- a lock held by "another server": fresh (must wait, then take over) and stale (take over at once)
+		do
+			local store = Services.storeFor("PlayerData_v1", nil, "global")
+			local nowT = math.floor(Sched.EPOCH + Sched.now + Sched.osTimeOffset)
+			store.data["u_1005"] = { Data = { Volts = 777, Shards = 5, Zone = 1, LastZone = 1 }, Lock = { Id = "other-server", Time = nowT } }
+			store.data["u_1006"] = { Data = { Volts = 888, Shards = 6, Zone = 1, LastZone = 1 }, Lock = { Id = "dead-server", Time = nowT - 3600 } }
+			local bf = join(1005, "BotFive", Vector2.new(1366, 768), false, skill3)
+			local bs = join(1006, "BotSix", Vector2.new(1366, 768), false, skill3)
+			table.insert(bots, bf)
+			table.insert(bots, bs)
+			local t0 = Sched.now
+			local tStale = nil
+			while Sched.now < t0 + 45 and not bf:data() do
+				Sched.step()
+				if not tStale and bs:data() then
+					tStale = Sched.now - t0
+				end
+			end
+			local tFresh = Sched.now - t0
+			local df, ds = bf:data(), bs:data()
+			check("stale foreign lock is taken over at once", ds ~= nil and (tStale or 99) < 3, string.format("loaded after %s s", tostring(tStale)))
+			check("stale-lock player keeps stored data", ds ~= nil and ds.Volts == 888, ds and ("Volts=" .. tostring(ds.Volts)) or "")
+			check("fresh foreign lock: data loads after waiting (not stuck)", df ~= nil, string.format("waited %.1f s", tFresh))
+			check("fresh-lock player keeps stored data", df ~= nil and df.Volts == 777, df and ("Volts=" .. tostring(df.Volts)) or "")
+			Report.logLine(string.format("foreign lock: fresh loaded after %.1f s, stale after %s s", tFresh, tostring(tStale)))
+			Runtime.removePlayer(bf.pd, "done")
+			Runtime.removePlayer(bs.pd, "done")
+		end
+		do
+			local ghostRec = nil
+			for k, st in Services.stores do
+				if st.kind == "global" and string.find(k, "PlayerData", 1, true) then
+					ghostRec = st.data["u_1004"]
+				end
+			end
+			check("instant leave left no session lock behind", ghostRec == nil or ghostRec.Lock == nil, ghostRec and ("Lock=" .. tostring(ghostRec.Lock and ghostRec.Lock.Id)) or "")
+		end
+	end
+
 	runTo(leaveAt)
 	if cfg.expectEvents ~= false then
 		if Sched.now >= (cfg.supercellAt or Config.Events.Supercell.Offset) + 5 then
@@ -688,6 +1023,25 @@ function Core.run(S, cfg)
 		if Sched.now >= (cfg.ballAt or Config.Events.BallLightning.Offset) + 5 then
 			check("Ball lightning event happened", eventsSeen.ball ~= nil)
 		end
+		-- Supercell: personal ring rate should go up (SupercellRate) — compare BotTwo on its island
+		local sc = eventsSeen.supercell
+		if sc and cfg.checkSupercellRate ~= false then
+			local dur = Config.Events.Supercell.Duration
+			local function rate(t0, t1)
+				local n, zones = 0, {}
+				for _, st in b2.metrics.strikeTimes or {} do
+					if st.t >= t0 and st.t < t1 then
+						n += 1
+						zones[st.zone] = true
+					end
+				end
+				return n / math.max(1e-6, t1 - t0) * 60
+			end
+			local during = rate(sc + math.min(20, dur * 0.3), sc + dur - 2)
+			local beforeRate = rate(at("checkIsland2", 165), at("hub", 202) - 2)
+			Report.logLine(string.format("supercell ring rate BotTwo: %.1f/min during vs %.1f/min before", during, beforeRate))
+			check("Supercell increases the ring rate (BotTwo)", during > beforeRate * 1.3, string.format("%.1f/min during vs %.1f/min before", during, beforeRate))
+		end
 		if cfg.rainbowAt and Sched.now >= cfg.rainbowAt + 15 then
 			check("Rainbow event happened", eventsSeen.rainbow ~= nil)
 		end
@@ -697,6 +1051,7 @@ function Core.run(S, cfg)
 	-- Leave (save) and rejoin (load)
 	----------------------------------------------------------------
 	local before = Services.deepCopy(serverData(b2))
+	b2.lastData = before
 	b2.active = false
 	Runtime.removePlayer(b2.pd, "leave")
 	runTo(leaveAt + 4)
@@ -760,6 +1115,7 @@ function Core.run(S, cfg)
 	end
 	-- BotTwo leaves and comes back "a day later": offline income (Welcome)
 	local b3d = serverData(b3)
+	b3.lastData = Services.deepCopy(b3d)
 	local incomeRate = b3d and b3d.IncomeRate or 0
 	b3.active = false
 	Runtime.removePlayer(b3.pd, "leave")
@@ -804,10 +1160,41 @@ function Core.run(S, cfg)
 	end
 	runTo(math.max(leaveAt + 70, totalMinutes * 60))
 	local census2 = Runtime.census()
+	local conns2 = Engine.connectionCensus()
+	local threads2 = Sched.threadCensus()
 
+	for _, b in bots do
+		if not b.realm.dead then
+			invariants(b, "end of play")
+		end
+	end
 	----------------------------------------------------------------
 	-- Server shutdown: BindToClose saves everyone
 	----------------------------------------------------------------
+	do
+		local board = Runtime.find("Workspace.Map.Markers.Board_Leaders", nil)
+		local texts = {}
+		if board then
+			Engine.forSubtree(DATA[board], function(x)
+				if x.cls.isA.TextLabel then
+					local t = x.props.Text
+					if type(t) == "string" and t ~= "" then
+						table.insert(texts, t)
+					end
+				end
+			end)
+		end
+		local joined = table.concat(texts, " | ")
+		Report.logLine("Board_Leaders: " .. joined)
+		check("leaderboard board lists the bots", string.find(joined, "BotOne", 1, true) ~= nil or string.find(joined, "BotTwo", 1, true) ~= nil, string.sub(joined, 1, 200))
+	end
+	local finalData = {}
+	for _, b in bots do
+		local sd = serverData(b)
+		if sd then
+			finalData[b] = Services.deepCopy(sd)
+		end
+	end
 	local beforeClose = Services.deepCopy(serverData(b1))
 	local t0 = Sched.now
 	Runtime.shutdown()
@@ -838,14 +1225,18 @@ function Core.run(S, cfg)
 			table.insert(kinds, k .. "=" .. v)
 		end
 		table.sort(kinds)
-		local sd = serverData(b)
-		w(string.format("%s (%s):", b.name, b.realm.name))
+		local sd = finalData[b] or b.lastData
+		w(string.format("%s (%s%s):", b.name, b.realm.name, if b.realm.dead then ", left" else ""))
 		w(string.format("  strikes received: %d (%.1f per minute on islands; %d ignored/skipped) kinds: %s", m.strikes, m.strikes / mins, m.ignored, table.concat(kinds, " ")))
 		w(string.format("  presses: %d; results: %s", m.presses, table.concat(res, " ")))
 		w(string.format("  sells: %d, Volts from sells: %d; purchases: %d; shards spawned: %d; toasts: %d; banners: %d", m.sells, math.floor(m.soldVolts), m.purchases, m.shardsSeen, m.toasts, m.banners))
 		if sd then
-			w(string.format("  server data: Volts=%d TotalVolts=%d Shards=%d Zone=%d Rebirths=%d Upgrades=Rod%d/Jar%d/Boots%d/Magnet%d/Ins%d Pets=%d Catches=%d Perfects=%d BestCombo=%d Sells=%d",
-				sd.Volts, sd.TotalVolts, sd.Shards, sd.Zone, sd.Rebirths, sd.Upgrades.Rod, sd.Upgrades.Jar, sd.Upgrades.Boots, sd.Upgrades.Magnet, sd.Upgrades.Insulation, #sd.Pets, sd.Stats.Catches, sd.Stats.Perfects, sd.Stats.BestCombo, sd.Stats.Sells))
+			local idx = 0
+			for _ in sd.Index do
+				idx += 1
+			end
+			w(string.format("  server data: Volts=%d TotalVolts=%d Shards=%d Zone=%d Rebirths=%d Upgrades=Rod%d/Jar%d/Boots%d/Magnet%d/Ins%d Pets=%d Fulgurites=%d Index=%d Catches=%d Perfects=%d BestCombo=%d Sells=%d IncomeRate=%.0f",
+				sd.Volts, sd.TotalVolts, sd.Shards, sd.Zone, sd.Rebirths, sd.Upgrades.Rod, sd.Upgrades.Jar, sd.Upgrades.Boots, sd.Upgrades.Magnet, sd.Upgrades.Insulation, #sd.Pets, #sd.Fulgs, idx, sd.Stats.Catches, sd.Stats.Perfects, sd.Stats.BestCombo, sd.Stats.Sells, sd.IncomeRate or 0))
 		end
 		local reqs = {}
 		for k, v in m.requests do
@@ -868,6 +1259,28 @@ function Core.run(S, cfg)
 		table.sort(effs)
 		w("  effects received: " .. table.concat(effs, " "))
 	end
+	do
+		local tot = { strikes = 0, presses = 0, sells = 0, volts = 0, purchases = 0, minutes = 0 }
+		local grades = {}
+		for _, b in bots do
+			local m = b.metrics
+			tot.strikes += m.strikes
+			tot.presses += m.presses
+			tot.sells += m.sells
+			tot.volts += m.soldVolts
+			tot.purchases += m.purchases
+			tot.minutes += m.zoneSeconds / 60
+			for g, n in m.results do
+				grades[g] = (grades[g] or 0) + n
+			end
+		end
+		local gl = {}
+		for _, g in { "perfect", "good", "miss", "zap", "ground", "burst" } do
+			table.insert(gl, g .. "=" .. tostring(grades[g] or 0))
+		end
+		w(string.format("TOTAL: %d rings in %.1f player-minutes on islands (%.1f rings/player/min); %d presses; results %s; %d sells for %d Volts; %d purchases",
+			tot.strikes, tot.minutes, tot.strikes / math.max(1e-6, tot.minutes), tot.presses, table.concat(gl, " "), tot.sells, math.floor(tot.volts), tot.purchases))
+	end
 	local evs = {}
 	for k, v in eventsSeen do
 		if type(v) == "number" and k ~= "cityLitMax" then
@@ -886,7 +1299,7 @@ function Core.run(S, cfg)
 		local growth = {}
 		for k, v in census2 do
 			local before = census1[k] or 0
-			if string.sub(k, 1, 6) == "client" and v - before > 50 then
+			if string.sub(k, 1, 6) == "client" and census1[k] ~= nil and v - before > 50 then
 				table.insert(growth, { k = k, a = before, b = v })
 			end
 		end
@@ -899,7 +1312,41 @@ function Core.run(S, cfg)
 				table.insert(parts, string.format("%s %d->%d", g.k, g.a, g.b))
 			end
 		end
-		w("client instance growth (alive in DataModel between ~7:30 and the end, >50 only): " .. (if #parts > 0 then table.concat(parts, ", ") else "none"))
+		w("client instance growth (same client, alive in DataModel at ~7:30 vs the end, >50 only): " .. (if #parts > 0 then table.concat(parts, ", ") else "none"))
+	end
+	do
+		local function growthOf(a, b, minGrowth, label)
+			local list = {}
+			for k, v in b do
+				local before = a[k]
+				if before ~= nil and v - before >= minGrowth then
+					table.insert(list, { k = k, a = before, b = v })
+				end
+			end
+			table.sort(list, function(x, y)
+				return (x.b - x.a) > (y.b - y.a)
+			end)
+			local parts = {}
+			for i, g in list do
+				if i <= 10 then
+					table.insert(parts, string.format("%s %d->%d", g.k, g.a, g.b))
+				end
+			end
+			w(label .. (if #parts > 0 then table.concat(parts, "; ") else "none"))
+			return list
+		end
+		local cg = growthOf(conns1, conns2, 25, "connection growth (same realm, ~7:50 vs end, >=25): ")
+		local tg = growthOf(threads1, threads2, 10, "suspended-thread growth (same realm, ~7:50 vs end, >=10): ")
+		for _, g in cg do
+			if g.b - g.a >= 100 then
+				Report.add("check", "scenario", string.format("possible connection leak: %s grew %d -> %d", g.k, g.a, g.b), {})
+			end
+		end
+		for _, g in tg do
+			if g.b - g.a >= 40 then
+				Report.add("check", "scenario", string.format("possible thread leak: %s grew %d -> %d", g.k, g.a, g.b), {})
+			end
+		end
 	end
 	w("scripted requests:")
 	for _, l in requestLog do

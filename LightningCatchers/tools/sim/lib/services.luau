@@ -606,6 +606,8 @@ function Services.buildCharacter(pd, rootCF)
 	return model, md
 end
 
+Services.characterReplicationDelay = 0.1
+
 function Services.spawnCFrame()
 	local sp = World.spawnLocation
 	if sp then
@@ -669,6 +671,41 @@ function Services.loadCharacter(pd)
 		end
 	end
 	local model, md = Services.buildCharacter(pd, Services.spawnCFrame())
+	md.props.Archivable = false -- like real characters: Clone() returns nil
+	-- clients get the model first and its parts a moment later (replication is not atomic)
+	local staged = {}
+	local readyAt = Sched.now + Services.characterReplicationDelay
+	for _, c in Engine.descendantsOf(md, nil) do
+		local cd = DATA[c]
+		cd.replicateAt = readyAt
+		table.insert(staged, cd)
+	end
+	Sched.at(readyAt, function()
+		for _, realm in Sched.realms do
+			if realm.kind == "client" and not realm.dead then
+				for _, x in staged do
+					local parent = x.parent and DATA[x.parent]
+					if parent and not x.destroyed then
+						Engine.fireEvent(parent, "ChildAdded", realm, x.proxy)
+						local anc = parent
+						local guard = 0
+						while anc and guard < 60 do
+							Engine.fireEvent(anc, "DescendantAdded", realm, x.proxy)
+							anc = anc.parent and DATA[anc.parent]
+							guard += 1
+						end
+					end
+				end
+			end
+		end
+		for _, x in staged do
+			x.replicateAt = nil
+			local parent = x.parent and DATA[x.parent]
+			if parent then
+				Engine.resolveWaiters(parent, x)
+			end
+		end
+	end)
 	setProp(pd, "Character", model, World.server)
 	Engine.setParent(md, World.workspace, World.server)
 	Engine.fireEvent(pd, "CharacterAdded", nil, model)

@@ -176,6 +176,10 @@ end
 function Bot:onStrike(msg)
 	local m = self.metrics
 	m.strikes += 1
+	m.strikeTimes = m.strikeTimes or {}
+	if not msg.Shared then
+		table.insert(m.strikeTimes, { t = Sched.now, zone = msg.Zone })
+	end
 	m.strikeKinds[msg.Kind] = (m.strikeKinds[msg.Kind] or 0) + 1
 	if msg.Tag then
 		m.strikeKinds["tag:" .. tostring(msg.Tag)] = (m.strikeKinds["tag:" .. tostring(msg.Tag)] or 0) + 1

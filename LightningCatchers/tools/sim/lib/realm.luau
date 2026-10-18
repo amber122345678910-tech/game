@@ -343,6 +343,20 @@ function Realm.makeGlobals(realm)
 		local text = logLine(cur(), "warn", ...)
 		local frames = Report.frames(nil, 1)
 		local cat = if looksLikeError(text) then "caught" else "warn"
+		if cat == "caught" then
+			-- attach the stack of the original error (captured when the game's pcall swallowed it)
+			for i = #Report.recentSwallowed, 1, -1 do
+				local sw = Report.recentSwallowed[i]
+				if string.find(text, string.sub(sw.msg, 1, 80), 1, true) then
+					local merged = table.clone(sw.frames)
+					for _, f in frames do
+						table.insert(merged, { src = f.src, line = f.line, name = (f.name or "") .. " [warn]" })
+					end
+					frames = merged
+					break
+				end
+			end
+		end
 		Report.add(cat, cur().name, text, frames)
 	end
 	G.printidentity = function()
@@ -426,7 +440,35 @@ function Realm.makeGlobals(realm)
 	G.ipairs = ipairs
 	G.next = next
 	G.pairs = pairs
-	G.pcall = pcall
+	-- pcall that remembers code errors it swallows (reported only if the game never warn()s about them)
+	local function codeError(msg)
+		local m = tostring(msg)
+		return string.find(m, "attempt to ", 1, true) ~= nil
+			or string.find(m, "invalid argument", 1, true) ~= nil
+			or string.find(m, "missing or nil", 1, true) ~= nil
+			or string.find(m, "is not a valid member", 1, true) ~= nil
+			or string.find(m, "Unable to ", 1, true) ~= nil
+			or string.find(m, "stack overflow", 1, true) ~= nil
+	end
+	local function onSwallow(e)
+		if codeError(e) then
+			local frames = Report.frames(nil, 1)
+			if #frames > 0 then
+				local msg = Report.cleanMessage(e)
+				table.insert(Report.recentSwallowed, { msg = msg, frames = frames })
+				if #Report.recentSwallowed > 40 then
+					table.remove(Report.recentSwallowed, 1)
+				end
+				if e ~= Sched.lastThrown then
+					Report.add("swallowed", (Sched.CUR or realm).name, msg, frames)
+				end
+			end
+		end
+		return e
+	end
+	G.pcall = function(f, ...)
+		return xpcall(f, onSwallow, ...)
+	end
 	G.rawequal = rawequal
 	G.rawget = rawget
 	G.rawlen = rawlen
