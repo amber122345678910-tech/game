@@ -9,6 +9,7 @@ local Vector3 = roblox.Vector3
 local CFrame = roblox.CFrame
 local Enum = roblox.Enum
 local M = Enum.Material
+local rgb = B.rgb
 
 local P = {}
 
@@ -481,6 +482,91 @@ function P.crate(parent, pos, rng, color, size)
 	local cf = CFrame.new(pos + Vector3.new(0, s / 2, 0)) * yaw(rng)
 	B.block(m, cf, Vector3.new(s, s, s), B.vary(color or B.rgb(170, 124, 76), rng, 0.04), { Material = M.WoodPlanks })
 	B.block(m, cf, Vector3.new(s * 1.02, s * 0.18, s * 1.02), B.shade(color or B.rgb(170, 124, 76), 0.25), B.deco({ Material = M.Wood }))
+	return m
+end
+
+----------------------------------------------------------------------
+-- Детали-«истории» (по одной-две на остров)
+----------------------------------------------------------------------
+
+-- Колодец с крышей-домиком (Луг)
+function P.well(parent, pos, rng)
+	local m = B.model(parent, "Well")
+	local stone = rgb(150, 146, 140)
+	B.cylY(m, pos + Vector3.new(0, 1.1, 0), 2.2, 4.4, B.vary(stone, rng, 0.03), { Material = M.Cobblestone, Shadow = true })
+	B.cylY(m, pos + Vector3.new(0, 2.15, 0), 0.2, 3.4, rgb(40, 60, 90), B.deco({ Material = M.Glass, Transparency = 0.2 }))
+	local base = CFrame.new(pos) * yaw(rng)
+	for side = -1, 1, 2 do
+		B.block(m, base * CFrame.new(side * 1.9, 3.3, 0), Vector3.new(0.4, 4.4, 0.4), P.WOOD, B.deco({ Material = M.Wood }))
+	end
+	B.cyl(m, base * CFrame.new(0, 4, 0), 3.8, 0.4, P.WOOD_DARK, B.deco({ Material = M.Wood }))
+	B.wedge(m, base * CFrame.new(0, 5.9, -0.8), Vector3.new(4.6, 1.4, 1.6), rgb(150, 70, 56), B.deco({ Material = M.WoodPlanks, Shadow = true }))
+	B.wedge(m, base * CFrame.new(0, 5.9, 0.8) * CFrame.Angles(0, math.pi, 0), Vector3.new(4.6, 1.4, 1.6), rgb(130, 60, 48), B.deco({ Material = M.WoodPlanks, Shadow = true }))
+	B.block(m, base * CFrame.new(0.6, 3.2, 0), Vector3.new(0.7, 0.8, 0.7), rgb(120, 90, 60), B.deco({ Material = M.Wood }))
+	return m
+end
+
+-- Вагонетка с медной рудой на обрывке рельсов (Медные Холмы)
+function P.mineCart(parent, pos, dir, rng, ore)
+	local m = B.model(parent, "MineCart")
+	local cf = B.facing(pos, dir)
+	local iron = rgb(70, 70, 78)
+	for side = -1, 1, 2 do
+		B.block(m, cf * CFrame.new(side * 1.1, 0.12, 0), Vector3.new(0.2, 0.24, 9), iron, B.deco({ Material = M.Metal }))
+	end
+	for k = -2, 2 do
+		B.block(m, cf * CFrame.new(rng:range(-0.1, 0.1), 0.05, k * 1.9) * CFrame.Angles(0, rng:range(-0.08, 0.08), 0), Vector3.new(3, 0.2, 0.6), P.WOOD_DARK, B.deco({ Material = M.Wood }))
+	end
+	local c = cf * CFrame.new(0, 0, rng:range(-1.5, 1.5))
+	B.block(m, c * CFrame.new(0, 1.35, 0), Vector3.new(2.6, 1.5, 3.4), rgb(110, 84, 70), { Material = M.CorrodedMetal })
+	for _, x in { -1.2, 1.2 } do
+		for _, z in { -1.1, 1.1 } do
+			B.cyl(m, c * CFrame.new(x, 0.55, z), 0.3, 0.9, iron, B.deco({ Material = M.Metal }))
+		end
+	end
+	for _ = 1, 4 do
+		B.ball(m, (c * CFrame.new(rng:range(-0.7, 0.7), 2.1, rng:range(-1, 1))).Position, rng:range(0.6, 0.9), B.vary(rgb(170, 96, 60), rng, 0.05), B.deco({ Material = M.Slate }))
+	end
+	B.ball(m, (c * CFrame.new(0.2, 2.3, 0.3)).Position, 0.6, ore, B.neon())
+	return m
+end
+
+-- Пальма: изогнутый ствол из сегментов и веер листьев-клиньев (оазис в Дюнах)
+function P.palm(parent, pos, rng)
+	local m = B.model(parent, "Palm")
+	local p = pos
+	local lean = Vector3.new(rng:range(-0.25, 0.25), 1, rng:range(-0.25, 0.25)).Unit
+	for k = 1, 4 do
+		local q = p + (lean + Vector3.new(0, 0, 0)).Unit * 2.2
+		B.rod(m, p, q, 1.1 - k * 0.12, B.vary(rgb(150, 112, 74), rng, 0.04), { Material = M.Wood, Collide = k == 1, Shadow = true })
+		p = q
+		lean = (lean + Vector3.new(rng:range(-0.12, 0.12), 0.05, rng:range(-0.12, 0.12))).Unit
+	end
+	for k = 1, 6 do
+		local a = k / 6 * math.pi * 2 + rng:range(-0.2, 0.2)
+		local cf = CFrame.new(p) * CFrame.Angles(0, a, 0) * CFrame.Angles(-0.35, 0, 0) * CFrame.new(0, 0, -2)
+		B.wedge(m, cf * CFrame.Angles(0, math.pi, 0), Vector3.new(1.2, 0.4, 4), B.vary(rgb(70, 140, 70), rng, 0.05), B.deco({ Material = M.Grass, Shadow = true }))
+	end
+	B.ball(m, p + Vector3.new(0, -0.4, 0), 0.9, rgb(120, 86, 50), B.deco())
+	return m
+end
+
+-- Снеговик: три шара, морковка, глазки-угольки, шарф (Ледяной Пик)
+function P.snowman(parent, pos, facingDir, rng)
+	local m = B.model(parent, "Snowman")
+	local cf = B.facing(pos, facingDir)
+	local snow = rgb(244, 248, 255)
+	B.ball(m, pos + Vector3.new(0, 1.5, 0), 3.2, snow, { Material = M.Snow, Shadow = true })
+	B.ball(m, pos + Vector3.new(0, 3.6, 0), 2.4, snow, B.deco({ Material = M.Snow }))
+	B.ball(m, pos + Vector3.new(0, 5.2, 0), 1.7, snow, B.deco({ Material = M.Snow }))
+	B.cyl(m, cf * CFrame.new(0, 4.6, -0.7) * CFrame.Angles(0, math.pi / 2, 0), 1.6, 1.25, rgb(220, 60, 60), B.deco({ Material = M.Fabric }))
+	local nose = cf * CFrame.new(0, 5.15, -1)
+	B.wedge(m, nose * CFrame.Angles(-math.pi / 2, 0, 0), Vector3.new(0.3, 0.9, 0.3), rgb(255, 140, 40), B.deco())
+	for side = -1, 1, 2 do
+		B.ball(m, (cf * CFrame.new(side * 0.32, 5.45, -0.72)).Position, 0.22, rgb(20, 20, 26), B.deco())
+		B.rod(m, (cf * CFrame.new(side * 1.0, 3.8, 0)).Position, (cf * CFrame.new(side * 2.4, 4.8, 0)).Position, 0.15, P.WOOD_DARK, B.deco({ Material = M.Wood }))
+	end
+	local _ = rng
 	return m
 end
 

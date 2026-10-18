@@ -609,6 +609,13 @@ function ZonesMap.build(ctx, i, parent)
 				end
 			end
 		end
+		-- колодец у края
+		do
+			local p = S.ring(rimMin + 3, R - 3, 4)
+			if p then
+				P.well(decor, ground(p), rng)
+			end
+		end
 		-- стожки сена
 		for _ = 1, 3 do
 			local p = S.ring(rimMin + 2, R, 3)
@@ -676,6 +683,14 @@ function ZonesMap.build(ctx, i, parent)
 				P.rock(decor, ground(p), rng, pal)
 			end
 		end
+		-- вагонетки с рудой на рельсах (вдоль края)
+		for _ = 1, 2 do
+			local p = S.ring(rimMin + 4, R - 4, 5)
+			if p then
+				local out = B.flat(p - C).Unit
+				P.mineCart(decor, ground(p), Vector3.new(-out.Z, 0, out.X), rng, th.vein)
+			end
+		end
 		-- бочки и ящики шахтёров
 		for _ = 1, 4 do
 			local p = S.ring(rimMin + 2, R, 3)
@@ -707,6 +722,23 @@ function ZonesMap.build(ctx, i, parent)
 			local p = S.ring(rimMin + 4, R - 2, 6)
 			if p then
 				P.ruinArch(decor, ground(p), rng, pal)
+			end
+		end
+		-- оазис: прудик, пальмы, камыши
+		do
+			local p = S.ring(rimMin + 7, R - 6, 8)
+			if p then
+				local o = B.model(decor, "Oasis")
+				B.cylY(o, ground(p) + Vector3.new(0, -0.02, 0), 0.12, 9, rgb(70, 170, 190), B.deco({ Material = M.Glass, Transparency = 0.15, Shadow = false, Name = "Water" }))
+				B.cylY(o, ground(p) + Vector3.new(0, -0.05, 0), 0.12, 10.5, rgb(200, 176, 120), B.deco({ Material = M.Sand, Shadow = false }))
+				for k = 1, 2 do
+					local a = rng:range(0, 6.28)
+					P.palm(o, ground(p + Vector3.new(math.cos(a) * 5.6, 0, math.sin(a) * 5.6)), rng)
+				end
+				for _ = 1, 4 do
+					local a = rng:range(0, 6.28)
+					P.tuft(o, ground(p + Vector3.new(math.cos(a) * 4.6, 0, math.sin(a) * 4.6)), rng, rgb(90, 150, 80), 1.6)
+				end
 			end
 		end
 		for _ = 1, 15 do
@@ -771,6 +803,13 @@ function ZonesMap.build(ctx, i, parent)
 			local p = S.ring(rimMin, R + 2, 3)
 			if p then
 				P.drift(decor, ground(p), rng, rgb(240, 245, 255))
+			end
+		end
+		-- снеговик смотрит на игровую поляну
+		do
+			local p = S.ring(rimMin + 2, R - 3, 3)
+			if p then
+				P.snowman(decor, ground(p), C - p, rng)
 			end
 		end
 		-- ледяные «блюдца» и снежные травинки внутри

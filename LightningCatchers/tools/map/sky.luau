@@ -47,9 +47,9 @@ local function ceiling(ctx, i, folder)
 			count += 1
 			local edge = off.Magnitude / R
 			local pos = g.Center + Vector3.new(off.X, H - z.GroundY + rng:range(-2, 3) + edge * 4, off.Z)
-			-- середина темнее (грозовое брюхо), край светлее и полупрозрачный — мягкий силуэт
+			-- середина темнее (грозовое брюхо), к краю светлее — мягкий силуэт
 			local col = B.vary(base:Lerp(rgb(150, 150, 176), 0.1 + edge * 0.22), rng, 0.03)
-			cloudBall(m, pos, d, col, if edge > 0.8 then 0.35 elseif edge > 0.6 then 0.15 else nil)
+			cloudBall(m, pos, d, col)
 		end
 	end
 	-- верхние клубы (видны с мостов и из хаба)
