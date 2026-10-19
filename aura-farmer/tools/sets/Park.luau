@@ -434,7 +434,7 @@ end
 	-- за правым плечом коня: маленькое яркое деревце
 	tree({ name = "FreshAiry", x = -9, z = 52, crown = { 6, 6.5, 5 }, cy = 10.2, fork = 4, trunkD = 0.7, bark = BARK.grey, pal = PAL.fresh, flat = 0.7, masses = 34, massR = 1.5, balls = { 2, 3 }, limbs = 4, branchy = 2, core = 1, sparkle = 15 })
 	-- Справа в кадре (-X): жёлто-зелёное молодое дерево перед изгородью (ствол виден до травы), рядом фонарь.
-	tree({ name = "LimeYoung", x = -14.7, z = 23.6, lean = { 0.15, 0.25 }, crown = { 5.1, 4.8, 4.0 }, cy = 8.4, fork = 3.6, trunkD = 0.8, bark = BARK.lime, pal = PAL.lime, sparse = true, flat = 0.62, limbs = 6, depth = 3, fork3 = 0.2, limbLen = 0.6, limbMin = 30, limbMax = 64, spreadMin = 18, spreadMax = 34, minD = 0.08, tuft = 1.0, clump = 2, extra = 60, shell = 130 })
+	tree({ name = "LimeYoung", x = -14.7, z = 23.6, lean = { 0.15, 0.25 }, crown = { 5.3, 5.0, 4.0 }, cy = 8.6, fork = 3.6, trunkD = 0.8, bark = BARK.lime, pal = PAL.lime, sparse = true, flat = 0.72, limbs = 6, depth = 3, fork3 = 0.2, limbLen = 0.6, limbMin = 30, limbMax = 64, spreadMin = 18, spreadMax = 34, minD = 0.08, tuft = 1.08, clump = 2, extra = 60, shell = 150 })
 	-- второй ряд
 	tree({ name = "Dark2", x = 56, z = 60, crown = { 14, 16, 12 }, cy = 28, fork = 15, flat = 0.8, trunkD = 2.1, bark = BARK.dark, pal = PAL.dark, masses = 18, massR = 3.4, balls = { 2, 3 }, limbs = 4, core = 3, sparkle = 10 })
 	tree({ name = "Mid3", x = 80, z = 32, crown = { 13, 14, 11 }, cy = 25, fork = 14, flat = 0.8, trunkD = 1.9, bark = BARK.brown, pal = PAL.mid, masses = 18, massR = 3.4, balls = { 2, 3 }, limbs = 4, core = 3, sparkle = 10 })

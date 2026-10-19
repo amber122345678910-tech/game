@@ -164,8 +164,8 @@ return {
 			return {
 				t = t,
 				root = { y = -1.72, bend = -62 + breath * 0.6 },
-				waist = { bend = -2 + breath * 0.8, turn = -14 },
-				neck = { nod = 52, turn = -40, tilt = -4 },
+				waist = { bend = -2 + breath * 0.8, turn = -22 },
+				neck = { nod = 50, turn = -62, tilt = -6 },
 				rArm = { ik = { 1.45, 0.28, -0.55 }, pole = { 0.3, -1, -1 } },
 				lArm = { ik = { -1.45, 0.28, -0.5 }, pole = { -0.3, -1, -1 } },
 				rLeg = { ik = { 0.6, 0.24, 2.0 }, pole = { 0, 1, 0.4 } },
