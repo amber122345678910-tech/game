@@ -45,7 +45,8 @@ export type Data = {
 	Boosts: { Volts2x: number }, -- до какого os.time() действует
 	LastOnline: number,
 	IncomeRate: number, -- Вольт в минуту активной игры (сглаженное)
-	Settings: { Music: boolean, Sfx: boolean, SoftFlash: boolean, Shake: boolean, Offset: number },
+	-- Lang: "" — по локали Roblox, "en" | "ru" — выбран в настройках (Loc.pick)
+	Settings: { Music: boolean, Sfx: boolean, SoftFlash: boolean, Shake: boolean, Offset: number, Lang: string },
 	Codes: { [string]: boolean },
 	Tutorial: { [string]: boolean },
 	Welcome: number, -- накопленный офлайн-доход, ещё не забранный
@@ -80,7 +81,7 @@ function PlayerData.default(): Data
 		Boosts = { Volts2x = 0 },
 		LastOnline = 0,
 		IncomeRate = 0,
-		Settings = { Music = true, Sfx = true, SoftFlash = true, Shake = true, Offset = 0 },
+		Settings = { Music = true, Sfx = true, SoftFlash = true, Shake = true, Offset = 0, Lang = "" },
 		Codes = {},
 		Tutorial = {},
 		Welcome = 0,
@@ -236,6 +237,7 @@ function PlayerData.reconcile(raw: any): Data
 		d.Settings.SoftFlash = bool(s.SoftFlash, true)
 		d.Settings.Shake = bool(s.Shake, true)
 		d.Settings.Offset = int(s.Offset, 0, -150, 150)
+		d.Settings.Lang = if s.Lang == "en" or s.Lang == "ru" then s.Lang else ""
 	end
 	if typeof(raw.Codes) == "table" then
 		for k, v in raw.Codes do

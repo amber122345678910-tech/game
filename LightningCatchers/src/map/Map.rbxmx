@@ -9720,6 +9720,7 @@
                 <Item class="TextLabel" referent="309">
                   <Properties>
                     <string name="Name">Line1</string>
+                    <BinaryString name="AttributesSerialize">AgAAAAgAAABMb2NVcHBlcgMBCAAAAExvY19UZXh0AhcAAADQk9GA0L7Qt9C+0LLQvtC5INCb0YPQsw==</BinaryString>
                     <float name="BackgroundTransparency">1</float>
                     <Font name="FontFace">
                       <Family>
@@ -9741,7 +9742,7 @@
                       <YS>0.84</YS>
                       <YO>0</YO>
                     </UDim2>
-                    <string name="Text">ГРОЗОВОЙ ЛУГ</string>
+                    <string name="Text">STORM MEADOW</string>
                     <Color3 name="TextColor3">
                       <R>1</R>
                       <G>0.972549</G>
@@ -9793,6 +9794,7 @@
                 <Item class="TextLabel" referent="313">
                   <Properties>
                     <string name="Name">Line1</string>
+                    <BinaryString name="AttributesSerialize">AgAAAAgAAABMb2NVcHBlcgMBCAAAAExvY19UZXh0AhcAAADQk9GA0L7Qt9C+0LLQvtC5INCb0YPQsw==</BinaryString>
                     <float name="BackgroundTransparency">1</float>
                     <Font name="FontFace">
                       <Family>
@@ -9814,7 +9816,7 @@
                       <YS>0.84</YS>
                       <YO>0</YO>
                     </UDim2>
-                    <string name="Text">ГРОЗОВОЙ ЛУГ</string>
+                    <string name="Text">STORM MEADOW</string>
                     <Color3 name="TextColor3">
                       <R>1</R>
                       <G>0.972549</G>
@@ -40697,6 +40699,7 @@
                 <Item class="TextLabel" referent="1296">
                   <Properties>
                     <string name="Name">Line1</string>
+                    <BinaryString name="AttributesSerialize">AgAAAAgAAABMb2NVcHBlcgMBCAAAAExvY19UZXh0AhcAAADQnNC10LTQvdGL0LUg0KXQvtC70LzRiw==</BinaryString>
                     <float name="BackgroundTransparency">1</float>
                     <Font name="FontFace">
                       <Family>
@@ -40718,7 +40721,7 @@
                       <YS>0.84</YS>
                       <YO>0</YO>
                     </UDim2>
-                    <string name="Text">МЕДНЫЕ ХОЛМЫ</string>
+                    <string name="Text">COPPER HILLS</string>
                     <Color3 name="TextColor3">
                       <R>1</R>
                       <G>0.972549</G>
@@ -40770,6 +40773,7 @@
                 <Item class="TextLabel" referent="1300">
                   <Properties>
                     <string name="Name">Line1</string>
+                    <BinaryString name="AttributesSerialize">AgAAAAgAAABMb2NVcHBlcgMBCAAAAExvY19UZXh0AhcAAADQnNC10LTQvdGL0LUg0KXQvtC70LzRiw==</BinaryString>
                     <float name="BackgroundTransparency">1</float>
                     <Font name="FontFace">
                       <Family>
@@ -40791,7 +40795,7 @@
                       <YS>0.84</YS>
                       <YO>0</YO>
                     </UDim2>
-                    <string name="Text">МЕДНЫЕ ХОЛМЫ</string>
+                    <string name="Text">COPPER HILLS</string>
                     <Color3 name="TextColor3">
                       <R>1</R>
                       <G>0.972549</G>
@@ -68037,6 +68041,7 @@
                 <Item class="TextLabel" referent="2169">
                   <Properties>
                     <string name="Name">Line1</string>
+                    <BinaryString name="AttributesSerialize">AgAAAAgAAABMb2NVcHBlcgMBCAAAAExvY19UZXh0Ah0AAADQodGC0LXQutC70Y/QvdC90YvQtSDQlNGO0L3Riw==</BinaryString>
                     <float name="BackgroundTransparency">1</float>
                     <Font name="FontFace">
                       <Family>
@@ -68058,7 +68063,7 @@
                       <YS>0.84</YS>
                       <YO>0</YO>
                     </UDim2>
-                    <string name="Text">СТЕКЛЯННЫЕ ДЮНЫ</string>
+                    <string name="Text">GLASS DUNES</string>
                     <Color3 name="TextColor3">
                       <R>1</R>
                       <G>0.972549</G>
@@ -68110,6 +68115,7 @@
                 <Item class="TextLabel" referent="2173">
                   <Properties>
                     <string name="Name">Line1</string>
+                    <BinaryString name="AttributesSerialize">AgAAAAgAAABMb2NVcHBlcgMBCAAAAExvY19UZXh0Ah0AAADQodGC0LXQutC70Y/QvdC90YvQtSDQlNGO0L3Riw==</BinaryString>
                     <float name="BackgroundTransparency">1</float>
                     <Font name="FontFace">
                       <Family>
@@ -68131,7 +68137,7 @@
                       <YS>0.84</YS>
                       <YO>0</YO>
                     </UDim2>
-                    <string name="Text">СТЕКЛЯННЫЕ ДЮНЫ</string>
+                    <string name="Text">GLASS DUNES</string>
                     <Color3 name="TextColor3">
                       <R>1</R>
                       <G>0.972549</G>
@@ -93539,6 +93545,7 @@
                 <Item class="TextLabel" referent="2982">
                   <Properties>
                     <string name="Name">Line1</string>
+                    <BinaryString name="AttributesSerialize">AgAAAAgAAABMb2NVcHBlcgMBCAAAAExvY19UZXh0AhUAAADQm9C10LTRj9C90L7QuSDQn9C40Lo=</BinaryString>
                     <float name="BackgroundTransparency">1</float>
                     <Font name="FontFace">
                       <Family>
@@ -93560,7 +93567,7 @@
                       <YS>0.84</YS>
                       <YO>0</YO>
                     </UDim2>
-                    <string name="Text">ЛЕДЯНОЙ ПИК</string>
+                    <string name="Text">FROST PEAK</string>
                     <Color3 name="TextColor3">
                       <R>1</R>
                       <G>0.972549</G>
@@ -93612,6 +93619,7 @@
                 <Item class="TextLabel" referent="2986">
                   <Properties>
                     <string name="Name">Line1</string>
+                    <BinaryString name="AttributesSerialize">AgAAAAgAAABMb2NVcHBlcgMBCAAAAExvY19UZXh0AhUAAADQm9C10LTRj9C90L7QuSDQn9C40Lo=</BinaryString>
                     <float name="BackgroundTransparency">1</float>
                     <Font name="FontFace">
                       <Family>
@@ -93633,7 +93641,7 @@
                       <YS>0.84</YS>
                       <YO>0</YO>
                     </UDim2>
-                    <string name="Text">ЛЕДЯНОЙ ПИК</string>
+                    <string name="Text">FROST PEAK</string>
                     <Color3 name="TextColor3">
                       <R>1</R>
                       <G>0.972549</G>
@@ -119783,6 +119791,7 @@
                 <Item class="TextLabel" referent="3815">
                   <Properties>
                     <string name="Name">Line1</string>
+                    <BinaryString name="AttributesSerialize">AgAAAAgAAABMb2NVcHBlcgMBCAAAAExvY19UZXh0Ag8AAADQntC60L4g0JHRg9GA0Lg=</BinaryString>
                     <float name="BackgroundTransparency">1</float>
                     <Font name="FontFace">
                       <Family>
@@ -119804,7 +119813,7 @@
                       <YS>0.84</YS>
                       <YO>0</YO>
                     </UDim2>
-                    <string name="Text">ОКО БУРИ</string>
+                    <string name="Text">EYE OF THE STORM</string>
                     <Color3 name="TextColor3">
                       <R>1</R>
                       <G>0.972549</G>
@@ -119856,6 +119865,7 @@
                 <Item class="TextLabel" referent="3819">
                   <Properties>
                     <string name="Name">Line1</string>
+                    <BinaryString name="AttributesSerialize">AgAAAAgAAABMb2NVcHBlcgMBCAAAAExvY19UZXh0Ag8AAADQntC60L4g0JHRg9GA0Lg=</BinaryString>
                     <float name="BackgroundTransparency">1</float>
                     <Font name="FontFace">
                       <Family>
@@ -119877,7 +119887,7 @@
                       <YS>0.84</YS>
                       <YO>0</YO>
                     </UDim2>
-                    <string name="Text">ОКО БУРИ</string>
+                    <string name="Text">EYE OF THE STORM</string>
                     <Color3 name="TextColor3">
                       <R>1</R>
                       <G>0.972549</G>
@@ -188398,6 +188408,7 @@
                 <Item class="TextLabel" referent="6022">
                   <Properties>
                     <string name="Name">Line1</string>
+                    <BinaryString name="AttributesSerialize">AgAAAAgAAABMb2NVcHBlcgMBCAAAAExvY19UZXh0Ag4AAADQnNCw0LPQsNC30LjQvQ==</BinaryString>
                     <float name="BackgroundTransparency">1</float>
                     <Font name="FontFace">
                       <Family>
@@ -189434,6 +189445,7 @@
                 <Item class="TextLabel" referent="6059">
                   <Properties>
                     <string name="Name">Line1</string>
+                    <BinaryString name="AttributesSerialize">AgAAAAgAAABMb2NVcHBlcgMBCAAAAExvY19UZXh0AgwAAADQmtC+0LrQvtC90Ys=</BinaryString>
                     <float name="BackgroundTransparency">1</float>
                     <Font name="FontFace">
                       <Family>
@@ -190504,6 +190516,7 @@
                 <Item class="TextLabel" referent="6094">
                   <Properties>
                     <string name="Name">Line1</string>
+                    <BinaryString name="AttributesSerialize">AgAAAAgAAABMb2NVcHBlcgMBCAAAAExvY19UZXh0Ag4AAADQm9GD0LPQvtCy0L7QuQ==</BinaryString>
                     <float name="BackgroundTransparency">1</float>
                     <Font name="FontFace">
                       <Family>
@@ -190564,6 +190577,7 @@
                 <Item class="TextLabel" referent="6097">
                   <Properties>
                     <string name="Name">Line2</string>
+                    <BinaryString name="AttributesSerialize">AQAAAAgAAABMb2NfVGV4dAIHAAAAMjUg8J+Sjg==</BinaryString>
                     <float name="BackgroundTransparency">1</float>
                     <Font name="FontFace">
                       <Family>
@@ -191525,6 +191539,7 @@
                 <Item class="TextLabel" referent="6128">
                   <Properties>
                     <string name="Name">Line1</string>
+                    <BinaryString name="AttributesSerialize">AgAAAAgAAABMb2NVcHBlcgMBCAAAAExvY19UZXh0Ag4AAADQm9C10LTRj9C90L7QuQ==</BinaryString>
                     <float name="BackgroundTransparency">1</float>
                     <Font name="FontFace">
                       <Family>
@@ -191585,6 +191600,7 @@
                 <Item class="TextLabel" referent="6131">
                   <Properties>
                     <string name="Name">Line2</string>
+                    <BinaryString name="AttributesSerialize">AQAAAAgAAABMb2NfVGV4dAIIAAAAMzAwIPCfko4=</BinaryString>
                     <float name="BackgroundTransparency">1</float>
                     <Font name="FontFace">
                       <Family>
@@ -192577,6 +192593,7 @@
                 <Item class="TextLabel" referent="6163">
                   <Properties>
                     <string name="Name">Line1</string>
+                    <BinaryString name="AttributesSerialize">AgAAAAgAAABMb2NVcHBlcgMBCAAAAExvY19UZXh0AhAAAADQk9GA0L7Qt9C+0LLQvtC5</BinaryString>
                     <float name="BackgroundTransparency">1</float>
                     <Font name="FontFace">
                       <Family>
@@ -192637,6 +192654,7 @@
                 <Item class="TextLabel" referent="6166">
                   <Properties>
                     <string name="Name">Line2</string>
+                    <BinaryString name="AttributesSerialize">AQAAAAgAAABMb2NfVGV4dAIJAAAAMjUwMCDwn5KO</BinaryString>
                     <float name="BackgroundTransparency">1</float>
                     <Font name="FontFace">
                       <Family>
@@ -192870,6 +192888,7 @@
                 <Item class="TextLabel" referent="6175">
                   <Properties>
                     <string name="Name">Line1</string>
+                    <BinaryString name="AttributesSerialize">AgAAAAgAAABMb2NVcHBlcgMBCAAAAExvY19UZXh0Ag4AAADQk9Cw0LvQtdGA0LXRjw==</BinaryString>
                     <float name="BackgroundTransparency">1</float>
                     <Font name="FontFace">
                       <Family>
@@ -192930,6 +192949,7 @@
                 <Item class="TextLabel" referent="6178">
                   <Properties>
                     <string name="Name">Line2</string>
+                    <BinaryString name="AttributesSerialize">AQAAAAgAAABMb2NfVGV4dAIWAAAA0YTRg9C70YzQs9GD0YDQuNGC0L7Qsg==</BinaryString>
                     <float name="BackgroundTransparency">1</float>
                     <Font name="FontFace">
                       <Family>
@@ -195945,6 +195965,7 @@
                 <Item class="TextLabel" referent="6272">
                   <Properties>
                     <string name="Name">Line1</string>
+                    <BinaryString name="AttributesSerialize">AgAAAAgAAABMb2NVcHBlcgMBCAAAAExvY19UZXh0AhQAAADQn9C10YDQtdC30LDQv9GD0YHQug==</BinaryString>
                     <float name="BackgroundTransparency">1</float>
                     <Font name="FontFace">
                       <Family>
@@ -196005,6 +196026,7 @@
                 <Item class="TextLabel" referent="6275">
                   <Properties>
                     <string name="Name">Line2</string>
+                    <BinaryString name="AttributesSerialize">AQAAAAgAAABMb2NfVGV4dAIUAAAA0LPQtdC90LXRgNCw0YLQvtGA0LA=</BinaryString>
                     <float name="BackgroundTransparency">1</float>
                     <Font name="FontFace">
                       <Family>
@@ -196950,6 +196972,7 @@
                 <Item class="TextLabel" referent="6306">
                   <Properties>
                     <string name="Name">Line1</string>
+                    <BinaryString name="AttributesSerialize">AgAAAAgAAABMb2NVcHBlcgMBCAAAAExvY19UZXh0Ag4AAADQndCw0LPRgNCw0LTRiw==</BinaryString>
                     <float name="BackgroundTransparency">1</float>
                     <Font name="FontFace">
                       <Family>
@@ -197010,6 +197033,7 @@
                 <Item class="TextLabel" referent="6309">
                   <Properties>
                     <string name="Name">Line2</string>
+                    <BinaryString name="AttributesSerialize">AQAAAAgAAABMb2NfVGV4dAIVAAAA0LrQsNC20LTRi9C5INC00LXQvdGM</BinaryString>
                     <float name="BackgroundTransparency">1</float>
                     <Font name="FontFace">
                       <Family>
@@ -229445,6 +229469,7 @@
             <Item class="TextLabel" referent="7457">
               <Properties>
                 <string name="Name">Line1</string>
+                <BinaryString name="AttributesSerialize">AgAAAAgAAABMb2NVcHBlcgMBCAAAAExvY19UZXh0AhcAAADQnNC10LTQvdGL0LUg0KXQvtC70LzRiw==</BinaryString>
                 <float name="BackgroundTransparency">1</float>
                 <Font name="FontFace">
                   <Family>
@@ -229466,7 +229491,7 @@
                   <YS>0.36615384</YS>
                   <YO>0</YO>
                 </UDim2>
-                <string name="Text">МЕДНЫЕ ХОЛМЫ</string>
+                <string name="Text">COPPER HILLS</string>
                 <Color3 name="TextColor3">
                   <R>1</R>
                   <G>0.972549</G>
@@ -229505,6 +229530,7 @@
             <Item class="TextLabel" referent="7460">
               <Properties>
                 <string name="Name">Line2</string>
+                <BinaryString name="AttributesSerialize">AQAAAAgAAABMb2NfVGV4dAIHAAAA4pqhIDIyMA==</BinaryString>
                 <float name="BackgroundTransparency">1</float>
                 <Font name="FontFace">
                   <Family>
@@ -229585,6 +229611,7 @@
             <Item class="TextLabel" referent="7465">
               <Properties>
                 <string name="Name">Line1</string>
+                <BinaryString name="AttributesSerialize">AgAAAAgAAABMb2NVcHBlcgMBCAAAAExvY19UZXh0AhcAAADQnNC10LTQvdGL0LUg0KXQvtC70LzRiw==</BinaryString>
                 <float name="BackgroundTransparency">1</float>
                 <Font name="FontFace">
                   <Family>
@@ -229606,7 +229633,7 @@
                   <YS>0.84</YS>
                   <YO>0</YO>
                 </UDim2>
-                <string name="Text">МЕДНЫЕ ХОЛМЫ</string>
+                <string name="Text">COPPER HILLS</string>
                 <Color3 name="TextColor3">
                   <R>1</R>
                   <G>0.972549</G>
@@ -230587,6 +230614,7 @@
             <Item class="TextLabel" referent="7499">
               <Properties>
                 <string name="Name">Line1</string>
+                <BinaryString name="AttributesSerialize">AgAAAAgAAABMb2NVcHBlcgMBCAAAAExvY19UZXh0Ah0AAADQodGC0LXQutC70Y/QvdC90YvQtSDQlNGO0L3Riw==</BinaryString>
                 <float name="BackgroundTransparency">1</float>
                 <Font name="FontFace">
                   <Family>
@@ -230608,7 +230636,7 @@
                   <YS>0.36615384</YS>
                   <YO>0</YO>
                 </UDim2>
-                <string name="Text">СТЕКЛЯННЫЕ ДЮНЫ</string>
+                <string name="Text">GLASS DUNES</string>
                 <Color3 name="TextColor3">
                   <R>1</R>
                   <G>0.972549</G>
@@ -230647,6 +230675,7 @@
             <Item class="TextLabel" referent="7502">
               <Properties>
                 <string name="Name">Line2</string>
+                <BinaryString name="AttributesSerialize">AQAAAAgAAABMb2NfVGV4dAIHAAAA4pqhIDEySw==</BinaryString>
                 <float name="BackgroundTransparency">1</float>
                 <Font name="FontFace">
                   <Family>
@@ -230727,6 +230756,7 @@
             <Item class="TextLabel" referent="7507">
               <Properties>
                 <string name="Name">Line1</string>
+                <BinaryString name="AttributesSerialize">AgAAAAgAAABMb2NVcHBlcgMBCAAAAExvY19UZXh0Ah0AAADQodGC0LXQutC70Y/QvdC90YvQtSDQlNGO0L3Riw==</BinaryString>
                 <float name="BackgroundTransparency">1</float>
                 <Font name="FontFace">
                   <Family>
@@ -230748,7 +230778,7 @@
                   <YS>0.84</YS>
                   <YO>0</YO>
                 </UDim2>
-                <string name="Text">СТЕКЛЯННЫЕ ДЮНЫ</string>
+                <string name="Text">GLASS DUNES</string>
                 <Color3 name="TextColor3">
                   <R>1</R>
                   <G>0.972549</G>
@@ -231729,6 +231759,7 @@
             <Item class="TextLabel" referent="7541">
               <Properties>
                 <string name="Name">Line1</string>
+                <BinaryString name="AttributesSerialize">AgAAAAgAAABMb2NVcHBlcgMBCAAAAExvY19UZXh0AhUAAADQm9C10LTRj9C90L7QuSDQn9C40Lo=</BinaryString>
                 <float name="BackgroundTransparency">1</float>
                 <Font name="FontFace">
                   <Family>
@@ -231750,7 +231781,7 @@
                   <YS>0.36615384</YS>
                   <YO>0</YO>
                 </UDim2>
-                <string name="Text">ЛЕДЯНОЙ ПИК</string>
+                <string name="Text">FROST PEAK</string>
                 <Color3 name="TextColor3">
                   <R>1</R>
                   <G>0.972549</G>
@@ -231789,6 +231820,7 @@
             <Item class="TextLabel" referent="7544">
               <Properties>
                 <string name="Name">Line2</string>
+                <BinaryString name="AttributesSerialize">AQAAAAgAAABMb2NfVGV4dAIIAAAA4pqhIDYwMEs=</BinaryString>
                 <float name="BackgroundTransparency">1</float>
                 <Font name="FontFace">
                   <Family>
@@ -231869,6 +231901,7 @@
             <Item class="TextLabel" referent="7549">
               <Properties>
                 <string name="Name">Line1</string>
+                <BinaryString name="AttributesSerialize">AgAAAAgAAABMb2NVcHBlcgMBCAAAAExvY19UZXh0AhUAAADQm9C10LTRj9C90L7QuSDQn9C40Lo=</BinaryString>
                 <float name="BackgroundTransparency">1</float>
                 <Font name="FontFace">
                   <Family>
@@ -231890,7 +231923,7 @@
                   <YS>0.84</YS>
                   <YO>0</YO>
                 </UDim2>
-                <string name="Text">ЛЕДЯНОЙ ПИК</string>
+                <string name="Text">FROST PEAK</string>
                 <Color3 name="TextColor3">
                   <R>1</R>
                   <G>0.972549</G>
@@ -232871,6 +232904,7 @@
             <Item class="TextLabel" referent="7583">
               <Properties>
                 <string name="Name">Line1</string>
+                <BinaryString name="AttributesSerialize">AgAAAAgAAABMb2NVcHBlcgMBCAAAAExvY19UZXh0Ag8AAADQntC60L4g0JHRg9GA0Lg=</BinaryString>
                 <float name="BackgroundTransparency">1</float>
                 <Font name="FontFace">
                   <Family>
@@ -232892,7 +232926,7 @@
                   <YS>0.36615384</YS>
                   <YO>0</YO>
                 </UDim2>
-                <string name="Text">ОКО БУРИ</string>
+                <string name="Text">EYE OF THE STORM</string>
                 <Color3 name="TextColor3">
                   <R>1</R>
                   <G>0.972549</G>
@@ -232931,6 +232965,7 @@
             <Item class="TextLabel" referent="7586">
               <Properties>
                 <string name="Name">Line2</string>
+                <BinaryString name="AttributesSerialize">AQAAAAgAAABMb2NfVGV4dAIHAAAA4pqhIDE1TQ==</BinaryString>
                 <float name="BackgroundTransparency">1</float>
                 <Font name="FontFace">
                   <Family>
@@ -233011,6 +233046,7 @@
             <Item class="TextLabel" referent="7591">
               <Properties>
                 <string name="Name">Line1</string>
+                <BinaryString name="AttributesSerialize">AgAAAAgAAABMb2NVcHBlcgMBCAAAAExvY19UZXh0Ag8AAADQntC60L4g0JHRg9GA0Lg=</BinaryString>
                 <float name="BackgroundTransparency">1</float>
                 <Font name="FontFace">
                   <Family>
@@ -233032,7 +233068,7 @@
                   <YS>0.84</YS>
                   <YO>0</YO>
                 </UDim2>
-                <string name="Text">ОКО БУРИ</string>
+                <string name="Text">EYE OF THE STORM</string>
                 <Color3 name="TextColor3">
                   <R>1</R>
                   <G>0.972549</G>
@@ -234612,6 +234648,7 @@
             <Item class="TextLabel" referent="7643">
               <Properties>
                 <string name="Name">Line1</string>
+                <BinaryString name="AttributesSerialize">AgAAAAgAAABMb2NVcHBlcgMBCAAAAExvY19UZXh0AhQAAADQn9C+0LTRgdGC0LDQvdGG0LjRjw==</BinaryString>
                 <float name="BackgroundTransparency">1</float>
                 <Font name="FontFace">
                   <Family>
@@ -236141,6 +236178,7 @@
             <Item class="TextLabel" referent="7692">
               <Properties>
                 <string name="Name">Line1</string>
+                <BinaryString name="AttributesSerialize">AgAAAAgAAABMb2NVcHBlcgMBCAAAAExvY19UZXh0AhQAAADQn9C+0LTRgdGC0LDQvdGG0LjRjw==</BinaryString>
                 <float name="BackgroundTransparency">1</float>
                 <Font name="FontFace">
                   <Family>
@@ -237670,6 +237708,7 @@
             <Item class="TextLabel" referent="7741">
               <Properties>
                 <string name="Name">Line1</string>
+                <BinaryString name="AttributesSerialize">AgAAAAgAAABMb2NVcHBlcgMBCAAAAExvY19UZXh0AhQAAADQn9C+0LTRgdGC0LDQvdGG0LjRjw==</BinaryString>
                 <float name="BackgroundTransparency">1</float>
                 <Font name="FontFace">
                   <Family>
@@ -239199,6 +239238,7 @@
             <Item class="TextLabel" referent="7790">
               <Properties>
                 <string name="Name">Line1</string>
+                <BinaryString name="AttributesSerialize">AgAAAAgAAABMb2NVcHBlcgMBCAAAAExvY19UZXh0AhQAAADQn9C+0LTRgdGC0LDQvdGG0LjRjw==</BinaryString>
                 <float name="BackgroundTransparency">1</float>
                 <Font name="FontFace">
                   <Family>
@@ -240728,6 +240768,7 @@
             <Item class="TextLabel" referent="7839">
               <Properties>
                 <string name="Name">Line1</string>
+                <BinaryString name="AttributesSerialize">AgAAAAgAAABMb2NVcHBlcgMBCAAAAExvY19UZXh0AhQAAADQn9C+0LTRgdGC0LDQvdGG0LjRjw==</BinaryString>
                 <float name="BackgroundTransparency">1</float>
                 <Font name="FontFace">
                   <Family>

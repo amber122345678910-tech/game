@@ -368,6 +368,8 @@ local function setSettings(player: Player, payload: any): (boolean, any)
 		SoftFlash = flag(payload.SoftFlash, s.SoftFlash),
 		Shake = flag(payload.Shake, s.Shake),
 		Offset = offset,
+		-- язык: "en" | "ru", пустая строка — по локали Roblox; без поля — прежний
+		Lang = if payload.Lang == "en" or payload.Lang == "ru" or payload.Lang == "" then payload.Lang else s.Lang,
 	}
 	DataService.update(player, function(data)
 		data.Settings = new

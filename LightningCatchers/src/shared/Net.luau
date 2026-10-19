@@ -87,7 +87,10 @@ export type EffectMsg = {
 ----------------------------------------------------------------------
 -- Запросы клиента (RemoteFunction "Request")
 -- Request:InvokeServer(action, payload) -> (ok: boolean, result: any)
--- result при ok=false — текст ошибки для игрока
+-- result при ok=false — текст ошибки для игрока: строка-исходник или Loc.Msg (клиент рисует через Loc.render)
+--
+-- Тексты для игрока в Notify (text, kind) и Banner (text, kind, color?) — тоже строка-исходник или Loc.Msg:
+-- сервер не знает языка игрока, переводит клиент (src/shared/Loc.luau)
 ----------------------------------------------------------------------
 Net.Actions = {
 	BuyUpgrade = "BuyUpgrade", -- payload: UpgradeId
@@ -107,7 +110,7 @@ Net.Actions = {
 	ClaimQuest = "ClaimQuest", -- payload: quest index (1..3)
 	RedeemCode = "RedeemCode", -- payload: string
 	Teleport = "Teleport", -- payload: zone number (0 = хаб)
-	SetSettings = "SetSettings", -- payload: { Music, Sfx, SoftFlash, Shake, Offset }
+	SetSettings = "SetSettings", -- payload: { Music, Sfx, SoftFlash, Shake, Offset, Lang }
 	ClaimWelcome = "ClaimWelcome", -- payload: nil -> result: volts
 	TutorialStep = "TutorialStep", -- payload: string (имя шага)
 }

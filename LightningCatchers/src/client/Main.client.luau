@@ -65,6 +65,18 @@ end
 
 ClientState.start()
 
+-- Язык (src/shared/Loc.luau): настройка игрока, а если её нет — локаль Roblox. Выбирается до запуска модулей:
+-- окна строят тексты один раз при старте. Данные ждём недолго — без них язык берётся по локали
+do
+	local Loc = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Loc"))
+	local t0 = os.clock()
+	while not ClientState.data and os.clock() - t0 < 6 do
+		task.wait(0.05)
+	end
+	local d = ClientState.data
+	Loc.setLang(Loc.pick(if d then d.Settings.Lang else nil, Loc.localeId()))
+end
+
 -- Прогрев шрифтов (docs/STYLE.md §8.3.5): Montserrat Black Italic и Nunito 700/800 — облачные начертания,
 -- качаются при первом использовании. Невидимые лейблы со всеми пятью начертаниями до показа HUD и окон,
 -- чтобы первая оценка и заголовки не мелькнули запасным шрифтом
@@ -107,7 +119,7 @@ end)
 startModule("Juice", Controllers:WaitForChild("Juice"))
 
 -- EventFX: шаровая молния, радужный луч, подарки и окна киосков хаба (ProximityPrompt → OpenWindow)
-for _, name in { "WorldFX", "StrikeController", "CatchController", "CharacterFX", "PetsFX", "EventFX" } do
+for _, name in { "WorldFX", "WorldText", "StrikeController", "CatchController", "CharacterFX", "PetsFX", "EventFX" } do
 	startModule(name, Controllers:WaitForChild(name))
 end
 

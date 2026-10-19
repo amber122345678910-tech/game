@@ -14,6 +14,9 @@ local Font = roblox.Font
 local ColorSequence = roblox.ColorSequence
 local ColorSequenceKeypoint = roblox.ColorSequenceKeypoint
 local NumberSequence = roblox.NumberSequence
+-- Локализация надписей (src/shared/Loc.luau). Пути Loader — от папки LightningCatchers/ (оттуда запускаются скрипты)
+local Loader = require("./loader")
+local Loc = Loader.load("src/shared/Loc")
 
 local B = {}
 B.count = 0 -- сколько деталей создано (бюджет карты для телефонов)
@@ -635,6 +638,7 @@ end
 B.gradient = gradient
 
 -- Табличка: строки одна под другой. lines = { {Text, Color, Size (доля высоты), Font, Rotation, Gradient = {верх, низ}, Stroke} }
+-- Text — русский исходник (строка или Loc.msg), перевод — в src/shared/Strings/Map.luau
 -- По умолчанию (STYLE §9): строка 1 — FontDisplay ЗАГЛАВНЫМИ, Cream, обводка Ink, наклон −3°;
 -- строка 2 — FontBodyHeavy, TextDim, 60% высоты, без наклона. opts: Face, PixelsPerStud, Name, Brightness
 function B.text(part, lines, opts)
@@ -655,7 +659,15 @@ function B.text(part, lines, opts)
 		t.Size = UDim2.fromScale(0.86, h * 0.84)
 		t.Position = UDim2.fromScale(0.07, y + h * 0.08)
 		t.FontFace = l.Font or (if first then B.FontDisplay else B.FontBodyHeavy)
-		t.Text = if first and l.Upper ~= false then B.upper(l.Text) else l.Text
+		-- текст по-английски, исходник — в атрибуте: русский клиент подменит его сам (Controllers/WorldText).
+		-- l.Text — строка-исходник или сообщение Loc.msg(исходник, аргументы...)
+		local upper = first and l.Upper ~= false
+		local en = Loc.renderIn("en", l.Text)
+		t.Text = if upper then B.upper(en) else en
+		t:SetAttribute(Loc.attr("Text"), Loc.encode(l.Text))
+		if upper then
+			t:SetAttribute("LocUpper", true)
+		end
 		t.TextColor3 = l.Color or (if first then B.CREAM else B.TEXT_DIM)
 		t.TextScaled = true
 		t.TextWrapped = false
