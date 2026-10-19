@@ -1,0 +1,324 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Aura Farmer preview</title>
+<style>html,body{margin:0;background:#000;overflow:hidden}canvas{display:block}</style>
+<script type="importmap">{"imports":{"three":"./node_modules/three/build/three.module.js","three/addons/":"./node_modules/three/examples/jsm/"}}</script>
+</head>
+<body>
+<script type="module">
+// Превью-рендер кадров Roblox-сцены (приближённо: формы, цвета, материалы, свет, туман, блум).
+import * as THREE from 'three';
+import { Sky } from 'three/addons/objects/Sky.js';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
+import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
+
+const W = window.__W || 1280, H = window.__H || 720;
+const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+renderer.setSize(W, H);
+renderer.setPixelRatio(1);
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+document.body.appendChild(renderer.domElement);
+const pmrem = new THREE.PMREMGenerator(renderer);
+
+const MAT = {
+  SmoothPlastic: [0.42, 0], Plastic: [0.6, 0], Fabric: [0.95, 0], Carpet: [1, 0], Metal: [0.32, 0.9], Foil: [0.18, 1],
+  DiamondPlate: [0.4, 0.75], CorrodedMetal: [0.7, 0.6], Glass: [0.05, 0.1], Neon: [1, 0], Wood: [0.75, 0], WoodPlanks: [0.8, 0],
+  Sand: [1, 0], Grass: [1, 0], LeafyGrass: [1, 0], Ground: [1, 0], Concrete: [0.95, 0], Slate: [0.9, 0], Rock: [0.95, 0],
+  Marble: [0.3, 0], Granite: [0.55, 0], Brick: [0.92, 0], Cobblestone: [0.9, 0], Pebble: [0.9, 0], Leather: [0.55, 0],
+  Rubber: [0.85, 0], Plaster: [0.92, 0], Cardboard: [0.95, 0], CeramicTiles: [0.25, 0], Asphalt: [0.95, 0], Basalt: [0.9, 0],
+  Pavement: [0.9, 0], Limestone: [0.9, 0], Sandstone: [0.9, 0], Ice: [0.1, 0], ForceField: [0.5, 0], Salt: [0.9, 0], Snow: [0.9, 0],
+};
+const TERRAIN_COLOR = {
+  Sand: 0xcdb98f, Grass: 0x5d8f3a, LeafyGrass: 0x4f8a33, Ground: 0x6b5236, Water: 0x2f6f88, Rock: 0x707070, Mud: 0x4a3a2a,
+  Concrete: 0x9a9a98, Asphalt: 0x444444, Slate: 0x5a5d60, Pavement: 0x9c9c98, Basalt: 0x333333, Snow: 0xffffff,
+};
+
+const geoCache = new Map();
+function geometry(def) {
+  const key = (def.mesh || def.shape);
+  if (geoCache.has(key)) return geoCache.get(key);
+  let g;
+  const m = def.mesh;
+  if (m === 'Sphere') g = new THREE.SphereGeometry(0.5, 40, 28);
+  else if (m === 'Cylinder') g = new THREE.CylinderGeometry(0.5, 0.5, 1, 36);
+  else if (m === 'Head') g = new RoundedBoxGeometry(1, 1, 1, 6, 0.32);
+  else if (m === 'Wedge' || (!m && def.shape === 'Wedge')) {
+    g = new THREE.BufferGeometry();
+    const v = [-.5,-.5,-.5, .5,-.5,-.5, .5,-.5,.5, -.5,-.5,.5, -.5,.5,.5, .5,.5,.5];
+    const idx = [0,2,1, 0,3,2, 3,4,5, 3,5,2, 0,1,5, 0,5,4, 0,4,3, 1,2,5];
+    g.setAttribute('position', new THREE.Float32BufferAttribute(v, 3)); g.setIndex(idx);
+    g = g.toNonIndexed(); g.computeVertexNormals();
+  }
+  else if (!m && def.shape === 'Ball') g = new THREE.SphereGeometry(0.5, 40, 28);
+  else if (!m && def.shape === 'Cylinder') { g = new THREE.CylinderGeometry(0.5, 0.5, 1, 40); g.rotateZ(Math.PI / 2); }
+  else g = new THREE.BoxGeometry(1, 1, 1);
+  geoCache.set(key, g);
+  return g;
+}
+
+function material(def, envIntensity) {
+  const [rough, metal] = MAT[def.mat] || [0.6, 0];
+  const color = new THREE.Color().setRGB(def.color[0], def.color[1], def.color[2], THREE.SRGBColorSpace);
+  if (def.mat === 'Neon') {
+    return new THREE.MeshBasicMaterial({ color: color.clone().multiplyScalar(2.2), transparent: def.tr > 0, opacity: 1 - def.tr, toneMapped: false });
+  }
+  const p = { color, roughness: Math.max(0.03, rough - def.rf * 0.6), metalness: Math.min(1, metal + def.rf * 0.5), envMapIntensity: envIntensity };
+  if (def.tr > 0 || def.mat === 'Glass' || def.mat === 'ForceField') {
+    p.transparent = true;
+    p.opacity = def.mat === 'Glass' ? Math.min(1, (1 - def.tr) * 0.85 + 0.1) : 1 - def.tr;
+    p.depthWrite = def.tr < 0.5;
+  }
+  return new THREE.MeshStandardMaterial(p);
+}
+
+function textPlane(def, t) {
+  const c = document.createElement('canvas'); c.width = 512; c.height = 256;
+  const ctx = c.getContext('2d'); ctx.clearRect(0, 0, 512, 256);
+  ctx.fillStyle = `rgb(${t.color.map(x => Math.round(x * 255)).join(',')})`;
+  ctx.font = 'bold 150px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillText(t.text, 256, 128, 500);
+  const tex = new THREE.CanvasTexture(c); tex.colorSpace = THREE.SRGBColorSpace;
+  const s = def.size;
+  const faces = { Front: [[s[0], s[1]], [0, 0, -s[2] / 2 - 0.01], [0, Math.PI, 0]], Back: [[s[0], s[1]], [0, 0, s[2] / 2 + 0.01], [0, 0, 0]],
+    Right: [[s[2], s[1]], [s[0] / 2 + 0.01, 0, 0], [0, Math.PI / 2, 0]], Left: [[s[2], s[1]], [-s[0] / 2 - 0.01, 0, 0], [0, -Math.PI / 2, 0]],
+    Top: [[s[0], s[2]], [0, s[1] / 2 + 0.01, 0], [-Math.PI / 2, 0, 0]], Bottom: [[s[0], s[2]], [0, -s[1] / 2 - 0.01, 0], [Math.PI / 2, 0, 0]] };
+  const f = faces[t.face] || faces.Front;
+  const mesh = new THREE.Mesh(new THREE.PlaneGeometry(f[0][0], f[0][1]), new THREE.MeshBasicMaterial({ map: tex, transparent: true }));
+  mesh.position.set(...f[1]); mesh.rotation.set(...f[2]);
+  return mesh;
+}
+
+function makeObject(def, env) {
+  const mesh = new THREE.Mesh(geometry(def), material(def, env));
+  const s = def.size;
+  let sx = s[0], sy = s[1], sz = s[2];
+  if (!def.mesh && def.shape === 'Ball') { const d = Math.min(sx, sy, sz); sx = sy = sz = d; }
+  if (!def.mesh && def.shape === 'Cylinder') { const d = Math.min(sy, sz); sy = sz = d; }
+  if (def.mesh && def.meshScale) { sx *= def.meshScale[0]; sy *= def.meshScale[1]; sz *= def.meshScale[2]; }
+  if (def.mesh === 'Cylinder') { const d = Math.min(sx, sz); sx = sz = d; }
+  mesh.scale.set(sx, sy, sz);
+  mesh.castShadow = def.shadow !== false && def.tr < 0.5 && def.mat !== 'Neon';
+  mesh.receiveShadow = def.mat !== 'Neon';
+  const group = new THREE.Group();
+  group.add(mesh);
+  if (def.meshOffset) mesh.position.set(def.meshOffset[0], def.meshOffset[1], def.meshOffset[2]);
+  if (def.texts) for (const t of arr(def.texts)) group.add(textPlane(def, t));
+  group.matrixAutoUpdate = false;
+  return group;
+}
+
+function setXform(obj, p, r) {
+  obj.matrix.set(r[0], r[1], r[2], p[0], r[3], r[4], r[5], p[1], r[6], r[7], r[8], p[2], 0, 0, 0, 1);
+  obj.matrixWorldNeedsUpdate = true;
+}
+
+const CC = {
+  uniforms: { tDiffuse: { value: null }, brightness: { value: 0 }, contrast: { value: 0 }, saturation: { value: 0 }, tint: { value: new THREE.Color(1, 1, 1) } },
+  vertexShader: `varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }`,
+  fragmentShader: `uniform sampler2D tDiffuse; uniform float brightness, contrast, saturation; uniform vec3 tint; varying vec2 vUv;
+    void main(){ vec4 c = texture2D(tDiffuse, vUv); vec3 col = c.rgb + brightness; col = (col - 0.5) * (1.0 + contrast) + 0.5;
+      float l = dot(col, vec3(0.299, 0.587, 0.114)); col = mix(vec3(l), col, 1.0 + saturation); col *= tint; gl_FragColor = vec4(col, c.a); }`,
+};
+
+let data = null;
+const arr = (x) => Array.isArray(x) ? x : [];
+const scenes = {};
+
+function buildScene(setName, preset) {
+  const scene = new THREE.Scene();
+  const day = preset.day;
+  // небо / окружение
+  let sky = null;
+  if (day) {
+    sky = new Sky(); sky.scale.setScalar(20000);
+    const u = sky.material.uniforms;
+    u.turbidity.value = 2.2; u.rayleigh.value = 1.1; u.mieCoefficient.value = 0.004; u.mieDirectionalG.value = 0.86;
+    u.sunPosition.value.set(...preset.sunDir);
+    scene.add(sky);
+    const envScene = new THREE.Scene(); const sky2 = new Sky(); sky2.scale.setScalar(1000);
+    Object.assign(sky2.material.uniforms.sunPosition.value, new THREE.Vector3(...preset.sunDir));
+    sky2.material.uniforms.turbidity.value = 2.2; sky2.material.uniforms.rayleigh.value = 1.1;
+    envScene.add(sky2);
+    scene.environment = pmrem.fromScene(envScene).texture;
+  } else {
+    scene.background = new THREE.Color(0x000000);
+    const envScene = new THREE.Scene(); envScene.background = new THREE.Color(0x202024);
+    scene.environment = pmrem.fromScene(envScene).texture;
+  }
+  const env = (preset.envSpecular ?? 1) * (day ? 0.45 : 0.6);
+  // солнце
+  const sun = new THREE.DirectionalLight(0xffffff, 0);
+  if (day) {
+    const tint = new THREE.Color(1, 0.97, 0.92);
+    sun.color = tint; sun.intensity = preset.brightness * 1.0;
+    sun.castShadow = true; sun.shadow.mapSize.set(4096, 4096); sun.shadow.bias = -0.0004; sun.shadow.normalBias = 0.02;
+    const sc = sun.shadow.camera; sc.left = -30; sc.right = 30; sc.top = 30; sc.bottom = -30; sc.near = 1; sc.far = 400;
+  }
+  scene.add(sun); scene.add(sun.target);
+  const amb = new THREE.HemisphereLight(new THREE.Color(...preset.outdoorAmbient), new THREE.Color(...preset.ambient), day ? 0.55 : 0.6);
+  scene.add(amb);
+  // туман (Atmosphere)
+  if (preset.atmosphere && preset.atmosphere.density > 0) {
+    scene.fog = new THREE.FogExp2(new THREE.Color(...preset.atmosphere.color), preset.atmosphere.density * 0.0022);
+  }
+  // статичные детали
+  for (const it of arr(data.statics[setName])) {
+    const def = data.defs[it.d];
+    const o = makeObject(def, env);
+    setXform(o, it.p, it.r);
+    scene.add(o);
+  }
+  // terrain
+  for (const t of arr(data.terrains[setName])) {
+    let g;
+    if (t.shape === 'Ball') g = new THREE.SphereGeometry(0.5, 32, 20);
+    else if (t.shape === 'Cylinder') g = new THREE.CylinderGeometry(0.5, 0.5, 1, 40);
+    else if (t.shape === 'Wedge') g = geometry({ shape: 'Wedge' });
+    else g = new THREE.BoxGeometry(1, 1, 1);
+    const water = t.material === 'Water';
+    const col = new THREE.Color(TERRAIN_COLOR[t.material] ?? 0x888888);
+    const m = water ? new THREE.MeshStandardMaterial({ color: col, roughness: 0.08, metalness: 0.3, transparent: true, opacity: 0.88, envMapIntensity: 1.2 })
+                    : new THREE.MeshStandardMaterial({ color: col, roughness: 1 });
+    const mesh = new THREE.Mesh(g, m);
+    mesh.scale.set(t.size[0], t.size[1], t.size[2]);
+    mesh.receiveShadow = true;
+    const grp = new THREE.Group(); grp.add(mesh); grp.matrixAutoUpdate = false; setXform(grp, t.p, t.r);
+    scene.add(grp);
+  }
+  // локальные источники
+  for (const l of arr(data.lights[setName])) addLight(scene, l);
+  // лучи (Beam)
+  for (const b of arr(data.beams[setName])) addBeam(scene, b);
+  return { scene, sun, sky };
+}
+
+function addLight(scene, l) {
+  const col = new THREE.Color(...l.color);
+  let light;
+  const I = l.brightness * 6;
+  if (l.kind === 'SpotLight') {
+    light = new THREE.SpotLight(col, I * 4, l.range * 1.4, THREE.MathUtils.degToRad(Math.min(l.angle, 170) / 2), 0.6, 1.2);
+    light.position.set(...l.p);
+    light.target.position.set(l.p[0] + l.dir[0] * 10, l.p[1] + l.dir[1] * 10, l.p[2] + l.dir[2] * 10);
+    scene.add(light.target);
+    if (l.shadows) { light.castShadow = true; light.shadow.mapSize.set(2048, 2048); light.shadow.bias = -0.0005; }
+  } else if (l.kind === 'SurfaceLight') {
+    light = new THREE.SpotLight(col, I * 3, l.range * 1.4, THREE.MathUtils.degToRad(Math.min(l.angle, 170) / 2), 0.8, 1.2);
+    light.position.set(l.p[0] + l.dir[0] * 0.2, l.p[1] + l.dir[1] * 0.2, l.p[2] + l.dir[2] * 0.2);
+    light.target.position.set(l.p[0] + l.dir[0] * 10, l.p[1] + l.dir[1] * 10, l.p[2] + l.dir[2] * 10);
+    scene.add(light.target);
+  } else {
+    light = new THREE.PointLight(col, I * 3, l.range * 1.4, 1.2);
+    light.position.set(...l.p);
+    if (l.shadows) light.castShadow = true;
+  }
+  scene.add(light);
+}
+
+function addBeam(scene, b) {
+  const a = new THREE.Vector3(...b.a), c = new THREE.Vector3(...b.b);
+  const geo = new THREE.BufferGeometry();
+  const mid = a.clone().add(c).multiplyScalar(0.5);
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(new Array(12).fill(0), 3));
+  geo.setAttribute('alpha', new THREE.Float32BufferAttribute([1 - b.t0, 1 - b.t0, 1 - b.t1, 1 - b.t1], 1));
+  geo.setIndex([0, 1, 2, 1, 3, 2]);
+  const mat = new THREE.ShaderMaterial({
+    transparent: true, depthWrite: false, side: THREE.DoubleSide, blending: b.emission > 0.5 ? THREE.AdditiveBlending : THREE.NormalBlending,
+    uniforms: { color: { value: new THREE.Color(...b.color) } },
+    vertexShader: `attribute float alpha; varying float vA; void main(){ vA = alpha; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }`,
+    fragmentShader: `uniform vec3 color; varying float vA; void main(){ gl_FragColor = vec4(color, vA); }`,
+  });
+  const mesh = new THREE.Mesh(geo, mat);
+  mesh.frustumCulled = false;
+  mesh.userData.beam = { a, c, w0: b.w0, w1: b.w1 };
+  scene.add(mesh);
+}
+
+function updateBeams(scene, camPos) {
+  scene.traverse(o => {
+    const bd = o.userData.beam; if (!bd) return;
+    const dir = bd.c.clone().sub(bd.a).normalize();
+    const toCam = camPos.clone().sub(bd.a.clone().add(bd.c).multiplyScalar(0.5)).normalize();
+    const side = dir.clone().cross(toCam).normalize();
+    const p = o.geometry.attributes.position;
+    const s0 = side.clone().multiplyScalar(bd.w0 / 2), s1 = side.clone().multiplyScalar(bd.w1 / 2);
+    p.setXYZ(0, ...bd.a.clone().sub(s0).toArray()); p.setXYZ(1, ...bd.a.clone().add(s0).toArray());
+    p.setXYZ(2, ...bd.c.clone().sub(s1).toArray()); p.setXYZ(3, ...bd.c.clone().add(s1).toArray());
+    p.needsUpdate = true;
+  });
+}
+
+let actorGroup = null;
+const camera = new THREE.PerspectiveCamera(50, W / H, 0.05, 30000);
+camera.matrixAutoUpdate = false;
+
+window.loadData = (d) => { data = d; return data.frames.length; };
+
+window.renderFrame = (i) => {
+  const fr = data.frames[i];
+  const key = fr.set + '|' + fr.preset.name;
+  if (!scenes[key]) scenes[key] = buildScene(fr.set, fr.preset);
+  const S = scenes[key];
+  const scene = S.scene;
+  if (actorGroup) { scene.remove(actorGroup); }
+  actorGroup = new THREE.Group();
+  const env = (fr.preset.envSpecular ?? 1) * (fr.preset.day ? 0.45 : 0.6);
+  for (const pr of arr(fr.parts)) {
+    const def = data.defs[pr[0]];
+    const o = makeObject(def, env);
+    setXform(o, [pr[1], pr[2], pr[3]], pr.slice(4, 13));
+    actorGroup.add(o);
+  }
+  scene.add(actorGroup);
+  const r = fr.camera.r, p = fr.camera.p;
+  camera.matrix.set(r[0], r[1], r[2], p[0], r[3], r[4], r[5], p[1], r[6], r[7], r[8], p[2], 0, 0, 0, 1);
+  camera.matrixWorldNeedsUpdate = true;
+  camera.updateMatrixWorld(true);
+  camera.fov = fr.camera.fov; camera.updateProjectionMatrix();
+  // тень солнца следует за точкой взгляда
+  const look = new THREE.Vector3(0, 0, -12).applyMatrix4(camera.matrixWorld);
+  const focus = fr.camera.focus ? new THREE.Vector3(...fr.camera.focus) : look;
+  const sd = new THREE.Vector3(...fr.preset.sunDir);
+  S.sun.position.copy(focus).add(sd.multiplyScalar(150));
+  S.sun.target.position.copy(focus);
+  S.sun.target.updateMatrixWorld();
+  updateBeams(scene, new THREE.Vector3(p[0], p[1], p[2]));
+  renderer.toneMappingExposure = Math.pow(2, fr.preset.exposure || 0) * (fr.preset.day ? 0.62 : 0.95);
+  const composer = new EffectComposer(renderer);
+  composer.addPass(new RenderPass(scene, camera));
+  const b = fr.preset.bloom || { Intensity: 0.5, Size: 24, Threshold: 1.2 };
+  composer.addPass(new UnrealBloomPass(new THREE.Vector2(W, H), b.Intensity * 0.35, Math.min(1, b.Size / 56), fr.preset.day ? 6.0 : Math.max(0.7, b.Threshold * 0.85)));
+  const cc = new ShaderPass(CC);
+  if (fr.preset.cc) { cc.uniforms.brightness.value = fr.preset.cc.brightness; cc.uniforms.contrast.value = fr.preset.cc.contrast; cc.uniforms.saturation.value = fr.preset.cc.saturation; cc.uniforms.tint.value = new THREE.Color(...fr.preset.cc.tint); }
+  composer.addPass(new OutputPass());
+  composer.addPass(cc);
+  composer.render();
+  // субтитры поверх (как в клипе: жирный узкий курсив, градиент, тёмно-малиновая выдавленная тень)
+  const c2 = document.createElement('canvas'); c2.width = W; c2.height = H;
+  const g = c2.getContext('2d');
+  g.drawImage(renderer.domElement, 0, 0);
+  if (fr.lyric && window.__subs !== false) {
+    const size = Math.round(H * 0.064);
+    g.font = `italic 700 ${size}px "Roboto Condensed", "Arial Narrow", sans-serif`;
+    g.textAlign = 'center'; g.textBaseline = 'middle';
+    const x = W / 2, y = H * 0.923;
+    for (let i = 6; i >= 1; i--) { g.fillStyle = '#7a0012'; g.fillText(fr.lyric, x + H * 0.0083 * i / 6, y + H * 0.0073 * i / 6); }
+    const grad = g.createLinearGradient(0, y - size * 0.36, 0, y + size * 0.36);
+    grad.addColorStop(0, '#ffd83a'); grad.addColorStop(0.45, '#ffae2c'); grad.addColorStop(0.7, '#ff7a2e'); grad.addColorStop(1, '#f0443c');
+    g.fillStyle = grad; g.fillText(fr.lyric, x, y);
+  }
+  return c2.toDataURL('image/png');
+};
+window.__ready = true;
+</script>
+</body>
+</html>

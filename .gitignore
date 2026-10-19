@@ -3,3 +3,6 @@ sourcemap.json
 *.rbxl.lock
 *.rbxlx.lock
 /build/
+aura-farmer/build/
+aura-farmer/tools/preview/node_modules/
+aura-farmer/tools/preview/package-lock.json
