@@ -51,10 +51,12 @@ type State = {
 }
 
 type Pad = { Pos: Vector3, Reach: number }
+-- груз дрона: заряд и вместимость банки в момент вылета
+type Cargo = { Charge: number, Cap: number }
 
 local states: { [Player]: State } = {}
--- груз дрона игрока, который вышел, пока дрон летел: вернётся в банку при последнем сохранении
-local orphanCargo: { [Player]: number } = {}
+-- груз дрона игрока, который вышел, пока дрон летел: дрон сдаст его при последнем сохранении
+local orphanCargo: { [Player]: { Cargo } } = {}
 local pads: { Pad } = {}
 local cityBoostProvider: (() -> boolean)? = nil
 local notifyRemote: RemoteEvent? = nil
@@ -158,6 +160,16 @@ local function ensureState(player: Player): State?
 		LastTeleport = -math.huge,
 	}
 	states[player] = st
+	-- заряд из старых сохранений не больше полной перегрузки (иначе банка «на 200%» и лишние Вольты)
+	local d = DataService.get(player)
+	if d then
+		local maxCharge = Economy.maxCharge(capacityOf(d), true)
+		if d.Charge > maxCharge then
+			DataService.update(player, function(data)
+				data.Charge = maxCharge
+			end)
+		end
+	end
 	refreshJarFill(player)
 	return st
 end
@@ -226,11 +238,7 @@ function EconomyService.addCharge(player: Player, amount: number, zone: number, 
 end
 
 -- Множитель Вольт при сдаче (перезапуски, питомцы, фульгуриты, Молниедекс, друзья, город, бусты)
-function EconomyService.multiplierFor(player: Player): number
-	local d = DataService.get(player)
-	if not d then
-		return 1
-	end
+local function multiplierOf(player: Player, d: Data): number
 	local friendsAttr = player:GetAttribute(Net.PlayerAttrs.FriendCount)
 	local friends = if typeof(friendsAttr) == "number" then friendsAttr else 0
 	local city = false
@@ -240,6 +248,14 @@ function EconomyService.multiplierFor(player: Player): number
 		city = ok and result == true
 	end
 	return Economy.multiplier(d, { friends = friends, cityBoost = city, now = os.time() })
+end
+
+function EconomyService.multiplierFor(player: Player): number
+	local d = DataService.get(player)
+	if not d then
+		return 1
+	end
+	return multiplierOf(player, d)
 end
 
 -- CityService сообщает, сияет ли город (×2 Вольт всем)
@@ -396,22 +412,30 @@ local function droneCheck(player: Player, st: State, d: Data)
 	end)
 end
 
--- Последнее сохранение игрока, который вышел, пока дрон летел: груз возвращается в банку
+-- Последнее сохранение игрока, который вышел, пока дрон летел: дрон сдаёт груз сразу, по тем же правилам,
+-- что и при прилёте (Вольты, а не обратно в банку — иначе банка переполнится сверх перегрузки)
 local function returnCargo(player: Player, d: Data, final: boolean)
 	if not final then
 		return
 	end
 	local st = states[player]
-	local cargo = orphanCargo[player] or 0
+	local list = orphanCargo[player] or {}
 	orphanCargo[player] = nil
 	if st and st.Cargo > 0 then
-		cargo += st.Cargo
+		table.insert(list, { Charge = st.Cargo, Cap = st.CargoCap })
 		st.Cargo = 0
 		st.DroneBusy = false
 		st.DroneToken += 1
 	end
-	if cargo > 0 then
-		d.Charge += cargo
+	if #list == 0 then
+		return
+	end
+	local mult = multiplierOf(player, d)
+	for _, cargo in list do
+		local cap = if cargo.Cap > 0 then cargo.Cap else capacityOf(d)
+		local volts = Economy.sellValue(cargo.Charge, cap, mult)
+		d.Volts += volts
+		d.TotalVolts += volts
 	end
 end
 
@@ -651,8 +675,10 @@ function EconomyService.start()
 		if st then
 			st.DroneToken += 1
 			if st.Cargo > 0 then
-				-- последнее сохранение могло ещё не начаться: груз вернёт returnCargo
-				orphanCargo[player] = (orphanCargo[player] or 0) + st.Cargo
+				-- последнее сохранение могло ещё не начаться: груз сдаст returnCargo
+				local list = orphanCargo[player] or {}
+				table.insert(list, { Charge = st.Cargo, Cap = st.CargoCap })
+				orphanCargo[player] = list
 				st.Cargo = 0
 				task.delay(60, function()
 					orphanCargo[player] = nil

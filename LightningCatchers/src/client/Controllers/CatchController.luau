@@ -274,7 +274,8 @@ local function onResolved(msg: Net.StrikeResultMsg)
 	end
 	local k = key(msg.Id, msg.Hit)
 	handled[k] = os.clock()
-	if msg.Grade == "zap" then
+	-- кольцо уже ударило током: «ШАРАХНУЛО» или нажатие мимо окна, стоя в кольце (МИМО + удар током)
+	if msg.Grade == "zap" or m.Zapped == true then
 		zappedRings[msg.Id] = os.clock()
 	end
 	local p = pending[k]

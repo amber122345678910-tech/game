@@ -47,6 +47,7 @@ export type StrikeResultMsg = {
 	NewIndex: string?, -- "зона:цвет", если впервые
 	Lost: number?, -- сколько заряда потеряно (банка лопнула)
 	Final: boolean?, -- последний удар кольца (кольцо можно убрать)
+	Zapped: boolean?, -- нажал мимо окна, стоя в кольце: током ударило (Grade = "miss"), это кольцо больше не бьёт
 }
 
 -- Сервер → клиенты (ненадёжно): чужая молния для красоты
@@ -69,6 +70,10 @@ export type ShardMsg = {
 
 -- Сервер → клиенты: разовые эффекты
 -- Kind: "rainbowWarn" | "perun" | "witness" | "ballBurst" | "zoneUnlocked" | "levelUp" | "hatch" | "cityLit" | "chain" | "sell" | "drone"
+--  | "shard" (Value = Id осколка: сервер засчитал его подбор)
+--  | "openWindow" (Text = имя окна) | "face" (Pos — куда сервер поставил персонажа лицом к центру острова:
+--    клиент ставит камеру за спину, если игрок ещё рядом)
+-- "levelUp" и "rebirth" — для справки: празднует окно, которое сделало запрос (по ответу Request)
 export type EffectMsg = {
 	Kind: string,
 	Pos: Vector3?,

@@ -69,7 +69,8 @@ export type Modifiers = {
 	extraRings: (() -> number)?, -- + колец одновременно
 }
 
--- Фульгурит при ИДЕАЛЬНО: (игрок, цвет, остров, тег) -> Id нового фульгурита (или его запись), nil — не выпал
+-- Фульгурит при ИДЕАЛЬНО (радужная и чёрная — при любой поимке): (игрок, цвет, остров, тег) ->
+-- Id нового фульгурита (или его запись), nil — не выпал
 export type DropHook = (Player, ColorId, number, string?) -> (number | PlayerData.FulgRecord)?
 
 type Ring = {
@@ -106,7 +107,7 @@ type PState = {
 	NextSpawn: number, -- серверное время следующего кольца
 	Combo: number,
 	LastCatch: number, -- серверное время последней удачной поимки (таймаут комбо)
-	FirstDone: boolean, -- первое кольцо новичка уже было в этой сессии
+	Gentle: Ring?, -- мягкое кольцо новичка (у ног, долгое предупреждение), пока оно на земле
 	CatchBucket: ServerLogic.Bucket,
 	ShardBucket: ServerLogic.Bucket,
 	Shards: { [number]: Shard },
@@ -177,8 +178,9 @@ local function tapLimits(player: Player, d: Data): (number, number)
 	return age + math.max(0, -offset), c.TapAheadSlack + math.max(0, offset)
 end
 
--- Сколько ждать нажатие после удара личного кольца: окно ХОРОШО + пинг + запас
--- (не дольше LatencyGrace) — чтобы «Шарахнуло» приходило сразу, а не через 0.6 с
+-- Сколько ждать нажатие после удара личного кольца: окно ХОРОШО + пинг с запасом на скачки + запас,
+-- но не меньше LatencyGrace (мгновенное «Шарахнуло» показывает прогноз клиента, а позднее, но честное
+-- нажатие с телефона не должно превращаться в удар током) и не дольше MaxTapAge (столько ждёт клиент)
 local function resolveGrace(player: Player, d: Data): number
 	local c = Config.Catch
 	local ping = pingOf(player)
@@ -186,7 +188,8 @@ local function resolveGrace(player: Player, d: Data): number
 		return c.LatencyGrace
 	end
 	local _, good = Strikes.windows(d.Upgrades.Rod, Economy.petBonuses(d).window)
-	return math.min(c.LatencyGrace, good + ping + math.max(0, -calibrationOf(d)) + c.ResolveSlack)
+	local wait = good + ping * c.ResolvePingMult + math.max(0, -calibrationOf(d)) + c.ResolveSlack
+	return math.clamp(wait, c.LatencyGrace, math.max(c.LatencyGrace, c.MaxTapAge))
 end
 
 ----------------------------------------------------------------------
@@ -636,14 +639,20 @@ local function applyCatch(player: Player, ps: PState, d: Data, ring: Ring, k: nu
 	if combo > bestBefore then
 		player:SetAttribute(Net.PlayerAttrs.BestCombo, combo)
 	end
+	if color == "gold" or color == "rainbow" or color == "black" then
+		-- титул на табличке, дуги Перуна на громоотводе (отдельно: смена модели не задерживает результат удара)
+		task.spawn(PlayerService.refreshStats, player)
+	end
 	if isNew then
 		msg.NewIndex = key
 		NotifyRemote:FireClient(player, string.format("Молниедекс: %s — %s!", Config.Colors[color].Name, Config.Zones[zone].Name), "rare")
 	end
 
-	-- фульгурит
+	-- фульгурит: шанс при ИДЕАЛЬНО; гарантированный (радужная, чёрная — шанс 100%) — при любой поимке,
+	-- до отправки результата, чтобы клиент показал его так же, как обычный
 	local hook = StrikeService.dropHook
-	if grade == "perfect" and hook then
+	local guaranteed = Config.Colors[color].FulgChance >= 1
+	if (grade == "perfect" or guaranteed) and hook then
 		local ok, result = pcall(hook, player, color, zone, ring.Tag)
 		if not ok then
 			warn("[StrikeService] dropHook: " .. tostring(result))
@@ -682,6 +691,7 @@ local function judgeTap(player: Player, ps: PState, d: Data, ring: Ring, k: numb
 		-- одно кольцо (двойное, вилка) оглушает не больше одного раза
 		if not outside and Config.Zones[ring.Zone].Penalties and not ring.Zapped[player] then
 			ring.Zapped[player] = true
+			msg.Zapped = true -- клиент: следующий удар этого кольца уже не «шарахнет»
 			PlayerService.zap(player, Economy.zapStun(d.Upgrades.Insulation))
 		end
 		result = info(ring, k, ps, grade, 0, false)
@@ -807,14 +817,15 @@ end
 -- Личный поток
 ----------------------------------------------------------------------
 
+-- Новичок — ещё ни разу не поймал молнию (флаг обучения или статистика старых сохранений)
 local function isNewbie(d: Data): boolean
-	return d.Tutorial.catch ~= true
+	return d.Tutorial.catch ~= true and d.Stats.Catches == 0
 end
 
 -- Пауза перед первым кольцом (появление, вход на остров)
 local function entryDelay(ps: PState): number
 	local d = DataService.get(ps.Player)
-	if d and not ps.FirstDone and isNewbie(d) then
+	if d and isNewbie(d) then
 		return Config.Catch.FirstStrikeDelay
 	end
 	return Config.Server.ZoneEnterDelay
@@ -831,7 +842,10 @@ local function spawnPersonal(ps: PState, d: Data, zone: number, root: BasePart, 
 	local bonuses = Economy.petBonuses(d)
 	local speed = Economy.walkSpeed(d.Upgrades.Boots)
 	local radius = Config.Catch.RingRadius
-	local first = not ps.FirstDone and isNewbie(d)
+	-- мягкое кольцо у ног — пока новичок не поймал первую молнию: если первое пропало без нажатия
+	-- (клиент ещё грузился, ребёнок не понял), следующее снова мягкое; одно такое кольцо за раз
+	local gentle = ps.Gentle
+	local first = isNewbie(d) and (gentle == nil or gentle.Done)
 	local warning = if first then Config.Catch.FirstStrikeWarning else zdef.Warning
 
 	-- цвет и тип
@@ -885,7 +899,7 @@ local function spawnPersonal(ps: PState, d: Data, zone: number, root: BasePart, 
 	ps.Rings[ring.Id] = ring
 	ps.Count += 1
 	if first then
-		ps.FirstDone = true
+		ps.Gentle = ring
 	end
 	local msg = toMsg(ring, shown, upgradeAt)
 	StrikeSpawn:FireClient(player, msg)
@@ -1032,6 +1046,8 @@ local function onShardCollect(player: Player, shardId: any)
 	ps.ShardCount -= 1
 	local granted = EconomyService.grantShards(player, shard.Amount)
 	if granted > 0 then
+		-- подтверждение по Id: клиент перестаёт повторять ShardCollect и показывает «+N 💎» именно этому осколку
+		EffectRemote:FireClient(player, { Kind = "shard", Value = shardId } :: Net.EffectMsg)
 		StrikeService.ShardCollected:Fire(player, granted)
 	end
 end
@@ -1084,7 +1100,7 @@ local function ensureState(player: Player): PState?
 		NextSpawn = math.huge, -- поток начнётся, когда персонаж появится
 		Combo = 0,
 		LastCatch = 0,
-		FirstDone = false,
+		Gentle = nil,
 		CatchBucket = ServerLogic.newBucket(rate, clock),
 		ShardBucket = ServerLogic.newBucket(Config.Server.ShardCollectRate, clock),
 		Shards = {},

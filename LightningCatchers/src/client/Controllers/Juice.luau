@@ -161,6 +161,43 @@ RunService:BindToRenderStep("JuiceCamera", Enum.RenderPriority.Camera.Value + 1,
 end)
 
 ----------------------------------------------------------------------
+-- Камера за спину, когда сервер переставил персонажа лицом к центру острова (Effect "face":
+-- появление, телепорт, возврат с обрыва). Стандартная камера берёт направление из текущего
+-- camera.CFrame — достаточно один раз повернуть его по взгляду персонажа (наклон и приближение прежние).
+----------------------------------------------------------------------
+local FACE_RADIUS = 12 -- игрок уже ушёл дальше от точки (сообщение запоздало) — камеру не трогаем
+
+ClientState.Effect:Connect(function(msg)
+	if msg.Kind ~= "face" or (msg.UserId ~= nil and msg.UserId ~= player.UserId) then
+		return
+	end
+	local at = msg.Pos
+	task.defer(function()
+		local camera = Workspace.CurrentCamera
+		local char = player.Character
+		local root = if char then char:FindFirstChild("HumanoidRootPart") else nil
+		if not camera or camera.CameraType ~= Enum.CameraType.Custom or not root or not root:IsA("BasePart") then
+			return
+		end
+		if typeof(at) == "Vector3" and (root.Position - at).Magnitude > FACE_RADIUS then
+			return
+		end
+		local look = root.CFrame.LookVector
+		local flat = Vector3.new(look.X, 0, look.Z)
+		if flat.Magnitude < 1e-3 then
+			return
+		end
+		local pitch = math.asin(math.clamp(camera.CFrame.LookVector.Y, -0.99, 0.99))
+		local dir = flat.Unit * math.cos(pitch) + Vector3.new(0, math.sin(pitch), 0)
+		local pos = camera.CFrame.Position
+		-- поворот тряски прошлого кадра уже не снимать: кадр камеры строится заново
+		lastOffset = CFrame.identity
+		offsetCamera = nil
+		camera.CFrame = CFrame.lookAt(pos, pos + dir)
+	end)
+end)
+
+----------------------------------------------------------------------
 -- Вспышка экрана цветом (редкая находка, покупка)
 ----------------------------------------------------------------------
 local flashGui: ScreenGui? = nil

@@ -847,7 +847,8 @@ check(waitUntil(function()
 	return along < gateAlong - 4
 end, 1), "отброшен назад от барьера")
 check(lastMsg("Notify", A, function(a)
-	return a[1] == "Остров закрыт — открой его в магазине"
+	-- у барьера следующего острова — цена (или «Хватает ⚡!» и магазин), у дальнего — «сначала открой …»
+	return string.find(a[1], "Остров закрыт", 1, true) == 1 or string.find(a[1], "Хватает", 1, true) == 1
 end) ~= nil, "Notify «Остров закрыт»")
 moveTo(A, g3.Center)
 check(waitUntil(function()
@@ -1294,6 +1295,14 @@ if black then
 	local r = catchRing(A, black, 1, 0)
 	check(r and r.Fulg == 42, "фульгурит из dropHook: " .. tostring(r and r.Fulg))
 	check(DataService.get(A).Stats.Blacks >= 1 and DataService.get(A).Index["5:black"], "Blacks и Молниедекс")
+	check(waitUntil(function()
+		local title = A:GetAttribute("Title")
+		return typeof(title) == "string" and string.find(title, "Ловец Перуна", 1, true) ~= nil
+	end, 1), "титул «Ловец Перуна» на табличке")
+	check(waitUntil(function()
+		local rod = A.Character and A.Character:FindFirstChild(PlayerService.RodName)
+		return rod ~= nil and rod:FindFirstChild("PerunArc") ~= nil
+	end, 1), "дуги Перуна на громоотводе")
 end
 StrikeService.dropHook = function()
 	return { Id = 43 }
@@ -1320,6 +1329,28 @@ if fr2 then
 	local r = catchRing(A, fr2, 1, -0.2)
 	check(r and r.Grade == "good" and r.Fulg == nil, "фульгурит только при ИДЕАЛЬНО")
 end
+-- радужная (фульгурит гарантирован) на ХОРОШО: фульгурит приходит в том же результате удара
+StrikeService.dropHook = function(_, color, _zone, tagArg)
+	return if color == "rainbow" and tagArg == "rainbow" then 44 else nil
+end
+do
+	local rid = StrikeService.spawnShared(5, root(A).Position, "rainbow", { radius = 8, warning = 0.8, tag = "rainbow" })
+	local rm = waitUntil(function()
+		for _, m in strikeMsgs(A) do
+			if m.Id == rid then
+				return m
+			end
+		end
+		return nil
+	end, 1)
+	check(rm ~= nil, "общее радужное кольцо на острове 5")
+	if rm then
+		emptyJar(A)
+		local r = catchRing(A, rm, 1, -0.2)
+		check(r and (r.Grade == "good" or r.Grade == "burst") and r.Fulg == 44, "радужная на ХОРОШО — фульгурит в результате: " .. tostring(r and r.Fulg))
+	end
+end
+StrikeService.dropHook = nil
 
 -- переливающееся кольцо
 Config.Catch.ShimmerChance = 1

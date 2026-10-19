@@ -1,6 +1,7 @@
 --!strict
 -- Уведомления: короткие тосты под банкой (до 3 сразу, исчезают сами) и большие баннеры
 -- на весь сервер (редкая поимка, событие) — лента через верхнюю треть экрана.
+-- Свои праздники: открыт новый остров (баннер, фанфары, вспышка); при входе на остров — его название.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -8,9 +9,11 @@ local TweenService = game:GetService("TweenService")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Net = require(Shared:WaitForChild("Net"))
+local Config = require(Shared:WaitForChild("Config"))
 
 local ClientState = require(script.Parent.Parent.ClientState)
 local Sounds = require(script.Parent.Parent.Controllers.Sounds)
+local Juice = require(script.Parent.Parent.Controllers.Juice)
 local Theme = require(script.Parent.Theme)
 local UIKit = require(script.Parent.UIKit)
 local HUD = require(script.Parent.HUD)
@@ -30,6 +33,8 @@ local TOAST_PHONE_SCALE = 1.3 -- на телефоне HUD мельче (до ×
 local BANNER_TIME = 4
 local BANNER_H = 112
 local MAX_BANNER_QUEUE = 3
+local TITLE_TIME = 2.2 -- название острова при входе
+local TITLE_FADE = 0.4
 
 local KINDS = {
 	info = { Color = Theme.ElectricDark, Icon = "💬" },
@@ -210,7 +215,7 @@ local bannerContent: Frame
 local bannerScale: UIScale
 local bannerLabel: TextLabel
 local bannerTextScale: UIScale
-local bannerQueue: { { text: string, kind: string, color: Color3? } } = {}
+local bannerQueue: { { text: string, kind: string, color: Color3?, sound: string? } } = {}
 local bannerBusy = false
 local shimmerTween: Tween? = nil
 
@@ -365,7 +370,7 @@ local function playNextBanner()
 	bannerTextScale.Scale = 0.6
 	UIKit.tween(band, 0.4, { Position = UDim2.fromScale(0, y) }, Enum.EasingStyle.Back)
 	UIKit.tween(bannerTextScale, 0.5, { Scale = 1 }, Enum.EasingStyle.Back)
-	Sounds.play("Notify")
+	Sounds.play(item.sound or "Notify")
 	if shimmer then
 		shine.Visible = true
 		shineGrad.Offset = Vector2.new(-1, 0)
@@ -397,12 +402,109 @@ local function playNextBanner()
 	end)
 end
 
-local function showBanner(text: string, kind: string, color: Color3?)
+local function showBanner(text: string, kind: string, color: Color3?, sound: string?)
 	if #bannerQueue >= MAX_BANNER_QUEUE then
 		table.remove(bannerQueue, 1)
 	end
-	table.insert(bannerQueue, { text = text, kind = kind, color = color })
+	table.insert(bannerQueue, { text = text, kind = kind, color = color, sound = sound })
 	playNextBanner()
+end
+
+----------------------------------------------------------------------
+-- Название острова при входе (короткая надпись под персонажем)
+----------------------------------------------------------------------
+local titleRoot: Frame
+local titleName: TextLabel
+local titleSub: TextLabel
+local titleToken = 0
+
+local function buildTitle()
+	titleRoot = UIKit.new("Frame", {
+		Name = "ZoneTitle",
+		Size = UDim2.fromOffset(760, 116),
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Position = UDim2.fromScale(0.5, 0.64),
+		BackgroundTransparency = 1,
+		Visible = false,
+		Parent = bannerGui,
+	}) :: Frame
+	UIKit.autoScale(titleRoot, "hud", 1280, 720)
+	titleSub = UIKit.label({
+		Name = "Sub",
+		Text = "",
+		Size = UDim2.new(1, 0, 0, 34),
+		TextColor3 = Theme.TextDim,
+		MaxTextSize = 30,
+		Parent = titleRoot,
+	})
+	titleName = UIKit.label({
+		Name = "Name",
+		Text = "",
+		Size = UDim2.new(1, 0, 0, 78),
+		Position = UDim2.fromOffset(0, 36),
+		MaxTextSize = 70,
+		Parent = titleRoot,
+	})
+end
+
+local function fadeTitle(target: number, time: number)
+	for _, l in { titleName, titleSub } do
+		UIKit.tween(l, time, { TextTransparency = target })
+		local stroke = l:FindFirstChildOfClass("UIStroke")
+		if stroke then
+			UIKit.tween(stroke, time, { Transparency = target })
+		end
+	end
+end
+
+local function showTitle(zone: number)
+	local name = "🏙 " .. Config.Hub.Name
+	local sub = "Город"
+	local color = Theme.Volt
+	if zone >= 1 and zone <= #Config.Zones then
+		local def = Config.Zones[zone]
+		name = def.Name
+		sub = "Остров " .. tostring(zone)
+		color = def.Accent:Lerp(WHITE, 0.25)
+	elseif zone ~= 0 then
+		return
+	end
+	titleToken += 1
+	local token = titleToken
+	titleName.Text = name
+	titleName.TextColor3 = color
+	titleSub.Text = sub
+	for _, l in { titleName, titleSub } do
+		l.TextTransparency = 1
+		local stroke = l:FindFirstChildOfClass("UIStroke")
+		if stroke then
+			stroke.Transparency = 1
+		end
+	end
+	titleRoot.Visible = true
+	fadeTitle(0, TITLE_FADE)
+	task.delay(TITLE_TIME, function()
+		if token ~= titleToken then
+			return
+		end
+		fadeTitle(1, TITLE_FADE)
+		task.delay(TITLE_FADE + 0.05, function()
+			if token == titleToken then
+				titleRoot.Visible = false
+			end
+		end)
+	end)
+end
+
+-- Свой новый остров: баннер с фанфарами, вспышка цветом острова и подсказка, как туда попасть
+local function onZoneUnlocked(zone: number)
+	local def = Config.Zones[zone]
+	if not def then
+		return
+	end
+	showBanner(string.format("🏝 Открыт остров %d: %s!", zone, def.Name), "rare", def.Accent, "LevelUp")
+	Juice.flash(def.Accent, 0.3)
+	showToast("Жми «🌀 Лететь» — и ты там!", "good")
 end
 
 ----------------------------------------------------------------------
@@ -465,6 +567,17 @@ function Notifications.start()
 	end)
 
 	buildBanner()
+	buildTitle()
+
+	ClientState.ZoneChanged:Connect(function(zone: number)
+		showTitle(zone)
+	end)
+	ClientState.Effect:Connect(function(msg: Net.EffectMsg)
+		local m = msg :: any
+		if m.Kind == "zoneUnlocked" and typeof(m.Zone) == "number" and (m.UserId == nil or m.UserId == player.UserId) then
+			onZoneUnlocked(m.Zone)
+		end
+	end)
 
 	ClientState.Toast:Connect(function(text: string, kind: string)
 		if typeof(text) == "string" and text ~= "" then
@@ -481,9 +594,9 @@ function Notifications.start()
 	end)
 end
 
--- Показать баннер локально (например, своё событие)
-function Notifications.banner(text: string, kind: string?, color: Color3?)
-	showBanner(text, kind or "info", color)
+-- Показать баннер локально (например, своё событие); sound — вместо обычного звука баннера
+function Notifications.banner(text: string, kind: string?, color: Color3?, sound: string?)
+	showBanner(text, kind or "info", color, sound)
 end
 
 return Notifications

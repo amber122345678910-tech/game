@@ -23,13 +23,13 @@ local TIMES = { "раз", "раза", "раз" }
 
 Quests.Pool = {
 	{ Id = "catch", Event = "catch", Text = "Поймай %d %s", Forms = LIGHTNING, Target = 60, MinZone = 1, Shards = 40, Minutes = 4 },
-	{ Id = "perfect", Event = "perfect", Text = "%d %s ИДЕАЛЬНО", Forms = TIMES, Target = 20, MinZone = 1, Shards = 50, Minutes = 5 },
+	{ Id = "perfect", Event = "perfect", Text = "Поймай %d %s ИДЕАЛЬНО", Forms = LIGHTNING, Target = 20, MinZone = 1, Shards = 50, Minutes = 5 },
 	{ Id = "combo", Event = "combo", Text = "Набери комбо %d", Target = 12, MinZone = 1, Shards = 60, Minutes = 6, Max = true },
 	{
 		Id = "rare",
 		Event = "rare",
 		Text = "Поймай %d %s",
-		Forms = { "фиолетовую или более редкую", "фиолетовые или более редкие", "фиолетовых или более редких" },
+		Forms = { "редкую молнию (◆ и выше)", "редкие молнии (◆ и выше)", "редких молний (◆ и выше)" },
 		Target = 8,
 		MinZone = 1,
 		Shards = 50,

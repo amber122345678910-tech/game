@@ -3,9 +3,12 @@
 --  * появление на последнем острове (новичок — на Грозовом Лугу), лицом к центру острова;
 --    персонаж появляется только после загрузки данных (CharacterAutoLoads = false),
 --    после смерти — через Players.RespawnTime;
---  * скорость от Сапог-скороходов, громоотвод в руке (Tool), банка на спине, табличка над головой;
+--  * скорость от Сапог-скороходов, громоотвод в руке (Tool: вид по уровню, свечение — цвет перезапуска,
+--    чёрно-золотые дуги у поймавших Перуна), банка на спине, табличка над головой (титул, ник, серия);
 --  * слежение за зоной раз в Config.Server.ZoneTick: атрибут Zone, data.LastZone, сигнал ZoneChanged;
---  * барьеры закрытых островов (отбрасываем назад к барьеру), возврат при падении ниже Config.VoidY;
+--  * барьеры закрытых островов (отбрасываем назад к барьеру; у барьера следующего острова — цена,
+--    а если Вольт хватает — сразу магазин островов), возврат при падении ниже Config.VoidY;
+--  * после появления, телепорта и возврата с обрыва — Effect "face": клиент ставит камеру за спину;
 --  * «Шарахнуло» (оглушение) и телепорт.
 
 local Players = game:GetService("Players")
@@ -15,12 +18,17 @@ local Workspace = game:GetService("Workspace")
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Config = require(Shared:WaitForChild("Config"))
 local Economy = require(Shared:WaitForChild("Economy"))
+local Format = require(Shared:WaitForChild("Format"))
+local Geom = require(Shared:WaitForChild("Geom"))
 local Net = require(Shared:WaitForChild("Net"))
+local PlayerData = require(Shared:WaitForChild("PlayerData"))
 local Signal = require(Shared:WaitForChild("Signal"))
 local Zones = require(Shared:WaitForChild("Zones"))
 
 local ServerLogic = require(script.Parent.Parent.Lib.ServerLogic)
 local DataService = require(script.Parent.DataService)
+
+type Data = PlayerData.Data
 
 -- Общие строители моделей (src/shared/Models.luau): громоотвод по уровню и банка.
 -- Если модуля нет или он упал — свои простые модели ниже, чтобы игрок всё равно появился снаряжённым.
@@ -64,12 +72,14 @@ type State = {
 	Stunned: boolean,
 	StunToken: number,
 	LastGateNotify: number,
+	LastGateShop: number, -- os.clock, когда барьер последний раз открыл магазин
 	RespawnFor: Model?, -- для какого персонажа уже запланировано появление
 	Conns: { RBXScriptConnection }, -- подписки текущего персонажа
 }
 
 local states: { [Player]: State } = {}
 local notifyRemote: RemoteEvent? = nil
+local effectRemote: RemoteEvent? = nil
 
 -- Оформление (только вид, на игру не влияет)
 local COPPER = Color3.fromRGB(196, 120, 66)
@@ -81,6 +91,10 @@ local TAG_TITLE = Color3.fromRGB(255, 214, 90)
 local TAG_SERIES = Color3.fromRGB(130, 214, 255)
 local TAG_STROKE = Color3.fromRGB(10, 12, 26)
 local TAG_FONT = Font.fromEnum(Enum.Font.BuilderSansExtraBold) -- с кириллицей
+local PERUN_GOLD = Config.Colors.gold.Color
+local PERUN_BLACK = Config.Colors.black.Color
+local PERUN_ARC_STEPS = 7 -- отрезков в одной дуге Перуна
+local PERUN_ARC_TURNS = 1.25 -- витков вокруг стержня
 
 ----------------------------------------------------------------------
 -- Вспомогательное
@@ -91,6 +105,19 @@ local function notify(player: Player, text: string, kind: string)
 	if r then
 		r:FireClient(player, text, kind)
 	end
+end
+
+local function effect(player: Player, msg: Net.EffectMsg)
+	local r = effectRemote
+	if r then
+		r:FireClient(player, msg)
+	end
+end
+
+-- Сервер поставил персонажа лицом к центру острова — камере встать за спину (клиент сам проверит,
+-- что игрок ещё рядом с этой точкой)
+local function faceCamera(player: Player, cf: CFrame)
+	effect(player, { Kind = "face", Pos = cf.Position, UserId = player.UserId })
 end
 
 local function isValidZone(zone: number): boolean
@@ -202,6 +229,41 @@ local function rodTier(rodLevel: number): number
 	return math.floor(rodLevel / 6)
 end
 
+-- Вид громоотвода: модель по уровню, свечение — цвет перезапуска (1-й — фиолетовый, … 5-й и дальше —
+-- радужный; 0 — свой цвет модели), дуги Перуна — поймал Чёрную молнию. Key — чтобы пересобрать при смене.
+type RodLook = { Tier: number, Glow: Color3?, Perun: boolean, Key: string }
+
+local function rodLook(d: Data?): RodLook
+	local tier = if d then rodTier(d.Upgrades.Rod) else 0
+	local rebirths = if d then d.Rebirths else 0
+	local perun = d ~= nil and d.Stats.Blacks > 0
+	local glowIndex = 0
+	local glow: Color3? = nil
+	if rebirths > 0 then
+		local rainbow: Config.ColorId = "rainbow"
+		local last = table.find(Config.ColorOrder, rainbow) or #Config.ColorOrder
+		glowIndex = math.min(rebirths + 1, last)
+		glow = Config.Colors[Config.ColorOrder[glowIndex]].Color
+	end
+	return { Tier = tier, Glow = glow, Perun = perun, Key = string.format("%d:%d:%d", tier, glowIndex, if perun then 1 else 0) }
+end
+
+-- Титул на табличке: самое редкое достижение и число перезапусков ("" — пока нечем хвастаться)
+local function titleFor(d: Data): string
+	local base = ""
+	if d.Stats.Blacks > 0 then
+		base = "☠ Ловец Перуна"
+	elseif d.Stats.Rainbows > 0 then
+		base = "🌈 Радужный ловец"
+	elseif d.Stats.Golds > 0 then
+		base = "✦ Золотой ловец"
+	end
+	if d.Rebirths > 0 then
+		return if base ~= "" then string.format("%s · ♻%d", base, d.Rebirths) else string.format("♻ Перезапуск ×%d", d.Rebirths)
+	end
+	return base
+end
+
 -- Запасной громоотвод: медный стержень (ось X детали) с неоновым шаром на конце.
 -- Хват держит стержень вертикально: ось X рукояти совпадает с "вверх" хвата.
 local function simpleRod(tier: number): Tool
@@ -278,6 +340,65 @@ local function simpleJar(): (Model, BasePart, CFrame)
 	light.Parent = core
 
 	return model, glass, CFrame.Angles(0, 0, math.pi / 2)
+end
+
+-- Чёрно-золотые дуги Перуна: две неоновые зигзаг-спирали вокруг стержня, от ручки почти до кончика
+local function addPerunArcs(tool: Tool)
+	local handle = tool:FindFirstChild("Handle")
+	local tip = tool:FindFirstChild("Tip", true)
+	if not handle or not handle:IsA("BasePart") or not tip or not tip:IsA("BasePart") then
+		return
+	end
+	-- где кончик в системе ручки: по сварке (запасная модель) или по расстановке деталей (Models)
+	local tipLocal: Vector3
+	local tipWeld = tip:FindFirstChildOfClass("Weld")
+	if tipWeld and tipWeld.Part0 == handle then
+		tipLocal = (tipWeld.C0 * tipWeld.C1:Inverse()).Position
+	else
+		tipLocal = handle.CFrame:PointToObjectSpace(tip.Position)
+	end
+	local length = tipLocal.Magnitude
+	if length < 1 then
+		return
+	end
+	local axis = tipLocal / length
+	local side = axis:Cross(if math.abs(axis.Y) < 0.9 then Vector3.yAxis else Vector3.xAxis).Unit
+	local side2 = axis:Cross(side).Unit
+	for arc = 0, 1 do
+		local color = if arc == 0 then PERUN_GOLD else PERUN_BLACK
+		local prev: Vector3? = nil
+		for i = 0, PERUN_ARC_STEPS do
+			local k = i / PERUN_ARC_STEPS
+			local a = arc * math.pi + k * PERUN_ARC_TURNS * 2 * math.pi
+			local r = if i % 2 == 0 then 0.32 else 0.5
+			local p = axis * (length * (0.3 + 0.62 * k)) + (side * math.cos(a) + side2 * math.sin(a)) * r
+			local from = prev
+			if from then
+				local cf, len = Geom.axisCFrame(from, p)
+				local seg = makePart("PerunArc", Enum.PartType.Cylinder, Vector3.new(math.max(len, 0.05), 0.09, 0.09), Enum.Material.Neon, color)
+				seg.CFrame = handle.CFrame * cf
+				weld(handle, seg, cf, "PerunWeld")
+				seg.Parent = tool
+			end
+			prev = p
+		end
+	end
+end
+
+-- Свечение цвета перезапуска и дуги Перуна поверх модели уровня
+local function decorateRod(tool: Tool, look: RodLook)
+	tool:SetAttribute("Look", look.Key)
+	local glow = look.Glow
+	if glow then
+		for _, part in tool:GetDescendants() do
+			if part:IsA("BasePart") and part.Material == Enum.Material.Neon then
+				part.Color = glow
+			end
+		end
+	end
+	if look.Perun then
+		addPerunArcs(tool)
+	end
 end
 
 -- Громоотвод нужного уровня: общий из Models или запасной
@@ -408,16 +529,17 @@ function PlayerService.refreshStats(player: Player)
 	if not st or not d then
 		return
 	end
-	local tier = rodTier(d.Upgrades.Rod)
+	local look = rodLook(d)
 	player:SetAttribute(Net.PlayerAttrs.Rebirths, d.Rebirths)
 	player:SetAttribute(Net.PlayerAttrs.BestCombo, d.Stats.BestCombo)
-	player:SetAttribute(Net.PlayerAttrs.RodTier, tier)
+	player:SetAttribute(Net.PlayerAttrs.RodTier, look.Tier)
+	player:SetAttribute(Net.PlayerAttrs.Title, titleFor(d))
 	applyWalkSpeed(player, st)
-	-- новый уровень громоотвода — новая модель в руке
+	-- новый уровень громоотвода, перезапуск или Перун — новая модель в руке
 	local rod = findRod(player, st)
 	local character = st.Character
 	local humanoid = aliveHumanoid(st)
-	if rod and rod:GetAttribute("Tier") ~= tier and character and humanoid then
+	if rod and rod:GetAttribute("Look") ~= look.Key and character and humanoid then
 		giveRod(player, st, character, humanoid)
 	end
 	updateNametag(player, st)
@@ -468,15 +590,15 @@ function giveRod(player: Player, st: State, character: Model, humanoid: Humanoid
 	if player.Character ~= character or aliveHumanoid(st) ~= humanoid then
 		return
 	end
-	local d = DataService.get(player)
-	local tier = if d then rodTier(d.Upgrades.Rod) else 0
+	local look = rodLook(DataService.get(player))
 	-- убрать старые копии (повторная настройка того же персонажа)
 	local old = findRod(player, st)
 	while old do
 		old:Destroy()
 		old = findRod(player, st)
 	end
-	local rod = buildRod(tier)
+	local rod = buildRod(look.Tier)
+	decorateRod(rod, look)
 	rod.Parent = if backpack then backpack else st.Character
 	humanoid:EquipTool(rod)
 	-- громоотвод всегда в руке: если его убрали в рюкзак — достать снова
@@ -559,7 +681,9 @@ local function onCharacterAdded(player: Player, character: Model)
 	-- место появления: последний открытый остров (или хаб), новичок — остров 1
 	local d = DataService.get(player)
 	local zone = safeZone(if d then d.LastZone else 1, if d then d.Zone else 1)
-	moveCharacter(st, spawnCFrame(zone))
+	local spawnAt = spawnCFrame(zone)
+	moveCharacter(st, spawnAt)
+	faceCamera(player, spawnAt)
 	setZone(player, st, zone)
 	st.Area = zone
 
@@ -617,18 +741,40 @@ local function lockedZoneAt(pos: Vector3, area: number?, unlocked: number): numb
 	return nil
 end
 
+-- Упёрся в барьер: у следующего острова — цена (сколько не хватает), а если Вольт хватает —
+-- сразу открыть магазин островов (не чаще GateShopEvery); дальний остров — сначала предыдущий
+local function gateHint(player: Player, st: State, zone: number, d: Data)
+	local clock = os.clock()
+	if clock - st.LastGateNotify < Config.Server.GateNotifyEvery then
+		return
+	end
+	st.LastGateNotify = clock
+	local name = Config.Zones[zone].Name
+	local nextZone = Config.Zones[d.Zone + 1]
+	if zone ~= d.Zone + 1 or not nextZone then
+		notify(player, string.format("Остров закрыт — сначала открой «%s»", if nextZone then nextZone.Name else name), "bad")
+		return
+	end
+	local cost = Economy.zoneCost(zone)
+	if d.Volts < cost then
+		notify(player, string.format("Остров закрыт — нужно ⚡ %s, не хватает ⚡ %s", Format.short(cost), Format.short(cost - d.Volts)), "bad")
+		return
+	end
+	notify(player, string.format("Хватает ⚡! Открой «%s» в магазине", name), "good")
+	if clock - st.LastGateShop >= Config.Server.GateShopEvery then
+		st.LastGateShop = clock
+		effect(player, { Kind = "openWindow", Text = "Shop:islands", UserId = player.UserId, Zone = zone })
+	end
+end
+
 -- Отбросить игрока на мост перед барьером острова zone
-local function pushBack(player: Player, st: State, zone: number)
+local function pushBack(player: Player, st: State, zone: number, d: Data)
 	local g = Zones.Geo[zone]
 	local gateAlong = ServerLogic.bridgeCoords(g.Gate, g.BridgeStart, g.BridgeEnd)
 	local point = ServerLogic.bridgePoint(g.BridgeStart, g.BridgeEnd, gateAlong - Config.Server.GatePushBack)
 	local pos = point + Vector3.new(0, 3, 0)
 	moveCharacter(st, CFrame.lookAt(pos, pos + g.ToHub))
-	local clock = os.clock()
-	if clock - st.LastGateNotify >= Config.Server.GateNotifyEvery then
-		st.LastGateNotify = clock
-		notify(player, CLOSED_TEXT, "bad")
-	end
+	gateHint(player, st, zone, d)
 end
 
 local function track(player: Player, st: State)
@@ -641,7 +787,9 @@ local function track(player: Player, st: State)
 	if pos.Y < Config.VoidY then
 		-- упал с острова: мягко вернуть на точку появления последней зоны
 		local zone = safeZone(st.Zone, d.Zone)
-		moveCharacter(st, spawnCFrame(zone))
+		local cf = spawnCFrame(zone)
+		moveCharacter(st, cf)
+		faceCamera(player, cf)
 		setZone(player, st, zone)
 		st.Area = zone
 		return
@@ -649,7 +797,7 @@ local function track(player: Player, st: State)
 	local area = Zones.zoneAt(pos)
 	local locked = lockedZoneAt(pos, area, d.Zone)
 	if locked then
-		pushBack(player, st, locked)
+		pushBack(player, st, locked, d)
 		st.Area = nil
 		return
 	end
@@ -732,7 +880,9 @@ function PlayerService.teleport(player: Player, zone: any): (boolean, string?)
 	if not aliveHumanoid(st) or not st.Root then
 		return false, "Подожди, пока появится персонаж"
 	end
-	moveCharacter(st, spawnCFrame(zone))
+	local cf = spawnCFrame(zone)
+	moveCharacter(st, cf)
+	faceCamera(player, cf)
 	setZone(player, st, zone)
 	st.Area = zone
 	return true, nil
@@ -754,6 +904,7 @@ local function newState(): State
 		Stunned = false,
 		StunToken = 0,
 		LastGateNotify = 0,
+		LastGateShop = -math.huge,
 		RespawnFor = nil,
 		Conns = {},
 	}
@@ -818,6 +969,7 @@ end
 
 function PlayerService.start()
 	notifyRemote = Net.event("Notify")
+	effectRemote = Net.event("Effect")
 	Players.CharacterAutoLoads = false
 
 	Players.PlayerAdded:Connect(onPlayerJoined)

@@ -436,13 +436,14 @@ local function updateJar()
 		end
 	end
 
-	-- строка состояния: риск перегрузки или "сдай заряд"
+	-- строка состояния: риск перегрузки или "сдай заряд" (или Тесла-дрон везёт заряд)
 	local full = (fill >= 0.999 and not overAllowed) or fill >= Config.Overcharge.MaxFill - 0.001
+	local droneAway = droneOn and ClientState.droneAway()
 	if full and zone ~= 0 then
 		statusLabel.Visible = true
-		statusLabel.Text = "Банка полна — сдай заряд!"
+		statusLabel.Text = if droneAway then "Банка полна — дрон скоро вернётся" else "Банка полна — сдай заряд!"
 		statusLabel.TextColor3 = Theme.Volt
-		setPulse(true)
+		setPulse(not droneAway)
 	elseif full then
 		statusLabel.Visible = true
 		statusLabel.Text = "Сдай заряд у Тесла-башни!"
@@ -454,6 +455,11 @@ local function updateJar()
 		statusLabel.Visible = true
 		statusLabel.Text = string.format("⚠ Перегрузка! Риск %d%%", math.floor(risk * 100 + 0.5))
 		statusLabel.TextColor3 = Theme.Miss
+		setPulse(false)
+	elseif droneAway then
+		statusLabel.Visible = true
+		statusLabel.Text = "🤖 Дрон везёт заряд"
+		statusLabel.TextColor3 = Theme.Electric
 		setPulse(false)
 	else
 		statusLabel.Visible = false
@@ -1450,10 +1456,17 @@ function HUD.start()
 		-- новая ячейка Молниедекса: тост с цветом и островом присылает сервер (Notify), свой не дублируем
 	end)
 
-	-- киоски в хабе (ProximityPrompt на сервере) открывают окна через Effect
+	-- киоски в хабе (ProximityPrompt на сервере) открывают окна через Effect; дрон улетел / сдал — строка банки
 	ClientState.Effect:Connect(function(msg: Net.EffectMsg)
 		if msg.Kind == "openWindow" and typeof(msg.Text) == "string" then
 			ClientState.OpenWindow:Fire(msg.Text)
+		elseif msg.Kind == "drone" and (msg.UserId == nil or msg.UserId == player.UserId) then
+			updateJar()
+			if msg.Text == "depart" then
+				-- если "sold" не придёт (перезапуск, выход), строка сама вернётся
+				local trip = if typeof(msg.Value) == "number" then math.clamp(msg.Value, 0, 60) else 5
+				task.delay(trip + 2, updateJar)
+			end
 		end
 	end)
 

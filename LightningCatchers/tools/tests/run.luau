@@ -497,7 +497,7 @@ test("тексты заданий: число и слово согласован
 	eq(Quests.text(catch, 1), "Поймай 1 молнию")
 	eq(Quests.text(catch, 3), "Поймай 3 молнии")
 	eq(Quests.text(catch, 60), "Поймай 60 молний")
-	eq(Quests.text(Quests.def("rare") :: any, 8), "Поймай 8 фиолетовых или более редких")
+	eq(Quests.text(Quests.def("rare") :: any, 8), "Поймай 8 редких молний (◆ и выше)")
 	eq(Quests.text(Quests.def("sell") :: any, 2), "Сдай банку 2 раза")
 	eq(Quests.text(Quests.def("shards") :: any, 21), "Собери 21 осколок с земли")
 	eq(Quests.text(Quests.def("combo") :: any, 12), "Набери комбо 12")

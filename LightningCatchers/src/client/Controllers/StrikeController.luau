@@ -67,6 +67,10 @@ local SHOCKWAVE_POOL = 8
 local SHOCKWAVE_TIME = 0.42
 local TARGET_SLACK = 1.5 -- допуск к радиусу при выборе кольца для нажатия
 local ZAP_PREDICT_SLACK = -0.5 -- «стоял в кольце» для прогноза «Шарахнуло»: чуть строже сервера (позиция у него старее)
+-- сервер видит игрока там, где он был половину пинга + шаг репликации назад: вбежавшего в кольцо
+-- перед самым ударом он ещё считает снаружи (молния в землю, осколок) — такой удар не прогнозируем
+local ZAP_PREDICT_LAG = 0.06 -- шаг репликации позиции (с), сверх половины пинга
+local ZAP_PREDICT_MAX_LAG = 0.4
 local LATE_SLACK = 0.1 -- после окна ХОРОШО удар ещё можно выбрать (сервер всё равно оценит)
 -- кольцо живёт после последнего удара (чтобы успело погаснуть и можно было нажать чуть позже)
 local RING_TAIL = math.max(0.45, Config.Catch.MaxGoodWindow + LATE_SLACK + 0.05)
@@ -77,10 +81,17 @@ local SHARD_FADE = 0.4
 local SHARD_LADDER_GAP = 1.1 -- осколки, собранные чаще, звенят всё выше
 local LADDER = { 0, 2, 4, 7, 9, 12 } -- пентатоника на одну октаву (выше звук становится визгливым)
 -- подбор осколка: сервер видит игрока с задержкой, поэтому ShardCollect повторяем, пока не придёт подтверждение
--- (рост Shards в DataSync); «+N 💎» — только после него. Не подтвердили — осколок возвращается на землю (один раз).
+-- (Effect "shard" с Id осколка); «+N 💎» — только после него. Не подтвердили — осколок возвращается на землю (один раз).
 local SHARD_RESEND = 0.15
 local SHARD_CONFIRM_TIME = 2
 local SHARD_RESEND_REACH = 8 -- повторяем, только пока игрок не дальше радиуса сбора + допуска сервера + столько
+-- новый тип удара (двойной, вилка, обманка, бегущий): над первыми кольцами — подсказка, что делать
+-- (пока это самый дальний открытый остров игрока, столько колец каждого типа за сессию)
+local KIND_HINT_RINGS = 3
+local KIND_HINT_TEXT = {
+	fake = "Обманка! Кольцо замрёт — жди",
+	runner = "Бегущее! Беги за ним",
+} :: { [string]: string }
 local ARROW_MARGIN = 54 -- отступ стрелок от края экрана (точки)
 local ARROW_TOUCH_BOTTOM = 0.3 -- на телефоне нижние 30% экрана — джойстик и кнопки
 local HIDDEN = CFrame.new(0, 1e4, 0)
@@ -130,6 +141,8 @@ type RingVisual = {
 	iconGui: BillboardGui,
 	icon: TextLabel,
 	count: TextLabel,
+	hintGui: BillboardGui,
+	hint: TextLabel,
 	segs: { Part },
 	cloud: { Part },
 	core: Part,
@@ -176,6 +189,7 @@ type Ring = {
 	lastHitsLeft: number,
 	lastRay: number,
 	appliedColor: Color3?,
+	kindHint: boolean, -- показать подсказку нового типа удара
 }
 
 type Bolt = {
@@ -808,11 +822,11 @@ local function makeVisual(): RingVisual
 	count.Name = "Count"
 	count.BackgroundTransparency = 1
 	count.AnchorPoint = Vector2.new(0, 0)
-	count.Position = UDim2.fromScale(0.68, 0.0)
-	count.Size = UDim2.fromScale(0.55, 0.45)
+	count.Position = UDim2.fromScale(0.62, -0.12)
+	count.Size = UDim2.fromScale(0.75, 0.6)
 	count.TextScaled = true
 	count.FontFace = Theme.Font
-	count.TextColor3 = WHITE
+	count.TextColor3 = Theme.Volt
 	count.Text = ""
 	count.Visible = false
 	count.Parent = iconGui
@@ -820,6 +834,29 @@ local function makeVisual(): RingVisual
 	countStroke.Thickness = 2.5
 	countStroke.Color = Theme.TextStroke
 	countStroke.Parent = count
+	local hintGui = Instance.new("BillboardGui")
+	hintGui.Name = "KindHint"
+	hintGui.Size = UDim2.fromScale(11, 1.8)
+	hintGui.StudsOffsetWorldSpace = Vector3.new(0, 5.4, 0)
+	hintGui.LightInfluence = 0
+	hintGui.MaxDistance = 140
+	hintGui.AlwaysOnTop = true
+	hintGui.ResetOnSpawn = false
+	hintGui.Enabled = false
+	hintGui.Parent = carrier
+	local hint = Instance.new("TextLabel")
+	hint.Name = "Text"
+	hint.BackgroundTransparency = 1
+	hint.Size = UDim2.fromScale(1, 1)
+	hint.TextScaled = true
+	hint.FontFace = Theme.Font
+	hint.TextColor3 = Theme.Volt
+	hint.Text = ""
+	hint.Parent = hintGui
+	local hintStroke = Instance.new("UIStroke")
+	hintStroke.Thickness = 3
+	hintStroke.Color = Theme.TextStroke
+	hintStroke.Parent = hint
 
 	local segs: { Part } = {}
 	for i = 1, SEGMENTS do
@@ -853,6 +890,8 @@ local function makeVisual(): RingVisual
 		iconGui = iconGui,
 		icon = icon,
 		count = count,
+		hintGui = hintGui,
+		hint = hint,
 		segs = segs,
 		cloud = cloud,
 		core = core,
@@ -872,6 +911,8 @@ end
 local function hideVisual(vis: RingVisual)
 	vis.edgeGui.Enabled = false
 	vis.iconGui.Enabled = false
+	vis.hintGui.Enabled = false
+	vis.count.Visible = false
 	vis.disk.Transparency = 1
 	queueMove(vis.disk, HIDDEN)
 	queueMove(vis.carrier, HIDDEN)
@@ -970,6 +1011,36 @@ local function applyRingColor(r: Ring, clock: number)
 	r.appliedColor = line
 end
 
+-- Подсказка нового типа удара: только на своих кольцах, пока этот остров — самый дальний открытый
+local kindHintsShown: { [string]: number } = {}
+local function wantsKindHint(kind: Config.KindId, shared: boolean): boolean
+	local d = ClientState.data
+	local def = Config.Kinds[kind]
+	if shared or kind == "single" or not d or not def or d.Zone > def.FromZone then
+		return false
+	end
+	local n = kindHintsShown[kind] or 0
+	if n >= KIND_HINT_RINGS then
+		return false
+	end
+	kindHintsShown[kind] = n + 1
+	return true
+end
+
+-- Текст подсказки: сколько раз жать (двойной, вилка) или что делать (обманка, бегущий)
+local function kindHintText(r: Ring, left: number): string
+	local fixed = KIND_HINT_TEXT[r.kind]
+	if fixed then
+		return fixed
+	end
+	if left >= #r.hits then
+		return string.format("%s! Жми ⚡ %d раза", Config.Kinds[r.kind].Name, left)
+	elseif left >= 2 then
+		return string.format("Ещё %d раза!", left)
+	end
+	return "Ещё раз!"
+end
+
 -- Сервер прислал новое кольцо
 local function onStrikeSpawned(msg: Net.StrikeMsg)
 	local m = msg :: any
@@ -1056,7 +1127,9 @@ local function onStrikeSpawned(msg: Net.StrikeMsg)
 		lastHitsLeft = -1,
 		lastRay = 0,
 		appliedColor = nil,
+		kindHint = false,
 	}
+	r.kindHint = now < hits[1] and wantsKindHint(r.kind, r.isShared)
 	-- удары, которые уже прошли до прихода сообщения, не рисуем
 	for i, t in hits do
 		if now >= t then
@@ -1088,6 +1161,25 @@ local function insideRing(r: Ring, center: Vector3, slack: number): boolean
 	return Zones.flatDist(p, center) <= r.radius + slack and math.abs(p.Y - center.Y) <= CATCH_HEIGHT
 end
 
+-- Прогноз «Шарахнуло»: игрок в кольце и сейчас, и там, где его видит сервер (позиция минус скорость × задержка)
+local function insideForZap(r: Ring, center: Vector3): boolean
+	local root = localRoot()
+	if not root or not insideRing(r, center, ZAP_PREDICT_SLACK) then
+		return false
+	end
+	local v = root.AssemblyLinearVelocity
+	local flat = Vector3.new(v.X, 0, v.Z)
+	if flat.Magnitude < 0.5 then
+		return true
+	end
+	local okPing, ping = pcall(function(): number
+		return player:GetNetworkPing()
+	end)
+	local halfPing = if okPing and typeof(ping) == "number" and ping == ping and ping >= 0 then ping / 2 else 0.05
+	local lag = math.min(ZAP_PREDICT_MAX_LAG, halfPing + ZAP_PREDICT_LAG)
+	return Zones.flatDist(root.Position - flat * lag, center) <= r.radius + ZAP_PREDICT_SLACK
+end
+
 local function strikeHit(r: Ring, index: number, center: Vector3)
 	local result = r.results[index]
 	local predicted = r.localGrade[index]
@@ -1113,7 +1205,7 @@ local function strikeHit(r: Ring, index: number, center: Vector3)
 	drawBolt(r.id * 7 + index, cloudPt, target, r.colorId, 4, not full, full and not softFlash())
 	impact(center, target, color, r.radius, true, full)
 	-- стоял в кольце и не нажимал: CatchController решит, «Шарахнуло» это или подсказка
-	if not r.judged[index] and r.results[index] == nil and insideRing(r, center, ZAP_PREDICT_SLACK) then
+	if not r.judged[index] and r.results[index] == nil and insideForZap(r, center) then
 		StrikeController.UntappedHit:Fire(r.id, index, r.colorId, r.zone)
 	end
 end
@@ -1211,8 +1303,16 @@ local function updateRing(r: Ring, now: number, clock: number, dt: number): bool
 	end
 	if left ~= r.lastHitsLeft then
 		r.lastHitsLeft = left
-		vis.count.Visible = left >= 2
+		-- двойной и вилка: «×2» → «×1» до последнего удара (второй удар — тоже нажатие)
+		vis.count.Visible = #hits >= 2 and left >= 1
 		vis.count.Text = "×" .. tostring(left)
+		if r.kindHint then
+			vis.hintGui.Enabled = left >= 1
+			vis.hint.Text = kindHintText(r, left)
+		end
+	end
+	if r.kindHint and left >= 1 then
+		vis.hint.TextTransparency = 0.2 * (0.5 + 0.5 * math.sin(clock * 8))
 	end
 
 	-- внешнее сжимающееся кольцо
@@ -1377,6 +1477,13 @@ local function onStrikeResolved(msg: Net.StrikeResultMsg)
 		if shakeOn() then
 			Juice.shake(if grade == "perfect" then 0.22 else 0.14)
 		end
+	elseif (grade == "perfect" or grade == "good") and typeof(m.Jar) == "number" and typeof(m.Capacity) == "number" and m.Jar >= m.Capacity then
+		-- поймал, но заряд не влез (банка полна, а перегружать нельзя): объяснить, куда делась награда
+		local pos: Vector3? = if r then r.center elseif typeof(m.Pos) == "Vector3" then m.Pos else nil
+		if pos then
+			local text = if ClientState.droneAway() then "Банка полна — дрон в пути" else "Банка полна!"
+			Juice.popup(pos + Vector3.new(0, 3, 0), text, Theme.Volt, false)
+		end
 	end
 end
 
@@ -1430,7 +1537,6 @@ local shardPool: { ShardVis } = {}
 local shards: { [number]: Shard } = {}
 local shardCount = 0
 local pendingShards: { [number]: PendingShard } = {}
-local knownShards: number? = nil -- data.Shards из последнего DataSync (для подтверждения подбора)
 local shardStep = 0
 local lastShardPick = 0
 local shardCollectEvent: RemoteEvent? = nil
@@ -1582,33 +1688,25 @@ local function updatePendingShards(now: number, clock: number)
 	end
 end
 
--- Пришли данные: рост осколков подтверждает ждущие подборы (сначала самые старые)
-local function onShardData(d: any)
-	local total = d.Shards
-	if typeof(total) ~= "number" then
+-- Сервер засчитал подбор осколка id (Effect "shard"): больше не повторяем ShardCollect, «+N 💎»
+local function onShardConfirmed(id: number)
+	local p = pendingShards[id]
+	local s = shards[id]
+	local amount: number
+	if p then
+		pendingShards[id] = nil
+		amount = p.amount
+	elseif s and s.restored and not s.collected then
+		-- подтверждение опоздало, и осколок уже вернули на землю: убрать его
+		amount = s.amount
+		removeShard(id)
+	else
 		return
 	end
-	local before = knownShards
-	knownShards = total
-	if before == nil or total <= before or next(pendingShards) == nil then
-		return
-	end
-	local gained = total - before
-	local list: { PendingShard } = {}
-	for _, p in pendingShards do
-		table.insert(list, p)
-	end
-	table.sort(list, function(a: PendingShard, b: PendingShard): boolean
-		return a.t0 < b.t0
-	end)
 	local root = localRoot()
-	for _, p in list do
-		if p.amount <= gained then
-			gained -= p.amount
-			pendingShards[p.id] = nil
-			local at = if root then root.Position + Vector3.new(0, 3, 0) else p.pos + Vector3.new(0, 1.5, 0)
-			Juice.popup(at, "+" .. Format.short(p.amount) .. " 💎", Theme.Shard, false)
-		end
+	local at = if root then root.Position + Vector3.new(0, 3, 0) elseif p then p.pos + Vector3.new(0, 1.5, 0) else nil
+	if at then
+		Juice.popup(at, "+" .. Format.short(amount) .. " 💎", Theme.Shard, false)
 	end
 end
 
@@ -1952,10 +2050,12 @@ function StrikeController.start()
 	started = true
 	ClientState.StrikeSpawned:Connect(onStrikeSpawned)
 	ClientState.StrikeResolved:Connect(onStrikeResolved)
-	if ClientState.data then
-		onShardData(ClientState.data)
-	end
-	ClientState.Changed:Connect(onShardData)
+	ClientState.Effect:Connect(function(msg: Net.EffectMsg)
+		local m = msg :: any
+		if m.Kind == "shard" and typeof(m.Value) == "number" then
+			onShardConfirmed(m.Value)
+		end
+	end)
 	ClientState.ZoneChanged:Connect(function(zone: number)
 		clearRings(zone)
 		clearShards()

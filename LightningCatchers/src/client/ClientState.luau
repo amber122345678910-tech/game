@@ -136,6 +136,14 @@ function ClientState.predictedGrade(id: number, hit: number): string?
 	return nil
 end
 
+-- Тесла-дрон улетел с зарядом (Effect drone "depart") и ещё не сдал его ("sold"): os.clock() крайнего срока
+local DRONE_LATE = 1.5 -- запас к времени полёта, если "sold" не пришёл
+local droneAwayUntil = 0
+
+function ClientState.droneAway(): boolean
+	return os.clock() < droneAwayUntil
+end
+
 -- Окна тайминга с учётом громоотвода и питомцев
 function ClientState.windows(): (number, number)
 	local d = ClientState.data
@@ -202,6 +210,14 @@ function ClientState.start()
 	end)
 	Net.event("Effect").OnClientEvent:Connect(function(msg: any)
 		if typeof(msg) == "table" then
+			if msg.Kind == "drone" and (msg.UserId == nil or msg.UserId == player.UserId) then
+				if msg.Text == "depart" then
+					local trip = if typeof(msg.Value) == "number" then math.clamp(msg.Value, 0, 60) else 5
+					droneAwayUntil = os.clock() + trip + DRONE_LATE
+				elseif msg.Text == "sold" then
+					droneAwayUntil = 0
+				end
+			end
 			ClientState.Effect:Fire(msg)
 		end
 	end)

@@ -6,10 +6,12 @@
 --    (цвет — как у обычных колец острова, но не ниже фиолетового); каждая поимка (ИДЕАЛЬНО/ХОРОШО) отнимает 1 HP;
 --    HP = игроки × HpPerPlayer (ушли игроки — HP не больше, чем на оставшихся); награда — по вкладу;
 --    на острове никого EmptyLeave с — шар улетает;
---  * Радужная молния — объявление за Announce с (Effect rainbowWarn), потом огромное общее кольцо;
---    награду получает каждый поймавший (доход за RewardMinutes + гарантированный радужный фульгурит);
---  * Чёрная молния Перуна — StrikeService.onPerun: баннер и Effect perun всем; когда её ловят — «Я видел!»
---    всем, кто был в WitnessRadius от поймавшего.
+--  * Радужная молния — объявление за Announce с (Effect rainbowWarn), потом огромное общее кольцо
+--    на каждом острове, где есть игроки (все в хабе — на Грозовом Лугу): поймать может каждый, а не только
+--    те, кто на самом людном острове; награду получает каждый поймавший (доход за RewardMinutes,
+--    гарантированный радужный фульгурит выдаёт StrikeService при любой поимке);
+--  * Чёрная молния Перуна — StrikeService.onPerun: баннер «бьёт рядом с …» и Effect perun всем; поймали —
+--    баннер с ловцом и «Я видел!» всем, кто был в WitnessRadius от поймавшего; не поймали — «ушла».
 -- События не накладываются: если одно идёт, следующее ждёт его конца. За WarnBefore с — предупреждение.
 -- Атрибуты GameState: Event, EventEnds, NextSupercell, NextBall, NextRainbow, Ball*.
 
@@ -28,7 +30,6 @@ local Zones = require(Shared:WaitForChild("Zones"))
 
 local DataService = require(script.Parent.DataService)
 local EconomyService = require(script.Parent.EconomyService)
-local FulguriteService = require(script.Parent.FulguriteService)
 local PlayerService = require(script.Parent.PlayerService)
 local StrikeService = require(script.Parent.StrikeService)
 
@@ -152,6 +153,24 @@ local function busiestIsland(): (number?, number)
 		end
 	end
 	return best, bestCount
+end
+
+-- Острова, где сейчас есть игроки (по возрастанию номера). Пусто — все в хабе.
+local function occupiedIslands(): { number }
+	local seen: { [number]: boolean } = {}
+	for _, p in Players:GetPlayers() do
+		local z = PlayerService.getZone(p)
+		if z >= 1 and z <= #Config.Zones then
+			seen[z] = true
+		end
+	end
+	local list = {}
+	for z = 1, #Config.Zones do
+		if seen[z] then
+			table.insert(list, z)
+		end
+	end
+	return list
 end
 
 local function playersIn(zone: number): { Player }
@@ -433,13 +452,17 @@ local function rainbowSpot(zone: number): Vector3
 end
 
 local function runRainbow(t0: number)
-	local zone = busiestIsland() or 1 -- все в хабе — на Грозовой Луг (он открыт у всех)
 	local ends = t0 + durationOf("rainbow")
 	currentEnds = ends
 	setAttr("EventEnds", ends)
 	setAttr("Event", "rainbow")
-	effectAll({ Kind = "rainbowWarn", Zone = zone })
-	banner(string.format("🌈 РАДУЖНАЯ МОЛНИЯ НАДВИГАЕТСЯ! Остров «%s»", Config.Zones[zone].Name), "rainbow")
+	effectAll({ Kind = "rainbowWarn" })
+	banner("🌈 РАДУЖНАЯ МОЛНИЯ НАДВИГАЕТСЯ! Ударит на каждом острове с ловцами!", "rainbow")
+	for _, p in Players:GetPlayers() do
+		if PlayerService.getZone(p) == 0 then
+			notify(p, string.format("🌈 Беги на остров — через %d с там ударит Радужная молния!", math.floor(RAIN.Announce)), "rare")
+		end
+	end
 
 	local spawnAt = t0 + RAIN.Announce
 	while now() < spawnAt do
@@ -448,7 +471,7 @@ local function runRainbow(t0: number)
 
 	local caught: { [Player]: boolean } = {}
 	local names: { string } = {}
-	local function onCatch(player: Player, grade: StrikeService.CatchGrade)
+	local function onCatch(player: Player, _grade: StrikeService.CatchGrade)
 		if caught[player] then
 			return
 		end
@@ -458,11 +481,8 @@ local function runRainbow(t0: number)
 		if not d then
 			return
 		end
+		-- радужный фульгурит уже выдал StrikeService (dropHook при любой поимке — до результата удара)
 		local volts = EconomyService.grantVolts(player, Economy.incomeMinutes(d, RAIN.RewardMinutes), "rainbow")
-		-- ИДЕАЛЬНО уже дал радужный фульгурит через dropHook (шанс 100%), ХОРОШО — даём здесь
-		if grade ~= "perfect" then
-			FulguriteService.grant(player, "rainbow", zone, "rainbow")
-		end
 		notify(player, string.format("🌈 Радужная молния твоя! +%s ⚡", Format.short(volts)), "rare")
 		EventService.HallEntry:Fire(player, "rainbow")
 	end
@@ -473,9 +493,17 @@ local function runRainbow(t0: number)
 		tag = "rainbow",
 		onCatch = onCatch,
 	}
-	local ok, err = pcall(StrikeService.spawnShared, zone, rainbowSpot(zone), "rainbow", opts)
-	if not ok then
-		warn("[EventService] радужное кольцо: " .. tostring(err))
+	-- по кольцу на каждый остров с игроками (кто где сейчас); все в хабе — на Грозовой Луг (он открыт у всех).
+	-- Удар у всех колец в одно время, а награда — одна на игрока (caught)
+	local zones = occupiedIslands()
+	if #zones == 0 then
+		zones = { 1 }
+	end
+	for _, zone in zones do
+		local ok, err = pcall(StrikeService.spawnShared, zone, rainbowSpot(zone), "rainbow", opts)
+		if not ok then
+			warn("[EventService] радужное кольцо: " .. tostring(err))
+		end
 	end
 	-- итог — когда все нажатия уже оценены (удар + время на пинг)
 	local resultAt = math.max(ends, now() + RAIN.Warning + Config.Catch.LatencyGrace)
@@ -493,17 +521,15 @@ end
 -- Чёрная молния Перуна
 ----------------------------------------------------------------------
 
+-- Чёрное кольцо только появилось: ещё никто не поймал — «бьёт рядом с», а не «Ловец»
 local function onPerun(player: Player, msg: Net.StrikeMsg)
-	banner(string.format("☠ ЧЁРНАЯ МОЛНИЯ ПЕРУНА! Ловец: %s", player.DisplayName), "perun")
+	banner(string.format("☠ ЧЁРНАЯ МОЛНИЯ ПЕРУНА бьёт рядом с %s!", player.DisplayName), "perun")
 	effectAll({ Kind = "perun", Pos = msg.Pos, UserId = player.UserId, Zone = msg.Zone })
 end
 
-local function onPerunCaught(player: Player, zone: number, grade: string)
+local function onPerunCaught(player: Player, zone: number)
 	banner(string.format("☠ Чёрная молния Перуна поймана! Ловец: %s", player.DisplayName), "perun")
-	-- ИДЕАЛЬНО — Перунов фульгурит уже выпал через dropHook (шанс 100%), ХОРОШО — даём здесь
-	if grade ~= "perfect" then
-		FulguriteService.grant(player, "black", zone, "perun")
-	end
+	-- Перунов фульгурит уже выдал StrikeService (dropHook при любой поимке — до результата удара)
 	EventService.HallEntry:Fire(player, "perun")
 	local root = PlayerService.getRoot(player)
 	if not root then
@@ -621,8 +647,13 @@ function EventService.start()
 	})
 	StrikeService.onPerun = onPerun
 	StrikeService.CatchResolved:Connect(function(player, info)
-		if info.color == "black" and (info.grade == "perfect" or info.grade == "good") then
-			onPerunCaught(player, info.zone, info.grade)
+		if info.color ~= "black" then
+			return
+		end
+		if info.grade == "perfect" or info.grade == "good" then
+			onPerunCaught(player, info.zone)
+		else
+			banner("☠ Чёрная молния Перуна ушла в землю — в другой раз!", "info")
 		end
 	end)
 

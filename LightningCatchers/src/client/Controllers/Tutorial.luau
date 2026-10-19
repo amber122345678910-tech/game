@@ -2,8 +2,9 @@
 -- Обучение без стен текста: одна короткая подсказка за раз (не больше 6 слов), луч-стрелка в мире к цели
 -- и пульсирующая кнопка интерфейса. Ничего не блокирует: все элементы не перехватывают касания.
 -- Шаги (флаги data.Tutorial): catch -> sell -> shop -> zone2, а overcharge — когда впервые можно перегрузить банку.
+-- shop выполнен, когда куплено первое улучшение (не когда магазин просто открыли).
 -- zone2: острова открываются в магазине (вкладка «Острова»), поэтому подсвечиваем кнопку магазина, а не барьер;
--- шаг выполнен, когда остров 2 открыт.
+-- шаг выполнен (и сохранён на сервере), когда остров 2 открыт. После открытия острова — «Лети туда!» у кнопки «Острова».
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -34,18 +35,21 @@ local HINT_W, HINT_H = 600, 66
 local TOP_OFFSET = 168 -- под верхней панелью HUD (точки макета 1280×720)
 local GRADE_PAUSE = 1.1 -- пока видна надпись оценки, подсказку прячем
 local OVERCHARGE_SHOW = 6
+local FLY_HINT_TIME = 30 -- столько секунд после открытия острова зовём туда лететь
 local BEAM_MIN = 4 -- ближе луч не нужен
 local PULSE_COLOR = Theme.Volt
 
 local TEXT = {
 	ring = "Встань в светящийся круг",
-	tapTouch = "Жми ⚡, когда кольцо сомкнётся",
-	tapKeys = "Жми ⚡ или E, когда кольцо сомкнётся",
-	tapPad = "Жми R2, когда кольцо сомкнётся",
+	tapTouch = "Жми ⚡, когда круги сойдутся!",
+	tapKeys = "Жми ⚡ или E, когда круги сойдутся!",
+	tapPad = "Жми R2, когда круги сойдутся!",
+	hub = "Беги на остров ловить молнии!",
 	sell = "Сдай заряд на подстанции",
 	shop = "Купи улучшение",
 	zone2 = "Открой новый остров в магазине!",
-	overcharge = "Можно рискнуть: перегрузи банку!",
+	fly = "Лети на новый остров!",
+	overcharge = "Банка полна — лови дальше, если не боишься!",
 }
 
 type Hint = { text: string, target: Vector3?, button: string? }
@@ -57,6 +61,8 @@ local localDone: { [string]: boolean } = {}
 local openWindows: { [string]: boolean } = {}
 local gradeHideUntil = 0
 local overchargeUntil = 0
+local flyZone: number? = nil -- только что открытый остров (зовём туда)
+local flyUntil = 0
 local current: Hint? = nil
 
 local gui: ScreenGui? = nil
@@ -199,9 +205,10 @@ local function isDone(step: string): boolean
 	elseif step == "sell" then
 		return d.Stats.Sells > 0
 	elseif step == "shop" then
-		return upgradesBought(d)
+		-- после перезапуска улучшения с нуля, но учиться покупать уже не нужно
+		return upgradesBought(d) or d.Zone >= 2 or d.Rebirths > 0
 	elseif step == "zone2" then
-		return d.Zone >= 2
+		return d.Zone >= 2 or d.Rebirths > 0
 	end
 	return false
 end
@@ -214,10 +221,7 @@ local function complete(step: string)
 	end
 	localDone[step] = true
 	task.spawn(function()
-		local fn = requestFn
-		if not fn then
-			return
-		end
+		local fn = requestFn or Net.func("Request")
 		-- тихо: подсказки не должны показывать ошибки
 		pcall(function()
 			fn:InvokeServer(Net.Actions.TutorialStep, step)
@@ -253,10 +257,13 @@ local function evaluate(clock: number): Hint?
 	local zone = ClientState.zone()
 	local rootPos = root.Position
 
-	-- 1. поймать молнию
+	-- 1. поймать молнию (в хабе молний нет — сначала на остров)
 	if not isDone("catch") then
 		if zone < 1 then
-			return nil
+			if player:GetAttribute(Net.PlayerAttrs.Zone) == nil then
+				return nil -- сервер ещё не сказал, где игрок
+			end
+			return { text = TEXT.hub, target = Zones.Geo[1].Spawn, button = nil }
 		end
 		local best = nil
 		local bestD = math.huge
@@ -282,6 +289,15 @@ local function evaluate(clock: number): Hint?
 			return { text = TEXT.sell, target = nearestStation(rootPos), button = nil }
 		end
 		return nil
+	end
+
+	-- только что открыл остров — лететь туда (кнопка «Острова»)
+	if flyZone ~= nil then
+		if zone == flyZone or clock >= flyUntil then
+			flyZone = nil
+		else
+			return { text = TEXT.fly, target = nil, button = "TeleportButton" }
+		end
 	end
 
 	-- 5. перегрузка (впервые банка полна там, где можно рисковать)
@@ -652,6 +668,9 @@ function Tutorial.start()
 			if m.Kind == "sell" or m.Text == "sold" then
 				complete("sell")
 			end
+		elseif m.Kind == "zoneUnlocked" and typeof(m.Zone) == "number" and (m.UserId == nil or m.UserId == player.UserId) then
+			flyZone = m.Zone
+			flyUntil = os.clock() + FLY_HINT_TIME
 		end
 	end)
 	ClientState.WindowOpened:Connect(function(name: string)
@@ -662,17 +681,24 @@ function Tutorial.start()
 			if d and wantsIslandsTab(d) then
 				ClientState.OpenWindow:Fire("Shop:islands")
 			end
-			complete("shop")
 		end
 	end)
 	ClientState.WindowClosed:Connect(function(name: string)
 		openWindows[name] = nil
 	end)
-	ClientState.Changed:Connect(function(d)
-		if d.Zone >= 2 then
-			localDone.zone2 = true
+	-- шаги, выполненные покупкой, сохраняем на сервере (после перезапуска остров 2 снова закрыт)
+	local function checkBought(d: any)
+		if not d.Tutorial.shop and upgradesBought(d) then
+			complete("shop")
 		end
-	end)
+		if not d.Tutorial.zone2 and d.Zone >= 2 then
+			complete("zone2")
+		end
+	end
+	ClientState.Changed:Connect(checkBought)
+	if ClientState.data then
+		checkBought(ClientState.data)
+	end
 
 	local acc = EVAL_EVERY
 	RunService.Heartbeat:Connect(function(dt: number)

@@ -5,7 +5,8 @@
 --  * кончик громоотвода светится ярче с комбо;
 --  * «Шарахнуло» (атрибут ZappedUntil): сажа (Highlight) и искры над головой;
 --  * цепная молния — дуга между громоотводами, сдача банки — сгустки энергии летят на подстанцию,
---    лопнувшая банка — стеклянные осколки.
+--    лопнувшая банка — стеклянные осколки;
+--  * Тесла-дрон: взлетает с банки со сгустком заряда, летит к подстанции, сдаёт его и возвращается.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -56,6 +57,14 @@ local DEBRIS_POOL = 28
 local DEBRIS_COUNT = 12
 local DEBRIS_TIME = 0.9
 local BURST_DEDUPE = 0.6
+local DRONE_RISE = 0.5 -- взлёт с банки (с)
+local DRONE_OUT = 0.45 -- доля полёта: прилетел к подстанции
+local DRONE_DROP = 0.52 -- сдал заряд
+local DRONE_BACK = 0.62 -- полетел обратно
+local DRONE_WAIT = 1.5 -- ждёт "sold" над игроком не дольше
+local DRONE_LAND = 0.3 -- садится в банку
+local DRONE_BODY = Color3.fromRGB(70, 76, 104)
+local DRONE_ROTOR = Color3.fromRGB(200, 210, 235)
 local HIDDEN = CFrame.new(0, 1e4, 0)
 
 ----------------------------------------------------------------------
@@ -935,6 +944,161 @@ local function updateParticles(clock: number, dt: number)
 end
 
 ----------------------------------------------------------------------
+-- Тесла-дрон своего игрока (Effect drone: "depart" — улетел с зарядом, "sold" — сдал)
+----------------------------------------------------------------------
+type DronePart = { part: Part, offset: CFrame, spin: boolean }
+local droneParts: { DronePart } = {}
+local droneOrb: Part
+do
+	local function add(shape: Enum.PartType, material: Enum.Material, size: Vector3, color: Color3, offset: CFrame, spin: boolean): Part
+		local p = newPart(shape, material)
+		p.Name = "Drone"
+		p.Size = size
+		p.Color = color
+		table.insert(droneParts, { part = p, offset = offset, spin = spin })
+		return p
+	end
+	add(Enum.PartType.Ball, Enum.Material.Metal, Vector3.one * 1.1, DRONE_BODY, CFrame.identity, false)
+	add(Enum.PartType.Cylinder, Enum.Material.Neon, Vector3.new(0.2, 1.6, 1.6), Theme.Electric, CFrame.Angles(0, 0, math.pi / 2), false)
+	add(Enum.PartType.Block, Enum.Material.SmoothPlastic, Vector3.new(2.8, 0.06, 0.26), DRONE_ROTOR, CFrame.new(0, 0.72, 0), true)
+	add(Enum.PartType.Block, Enum.Material.SmoothPlastic, Vector3.new(0.26, 0.06, 2.8), DRONE_ROTOR, CFrame.new(0, 0.72, 0), true)
+	droneOrb = add(Enum.PartType.Ball, Enum.Material.Neon, Vector3.one * 0.9, Theme.Volt, CFrame.new(0, -0.95, 0), false)
+end
+
+type DroneFlight = {
+	t0: number,
+	trip: number,
+	from: Vector3, -- где взлетел (над банкой)
+	station: Vector3, -- куда везёт заряд
+	out: Vector3?, -- откуда полетел к подстанции (после взлёта)
+	dropped: boolean,
+	landT: number?, -- начал садиться в банку
+	landFrom: Vector3?,
+	pos: Vector3,
+}
+local flight: DroneFlight? = nil
+local droneShown = false
+local droneMoveParts: { BasePart } = {}
+local droneMoveCFs: { CFrame } = {}
+
+local function bezier(a: Vector3, ctrl: Vector3, b: Vector3, t: number): Vector3
+	local e = t * t * (3 - 2 * t)
+	return a:Lerp(ctrl, e):Lerp(ctrl:Lerp(b, e), e)
+end
+
+local function hideDrone()
+	if not droneShown then
+		return
+	end
+	droneShown = false
+	for _, dp in droneParts do
+		dp.part.Transparency = 1
+		dp.part.CFrame = HIDDEN
+	end
+end
+
+local function droneDepart(trip: number)
+	local from = jarPosOf(player)
+	if not from then
+		return
+	end
+	local station = nearestStation(from)
+	flight = {
+		t0 = os.clock(),
+		trip = math.max(1, trip),
+		from = from,
+		-- нет подстанции рядом — просто кружит над игроком
+		station = if station then station + Vector3.new(0, 7, 0) else from + Vector3.new(0, 14, 0),
+		out = nil,
+		dropped = false,
+		landT = nil,
+		landFrom = nil,
+		pos = from,
+	}
+	droneShown = true
+	for _, dp in droneParts do
+		dp.part.Transparency = if dp.spin then 0.35 else 0
+	end
+	droneOrb.Transparency = 0.05
+	Sounds.play("Sell", 1.25, 0.6)
+	Juice.popup(from + Vector3.new(0, 2.5, 0), "🤖 Дрон везёт заряд", Theme.Electric, false)
+end
+
+local function droneLand(clock: number)
+	local f = flight
+	if f and not f.landT then
+		f.landT = clock
+		f.landFrom = f.pos
+	end
+end
+
+local function updateDrone(clock: number)
+	local f = flight
+	if not f then
+		hideDrone()
+		return
+	end
+	local home = (jarPosOf(player) or f.from) + Vector3.new(0, 4, 0)
+	local t = clock - f.t0
+	local pos: Vector3
+	local landT = f.landT
+	local scale = 1
+	if landT then
+		local k = math.clamp((clock - landT) / DRONE_LAND, 0, 1)
+		pos = (f.landFrom or home):Lerp(home - Vector3.new(0, 4, 0), k)
+		scale = 1 - 0.8 * k
+		if k >= 1 then
+			flight = nil
+			hideDrone()
+			return
+		end
+	elseif t < DRONE_RISE then
+		pos = f.from:Lerp(home, t / DRONE_RISE)
+	elseif t < f.trip * DRONE_OUT then
+		local out = f.out or home
+		f.out = out
+		local k = (t - DRONE_RISE) / math.max(0.05, f.trip * DRONE_OUT - DRONE_RISE)
+		pos = bezier(out, out:Lerp(f.station, 0.5) + Vector3.new(0, 10, 0), f.station, k)
+	elseif t < f.trip * DRONE_BACK then
+		pos = f.station + Vector3.new(0, math.sin(clock * 5) * 0.4, 0)
+		if not f.dropped and t >= f.trip * DRONE_DROP then
+			f.dropped = true
+			droneOrb.Transparency = 1
+			launchOrbs(pos, f.station - Vector3.new(0, 4, 0))
+		end
+	elseif t < f.trip then
+		local k = (t - f.trip * DRONE_BACK) / math.max(0.05, f.trip * (1 - DRONE_BACK))
+		pos = bezier(f.station, f.station:Lerp(home, 0.5) + Vector3.new(0, 8, 0), home, k)
+	else
+		pos = home + Vector3.new(0, math.sin(clock * 5) * 0.3, 0)
+		if t >= f.trip + DRONE_WAIT then
+			droneLand(clock) -- "sold" так и не пришёл
+		end
+	end
+	if not f.dropped and t >= f.trip * DRONE_DROP then
+		f.dropped = true
+		droneOrb.Transparency = 1
+	end
+	f.pos = pos
+	-- лёгкое покачивание корпуса и вращение винтов
+	local base = CFrame.new(pos) * CFrame.Angles(0, clock * 0.8, math.sin(clock * 2.2) * 0.08)
+	local n = 0
+	for _, dp in droneParts do
+		n += 1
+		local off = dp.offset
+		if dp.spin then
+			off = off * CFrame.Angles(0, clock * 28, 0)
+		end
+		if scale ~= 1 then
+			off = CFrame.new(off.Position * scale) * off.Rotation
+		end
+		droneMoveParts[n] = dp.part
+		droneMoveCFs[n] = base * off
+	end
+	Workspace:BulkMoveTo(droneMoveParts, droneMoveCFs, Enum.BulkMoveMode.FireCFrameChanged)
+end
+
+----------------------------------------------------------------------
 -- Разовые эффекты
 ----------------------------------------------------------------------
 local lastBurst = -math.huge
@@ -1024,7 +1188,10 @@ local function onEffect(msg: Net.EffectMsg)
 		end
 	elseif msg.Kind == "sell" then
 		onSell(msg, subject)
+	elseif msg.Kind == "drone" and m.Text == "depart" and subject == player then
+		droneDepart(if typeof(m.Value) == "number" then math.clamp(m.Value, 0, 60) else Config.Drone.TripTime)
 	elseif msg.Kind == "drone" and m.Text == "sold" and subject == player then
+		droneLand(os.clock())
 		local value = if typeof(m.Value) == "number" then m.Value else 0
 		local root = rootOf(player.Character)
 		if root and value > 0 then
@@ -1107,6 +1274,7 @@ function CharacterFX.start()
 		end
 		updateArcs(clock)
 		updateParticles(clock, dt)
+		updateDrone(clock)
 	end)
 end
 

@@ -431,7 +431,8 @@ function FulguriteService.grant(player: Player, color: Config.ColorId, zone: num
 	return rec
 end
 
--- Шанс фульгурита при ИДЕАЛЬНОЙ поимке (StrikeService.dropHook). Возвращает Id нового фульгурита.
+-- Шанс фульгурита при ИДЕАЛЬНОЙ поимке (StrikeService.dropHook; радужная и чёрная — при любой поимке, шанс 100%).
+-- Возвращает Id нового фульгурита.
 function FulguriteService.tryDrop(player: Player, color: Config.ColorId, zone: number, tag: string?): number?
 	local d = DataService.get(player)
 	if not d or not isColor(color) then

@@ -163,6 +163,7 @@ function PetService.hasRoom(player: Player): boolean
 end
 
 -- Подарить питомца (награда календаря и т.п.). equip ~= false — надеть, если есть свободный слот.
+-- Клиент получает Effect "hatch" — тот же показ подарка, что у бесплатного кокона.
 -- nil — нет такого вида, нет места или данные не загружены.
 function PetService.grantPet(player: Player, kind: string, equip: boolean?): PetRecord?
 	if typeof(kind) ~= "string" or not Pets.Kinds[kind] then
@@ -176,11 +177,13 @@ function PetService.grantPet(player: Player, kind: string, equip: boolean?): Pet
 	DataService.update(player, function(data)
 		rec = addRecord(data, kind, equip ~= false)
 	end)
-	if rec then
+	local granted = rec
+	if granted then
 		syncAttr(player)
 		announce(player, kind)
+		effect(player, { Kind = "hatch", Text = kind, Value = granted.Id, UserId = player.UserId })
 	end
-	return rec
+	return granted
 end
 
 -- Бесплатный кокон (награда календаря, код): вылупляется как купленный (Pity, статистика, задания),
