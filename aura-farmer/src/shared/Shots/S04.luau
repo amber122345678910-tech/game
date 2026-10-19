@@ -17,8 +17,8 @@ local function dir(x: number, y: number, f: number): Vector3
 	return PLACE:VectorToWorldSpace(Vector3.new(x, y, -f)).Unit
 end
 
-local CAM = at(3.2, 3.9, 3.6)
-local LOOK = at(0, 5.35, 0.2)
+local CAM = at(3.5, 4.4, 3.9)
+local LOOK = at(0, 5.6, 0.2)
 
 return {
 	id = "S04",
@@ -35,8 +35,8 @@ return {
 	},
 	camera = {
 		keys = {
-			{ t = 3.8667, pos = CAM, look = LOOK, fov = 36, blur = 0 },
-			{ t = 4.9667, pos = CAM, look = LOOK, fov = 36, blur = 0 },
+			{ t = 3.8667, pos = CAM, look = LOOK, fov = 32, blur = 0 },
+			{ t = 4.9667, pos = CAM, look = LOOK, fov = 32, blur = 0 },
 		},
 		focus = { actor = "Horse", part = "Head" },
 	},

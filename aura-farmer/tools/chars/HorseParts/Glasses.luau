@@ -16,7 +16,7 @@ local Glasses = {}
 local LENS_C = { 0.012, -0.022 } -- центр эллипса
 local LENS_A, LENS_B = 0.238, 0.188 -- полуоси
 local LENS_ROT = -17 -- наклон большой оси (наружу-вниз): каплевидный силуэт
-local BAR_V = 0.15 -- высота брау-планки (верх линзы)
+local BAR_V = 0.152 -- высота брау-планки (верх линзы)
 
 local function lensPt(t)
 	-- точка эллипса по углу t (градусы) в координатах оправы (правая линза)
@@ -41,7 +41,13 @@ function Glasses.build(g, opts)
 		g:ell("Glasses", lcf, V(LENS_A * 2, LENS_B * 2, 0.014), lensColor, "Glass", nil, { transparency = 0.3, castShadow = false, name = "Lens" })
 		-- оправа по нижней дуге (от планки до планки)
 		local pts = {}
-		local t0, t1 = 22, 162 -- углы, где эллипс пересекает планку (подобраны под BAR_V)
+		-- углы, где эллипс пересекает планку: v(t) = c + R*sin(t - phi)
+		local r = rad(LENS_ROT)
+		local ka, kb = LENS_A * math.sin(r), LENS_B * math.cos(r)
+		local R = math.sqrt(ka * ka + kb * kb)
+		local phi = math.deg(math.atan2(-ka, kb))
+		local k = math.deg(math.asin(math.clamp((BAR_V - LENS_C[2]) / R, -1, 1)))
+		local t0, t1 = phi + k, phi + 180 - k
 		for i = 0, 14 do
 			local t = t1 + (360 + t0 - t1) * i / 14
 			local u, v = lensPt(t)
@@ -53,7 +59,7 @@ function Glasses.build(g, opts)
 		return frames[s] * V(s * u, v, -0.004)
 	end
 	-- брау-планка: от внешнего края одной линзы до другой (прямая, двойная толщина)
-	g:caps("Glasses", { fp(1, 0.23, BAR_V - 0.004), fp(1, -0.2, BAR_V + 0.004), fp(-1, -0.2, BAR_V + 0.004), fp(-1, 0.23, BAR_V - 0.004) }, 0.034, P.frame, "Metal")
+	g:caps("Glasses", { fp(1, 0.23, BAR_V - 0.004), fp(1, -0.2, BAR_V + 0.004), fp(-1, -0.2, BAR_V + 0.004), fp(-1, 0.23, BAR_V - 0.004) }, 0.038, P.frame, "Metal")
 	-- нижний мост-дуга между линзами
 	local a, b = fp(1, -0.205, 0.06), fp(-1, -0.205, 0.06)
 	local m = a:Lerp(b, 0.5) + V(0, 0.045, -0.015)

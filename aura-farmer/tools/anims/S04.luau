@@ -14,8 +14,8 @@ local function fist(x, y, f)
 	return { ik = { x, y, f }, space = "chest", pole = POLE, wrist = { palm = PALM, fingers = UP } }
 end
 
-local NOD = 35
-local LEAN = -12
+local NOD = 28
+local LEAN = -10
 
 -- t, root.turn, waist.turn, waist.bend, neck.turn, neck.nod, neck.tilt, ease, root.x, root.y, root.f
 local body = {
