@@ -5,8 +5,20 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Config = require(script.Parent.Config)
+local Loc = require(script.Parent.Loc)
 
 local Net = {}
+
+----------------------------------------------------------------------
+-- Тексты для игрока
+----------------------------------------------------------------------
+-- Сервер не знает языка игрока: всё, что клиент покажет (Notify, Banner, ошибки и результаты Request),
+-- он отправляет строкой-исходником или Loc.msg(исходник, аргументы...); клиент рисует через Loc.render
+export type Text = string | Loc.Msg
+
+-- Notify:FireClient(player, text: Text, kind: NotifyKind)
+export type NotifyKind = "good" | "bad" | "info" | "rare"
+-- Banner:FireAllClients(text: Text, kind: string (редкость или вид события), color: Color3?)
 
 ----------------------------------------------------------------------
 -- Сообщения
@@ -69,6 +81,8 @@ export type ShardMsg = {
 }
 
 -- Сервер → клиенты: разовые эффекты
+-- Text — служебный id (имя окна, вид питомца, состояние дрона, id улучшения), у "zoneUnlocked" — имя острова
+-- (исходник: клиент показывает Loc.t(Text))
 -- Kind: "rainbowWarn" | "perun" | "witness" | "ballBurst" | "zoneUnlocked" | "levelUp" | "hatch" | "cityLit" | "chain" | "sell" | "drone"
 --  | "shard" (Value = Id осколка: сервер засчитал его подбор)
 --  | "openWindow" (Text = имя окна) | "face" (Pos — куда сервер поставил персонажа лицом к центру острова:
@@ -87,9 +101,10 @@ export type EffectMsg = {
 ----------------------------------------------------------------------
 -- Запросы клиента (RemoteFunction "Request")
 -- Request:InvokeServer(action, payload) -> (ok: boolean, result: any)
--- result при ok=false — текст ошибки для игрока: строка-исходник или Loc.Msg (клиент рисует через Loc.render)
+-- result при ok=false — текст ошибки для игрока (Net.Text: строка-исходник или Loc.Msg, клиент рисует через Loc.render);
+-- при ok=true — данные действия (см. ниже) или текст для игрока (Net.Text: ClaimDaily, ClaimQuest, RedeemCode)
 --
--- Тексты для игрока в Notify (text, kind) и Banner (text, kind, color?) — тоже строка-исходник или Loc.Msg:
+-- Тексты для игрока в Notify (text, kind) и Banner (text, kind, color?) — тоже Net.Text:
 -- сервер не знает языка игрока, переводит клиент (src/shared/Loc.luau)
 ----------------------------------------------------------------------
 Net.Actions = {

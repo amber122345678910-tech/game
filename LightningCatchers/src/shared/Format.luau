@@ -1,5 +1,6 @@
 --!strict
--- Форматирование чисел и времени для интерфейса.
+-- Форматирование чисел и времени для интерфейса (не зависит от языка: K/M, «1:15», «x1.5», «25%»).
+-- Слова для игрока — через Loc (src/shared/Loc.luau), множественное число — Loc.plural.
 
 local Format = {}
 
@@ -51,7 +52,8 @@ function Format.time(seconds: number): string
 	return string.format("%d:%02d", m, s)
 end
 
--- Русское множественное число: plural(5, "звезда", "звезды", "звёзд") -> "звёзд"
+-- Русское множественное число: plural(5, "звезда", "звезды", "звёзд") -> "звёзд".
+-- Только русский: для текста игроку — Loc.plural(n, "звезда|звезды|звёзд") (переводится на язык игрока)
 function Format.plural(n: number, one: string, few: string, many: string): string
 	local a = math.abs(math.floor(n)) % 100
 	local b = a % 10

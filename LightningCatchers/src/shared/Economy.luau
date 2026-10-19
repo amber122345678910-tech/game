@@ -4,6 +4,7 @@
 
 local Config = require(script.Parent.Config)
 local Format = require(script.Parent.Format)
+local Loc = require(script.Parent.Loc)
 local Pets = require(script.Parent.Pets)
 local Fulgurite = require(script.Parent.Fulgurite)
 local PlayerData = require(script.Parent.PlayerData)
@@ -55,20 +56,24 @@ function Economy.zapStun(insulationLevel: number): number
 	return math.max(0.2, Config.Catch.ZapStun - Config.UpgradeEffects.InsulationStunPerLevel * insulationLevel)
 end
 
--- Текст эффекта для магазина: текущий и следующий уровень
+-- Текст эффекта для магазина (клиент, язык игрока): текущий и следующий уровень
 function Economy.effectText(id: Config.UpgradeId, level: number): string
 	if id == "Rod" then
-		return string.format("заряд ×%s", Economy.shortMult(Economy.rodMult(level)))
+		return Loc.t("заряд ×%s", Economy.shortMult(Economy.rodMult(level)))
 	elseif id == "Jar" then
 		-- «вместимость 25», «вместимость 1.2K»: без слова после числа — не нужно согласовывать падеж
-		return "вместимость " .. Format.short(Economy.jarCapacity(level))
+		return Loc.t("вместимость %s", Format.short(Economy.jarCapacity(level)))
 	elseif id == "Boots" then
-		return string.format("скорость %d", Economy.walkSpeed(level))
+		return Loc.t("скорость %d", Economy.walkSpeed(level))
 	elseif id == "Magnet" then
 		local extra = Economy.extraRings(level)
-		return string.format("частота +%d%%%s", math.floor((Economy.rateMult(level) - 1) * 100 + 0.5), if extra > 0 then string.format(", колец +%d", extra) else "")
+		local rate = math.floor((Economy.rateMult(level) - 1) * 100 + 0.5)
+		if extra > 0 then
+			return Loc.t("частота +%d%%, колец +%d", rate, extra)
+		end
+		return Loc.t("частота +%d%%", rate)
 	else
-		return string.format("риск −%d%%", math.floor(Config.UpgradeEffects.InsulationRiskPerLevel * level * 100 + 0.5))
+		return Loc.t("риск −%d%%", math.floor(Config.UpgradeEffects.InsulationRiskPerLevel * level * 100 + 0.5))
 	end
 end
 

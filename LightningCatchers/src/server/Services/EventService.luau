@@ -23,6 +23,7 @@ local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Config = require(Shared:WaitForChild("Config"))
 local Economy = require(Shared:WaitForChild("Economy"))
 local Format = require(Shared:WaitForChild("Format"))
+local Loc = require(Shared:WaitForChild("Loc"))
 local Net = require(Shared:WaitForChild("Net"))
 local Signal = require(Shared:WaitForChild("Signal"))
 local Strikes = require(Shared:WaitForChild("Strikes"))
@@ -63,12 +64,12 @@ local RAINBOW_SPOT_TRIES = 12
 local RAINBOW_SPOT_SPREAD = 0.35 -- доля игрового радиуса вокруг центра острова
 local NAMES_IN_BANNER = 4
 
-type Plan = { Period: number, Offset: number, Attr: string, Name: string }
+type Plan = { Period: number, Offset: number, Attr: string, Name: Loc.Msg }
 
 local PLANS: { [Kind]: Plan } = {
-	supercell = { Period = EV.Supercell.Period, Offset = EV.Supercell.Offset, Attr = "NextSupercell", Name = "⚡ Суперячейка" },
-	ball = { Period = BALL.Period, Offset = BALL.Offset, Attr = "NextBall", Name = "🔮 Шаровая молния" },
-	rainbow = { Period = RAIN.Period, Offset = RAIN.Offset, Attr = "NextRainbow", Name = "🌈 Радужная молния" },
+	supercell = { Period = EV.Supercell.Period, Offset = EV.Supercell.Offset, Attr = "NextSupercell", Name = Loc.msg("⚡ Суперячейка") },
+	ball = { Period = BALL.Period, Offset = BALL.Offset, Attr = "NextBall", Name = Loc.msg("🔮 Шаровая молния") },
+	rainbow = { Period = RAIN.Period, Offset = RAIN.Offset, Attr = "NextRainbow", Name = Loc.msg("🌈 Радужная молния") },
 }
 -- при одинаковом времени: сначала самое редкое
 local PRIORITY: { Kind } = { "rainbow", "ball", "supercell" }
@@ -99,21 +100,21 @@ local function setAttr(name: string, value: any)
 	end
 end
 
-local function notify(player: Player, text: string, kind: string)
+local function notify(player: Player, text: Loc.Msg | string, kind: string)
 	local r = notifyRemote
 	if r then
 		r:FireClient(player, text, kind)
 	end
 end
 
-local function notifyAll(text: string, kind: string)
+local function notifyAll(text: Loc.Msg | string, kind: string)
 	local r = notifyRemote
 	if r then
 		r:FireAllClients(text, kind)
 	end
 end
 
-local function banner(text: string, kind: string, color: Color3?)
+local function banner(text: Loc.Msg | string, kind: string, color: Color3?)
 	local r = bannerRemote
 	if r then
 		r:FireAllClients(text, kind, color)
@@ -191,14 +192,14 @@ local function randomPlayPoint(zone: number, spread: number, margin: number): Ve
 	return Zones.clampToPlay(zone, g.Center + Vector3.new(math.cos(a) * r, 0, math.sin(a) * r), margin)
 end
 
-local function namesText(list: { string }): string
+local function namesText(list: { string }): Loc.Msg | string
 	local shown = {}
 	for i = 1, math.min(#list, NAMES_IN_BANNER) do
 		table.insert(shown, list[i])
 	end
 	local text = table.concat(shown, ", ")
 	if #list > NAMES_IN_BANNER then
-		text ..= string.format(" и ещё %d", #list - NAMES_IN_BANNER)
+		return Loc.msg("%s и ещё %d", text, #list - NAMES_IN_BANNER)
 	end
 	return text
 end
@@ -279,11 +280,11 @@ local function runSupercell(t0: number)
 	currentEnds = ends
 	setAttr("EventEnds", ends)
 	setAttr("Event", "supercell")
-	banner("⚡ СУПЕРЯЧЕЙКА! Молнии чаще и дороже!", "event")
+	banner(Loc.msg("⚡ СУПЕРЯЧЕЙКА! Молнии чаще и дороже!"), "event")
 	while now() < ends do
 		task.wait(TICK)
 	end
-	notifyAll("Суперячейка закончилась — до следующей!", "info")
+	notifyAll(Loc.msg("Суперячейка закончилась — до следующей!"), "info")
 end
 
 ----------------------------------------------------------------------
@@ -337,7 +338,7 @@ local function runBall(t0: number): boolean
 	setAttr("BallHp", hp)
 	setAttr("EventEnds", ends)
 	setAttr("Event", "ball")
-	banner(string.format("🔮 ШАРОВАЯ МОЛНИЯ над островом «%s»! Ловите её кольца вместе!", Config.Zones[zone].Name), "event", Config.Colors.gold.Color)
+	banner(Loc.msg("🔮 ШАРОВАЯ МОЛНИЯ над островом «%s»! Ловите её кольца вместе!", Config.Zones[zone].Name), "event", Config.Colors.gold.Color)
 
 	local function posAt(t: number): Vector3
 		local k = math.clamp((t - t0) / math.max(1e-3, ends - t0), 0, 1)
@@ -349,14 +350,14 @@ local function runBall(t0: number): boolean
 		for _, p in playersIn(zone) do
 			effectTo(p, { Kind = "ballBurst", Pos = pos, Zone = zone })
 		end
-		banner("🔮 Шаровая молния повержена!", "event", Config.Colors.gold.Color)
+		banner(Loc.msg("🔮 Шаровая молния повержена!"), "event", Config.Colors.gold.Color)
 		for p, n in contrib do
 			local d = DataService.get(p)
 			if d and p.Parent == Players then
 				local share = if total > 0 then n / total else 0
 				local volts = EconomyService.grantVolts(p, Economy.incomeMinutes(d, BALL_MINUTES + BALL_SHARE_MINUTES * share), "ball")
 				local shards = EconomyService.grantShards(p, BALL_SHARDS)
-				notify(p, string.format("🔮 Шаровая молния повержена! +%s ⚡ +%s 💎", Format.short(volts), Format.short(shards)), "good")
+				notify(p, Loc.msg("🔮 Шаровая молния повержена! +%s ⚡ +%s 💎", Format.short(volts), Format.short(shards)), "good")
 			end
 		end
 	end
@@ -421,12 +422,12 @@ local function runBall(t0: number): boolean
 
 	if not dead then
 		dead = true
-		banner("🔮 Шаровая молния ушла...", "info")
+		banner(Loc.msg("🔮 Шаровая молния ушла..."), "info")
 		for p in contrib do
 			local d = DataService.get(p)
 			if d and p.Parent == Players then
 				local volts = EconomyService.grantVolts(p, Economy.incomeMinutes(d, BALL_CONSOLATION_MINUTES), "ball")
-				notify(p, string.format("Шаровая молния ушла… Утешительный приз: +%s ⚡", Format.short(volts)), "info")
+				notify(p, Loc.msg("Шаровая молния ушла… Утешительный приз: +%s ⚡", Format.short(volts)), "info")
 			end
 		end
 	end
@@ -457,10 +458,10 @@ local function runRainbow(t0: number)
 	setAttr("EventEnds", ends)
 	setAttr("Event", "rainbow")
 	effectAll({ Kind = "rainbowWarn" })
-	banner("🌈 РАДУЖНАЯ МОЛНИЯ НАДВИГАЕТСЯ! Ударит на каждом острове с ловцами!", "rainbow")
+	banner(Loc.msg("🌈 РАДУЖНАЯ МОЛНИЯ НАДВИГАЕТСЯ! Ударит на каждом острове с ловцами!"), "rainbow")
 	for _, p in Players:GetPlayers() do
 		if PlayerService.getZone(p) == 0 then
-			notify(p, string.format("🌈 Беги на остров — через %d с там ударит Радужная молния!", math.floor(RAIN.Announce)), "rare")
+			notify(p, Loc.msg("🌈 Беги на остров — через %d с там ударит Радужная молния!", math.floor(RAIN.Announce)), "rare")
 		end
 	end
 
@@ -483,7 +484,7 @@ local function runRainbow(t0: number)
 		end
 		-- радужный фульгурит уже выдал StrikeService (dropHook при любой поимке — до результата удара)
 		local volts = EconomyService.grantVolts(player, Economy.incomeMinutes(d, RAIN.RewardMinutes), "rainbow")
-		notify(player, string.format("🌈 Радужная молния твоя! +%s ⚡", Format.short(volts)), "rare")
+		notify(player, Loc.msg("🌈 Радужная молния твоя! +%s ⚡", Format.short(volts)), "rare")
 		EventService.HallEntry:Fire(player, "rainbow")
 	end
 
@@ -511,9 +512,9 @@ local function runRainbow(t0: number)
 		task.wait(0.1)
 	end
 	if #names > 0 then
-		banner("🌈 Радужную молнию поймали: " .. namesText(names) .. "!", "rainbow")
+		banner(Loc.msg("🌈 Радужную молнию поймали: %s!", namesText(names)), "rainbow")
 	else
-		banner("🌈 Радужная молния ушла... В следующий раз!", "info")
+		banner(Loc.msg("🌈 Радужная молния ушла... В следующий раз!"), "info")
 	end
 end
 
@@ -523,12 +524,12 @@ end
 
 -- Чёрное кольцо только появилось: ещё никто не поймал — «бьёт рядом с», а не «Ловец»
 local function onPerun(player: Player, msg: Net.StrikeMsg)
-	banner(string.format("☠ ЧЁРНАЯ МОЛНИЯ ПЕРУНА бьёт рядом с %s!", player.DisplayName), "perun")
+	banner(Loc.msg("☠ ЧЁРНАЯ МОЛНИЯ ПЕРУНА бьёт рядом с %s!", player.DisplayName), "perun")
 	effectAll({ Kind = "perun", Pos = msg.Pos, UserId = player.UserId, Zone = msg.Zone })
 end
 
 local function onPerunCaught(player: Player, zone: number)
-	banner(string.format("☠ Чёрная молния Перуна поймана! Ловец: %s", player.DisplayName), "perun")
+	banner(Loc.msg("☠ Чёрная молния Перуна поймана! Ловец: %s", player.DisplayName), "perun")
 	-- Перунов фульгурит уже выдал StrikeService (dropHook при любой поимке — до результата удара)
 	EventService.HallEntry:Fire(player, "perun")
 	local root = PlayerService.getRoot(player)
@@ -543,7 +544,7 @@ local function onPerunCaught(player: Player, zone: number)
 			if r and d and (r.Position - center).Magnitude <= PERUN.WitnessRadius then
 				local volts = EconomyService.grantVolts(other, Economy.incomeMinutes(d, PERUN.WitnessMinutes), "witness")
 				effectTo(other, { Kind = "witness", Value = volts, UserId = player.UserId, Pos = center, Zone = zone })
-				notify(other, string.format("☠ Я видел Чёрную молнию! +%s ⚡", Format.short(volts)), "rare")
+				notify(other, Loc.msg("☠ Я видел Чёрную молнию! +%s ⚡", Format.short(volts)), "rare")
 			end
 		end
 	end
@@ -598,7 +599,7 @@ local function tick()
 			nextAt[due] = occurrenceAfter(due, t)
 			if due == "ball" and busiestIsland() == nil then
 				-- шару некуда лететь: пропускаем до следующего раза
-				notifyAll("🔮 Шаровая молния не нашла ловцов — все в городе", "info")
+				notifyAll(Loc.msg("🔮 Шаровая молния не нашла ловцов — все в городе"), "info")
 			else
 				startEvent(due, t)
 			end
@@ -612,7 +613,7 @@ local function tick()
 		local left = at - t
 		if kind ~= current and left > 0 and left <= EV.WarnBefore and warnedFor[kind] ~= nextAt[kind] then
 			warnedFor[kind] = nextAt[kind]
-			notifyAll(string.format("%s через %d с!", plan.Name, math.ceil(left)), "info")
+			notifyAll(Loc.msg("%s через %d с!", plan.Name, math.ceil(left)), "info")
 		end
 	end
 end
@@ -653,7 +654,7 @@ function EventService.start()
 		if info.grade == "perfect" or info.grade == "good" then
 			onPerunCaught(player, info.zone)
 		else
-			banner("☠ Чёрная молния Перуна ушла в землю — в другой раз!", "info")
+			banner(Loc.msg("☠ Чёрная молния Перуна ушла в землю — в другой раз!"), "info")
 		end
 	end)
 

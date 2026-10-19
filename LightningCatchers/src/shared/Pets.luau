@@ -1,6 +1,8 @@
 --!strict
 -- Питомцы-искрята: виды, коконы, шансы, бонусы. Чистая логика (без инстансов).
+-- Имена (Name) — русские исходники и ключи словаря: показываются через Loc.t(def.Name), переводы — в Strings/Shared.luau.
 
+local Loc = require(script.Parent.Loc)
 local Rng = require(script.Parent.Rng)
 
 export type Rarity = "common" | "rare" | "epic" | "legendary" | "mythic"
@@ -40,6 +42,7 @@ Pets.Rarities = {
 	mythic = { Name = "Мифический", Color = Color3.fromRGB(255, 70, 160), Rank = 5 },
 } :: { [Rarity]: { Name: string, Color: Color3, Rank: number } }
 
+-- Исходники для Loc.t (переводы — в Strings/Shared.luau)
 Pets.BonusNames = {
 	volts = "⚡ Вольты",
 	luck = "🍀 Удача",
@@ -195,15 +198,22 @@ function Pets.totalBonus(kinds: { string }): Bonuses
 	return b
 end
 
-function Pets.bonusText(kind: string): string
+-- Бонус питомца сообщением (переводит клиент: Loc.render): «⚡ Вольты +20%», «🎯 Окно ИДЕАЛЬНО +15 мс»
+function Pets.bonusMsg(kind: string): Loc.Msg?
 	local d = Pets.Kinds[kind]
 	if not d then
-		return ""
+		return nil
 	end
 	if d.Bonus == "window" then
-		return string.format("%s +%d мс", Pets.BonusNames.window, d.Value)
+		return Loc.msg("%s +%d мс", Pets.BonusNames.window, d.Value)
 	end
-	return string.format("%s +%d%%", Pets.BonusNames[d.Bonus], math.floor(d.Value * 100 + 0.5))
+	return Loc.msg("%s +%d%%", Pets.BonusNames[d.Bonus], math.floor(d.Value * 100 + 0.5))
+end
+
+-- Бонус питомца текстом на языке игрока (клиент)
+function Pets.bonusText(kind: string): string
+	local m = Pets.bonusMsg(kind)
+	return if m then Loc.render(m) else ""
 end
 
 return Pets

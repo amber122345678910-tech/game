@@ -6,6 +6,7 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
+local Loc = require(Shared:WaitForChild("Loc"))
 local Net = require(Shared:WaitForChild("Net"))
 
 local DataService = require(script.Parent.DataService)
@@ -25,12 +26,12 @@ TutorialService.Steps = {
 
 local function tutorialStep(player: Player, payload: any): (boolean, any)
 	if typeof(payload) ~= "string" or not TutorialService.Steps[payload] then
-		return false, "Неизвестный шаг обучения"
+		return false, Loc.msg("Неизвестный шаг обучения")
 	end
 	local step: string = payload
 	local d = DataService.get(player)
 	if not d then
-		return false, "Данные ещё загружаются"
+		return false, Loc.msg("Данные ещё загружаются")
 	end
 	if d.Tutorial[step] ~= true then
 		DataService.update(player, function(data)

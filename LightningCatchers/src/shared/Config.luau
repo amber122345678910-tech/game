@@ -1,6 +1,8 @@
 --!strict
 -- Все настройки игры в одном месте: баланс, острова, молнии, улучшения, события.
 -- Меняешь числа здесь — меняется игра (и тесты/симуляция баланса берут их отсюда же).
+-- Имена и описания (Name, Short, Desc) — русские исходники и ключи словаря: показываются через Loc.t(def.Name),
+-- английские переводы — в Strings/Shared.luau (глоссарий).
 
 local Config = {}
 
@@ -14,7 +16,7 @@ export type ColorId = "blue" | "purple" | "green" | "red" | "gold" | "rainbow" |
 
 export type ColorDef = {
 	Id: ColorId,
-	Name: string, -- "Голубая"
+	Name: string, -- "Голубая" (исходник для Loc.t)
 	Mult: number, -- множитель заряда
 	Color: Color3,
 	Icon: string, -- значок в кольце и в интерфейсе
@@ -42,6 +44,7 @@ Config.NormalColors = { "blue", "purple", "green", "red", "gold" } :: { ColorId 
 ----------------------------------------------------------------------
 export type KindId = "single" | "double" | "fork" | "fake" | "runner"
 
+-- Name показывать через Loc.t("kind::" .. def.Name): «Обычный» удар по-английски Normal, а редкость «Обычный» — Common
 Config.Kinds = {
 	single = { Name = "Обычный", FromZone = 1, Hits = { 0 } },
 	double = { Name = "Двойной", FromZone = 2, Hits = { 0, 0.45 } },
@@ -55,8 +58,8 @@ Config.Kinds = {
 ----------------------------------------------------------------------
 export type ZoneDef = {
 	Index: number,
-	Name: string,
-	Short: string,
+	Name: string, -- исходник для Loc.t
+	Short: string, -- короткое имя (исходник для Loc.t)
 	BaseCharge: number, -- заряд голубой молнии при оценке ХОРОШО без улучшений
 	Warning: number, -- секунд от появления кольца до удара
 	Interval: number, -- средний интервал между новыми кольцами (с)
@@ -445,11 +448,17 @@ Config.DailyRewards = {
 	{ Kind = "pet", Pet = "gromik" },
 } :: { { Kind: string, Amount: number?, Shards: number?, Cocoon: string?, Pet: string? } }
 
+-- Коды (ключ — в верхнем регистре, без пробелов: так их нормализует DailyService.normalizeCode).
+-- Английские имена тех же кодов — с AliasOf: та же награда, а отметка «использован» общая с основным кодом
+-- (d.Codes[AliasOf]), чтобы одну награду не забрать дважды на двух языках.
 Config.Codes = {
-	["МОЛНИЯ"] = { Kind = "shards", Amount = 50 },
-	["ПЕРУН"] = { Kind = "boost", Amount = 10 },
-	["ГРОЗА"] = { Kind = "cocoon", Cocoon = "meadow" },
-} :: { [string]: { Kind: string, Amount: number?, Cocoon: string? } }
+	["МОЛНИЯ"] = { Kind = "shards", Amount = 50 }, -- noloc
+	["ПЕРУН"] = { Kind = "boost", Amount = 10 }, -- noloc
+	["ГРОЗА"] = { Kind = "cocoon", Cocoon = "meadow" }, -- noloc
+	LIGHTNING = { Kind = "shards", Amount = 50, AliasOf = "МОЛНИЯ" }, -- noloc
+	PERUN = { Kind = "boost", Amount = 10, AliasOf = "ПЕРУН" }, -- noloc
+	STORM = { Kind = "cocoon", Cocoon = "meadow", AliasOf = "ГРОЗА" }, -- noloc
+} :: { [string]: { Kind: string, Amount: number?, Cocoon: string?, AliasOf: string? } }
 
 Config.MinIncomePerMinute = 30 -- нижняя граница "дохода в минуту" для наград
 

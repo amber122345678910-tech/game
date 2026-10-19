@@ -8,6 +8,7 @@ local Workspace = game:GetService("Workspace")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Format = require(Shared:WaitForChild("Format"))
+local Loc = require(Shared:WaitForChild("Loc"))
 local Pets = require(Shared:WaitForChild("Pets"))
 
 local KioskService = {}
@@ -17,15 +18,16 @@ KioskService.PromptName = "KioskPrompt"
 local ACTIVATION_DISTANCE = 10
 local MAP_WAIT = 30 -- сколько ждать карту, если её ещё нет
 
-type KioskDef = { Marker: string, Window: string, Action: string, Object: string }
+-- Action / Object — исходники надписей (Loc.msg): по-английски в свойстве, исходник в атрибуте (Loc.setWorldText)
+type KioskDef = { Marker: string, Window: string, Action: Loc.Msg, Object: Loc.Msg }
 
 local function definitions(): { KioskDef }
 	local list: { KioskDef } = {
-		{ Marker = "Kiosk_Shop", Window = "Shop", Action = "Магазин", Object = "Улучшения и острова" },
-		{ Marker = "Kiosk_Hatchery", Window = "Pets:cocoons", Action = "Коконы", Object = "Питомцы-искрята" },
-		{ Marker = "Kiosk_Gallery", Window = "Collection", Action = "Коллекция", Object = "Фульгуриты и Молниедекс" },
-		{ Marker = "Kiosk_Rebirth", Window = "Rebirth", Action = "Перезапуск", Object = "Генератор" },
-		{ Marker = "Kiosk_Daily", Window = "Daily", Action = "Награды", Object = "Календарь и задания" },
+		{ Marker = "Kiosk_Shop", Window = "Shop", Action = Loc.msg("Магазин"), Object = Loc.msg("Улучшения и острова") },
+		{ Marker = "Kiosk_Hatchery", Window = "Pets:cocoons", Action = Loc.msg("Коконы"), Object = Loc.msg("Питомцы-искрята") },
+		{ Marker = "Kiosk_Gallery", Window = "Collection", Action = Loc.msg("Коллекция"), Object = Loc.msg("Фульгуриты и Молниедекс") },
+		{ Marker = "Kiosk_Rebirth", Window = "Rebirth", Action = Loc.msg("Перезапуск"), Object = Loc.msg("Генератор") },
+		{ Marker = "Kiosk_Daily", Window = "Daily", Action = Loc.msg("Награды"), Object = Loc.msg("Календарь и задания") },
 	}
 	for _, id in Pets.CocoonOrder do
 		local c = Pets.Cocoons[id]
@@ -33,8 +35,8 @@ local function definitions(): { KioskDef }
 			table.insert(list, {
 				Marker = "Cocoon_" .. id,
 				Window = "Pets:cocoons",
-				Action = "Вылупить",
-				Object = string.format("%s · %s 💎", c.Name, Format.short(c.Cost)),
+				Action = Loc.msg("Вылупить"),
+				Object = Loc.msg("%s · %s 💎", c.Name, Format.short(c.Cost)),
 			})
 		end
 	end
@@ -48,8 +50,8 @@ local function addPrompt(marker: Instance, def: KioskDef)
 	end
 	local prompt = Instance.new("ProximityPrompt")
 	prompt.Name = KioskService.PromptName
-	prompt.ActionText = def.Action
-	prompt.ObjectText = def.Object
+	Loc.setWorldText(prompt, "ActionText", "%s", def.Action)
+	Loc.setWorldText(prompt, "ObjectText", "%s", def.Object)
 	prompt.HoldDuration = 0
 	prompt.MaxActivationDistance = ACTIVATION_DISTANCE
 	prompt.RequiresLineOfSight = false

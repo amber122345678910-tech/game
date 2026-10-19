@@ -13,6 +13,7 @@ local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Config = require(Shared:WaitForChild("Config"))
 local Economy = require(Shared:WaitForChild("Economy"))
 local Format = require(Shared:WaitForChild("Format"))
+local Loc = require(Shared:WaitForChild("Loc"))
 local Net = require(Shared:WaitForChild("Net"))
 local PlayerData = require(Shared:WaitForChild("PlayerData"))
 local Signal = require(Shared:WaitForChild("Signal"))
@@ -34,8 +35,8 @@ EconomyService.Sold = Signal.new() :: Signal.Signal<Player, number, number>
 -- "Zone" -> номер острова, "Drone" -> 1, "Rebirth" -> число перезапусков
 EconomyService.Purchased = Signal.new() :: Signal.Signal<Player, string, number>
 
-local NO_VOLTS = "Не хватает Вольт"
-local LOADING = "Данные ещё загружаются"
+local NO_VOLTS = Loc.msg("Не хватает Вольт")
+local LOADING = Loc.msg("Данные ещё загружаются")
 
 type State = {
 	LastSell: number, -- os.clock последней сдачи
@@ -67,7 +68,7 @@ local bannerRemote: RemoteEvent? = nil
 -- Вспомогательное
 ----------------------------------------------------------------------
 
-local function notify(player: Player, text: string, kind: string)
+local function notify(player: Player, text: Loc.Msg | string, kind: string)
 	local r = notifyRemote
 	if r then
 		r:FireClient(player, text, kind)
@@ -231,7 +232,7 @@ function EconomyService.addCharge(player: Player, amount: number, zone: number, 
 		local clock = os.clock()
 		if becameFull or clock - st.LastFullNotify >= Config.Server.JarFullNotifyEvery then
 			st.LastFullNotify = clock
-			notify(player, "Банка полна! Сдай заряд ⚡", "info")
+			notify(player, Loc.msg("Банка полна! Сдай заряд ⚡"), "info")
 		end
 	end
 	return r.Added, r.Burst, r.Lost
@@ -482,7 +483,7 @@ end
 local function buyUpgrade(player: Player, payload: any): (boolean, any)
 	local def: Config.UpgradeDef? = if typeof(payload) == "string" then (Config.Upgrades :: any)[payload] else nil
 	if not def then
-		return false, "Неизвестное улучшение"
+		return false, Loc.msg("Неизвестное улучшение")
 	end
 	local id = def.Id
 	local d = DataService.get(player)
@@ -492,7 +493,7 @@ local function buyUpgrade(player: Player, payload: any): (boolean, any)
 	local level = upgradeLevel(d, id)
 	local cost = Economy.upgradeCost(id, level)
 	if not cost then
-		return false, "Уже максимальный уровень"
+		return false, Loc.msg("Уже максимальный уровень")
 	end
 	if d.Volts < cost then
 		return false, NO_VOLTS
@@ -511,7 +512,7 @@ end
 
 local function unlockZone(player: Player, payload: any): (boolean, any)
 	if not ServerLogic.isInteger(payload) or payload < 1 or payload > #Config.Zones then
-		return false, "Нет такого острова"
+		return false, Loc.msg("Нет такого острова")
 	end
 	local zone: number = payload
 	local d = DataService.get(player)
@@ -519,10 +520,10 @@ local function unlockZone(player: Player, payload: any): (boolean, any)
 		return false, LOADING
 	end
 	if zone <= d.Zone then
-		return false, "Остров уже открыт"
+		return false, Loc.msg("Остров уже открыт")
 	end
 	if zone ~= d.Zone + 1 then
-		return false, "Сначала открой предыдущий остров"
+		return false, Loc.msg("Сначала открой предыдущий остров")
 	end
 	local cost = Economy.zoneCost(zone)
 	if d.Volts < cost then
@@ -543,10 +544,10 @@ local function buyDrone(player: Player, _payload: any): (boolean, any)
 		return false, LOADING
 	end
 	if d.Drone then
-		return false, "Дрон уже куплен"
+		return false, Loc.msg("Дрон уже куплен")
 	end
 	if d.Zone < Config.Drone.FromZone then
-		return false, string.format("Дрон откроется с острова «%s»", Config.Zones[Config.Drone.FromZone].Name)
+		return false, Loc.msg("Дрон откроется с острова «%s»", Config.Zones[Config.Drone.FromZone].Name)
 	end
 	if d.Volts < Config.Drone.Cost then
 		return false, NO_VOLTS
@@ -563,14 +564,14 @@ end
 
 local function toggleDrone(player: Player, payload: any): (boolean, any)
 	if typeof(payload) ~= "boolean" then
-		return false, "Ошибка, попробуй ещё раз"
+		return false, RequestService.ErrorText
 	end
 	local d = DataService.get(player)
 	if not d then
 		return false, LOADING
 	end
 	if not d.Drone then
-		return false, "Сначала купи дрон"
+		return false, Loc.msg("Сначала купи дрон")
 	end
 	local on: boolean = payload
 	DataService.update(player, function(data)
@@ -586,10 +587,10 @@ local function rebirth(player: Player, _payload: any): (boolean, any)
 		return false, LOADING
 	end
 	if d.Zone < Config.Rebirth.RequiredZone then
-		return false, string.format("Сначала открой остров «%s»", Config.Zones[Config.Rebirth.RequiredZone].Name)
+		return false, Loc.msg("Сначала открой остров «%s»", Config.Zones[Config.Rebirth.RequiredZone].Name)
 	end
 	if not Economy.canRebirth(d) then
-		return false, string.format("Нужно %s ⚡", Format.short(Economy.rebirthCost(d.Rebirths)))
+		return false, Loc.msg("Нужно %s ⚡", Format.short(Economy.rebirthCost(d.Rebirths)))
 	end
 	local rebirths = d.Rebirths + 1
 	DataService.update(player, function(data)
@@ -618,7 +619,7 @@ local function rebirth(player: Player, _payload: any): (boolean, any)
 	local mult = string.sub(Format.mult(Economy.rebirthMult(rebirths)), 2)
 	local banner = bannerRemote
 	if banner then
-		banner:FireAllClients(string.format("♻ Генератор перезапущен! %s теперь ×%s", player.DisplayName, mult), "rare", Config.Colors.gold.Color)
+		banner:FireAllClients(Loc.msg("♻ Генератор перезапущен! %s теперь ×%s", player.DisplayName, mult), "rare", Config.Colors.gold.Color)
 	end
 	effect(player, { Kind = "rebirth", Value = rebirths, UserId = player.UserId })
 	EconomyService.Purchased:Fire(player, "Rebirth", rebirths)
@@ -632,11 +633,11 @@ local function teleport(player: Player, payload: any): (boolean, any)
 	end
 	-- уже стоишь там (на мосту или в пустоте — можно)
 	if ServerLogic.isInteger(payload) and payload == PlayerService.getArea(player) then
-		return false, if payload == 0 then "Ты уже в городе" else "Ты уже на этом острове"
+		return false, if payload == 0 then Loc.msg("Ты уже в городе") else Loc.msg("Ты уже на этом острове")
 	end
 	local left = Config.Server.TeleportCooldown - (os.clock() - st.LastTeleport)
 	if left > 0 then
-		return false, string.format("Телепорт заряжается: ещё %d с", math.ceil(left))
+		return false, Loc.msg("Телепорт заряжается: ещё %d с", math.ceil(left))
 	end
 	local ok, err = PlayerService.teleport(player, payload)
 	if not ok then

@@ -15,6 +15,7 @@ local Workspace = game:GetService("Workspace")
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Config = require(Shared:WaitForChild("Config"))
 local Format = require(Shared:WaitForChild("Format"))
+local Loc = require(Shared:WaitForChild("Loc"))
 local Net = require(Shared:WaitForChild("Net"))
 local Signal = require(Shared:WaitForChild("Signal"))
 
@@ -81,7 +82,7 @@ local function startBoost()
 	local banner = bannerRemote
 	if banner then
 		banner:FireAllClients(
-			string.format("🏙 ЭЛЕКТРОГРАД СИЯЕТ! %s Вольт на %d %s", "×" .. string.sub(Format.mult(Config.Multipliers.CityBoost), 2), minutes, Format.plural(minutes, "минуту", "минуты", "минут")),
+			Loc.msg("🏙 ЭЛЕКТРОГРАД СИЯЕТ! %s Вольт на %d %s", "×" .. string.sub(Format.mult(Config.Multipliers.CityBoost), 2), minutes, Loc.pmsg(minutes, "минуту|минуты|минут")),
 			"city"
 		)
 	end
@@ -120,7 +121,7 @@ local function tick()
 		nextDecay = t + C.DecayDelay / C.Districts
 		local notify = notifyRemote
 		if notify then
-			notify:FireAllClients("🏙 Электроград гаснет — сдавайте банки, чтобы зажечь снова!", "info")
+			notify:FireAllClients(Loc.msg("🏙 Электроград гаснет — сдавайте банки, чтобы зажечь снова!"), "info")
 		end
 	end
 	if not boosting then

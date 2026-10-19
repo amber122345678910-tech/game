@@ -1,8 +1,10 @@
 --!strict
 -- Фульгуриты — стеклянные "скульптуры", которые оставляет молния. Каждый строится из seed,
 -- поэтому у каждого игрока свои уникальные формы. Чистая логика: геометрия как список деталей.
+-- Имена форм и мутаций — русские исходники и ключи словаря (переводы — в Strings/Shared.luau).
 
 local Config = require(script.Parent.Config)
+local Loc = require(script.Parent.Loc)
 local Prng = require(script.Parent.Prng)
 local Pets = require(script.Parent.Pets)
 local Geom = require(script.Parent.Geom)
@@ -18,7 +20,7 @@ export type PartSpec = {
 
 export type Spec = {
 	Shape: string, -- id формы
-	ShapeName: string,
+	ShapeName: string, -- исходник для Loc.t
 	Rarity: Pets.Rarity,
 	Bonus: number, -- +доля Вольт
 	Height: number,
@@ -268,13 +270,19 @@ function Fulgurite.generate(seed: number, color: Config.ColorId, mut: MutId?): S
 	}
 end
 
--- Название для интерфейса: "Золотой фульгурит «Спираль»"
+-- Название сообщением (сервер → клиент, переводит клиент через Loc.render):
+-- «Золотой фульгурит «Спираль»» / «Golden Spiral Fulgurite»
 -- (string.lower/sub режут кириллицу по байтам, поэтому строки собираются целиком)
-function Fulgurite.title(spec: Spec, mut: MutId?): string
+function Fulgurite.titleMsg(spec: Spec, mut: MutId?): Loc.Msg
 	if mut then
-		return Fulgurite.Mutations[mut].Name .. " фульгурит «" .. spec.ShapeName .. "»"
+		return Loc.msg("%s фульгурит «%s»", Fulgurite.Mutations[mut].Name, spec.ShapeName)
 	end
-	return "Фульгурит «" .. spec.ShapeName .. "»"
+	return Loc.msg("Фульгурит «%s»", spec.ShapeName)
+end
+
+-- Название для интерфейса на языке игрока (клиент)
+function Fulgurite.title(spec: Spec, mut: MutId?): string
+	return Loc.render(Fulgurite.titleMsg(spec, mut))
 end
 
 -- Цвет стекла

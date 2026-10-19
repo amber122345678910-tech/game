@@ -234,7 +234,7 @@ end
 -- Неоновые детали сервер перекрашивает в цвет перезапуска (PlayerService), Tip подсвечивает CharacterFX.
 ----------------------------------------------------------------------
 export type RodStyle = {
-	Name: string,
+	Name: string, -- исходник для Loc.t (переводы — в Strings/Shared.luau)
 	Shaft: Color3,
 	ShaftMaterial: Enum.Material,
 	Trim: Color3,
@@ -267,8 +267,9 @@ function Models.rod(tier: number): Tool
 	local t = math.clamp(math.floor(tier), 0, 5)
 	local st = Models.RodStyles[t]
 	local tool = Instance.new("Tool")
-	tool.Name = "Громоотвод"
-	tool.ToolTip = st.Name .. " громоотвод"
+	-- имя — для поиска (PlayerService.RodName); подсказку никто не видит: свой Backpack выключен (Main.client)
+	tool.Name = "Громоотвод" -- noloc
+	tool.ToolTip = st.Name .. " громоотвод" -- noloc
 	tool.CanBeDropped = false
 	tool.RequiresHandle = true
 	tool.ManualActivationOnly = true

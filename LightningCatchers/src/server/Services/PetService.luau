@@ -13,6 +13,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Config = require(Shared:WaitForChild("Config"))
 local Economy = require(Shared:WaitForChild("Economy"))
+local Loc = require(Shared:WaitForChild("Loc"))
 local Net = require(Shared:WaitForChild("Net"))
 local Pets = require(Shared:WaitForChild("Pets"))
 local PlayerData = require(Shared:WaitForChild("PlayerData"))
@@ -31,10 +32,10 @@ local PetService = {}
 -- (игрок, вид питомца) — питомец вылупился из кокона (купленного или из награды)
 PetService.Hatched = Signal.new() :: Signal.Signal<Player, string>
 
-local LOADING = "Данные ещё загружаются"
-local NO_PET = "Нет такого питомца"
-local NO_COCOON = "Нет такого кокона"
-local FULL_TEXT = "Нет места — удали лишних питомцев"
+local LOADING = Loc.msg("Данные ещё загружаются")
+local NO_PET = Loc.msg("Нет такого питомца")
+local NO_COCOON = Loc.msg("Нет такого кокона")
+local FULL_TEXT = Loc.msg("Нет места — удали лишних питомцев")
 local BANNER_RANK = 4 -- с какого ранга редкости (Pets.Rarities[].Rank) баннер на весь сервер: легендарный+
 local STARTER_DELAY = 1.5 -- подарок появляется после анимации сдачи банки (монеты летят в счётчик)
 
@@ -46,7 +47,7 @@ local effectRemote: RemoteEvent? = nil
 -- Вспомогательное
 ----------------------------------------------------------------------
 
-local function notify(player: Player, text: string, kind: string)
+local function notify(player: Player, text: Loc.Msg | string, kind: string)
 	local r = notifyRemote
 	if r then
 		r:FireClient(player, text, kind)
@@ -124,7 +125,7 @@ local function announce(player: Player, kind: string)
 	if rarity.Rank < BANNER_RANK then
 		return
 	end
-	r:FireAllClients(string.format("🐾 %s питомец «%s»! Хозяин: %s", rarity.Name, def.Name, player.DisplayName), def.Rarity, rarity.Color)
+	r:FireAllClients(Loc.msg("🐾 %s питомец «%s»! Хозяин: %s", rarity.Name, def.Name, player.DisplayName), def.Rarity, rarity.Color)
 end
 
 -- Вылупить питомца из кокона: списать cost осколков, Pity, статистика, баннер, сигнал.
@@ -228,7 +229,7 @@ local function checkStarter(player: Player)
 	end
 	syncAttr(player)
 	effect(player, { Kind = "hatch", Text = kind, Value = granted.Id, UserId = player.UserId })
-	notify(player, "🎁 Подарок: " .. Pets.Kinds[kind].Name .. "!", "good")
+	notify(player, Loc.msg("🎁 Подарок: %s!", Pets.Kinds[kind].Name), "good")
 end
 
 ----------------------------------------------------------------------
@@ -252,13 +253,13 @@ local function hatch(player: Player, payload: any): (boolean, any)
 		return false, LOADING
 	end
 	if d.Zone < cocoon.Zone then
-		return false, string.format("Сначала открой остров «%s»", Config.Zones[cocoon.Zone].Name)
+		return false, Loc.msg("Сначала открой остров «%s»", Config.Zones[cocoon.Zone].Name)
 	end
 	if not hasRoom(d) then
 		return false, FULL_TEXT
 	end
 	if d.Shards < cocoon.Cost then
-		return false, "Не хватает 💎 Осколков"
+		return false, Loc.msg("Не хватает 💎 Осколков")
 	end
 	local rec = hatchInto(player, cocoon, cocoon.Cost)
 	if not rec then
@@ -280,11 +281,11 @@ local function equipPet(player: Player, payload: any): (boolean, any)
 		return false, NO_PET
 	end
 	if table.find(d.Equipped, id) then
-		return false, "Этот питомец уже надет"
+		return false, Loc.msg("Этот питомец уже надет")
 	end
 	local slots = Economy.petSlots(d.Rebirths)
 	if #d.Equipped >= slots then
-		return false, string.format("Все слоты заняты (%d) — сними другого питомца", slots)
+		return false, Loc.msg("Все слоты заняты (%d) — сними другого питомца", slots)
 	end
 	DataService.update(player, function(data)
 		table.insert(data.Equipped, id)
@@ -303,7 +304,7 @@ local function unequipPet(player: Player, payload: any): (boolean, any)
 		return false, LOADING
 	end
 	if not table.find(d.Equipped, id) then
-		return false, "Этот питомец не надет"
+		return false, Loc.msg("Этот питомец не надет")
 	end
 	DataService.update(player, function(data)
 		local i = table.find(data.Equipped, id)
@@ -383,7 +384,7 @@ local function equipBest(player: Player, _payload: any): (boolean, any)
 		return false, LOADING
 	end
 	if #d.Pets == 0 then
-		return false, "У тебя пока нет питомцев"
+		return false, Loc.msg("У тебя пока нет питомцев")
 	end
 	local list = table.clone(d.Pets)
 	table.sort(list, better)

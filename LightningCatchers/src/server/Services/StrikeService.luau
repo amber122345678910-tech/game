@@ -22,6 +22,7 @@ local Workspace = game:GetService("Workspace")
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Config = require(Shared:WaitForChild("Config"))
 local Economy = require(Shared:WaitForChild("Economy"))
+local Loc = require(Shared:WaitForChild("Loc"))
 local Net = require(Shared:WaitForChild("Net"))
 local PlayerData = require(Shared:WaitForChild("PlayerData"))
 local Prng = require(Shared:WaitForChild("Prng"))
@@ -133,7 +134,7 @@ local EffectRemote = Net.event("Effect")
 local BoltFX = Net.unreliable("BoltFX")
 
 local function defaultOnPerun(player: Player, _msg: Net.StrikeMsg)
-	BannerRemote:FireAllClients(string.format("☠ Чёрная молния Перуна бьёт рядом с %s!", player.DisplayName), "rare", Config.Colors.gold.Color)
+	BannerRemote:FireAllClients(Loc.msg("☠ Чёрная молния Перуна бьёт рядом с %s!", player.DisplayName), "rare", Config.Colors.gold.Color)
 end
 
 -- Ставит FulguriteService
@@ -645,7 +646,7 @@ local function applyCatch(player: Player, ps: PState, d: Data, ring: Ring, k: nu
 	end
 	if isNew then
 		msg.NewIndex = key
-		NotifyRemote:FireClient(player, string.format("Молниедекс: %s — %s!", Config.Colors[color].Name, Config.Zones[zone].Name), "rare")
+		NotifyRemote:FireClient(player, Loc.msg("Молниедекс: %s — %s!", Config.Colors[color].Name, Config.Zones[zone].Name), "rare")
 	end
 
 	-- фульгурит: шанс при ИДЕАЛЬНО; гарантированный (радужная, чёрная — шанс 100%) — при любой поимке,

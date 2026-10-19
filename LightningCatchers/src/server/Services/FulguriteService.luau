@@ -19,6 +19,7 @@ local Config = require(Shared:WaitForChild("Config"))
 local Economy = require(Shared:WaitForChild("Economy"))
 local Fonts = require(Shared:WaitForChild("Fonts"))
 local Fulgurite = require(Shared:WaitForChild("Fulgurite"))
+local Loc = require(Shared:WaitForChild("Loc"))
 local Models = require(Shared:WaitForChild("Models"))
 local Net = require(Shared:WaitForChild("Net"))
 local Pets = require(Shared:WaitForChild("Pets"))
@@ -36,8 +37,8 @@ type FulgRecord = PlayerData.FulgRecord
 
 local FulguriteService = {}
 
-local LOADING = "Данные ещё загружаются"
-local NO_FULG = "Нет такого фульгурита"
+local LOADING = Loc.msg("Данные ещё загружаются")
+local NO_FULG = Loc.msg("Нет такого фульгурита")
 
 -- Осколки за разбитый фульгурит по редкости (умножаются на ShardValue острова, где он найден).
 -- Таблица общая с клиентом: окно «Разбить» показывает ту же сумму
@@ -82,15 +83,16 @@ local galleryFolder: Folder? = nil
 -- Вспомогательное
 ----------------------------------------------------------------------
 
-local function notify(player: Player, text: string, kind: string)
+local function notify(player: Player, text: Loc.Msg | string, kind: string)
 	local r = notifyRemote
 	if r then
 		r:FireClient(player, text, kind)
 	end
 end
 
-local function serialText(serial: number): string
-	return string.format("№%06d", serial)
+-- Номер фульгурита: «№000123» (по-английски «#000123») — переводит клиент
+local function serialMsg(serial: number): Loc.Msg
+	return Loc.msg("№%06d", serial)
 end
 
 local function specOf(f: FulgRecord): Fulgurite.Spec
@@ -164,7 +166,7 @@ local function newLabel(parent: Instance, name: string, text: string, color: Col
 	l.Size = UDim2.fromScale(1, h)
 	l.Position = UDim2.fromScale(0, y)
 	l.FontFace = LABEL_FONT
-	l.Text = text
+	l.Text = text -- ник как есть; переводимый текст ставит Loc.setWorldText после создания
 	l.TextColor3 = color
 	l.TextScaled = true
 	l.Parent = parent
@@ -188,8 +190,8 @@ local function buildDisplay(ped: Pedestal, player: Player, f: FulgRecord?)
 	holder:SetAttribute("UserId", player.UserId)
 	local top = ped.Marker.CFrame -- центр верхней грани, лицом к центру галереи
 	local height = 0
-	local line2 = "пока без фульгурита"
-	local line2Color = DIM_TEXT
+	local rarity: { Name: string, Color: Color3, Rank: number }? = nil
+	local serial = 0
 	if f then
 		local spec = specOf(f)
 		local mut: Fulgurite.MutId? = f.Mut :: any
@@ -218,9 +220,8 @@ local function buildDisplay(ped: Pedestal, player: Player, f: FulgRecord?)
 			light.Shadows = false
 			light.Parent = root
 		end
-		local rarity = Pets.Rarities[spec.Rarity]
-		line2 = rarity.Name .. " · " .. serialText(f.Serial)
-		line2Color = rarity.Color
+		rarity = Pets.Rarities[spec.Rarity]
+		serial = f.Serial
 	end
 
 	-- табличка: невидимая деталь над верхушкой с BillboardGui
@@ -244,7 +245,12 @@ local function buildDisplay(ped: Pedestal, player: Player, f: FulgRecord?)
 	gui.ResetOnSpawn = false
 	gui.Parent = anchor
 	newLabel(gui, "PlayerName", player.DisplayName, Color3.fromRGB(255, 248, 232), 0, 0.55)
-	newLabel(gui, "Info", line2, line2Color, 0.55, 0.45)
+	local info = newLabel(gui, "Info", "", if rarity then rarity.Color else DIM_TEXT, 0.55, 0.45)
+	if rarity then
+		Loc.setWorldText(info, "Text", "%s · %s", rarity.Name, serialMsg(serial))
+	else
+		Loc.setWorldText(info, "Text", "пока без фульгурита")
+	end
 
 	holder.Parent = folder
 	ped.Display = holder
@@ -382,9 +388,9 @@ local function makeRoom(player: Player, d: Data)
 	if not f then
 		return
 	end
-	local title = Fulgurite.title(specOf(f), f.Mut :: any)
+	local title = Fulgurite.titleMsg(specOf(f), f.Mut :: any)
 	local shards = shatter(player, f)
-	notify(player, string.format("Коллекция полна: %s %s разбит, +%d 💎 — место для нового!", title, serialText(f.Serial), shards), "info")
+	notify(player, Loc.msg("Коллекция полна: %s %s разбит, +%d 💎 — место для нового!", title, serialMsg(f.Serial), shards), "info")
 end
 
 -- Гарантированный фульгурит (без броска шанса): Радужная молния, Перун.
@@ -399,7 +405,7 @@ function FulguriteService.grant(player: Player, color: Config.ColorId, zone: num
 		if not guaranteed then
 			if not fullNotified[player] then
 				fullNotified[player] = true
-				notify(player, "Коллекция фульгуритов полна — разбей лишние в «Коллекции»", "bad")
+				notify(player, Loc.msg("Коллекция фульгуритов полна — разбей лишние в «Коллекции»"), "bad")
 			end
 			return nil
 		end
@@ -424,13 +430,13 @@ function FulguriteService.grant(player: Player, color: Config.ColorId, zone: num
 		return nil
 	end
 	local rarity = Pets.Rarities[spec.Rarity]
-	local title = Fulgurite.title(spec, mut)
-	notify(player, string.format("🔮 %s %s — %s!", title, serialText(serial), rarity.Name), if rarity.Rank >= NOTIFY_RARE_RANK then "rare" else "good")
+	local title = Fulgurite.titleMsg(spec, mut)
+	notify(player, Loc.msg("🔮 %s %s — %s!", title, serialMsg(serial), rarity.Name), if rarity.Rank >= NOTIFY_RARE_RANK then "rare" else "good")
 	-- у Радужной и Перуна свои баннеры (EventService) — второй не нужен
 	local banner = bannerRemote
 	local eventDrop = tag == "rainbow" or tag == "perun"
 	if banner and rarity.Rank >= BANNER_RANK and not eventDrop then
-		banner:FireAllClients(string.format("🔮 %s нашёл: %s %s!", player.DisplayName, title, serialText(serial)), spec.Rarity, rarity.Color)
+		banner:FireAllClients(Loc.msg("🔮 %s нашёл: %s %s!", player.DisplayName, title, serialMsg(serial)), spec.Rarity, rarity.Color)
 	end
 	return rec
 end
@@ -474,10 +480,10 @@ local function equipFulg(player: Player, payload: any): (boolean, any)
 		return false, NO_FULG
 	end
 	if table.find(d.EquippedFulgs, id) then
-		return false, "Этот фульгурит уже надет"
+		return false, Loc.msg("Этот фульгурит уже надет")
 	end
 	if #d.EquippedFulgs >= Fulgurite.MaxEquipped then
-		return false, string.format("Можно надеть только %d — сними другой", Fulgurite.MaxEquipped)
+		return false, Loc.msg("Можно надеть только %d — сними другой", Fulgurite.MaxEquipped)
 	end
 	DataService.update(player, function(data)
 		table.insert(data.EquippedFulgs, id)
@@ -495,7 +501,7 @@ local function unequipFulg(player: Player, payload: any): (boolean, any)
 		return false, LOADING
 	end
 	if not table.find(d.EquippedFulgs, id) then
-		return false, "Этот фульгурит не надет"
+		return false, Loc.msg("Этот фульгурит не надет")
 	end
 	DataService.update(player, function(data)
 		local i = table.find(data.EquippedFulgs, id)
