@@ -426,32 +426,32 @@ end
 	end
 
 	-- Слева в кадре (+X): тёмная большая липа (крона до изгороди, два ствола видны под ней) и вторая за ней.
-	tree({ name = "DarkLime", x = 26.5, z = 36, lean = { -0.4, 0.2 }, crown = { 14, 15, 12 }, cy = 19, fork = 8, trunkD = 2.0, bark = BARK.dark, pal = PAL.dark, flat = 0.64, masses = 85, massR = 2.4, balls = { 3, 4 }, limbs = 6, core = 5, sparkle = 36 })
-	tree({ name = "DarkLime2", x = 25, z = 48, lean = { -0.3, 0.3 }, crown = { 9, 12, 8 }, cy = 16, fork = 6, trunkD = 1.4, bark = BARK.dark, pal = PAL.dark, flat = 0.7, masses = 40, massR = 2.4, balls = { 3, 4 }, limbs = 4, core = 2, sparkle = 16 })
+	tree({ name = "DarkLime", x = 26.5, z = 36, lean = { -0.4, 0.2 }, crown = { 14, 16, 12 }, cy = 16.5, fork = 7, trunkD = 2.0, bark = BARK.dark, pal = PAL.dark, flat = 0.7, masses = 105, massR = 2.1, balls = { 3, 4 }, limbs = 6, core = 5, sparkle = 45 })
+	tree({ name = "DarkLime2", x = 29, z = 48, lean = { -0.3, 0.3 }, crown = { 9, 12, 8 }, cy = 16, fork = 6, trunkD = 1.4, bark = BARK.dark, pal = PAL.dark, flat = 0.7, masses = 40, massR = 2.4, balls = { 3, 4 }, limbs = 4, core = 2, sparkle = 16 })
 	-- Центр (за конём): высокие ранневесенние деревья — тонкие веточки, редкие кремовые листочки, много неба.
 	tree({ name = "PaleAsh1", x = 16, z = 62, crown = { 9, 11, 8 }, cy = 23, fork = 11, trunkD = 1.0, bark = BARK.pale, twig = TWIG, pal = PAL.pale, sparse = true, limbs = 4, depth = 4, fork3 = 0, limbLen = 0.62, limbMin = 12, limbMax = 32, spreadMin = 20, spreadMax = 38, taper = 0.7, minD = 0.06, tuft = 0.9, clump = 1, extra = 50 })
-	tree({ name = "PaleAsh2", x = -1, z = 76, crown = { 17, 15, 13 }, cy = 35, fork = 15, trunkD = 1.4, bark = BARK.pale, twig = TWIG, pal = PAL.pale, sparse = true, limbs = 5, depth = 4, fork3 = 0, limbLen = 0.62, limbMin = 18, limbMax = 40, spreadMin = 20, spreadMax = 38, taper = 0.7, minD = 0.06, tuft = 1.1, clump = 1, extra = 110 })
+	tree({ name = "PaleAsh2", x = -1, z = 76, crown = { 17, 15, 13 }, cy = 35, fork = 15, trunkD = 1.4, bark = BARK.pale, twig = TWIG, pal = PAL.pale, sparse = true, limbs = 4, depth = 4, fork3 = 0, limbLen = 0.66, limbMin = 18, limbMax = 40, spreadMin = 20, spreadMax = 38, taper = 0.7, minD = 0.06, tuft = 1.1, clump = 2, extra = 150 })
 	-- за правым плечом коня: маленькое яркое деревце
 	tree({ name = "FreshAiry", x = -9, z = 52, crown = { 6, 6.5, 5 }, cy = 10.2, fork = 4, trunkD = 0.7, bark = BARK.grey, pal = PAL.fresh, flat = 0.7, masses = 34, massR = 1.5, balls = { 2, 3 }, limbs = 4, branchy = 2, core = 1, sparkle = 15 })
 	-- Справа в кадре (-X): жёлто-зелёное молодое дерево перед изгородью (ствол виден до травы), рядом фонарь.
-	tree({ name = "LimeYoung", x = -14.7, z = 23.6, lean = { 0.15, 0.25 }, crown = { 5.3, 5.0, 4.0 }, cy = 8.6, fork = 3.6, trunkD = 0.8, bark = BARK.lime, pal = PAL.lime, sparse = true, flat = 0.72, limbs = 6, depth = 3, fork3 = 0.2, limbLen = 0.6, limbMin = 30, limbMax = 64, spreadMin = 18, spreadMax = 34, minD = 0.08, tuft = 1.08, clump = 2, extra = 60, shell = 150 })
+	tree({ name = "LimeYoung", x = -14.7, z = 23.6, lean = { 0.15, 0.25 }, crown = { 6.0, 5.2, 4.2 }, cy = 8.3, fork = 3.4, trunkD = 0.62, bark = BARK.lime, pal = PAL.lime, sparse = true, flat = 0.85, limbs = 6, depth = 3, fork3 = 0.2, limbLen = 0.6, limbMin = 30, limbMax = 64, spreadMin = 18, spreadMax = 34, minD = 0.07, tuft = 1.0, clump = 2, extra = 50, shell = 230 })
 	-- второй ряд
-	tree({ name = "Dark2", x = 56, z = 60, crown = { 14, 16, 12 }, cy = 28, fork = 15, flat = 0.8, trunkD = 2.1, bark = BARK.dark, pal = PAL.dark, masses = 18, massR = 3.4, balls = { 2, 3 }, limbs = 4, core = 3, sparkle = 10 })
-	tree({ name = "Mid3", x = 80, z = 32, crown = { 13, 14, 11 }, cy = 25, fork = 14, flat = 0.8, trunkD = 1.9, bark = BARK.brown, pal = PAL.mid, masses = 18, massR = 3.4, balls = { 2, 3 }, limbs = 4, core = 3, sparkle = 10 })
-	tree({ name = "Fresh2", x = -66, z = 60, crown = { 12, 13, 11 }, cy = 25, fork = 15, flat = 0.8, trunkD = 1.6, bark = BARK.brown, pal = PAL.fresh, masses = 18, massR = 3.4, balls = { 2, 3 }, limbs = 4, core = 3, sparkle = 10 })
-	tree({ name = "Mid4", x = -76, z = 36, crown = { 13, 14, 12 }, cy = 26, fork = 15, flat = 0.8, trunkD = 1.9, bark = BARK.brown, pal = PAL.mid, masses = 18, massR = 3.4, balls = { 2, 3 }, limbs = 4, core = 3, sparkle = 10 })
-	tree({ name = "Back1", x = 48, z = 100, crown = { 15, 17, 13 }, cy = 30, fork = 17, flat = 0.8, trunkD = 2.0, bark = BARK.dark, pal = PAL.mid, masses = 18, massR = 3.4, balls = { 2, 3 }, limbs = 3, core = 3, sparkle = 10 })
-	tree({ name = "Back2", x = -92, z = 98, crown = { 12, 13, 11 }, cy = 26, fork = 15, flat = 0.8, trunkD = 1.5, bark = BARK.grey, pal = PAL.lime, masses = 18, massR = 3.4, balls = { 2, 3 }, limbs = 3, core = 2, sparkle = 10 })
+	tree({ name = "Dark2", x = 56, z = 60, crown = { 14, 16, 12 }, cy = 28, fork = 15, flat = 0.8, trunkD = 2.1, bark = BARK.dark, pal = PAL.dark, masses = 11, massR = 3.8, balls = { 2, 3 }, limbs = 3, core = 3, sparkle = 8 })
+	tree({ name = "Mid3", x = 80, z = 32, crown = { 13, 14, 11 }, cy = 25, fork = 14, flat = 0.8, trunkD = 1.9, bark = BARK.brown, pal = PAL.mid, masses = 11, massR = 3.8, balls = { 2, 3 }, limbs = 3, core = 3, sparkle = 8 })
+	tree({ name = "Fresh2", x = -66, z = 60, crown = { 12, 13, 11 }, cy = 25, fork = 15, flat = 0.8, trunkD = 1.6, bark = BARK.brown, pal = PAL.fresh, masses = 11, massR = 3.8, balls = { 2, 3 }, limbs = 3, core = 3, sparkle = 8 })
+	tree({ name = "Mid4", x = -76, z = 36, crown = { 13, 14, 12 }, cy = 26, fork = 15, flat = 0.8, trunkD = 1.9, bark = BARK.brown, pal = PAL.mid, masses = 11, massR = 3.8, balls = { 2, 3 }, limbs = 3, core = 3, sparkle = 8 })
+	tree({ name = "Back1", x = 48, z = 100, crown = { 15, 17, 13 }, cy = 30, fork = 17, flat = 0.8, trunkD = 2.0, bark = BARK.dark, pal = PAL.mid, masses = 11, massR = 3.8, balls = { 2, 3 }, limbs = 3, core = 3, sparkle = 8 })
+	tree({ name = "Back2", x = -110, z = 60, crown = { 12, 13, 11 }, cy = 26, fork = 15, flat = 0.8, trunkD = 1.5, bark = BARK.grey, pal = PAL.lime, masses = 11, massR = 3.8, balls = { 2, 3 }, limbs = 3, core = 2, sparkle = 8 })
 	-- по бокам (для более широких ракурсов)
-	tree({ name = "SideL", x = 100, z = 4, crown = { 14, 15, 12 }, cy = 28, fork = 16, flat = 0.8, trunkD = 2.0, bark = BARK.dark, pal = PAL.dark, masses = 18, massR = 3.4, balls = { 2, 3 }, limbs = 3, core = 3, sparkle = 10 })
-	tree({ name = "SideR", x = -100, z = 10, crown = { 13, 14, 12 }, cy = 26, fork = 15, flat = 0.8, trunkD = 1.8, bark = BARK.brown, pal = PAL.fresh, masses = 18, massR = 3.4, balls = { 2, 3 }, limbs = 3, core = 3, sparkle = 10 })
+	tree({ name = "SideL", x = 100, z = 4, crown = { 14, 15, 12 }, cy = 28, fork = 16, flat = 0.8, trunkD = 2.0, bark = BARK.dark, pal = PAL.dark, masses = 11, massR = 3.8, balls = { 2, 3 }, limbs = 3, core = 3, sparkle = 8 })
+	tree({ name = "SideR", x = -100, z = 10, crown = { 13, 14, 12 }, cy = 26, fork = 15, flat = 0.8, trunkD = 1.8, bark = BARK.brown, pal = PAL.fresh, masses = 11, massR = 3.8, balls = { 2, 3 }, limbs = 3, core = 3, sparkle = 8 })
 
 	-- дальний фон: слева — ряд деревьев, совсем далеко — сплошная полоса леса
 	for i = 0, 8 do
 		farTree(250 - i * 24 + rr(-6, 6), rr(150, 200), rr(34, 46), rr(9, 12), if rnd() < 0.5 then PAL.dark else PAL.mid, 8)
 	end
 	for i = 0, 16 do
-		farTree(-330 + i * 40 + rr(-8, 8), rr(275, 320), rr(40, 54), rr(13, 17), if rnd() < 0.5 then PAL.dark else PAL.mid, 7)
+		farTree(-330 + i * 40 + rr(-8, 8), rr(275, 320), rr(40, 54), rr(13, 17), if rnd() < 0.5 then PAL.dark else PAL.mid, 6)
 	end
 	for i = 0, 4 do
 		farTree(rr(130, 200), 30 + i * 26 + rr(-5, 5), rr(36, 46), rr(9, 12), PAL.mid, 7)
@@ -460,11 +460,11 @@ end
 	-- кольцо деревьев за спиной камеры (два ряда в шахматном порядке) и по бокам: горизонт закрыт
 	for i = 0, 18 do
 		farTree(-240 + i * 26 + rr(-5, 5), rr(-185, -165), rr(38, 50), rr(12, 16), if rnd() < 0.5 then PAL.dark else PAL.mid, 4, 0.5)
-		farTree(-227 + i * 26 + rr(-5, 5), rr(-205, -190), rr(40, 52), rr(12, 16), if rnd() < 0.5 then PAL.dark else PAL.mid, 4, 0.52)
+		farTree(-227 + i * 26 + rr(-5, 5), rr(-205, -190), rr(40, 52), rr(12, 16), if rnd() < 0.5 then PAL.dark else PAL.mid, 3, 0.52)
 	end
 	for i = 0, 8 do
-		farTree(rr(250, 290), -150 + i * 35 + rr(-6, 6), rr(38, 50), rr(11, 15), PAL.mid, 6)
-		farTree(rr(-290, -250), -150 + i * 35 + rr(-6, 6), rr(38, 50), rr(11, 15), PAL.dark, 6)
+		farTree(rr(250, 290), -150 + i * 35 + rr(-6, 6), rr(38, 50), rr(11, 15), PAL.mid, 5)
+		farTree(rr(-290, -250), -150 + i * 35 + rr(-6, 6), rr(38, 50), rr(11, 15), PAL.dark, 5)
 	end
 	-- кусты за изгородью
 	for _, b in { { 42, 46, 3.2, PAL.dark }, { 64, 44, 3.4, PAL.dark }, { 92, 50, 3.0, PAL.mid }, { -40, 50, 2.8, PAL.mid }, { -62, 46, 3.2, PAL.mid }, { -90, 52, 3.0, PAL.fresh }, { 48, 92, 3.4, PAL.dark }, { 74, 78, 3.6, PAL.mid } } do
@@ -495,8 +495,8 @@ end
 		local dz = (if odd then -0.03 else 0.03)
 		local zc = (HZ0 + HZ1) / 2 + dz
 		local f0 = HZ0 + dz -- лицевая плоскость сегмента
-		local y0 = 0.4 + (if odd then 0.03 else 0) -- низ тела (под ним — тёмные стебли)
-		local bh = 0.5 + (if odd then 0.04 else 0)
+		local y0 = 0.62 + (if odd then 0.03 else 0) -- низ тела (под ним — тёмные стебли)
+		local bh = 0.72 + (if odd then 0.04 else 0)
 		B:box(V(cx, y0 + (h - y0) / 2, zc), V(len + 0.12, h - y0, HZ1 - HZ0), jitter(hedgeBody, 0.15), "LeafyGrass", nil, { parent = hedgeFolder, name = "HedgeBody" })
 		B:box(V(cx, bh / 2 - 0.02 - (if odd then 0.03 else 0), zc + 0.15), V(len + 0.04, bh, HZ1 - HZ0 - 0.6), jitter(hedgeDark, 0.4), "LeafyGrass", nil, { parent = hedgeFolder, name = "HedgeBase", castShadow = false })
 		-- скруглённые верхние кромки (спереди и сзади) — светлее, это солнечная «шапка»
@@ -507,20 +507,28 @@ end
 		-- светлая «шапка» верха между кромками (солнечная стриженая поверхность; видна с высоких ракурсов)
 		B:box(V(cx, h + 0.04, zc), V(len + 0.06 + (if odd then 0.02 else 0), 0.1, HZ1 - HZ0 - 0.9), jitter(lerpC(hedgeBody, hedgeTop, 0.65), 0.12), "LeafyGrass", nil, { parent = hedgeFolder, name = "HedgeCap", castShadow = false })
 		-- шов между сегментами закрыт двумя «подушками» поверх стыка (сплошная изгородь без вертикальных линий)
-		if hx > -129 then
+		if hx > -129 and (near or segI % 2 == 0) then
 			B:ball(V(hx + rr(-0.15, 0.15), rr(1.1, 1.5), f0 + 0.6), rr(1.35, 1.6), jitter(hedgeBody, 0.15), "LeafyGrass", { parent = hedgeFolder, name = "HedgeLump" })
 			B:ball(V(hx + rr(-0.15, 0.15), rr(h - 0.75, h - 0.5), f0 + 0.6), rr(1.3, 1.5), jitter(lerpC(hedgeBody, hedgeTop, 0.15), 0.15), "LeafyGrass", { parent = hedgeFolder, name = "HedgeLump" })
 		end
 		-- «подушки» листвы: утоплены в лицевую сторону на 60–70%, цвет тела (вверху чуть светлее)
-		local nl = if near then math.floor(len / 1.6) else math.floor(len / 3.2)
+		local nl = if near then math.floor(len / 1.6) else 2
 		for b = 1, nl do
 			local bx = hx + (b - 0.5) * len / nl + rr(-0.4, 0.4)
 			local by = rr(1.5, h - 0.7)
 			local cb = lerpC(hedgeBody, hedgeTop, math.clamp((by - 1.2) / (h - 1.2) * 0.2 + rr(-0.08, 0.08), 0, 1))
 			B:ball(V(bx, by, f0 + 0.6), rr(1.25, 1.6), jitter(cb, 0.2), "LeafyGrass", { parent = hedgeFolder, name = "HedgeLump" })
 		end
+		-- неровный нижний край листвы: небольшие притенённые «подушки» свисают чуть ниже тела (над стеблями)
+		if near then
+			local nd = math.floor(len / 1.3)
+			for b = 1, nd do
+				local bx = hx + (b - 0.5) * len / nd + rr(-0.55, 0.55)
+				B:ball(V(bx, y0 + rr(0.02, 0.3), f0 + 0.42), rr(0.7, 1.2), jitter(lerpC(hedgeBody, hedgeDark, rr(0.15, 0.3)), 0.15), "LeafyGrass", { parent = hedgeFolder, name = "HedgeLump", castShadow = false })
+			end
+		end
 		-- светлые побеги по верху (ближе к лицевой кромке — их видно снизу на силуэте)
-		local ns = if near then math.floor(rr(4, 6.99)) else 2
+		local ns = if near then math.floor(rr(4, 6.99)) else 1
 		for _ = 1, ns do
 			B:ball(V(rr(hx + 0.3, hx + len - 0.3), h + rr(-0.12, 0.08), rr(HZ0 + 0.3, HZ0 + 1.6)), rr(0.5, 0.8), jitter(lerpC(hedgeTop, sprigC, rr(0.1, 0.55)), 0.25), "LeafyGrass", { parent = hedgeFolder, name = "HedgeSprig", castShadow = false })
 		end
@@ -529,9 +537,9 @@ end
 		end
 		-- тёмные одревесневшие стебли у земли (видны под телом)
 		if near then
-			local nst = math.floor(rr(4, 6.99))
+			local nst = math.floor(rr(7, 9.99))
 			for _ = 1, nst do
-				B:box(V(rr(hx + 0.3, hx + len - 0.3), 0.35, HZ0 + 0.25 + rr(-0.05, 0.05)), V(0.12, 0.7, 0.12), jitter(stemC, 0.3), "Wood", V(rr(-8, 8), rr(0, 90), rr(-8, 8)), { parent = hedgeFolder, name = "HedgeStem", castShadow = false })
+				B:box(V(rr(hx + 0.3, hx + len - 0.3), 0.5, HZ0 + 0.25 + rr(-0.05, 0.05)), V(0.12, 1.0, 0.12), jitter(stemC, 0.3), "Wood", V(rr(3, 9) * (if rnd() < 0.5 then -1 else 1), rr(10, 80), rr(3, 9) * (if rnd() < 0.5 then -1 else 1)), { parent = hedgeFolder, name = "HedgeStem", castShadow = false })
 			end
 		end
 		hx += len
@@ -618,7 +626,7 @@ end
 	local office = group("Office")
 	do
 		local L, W = 130, 40
-		local ocf = CFrame.new(-40, 0, 175) * CFrame.Angles(0, math.rad(-45), 0)
+		local ocf = CFrame.new(-44, 0, 178) * CFrame.Angles(0, math.rad(-50), 0)
 		local function obox(p: Vector3, size: Vector3, color: Color3, mat: string, extra)
 			local spec = { cf = ocf * CFrame.new(p), size = size, color = color, material = mat, parent = office }
 			for k, v in extra or {} do
@@ -628,12 +636,12 @@ end
 		end
 		local FLOORS, FH = 4, 11
 		local H = FLOORS * FH
-		local glassC = hex("0f1412")
-		local bandC = hex("7c807c")
+		local glassC = hex("0c100e")
+		local bandC = hex("4f5351")
 		local mullC = hex("1c2022")
 		local lightC = hex("dfe6e6")
 		local cx, cz = -L / 2, W / 2
-		local glassFx = { transparency = 0.3, reflectance = 0.05 }
+		local glassFx = { transparency = 0.22, reflectance = 0.05 }
 		-- тёмный внутренний объём отступает от стекла на 3.2: в зазоре видны перекрытия и потолочные светильники
 		obox(V((-L + 1.2 - 3.2) / 2, H / 2, (3.2 + W - 1.2) / 2), V(L - 4.4, H - 0.4, W - 4.4), hex("0a0c0b"), "SmoothPlastic", { name = "Interior" })
 		obox(V(cx, (H - 0.05) / 2, 0), V(L, H - 0.05, 0.2), glassC, "Glass", { name = "GlassFront", transparency = glassFx.transparency, reflectance = glassFx.reflectance })

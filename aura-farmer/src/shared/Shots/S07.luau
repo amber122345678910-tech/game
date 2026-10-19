@@ -48,22 +48,42 @@ return {
 		clouds = { Enabled = false },
 	},
 	actors = {
-		-- A повёрнута к B (влево) на 15°, B — на 14° вправо (к камере, которая справа-спереди от неё)
+		-- A повёрнута к B (влево) на 25°, B — на 8° влево (корпус B смотрит чуть правее камеры, как в клипе)
 		WomanA = {
 			char = "WomanA",
 			place = STAGE * CFrame.Angles(0, math.rad(25), 0),
 			-- в этом плане: кремовая майка в рубчик с высоким круглым вырезом, очки в правой руке
-			opts = { glassesOn = "RightHand", topStyle = "tank", scoop = 0.2, top = Color3.fromRGB(238, 230, 222) },
+			-- (низ — в цвет майки: в начале плана пояс шорт мелькает под поднятой рукой, в клипе там майка)
+			opts = {
+				glassesOn = "RightHand",
+				topStyle = "tank",
+				scoop = 0.2,
+				top = Color3.fromRGB(238, 230, 222),
+				bottom = Color3.fromRGB(234, 226, 218),
+				stitch = Color3.fromRGB(234, 226, 218),
+				roses = Color3.fromRGB(234, 226, 218),
+			},
 		},
-		WomanB = { char = "WomanB", place = STAGE * CFrame.new(-1.87, 0, 1.0) * CFrame.Angles(0, math.rad(8), 0), opts = { glassesOn = "RightHand" } },
+		WomanB = {
+			char = "WomanB",
+			place = STAGE * CFrame.new(-1.97, 0, 1.0) * CFrame.Angles(0, math.rad(8), 0),
+			opts = {
+				glassesOn = "RightHand",
+				-- шорты B в этом плане видны только краем в правом нижнем углу (в клипе там белая майка):
+				-- красим их в цвет майки, чтобы низ читался как продолжение майки
+				bottom = Color3.fromRGB(240, 239, 236),
+				stripe = Color3.fromRGB(240, 239, 236),
+			},
+		},
 	},
 	camera = {
 		keys = {
 			-- 6.6–7.0: быстрый наезд с подъёмом (Sine Out, приходит на долю 6.992), дальше — медленный дрейф вперёд-вправо
-			camKey(6.6, { -1.05, 2.9, -2.45 }, 9, 15, "Sine_Out"),
-			camKey(7.0, { -1.25, 3.45, -2.36 }, 9, 16, "linear"),
-			camKey(7.4, { -1.27, 3.47, -2.35 }, 9, 16.6, "linear"),
-			camKey(7.8667, { -1.3, 3.49, -2.33 }, 9, 17.5),
+			camKey(6.6, { -0.78, 2.95, -2.2 }, 9, 15, "linear"),
+			camKey(6.8, { -0.96, 3.3, -2.02 }, 9, 15.6, "Sine_Out"),
+			camKey(7.0, { -1.05, 3.55, -1.98 }, 9, 16, "linear"),
+			camKey(7.4, { -1.06, 3.58, -2.0 }, 9, 16.6, "linear"),
+			camKey(7.8667, { -1.1, 3.6, -2.0 }, 9, 17.5),
 		},
 		shake = { rot = 0.1, pos = 0.005, freq = 1.5, seed = 7 },
 		focus = { actor = "WomanA", part = "Head" },

@@ -120,6 +120,27 @@ function Drape:tube(bone, pts, off, d, color, mat, maxLen, closed, extra)
 	self.g:caps(bone, p3, d, color, mat, extra)
 end
 
+-- Гладкий «кант» из настоящих цилиндров вдоль ломаной на поверхности (концы перекрываются на d/2).
+function Drape:rod(bone, pts, off, d, color, mat, maxLen, closed, extra)
+	local line = subdivide(pts, maxLen or 0.2, closed)
+	local p3 = {}
+	for _, p in line do
+		table.insert(p3, (self:at(p[1], p[2], off)))
+	end
+	if closed then
+		table.insert(p3, p3[1])
+	end
+	for i = 1, #p3 - 1 do
+		local a, b = p3[i], p3[i + 1]
+		local dv = b - a
+		if dv.Magnitude > 1e-3 then
+			local u = dv.Unit
+			self.g:cylSeg(bone, a - u * d * 0.5, b + u * d * 0.5, d, color, mat, extra)
+		end
+	end
+	return p3
+end
+
 -- CFrame детали, лежащей на поверхности в (x, y): -Z смотрит наружу по нормали, поворот rot (град) вокруг нормали.
 function Drape:cf(x, y, off, rot)
 	local p, n = self:at(x, y, off)

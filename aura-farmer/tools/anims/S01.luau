@@ -53,16 +53,17 @@ end
 
 -- Доп. суставы: очки + верхняя губа чуть опущена (рот «О» без зубов, как в клипе).
 local function glasses(g)
-	return { Glasses = { y = g.y or 0, f = g.f or 0, rx = g.rx or 0 }, UpperLip = { y = -0.018, f = 0.008 }, Mouth = { y = 0.036, f = -0.004 } }
+	return { Glasses = { y = g.y or 0, f = g.f or 0, rx = g.rx or 0 }, UpperLip = { y = -0.018, f = 0.008 }, Mouth = { y = 0.05, f = 0.004 } }
 end
 
 -- Сидит на песке: таз опущен, колени согнуты, правая рука опирается о песок сбоку.
 local function seat(bend, dy, f)
 	return { y = -1.66 + (dy or 0), bend = bend, f = f or 0 }
 end
-local R_ARM = { ik = { 1.72, 0.36, 0.05 }, pole = { 1, 0, -0.2 } }
-local R_LEG = { ik = { 0.7, 0.28, 1.55 }, pole = { 0.4, 1, 1 } }
-local L_LEG = { ik = { -0.75, 0.28, 1.45 }, pole = { -0.4, 1, 1 } }
+-- правая рука опирается ладонью о песок у бедра (вне кадра, видно только плечо)
+local R_ARM = { ik = { 1.7, 0.35, 0.25 }, pole = { 1, 0, -0.2 }, wrist = { palm = { 0.1, -1, 0 }, fingers = { 0.25, 0, 1 } } }
+local R_LEG = { ik = { 0.75, 0.28, 1.95 }, pole = { 0.4, 1, 1 } }
+local L_LEG = { ik = { -0.85, 0.28, 1.85 }, pole = { -0.4, 1, 1 } }
 
 -- Пальцы: «когти» на подлёте, щипок на оправе, дожим (squash) в момент контакта.
 local CLAW = { index = 0.3, middle = 0.36, ring = 0.52, pinky = 0.6, thumb = 0.5, thumbOut = 0.45, spread = 0.25 }
@@ -131,6 +132,8 @@ return {
 		{ t = 0.3, root = seat(-2.2), neck = neck(-4.5, 0.2), face = face(0.32, 0.3, 0.05) },
 		{ t = 0.36, face = face(0.42, 0.33, 0.06) },
 		{ t = 0.47, face = face(0.3, 0.37, 0.08) },
+		-- вдох: грудь чуть поднимается между долями
+		{ t = 0.45, root = seat(-1.2, 0.012) },
 		-- доля 1: старт спуска
 		{ t = 0.651, root = seat(0), waist = { turn = 3, bend = 0 }, neck = neck(-2.5, 0), lArm = grip(gl(0.03)), joints = glasses(gl(0.03)), face = face(0.3, 0.4, 0.1) },
 		{ t = 0.7, lArm = grip(gl(0.15)), joints = glasses(gl(0.15)) },
@@ -164,8 +167,8 @@ return {
 			return {
 				t = t,
 				root = { y = -1.72, bend = -62 + breath * 0.6 },
-				waist = { bend = -2 + breath * 0.8, turn = -22 },
-				neck = { nod = 50, turn = -62, tilt = -6 },
+				waist = { bend = -2 + breath * 0.8, turn = -10 },
+				neck = { nod = 50, turn = -25, tilt = -6 },
 				rArm = { ik = { 1.45, 0.28, -0.55 }, pole = { 0.3, -1, -1 } },
 				lArm = { ik = { -1.45, 0.28, -0.5 }, pole = { -0.3, -1, -1 } },
 				rLeg = { ik = { 0.6, 0.24, 2.0 }, pole = { 0, 1, 0.4 } },

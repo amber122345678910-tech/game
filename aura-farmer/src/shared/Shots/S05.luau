@@ -5,8 +5,8 @@ local Config = require(script.Parent.Parent:WaitForChild("Config"))
 -- Камера неподвижна (locked-off), фронтально по оси груди, чуть сверху (≈−8°: у нашей цепи дуга глубже, чем в клипе,
 -- взгляд сверху «уплощает» её к «улыбке» с концами под воротником), vFOV 30. Цепь — x 0.30–0.69, низ дуги y≈0.36 кадра
 -- (в клипе x 0.29–0.69, y 0.08–0.37). «Грув» (наезд/отъезд 1–2.3 %) делает сам конь (tools/anims/S05.luau).
-local CAM = Config.at("Beach", 0, 4.44, -2.35)
-local LOOK = Config.at("Beach", 0, 4.1, 0)
+local CAM = Config.at("Beach", 0, 4.43, -2.35)
+local LOOK = Config.at("Beach", 0, 4.075, 0)
 local FOCUS = 1.9 -- дистанция до цепи (плоскость фокуса — цепь и внутренние края воротника)
 
 return {
@@ -33,14 +33,14 @@ return {
 	-- на свету, правая половина груди в тени; холодное синее заполнение неба спереди; тёплый «грейд» прибирает
 	-- синеву атласа, контраст давит черноту меха.
 	lighting = {
-		sunDir = Vector3.new(0.85, 0.48, -0.12),
+		sunDir = Vector3.new(0.88, 0.45, -0.03),
 		lighting = {
-			Brightness = 5,
-			ExposureCompensation = -0.7,
-			EnvironmentDiffuseScale = 0.45,
-			EnvironmentSpecularScale = 0.7,
-			Ambient = Color3.fromRGB(22, 24, 40),
-			OutdoorAmbient = Color3.fromRGB(64, 72, 104),
+			Brightness = 5.5,
+			ExposureCompensation = -0.6,
+			EnvironmentDiffuseScale = 0.35,
+			EnvironmentSpecularScale = 0.6,
+			Ambient = Color3.fromRGB(20, 22, 36),
+			OutdoorAmbient = Color3.fromRGB(52, 58, 88),
 		},
 		bloom = { Intensity = 1.2, Size = 36, Threshold = 0.9 },
 		sunRays = { Intensity = 0.03, Spread = 0.5 },

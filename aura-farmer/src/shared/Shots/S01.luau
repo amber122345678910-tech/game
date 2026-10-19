@@ -6,8 +6,8 @@ local Config = require(script.Parent.Parent:WaitForChild("Config"))
 -- pitch > 0 — вверх, roll < 0 — «по часовой» (горизонт поднимается к правому краю кадра).
 -- Ключ задаётся кадрированием: точка AIM (центр головы) должна оказаться в точке кадра (sx, sy)
 -- (доли ширины/высоты, 0,0 — левый верх) на расстоянии dist по лучу; ориентация — pan/pitch/roll.
--- Точка постановки: ближе к морю, чтобы павильон и город за спиной были дальше и мельче (как в клипе).
-local SX, SZ = 0, -70
+-- Точка постановки (зона постановки декорации у (0,0,0); вокруг неё — следы и вмятины на песке).
+local SX, SZ = 0, 0
 local AIM = Config.at("Beach", SX + 0.1, 3.3, SZ)
 local ASPECT = 16 / 9
 local function camKey(t: number, sx: number, sy: number, dist: number, pan: number, pitch: number, roll: number, fov: number, ease: string?): any
@@ -35,16 +35,16 @@ return {
 	lighting = {
 		sunDir = Vector3.new(0.42, 0.85, -0.32),
 		lighting = {
-			Brightness = 2.9,
-			ExposureCompensation = -0.05,
+			Brightness = 3.0,
+			ExposureCompensation = -0.15,
 			ShadowSoftness = 0.05,
-			OutdoorAmbient = Color3.fromRGB(138, 146, 160),
+			OutdoorAmbient = Color3.fromRGB(118, 128, 148),
 			Ambient = Color3.fromRGB(94, 100, 112),
 		},
 		atmosphere = { Density = 0.28, Offset = 0.15, Haze = 1.1, Glare = 0, Color = Color3.fromRGB(199, 214, 224), Decay = Color3.fromRGB(84, 124, 168) },
 		bloom = { Intensity = 0.45, Size = 28, Threshold = 1.1 },
 		sunRays = { Intensity = 0.01, Spread = 0.5 },
-		cc = { Brightness = 0.01, Contrast = 0.2, Saturation = 0.22, TintColor = Color3.fromRGB(255, 246, 236) },
+		cc = { Brightness = 0, Contrast = 0.26, Saturation = 0.26, TintColor = Color3.fromRGB(255, 244, 232) },
 		dof = { Enabled = true, FarIntensity = 0.42, NearIntensity = 0, InFocusRadius = 1.8, FocusDistance = 4.6 },
 		clouds = { Cover = 0.22, Density = 0.12 },
 	},
@@ -54,7 +54,7 @@ return {
 		-- друг полулёжа на локтях позади-справа по кадру (не в фокусе), ноги к камере и вправо
 		Friend = {
 			char = "Human",
-			place = Config.place("Beach", SX - 6.75, SZ + 8.9, 80),
+			place = Config.place("Beach", SX - 6.2, SZ + 7.95, 40),
 			opts = {
 				skin = Color3.fromRGB(214, 162, 140),
 				hair = Color3.fromRGB(42, 26, 20),
@@ -85,5 +85,6 @@ return {
 		shake = { rot = 0.2, pos = 0.012, freq = 1.6, seed = 11 },
 		focus = { actor = "Man", part = "Head" },
 	},
+	-- В клипе в этом плане нет VFX (ни бликов, ни вспышек): только субтитр (Lyrics), DOF по голове и ручная камера.
 	effects = {},
 }

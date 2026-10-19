@@ -55,8 +55,8 @@ return {
 	-- Клип: жёсткий тёплый верхний прожектор, всё вокруг — чистый чёрный; насыщенный фиолетовый пиджак и красный
 	-- бархат, сильный ореол (bloom) на золоте; глубокая резкость (всё от колена до гребня резкое).
 	lighting = {
-		lighting = { Ambient = Color3.fromRGB(20, 15, 28), ExposureCompensation = 0.25 },
-		bloom = { Intensity = 1.5, Size = 44, Threshold = 0.85 },
+		lighting = { Ambient = Color3.fromRGB(22, 16, 30), ExposureCompensation = 0.05 },
+		bloom = { Intensity = 1.4, Size = 44, Threshold = 0.95 },
 		cc = { Brightness = 0.01, Contrast = 0.22, Saturation = 0.2, TintColor = Color3.fromRGB(255, 244, 236) },
 		dof = { FarIntensity = 0.08, NearIntensity = 0, InFocusRadius = 10 },
 	},

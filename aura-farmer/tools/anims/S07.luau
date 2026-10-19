@@ -101,28 +101,28 @@ end
 local CLAWP = { 0.3, -0.45, 1 }
 
 local bBeats = {
-	{ t = 6.533, yaw = 8, lean = -5, tilt = 0, x = 0, hp = 10, hy = 26, L = { -0.74, 3.23, 0.7, CLAWP, { -0.3, 1, 0.3 } }, lh = CLAW, R = Rp(0.46, 3.33, 0.84), rh = PINCH_B, face = { jaw = 0.5, smile = 0.3, brows = 0.6 } },
-	{ t = 6.6, yaw = 8, lean = -5, tilt = 0, x = 0, hp = 10, hy = 26, L = { -0.75, 3.25, 0.7, CLAWP, { -0.3, 1, 0.3 } }, lh = CLAW, R = Rp(0.46, 3.35, 0.84), rh = PINCH_B, face = { jaw = 0.55, smile = 0.35, brows = 0.6 } },
+	{ t = 6.533, yaw = 8, lean = -5, tilt = 0, x = 0, hp = 8, hy = 26, L = { -0.64, 3.23, 0.58, CLAWP, { -0.3, 1, 0.3 } }, lh = CLAW, R = Rp(0.54, 3.23, 0.84), rh = PINCH_B, face = { jaw = 0.5, smile = 0.3, brows = 0.6 } },
+	{ t = 6.6, yaw = 8, lean = -5, tilt = 0, x = 0, hp = 8, hy = 26, L = { -0.65, 3.25, 0.58, CLAWP, { -0.3, 1, 0.3 } }, lh = CLAW, R = Rp(0.54, 3.25, 0.84), rh = PINCH_B, face = { jaw = 0.55, smile = 0.35, brows = 0.6 } },
 	-- коготь сжимается, кисть подтягивается вверх
-	{ t = 6.667, yaw = 8, lean = -5, tilt = -1, x = -0.01, hp = 8, hy = 28, L = { -0.76, 3.30, 0.72, { 0.25, -0.55, 1 }, { -0.25, 1, 0.45 } }, lh = CLAW2, R = Rp(0.46, 3.37, 0.84), rh = PINCH_B, face = { jaw = 0.4, smile = 0.4, brows = 0.6 } },
-	{ t = 6.7, ease = "out", yaw = 8, lean = -5, tilt = -1.5, x = -0.02, hp = 8, hy = 29, L = { -0.77, 3.33, 0.73, { 0.25, -0.55, 1 }, { -0.25, 1, 0.45 } }, lh = CLAW2, R = Rp(0.45, 3.4, 0.85), rh = { curl = 0.95, index = 0.3, middle = 0.4, ring = 0.85, thumb = 0.7, thumbOut = 0.25 }, face = { jaw = 0.45, smile = 0.4, brows = 0.65 } },
+	{ t = 6.667, yaw = 8, lean = -5, tilt = -1, x = -0.01, hp = 6, hy = 28, L = { -0.66, 3.30, 0.60, { 0.25, -0.55, 1 }, { -0.25, 1, 0.45 } }, lh = CLAW2, R = Rp(0.54, 3.27, 0.84), rh = PINCH_B, face = { jaw = 0.4, smile = 0.4, brows = 0.6 } },
+	{ t = 6.7, ease = "inout", yaw = 8, lean = -5, tilt = -1.5, x = -0.02, hp = 6, hy = 29, L = { -0.67, 3.33, 0.61, { 0.25, -0.55, 1 }, { -0.25, 1, 0.45 } }, lh = CLAW2, R = Rp(0.53, 3.30, 0.85), rh = { curl = 0.95, index = 0.3, middle = 0.4, ring = 0.85, thumb = 0.7, thumbOut = 0.25 }, face = { jaw = 0.45, smile = 0.4, brows = 0.65 } },
 	-- ВЗМАХ (6.733–6.767): коготь -> джаз-ладонь с перелётом вверх, корпус качнулся влево (вправо в кадре)
-	{ t = 6.767, ease = "inout", yaw = 6, lean = -5, tilt = -4.5, x = -0.08, hp = 6, hy = 34, hr = -2, L = Lp(-0.86, 3.62, 0.78), lh = JAZZ, R = Rp(0.44, 3.48, 0.88), rh = BLADE, face = { jaw = 0.48, smile = 0.5, brows = 0.72 } },
-	{ t = 6.833, yaw = 6, lean = -5, tilt = -5, x = -0.1, hp = 5, hy = 36, hr = -2, L = Lp(-0.86, 3.55, 0.78), lh = JAZZ, R = Rp(0.44, 3.46, 0.88), rh = BLADE, face = { jaw = 0.45, smile = 0.45, brows = 0.7 } },
-	{ t = 6.9, yaw = 6, lean = -5, tilt = -4, x = -0.09, hp = 3, hy = 34, hr = -2, L = Lp(-0.85, 3.54, 0.78), lh = JAZZ, R = Rp(0.44, 3.46, 0.88), rh = BLADE, face = { jaw = 0.33, oh = 0.5, smile = 0.15, brows = 0.65 } },
+	{ t = 6.767, ease = "inout", yaw = 6, lean = -5, tilt = -4.5, x = -0.08, hp = 4, hy = 34, hr = -2, L = Lp(-0.64, 3.62, 0.60), lh = JAZZ, R = Rp(0.52, 3.38, 0.88), rh = BLADE, face = { jaw = 0.48, smile = 0.5, brows = 0.72 } },
+	{ t = 6.833, yaw = 6, lean = -5, tilt = -5, x = -0.1, hp = 3, hy = 36, hr = -2, L = Lp(-0.64, 3.55, 0.60), lh = JAZZ, R = Rp(0.52, 3.36, 0.88), rh = BLADE, face = { jaw = 0.45, smile = 0.45, brows = 0.7 } },
+	{ t = 6.9, yaw = 6, lean = -5, tilt = -4, x = -0.09, hp = 1, hy = 34, hr = -2, L = Lp(-0.63, 3.54, 0.60), lh = JAZZ, R = Rp(0.52, 3.36, 0.88), rh = BLADE, face = { jaw = 0.33, oh = 0.5, smile = 0.15, brows = 0.65 } },
 	-- доля 6.992: кивок и «приседание»
-	{ t = 7.0, yaw = 6, lean = -4, tilt = -3, x = -0.08, y = -0.035, hp = 0, hy = 33, hr = -1, L = Lp(-0.84, 3.51, 0.78), lh = JAZZ, R = Rp(0.44, 3.44, 0.88), rh = BLADE, face = { jaw = 0.36, oh = 0.75, smile = 0.05, brows = 0.6 } },
-	{ t = 7.1, yaw = 6, lean = -4, tilt = -2, x = -0.07, y = -0.01, hp = 1, hy = 32, hr = -1, L = Lp(-0.83, 3.50, 0.78, 0.08), lh = JAZZ_SOFT, R = Rp(0.44, 3.44, 0.88), rh = BLADE, face = { jaw = 0.28, oh = 0.3, smile = 0.2, brows = 0.6 } },
-	{ t = 7.2, yaw = 6, lean = -4, tilt = -1, x = -0.06, hp = 1, hy = 32, hr = 0, L = Lp(-0.82, 3.48, 0.78, -0.06), lh = JAZZ, R = Rp(0.44, 3.44, 0.88), rh = BLADE_FLUTTER, face = { jaw = 0.22, smile = 0.35, brows = 0.6 } },
+	{ t = 7.0, yaw = 6, lean = -4, tilt = -3, x = -0.08, y = -0.035, hp = -2, hy = 33, hr = -1, L = Lp(-0.62, 3.51, 0.60), lh = JAZZ, R = Rp(0.52, 3.34, 0.88), rh = BLADE, face = { jaw = 0.36, oh = 0.75, smile = 0.05, brows = 0.6 } },
+	{ t = 7.1, yaw = 6, lean = -4, tilt = -2, x = -0.07, y = -0.01, hp = -1, hy = 32, hr = -1, L = Lp(-0.61, 3.50, 0.60, 0.08), lh = JAZZ_SOFT, R = Rp(0.52, 3.34, 0.88), rh = BLADE, face = { jaw = 0.28, oh = 0.3, smile = 0.2, brows = 0.6 } },
+	{ t = 7.2, yaw = 6, lean = -4, tilt = -1, x = -0.06, hp = -1, hy = 32, hr = 0, L = Lp(-0.60, 3.48, 0.60, -0.06), lh = JAZZ, R = Rp(0.52, 3.34, 0.88), rh = BLADE_FLUTTER, face = { jaw = 0.22, smile = 0.35, brows = 0.6 } },
 	-- «CHAR»: подбородок вверх, рот широко «А/О»
-	{ t = 7.3, yaw = 6, lean = -5, tilt = 0, x = -0.05, hp = 7, hy = 29, hr = 0, L = Lp(-0.81, 3.47, 0.78, 0.08), lh = JAZZ_SOFT, R = Rp(0.44, 3.44, 0.88), rh = BLADE, face = { jaw = 0.9, oh = 0.55, brows = 0.9, squint = 0.15 } },
-	{ t = 7.4, yaw = 6, lean = -6, tilt = 0, x = -0.04, hp = 9, hy = 29, hr = 0, L = Lp(-0.80, 3.45, 0.78, -0.06), lh = JAZZ, R = Rp(0.44, 3.44, 0.88), rh = BLADE, face = { jaw = 0.7, oh = 0.6, brows = 0.85, squint = 0.1 } },
+	{ t = 7.3, yaw = 6, lean = -2, tilt = 0, x = -0.05, hp = 5, hy = 29, hr = 0, L = Lp(-0.59, 3.47, 0.60, 0.08), lh = JAZZ_SOFT, R = Rp(0.52, 3.34, 0.88), rh = BLADE, face = { jaw = 0.9, oh = 0.55, brows = 0.9, squint = 0.15 } },
+	{ t = 7.4, yaw = 6, lean = -3, tilt = 0, x = -0.04, hp = 7, hy = 29, hr = 0, L = Lp(-0.58, 3.45, 0.60, -0.06), lh = JAZZ, R = Rp(0.52, 3.34, 0.88), rh = BLADE, face = { jaw = 0.7, oh = 0.6, brows = 0.85, squint = 0.1 } },
 	-- «m» (доля 7.48): губы сомкнуты, голова чуть вниз
-	{ t = 7.483, yaw = 6, lean = -5, tilt = 0, x = -0.03, y = -0.03, hp = 3, hy = 32, hr = 0, L = Lp(-0.79, 3.43, 0.78, 0.06), lh = JAZZ_SOFT, R = Rp(0.44, 3.43, 0.88), rh = BLADE, face = { jaw = 0, smile = 0.2, brows = 0.7 } },
+	{ t = 7.483, yaw = 6, lean = -2, tilt = 0, x = -0.03, y = -0.03, hp = 1, hy = 32, hr = 0, L = Lp(-0.57, 3.43, 0.60, 0.06), lh = JAZZ_SOFT, R = Rp(0.52, 3.33, 0.88), rh = BLADE, face = { jaw = 0, smile = 0.2, brows = 0.7 } },
 	-- «MER»
-	{ t = 7.583, yaw = 6, lean = -5, tilt = 0, x = -0.02, hp = 8, hy = 29, hr = 0, L = Lp(-0.78, 3.42, 0.78, -0.06), lh = JAZZ, R = Rp(0.44, 3.43, 0.88), rh = BLADE, face = { jaw = 0.9, oh = 0.5, brows = 0.9, squint = 0.1 } },
-	{ t = 7.7, yaw = 6, lean = -5, tilt = 0, x = -0.01, hp = 6, hy = 29, hr = 0, L = Lp(-0.77, 3.41, 0.78, 0.05), lh = JAZZ_SOFT, R = Rp(0.44, 3.43, 0.88), rh = BLADE, face = { jaw = 0.5, oh = 0.3, smile = 0.3, brows = 0.72 } },
-	{ t = 7.9, yaw = 6, lean = -5, tilt = 0, x = 0.0, hp = 4, hy = 29, hr = 0, L = Lp(-0.76, 3.40, 0.78, -0.03), lh = JAZZ, R = Rp(0.44, 3.43, 0.88), rh = BLADE, face = { jaw = 0.38, smile = 0.45, brows = 0.6 } },
+	{ t = 7.583, yaw = 6, lean = -2, tilt = 0, x = -0.02, hp = 6, hy = 29, hr = 0, L = Lp(-0.56, 3.42, 0.60, -0.06), lh = JAZZ, R = Rp(0.52, 3.33, 0.88), rh = BLADE, face = { jaw = 0.9, oh = 0.5, brows = 0.9, squint = 0.1 } },
+	{ t = 7.7, yaw = 6, lean = -2, tilt = 0, x = -0.01, hp = 4, hy = 29, hr = 0, L = Lp(-0.55, 3.41, 0.60, 0.05), lh = JAZZ_SOFT, R = Rp(0.52, 3.33, 0.88), rh = BLADE, face = { jaw = 0.5, oh = 0.3, smile = 0.3, brows = 0.72 } },
+	{ t = 7.9, yaw = 6, lean = -2, tilt = 0, x = 0.0, hp = 2, hy = 29, hr = 0, L = Lp(-0.54, 3.40, 0.60, -0.03), lh = JAZZ, R = Rp(0.52, 3.33, 0.88), rh = BLADE, face = { jaw = 0.38, smile = 0.45, brows = 0.6 } },
 }
 
 -- B чуть ниже A: стоит, слегка согнув колени (стопы на месте — IK ног); к «CHARMER» выпрямляется
@@ -138,9 +138,9 @@ local bKeys = {}
 for _, b in bBeats do
 	local face = table.clone(b.face)
 	face.lookX = face.lookX or -0.45 -- взгляд вверх-вправо (влево от неё)
-	face.lookY = face.lookY or 0.5
+	face.lookY = face.lookY or 0.75
 	table.insert(bKeys, key("WomanB", {
-		t = b.t, ease = b.ease, yaw = b.yaw, lean = b.lean, tilt = b.tilt, x = b.x, y = (b.y or 0) + bDrop(b.t), hp = b.hp, hy = b.hy, hr = b.hr,
+		t = b.t, ease = b.ease, yaw = b.yaw, lean = b.lean, tilt = b.tilt, x = b.x, f = b.f, y = (b.y or 0) + bDrop(b.t), hp = b.hp, hy = b.hy, hr = b.hr,
 		lArm = bL(b.L), lHand = b.lh, rArm = bR(b.R), rHand = b.rh, face = face,
 	}))
 end
@@ -168,23 +168,23 @@ end
 -- A: { t, yaw, lean, f, x, hp, hy, hr, R = { x, y, f, palm, fingers, pole? }, face }
 local DOWN_P, DOWN_F, DOWN_POLE = { 0.5, 0, -1 }, { 0, 0, 1 }, { 1, -0.4, 0.5 }
 local aBeats = {
-	{ t = 6.533, yaw = 32, lean = 0, f = 0.05, hp = 18, hy = 40, hr = 7, R = { 0.5, 2.93, 0.68, { 0.2, -0.1, -1 }, { -0.25, 1, 0.25 } }, face = laugh(0.62) },
-	{ t = 6.6, yaw = 32, lean = 0, f = 0.05, hp = 18, hy = 40, hr = 7, R = { 0.5, 2.95, 0.7, { 0.2, -0.1, -1 }, { -0.25, 1, 0.25 } }, face = laugh(0.6) },
-	{ t = 6.7, yaw = 32, lean = 0, f = 0.05, hp = 17, hy = 40, hr = 5, R = { 0.53, 3.0, 0.76, { 0.2, -0.25, -1 }, { -0.3, 1, 0.35 } }, face = laugh(0.4) },
-	{ t = 6.8, yaw = 32, lean = 0, f = 0.05, x = -0.03, hp = 15, hy = 37, hr = 5, R = { 0.57, 2.98, 0.82, { 0.2, -0.25, -1 }, { -0.3, 1, 0.35 } }, face = laugh(0.6) },
-	{ t = 6.9, yaw = 31, lean = 0, f = 0.05, x = -0.05, hp = 10, hy = 35, hr = 5, R = { 0.7, 2.7, 0.78, { 0.3, -0.3, -1 }, { -0.2, 1, 0.5 } }, face = laugh(0.5, { blink = 0.5 }) },
+	{ t = 6.533, yaw = 32, lean = 0, f = 0.05, hp = 8, hy = 40, hr = 7, R = { 0.66, 2.83, 0.66, { 0.2, -0.1, -1 }, { -0.25, 1, 0.25 } }, face = laugh(0.40) },
+	{ t = 6.6, yaw = 32, lean = 0, f = 0.05, hp = 8, hy = 40, hr = 7, R = { 0.66, 2.85, 0.68, { 0.2, -0.1, -1 }, { -0.25, 1, 0.25 } }, face = laugh(0.39) },
+	{ t = 6.7, yaw = 32, lean = 0, f = 0.05, hp = 8, hy = 40, hr = 5, R = { 0.68, 2.9, 0.74, { 0.2, -0.25, -1 }, { -0.3, 1, 0.35 } }, face = laugh(0.26) },
+	{ t = 6.8, yaw = 32, lean = 0, f = 0.05, x = -0.03, hp = 6, hy = 37, hr = 5, R = { 0.72, 2.88, 0.8, { 0.2, -0.25, -1 }, { -0.3, 1, 0.35 } }, face = laugh(0.39) },
+	{ t = 6.9, yaw = 31, lean = 0, f = 0.05, x = -0.05, hp = 2, hy = 35, hr = 5, R = { 0.82, 2.6, 0.76, { 0.3, -0.3, -1 }, { -0.2, 1, 0.5 } }, face = laugh(0.33, { blink = 0.38 }) },
 	-- доля 6.992: голова падает вперёд, корпус выпрямляется, рука с очками ушла вниз из кадра
-	{ t = 7.0, ease = "out", yaw = 29, lean = 2, f = 0.1, x = -0.04, hp = -2, hy = 35, hr = 6, R = { 1.02, 2.35, 0.5, DOWN_P, { -0.05, 0.3, 1 }, DOWN_POLE }, face = laugh(0.42, { blink = 0.25, squint = 0.45, lookX = -0.45, lookY = 0.55 }) },
-	{ t = 7.1, yaw = 28, lean = 3, f = 0.08, x = 0.0, hp = -4, hy = 33, hr = 0, R = { 1.05, 2.15, 0.42, DOWN_P, DOWN_F, DOWN_POLE }, face = laugh(0.42, { blink = 0.12, squint = 0.4, brows = 0.45, lookX = -0.45, lookY = 0.55 }) },
-	{ t = 7.2, yaw = 27, lean = 4, f = 0.07, x = 0.05, hp = -6, hy = 30, hr = -5, R = { 1.05, 2.12, 0.42, DOWN_P, DOWN_F, DOWN_POLE }, face = laugh(0.42, { blink = 0.1, squint = 0.4, brows = 0.4, lookX = -0.45, lookY = 0.5 }) },
+	{ t = 7.0, ease = "out", yaw = 29, lean = 2, f = 0.1, x = -0.04, hp = -8, hy = 35, hr = 6, R = { 1.02, 2.35, 0.5, DOWN_P, { -0.05, 0.3, 1 }, DOWN_POLE }, face = laugh(0.23, { blink = 0.12, squint = 0.5, lookX = -0.45, lookY = 0.55 }) },
+	{ t = 7.1, yaw = 28, lean = 3, f = 0.08, x = 0.0, hp = -9, hy = 33, hr = 0, R = { 1.05, 2.15, 0.42, DOWN_P, DOWN_F, DOWN_POLE }, face = laugh(0.23, { blink = 0.12, squint = 0.5, brows = 0.2, lookX = -0.45, lookY = 0.55 }) },
+	{ t = 7.2, yaw = 27, lean = 3, f = 0.04, x = 0.05, hp = -10, hy = 30, hr = -5, R = { 1.05, 2.12, 0.42, DOWN_P, DOWN_F, DOWN_POLE }, face = laugh(0.23, { blink = 0.12, squint = 0.5, brows = 0.2, lookX = -0.45, lookY = 0.5 }) },
 	-- «CHAR»: широкий смех, корпус к объективу
-	{ t = 7.3, yaw = 26, lean = 5, f = 0.06, x = 0.12, tilt = 2, hp = -3, hy = 27, hr = -8, R = { 1.05, 2.12, 0.42, DOWN_P, DOWN_F, DOWN_POLE }, face = laugh(0.85, { blink = 0.2, squint = 0.6, brows = 0.35, lookX = -0.4, lookY = 0.5 }) },
-	{ t = 7.4, yaw = 25, lean = 6, f = 0.05, x = 0.16, tilt = 3, hp = -4, hy = 30, hr = -8, R = { 1.05, 2.12, 0.42, DOWN_P, DOWN_F, DOWN_POLE }, face = laugh(0.35, { blink = 0.15, squint = 0.45, brows = 0.35, lookX = -0.4, lookY = 0.45 }) },
-	{ t = 7.5, yaw = 24, lean = 6, f = 0.03, x = 0.22, tilt = 4, hp = -6, hy = 30, hr = -8, R = { 1.05, 2.2, 0.5, DOWN_P, { 0, 0.2, 1 }, DOWN_POLE }, face = laugh(0.42, { blink = 0.2, squint = 0.5, brows = 0.3, lookX = -0.3, lookY = 0.4 }) },
+	{ t = 7.3, yaw = 26, lean = 3, f = 0.0, x = 0.12, tilt = 2, hp = -7, hy = 27, hr = -8, R = { 1.05, 2.12, 0.42, DOWN_P, DOWN_F, DOWN_POLE }, face = laugh(0.47, { blink = 0.12, squint = 0.5, brows = 0.2, lookX = -0.4, lookY = 0.5 }) },
+	{ t = 7.4, yaw = 25, lean = 3, f = -0.03, x = 0.16, tilt = 3, hp = -8, hy = 30, hr = -8, R = { 1.05, 2.12, 0.42, DOWN_P, DOWN_F, DOWN_POLE }, face = laugh(0.20, { blink = 0.12, squint = 0.5, brows = 0.2, lookX = -0.4, lookY = 0.45 }) },
+	{ t = 7.5, yaw = 24, lean = 3, f = -0.06, x = 0.22, tilt = 4, hp = -10, hy = 30, hr = -8, R = { 1.05, 2.2, 0.5, DOWN_P, { 0, 0.2, 1 }, DOWN_POLE }, face = laugh(0.23, { blink = 0.12, squint = 0.5, brows = 0.2, lookX = -0.3, lookY = 0.4 }) },
 	-- «MER»: снова широкий смех, наклон к объективу и вправо (влево в кадре); правая рука поднимается
-	{ t = 7.6, yaw = 23, lean = 6, f = 0.0, x = 0.28, tilt = 5, hp = -8, hy = 25, hr = -10, R = { 0.95, 2.75, 0.8, { 0.3, -0.3, -1 }, { -0.2, 0.8, 0.6 } }, face = laugh(0.85, { blink = 0.2, squint = 0.6, brows = 0.3, lookX = -0.2, lookY = 0.3 }) },
-	{ t = 7.7, yaw = 22, lean = 5, f = -0.02, x = 0.32, tilt = 6, hp = -10, hy = 25, hr = -10, R = { 0.78, 3.4, 0.88, { 0.2, -0.3, -1 }, { -0.3, 1, 0.4 } }, face = laugh(0.65, { blink = 0.2, squint = 0.55, brows = 0.35, lookX = -0.1, lookY = 0.2 }) },
-	{ t = 7.9, yaw = 22, lean = 5, f = -0.03, x = 0.35, tilt = 6, hp = -12, hy = 23, hr = -10, R = { 0.66, 3.78, 0.9, { 0.2, -0.3, -1 }, { -0.3, 1, 0.3 } }, face = laugh(0.6, { blink = 0.2, squint = 0.55, brows = 0.4, lookX = -0.05, lookY = 0.15 }) },
+	{ t = 7.6, yaw = 23, lean = 3, f = -0.09, x = 0.28, tilt = 5, hp = -11, hy = 25, hr = -10, R = { 1.0, 2.6, 0.75, { 0.3, -0.3, -1 }, { -0.2, 0.8, 0.6 } }, face = laugh(0.47, { blink = 0.12, squint = 0.5, brows = 0.2, lookX = -0.2, lookY = 0.3 }) },
+	{ t = 7.7, yaw = 22, lean = 2, f = -0.12, x = 0.32, tilt = 6, hp = -12, hy = 25, hr = -10, R = { 0.98, 3.12, 0.98, { 0.2, -0.3, -1 }, { -0.3, 1, 0.4 } }, face = laugh(0.36, { blink = 0.12, squint = 0.5, brows = 0.2, lookX = -0.1, lookY = 0.2 }) },
+	{ t = 7.9, yaw = 22, lean = 2, f = -0.14, x = 0.35, tilt = 6, hp = -13, hy = 23, hr = -10, R = { 0.92, 3.42, 1.05, { 0.2, -0.3, -1 }, { -0.3, 1, 0.3 } }, face = laugh(0.33, { blink = 0.12, squint = 0.5, brows = 0.2, lookX = -0.05, lookY = 0.15 }) },
 }
 local aKeys = {}
 for _, a in aBeats do
@@ -194,6 +194,65 @@ for _, a in aBeats do
 		rArm = aR(R[1], R[2], R[3], R[4], R[5], R[6]), rHand = PINCH_A, face = a.face,
 	}))
 end
+
+-- ===== «смеховые» покачивания головы: синусоида поверх ключей шеи (на ключах и в пиках между ними) =====
+local function addBob(keys, t0, t1, freq, amp, field)
+	local neckKeys = {}
+	for _, k in keys do
+		if k.neck then
+			table.insert(neckKeys, k)
+		end
+	end
+	table.sort(neckKeys, function(a, b)
+		return a.t < b.t
+	end)
+	local function offset(t)
+		local w = math.clamp((t - t0) / 0.08, 0, 1) * math.clamp((t1 - t) / 0.08, 0, 1)
+		return amp * w * math.sin(2 * math.pi * freq * (t - t0))
+	end
+	local function lerpNeck(t)
+		local a, b = neckKeys[1], neckKeys[#neckKeys]
+		for i = 1, #neckKeys - 1 do
+			if neckKeys[i].t <= t and neckKeys[i + 1].t >= t then
+				a, b = neckKeys[i], neckKeys[i + 1]
+				break
+			end
+		end
+		local u = if b.t > a.t then (t - a.t) / (b.t - a.t) else 0
+		local n = {}
+		for _, f in { "nod", "turn", "tilt" } do
+			n[f] = (a.neck[f] or 0) + ((b.neck[f] or 0) - (a.neck[f] or 0)) * u
+		end
+		return n
+	end
+	local extra = {}
+	local t = t0 + 0.25 / freq
+	while t < t1 do
+		local near = false
+		for _, k in neckKeys do
+			if math.abs(k.t - t) < 0.03 then
+				near = true
+			end
+		end
+		if not near then
+			table.insert(extra, { t = t, neck = lerpNeck(t) })
+		end
+		t += 0.5 / freq
+	end
+	for _, k in neckKeys do
+		if k.t > t0 and k.t < t1 then
+			k.neck = table.clone(k.neck)
+			k.neck[field] = (k.neck[field] or 0) + offset(k.t)
+		end
+	end
+	for _, k in extra do
+		k.neck[field] += offset(k.t)
+		table.insert(keys, k)
+	end
+end
+-- A смеётся: кивки ±2.5° ~4 Гц после того, как уронила голову; B — лёгкие покачивания головы в ритм пения
+addBob(aKeys, 7.05, 7.86, 4, 2.5, "nod")
+addBob(bKeys, 7.05, 7.86, 2.05, 1.5, "tilt")
 
 -- ===== стопы на месте (ноги вне кадра, но таз качается) =====
 local function addLegs(keys, rig)

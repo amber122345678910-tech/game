@@ -11,7 +11,7 @@ end
 
 return function(opts)
 	local o = {
-		skin = rgb(214, 154, 126),
+		skin = rgb(216, 142, 110),
 		eyes = rgb(92, 120, 134),
 		lips = rgb(184, 112, 104),
 		hair = rgb(40, 28, 22),
