@@ -667,9 +667,13 @@ return function(opts)
 	local headHW = cran.X / 2 -- полуширина черепа
 	sk("Head", v(0, 0.1, 0.06), cran, skin, "Cranium")
 	sk("Head", v(0, -0.0, -0.3), if fem then v(0.88, 0.98, 0.58) else v(0.92, 1.0, 0.6), skin, "Face")
-	sk("Head", v(0, 0.17, -0.42), v(0.76, 0.2, 0.36), skin, "BrowRidge")
 	if fem then
-		sk("Head", v(0, -0.235, -0.415), v(0.38, 0.2, 0.34), skin, "Muzzle")
+		sk("Head", v(0, 0.17, -0.4), v(0.7, 0.18, 0.34), skin, "BrowRidge")
+	else
+		sk("Head", v(0, 0.17, -0.42), v(0.76, 0.2, 0.36), skin, "BrowRidge")
+	end
+	if fem then
+		sk("Head", v(0, -0.235, -0.4), v(0.38, 0.2, 0.34), skin, "Muzzle")
 	else
 		sk("Head", v(0, -0.235, -0.43), v(0.42, 0.22, 0.36), skin, "Muzzle")
 	end
@@ -688,9 +692,9 @@ return function(opts)
 	for _, side in { "Right", "Left" } do
 		local s = if side == "Right" then 1 else -1
 		local cj = side .. "Cheek"
-		local cc = if fem then v(s * 0.215, -0.12, -0.335) else v(s * 0.22, -0.13, -0.36)
+		local cc = if fem then v(s * 0.22, -0.14, -0.33) else v(s * 0.22, -0.13, -0.36)
 		rig:joint(cj, "Head", H(cc.X, cc.Y, cc.Z), H(cc.X, cc.Y, cc.Z), v(0.05, 0.05, 0.05))
-		sk(cj, cc, if fem then v(0.32, 0.27, 0.4) else v(0.34, 0.3, 0.44), cheekC, "Cheek")
+		sk(cj, cc, if fem then v(0.3, 0.25, 0.38) else v(0.34, 0.3, 0.44), cheekC, "Cheek")
 	end
 	-- уши
 	for _, s in { 1, -1 } do
@@ -711,7 +715,7 @@ return function(opts)
 	for _, side in { "Right", "Left" } do
 		local s = if side == "Right" then 1 else -1
 		local ex = s * eyeX
-		local eyeCF = onFace(ex, eyeY, 0) * at(0, 0, eyeD / 2 - 0.03)
+		local eyeCF = onFace(ex, eyeY, 0) * at(0, 0, eyeD / 2 - 0.014)
 		eyeCFs[side] = eyeCF
 		ell("Head", eyeCF, v(eyeW, eyeH, eyeD), rgb(246, 242, 236), "SmoothPlastic", "EyeWhite")
 		-- взгляд: радужка-«колпачок», зрачок, два блика
@@ -729,7 +733,7 @@ return function(opts)
 		local lidJ = side .. "Lid"
 		rig:joint(lidJ, "Head", eyeCF.Position, eyeCF.Position, v(0.05, 0.05, 0.05))
 		local lidY = if fem then 1.0 else 0.88
-		ell(lidJ, eyeCF * at(0, eyeH * lidY, 0.0) * ang(18, 0, 0), v(eyeW + 0.04, eyeH * 1.22, eyeD + 0.024), skin, "SmoothPlastic", "Lid")
+		ell(lidJ, eyeCF * at(0, eyeH * lidY, 0.004) * ang(26, 0, 0), v(eyeW + 0.036, eyeH * 1.22, eyeD + 0.012), skin, "SmoothPlastic", "Lid")
 		local lashT = if o.lashes then 0.03 else 0.022
 		local lashY = eyeH * (lidY - 0.6)
 		ell(lidJ, eyeCF * at(0, lashY, -0.002), v(eyeW * 1.04, lashT, eyeD * 1.06), lashC, "SmoothPlastic", "LashLine")
@@ -739,8 +743,7 @@ return function(opts)
 		-- нижнее веко (поднимается при улыбке/прищуре — «смеющиеся» глаза)
 		local llJ = side .. "LowerLid"
 		rig:joint(llJ, "Head", eyeCF.Position, eyeCF.Position, v(0.05, 0.05, 0.05))
-		ell(llJ, eyeCF * at(0, -eyeH * 0.86, -0.003), v(eyeW + 0.04, eyeH * 0.95, eyeD + 0.026), skin, "SmoothPlastic", "LowerLid")
-		ell(llJ, eyeCF * at(0, -eyeH * 0.42, -0.004), v(eyeW * 0.8, 0.014, eyeD * 0.96), skin:Lerp(lashC, 0.25), "SmoothPlastic", "LowerLash")
+		ell(llJ, eyeCF * at(0, -eyeH * 0.88, 0.006) * ang(-20, 0, 0), v(eyeW + 0.036, eyeH * 0.95, eyeD + 0.008), skin, "SmoothPlastic", "LowerLid")
 	end
 
 	-- ----- брови -----
@@ -753,20 +756,20 @@ return function(opts)
 		local pivot = onFace(s * (eyeX + 0.005), by, 0.01).Position
 		rig:joint(bj, "Head", pivot, pivot, v(0.05, 0.05, 0.05))
 		-- три сегмента: толстое начало у переносицы, дуга, тонкий хвост
-		ell(bj, onFace(s * (eyeX - 0.075), by - 0.002, 0.02, -s * 6), v(0.12, 0.064 * bt, 0.06), browC, "SmoothPlastic", "Brow")
-		ell(bj, onFace(s * (eyeX + 0.005), by + 0.012, 0.02, -s * 4), v(0.14, 0.056 * bt, 0.06), browC, "SmoothPlastic", "Brow")
-		ell(bj, onFace(s * (eyeX + 0.088), by - 0.004, 0.016, -s * 22), v(0.12, 0.04 * bt, 0.055), browC, "SmoothPlastic", "Brow")
+		ell(bj, onFace(s * (eyeX - 0.07), by, 0.016, -s * 5), v(0.13, 0.06 * bt, 0.05), browC, "SmoothPlastic", "Brow")
+		ell(bj, onFace(s * (eyeX + 0.01), by + 0.012, 0.016, -s * 6), v(0.14, 0.052 * bt, 0.05), browC, "SmoothPlastic", "Brow")
+		ell(bj, onFace(s * (eyeX + 0.085), by - 0.002, 0.012, -s * 20), v(0.12, 0.038 * bt, 0.045), browC, "SmoothPlastic", "Brow")
 	end
 
 	-- ----- нос -----
 	local ns = o.nose
-	local noseC = skin:Lerp(rosyC, 0.45)
+	local noseC = skin:Lerp(rosyC, if fem then 0.25 else 0.45)
 	ell("Head", onFace(0, -0.03, 0.006), v(0.1 * ns, 0.3 * ns, 0.1 * ns), skin, "SmoothPlastic", "NoseBridge")
 	ell("Head", onFace(0, -0.1, 0.022 * ns), v(0.12 * ns, 0.16 * ns, 0.1 * ns), skin, "SmoothPlastic", "NoseBridge")
 	local tipZ = surfZ(0, -0.155) - 0.05 * ns
 	ell("Head", Hc(0, -0.155 * ns, tipZ), v(0.15 * ns, 0.13 * ns, 0.13 * ns), noseC, "SmoothPlastic", "NoseTip")
 	for _, s in { 1, -1 } do
-		ell("Head", Hc(s * 0.062 * ns, -0.178 * ns, tipZ + 0.035), v(0.08 * ns, 0.075 * ns, 0.08 * ns), noseC, "SmoothPlastic", "NoseWing")
+		ell("Head", Hc(s * 0.058 * ns, -0.176 * ns, tipZ + 0.036), v(0.075 * ns, 0.068 * ns, 0.075 * ns), noseC, "SmoothPlastic", "NoseWing")
 		ell("Head", Hc(s * 0.032 * ns, -0.205 * ns, tipZ + 0.012), v(0.042 * ns, 0.022, 0.05 * ns), skinDeep:Lerp(BLACK, 0.3), "SmoothPlastic", "Nostril")
 	end
 
@@ -780,8 +783,8 @@ return function(opts)
 	local teethC = rgb(250, 247, 238)
 	local mPivot = H(0, my, -0.5)
 	rig:joint("Mouth", "Head", mPivot, mPivot, v(0.05, 0.05, 0.05))
-	ell("Mouth", Hc(0, my - 0.06, mz + 0.105), v(0.44, 0.27, 0.16), mouthDark, "SmoothPlastic", "MouthInside")
-	ell("Mouth", Hc(0, my - 0.018, mz + 0.05), v(0.27, 0.085, 0.06), teethC, "SmoothPlastic", "UpperTeeth")
+	ell("Mouth", Hc(0, my - 0.065, mz + 0.115), v(0.44, 0.27, 0.16), mouthDark, "SmoothPlastic", "MouthInside")
+	ell("Mouth", Hc(0, my - 0.012, mz + 0.036), v(0.27, 0.1, 0.06), teethC, "SmoothPlastic", "UpperTeeth")
 	-- верхняя губа (с «луком Купидона»)
 	local ulPivot = H(0, my + 0.04, mz)
 	rig:joint("UpperLip", "Head", ulPivot, ulPivot, v(0.05, 0.05, 0.05))
@@ -803,8 +806,7 @@ return function(opts)
 		local cx = s * 0.135
 		local mp = H(cx, my, surfZ(cx, my))
 		rig:joint(mj, "Head", mp, mp, v(0.05, 0.05, 0.05))
-		ell(mj, Hc(cx, my + 0.0, surfZ(cx, my) - 0.005) * ang(0, -s * 18, 0), v(0.06, 0.05, 0.05), lipC:Lerp(skinShade, 0.3), "SmoothPlastic", "LipCorner")
-		ell(mj, Hc(s * 0.155, my + 0.012, surfZ(s * 0.155, my) - 0.004) * ang(0, -s * 22, s * 40), v(0.045, 0.016, 0.04), skinDeep, "SmoothPlastic", "CornerCrease")
+		ell(mj, Hc(s * 0.15, my + 0.006, surfZ(s * 0.15, my) - 0.001) * ang(0, -s * 22, s * 30), v(0.04, 0.014, 0.03), skinShade:Lerp(skinDeep, 0.4), "SmoothPlastic", "CornerCrease")
 	end
 
 	-- ----- борода-щетина -----
