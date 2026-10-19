@@ -1,26 +1,28 @@
 #!/usr/bin/env python3
-# Шрифт названия: Russo One (OFL), https://fonts.google.com/specimen/Russo+One
+# Шрифты: Montserrat Black Italic (логотип, теги) и Nunito ExtraBold (подзаголовок) — Google Fonts, лицензия OFL.
 """Иконка (512x512) и обложка (1920x1080) игры из офлайн-рендеров сцены tools/preview/icon_scene.luau.
-python3 compose_icon.py <рендер_квадрат.png> <рендер_широкий.png> <шрифт.ttf> <папка_вывода>"""
+Логотип по docs/STYLE.md §10: две строки, «МОЛНИЙ» на 15% крупнее, наклон, градиент 3 цвета,
+двойная обводка, жёсткая тень, голубое свечение, зигзаг-молния за буквами.
+python3 compose_icon.py <квадрат.png> <широкий.png> <MontserratBlackItalic.ttf> <NunitoExtraBold.ttf> <папка>"""
 import sys, os
 from PIL import Image, ImageDraw, ImageFont, ImageEnhance, ImageFilter
 
-sq_path, wide_path, font_path, out_dir = sys.argv[1:5]
+sq_path, wide_path, display_path, body_path, out_dir = sys.argv[1:6]
 os.makedirs(out_dir, exist_ok=True)
 
-GOLD_TOP = (255, 246, 150)
-GOLD_BOTTOM = (255, 160, 20)
-OUTLINE = (18, 22, 60)
+FILL = [(255, 248, 190), (255, 212, 60), (242, 146, 22)]
+INNER = (58, 26, 110)
+INK = (14, 10, 32)
+SPARK = (80, 210, 255)
+CREAM = (255, 248, 232)
 
 
 def grade(img):
-    """Сочнее цвета и контраст (как в превью-картинках Roblox)."""
-    img = ImageEnhance.Color(img).enhance(1.3)
-    img = ImageEnhance.Contrast(img).enhance(1.12)
-    return img
+    img = ImageEnhance.Color(img).enhance(1.25)
+    return ImageEnhance.Contrast(img).enhance(1.1)
 
 
-def vignette(img, strength=0.45):
+def vignette(img, strength=0.4):
     w, h = img.size
     mask = Image.new("L", (w, h), 0)
     d = ImageDraw.Draw(mask)
@@ -28,103 +30,141 @@ def vignette(img, strength=0.45):
         t = i / 60
         d.ellipse([-w * 0.25 + t * w * 0.2, -h * 0.25 + t * h * 0.2, w * 1.25 - t * w * 0.2, h * 1.25 - t * h * 0.2], fill=int(255 * t))
     mask = mask.filter(ImageFilter.GaussianBlur(w // 20))
-    dark = Image.new("RGB", (w, h), (8, 10, 30))
+    dark = Image.new("RGB", (w, h), (10, 8, 28))
     return Image.composite(img, Image.blend(img, dark, strength), mask)
 
 
-def gradient_text(size, text, font, top, bottom, stroke, outline, shadow_offset):
-    """Текст с вертикальным градиентом, толстой обводкой и тенью. Возвращает RGBA и смещение."""
-    tmp = Image.new("L", (10, 10))
-    bbox = ImageDraw.Draw(tmp).textbbox((0, 0), text, font=font, stroke_width=stroke)
-    w, h = bbox[2] - bbox[0] + shadow_offset * 2 + 8, bbox[3] - bbox[1] + shadow_offset * 2 + 8
-    ox, oy = -bbox[0] + 4, -bbox[1] + 4
-    layer = Image.new("RGBA", (w, h), (0, 0, 0, 0))
-    # тень
-    sh = Image.new("L", (w, h), 0)
-    ImageDraw.Draw(sh).text((ox + shadow_offset, oy + shadow_offset), text, font=font, fill=255, stroke_width=stroke, stroke_fill=255)
-    sh = sh.filter(ImageFilter.GaussianBlur(max(1, shadow_offset // 2)))
-    layer.paste(Image.new("RGBA", (w, h), (0, 0, 0, 170)), (0, 0), sh)
-    # обводка
-    ol = Image.new("L", (w, h), 0)
-    ImageDraw.Draw(ol).text((ox, oy), text, font=font, fill=255, stroke_width=stroke, stroke_fill=255)
-    layer.paste(Image.new("RGBA", (w, h), outline + (255,)), (0, 0), ol)
-    # заливка градиентом
-    fill_mask = Image.new("L", (w, h), 0)
-    ImageDraw.Draw(fill_mask).text((ox, oy), text, font=font, fill=255)
-    grad = Image.new("RGBA", (w, h))
-    gd = ImageDraw.Draw(grad)
-    t0, t1 = oy + bbox[1], oy + bbox[3]
+def text_mask(size, text, font, offset, stroke=0):
+    m = Image.new("L", size, 0)
+    ImageDraw.Draw(m).text(offset, text, font=font, fill=255, stroke_width=stroke, stroke_fill=255)
+    return m
+
+
+def gradient(size, top, bottom, stops):
+    w, h = size
+    g = Image.new("RGBA", size)
+    d = ImageDraw.Draw(g)
     for y in range(h):
-        t = min(1, max(0, (y - t0) / max(1, (t1 - t0))))
-        c = tuple(int(top[i] + (bottom[i] - top[i]) * t) for i in range(3))
-        gd.line([(0, y), (w, y)], fill=c + (255,))
-    layer.paste(grad, (0, 0), fill_mask)
-    # блик в верхней трети букв
+        t = min(1, max(0, (y - top) / max(1, bottom - top)))
+        if t < 0.5:
+            a, b, k = stops[0], stops[1], t / 0.5
+        else:
+            a, b, k = stops[1], stops[2], (t - 0.5) / 0.5
+        c = tuple(int(a[i] + (b[i] - a[i]) * k) for i in range(3))
+        d.line([(0, y), (w, y)], fill=c + (255,))
+    return g
+
+
+def logo_word(text, font, cap_h):
+    """Одно слово логотипа на прозрачном фоне."""
+    outer = max(2, int(cap_h * 0.07))
+    inner = max(1, int(cap_h * 0.035))
+    shadow = max(2, int(cap_h * 0.06))
+    glow = max(2, int(cap_h * 0.15))
+    tmp = ImageDraw.Draw(Image.new("L", (4, 4)))
+    bb = tmp.textbbox((0, 0), text, font=font, stroke_width=outer)
+    pad = glow * 2 + shadow
+    w, h = bb[2] - bb[0] + pad * 2, bb[3] - bb[1] + pad * 2
+    off = (pad - bb[0], pad - bb[1])
+    layer = Image.new("RGBA", (w, h), (0, 0, 0, 0))
+    # свечение
+    gm = text_mask((w, h), text, font, off, outer).filter(ImageFilter.GaussianBlur(glow))
+    layer.paste(Image.new("RGBA", (w, h), SPARK + (255,)), (0, 0), gm.point(lambda v: int(v * 0.4)))
+    # жёсткая тень
+    sm = text_mask((w, h), text, font, (off[0], off[1] + shadow), outer)
+    layer.paste(Image.new("RGBA", (w, h), INK + (255,)), (0, 0), sm)
+    # внешняя обводка
+    layer.paste(Image.new("RGBA", (w, h), INK + (255,)), (0, 0), text_mask((w, h), text, font, off, outer))
+    # внутренняя обводка
+    layer.paste(Image.new("RGBA", (w, h), INNER + (255,)), (0, 0), text_mask((w, h), text, font, off, inner))
+    # заливка градиентом
+    fill_mask = text_mask((w, h), text, font, off)
+    tb = tmp.textbbox(off, text, font=font)
+    layer.paste(gradient((w, h), tb[1], tb[3], FILL), (0, 0), fill_mask)
+    # блик по верхней трети
     shine = Image.new("L", (w, h), 0)
-    sd = ImageDraw.Draw(shine)
-    sd.rectangle([0, t0, w, t0 + (t1 - t0) * 0.32], fill=70)
-    shine = Image.composite(shine, Image.new("L", (w, h), 0), fill_mask)
-    layer.paste(Image.new("RGBA", (w, h), (255, 255, 255, 255)), (0, 0), shine)
+    ImageDraw.Draw(shine).rectangle([0, tb[1], w, tb[1] + (tb[3] - tb[1]) * 0.3], fill=60)
+    layer.paste(Image.new("RGBA", (w, h), (255, 255, 255, 255)), (0, 0), Image.composite(shine, Image.new("L", (w, h), 0), fill_mask))
     return layer
 
 
-def paste_rotated(base, layer, center, angle):
-    rot = layer.rotate(angle, resample=Image.BICUBIC, expand=True)
-    x = int(center[0] - rot.width / 2)
-    y = int(center[1] - rot.height / 2)
-    base.alpha_composite(rot, (x, y))
+BOLT = [(0.62, 0.0), (0.18, 0.56), (0.44, 0.56), (0.30, 1.0), (0.86, 0.38), (0.58, 0.38), (0.80, 0.0)]
 
 
-def badge(text, font, fill, outline, pad=18):
-    tmp = Image.new("L", (10, 10))
-    bbox = ImageDraw.Draw(tmp).textbbox((0, 0), text, font=font)
-    w, h = bbox[2] - bbox[0] + pad * 2, bbox[3] - bbox[1] + pad * 2
-    img = Image.new("RGBA", (w + 8, h + 8), (0, 0, 0, 0))
+def bolt(size, box, outline):
+    """Силуэт молнии (заливка Cream→Volt, обводка Ink) в прямоугольнике box = (x, y, w, h)."""
+    layer = Image.new("RGBA", size, (0, 0, 0, 0))
+    x, y, w, h = box
+    pts = [(x + px * w, y + py * h) for px, py in BOLT]
+    d = ImageDraw.Draw(layer)
+    d.polygon(pts, fill=INK + (255,))
+    d.line(pts + [pts[0]], fill=INK + (255,), width=int(outline * 2), joint="curve")
+    m = Image.new("L", size, 0)
+    ImageDraw.Draw(m).polygon(pts, fill=255)
+    m = m.filter(ImageFilter.MinFilter(max(3, int(outline) | 1)))
+    layer.paste(gradient(size, y, y + h, [CREAM, (255, 236, 120), (255, 196, 40)]), (0, 0), m)
+    return layer
+
+
+def logo(width, display_path, cap_frac=0.13):
+    """Двухстрочный логотип «ЛОВЦЫ / МОЛНИЙ» шириной примерно width."""
+    size1 = int(width * cap_frac * 1.32)
+    f1 = ImageFont.truetype(display_path, size1)
+    f2 = ImageFont.truetype(display_path, int(size1 * 1.15))
+    cap = f1.getbbox("Л")[3] - f1.getbbox("Л")[1]
+    w1 = logo_word("ЛОВЦЫ", f1, cap)
+    w2 = logo_word("МОЛНИЙ", f2, int(cap * 1.15))
+    W = max(w1.width, w2.width) + cap * 2
+    H = int(w1.height * 0.78 + w2.height)
+    canvas = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+    # молния за буквами: справа, между строками
+    canvas.alpha_composite(bolt((W, H), (W - cap * 2.5, H * 0.0, cap * 2.3, H * 0.98), cap * 0.08))
+    canvas.alpha_composite(w1, (int((W - w1.width) / 2 - cap * 0.25), 0))
+    canvas.alpha_composite(w2, (int((W - w2.width) / 2 + cap * 0.2), int(w1.height * 0.78)))
+    return canvas.rotate(4, resample=Image.BICUBIC, expand=True)
+
+
+def tag(text, font_path, height):
+    """Стикер-тег: лента Ink, наклон, FontDisplay."""
+    f = ImageFont.truetype(font_path, int(height * 0.62))
+    bb = ImageDraw.Draw(Image.new("L", (4, 4))).textbbox((0, 0), text, font=f)
+    w = bb[2] - bb[0] + int(height * 0.9)
+    img = Image.new("RGBA", (w + 16, height + 16), (0, 0, 0, 0))
     d = ImageDraw.Draw(img)
-    d.rounded_rectangle([4, 4, w + 4, h + 4], radius=h // 2, fill=fill, outline=outline, width=6)
-    d.text((4 + pad - bbox[0], 4 + pad - bbox[1]), text, font=font, fill=(255, 255, 255), stroke_width=3, stroke_fill=outline)
-    return img
+    d.polygon([(8 + height * 0.25, 8), (8 + w, 8), (8 + w - height * 0.25, 8 + height), (8, 8 + height)], fill=INK + (255,))
+    d.polygon([(8 + height * 0.25, 8), (8 + w, 8), (8 + w - height * 0.12, 8 + height * 0.18), (8 + height * 0.15, 8 + height * 0.18)], fill=(255, 210, 60, 255))
+    d.text((8 + height * 0.45 - bb[0], 8 + height * 0.5 - (bb[1] + bb[3]) / 2), text, font=f, fill=CREAM)
+    return img.rotate(4, resample=Image.BICUBIC, expand=True)
 
 
 # ---------------- иконка ----------------
-sq = grade(Image.open(sq_path).convert("RGB"))
-sq = vignette(sq, 0.35).convert("RGBA")
-S = sq.width  # 1024
-f1 = ImageFont.truetype(font_path, int(S * 0.165))
-f2 = ImageFont.truetype(font_path, int(S * 0.185))
-line1 = gradient_text(S, "ЛОВЦЫ", f1, GOLD_TOP, GOLD_BOTTOM, int(S * 0.016), OUTLINE, int(S * 0.012))
-line2 = gradient_text(S, "МОЛНИЙ", f2, GOLD_TOP, GOLD_BOTTOM, int(S * 0.018), OUTLINE, int(S * 0.012))
-paste_rotated(sq, line1, (S * 0.5, S * 0.74), 4)
-paste_rotated(sq, line2, (S * 0.5, S * 0.885), 4)
-icon = sq.convert("RGB").resize((512, 512), Image.LANCZOS)
-icon.save(os.path.join(out_dir, "icon_512.png"))
+sq = vignette(grade(Image.open(sq_path).convert("RGB")), 0.32).convert("RGBA")
+S = sq.width
+lg = logo(int(S * 0.92), display_path)
+scale = min(S * 0.96 / lg.width, S * 0.40 / lg.height)
+lg = lg.resize((int(lg.width * scale), int(lg.height * scale)), Image.LANCZOS)
+sq.alpha_composite(lg, (int((S - lg.width) / 2), int(S - lg.height - S * 0.015)))
+sq.convert("RGB").resize((512, 512), Image.LANCZOS).save(os.path.join(out_dir, "icon_512.png"))
 sq.convert("RGB").save(os.path.join(out_dir, "icon_1024.png"))
 
 # ---------------- обложка ----------------
-wide = grade(Image.open(wide_path).convert("RGB"))
-wide = vignette(wide, 0.3).convert("RGBA")
+wide = vignette(grade(Image.open(wide_path).convert("RGB")), 0.28).convert("RGBA")
 W, H = wide.size
-# затемнение слева под текст
 shade = Image.new("L", (W, H), 0)
 sd = ImageDraw.Draw(shade)
 for x in range(int(W * 0.55)):
-    sd.line([(x, 0), (x, H)], fill=int(150 * (1 - x / (W * 0.55)) ** 1.5))
-wide.paste(Image.new("RGBA", (W, H), (6, 8, 28, 255)), (0, 0), shade)
-ft1 = ImageFont.truetype(font_path, int(H * 0.17))
-ft2 = ImageFont.truetype(font_path, int(H * 0.19))
-fsub = ImageFont.truetype(font_path, int(H * 0.05))
-t1 = gradient_text(W, "ЛОВЦЫ", ft1, GOLD_TOP, GOLD_BOTTOM, int(H * 0.016), OUTLINE, int(H * 0.012))
-t2 = gradient_text(W, "МОЛНИЙ", ft2, GOLD_TOP, GOLD_BOTTOM, int(H * 0.018), OUTLINE, int(H * 0.012))
-paste_rotated(wide, t1, (W * 0.25, H * 0.26), 3)
-paste_rotated(wide, t2, (W * 0.25, H * 0.45), 3)
-sub = gradient_text(W, "Лови молнию в нужный момент!", fsub, (210, 240, 255), (120, 200, 255), int(H * 0.007), OUTLINE, int(H * 0.006))
-paste_rotated(wide, sub, (W * 0.25, H * 0.6), 2)
-fb = ImageFont.truetype(font_path, int(H * 0.055))
-b1 = badge("ИДЕАЛЬНО!", fb, (255, 190, 30, 255), OUTLINE)
-paste_rotated(wide, b1, (W * 0.8, H * 0.2), -8)
-b2 = badge("x25 КОМБО", fb, (150, 90, 255, 255), OUTLINE)
-paste_rotated(wide, b2, (W * 0.16, H * 0.82), 6)
-b3 = badge("+1.2M ВОЛЬТ", fb, (40, 170, 90, 255), OUTLINE)
-paste_rotated(wide, b3, (W * 0.84, H * 0.86), -5)
+    sd.line([(x, 0), (x, H)], fill=int(140 * (1 - x / (W * 0.55)) ** 1.6))
+wide.paste(Image.new("RGBA", (W, H), (8, 6, 26, 255)), (0, 0), shade)
+lg = logo(int(W * 0.5), display_path)
+scale = min(W * 0.48 / lg.width, H * 0.62 / lg.height)
+lg = lg.resize((int(lg.width * scale), int(lg.height * scale)), Image.LANCZOS)
+wide.alpha_composite(lg, (int(W * 0.02), int(H * 0.08)))
+fsub = ImageFont.truetype(body_path, int(H * 0.05))
+sub = Image.new("RGBA", (W, int(H * 0.1)), (0, 0, 0, 0))
+ImageDraw.Draw(sub).text((0, 0), "Лови молнию в нужный момент!", font=fsub, fill=CREAM, stroke_width=int(H * 0.006), stroke_fill=INK)
+sub = sub.crop(sub.getbbox())
+wide.alpha_composite(sub.rotate(4, resample=Image.BICUBIC, expand=True), (int(W * 0.06), int(H * 0.08 + lg.height + H * 0.02)))
+t = tag("ИДЕАЛЬНО!", display_path, int(H * 0.08))
+wide.alpha_composite(t, (int(W * 0.72), int(H * 0.1)))
 wide.convert("RGB").save(os.path.join(out_dir, "thumbnail_1920x1080.png"))
 print("saved to", out_dir)
