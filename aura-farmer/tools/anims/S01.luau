@@ -25,7 +25,7 @@ end
 -- Кисть щипком держит оправу у левой петли: ладонь к стеклу, пальцы вдоль верха оправы к переносице,
 -- большой палец снизу. WRIST — запястье относительно точки щипка (середина кончиков указательного и большого),
 -- посчитано по геометрии рига для PALM/FING (оси головы).
-local WRIST = { -0.167, -0.43, 0.369 }
+local WRIST = { -0.094, -0.516, 0.367 }
 local PALM = { 0.0, -0.2, -1 }
 local FING = { 0.55, 0.8, -0.15 }
 local POLE = { -0.3, -1, 0.25 }
@@ -80,14 +80,14 @@ end
 return {
 	Man = { keys = {
 		-- подлёт руки (ключ до начала плана задаёт скорость в первом кадре)
-		{ t = -0.1, root = seat(-5.5), waist = { turn = 3, bend = -1 }, neck = neck(-15.5, 0.5), lArm = grip(G0, { -0.75, -0.35, 0.7 }), lHand = CLAW, joints = glasses(G0), face = face(0.3, 0, 0) },
+		{ t = -0.1, root = seat(-5.5), waist = { turn = 3, bend = -1 }, neck = neck(-15.5, 0.5), lArm = grip(G0, { -0.7, -0.7, 0.65 }), lHand = CLAW, joints = glasses(G0), face = face(0.3, 0, 0) },
 		{
 			t = 0.0,
 			root = seat(-5),
 			waist = { turn = 3, bend = -1 },
 			neck = neck(-15, 0.5),
 			rArm = R_ARM,
-			lArm = grip(G0, { -0.42, -0.2, 0.42 }),
+			lArm = grip(G0, { -0.42, -0.42, 0.42 }),
 			rLeg = R_LEG,
 			lLeg = L_LEG,
 			lHand = CLAW,
