@@ -4,8 +4,8 @@ local Config = require(script.Parent.Parent:WaitForChild("Config"))
 
 -- Камера неподвижна (locked-off), фронтально по оси груди, чуть сверху (−3°), vFOV 30.
 -- «Грув» (наезд/отъезд 1–3 %) делает сам конь (tools/anims/S05.luau), камера не двигается.
-local CAM = Config.at("Beach", 0, 4.18, -2.65)
-local LOOK = Config.at("Beach", 0, 4.04, 0)
+local CAM = Config.at("Beach", 0, 4.25, -2.65)
+local LOOK = Config.at("Beach", 0, 4.11, 0)
 local FOCUS = 2.15 -- дистанция до цепи (плоскость фокуса — цепь и внутренние края воротника)
 
 return {

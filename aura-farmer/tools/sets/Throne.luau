@@ -795,7 +795,7 @@ return function(B)
 		l.Name = name .. "Light"
 		return p
 	end
-	spot("FillFront", V(0, 5, -11), V(0, 3.5, 0), "SpotLight", { Brightness = 0.6, Range = 24, Angle = 46, Face = "Front", Shadows = false, Color = rgb(255, 214, 160) })
+	spot("FillFront", V(0, 5, -11), V(0, 3.5, 0), "SpotLight", { Brightness = 0.35, Range = 24, Angle = 46, Face = "Front", Shadows = false, Color = rgb(255, 214, 160) })
 	spot("RimBack", V(0, 17, 7.5), V(0, 7.5, 0.8), "SpotLight", { Brightness = 1.2, Range = 22, Angle = 38, Face = "Front", Shadows = false, Color = rgb(255, 220, 170) })
 
 	-- ===================================================================
