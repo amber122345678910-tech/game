@@ -1,0 +1,167 @@
+{
+ "shot": "S11_throne",
+ "start": 13.133,
+ "end": 15.633,
+ "summary": "Hard cut in at 13.133s from the gym shot. The last S10 frame (all_0394, t=13.100) still shows the subtitle AIN'T GOT NO WORRIES. A horse-headed \"king\" in a purple satin 70s suit and gold aviators sits on an ornate gold throne with a coral-red velvet back and a deep-red cushion. The throne is in a pitch-black void lit only by one hazy top spotlight. His LEFT leg is crossed over his RIGHT. He starts with both hands on the armrests, looking down with a snarl (\"Cuz...\"). On the beat at 13.334 he snaps both hands up into fists and throws his head back in a wide-mouthed laugh/scream that peaks at about 13.50. By about 13.57 he has flung both arms wide, palms up, in a \"what can I say, I'm the best\" pose that he holds to the end. The head comes back upright by about 13.95, turned a little toward his left. He then lip-syncs and laughs, settling into a smug toothy grin. Through the whole shot a low camera moves at a constant speed: it arcs about 35 deg around the throne toward the character's right (screen-left) and rolls about 26 deg, so the image turns clockwise. The throne drifts from center-left of frame to right of center. The subtitle \"CUZ I KNOW I'M THE BEST\" is visible from the cut through 15.367 and is gone at 15.400. The last frame is 15.600; at 15.633 there is a hard cut to the gym (a man curling a dumbbell).",
+ "camera": {
+  "framing": "16:9, low-angle medium-full shot of the seated character and the whole throne. At 13.133 the top edge of the frame touches the throne's gold crown crest (about 2% headroom). The bottom edge cuts through the lower shins and the dangling foot, so the floor is never visible. Horse head at about 47% frame width and 26% frame height. The crossed knee is near dead-center (about 52% w, 50% h) and is the biggest foreground mass. 'A' pendant at about 49% w, 53% h. The throne spans about 36%-67% of frame width at the start. Wide black negative space on both sides, with the lit beam haze on the left half of the frame. By 15.600 the throne has drifted to about 25%-66% w (crest at about 59% w). The head is then at about 57% w and 25% h, and the whole composition is tilted clockwise. The character faces the camera throughout: about 10 deg toward his left at the start, and the face appears about 35 deg toward screen-right at the end because of the orbit.",
+  "position": "Throne-local coordinates: throne seat center at (0,0,0) on the floor, character facing +Z toward the camera, character's left = +X, Y up, adult = 5.5 studs. START (13.133): camera at about (+0.6, 2.0, 7.4). That is about 7.4 studs in front of the throne, at seated-knee height, about 5 deg toward the character's left side, almost frontal. It aims at about (+0.9, 3.8, 0), so the throne sits slightly left of frame center. END (15.600): camera at about (-3.6, 2.2, 6.2). That is radius about 7.1, azimuth about 30 deg toward the character's RIGHT side (screen-left), so the right side of the throne (both gold legs on that side) becomes visible. It aims at about (-0.8, 3.8, -0.45), i.e. about 7 deg to the camera's left of the throne, so the throne sits right of center. The height stays at about 2 studs the whole time (below the subject's eye line, about 3.3 studs below the head).",
+  "angle": "Low angle looking up. Pitch about +14 deg (up) for the whole shot, yaw follows the arc. Dutch roll animates: about -6 deg at 13.133 (world verticals lean slightly top-LEFT in frame) to about +20 deg at 15.600 (verticals lean top-RIGHT; the image is rotated clockwise). In Roblox terms: CFrame.lookAt(pos, target) * CFrame.Angles(0, 0, math.rad(roll)), where positive roll tilts the camera's top to the left and makes the image turn clockwise. Roll goes from -6 to +20.",
+  "fovVerticalDeg": 55,
+  "lensNotes": "Moderately wide lens, about 55 deg vertical (about 24mm full-frame equivalent). Mild perspective exaggeration: the crossed knee and shins look large and close, the throne crest looks small and far, and verticals converge upward. Deep depth of field, everything sharp from knee to crest; the background is pure black, so there is no visible bokeh. A soft diffusion/halation glow sits over the bright areas (gold edges, pendant, beam). Slight edge vignette. A little motion blur on the hands during the fling (13.40-13.53). No lens distortion beyond the wide-angle perspective.",
+  "movement": [
+   {
+    "t": 13.133,
+    "description": "Shot starts on a hard cut with the camera already moving. Pos (+0.6,2.0,7.4), aim (+0.9,3.8,0), roll -6 deg, FOV 55. Throne center at about 46% frame width."
+   },
+   {
+    "t": 13.733,
+    "description": "Linear arc continues: about 8.5 deg of orbit done toward the character's right (screen-left), roll about 0 deg. The throne crest has moved about 25 px right on an 854 px frame."
+   },
+   {
+    "t": 14.333,
+    "description": "About the midpoint: orbit about -12 deg (toward the character's right), roll about +7 deg, the throne at about 51% w. The right side of the throne starts to show."
+   },
+   {
+    "t": 14.933,
+    "description": "Orbit about -21 deg, roll about +13 deg. Throne about 54% w; the composition is visibly tilted clockwise."
+   },
+   {
+    "t": 15.6,
+    "description": "Last frame: orbit about -30 deg, roll about +20 deg, pos (-3.6,2.2,6.2), throne about 57% w, slight push-in (the throne looks about 10% bigger than at the start). Hard cut at 15.633. The move is constant-speed, linear and without ease: about 14 deg/s orbit, about 10.5 deg/s roll, about 1.6 studs/s travel."
+   }
+  ],
+  "shake": "None. Smooth motion-controlled/CG camera with no handheld jitter, whip or zoom."
+ },
+ "subjects": [
+  {
+   "who": "Horse-headed king (anthropomorphic horse man, the 'Aura Farmer' mascot)",
+   "appearance": "Humanoid body with a realistic horse head, adult proportions, broad padded shoulders, sturdy build. HEAD: dark brown-black horse with short sleek coat #1E1A1A to #3A2C28 (highlights #5A4A44 where the top light hits). Long muzzle, dark lips, two short upright pointed ears (they read almost like little horns), short dark mane at the poll. Big square white teeth #ECE6DA shown in most frames. Pink tongue #C46A70 visible when the mouth is wide open. Gold aviator sunglasses: thin gold frame #D8B060 with a double bridge, tear-drop lenses in amber-brown gradient #7A4A28 to #C08A50, semi-transparent. They sit on the nose bridge and always hide the eyes. HANDS: humanoid, dark brown skin #3B2E2E with lighter palms #8D584D. Gold rings on the right hand (index and ring finger) and a gold chunky bracelet/watch on the LEFT wrist #D3BE9C (bright gold #E8C873 in highlight). A red shirt cuff #8A3A36 peeks out at the RIGHT wrist. JACKET: shiny satin/velvet violet-purple 70s blazer: base #6B4FC8, lit #8E70E0 to #A38CBC sheen, shadows #3A2C7A to #333448. Very wide pointed lapels, padded shoulders, long sleeves, worn open. SHIRT: coral/rust-red #C0503A (lit #D98A80, shadow #8A3A36) with a huge pointed 70s collar spread out over the lapels. Unbuttoned to the sternum, dark chest fur showing. JEWELRY: thick gold Cuban-link chain choker at the neck base #C9A65A / highlight #F3E2A8. Second, longer chain holding a large glowing triangular 'A' pendant (white-gold #F0E8C8 with bloom) about 0.45 studs tall at the sternum. BELT: black with a small gold buckle. PANTS: light-wash blue denim flared bell-bottoms #5A6496 (lit #A8A6C8 sheen, shadow #3D4056), wide flares. SHOES: black leather dress shoes/boots #1A1A20 with a slight sheen.",
+   "placement": "Seated dead-center on the throne at throne-local origin, pelvis at about (0, 2.6, 0.2), head center at about (0, 5.3, 0.1), ear tips at about 6.0 studs. He faces +Z toward the camera, and his hips/knees are angled about 12 deg toward his own left. Frame position: head at 47% w / 26% h at the start, 57% w / 25% h at the end. Torso fills about 40%-60% w. Faces the camera the whole time; head turns up to about 20 deg toward his left. Because of the camera orbit, by the end the face appears about 35 deg toward screen-right.",
+   "poseKeys": [
+    {
+     "t": 13.133,
+     "body": "ROOT/HIPS seated deep in the throne, pelvis about 2.6 studs high, rotated 12 deg toward the character's left. TORSO reclined 10 deg back against the throne back, twisted 5 deg toward his left, chest relaxed, shoulders level. NECK flexed 10 deg forward. HEAD: yaw 20 deg to the character's left, pitch -20 deg (chin down, looking down toward screen-right), roll 15 deg toward his RIGHT shoulder (top of head leans screen-left). RIGHT ARM (screen-left): upper arm hangs close to the torso, abducted 15 deg and flexed 20 deg forward. Elbow 85 deg, forearm lying forward along the right armrest. Wrist flexed 15 deg. The hand grips the front scroll of the armrest in a loose fist, thumb on top, ringed fingers wrapped over the front edge. LEFT ARM (screen-right): upper arm abducted 30 deg, flexed 25 deg. Elbow 100 deg, forearm on the left armrest. Wrist flexed down 35 deg; the hand is draped over the front scroll with fingers open, slightly spread, hanging over the edge. LEGS: LEFT over RIGHT at the knee. Right hip flexed 85 deg, right knee about 85 deg, right shin near-vertical, right foot flat on the floor about 0.3 studs left of center (from the character's view). Left hip flexed 100 deg and adducted 20 deg, so the left thigh lies across the top of the right thigh and the left knee is the highest point at about 3.4 studs, pointing at the camera. Left knee flexed 70 deg. The left shin drapes diagonally down across the front of the right shin toward the character's RIGHT (about 55 deg below horizontal). Left ankle plantar-flexed 20 deg; the foot hangs about 0.8 studs above the floor outside the right shin (screen-left).",
+     "face": "Mouth open 0.5 in a snarl/growl ('Cuz'): lips pulled back, upper and lower teeth bared, no smile. Sunglasses on and level on the nose, eyes hidden. Cocky menacing look down at the camera."
+    },
+    {
+     "t": 13.267,
+     "body": "Head lifting: pitch 0, yaw 10 deg to his left, roll 15 deg toward his right shoulder. Anticipation: the RIGHT hand lifts about 0.3 studs off the armrest and the fingers start to curl. The LEFT hand is still draped on the armrest. Torso and legs unchanged.",
+     "face": "Mouth 0.3: clenched toothy grin, both rows of teeth visible, lips stretched wide."
+    },
+    {
+     "t": 13.333,
+     "body": "ON BEAT (13.334). Head pitch +20 deg (tipping back), roll 15 deg toward his right shoulder. Both arms start to rise. RIGHT: shoulder abducted 25 deg, elbow 100 deg, hand about 0.6 studs above the armrest forming a loose claw/fist. LEFT: hand leaves the armrest, fist forming, elbow flexing to 110 deg. Torso begins to recline a further 3 deg.",
+     "face": "Mouth 0.3 toothy grin, starting to open."
+    },
+    {
+     "t": 13.4,
+     "body": "Head thrown back: pitch +45 deg, yaw 10 deg left, roll 15 deg. Torso reclines another 8 deg with the chest lifted (puffed). RIGHT ARM: shoulder abducted 50 deg, flexed 20 deg, elbow 100 deg. Closed fist with knuckles up, at chest height, about 1.3 studs out from the right side of the torso. LEFT ARM: shoulder abducted 55 deg, elbow 110 deg, forearm near vertical. Fist at shoulder height, about 1.4 studs out to the left. Reads as a double fist-pump/flex. Both fists fully closed, thumbs wrapped. The left hand rides about 0.3 studs higher than the right.",
+     "face": "Mouth opening 0.4, teeth showing, laughing."
+    },
+    {
+     "t": 13.5,
+     "body": "Head at maximum throw-back: pitch +55 deg, muzzle pointing up and slightly to screen-right, yaw 15 deg left, roll 10 deg. Torso at maximum recline, about 20 deg. Arms fling outward: shoulders abducted 65 deg, flexed 20 deg forward. Elbows extending to about 40 deg flexion. Forearms supinating, palms turning up. Wrists extended 30 deg. Fingers snapping open and spreading. Hands slightly overshoot outward, about 2.2 studs lateral from torso center, at upper-chest height. Slight motion blur on the hands.",
+     "face": "Mouth 1.0, fully open (jaw dropped about 40 deg): a big scream/laugh on 'KNOW', tongue visible, upper teeth showing."
+    },
+    {
+     "t": 13.633,
+     "body": "Arms settle into the held SPREAD pose. Both shoulders abducted 60 deg, flexed 20 deg forward. Elbows 45 deg. Forearms fully supinated, palms facing up and slightly forward. Wrists extended 25 deg. Fingers spread with a gentle curl (MCP 15 deg, PIP 20 deg); thumbs abducted 40 deg. Hands about 2.0 studs out from torso center at chest height, about 0.5 studs below shoulder level. The left hand is about 0.2 studs higher than the right. Head still back, pitch +45 deg, yaw 15 deg. Torso recline 18 deg.",
+     "face": "Mouth closes briefly to 0.3, a wide toothy grin."
+    },
+    {
+     "t": 13.733,
+     "body": "Head coming forward: pitch +30 deg, yaw 15 deg. Arms hold the spread pose. Torso recline easing back to 15 deg.",
+     "face": "Mouth 0.9, open laugh with the tongue clearly visible (second laugh pulse)."
+    },
+    {
+     "t": 13.833,
+     "body": "Near beat 13.822. Head pitch +12 deg, yaw 12 deg. Arms hold, hands sink about 3 deg (a small settle). Torso recline 12 deg.",
+     "face": "Mouth 0.8, laughing, teeth and tongue visible."
+    },
+    {
+     "t": 13.967,
+     "body": "Head upright: pitch 0, yaw 10 deg to his left, roll 5 deg toward his left shoulder. Torso back to its base 10 deg recline, twisted 5 deg to his left. Arms hold the spread with palms up.",
+     "face": "Mouth 0.3, broad confident grin with teeth together."
+    },
+    {
+     "t": 14.133,
+     "body": "Head yaw 20 deg to his left, pitch +5 deg. Arms hold; the fingers flex very slightly (about 5 deg).",
+     "face": "Mouth 0.6, rounded open shape (singing/shouting)."
+    },
+    {
+     "t": 14.233,
+     "body": "Head yaw 22 deg, pitch +8 deg (a small chin lift).",
+     "face": "Mouth 0.8, wide open."
+    },
+    {
+     "t": 14.333,
+     "body": "Beat 14.310. Head yaw 22 deg, pitch +5 deg. Arms hold.",
+     "face": "Mouth 0.6, open grin with teeth showing."
+    },
+    {
+     "t": 14.467,
+     "body": "Head yaw 20 deg to his left, pitch 0, roll 5 deg toward his left shoulder. Hold. Torso still. Arms spread, palms up.",
+     "face": "Mouth 0.2, closed smug toothy grin (teeth together, lips stretched)."
+    },
+    {
+     "t": 14.667,
+     "body": "Hold the same pose: subtle breathing, chest rising about 1 deg. Hands drift up about 2 deg.",
+     "face": "Mouth 0.2, smug grin."
+    },
+    {
+     "t": 14.8,
+     "body": "Beat 14.797. Head yaw 20 deg, pitch +3 deg. Arms hold.",
+     "face": "Mouth opens to 0.55, laughing, both rows of teeth visible."
+    },
+    {
+     "t": 15.067,
+     "body": "Head pitch +5 deg, yaw 20 deg. Arms hold.",
+     "face": "Mouth 0.6, peak of the laugh/'BEST'."
+    },
+    {
+     "t": 15.2,
+     "body": "Same as before, small settle.",
+     "face": "Mouth 0.5."
+    },
+    {
+     "t": 15.333,
+     "body": "Beat 15.285. Head pitch -5 deg (chin dips slightly), yaw 20 deg, roll 5 deg. Arms hold, palms up.",
+     "face": "Mouth 0.25, big toothy grin with teeth together."
+    },
+    {
+     "t": 15.6,
+     "body": "Final frame: same held king pose. Torso reclined 10 deg, head yaw 20 deg left, pitch -5 deg. Arms spread with palms up. LEFT leg still crossed over the right.",
+     "face": "Mouth 0.25, smug wide grin, teeth showing, sunglasses on."
+    }
+   ],
+   "motionNotes": "Two phases. (1) 13.133-13.30: near-still, a menacing look down with a snarl. The right hand lifts slightly at 13.27 as anticipation. (2) Starts exactly on the 13.334 beat. Fast explosive gesture, about 7 frames (0.23 s): hands pop up into fists (13.40), then fling open and wide (13.47-13.53) with about 5% overshoot, then settle by 13.63. The head lags the arms by about 2 frames: it peaks thrown back at about 13.50, holds until 13.63, then returns with an ease-out over about 0.35 s, upright by about 13.95. The mouth has two laugh pulses (13.50 and 13.73). From 13.95 to the end the spread-arm pose is held almost frozen. Only the mouth (lip-sync and laughs), small head yaw/pitch changes and subtle breathing move. Mouth openings land near beats 14.310 and 14.797, and the mouth closes into a grin at 15.285. The legs never move. No bounce in the body. Use a smooth ease-in on the arm fling and an ease-out on the head return."
+  }
+ ],
+ "set": "Infinite black void, background #010206; no floor, walls or horizon visible. The floor is black and out of frame, and the bottom of the throne fades into darkness. The only prop is the throne at the origin. THRONE (Baroque/Rococo): overall about 4.6 studs wide at the armrests, about 3.4 studs deep, crest top about 7.5 studs above the floor. BACK: tall, about 3.4 wide by 4.6 tall above the seat, reclined about 8 deg, with an arched/shield-shaped top. Upholstered in coral-red velvet: lit side #DBA893 to #E0705A, mid #C8503E, shadow side #A3544B. Thick carved gold frame border. On top, a gold crown-like crest with acanthus scrolls, a central cartouche and small finials, about 1.4 wide by 1.0 tall. Gold scroll 'ears' stick out at shoulder height on both sides of the back. SEAT: puffy button-tufted deep-red velvet cushion #8A0A14 (shadow #4E020A), seat top about 2.2 studs high. ARMRESTS: about 3.2 studs high, gold with big curled volute scrolls at the front ends; the hands rest on these. LEGS: carved gold cabriole legs with scroll feet. GOLD: #C9A65A base, highlights #F3E2A8, shadows #6E5A30, metallic and glowing. No other objects or characters in the shot.",
+ "lighting": "One hard, warm-white top SPOTLIGHT (about #FFF2DC, about 4800K) placed high above the throne: about 16-18 studs up, about 2.5 studs toward the character's RIGHT (screen-left) and about 1 stud in front of the throne. It aims down at the seat. A visible volumetric beam (hazy cone) comes in from the top of frame: at the start its left edge is near-vertical at about 27% w and its right edge slopes from about 53% w at the top to about 75% w lower down. The beam is brightest at the top (#D1CBBD), mid haze #5C5656, faint haze lower #24272C. As the camera rolls, the beam rotates with the frame, and by the end its left edge leans strongly top-right. The light lands as a top/side key: the top of the head, ears, sunglasses, shoulders, the top of the crossed knee/thigh and the top of the throne back get the brightest light. The character's right half of the throne back (screen-left) is brighter salmon, the screen-right half darker red. Fill is very low: faint bounce lifts the front of the purple jacket and the jeans to mid-tones. There is no separate rim light; the top light acts as a rim on the ears and shoulders. Very high contrast with crushed true-black surroundings. Saturation is high on the violet jacket and the reds. Strong bloom/halation on the gold throne edges and the 'A' pendant, with a soft glow around the beam. The exposure keeps the beam top and gold highlights near clipping and the face mid-dark. No colored gels. Notable colors: jacket #6B4FC8, shirt #C0503A, cushion #8A0A14, throne back #C8503E, gold #C9A65A to #F3E2A8, denim #5A6496, background #010206, beam #FFF2DC.",
+ "effects": [
+  {
+   "t": 13.133,
+   "description": "Hard cut in (no transition). The subtitle switches to 'CUZ I KNOW I'M THE BEST' on the cut frame. Volumetric beam haze, bloom/halation on the gold and the pendant, and a light vignette are present from the first frame."
+  },
+  {
+   "t": 13.133,
+   "description": "Continuous through the shot: twinkling 4-point star glints (cross-shaped lens sparkles, warm white/gold #FFF0C0). They sit on the gold edges of the throne: armrest scroll tops, side 'ears' of the back, crest points, front legs and the pendant. About 2-4 are visible at once, each lasting about 0.2-0.4 s and about 2-4% of frame height in size. Examples: screen-left armrest top at about (36% w, 48% h) and screen-right back scroll at about (62% w, 37% h) at the start; bottom of the screen-left throne leg at about (25% w, 92% h) near the end."
+  },
+  {
+   "t": 13.4,
+   "description": "Slight motion blur on both hands during the fast fist-pump to open-palm fling (about 13.40-13.53)."
+  },
+  {
+   "t": 15.4,
+   "description": "Subtitle disappears (hard off, no fade). The last frame with text is 15.367."
+  },
+  {
+   "t": 15.633,
+   "description": "Hard cut to the next shot (gym, a man in a white tank top curling a dumbbell). The last frame of S11 is 15.600."
+  }
+ ],
+ "subtitle": "\"CUZ I KNOW I'M THE BEST\", visible from 13.133 (the first frame, switching from \"AIN'T GOT NO WORRIES\" on the cut) through 15.367; gone at 15.400 while the picture continues to 15.600. One line, centered horizontally (about 29.5%-70.5% of frame width) at about 92-94% frame height (baseline about 95%). Cap height about 5.5% of frame height. Style: all-caps, heavy bold italic condensed display font (Impact/Anton-italic look). Vertical gradient fill: yellow-orange #F2C14A at the top, orange #E8742E in the middle, red #C2302E / #A32D30 at the bottom. Thin dark-maroon outline #4A0A0A about 2 px at 480p, plus a soft dark drop shadow/glow. It does not move or animate.",
+ "recreateInRoblox": "WORLD/LIGHTING: Lighting.Technology = Future (needed for SpotLight shadows), Ambient = 0,0,0, OutdoorAmbient = 0,0,0, Brightness = 0, ClockTime = 0, EnvironmentDiffuseScale = 0, EnvironmentSpecularScale = 0.6, GlobalShadows = true. Sky: all six faces set to a black texture, CelestialBodiesShown = false, StarCount = 0. Add an Atmosphere with Density 0.3, Offset 0, Color (25,25,30), Decay (0,0,0), Glare 0, Haze 1.5, then check that the void stays #010206 (lower Density if it grays out). Floor: a black SmoothPlastic baseplate (Color 0,0,0) or none. KEY LIGHT: an invisible anchored Part at about (-2.5, 17, 1) relative to the throne, rotated so its Bottom face points at about (0.3, 2, 0). Add a SpotLight with Face = Bottom, Angle = 38, Brightness = 10-14, Range = 40, Color = (255,242,220), Shadows = true. Optional faint fill: a PointLight near the camera at about (0, 3, 5), Brightness 0.3, Range 8, Color (200,190,255), to lift the jacket front. VISIBLE BEAM: 3 overlapping Beam objects between an Attachment at the light part (top) and one on the floor under the throne. Width0 about 0.8, Width1 about 7. Use a soft vertical-gradient light-ray texture, LightEmission = 1, LightInfluence = 0, Color (255,240,215), Transparency NumberSequence 0.7 at the top to 0.97 at the bottom, FaceCamera = true, Segments 12; vary the widths slightly between the three. Add a ParticleEmitter of dust motes inside the beam volume: Rate 15, Lifetime 4, Size 0.04-0.08, Speed 0.1-0.3, LightEmission 1, Transparency 0.4. POST: BloomEffect Intensity 1.4, Size 40, Threshold 0.8. ColorCorrectionEffect Contrast 0.25, Saturation 0.2, Brightness 0, TintColor (255,247,238). DepthOfFieldEffect FocusDistance 7, InFocusRadius 6, NearIntensity 0, FarIntensity 0.1. A vignette ScreenGui ImageLabel (radial black gradient, ImageTransparency 0.45). THRONE from parts (throne seat center at the origin, character facing +Z). Seat: block 4.0x0.6x3.2 with its top at y = 2.2, plus a puffy cushion (a Part with a SpecialMesh 'Sphere' scaled 3.6x0.7x2.8) in Fabric #8A0A14. Back: block 3.4 wide x 4.6 tall x 0.4 at z = -1.5, tilted back 8 deg, Fabric #C8503E. Use a half-cylinder (Cylinder part, 3.4 diameter, cut with a NegatePart) for the arched top. Gold frame: border cylinders/blocks 0.25 thick around the back in Foil or Metal #D4AF37, Reflectance 0.25 (or a gold SurfaceAppearance). Crest: a ball, 3-5 small cone/wedge finials and Torus-mesh scrolls, about 1.4x1.0, top at y about 7.5. Armrests: gold blocks 0.45x0.45x2.6 at y = 3.0, x = +/-2.1, with big curled scroll ends at the front (SpecialMesh Torus or stacked cylinders). Legs: 4 gold cabriole legs (cylinders + wedges), about 0.35 thick. Add gold 'ear' scrolls on the sides of the back at y about 5. Mark gold edges with Attachments for sparkles. SPARKLES: on 8-12 Attachments, a ParticleEmitter with a 4-point star texture (e.g. rbxasset://textures/particles/sparkles_main.dds or a custom cross-star), Rate 1.5-3, Lifetime 0.2-0.45, Speed 0, Size NumberSequence {0:0, 0.5:0.5, 1:0}, Rotation 0-45, LightEmission 1, LightInfluence 0, Color (255,240,190), Brightness 4, ZOffset 1. Add a small Neon/PointLight on the pendant (Brightness 1, Range 2, warm). CHARACTER: R15 rig (Rthro proportions, broad shoulders). Custom horse head MeshPart in dark brown #2A1F1C. Give it a separate hinged JAW (Motor6D) for mouth open 0-1, mapped to 0-40 deg of jaw rotation, with white teeth blocks #ECE6DA and a pink tongue. Two small wedge ears and a short mane. Gold aviators: thin gold Cylinder/Neon frame + two teardrop lenses in Glass #8A5A30, Transparency 0.35. Clothing: purple satin blazer (layered clothing or a Shirt template, #6B4FC8, wide lapels with wedge parts), coral shirt collar (thin wedges #C0503A over the lapels), gold Cuban chain (a ring of small Torus meshes) and a triangular 'A' pendant (3 thin gold Neon parts in an A/triangle shape, about 0.45 studs), black belt, flared light-blue jeans (Pants #5A6496, plus cone flares at the ankles) and black shoes. Gold bracelet on the LEFT wrist, rings on the right hand. POSE: seat the HumanoidRootPart so the pelvis is at y about 2.6, turned 12 deg toward the character's left, with the torso reclined 10 deg. Cross the LEFT leg over the RIGHT. Right hip 85 deg / knee 85 deg, foot flat. Left hip 100 deg flexion + 20 deg adduction, left knee 70 deg, the left shin draping toward the character's right, ankle plantar-flexed 20 deg. ANIMATION: Animation Editor/Moon Animator at 30 fps, keys at shot-local times (t - 13.133): 0.000 snarl-down with hands on the armrests; 0.134 right-hand anticipation lift; 0.200 (beat) arms start; 0.267 double fists up + head back 45; 0.367 head back 55, mouth 1.0, arms flinging open with overshoot; 0.500 spread hold with palms up; 0.600 laugh 0.9; 0.833 head upright; then lip-sync keys at 1.000/1.100/1.200/1.333/1.533/1.667/1.933/2.067/2.200/2.467 as in poseKeys. Use Cubic/EaseIn into 0.267 and EaseOut from 0.367 to 0.833 for the head; hold the arms with tiny 2-3 deg drifts and a breathing cycle. CAMERA: Camera.CameraType = Scriptable, FieldOfView = 55. In RenderStepped, alpha = clamp((time - t0)/2.467, 0, 1), LINEAR, no easing. Position: start (0.6, 2.0, 7.4) and end (-3.6, 2.2, 6.2), interpolated along a circular arc around (0, y, 0); radius 7.4 to 7.1, azimuth +5 deg to -30 deg, where negative is toward the character's right. Target lerps from (0.9, 3.8, 0) to (-0.8, 3.8, -0.45). roll = lerp(-6, 20, alpha). Set cam.CFrame = CFrame.lookAt(pos, target) * CFrame.Angles(0, 0, math.rad(roll)); positive roll makes the image rotate clockwise. Throne crest should touch the top of the frame at the start. SUBTITLE: ScreenGui TextLabel 'CUZ I KNOW I'M THE BEST', Font Bangers (or LuckiestGuy) italic look, TextScaled with a height of about 6% of the screen, AnchorPoint (0.5, 1), Position (0.5, 0, 0.96, 0). Add a UIGradient (Rotation 90, ColorSequence #F2C14A to #E8742E to #C2302E) and a UIStroke (Thickness 2, Color #4A0A0A), with a duplicate offset label as a drop shadow. Visible 0.000-2.234 shot-local, hidden from 2.267. Hard cut out at 2.500."
+}

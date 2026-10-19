@@ -13,7 +13,20 @@ local Geo = {}
 Geo.__index = Geo
 
 function Geo.new(rig)
-	return setmetatable({ rig = rig }, Geo)
+	return setmetatable({ rig = rig, xf = nil }, Geo)
+end
+
+-- Создать деталь; если задан self.xf (CFrame), он применяется ко всей детали (напр. наклон морды).
+function Geo:put(bone, spec)
+	if self.xf then
+		spec.cf = self.xf * spec.cf
+	end
+	return self.rig:part(bone, spec)
+end
+
+-- Точка с учётом текущего преобразования.
+function Geo:pt(p)
+	return if self.xf then self.xf * p else p
 end
 
 function Geo.hex(h: string)
@@ -63,7 +76,7 @@ end
 -- Эллипсоид (SpecialMesh Sphere). pos: Vector3 или CFrame.
 function Geo:ell(bone, pos, size, color, mat, rot, extra)
 	local cf = if typeof(pos) == "CFrame" then pos else cfOf(pos, rot)
-	return self.rig:part(bone, merge({ cf = cf, size = size, color = color, material = mat or "SmoothPlastic", mesh = "Sphere" }, extra))
+	return self:put(bone, merge({ cf = cf, size = size, color = color, material = mat or "SmoothPlastic", mesh = "Sphere" }, extra))
 end
 
 -- Эллипсоид, вытянутый между точками a и b (концы включительно), сечение w×h (h по умолчанию = w).
@@ -71,36 +84,52 @@ end
 function Geo:ellSeg(bone, a, b, w, h, color, mat, up, extra)
 	local d = b - a
 	local cf = Geo.axisX((a + b) / 2, d, up)
-	return self.rig:part(bone, merge({ cf = cf, size = V(d.Magnitude, h or w, w), color = color, material = mat or "SmoothPlastic", mesh = "Sphere" }, extra))
+	return self:put(bone, merge({ cf = cf, size = V(d.Magnitude, h or w, w), color = color, material = mat or "SmoothPlastic", mesh = "Sphere" }, extra))
 end
 
 -- Цилиндр (Part Cylinder) между точками a и b, диаметр d.
 function Geo:cylSeg(bone, a, b, d, color, mat, extra)
 	local dv = b - a
 	local cf = Geo.axisX((a + b) / 2, dv)
-	return self.rig:part(bone, merge({ cf = cf, size = V(dv.Magnitude, d, d), color = color, material = mat or "SmoothPlastic", shape = "Cylinder" }, extra))
+	return self:put(bone, merge({ cf = cf, size = V(dv.Magnitude, d, d), color = color, material = mat or "SmoothPlastic", shape = "Cylinder" }, extra))
 end
 
 -- Эллиптический цилиндр (SpecialMesh Cylinder в блоке): ось вдоль a->b, сечение w (по up×dir) и h (по up).
 function Geo:ecylSeg(bone, a, b, w, h, color, mat, up, extra)
 	local dv = b - a
 	local cf = Geo.axisY((a + b) / 2, dv, up)
-	return self.rig:part(bone, merge({ cf = cf, size = V(w, dv.Magnitude, h), color = color, material = mat or "SmoothPlastic", mesh = "Cylinder" }, extra))
+	return self:put(bone, merge({ cf = cf, size = V(w, dv.Magnitude, h), color = color, material = mat or "SmoothPlastic", mesh = "Cylinder" }, extra))
 end
 
 function Geo:ball(bone, pos, d, color, mat, extra)
-	return self.rig:part(bone, merge({ cf = CFrame.new(pos), size = V(d, d, d), color = color, material = mat or "SmoothPlastic", shape = "Ball" }, extra))
+	return self:put(bone, merge({ cf = CFrame.new(pos), size = V(d, d, d), color = color, material = mat or "SmoothPlastic", shape = "Ball" }, extra))
 end
 
 function Geo:box(bone, pos, size, color, mat, rot, extra)
 	local cf = if typeof(pos) == "CFrame" then pos else cfOf(pos, rot)
-	return self.rig:part(bone, merge({ cf = cf, size = size, color = color, material = mat or "SmoothPlastic" }, extra))
+	return self:put(bone, merge({ cf = cf, size = size, color = color, material = mat or "SmoothPlastic" }, extra))
 end
 
 -- Скруглённый блок (SpecialMesh Head) — для зубов, пряжек, звеньев.
 function Geo:rbox(bone, pos, size, color, mat, rot, extra)
 	local cf = if typeof(pos) == "CFrame" then pos else cfOf(pos, rot)
-	return self.rig:part(bone, merge({ cf = cf, size = size, color = color, material = mat or "SmoothPlastic", mesh = "Head" }, extra))
+	return self:put(bone, merge({ cf = cf, size = size, color = color, material = mat or "SmoothPlastic", mesh = "Head" }, extra))
+end
+
+-- Гладкая «трубка» через точки: цилиндры между точками + шары в узлах. d — диаметр (число или функция i->d).
+function Geo:tube(bone, pts, d, color, mat, extra, caps)
+	local function dia(i)
+		return if type(d) == "function" then d(i) else d
+	end
+	for i = 1, #pts - 1 do
+		local di = math.min(dia(i), dia(i + 1))
+		self:cylSeg(bone, pts[i], pts[i + 1], di, color, mat, extra)
+	end
+	for i = 1, #pts do
+		if caps ~= false or (i > 1 and i < #pts) then
+			self:ball(bone, pts[i], dia(i), color, mat, extra)
+		end
+	end
 end
 
 -- ===== Плоские фигуры из клиньев =====
@@ -120,7 +149,7 @@ function Geo:tri(bone, frame, uc, vc, wu, hv, thick, color, mat, zoff, extra)
 		flip = CFrame.Angles(math.pi, 0, 0) * flip
 	end
 	local cf = frame * CFrame.new(uc + wu / 2, vc + hv / 2, zoff or 0) * flip * CFrame.Angles(0, math.pi / 2, 0)
-	return self.rig:part(bone, merge({ cf = cf, size = V(thick, math.abs(hv), math.abs(wu)), color = color, material = mat or "SmoothPlastic", shape = "Wedge" }, extra))
+	return self:put(bone, merge({ cf = cf, size = V(thick, math.abs(hv), math.abs(wu)), color = color, material = mat or "SmoothPlastic", shape = "Wedge" }, extra))
 end
 
 -- Трапеция между v0 и v1: левая граница от L0 до L1, правая от R0 до R1.

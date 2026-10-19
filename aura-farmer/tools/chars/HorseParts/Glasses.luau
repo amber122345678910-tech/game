@@ -8,6 +8,7 @@ local rad = math.rad
 
 local Geo = require("./Geo")
 local P = require("./Palette")
+local Head = require("./Head")
 
 local Glasses = {}
 
@@ -35,7 +36,8 @@ local LENS = {
 function Glasses.build(g, opts)
 	local lensColor = if opts.glasses == "yellow" then P.lensYellow else P.lensAmber
 	local frameD = 0.024
-	local cy, cz = 6.2, -0.8
+	local cy, cz = 6.22, -0.8
+	g.xf = Head.XF
 	for _, s in { 1, -1 } do
 		-- плоскость линзы: центр, разворот наружу (обтекание лица) и лёгкий наклон
 		local center = V(s * 0.3, cy, cz)
@@ -82,6 +84,7 @@ function Glasses.build(g, opts)
 		g:cylSeg("Glasses", mid, back, 0.02, P.frame, "Metal")
 		g:ball("Glasses", hinge, 0.034, P.frame, "Metal")
 	end
+	g.xf = nil
 end
 
 return Glasses

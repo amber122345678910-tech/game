@@ -1,0 +1,298 @@
+{
+ "shot": "S10_gym",
+ "start": 11.133,
+ "end": 13.133,
+ "summary": "A locked-off, wide, slightly low frontal shot of a CG anthropomorphic horse composited into real gym footage. The horse wears gold aviators, a violet-blue satin blazer, a red polka-dot disco shirt, a gold chain, a gold \"A\" belt buckle and flared jeans. It sits facing the camera on a black flat bench in a gym lit by purple neon on the ceiling. It does two snappy one-arm dumbbell curls with its RIGHT hand (frame left) using a huge \"500 KG\" dumbbell, while its LEFT hand rests on its left knee. Each curl moves only in the first half of a beat and holds for the second half. The lift starts on beat 23 (11.383) and beat 25 (12.358), and the lowering starts on beat 24 (11.870) and beat 26 (12.846). One full rep takes 2 beats (0.976 s). As the arm curls, the wrist rotates the dumbbell about 85 deg, so the \"500 KG\" end cap goes from upright to sideways. Behind the horse, two real people do standing glute kick-backs in exact sync with the curl: their legs are up when the dumbbell is up and they stand when it is down. The ginger woman is at frame left and kicks toward frame left. The curly-haired man in Adidas-style shorts and orange sneakers is at frame right and kicks toward frame right. A third woman stands at the rack in between. The horse starts with a closed-teeth smug grin, the tail of \"STRESS\". From 12.0 s it lip-syncs \"AIN'T GOT NO WORRIES\" with its mouth opening wide and its head tipping back. Over the 2 s the image slowly zooms in a linear 2.6%. Hard cut in from an outdoor lawn shot at 11.133 and hard cut out to a throne/spotlight shot at 13.133.",
+ "camera": {
+  "framing": "Medium-wide frontal shot of the seated horse, from its ear tips (about 6% from the top of the frame) down to mid-shin. The bottom edge crops the jeans; the feet are never seen. Horse body (blazer) spans about x 0.36-0.73 of frame width and y 0.22-0.62. Head (ears to chin) spans about x 0.40-0.55. In the down pose it is at y 0.11-0.47; in the up pose at y 0.06-0.42. The 'A' buckle is at (0.55, 0.63). The knee tops are at y about 0.61: the horse's right knee is at x 0.42 and its left knee (with the hand on it) at x 0.64. The two jeans shins run straight down to the bottom edge at x 0.38-0.47 and x 0.62-0.75. Dumbbell in the down pose: bottom-left at x 0.16-0.42, y 0.62-0.86. Dumbbell in the up pose: upper-left beside the head at x 0.21-0.43, y 0.20-0.45. Background: the left third shows a ginger woman, a black dumbbell rack, a white/lilac wall and a speaker box on the floor at lower left. The right quarter shows a curly-haired man at the dumbbell rack. The top 25% is the wood ceiling with zig-zag purple neon tubes and black track spotlights. The bottom 15% is a black floor plus the horse's jeans. Composition is roughly centered with the horse's head slightly left of center (x 0.45-0.47).",
+  "position": "Use a set origin on the floor directly under the horse's seat. +Z points toward the camera and +X toward frame right, which is the horse's left. Camera at about (0, 2.4, 6.0) studs: about 6 studs horizontally from the horse's hips/chest and about 3.4 studs from its knee caps. Lens height is about 2.4 studs, just above the horse's knee-top height and well below its chest, so we look slightly up at the torso and head and slightly down onto the tops of the thighs. Horizontally straight-on: the horse's pelvis faces the camera squarely, and the horse root sits about 0.25 studs to frame right of the lens axis. The background people are about 8-8.5 studs from the camera, 2-2.5 studs behind the horse: the woman at X about -3.5, the man at X about +4.6. The middle woman is about 11 studs from the camera at X about -3.",
+  "angle": "Pitch about +4 deg (tilted slightly up; aim point about (-0.2, 2.8, 0)). Yaw about 2 deg to frame left. Roll 0 (no dutch, verticals upright). It reads as a mild low-angle hero shot because the lens sits at knee level with a wide FOV.",
+  "fovVerticalDeg": 58,
+  "lensNotes": "Wide lens, about 22 mm full-frame equivalent (vertical FOV about 58 deg at the start, about 56.6 deg at the end because of the zoom-in). Mild barrel distortion: ceiling neon and wall/ceiling edges bow slightly near the frame edges, and the near knees and shins look enlarged and splayed. Deep depth of field with everything readable: the horse is crisp, the background people and racks are very slightly softer, and there is no visible bokeh. Motion blur at about a 180-degree shutter is strong on the dumbbell and arm during the fast lift and lower (11.40-11.60, 11.90-12.10, 12.40-12.60, 12.90-13.07) and on the extras' kicking legs at the same moments. Slight corner vignette, gentle film grain or soft compression, slightly lifted blacks.",
+  "movement": [
+   {
+    "t": 11.133,
+    "description": "Hard cut in (the previous shot is an outdoor lawn). Camera locked off. Image scale 1.000 (FOV about 58.0)."
+   },
+   {
+    "t": 11.733,
+    "description": "Very slow linear push-in or zoom, image scale +0.8% (FOV about 57.6). No pan, tilt or roll."
+   },
+   {
+    "t": 12.133,
+    "description": "Linear zoom continues, scale +1.4% (FOV about 57.3)."
+   },
+   {
+    "t": 12.533,
+    "description": "Linear zoom continues, scale +1.8% (FOV about 57.1)."
+   },
+   {
+    "t": 13.1,
+    "description": "Last frame of the shot, scale +2.6% (FOV about 56.6, equivalent to dollying about 0.15 studs toward the horse). Hard cut at 13.133 to the throne/spotlight shot."
+   }
+  ],
+  "shake": "None. The camera is a locked-off tripod; measured background drift is under 1 px apart from the uniform 2.6% linear zoom. No whips, no zoom punches and no beat-synced shake."
+ },
+ "subjects": [
+  {
+   "who": "Aura Farmer horse (CG hero character, seated on the bench and curling the dumbbell)",
+   "appearance": "Humanoid body with a large realistic horse head. Head from ear tip to chin is about 1.9 studs, about 1/3 of the frame height; the snout is long. Fur is dark brown with a purple sheen from the neon: mid #5A3F45, shadow #34262C, highlight #8A6A85. Muzzle and nostrils darker, #2A2026. Two tall upright pointed ears. Spiky dark brown-black mane and forelock (#2E2228) sticking up and out between the ears, with mane continuing down the back of the neck. Gold aviator sunglasses: thin wire frame #D4A860 with a double bridge; teardrop gradient lenses, dark brown #4A2814 at the top fading to amber #C8945A at the bottom, semi-transparent. Big white teeth #E6DCCC in a toothy grin; inside of the mouth dark maroon #4A1A22. Outfit: vivid violet-blue satin blazer (base #5C55E0, highlights #8C7EF5, shadows #2A2380) with wide notched lapels, worn open, with slightly wrinkled sleeves. Red-orange 70s disco shirt (#C8323A, shadow #861A21) with small violet-blue polka dots (#5A4CC0). Its huge pointed collar is spread over the blazer lapels, and it is unbuttoned to the sternum in a deep V showing dark brown chest fur. Thin gold rope chain (#C9A050) around the neck. Large chunky gold sans-serif letter 'A' (#C89A55, about 0.45 studs tall) worn as a belt buckle at the waist. Baggy flared jeans, medium-wash blue (#4A5590 lit, #1E2135 in shadow). Hands are humanoid, dark brown-black (#2E2428) with 5 fingers. The left hand wears two chunky gold rings with dark stones on the middle and ring fingers, and a gold bracelet watch (#C8A060) on the left wrist. Broad shoulders and a slightly chunky torso; reads as a cool, smug cartoon horse. Prop: the giant urethane dumbbell. Two round plates, each about 1.3 studs in diameter and about 0.75 studs thick with rounded edges, dark navy-black rubber (#1C1A2E) with violet specular sheen (#5A5080). Chrome handle about 0.5 studs visible between the plates; total length about 2.1 studs. The outer end cap reads '500' over 'KG' in bold condensed sans, light lavender-grey (#C8C4DC), and the text covers about 60% of the cap diameter.",
+   "placement": "Sits squarely in the middle of a black flat bench that runs left-right across the frame. The seat top is at about 1.6 studs; hips are at about (0.25, 1.8, 0). The body faces the camera directly (pelvis yaw 0). Knees are spread wide, about 2 studs apart. The knee tops are at about 2.1-2.2 studs height and about 1.6 studs in front of the hips, with the shins vertical. The horse's right side (frame left) holds the dumbbell; its left hand (frame right) rests on its left knee. Its eyes, behind the lenses, look toward the camera the whole time, while the head is turned and rolled toward its right shoulder (frame left).",
+   "poseKeys": [
+    {
+     "t": 11.133,
+     "body": "DOWN POSE (bottom hold). Hips flexed 85 deg, thighs near horizontal toward the camera and each abducted about 30 deg; knees flexed 90 deg, shins vertical, feet flat off-frame. UpperTorso leans forward 30 deg, side-bends 10 deg toward its right and twists 10 deg right, so the right shoulder is lower and more forward (right shoulder at frame (0.46, 0.44), left shoulder at (0.65, 0.33)). Neck and head: yaw 25 deg to its right (frame left), pitch -15 deg (snout down), roll 20 deg toward its right shoulder; glasses line rises to frame right. Head center at about frame (0.45, 0.28). RIGHT ARM (frame left) hangs down, forward and out: shoulder flexion 45 deg, abduction 30 deg, elbow bent about 20 deg (elbow at frame (0.37, 0.58)). Hand at about knee height (1.9 studs), 0.6 studs outside and slightly in front of the right knee, at frame (0.29, 0.71). Neutral/hammer grip: closed fist around the handle, thumb wrapped over the fingers, knuckles facing frame left and forward. Dumbbell handle is horizontal and runs from the far plate (back, frame left) to the near plate (front, frame right) at about 45 deg to the image plane. The near cap faces camera-right and its '500 KG' text is UPRIGHT ('500' above 'KG', about -10 deg tilt). LEFT ARM (frame right): shoulder abducted 40 deg, extended 10 deg; elbow flexed 95 deg and flared out and back (elbow at frame (0.71, 0.51)). Forearm angles inward and down; wrist extended 15 deg. Palm rests flat on top of the left knee at frame (0.63, 0.60), fingers relaxed and curled 30-40 deg over the kneecap, thumb on the inner side of the knee. Rings and watch face the camera.",
+     "face": "Mouth 0.1: closed-teeth smug grin, the 'sss' tail of 'STRESS'. Lips pulled back with upper and lower teeth together and visible. Big confident smile; cheeks raised. Eyes behind the amber lenses are half-lidded and look at the camera; brows hidden. Glasses sit straight on the bridge and roll with the head."
+    },
+    {
+     "t": 11.383,
+     "body": "BEAT 23, lift trigger. Same down pose, with a tiny 0.05-stud anticipation dip of the right hand and the right shoulder dropping 2 deg on 11.367. The lift starts here.",
+     "face": "Mouth 0.1, same closed-teeth grin."
+    },
+    {
+     "t": 11.5,
+     "body": "MID-LIFT (heavy motion blur). Right shoulder flexion 45, abduction 55; elbow flexed 70 deg. Dumbbell swings up and out to frame (0.28, 0.55), at chest height, with the forearm rotating (supinating). Torso lifts: forward lean 22 deg, side-bend 4 deg right. Head rises with the torso: yaw 20 deg right, pitch -10, roll 20. Left arm unchanged.",
+     "face": "Mouth 0.15, grin widening."
+    },
+    {
+     "t": 11.633,
+     "body": "TOP REACHED, with an ease-out snap and about 3 deg overshoot that settles by 11.70. UpperTorso is more upright: forward lean 15 deg, side-bend 0, twist 5 deg to its left. Right shoulder about (0.40, 0.40). RIGHT ARM: upper arm near horizontal, pointing out to its right and forward toward the camera (shoulder abduction 65-70 deg, flexion 30-35 deg). Elbow at frame (0.36, 0.53), flexed about 110 deg so the forearm is vertical. Wrist flexed 10 deg toward the face. Fist grips the handle with the forearm supinated 85 deg compared with the down pose. Dumbbell center at frame (0.33, 0.33), level with the horse's eyes, about 0.9 stud to its right of the snout and 0.4 stud in front of it. The handle now points almost straight at the camera, so the near end cap is nearly face-on (about 20 deg off-axis, turned slightly to frame right). The '500 KG' text now reads SIDEWAYS, rotated 90 deg clockwise: the '500' column is on the right and reads top to bottom, with 'KG' to its left. LEFT ARM: same hand-on-knee pose, elbow flared at frame (0.72, 0.50), flexion 100 deg. Head: yaw 15 deg right, pitch -5 deg, roll 20 deg toward the right shoulder, leaning toward the dumbbell. Head center has moved about 0.3 studs to frame right and 0.4 studs up, to frame (0.47, 0.22).",
+     "face": "Mouth 0.2: wide toothy grin, upper and lower teeth showing with a slight gap. Smug, self-satisfied, looking at the camera."
+    },
+    {
+     "t": 11.867,
+     "body": "BEAT 24, end of the top hold. Same top pose; during the hold the head nods 3 deg down and back up (subtle). Lowering starts here.",
+     "face": "Mouth 0.25, grin. The subtitle is blank during this hold."
+    },
+    {
+     "t": 12,
+     "body": "MID-DESCENT (motion blur), easing in and out. Right shoulder abduction 50, flexion 40; elbow flexed 60 deg; forearm pronating back. Dumbbell at frame (0.28, 0.60). Torso leans forward to 22 deg. Head pitches UP +5 deg and stays higher than in the first down pose for the rest of the shot.",
+     "face": "Mouth 0.45 on 'AIN'T': a laughing, wide-open grin with both rows of teeth showing and the jaw dropped. Big joyful expression."
+    },
+    {
+     "t": 12.133,
+     "body": "BOTTOM REACHED. Same as the 11.133 down pose, but the head is held higher: yaw 20 deg right, pitch 0, roll 18 deg right, head center at frame (0.455, 0.21). Dumbbell back at bottom-left (x 0.16-0.42, y 0.60-0.85) with the text upright again.",
+     "face": "Mouth 0.35: grinning laugh with teeth."
+    },
+    {
+     "t": 12.333,
+     "body": "Bottom hold. Head pitched up 10 deg and slightly back, tilted right (roll 15 deg). Head center at frame (0.44, 0.22).",
+     "face": "Mouth 0.75 on 'GOT': jaw dropped, tall open shout with the top teeth and dark maroon mouth interior visible. Energetic, singing hard."
+    },
+    {
+     "t": 12.4,
+     "body": "BEAT 25 (12.358): the second lift starts, with the same anticipation dip and arc as at 11.383.",
+     "face": "Mouth 0.5, closing between words."
+    },
+    {
+     "t": 12.533,
+     "body": "MID-LIFT (blur). Dumbbell at frame (0.28, 0.50); elbow about 75 deg; torso straightening (lean 20 deg). Head tipped back: pitch +12 deg, roll 15 deg right.",
+     "face": "Mouth 0.8 on 'NO': wide, tall open shout."
+    },
+    {
+     "t": 12.633,
+     "body": "TOP REACHED again, identical arm, dumbbell and text orientation to 11.633, with dumbbell center at (0.33, 0.32). Head yaw 15 deg right, pitch +5 deg, roll 18 deg. Head center at (0.47, 0.21).",
+     "face": "Mouth 0.6, open and singing."
+    },
+    {
+     "t": 12.767,
+     "body": "Top hold. Head pitched up 8 deg; head center at (0.475, 0.19). The dumbbell sits right next to the snout without touching it.",
+     "face": "Mouth 0.8 on 'WOR-': rounded 'O/AW' shape, lips pushed slightly forward, jaw fully dropped, teeth partly hidden."
+    },
+    {
+     "t": 12.867,
+     "body": "BEAT 26 (12.846): lowering starts, with the same ease-in-out arc as at 11.867.",
+     "face": "Mouth 0.7, still on 'WOR(R)'."
+    },
+    {
+     "t": 12.967,
+     "body": "MID-DESCENT (blur). Dumbbell at frame (0.27, 0.58); elbow about 60 deg; head yaw 18 deg right, pitch 0, roll 18.",
+     "face": "Mouth 0.35 on '-RIES': wide stretched 'ee' grin with teeth nearly together and lip corners pulled far back."
+    },
+    {
+     "t": 13.1,
+     "body": "Bottom essentially reached (dumbbell at x 0.15-0.40, y 0.58-0.83, text upright). Torso lean 28 deg, head center at (0.45, 0.20). Last frame before the hard cut.",
+     "face": "Mouth 0.55: big open laughing grin, both rows of teeth visible, very pleased with itself."
+    }
+   ],
+   "motionNotes": "The curl has a strict on-beat rhythm. MOVE during the first half of a beat (about 0.23-0.27 s), then HOLD dead still for the second half. Up moves start on beats 23 and 25 (11.383 and 12.358) and use an ease-out curve (cubic out) with a 3 deg overshoot and settle. Down moves start on beats 24 and 26 (11.870 and 12.846) and use an ease-in-out curve (sine in-out). Bottom holds are 12.13-12.36 and 13.07 onward; top holds are 11.63-11.87 and 12.63-12.85. The whole upper body follows the arm: the torso straightens about 15 deg on the lift and folds back on the lower, and the head travels about 0.4 studs up and 0.3 studs toward frame right with it. The forearm rotates (supinates and pronates) about 85 deg during each lift and lower, which makes the '500 KG' text spin from upright to sideways. The left hand stays planted on the knee throughout, with only small elbow flexion changes (95 to 100 deg) as the torso moves. Secondary motion: the satin blazer sleeve bunches at the elbow on the curl, the big shirt collar flaps lightly, the chain swings about 0.05 studs, and the dumbbell stays rigid. Lip-sync of 'AIN'T GOT NO WORRIES': AIN'T 12.00-12.13, GOT 12.30-12.45, NO 12.50-12.63, WOR 12.70-12.87, RIES 12.93-13.10. From the second rep on, the head is held about 10 deg higher (singing)."
+  },
+  {
+   "who": "Background extra 1: ginger woman doing standing glute kick-backs (frame left, real footage)",
+   "appearance": "Slim young woman, about 5.5 studs tall. Shoulder-length straight auburn/ginger hair (#A0583A) with bangs. White ribbed cropped tank top (#ECE6EA, lilac-tinted in the frame), bare midriff. Loose black wide-leg pants or long shorts (#1A1A1E) with large red rose prints (#C0283A) and thin white sketch-line doodles. Barefoot. Skin fair, #E8BCA8 (lilac-tinted #CFACAC in the frame).",
+   "placement": "Stands about 8 studs from the camera, about 2 studs behind and 3.5 studs to the left of the horse, at frame x 0.22-0.32 (head at y 0.23-0.30, feet at y about 0.86). She is in profile, facing frame right toward the center and the dumbbell rack, with both hands resting on the rack top in front of her (about 3 studs high, at frame (0.35, 0.53)). Her right side faces the camera, which makes her right leg the near leg.",
+   "poseKeys": [
+    {
+     "t": 11.133,
+     "body": "Standing upright with a slight forward lean (5 deg). Both arms straight forward and down, hands on the rack bar. Weight on both feet, feet together.",
+     "face": "Head tilted up about 20 deg, looking up and to frame right; soft smile, mouth closed."
+    },
+    {
+     "t": 11.4,
+     "body": "Kick-back starts on beat 23 (motion blur). The torso begins hinging forward at the hips and the near leg swings back.",
+     "face": "Head dropping forward, face turning down."
+    },
+    {
+     "t": 11.633,
+     "body": "Full extension. Torso hinged forward about 65 deg, nearly horizontal, with arms straight to the rack. The working leg is extended straight back toward frame left to horizontal at hip height (hip extension about 90 deg relative to the standing torso line), knee straight, foot pointed. The foot reaches frame (0.05, 0.69). The standing leg is vertical with the knee soft. Her head and upper torso are mostly hidden behind the raised dumbbell.",
+     "face": "Hidden (face down, behind the dumbbell)."
+    },
+    {
+     "t": 11.867,
+     "body": "Holding the extension (the leg drifts up and down about 5 deg). From beat 24 the leg starts returning.",
+     "face": "Hidden."
+    },
+    {
+     "t": 12.133,
+     "body": "Back to standing upright, hands on the rack, same as 11.133 (leg return about 0.25 s with ease-in-out, blur at 11.93-12.10).",
+     "face": "Head up about 15 deg, looking toward frame right, smiling."
+    },
+    {
+     "t": 12.4,
+     "body": "Second kick-back starts on beat 25.",
+     "face": "Head going down."
+    },
+    {
+     "t": 12.633,
+     "body": "Full extension again, identical to 11.633; foot at frame (0.04, 0.68).",
+     "face": "Hidden behind the dumbbell."
+    },
+    {
+     "t": 12.867,
+     "body": "Beat 26: the leg starts returning.",
+     "face": "Hidden."
+    },
+    {
+     "t": 13.1,
+     "body": "Almost upright again (as at 12.133).",
+     "face": "Head up, slight smile."
+    }
+   ],
+   "motionNotes": "Moves in perfect unison with the horse's curl and with the man on the right: the leg goes up when the dumbbell goes up and comes down when it comes down. All moves happen in the first half of each beat and hold in the second half. Each move takes about 0.23 s and is motion-blurred. It looks like a looped real-footage clip."
+  },
+  {
+   "who": "Background extra 2: curly-haired man doing standing kick-backs (frame right, real footage)",
+   "appearance": "Young man, about 5.6 studs tall, slim and athletic. Dark brown curly medium-length hair (#2A1E18). White ribbed tank top (#F0EEEE, lilac-tinted #BEA6B4 in the frame). Black athletic shorts (#0A0C12) with three white stripes down the side (Adidas-style, #FFFFFF) and a small white logo. White crew socks. Orange-red suede low-top sneakers (#E0502A, darker #8B1906 in shade) with white side stripe and sole (Puma-style). Skin light olive, #D8A890.",
+   "placement": "About 8.5 studs from the camera, 2.5 studs behind and about 4.6 studs right of the horse, at frame x 0.73-0.88 (head at y 0.23-0.30, shoes at y about 0.86). Three-quarter view facing frame left (toward the horse and slightly toward the camera). Left hand on the dumbbell rack in front of him at frame (0.71, 0.53); right hand on the rack or hip. A partly hidden 4th person with dark hair stands just to his left, behind the horse's left shoulder, at frame (0.70, 0.35).",
+   "poseKeys": [
+    {
+     "t": 11.133,
+     "body": "Standing upright, torso leaning forward 10 deg onto the rack with the left arm straight to the rack. Legs straight, feet hip-width apart. Weight centered.",
+     "face": "Head turned toward frame left/center (yaw about 40 deg toward the horse), slight smile, mouth closed."
+    },
+    {
+     "t": 11.4,
+     "body": "Kick starts on beat 23. The torso hinges forward and the back leg swings back toward frame right (blur).",
+     "face": "Head starts turning toward the camera."
+    },
+    {
+     "t": 11.633,
+     "body": "Full extension. Torso hinged forward about 35 deg and leaning toward the rack. Rear leg extended straight back toward frame right, close to horizontal at hip height (hip extension about 70-80 deg), knee nearly straight. The shoe reaches the right frame edge at (0.99, 0.57). Standing leg vertical.",
+     "face": "Face turned toward the camera (yaw about 20 deg off-axis), cheeky smirk, chin slightly down, eyes on the camera."
+    },
+    {
+     "t": 11.867,
+     "body": "Holds the extension (small 5 deg leg bob); from beat 24 the leg returns.",
+     "face": "Smirk toward the camera."
+    },
+    {
+     "t": 12.133,
+     "body": "Standing again, same as 11.133.",
+     "face": "Looking toward frame left, smiling."
+    },
+    {
+     "t": 12.4,
+     "body": "Second kick starts on beat 25.",
+     "face": "Turning toward the camera."
+    },
+    {
+     "t": 12.633,
+     "body": "Full extension again, same as 11.633.",
+     "face": "Grin toward the camera."
+    },
+    {
+     "t": 12.867,
+     "body": "Beat 26: the leg starts returning.",
+     "face": "Grin."
+    },
+    {
+     "t": 13.1,
+     "body": "Nearly standing (foot about to plant).",
+     "face": "Smiling toward frame left."
+    }
+   ],
+   "motionNotes": "Same timing as the ginger woman and the horse: up on beats 23 and 25, down on 24 and 26, each move in about 0.23 s with motion blur, then a hold. Mirror image of the woman, since he kicks toward frame right and she kicks toward frame left, giving a symmetrical 'wings' effect around the horse at the top of each curl."
+  },
+  {
+   "who": "Background extra 3: dark-haired woman at the rack (mid-background, between the ginger woman and the horse)",
+   "appearance": "Young woman with dark brown hair pulled back in a low ponytail or bun (#302020). White tank or tee (#EEE8E8, #BDA29F in the frame). Dark bottoms, hidden by the rack. Fair skin.",
+   "placement": "About 11 studs from the camera, at frame x 0.33-0.38, with her head at y 0.33 and her waist hidden by the dumbbell rack. Profile facing frame right, toward the horse and center, hands down on the dumbbells on the rack.",
+   "poseKeys": [
+    {
+     "t": 11.133,
+     "body": "Standing, leaning slightly forward over the rack, arms straight down to the dumbbells.",
+     "face": "Looking down at the rack, neutral."
+    },
+    {
+     "t": 11.633,
+     "body": "Same pose, but hidden behind the raised dumbbell and the bent-over ginger woman.",
+     "face": "Hidden."
+    },
+    {
+     "t": 12.133,
+     "body": "Visible again, same static pose (tiny sway of 2 deg).",
+     "face": "Looking down or forward, neutral."
+    },
+    {
+     "t": 12.633,
+     "body": "Hidden again behind the raised dumbbell.",
+     "face": "Hidden."
+    },
+    {
+     "t": 13.1,
+     "body": "Visible again, same pose.",
+     "face": "Neutral."
+    }
+   ],
+   "motionNotes": "Essentially static filler. She only appears and disappears because the horse's dumbbell and the bending woman cover her on the up beats."
+  }
+ ],
+ "set": "An indoor boutique gym: a long, fairly narrow room, about 16 studs wide, more than 35 studs deep and about 10 studs high, receding straight away from the camera with the vanishing point just above frame center, behind the horse's chest. FLOOR: matte black rubber gym flooring (#0A0A10), almost featureless. FOREGROUND/HERO: a black padded flat weight bench (pad #141218, about 4.5 x 1 x 0.35 studs, seat top at about 1.6 studs) running left-right across the frame under the horse. A black steel frame and a diagonal rear support strut (#1A1A20) are visible below and behind the seat at frame (0.47-0.62, 0.80-0.90). LEFT SIDE, 7-12 studs from the camera: a long black 2-tier dumbbell rack (top tier about 2.7 studs high, lower tier about 1.8 studs, rack about 9 studs long), roughly parallel to the image plane and angled slightly toward the center. It is loaded with round black rubber dumbbells (#16141A, each about 0.5-0.7 studs in diameter), with a black speaker or plyo box on the floor at lower left (frame (0.04-0.12, 0.72-0.85)). Behind it is a white wall washed lilac/purple (#C8B4DC to #A07E99), with a large wall mirror (frame edge visible at x 0.12) and a small electrical outlet at frame (0.14, 0.50). CENTER BACKGROUND, about 15-25 studs back: black power rack / cable machine and a barbell station behind the horse's head and shoulders, plus a distant back wall and doorway at about 30 studs. RIGHT SIDE, 8-12 studs away: another black 2-tier dumbbell rack full of black dumbbells (frame x 0.68-1.0, y 0.45-0.75), a white wall washed lilac (#B596B3), a tall black framed mirror or poster panel at frame x 0.80-0.84, a small dark framed picture at (0.80, 0.33), and a tall dark rounded object (punching bag or foam roller stand) at x 0.83. A dark-haired 4th person is partly hidden just behind the horse's left shoulder at frame (0.70, 0.35). CEILING (top 25% of frame): warm dark-stained wood plank/slat ceiling (#6A4A3C, warm #8A6A50 where lit) with planks running away from the camera. A black rectangular track-light frame hangs at center, about 7 x 3 studs, at frame (0.46-0.74, 0.06-0.12), carrying 6-8 small black cylindrical spotlights with bright warm-white lamps (#FFF2D8, blooming). A row of 4-5 more spots recedes down the right side toward the back. Several long neon LED tubes are mounted on the ceiling in a zig-zag. Violet neon tube A runs from the top-left corner (frame (0.26, 0.0)) diagonally down-right to about (0.60, 0.25). Violet neon tube B runs from the top-right (frame (0.96, 0.04)) diagonally to about (0.55, 0.20). A third violet tube runs from the center-right toward the back. An orange-red neon tube (#FF6A2A) runs parallel just below tube A, from (0.57, 0.17) to (0.70, 0.32). A warm yellow neon strip (#F2C44A) runs down the left wall/ceiling corner from (0.19, 0.0) to (0.26, 0.33). All neon tubes have white-hot cores with a violet glow (#8A5CFF, glow #B89CFF).",
+ "lighting": "Mixed practical lighting from the gym footage with a matched CG horse. KEY: soft, warm-neutral top light (#FFF0E0) from the ceiling track spots above and slightly to frame right of the horse, about 40 deg above the horse and 20 deg right of the camera axis. It brightens the horse's blazer shoulders, the top of the head, the right cheek (frame right), the left hand and the gold accessories; the gold glints (aviator frame, chain, 'A' buckle, rings, watch) catch small specular hits. FILL: strong soft fill, about a 2:1 key-to-fill ratio, from the bright lilac walls bouncing light back; the shadows lean toward cool violet (#2A2380 on the blazer, #1E2135 on the jeans). RIM/BACK: violet neon rim on the horse's ears, mane, the frame-left edges of the head and sleeves and the dumbbell plates (#9C8CFF to #B89CFF), plus a magenta sheen on the fur. The purple/violet neon casts a strong purple wash over the white walls. COLOR TEMPERATURE: mixed overall. The ceiling wood and practicals are warm (about 3200K); walls and shadows are pushed to violet-magenta (about 7500K plus a magenta tint). Skin tones of the extras stay warm-pink. EXPOSURE: bright mid-key, with the back and side walls near clipping (#E8DCF0, #F0E8F4). The floor and racks are almost black but slightly lifted (#0A0A10, not pure 0). CONTRAST: medium, soft roll-off highlights. SATURATION: high on the blazer violet-blue (#5C55E0) and shirt red (#C8323A), moderate elsewhere. Overall grade: violet/magenta tint in the highlights and mids, slightly crushed but lifted blacks. Notable colors: blazer #5C55E0 / #8C7EF5, shirt #C8323A, jeans #4A5590, gold #D4A860, fur #5A3F45, dumbbell #1C1A2E, neon violet #8A5CFF, neon orange #FF6A2A, neon yellow #F2C44A, wall lilac #C8B4DC, ceiling wood #6A4A3C. BLOOM: soft bloom around the neon tubes and track spotlight lamps. No anamorphic flares; just a gentle glow halo on the brightest spots.",
+ "effects": [
+  {
+   "t": 11.133,
+   "description": "Hard cut in from the previous outdoor lawn shot; the subtitle 'I'M FEELING NO STRESS' carries over unchanged across the cut. Constant effects for the whole shot: violet/magenta color grade, soft bloom on the neon tubes and spot lamps, slight vignette, light film grain or softness."
+  },
+  {
+   "t": 11.4,
+   "description": "Directional motion blur on the dumbbell, right arm and both extras' kicking legs during the lift (11.40-11.60). The blur streaks run diagonally up and left for the dumbbell."
+  },
+  {
+   "t": 11.567,
+   "description": "Subtitle 'I'M FEELING NO STRESS' disappears (hard off, no fade). The screen has no text from 11.567 to 11.933."
+  },
+  {
+   "t": 11.9,
+   "description": "Motion blur on the dumbbell, arm and legs during the lowering (11.90-12.10)."
+  },
+  {
+   "t": 11.967,
+   "description": "Subtitle 'AIN'T GOT NO WORRIES' pops on (hard cut-on, no animation)."
+  },
+  {
+   "t": 12.4,
+   "description": "Motion blur during the second lift (12.40-12.60)."
+  },
+  {
+   "t": 12.9,
+   "description": "Motion blur during the second lowering (12.90-13.07)."
+  },
+  {
+   "t": 13.133,
+   "description": "Hard cut to the next shot (horse on a gold throne under a spotlight; the subtitle changes to 'CUZ I KNOW I'M THE BEST'). No transition effect, flash or shake."
+  }
+ ],
+ "subtitle": "11.133-11.533: \"I'M FEELING NO STRESS\" (carried over from the previous shot; it switches off at 11.567). 11.567-11.933: no subtitle. 11.967-13.100 (to the end of the shot): \"AIN'T GOT NO WORRIES\". Style for both: ALL CAPS, heavy, slightly italic or condensed display sans (like Anton or Bangers italic). The fill is a vertical gradient from bright yellow #FFE040 at the top to orange #FF8A1A to red-orange #FF3A1A at the bottom. The outline is a thin dark red-brown stroke (#5A0E0E, about 2 px at 480p), with a soft dark drop shadow offset down-right. The text is centered horizontally, with its baseline at about y 0.94 of frame height. The cap height is about 0.05 of frame height (about 24 px at 480p), and the line is about 0.38 of frame width wide (x 0.31-0.69). Single line, no background box.",
+ "recreateInRoblox": "CAMERA\n- Set workspace.CurrentCamera.CameraType = Scriptable.\n- Place the camera at CFrame.lookAt(Vector3.new(0, 2.4, 6.0), Vector3.new(-0.2, 2.8, 0)), relative to the bench origin. The horse's HumanoidRootPart is at about (0.25, 1.8, 0), seated and facing +Z toward the camera.\n- Set FieldOfView to 58, then tween it to 56.6 with TweenService over 2.0 s using Enum.EasingStyle.Linear. Alternatively, tween the camera 0.15 studs forward along its LookVector.\n- No shake.\n- To check framing, put temporary marker parts on the head and buckle. The glasses center should land at screen (0.45, 0.28) in the down pose and (0.47, 0.22) in the up pose. The 'A' buckle should be at (0.55, 0.63) and the knee tops at y about 0.61. The background actors' feet should be at y about 0.86 and their heads at y about 0.24.\n\nHORSE RIG\n- Use an R15 rig scaled about 1.1x, so the seated head center sits at about 4.2-4.4 studs.\n- Head: a MeshPart horse head about 1.9 studs tall with a long snout, upright ears and a spiky dark mane. You could use a UGC horse head, or build one from a stretched Head/sphere plus wedge snout and cone ears.\n- Material: Fabric or SmoothPlastic, color #5A3F45.\n- Teeth: a white block row with a separately rigged JawBone or lower-jaw part, so the mouth can open from 0 to 0.8.\n- Sunglasses: two semi-transparent teardrop MeshParts (Color #8A5A2A, Transparency 0.25, Glass material) joined by thin gold Neon or Metal wire, color #D4A860.\n- Blazer: Satin-look material (SmoothPlastic with Reflectance 0.05), color #5C55E0. Use wide lapel wedges.\n- Shirt: red #C8323A with a polka-dot texture (tiny #5A4CC0 dots). Make the big pointed collar as two thin wedges laid over the lapels.\n- Chain: a thin gold torus or chain mesh, #C9A050, Metal material.\n- Buckle: a gold 'A' MeshPart or extruded letter, 0.45 studs tall.\n- Jeans: flared, color #4A5590, Fabric material.\n- Hands: dark #2E2428. Add gold rings and a watch on the LEFT hand.\n\nDUMBBELL (welded to the RightHand with a Motor6D so it can be keyed)\n- Two cylinders, each 1.3 studs in diameter and 0.75 studs long, color #1C1A2E, SmoothPlastic with slight Reflectance. Bevel the edges or use rounded MeshParts.\n- Handle: a chrome cylinder of 0.25 diameter, 0.5 studs long, DiamondPlate or Metal material.\n- End cap: SurfaceGui on the outer face with '500' over 'KG' in Font Oswald Bold, color #C8C4DC.\n- Orient it so the text is UPRIGHT in the down pose and turned 90 deg clockwise (viewed from the camera) in the up pose. Achieve this by rolling the RightHand/forearm about 85 deg during the curl.\n\nBENCH AND SET\n- Bench: a black pad Part 4.5 x 0.35 x 1, seat top at 1.6 studs, running along X. Add black metal legs and a diagonal strut.\n- Floor: 40 x 60 studs, color #0A0A10, Rubber material.\n- Walls: white SmoothPlastic, about 16 studs apart and 10 studs high.\n- Ceiling: WoodPlanks material, color #6A4A3C.\n- Neon tubes: 0.15 x 0.15 Parts in Neon material, about 8-12 studs long, laid diagonally on the ceiling in the zig-zag described in the set notes.\n  - Violet tubes: #8A5CFF. Orange tube: #FF6A2A. Yellow tube in the left corner: #F2C44A.\n  - Give each tube a SurfaceLight facing down (Brightness 2-3, Range 12, same color).\n- Track lights: a black rectangular rail (7 x 3 studs) with small cylinders and white Neon disks. Put a SpotLight in each (Color #FFF0E0, Brightness 2, Angle 60, Range 16, pointing down).\n- Dumbbell racks: two 9-stud black 2-tier racks, at about X -4 to -12 and +2 to +10, Z -4.5, angled about 15 deg toward the center. Fill them with rows of small black cylinder dumbbells.\n- Also add: a power rack and cable machine silhouettes at Z -15 to -25, mirrors (Glass material, Reflectance 0.3) on the side walls, and a speaker box at lower left.\n\nLIGHTING (Future technology)\n- ClockTime 0, so no sun.\n- Ambient #2A2035, OutdoorAmbient #1A1424, Brightness 0.\n- EnvironmentDiffuseScale 0.3, EnvironmentSpecularScale 0.6.\n- Key: a SpotLight in a hidden part above and to the right of the camera at about (2.5, 8, 4), aimed at the horse's chest. Color #FFF0E0, Brightness 4, Range 18, Angle 70, Shadows on.\n- Fill: a large SurfaceLight on a hidden panel behind the camera at (0, 4, 9), facing the horse. Color #D8C8FF, Brightness 1.2.\n- Rim: two PointLights behind the horse at (-2.5, 5, -2) and (2.5, 5, -2). Color #9A70FF, Brightness 3, Range 8.\n- Wall wash: a purple SurfaceLight on each side wall, #B48CFF.\n\nPOST EFFECTS\n- ColorCorrectionEffect: TintColor #F2E6FF, Saturation 0.15, Contrast 0.08, Brightness 0.02.\n- BloomEffect: Intensity 0.7, Size 28, Threshold 0.85.\n- DepthOfFieldEffect: FocusDistance 6, InFocusRadius 8, FarIntensity 0.08, NearIntensity 0. Keep everything readable.\n- Optional: a soft vignette (ScreenGui ImageLabel with a radial black gradient at 0.85 transparency).\n- Motion blur: Roblox has none built in. Fake it on the fast frames by adding 2-3 semi-transparent ghost copies of the dumbbell and arm trailing along the arc (Transparency 0.6-0.8), only during the 0.23 s moves. Alternatively, accept crisp motion.\n\nANIMATION (Moon Animator 2 or Animation Editor, 30 fps)\n- Times below are relative to the shot start: t0 = 11.133 s, so beat 23 = 0.250 s, beat 24 = 0.737, beat 25 = 1.225, beat 26 = 1.713.\n- Keys: down hold 0-0.25; lift 0.25-0.50 (Cubic Out, with a 3 deg overshoot key at 0.50 settling at 0.57); top hold 0.50-0.737; lower 0.737-1.0 (Sine InOut); down hold 1.0-1.225; lift 1.225-1.50; top hold 1.50-1.713; lower 1.713-1.967.\n- On each move, key the torso lean (30 down, 15 up), head rise (+0.4 studs, +0.3 to frame right) and forearm roll (85 deg).\n- Keep the left hand IK-locked on the left knee. Use Moon's IK, or key the elbow at 95-100 deg.\n- Mouth: key a JawBone or Motor6D rotation, or swap mouth decals. Values: 0.1 grin 0-0.83, 0.25 at 0.73, 0.45 at 0.87 ('AIN'T'), 0.35 at 1.0, 0.75 at 1.2 ('GOT'), 0.5 at 1.27, 0.8 at 1.4 ('NO'), 0.6 at 1.5, 0.8 at 1.63 ('WOR'), 0.35 at 1.83 ('RIES'), 0.55 at 1.967.\n- Head pitch goes +5 to +12 deg (tipped back) while singing from 0.87 s onward.\n\nEXTRAS\n- Three R15 NPCs with matching clothing colors: the ginger woman in a white crop tank, rose-print black pants and bare feet; the curly-haired man in a white tank, black 3-stripe shorts and orange sneakers; and a dark-haired woman in white.\n- Give the two front extras one looped 'standing kick-back' animation, mirrored for the man.\n  - Standing pose to full extension: torso hinged 65 deg (woman) or 35 deg (man), rear leg straight and horizontal.\n  - Timing: start the extension at 0.25 s and reach it by 0.50; hold until 0.737; return by 1.0; repeat at 1.225, 1.50, 1.713 and 1.967 (exactly in sync with the curl).\n  - The man's head turns toward the camera at the top.\n\nSUBTITLES\n- ScreenGui TextLabel, AnchorPoint (0.5, 1), Position UDim2.new(0.5, 0, 0.95, 0), Size UDim2.new(0.4, 0, 0.06, 0), TextScaled.\n- Font: Bangers, or Oswald Heavy Italic via FontFace.\n- TextColor3 white, with a UIGradient at Rotation 90: #FFE040 to #FF8A1A to #FF3A1A.\n- UIStroke: Color #5A0E0E, Thickness 2.\n- Add a duplicate black label offset 2 px for the shadow.\n- Show 'I'M FEELING NO STRESS' from 0 to 0.43 s, nothing from 0.43 to 0.83, and 'AIN'T GOT NO WORRIES' from 0.83 s to the end (hard on and off).\n- Music and sounds will be added by the user, so drive all timing from beat constants: beat = 0.163 + n*0.4878 s."
+}
