@@ -1,3 +1,9 @@
+> ## ⚡ Новая игра: «Ловцы Молний»
+> Всё в папке **[LightningCatchers/](LightningCatchers/)**: готовый файл
+> **[LightningCatchers/LightningCatchers.rbxl](LightningCatchers/LightningCatchers.rbxl)** открывается в Roblox Studio,
+> описание и управление — в [LightningCatchers/README.md](LightningCatchers/README.md).
+> Ниже — прошлый проект (Симулятор Бункера), он не связан с новой игрой.
+
 # 🌩 Симулятор Бункера (Roblox)
 
 Игра в стиле «Build a Boat for Treasure», только про бункер: строишь бункер из блоков
