@@ -3,7 +3,8 @@
 --  * ежедневный календарь (Config.DailyRewards): забрать можно раз в день (день — Quests.dayNumber, UTC);
 --    серия растёт, если пропущено не больше одного дня («заморозка»), после 7-го дня — снова с 1-го;
 --  * 3 задания в день (Quests.forDay): прогресс от поимок, сдач, вылуплений, собранных осколков; награда —
---    осколки + минуты дохода;
+--    осколки + минуты дохода; выполненные, но не забранные к смене дня награды зачисляются сами;
+--    общие кольца событий не идут в задания на цвет (фиолетовые/золотые), сдача почти пустой банки — в «Сдай банку»;
 --  * коды (Config.Codes): регистр и пробелы не важны (кириллица переводится в верхний регистр вручную —
 --    string.upper её не умеет), каждый код — один раз;
 --  * офлайн-доход (Welcome) и настройки игрока (SetSettings);
@@ -147,7 +148,18 @@ end
 -- Задания дня
 ----------------------------------------------------------------------
 
--- Задания на сегодня (новый день — новые задания)
+-- Выдать награду за выполненное задание (q уже отмечено как полученное). Текст «+X ⚡ и +Y 💎».
+local function grantQuestReward(player: Player, d: Data, q: QuestState): string
+	local def = Quests.def(q.Id)
+	if not def then
+		return ""
+	end
+	local volts = EconomyService.grantVolts(player, Economy.incomeMinutes(d, def.Minutes), "quest")
+	local shards = EconomyService.grantShards(player, def.Shards)
+	return voltsAndShardsText(volts, shards)
+end
+
+-- Задания на сегодня (новый день — новые задания). Выполненные, но не забранные — зачисляются сами.
 local function ensureQuests(player: Player)
 	local d = DataService.get(player)
 	if not d then
@@ -157,10 +169,28 @@ local function ensureQuests(player: Player)
 	if d.Quests.Day == day then
 		return
 	end
+	local done: { QuestState } = {}
+	for _, q in d.Quests.List do
+		if not q.Claimed and q.Progress >= q.Target then
+			table.insert(done, q)
+		end
+	end
 	local list = Quests.forDay(day, player.UserId, d.Zone)
-	DataService.update(player, function(data)
+	local ok = DataService.update(player, function(data)
+		for _, q in done do
+			q.Claimed = true
+		end
 		data.Quests = { Day = day, List = list }
 	end)
+	if not ok then
+		return
+	end
+	for _, q in done do
+		local text = grantQuestReward(player, d, q)
+		if text ~= "" then
+			notify(player, "✅ Награда за прошлое задание зачислена: " .. text, "good")
+		end
+	end
 end
 
 -- Продвинуть задания с событием event: сумма (amount) или максимум (для Max-заданий)
@@ -208,7 +238,7 @@ local function claimQuest(player: Player, payload: any): (boolean, any)
 		return false, LOADING
 	end
 	if d.Quests.Day ~= today() then
-		ensureQuests(player)
+		ensureQuests(player) -- выполненные вчерашние награды зачислит сама
 		return false, "Наступил новый день — задания обновились"
 	end
 	local q = d.Quests.List[index]
@@ -221,16 +251,11 @@ local function claimQuest(player: Player, payload: any): (boolean, any)
 	if q.Progress < q.Target then
 		return false, string.format("Ещё не выполнено: осталось %d", q.Target - q.Progress)
 	end
-	local def = Quests.def(q.Id)
 	DataService.update(player, function()
 		q.Claimed = true
 	end)
-	if not def then
-		return true, "✅"
-	end
-	local volts = EconomyService.grantVolts(player, Economy.incomeMinutes(d, def.Minutes), "quest")
-	local shards = EconomyService.grantShards(player, def.Shards)
-	return true, voltsAndShardsText(volts, shards)
+	local text = grantQuestReward(player, d, q)
+	return true, if text ~= "" then text else "✅"
 end
 
 ----------------------------------------------------------------------
@@ -409,6 +434,9 @@ function DailyService.start()
 			bump(player, "perfect", 1)
 		end
 		bump(player, "combo", info.combo)
+		if info.shared then
+			return -- общие кольца событий (шаровая, радужная) не идут в задания на цвет
+		end
 		local def = Config.Colors[info.color]
 		if def and def.Order >= RARE_ORDER then
 			bump(player, "rare", 1)
@@ -417,8 +445,10 @@ function DailyService.start()
 			bump(player, "gold", 1)
 		end
 	end)
-	EconomyService.Sold:Connect(function(player)
-		bump(player, "sell", 1)
+	EconomyService.Sold:Connect(function(player, _volts, fill)
+		if typeof(fill) == "number" and fill >= Config.City.MinFill then
+			bump(player, "sell", 1)
+		end
 	end)
 	PetService.Hatched:Connect(function(player)
 		bump(player, "hatch", 1)

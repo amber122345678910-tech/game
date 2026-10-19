@@ -448,6 +448,7 @@ Config.Catch.FirstStrikeDelay = 0.3
 Config.Catch.FirstStrikeWarning = 0.7
 Config.Server.ZoneEnterDelay = 0.2
 Config.Drone.TripTime = 0.4
+Config.Server.TeleportCooldown = 0 -- пауза телепорта проверяется отдельно
 for _, z in Config.Zones do
 	z.Warning = 0.9
 	z.Interval = 0.35
@@ -542,6 +543,9 @@ local EconomyService = load("src/server/Services/EconomyService")
 local PlayerService = load("src/server/Services/PlayerService")
 local StrikeService = load("src/server/Services/StrikeService")
 local RequestService = load("src/server/Services/RequestService")
+local FulguriteService = load("src/server/Services/FulguriteService")
+local Fulgurite = load("src/shared/Fulgurite")
+local PlayerData = load("src/shared/PlayerData")
 
 check(ReplicatedStorage:FindFirstChild("GameState") ~= nil, "GameState создан")
 check(ReplicatedStorage.GameState:GetAttribute("Event") == "", "GameState.Event")
@@ -755,8 +759,11 @@ check(lastMsg("Effect", A, function(a)
 	return a[1].Kind == "sell" and a[1].Value == expectVolts
 end) ~= nil, "Effect sell")
 check(A:GetAttribute("JarFill") == 0, "JarFill = 0 после сдачи")
-local dataSync = lastMsg("DataSync", A)
-check(dataSync ~= nil and dataSync[1].Volts == d.Volts, "DataSync со свежими данными")
+-- снимок копируется в момент отправки (как в Roblox), отправка — с троттлингом
+check(waitUntil(function()
+	local dataSync = lastMsg("DataSync", A)
+	return dataSync ~= nil and dataSync[1].Volts == d.Volts
+end, 1), "DataSync со свежими данными")
 moveTo(A, Zones.Geo[1].Center)
 
 ----------------------------------------------------------------------
@@ -867,7 +874,15 @@ for _, m in strikeMsgs(A) do
 	end
 end
 check(hubRings == 0, "в хабе колец нет")
-request(A, "Teleport", 2)
+ok, err = request(A, "Teleport", 0)
+check(ok == false and err == "Ты уже в городе", "телепорт туда, где стоишь, — нельзя: " .. tostring(err))
+ok, err = request(A, "Teleport", 2)
+check(ok == true and A:GetAttribute("Zone") == 2, "телепорт обратно на остров 2: " .. tostring(err))
+Config.Server.TeleportCooldown = 5
+ok, err = request(A, "Teleport", 0)
+check(ok == false and typeof(err) == "string" and string.find(err, "заряжается", 1, true) ~= nil, "пауза между телепортами: " .. tostring(err))
+check(A:GetAttribute("Zone") == 2, "без телепорта остался на острове 2")
+Config.Server.TeleportCooldown = 0
 -- падение
 root(A).CFrame = CFrame.new(Zones.Geo[2].Center + Vector3.new(200, -200, 0))
 check(waitUntil(function()
@@ -996,35 +1011,54 @@ check(waitUntil(function()
 	end)
 end, 1.5), "дрон сдал банку")
 check(DataService.get(A).Charge == 0, "банка пуста")
--- остров с перегрузкой: пока ловишь — дрон ждёт
+local function departed()
+	return lastMsg("Effect", A, function(a)
+		return a[1].Kind == "drone" and a[1].Text == "depart"
+	end)
+end
+local function droneSold()
+	return lastMsg("Effect", A, function(a)
+		return a[1].Kind == "drone" and a[1].Text == "sold" and a[1].Value > 0
+	end)
+end
+-- остров с перегрузкой: дрон тоже летит сразу и забирает банку с собой; с дроном банка не перегружается
 request(A, "Teleport", 2)
 task.wait(0.1)
 clearLog()
 DataService.update(A, function(dd)
-	dd.Charge = capNow
+	dd.Charge = capNow * 0.95
 end)
-EconomyService.addCharge(A, 0.01, 2, true)
-task.wait(Config.Server.DroneIdle * 0.5)
-check(lastMsg("Effect", A, function(a)
-	return a[1].Kind == "drone"
-end) == nil, "дрон не мешает перегружать")
-local departed = waitUntil(function()
-	return lastMsg("Effect", A, function(a)
-		return a[1].Kind == "drone" and a[1].Text == "depart"
-	end)
-end, Config.Server.DroneIdle + 1)
-check(departed, "после паузы дрон летит")
-if not departed then
-	local dd = DataService.get(A)
-	print("   charge", dd.Charge, "cap", EconomyService.capacity(A), "zone", PlayerService.getZone(A), "drone", dd.Drone, dd.DroneOn)
-end
+local addedD, burstD, lostD = EconomyService.addCharge(A, capNow * 0.2, 2)
+check(not burstD and math.abs(addedD - capNow * 0.05) < 1e-6 and lostD > 0, "с дроном банка не перегружается и не лопается")
+check(waitUntil(departed, 1), "на острове с перегрузкой дрон летит сразу")
+check(DataService.get(A).Charge == 0 and A:GetAttribute("JarFill") == 0, "дрон забрал заряд с собой")
+local voltsD = DataService.get(A).Volts
+EconomyService.addCharge(A, 1, 2)
+check(math.abs(DataService.get(A).Charge - 1) < 1e-9, "пока дрон в пути — ловишь в пустую банку")
+check(waitUntil(droneSold, 1.5), "дрон сдал груз")
+local gotD = DataService.get(A).Volts - voltsD
+check(gotD == Economy.sellValue(capNow, capNow, EconomyService.multiplierFor(A)), "груз дрона — по формуле подстанции: " .. tostring(gotD))
+check(math.abs(DataService.get(A).Charge - 1) < 1e-9, "новый заряд в банке не тронут")
+-- перегруженную с выключенным дроном банку дрон сдаёт с перегрузочной частью
 ok, err = request(A, "ToggleDrone", false)
 check(ok == true and err == false and DataService.get(A).DroneOn == false, "дрон выключен")
 ok = request(A, "ToggleDrone", "yes")
 check(ok == false, "ToggleDrone проверяет тип")
-waitUntil(function()
-	return DataService.get(A).Charge == 0
-end, 2)
+DataService.update(A, function(dd)
+	dd.Charge = capNow * 1.3
+end)
+task.wait(0.4)
+check(DataService.get(A).Charge == capNow * 1.3, "выключенный дрон не летает")
+clearLog()
+voltsD = DataService.get(A).Volts
+request(A, "ToggleDrone", true)
+check(waitUntil(departed, 1), "включили — дрон полетел")
+check(waitUntil(droneSold, 1.5), "дрон сдал перегруженную банку")
+check(DataService.get(A).Volts - voltsD == Economy.sellValue(capNow * 1.3, capNow, EconomyService.multiplierFor(A)), "перегрузочная часть ×1.5")
+request(A, "ToggleDrone", false)
+DataService.update(A, function(dd)
+	dd.Charge = 0
+end)
 
 ----------------------------------------------------------------------
 -- 9. Общие удары и цепная молния
@@ -1076,12 +1110,12 @@ if sm then
 	end, 1)
 	check(ra and (ra.Grade == "perfect" or ra.Grade == "burst") and rb and (rb.Grade == "perfect" or rb.Grade == "burst"), "оба поймали общее кольцо")
 	check(#caughtBy == 2, "onCatch для каждого")
-	check(rb and rb.Chain and rb.Chain[1] == A.UserId, "цепная молния у второго")
+	check(rb and rb.Chain == nil, "общее кольцо не даёт цепную молнию")
 	check(lastMsg("Effect", A, function(a)
 		return a[1].Kind == "chain"
-	end) ~= nil and lastMsg("Effect", B, function(a)
+	end) == nil and lastMsg("Effect", B, function(a)
 		return a[1].Kind == "chain"
-	end) ~= nil, "Effect chain обоим")
+	end) == nil, "без Effect chain")
 	check(DataService.get(A).Index["2:rainbow"] == true and DataService.get(A).Stats.Rainbows == 1, "радужная в статистике и Молниедексе")
 	fireCatch(A, sid, 1, sm.Hits[1])
 	task.wait(0.05)
@@ -1092,6 +1126,44 @@ if sm then
 		end
 	end
 	check(count == 1, "общее кольцо ловится один раз")
+end
+-- кольцо шаровой (общее, обычный цвет): не открывает Молниедекс и не идёт в золотую статистику
+do
+	local golds = DataService.get(B).Stats.Golds
+	local hadIndex = DataService.get(B).Index["2:gold"] == true
+	local bid = StrikeService.spawnShared(2, center2 + Vector3.new(-3, 0, 0), "gold", { radius = 10, warning = 0.6, tag = "ball" })
+	local bm = sharedMsg(B)
+	for _, m in strikeMsgs(B) do
+		if m.Id == bid then
+			bm = m
+		end
+	end
+	if bm and bm.Id == bid then
+		moveTo(B, center2 + Vector3.new(-3, 0, 0))
+		local r = catchRing(B, bm, 1, 0)
+		check(r and (r.Grade == "perfect" or r.Grade == "burst"), "кольцо шаровой поймано")
+		local db = DataService.get(B)
+		check(db.Stats.Golds == golds and (db.Index["2:gold"] == true) == hadIndex, "шаровая не считается в Молниедекс и золотые")
+	else
+		check(false, "кольцо шаровой дошло до игрока")
+	end
+end
+-- пришёл на остров, пока общее кольцо ещё сжимается, — тоже видит его
+do
+	request(B, "Teleport", 1)
+	task.wait(0.1)
+	local lid = StrikeService.spawnShared(2, center2 + Vector3.new(30, 0, 0), "rainbow", { radius = 5, warning = 1.5, tag = "rainbow" })
+	local function seen()
+		for _, m in strikeMsgs(B) do
+			if m.Id == lid then
+				return m
+			end
+		end
+		return nil
+	end
+	check(seen() == nil, "на другом острове общее кольцо не приходит")
+	request(B, "Teleport", 2)
+	check(waitUntil(seen, 0.5) ~= nil, "опоздавший на остров получил общее кольцо")
 end
 -- BoltFX: чужие молнии видит второй игрок
 check(waitUntil(function()
@@ -1113,18 +1185,21 @@ DataService.update(A, function(dd)
 	dd.Zone = 4
 	dd.Volts = Economy.rebirthCost(0) + 5
 	dd.Shards = 77
+	dd.IncomeRate = 500
 end)
 local petsBefore = #DataService.get(A).Pets
 clearLog()
 ok, err = request(A, "Rebirth", nil)
 local dr = DataService.get(A)
 check(ok == true and err == 1, "перезапуск")
-check(dr.Volts == 0 and dr.Charge == 0 and dr.Zone == 1 and dr.Drone == false and dr.Upgrades.Rod == 0 and dr.Upgrades.Boots == 0, "сброс прогресса")
+check(dr.Volts == 0 and dr.Charge == 0 and dr.Zone == 1 and dr.Upgrades.Rod == 0 and dr.Upgrades.Boots == 0, "сброс прогресса")
+check(dr.IncomeRate == 0, "доход в минуту — с нуля")
+check(dr.Drone == true, "Тесла-дрон остаётся")
 check(dr.Rebirths == 1 and dr.Shards == 77 and #dr.Pets == petsBefore and dr.Index["2:rainbow"], "сохранено нужное")
 check(A:GetAttribute("Rebirths") == 1 and A:GetAttribute("Zone") == 1, "атрибуты после перезапуска")
 check(A.Character.Humanoid.WalkSpeed == Economy.walkSpeed(0), "скорость сброшена")
 check(lastMsg("Banner", "all", function(a)
-	return a[1] == "Аня перезапустил генератор! ×1.5"
+	return a[1] == "♻ Генератор перезапущен! Аня теперь ×1.5"
 end) ~= nil, "баннер перезапуска")
 
 ----------------------------------------------------------------------
@@ -1376,6 +1451,71 @@ c0.Parent = nil
 check(waitUntil(function()
 	return A.Character ~= c0 and PlayerService.getRoot(A)
 end, 2), "персонаж удалён — появился снова")
+
+-- полная коллекция: обычный фульгурит не выпадает, гарантированный разбивает самый простой ненадетый
+do
+	local keep = {}
+	DataService.update(A, function(dd)
+		dd.Fulgs = {}
+		dd.EquippedFulgs = {}
+		for i = 1, Fulgurite.MaxInventory do
+			table.insert(dd.Fulgs, { Id = 5000 + i, Seed = 900 + i, Color = if i <= 3 then "gold" else "blue", Serial = 5000 + i, Zone = 1 })
+		end
+		dd.EquippedFulgs = { 5001, 5002, 5003 }
+		dd.NextFulgId = 5000 + Fulgurite.MaxInventory + 1
+		keep = table.clone(dd.EquippedFulgs)
+	end)
+	clearLog()
+	check(FulguriteService.grant(A, "blue", 1, nil) == nil and #DataService.get(A).Fulgs == Fulgurite.MaxInventory, "полная коллекция: обычный не выпал")
+	local shardsBefore = DataService.get(A).Shards
+	local rec = FulguriteService.grant(A, "rainbow", 1, "rainbow")
+	local dd = DataService.get(A)
+	check(rec ~= nil and #dd.Fulgs == Fulgurite.MaxInventory and dd.Fulgs[#dd.Fulgs].Color == "rainbow", "радужный нашёл место в полной коллекции")
+	check(dd.Shards > shardsBefore, "разбитый дал осколки")
+	local equippedKept = true
+	for _, id in keep do
+		if not PlayerData.findFulg(dd, id) then
+			equippedKept = false
+		end
+	end
+	check(equippedKept, "надетые не разбиваются")
+	check(lastMsg("Notify", A, function(a)
+		return string.find(a[1], "Коллекция полна", 1, true) ~= nil and string.find(a[1], "разбит", 1, true) ~= nil
+	end) ~= nil, "игроку сказали, какой разбит")
+	DataService.update(A, function(d2)
+		d2.Fulgs = {}
+		d2.EquippedFulgs = {}
+	end)
+end
+
+-- Электроград: почти пустая банка очков не даёт
+do
+	local gs = ReplicatedStorage.GameState
+	local before = gs:GetAttribute("CityPoints")
+	EconomyService.Sold:Fire(A, 1, Config.City.MinFill * 0.5)
+	task.wait(0.05)
+	check(gs:GetAttribute("CityPoints") == before, "почти пустая банка не зажигает город")
+	EconomyService.Sold:Fire(A, 1, 0.5)
+	task.wait(0.05)
+	check(math.abs(gs:GetAttribute("CityPoints") - before - 0.5) < 1e-6, "очки города = заполнение банки")
+end
+
+-- смена дня: выполненное, но не забранное задание зачисляется само
+do
+	task.wait(1.1)
+	local yesterday = math.floor(os.time() / 86400) - 1
+	DataService.update(A, function(dd)
+		dd.Quests = { Day = yesterday, List = { { Id = "catch", Target = 60, Progress = 60, Claimed = false }, { Id = "sell", Target = 8, Progress = 2, Claimed = false } } }
+	end)
+	clearLog()
+	local voltsBefore = DataService.get(A).Volts
+	local okQ, errQ = request(A, "ClaimQuest", 1)
+	check(okQ == false and errQ == "Наступил новый день — задания обновились", "после смены дня — новые задания: " .. tostring(errQ))
+	check(DataService.get(A).Quests.Day == yesterday + 1 and DataService.get(A).Volts > voltsBefore, "вчерашняя награда зачислена")
+	check(lastMsg("Notify", A, function(a)
+		return string.find(a[1], "прошлое задание", 1, true) ~= nil
+	end) ~= nil, "тост о вчерашней награде")
+end
 
 ----------------------------------------------------------------------
 -- 11. Смерть и выход

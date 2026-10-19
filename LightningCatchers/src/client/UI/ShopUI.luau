@@ -14,6 +14,7 @@ local ClientState = require(script.Parent.Parent.ClientState)
 local Sounds = require(script.Parent.Parent.Controllers.Sounds)
 local Theme = require(script.Parent.Theme)
 local UIKit = require(script.Parent.UIKit)
+local TeleportUI = require(script.Parent.TeleportUI)
 
 local ShopUI = {}
 
@@ -319,8 +320,13 @@ local function buildIslands(page: Frame)
 			end
 			if i <= d.Zone then
 				-- уже открыт: полететь туда
+				-- общая с окном «Острова» пауза телепорта
+				if TeleportUI.cooldownLeft() > 0 then
+					TeleportUI.request(i) -- покажет, сколько ждать
+					return
+				end
 				entry.busy = true
-				local ok = ClientState.request(Net.Actions.Teleport, i)
+				local ok = TeleportUI.request(i)
 				entry.busy = false
 				if ok then
 					win.close()

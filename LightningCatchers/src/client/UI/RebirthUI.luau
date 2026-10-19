@@ -1,6 +1,7 @@
 --!strict
 -- Перезапуск генератора: что получишь (множитель ×A → ×B), что нужно, что сбросится и что останется.
--- Кнопка с подтверждением "Точно?" и праздник после успеха.
+-- Кнопка с подтверждением "Точно?" (второе нажатие засчитывается не раньше CONFIRM_GUARD — двойной тап
+-- не сбросит прогресс случайно) и праздник после успеха.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
@@ -20,7 +21,8 @@ local UIKit = require(script.Parent.UIKit)
 local RebirthUI = {}
 
 local W, H = 780, 560
-local CONFIRM_TIME = 3
+local CONFIRM_TIME = 3 -- сколько секунд ждём второе нажатие
+local CONFIRM_GUARD = 0.8 -- первые столько секунд после «Точно?» нажатия не считаются
 local CONFETTI = 28
 local CONFETTI_COLORS = { Theme.Volt, Theme.Electric, Theme.Pink, Theme.Green, Theme.Purple, Theme.Orange }
 
@@ -34,6 +36,7 @@ local bonusLabel: TextLabel
 local countLabel: TextLabel -- число перезапусков в заголовке
 local rebirthButton: TextButton
 local confirmUntil = 0
+local confirmFrom = 0 -- раньше этого (os.clock) второе нажатие игнорируется
 local busy = false
 local confetti: { Frame } = {}
 local celebrateLabel: TextLabel
@@ -157,19 +160,31 @@ local function onRebirthPressed()
 		return
 	end
 	-- первое нажатие — подтверждение
-	if os.clock() > confirmUntil then
-		confirmUntil = os.clock() + CONFIRM_TIME
+	local now = os.clock()
+	if now > confirmUntil then
+		confirmFrom = now + CONFIRM_GUARD
+		confirmUntil = confirmFrom + CONFIRM_TIME
 		UIKit.setButtonText(rebirthButton, "Точно? Жми ещё раз!")
-		UIKit.setButtonColor(rebirthButton, Theme.Orange)
-		local scale = rebirthButton:FindFirstChildOfClass("UIScale")
-		if scale then
-			UIKit.bump(scale, 0.1)
-		end
-		task.delay(CONFIRM_TIME + 0.05, function()
+		-- пока второе нажатие не засчитывается, кнопка серая; потом — оранжевая с пружинкой
+		UIKit.setButtonColor(rebirthButton, Theme.GrayDark)
+		task.delay(CONFIRM_GUARD, function()
+			if os.clock() < confirmUntil and not busy then
+				UIKit.setButtonColor(rebirthButton, Theme.Orange)
+				local scale = rebirthButton:FindFirstChildOfClass("UIScale")
+				if scale then
+					UIKit.bump(scale, 0.1)
+				end
+			end
+		end)
+		task.delay(CONFIRM_GUARD + CONFIRM_TIME + 0.05, function()
 			if os.clock() >= confirmUntil then
 				refresh()
 			end
 		end)
+		return
+	end
+	-- двойной тап: второе касание слишком рано — не считаем
+	if now < confirmFrom then
 		return
 	end
 	confirmUntil = 0
@@ -198,7 +213,7 @@ local function build()
 	})
 	UIKit.label({
 		Name = "Line2",
-		Text = "Питомцы, фульгуриты и Молниедекс остаются с тобой.",
+		Text = "Питомцы, фульгуриты, Тесла-дрон и Молниедекс остаются с тобой.",
 		Size = UDim2.new(1, -20, 0, 26),
 		Position = UDim2.fromOffset(10, 32),
 		FontFace = Theme.FontBold,
@@ -291,17 +306,18 @@ local function build()
 		UIKit.label({
 			Name = "Text",
 			Text = text,
-			Size = UDim2.new(1, -20, 0, 56),
-			Position = UDim2.fromOffset(10, 34),
+			Size = UDim2.new(1, -20, 0, 54),
+			Position = UDim2.fromOffset(10, 32),
 			TextXAlignment = Enum.TextXAlignment.Left,
 			TextYAlignment = Enum.TextYAlignment.Top,
 			FontFace = Theme.FontBold,
-			MaxTextSize = 20,
+			MaxTextSize = 18,
 			Parent = c,
 		})
 	end
-	listCard("Reset", "Сбросится:", Theme.Miss, "⚡ Вольты и банка\n🔱 улучшения и 🏝 острова", 0)
-	listCard("Keep", "Останется:", Theme.Green, "🐾 питомцы, 🔮 фульгуриты\n💎 осколки, 📖 Молниедекс", 0.5)
+	-- как в EconomyService.rebirth: доход в минуту тоже с нуля (награды «N минут дохода» — от минимума)
+	listCard("Reset", "Сбросится:", Theme.Miss, "⚡ Вольты и банка\n🔱 улучшения, 🏝 острова\n📈 доход в минуту", 0)
+	listCard("Keep", "Останется:", Theme.Green, "🐾 питомцы, 🔮 фульгуриты\n💎 осколки, 📖 Молниедекс\n🤖 Тесла-дрон", 0.5)
 
 	bonusLabel = UIKit.label({
 		Name = "Bonus",
@@ -339,6 +355,7 @@ function RebirthUI.start()
 		Accent = Theme.RedDark,
 		OnOpen = function()
 			confirmUntil = 0
+			confirmFrom = 0
 			refresh()
 			UIKit.bump(multScale, 0.12)
 			ClientState.WindowOpened:Fire("Rebirth")

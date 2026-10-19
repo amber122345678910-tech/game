@@ -154,6 +154,23 @@ function ServerLogic.tapPlausible(tapTime: number, now: number, spawn: number, m
 	return tapTime >= spawn and tapTime <= now + maxAhead and now - tapTime <= maxAge
 end
 
+-- Какой удар кольца оценивать: ближайший по времени к нажатию из ещё открытых (open(i) = true).
+-- При равном расстоянии — тот, что назвал клиент (hint), иначе более ранний. nil — оценивать нечего.
+function ServerLogic.nearestHit(hits: { number }, tapTime: number, open: (number) -> boolean, hint: number?): number?
+	local best: number? = nil
+	local bestDist = math.huge
+	for i, t in hits do
+		if open(i) then
+			local dist = math.abs(tapTime - t)
+			if dist < bestDist - 1e-9 or (dist <= bestDist + 1e-9 and i == hint) then
+				best = i
+				bestDist = dist
+			end
+		end
+	end
+	return best
+end
+
 -- Новое комбо после оценки (ИДЕАЛЬНО +1, ХОРОШО — без изменений, остальное — сброс)
 function ServerLogic.nextCombo(combo: number, grade: string): number
 	if grade == "perfect" then

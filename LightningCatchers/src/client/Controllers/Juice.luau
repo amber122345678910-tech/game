@@ -1,12 +1,15 @@
 --!strict
 -- "Сочность": всплывающие числа, лёгкая тряска и "удар" камеры, вспышки экрана.
 -- Всё рисуется только у этого игрока и не влияет на логику.
+-- Настройки игрока соблюдаются здесь, для всех вызовов сразу: «Тряска» выключена — нет ни тряски, ни удара FOV;
+-- «Мягкие вспышки» — вспышка экрана не ярче SOFT_FLASH_MAX.
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
 local Workspace = game:GetService("Workspace")
 
+local ClientState = require(script.Parent.Parent.ClientState)
 local Theme = require(script.Parent.Parent.UI.Theme)
 
 local Juice = {}
@@ -78,21 +81,56 @@ function Juice.popup(position: Vector3, text: string, color: Color3?, big: boole
 end
 
 ----------------------------------------------------------------------
+-- Настройки игрока
+----------------------------------------------------------------------
+local SOFT_FLASH_MAX = 0.3 -- «Мягкие вспышки»: вспышка экрана не ярче (доля непрозрачности)
+
+local function shakeAllowed(): boolean
+	local d = ClientState.data
+	return d == nil or d.Settings.Shake
+end
+
+local function softFlash(): boolean
+	local d = ClientState.data
+	return d == nil or d.Settings.SoftFlash
+end
+
+----------------------------------------------------------------------
 -- Камера: тряска и "удар" FOV (поверх стандартной камеры Roblox)
+-- Стандартная камера строит следующий кадр из текущего camera.CFrame, поэтому поворот тряски
+-- нельзя просто оставить в нём — он бы копился и камера «уплывала». Каждый кадр: до модуля камеры
+-- (Camera − 1) снимаем поворот прошлого кадра, после него (Camera + 1) добавляем новый.
 ----------------------------------------------------------------------
 local shakeAmount = 0
 local fovKick = 0
 local baseFov = 70
+local lastOffset = CFrame.identity -- поворот тряски, добавленный в прошлом кадре
+local offsetCamera: Camera? = nil -- к какой камере он добавлен
 
 -- amount: 0.1 — лёгкая, 0.5 — сильная. Затухает сама.
 function Juice.shake(amount: number)
+	if not shakeAllowed() then
+		return
+	end
 	shakeAmount = math.min(1, math.max(shakeAmount, amount))
 end
 
 -- Резкое расширение обзора, которое плавно возвращается (ощущение скорости/удара)
 function Juice.fovPunch(degrees: number)
+	if not shakeAllowed() then
+		return
+	end
 	fovKick = math.min(12, fovKick + degrees)
 end
+
+RunService:BindToRenderStep("JuiceCameraUndo", Enum.RenderPriority.Camera.Value - 1, function()
+	local camera = offsetCamera
+	offsetCamera = nil
+	if camera and camera == Workspace.CurrentCamera then
+		camera.CFrame = camera.CFrame * lastOffset:Inverse()
+	end
+	lastOffset = CFrame.identity
+end)
 
 RunService:BindToRenderStep("JuiceCamera", Enum.RenderPriority.Camera.Value + 1, function(dt: number)
 	local camera = Workspace.CurrentCamera
@@ -100,11 +138,17 @@ RunService:BindToRenderStep("JuiceCamera", Enum.RenderPriority.Camera.Value + 1,
 		return
 	end
 	if shakeAmount > 0.001 then
-		local t = os.clock() * 40
-		local s = shakeAmount * shakeAmount * 0.35
-		local offset = CFrame.Angles(math.noise(t, 0.3) * s * 0.06, math.noise(0.7, t) * s * 0.06, 0)
-		camera.CFrame = camera.CFrame * offset
-		shakeAmount = math.max(0, shakeAmount - dt * 2.2)
+		if shakeAllowed() then
+			local t = os.clock() * 40
+			local s = shakeAmount * shakeAmount * 0.35
+			local offset = CFrame.Angles(math.noise(t, 0.3) * s * 0.06, math.noise(0.7, t) * s * 0.06, 0)
+			camera.CFrame = camera.CFrame * offset
+			lastOffset = offset
+			offsetCamera = camera
+			shakeAmount = math.max(0, shakeAmount - dt * 2.2)
+		else
+			shakeAmount = 0 -- тряску выключили посреди эффекта
+		end
 	end
 	if fovKick > 0.01 then
 		camera.FieldOfView = baseFov + fovKick
@@ -146,13 +190,18 @@ end
 
 function Juice.flash(color: Color3, strength: number?)
 	local f = ensureFlash()
+	local k = strength or 0.35
+	if softFlash() then
+		k = math.min(k, SOFT_FLASH_MAX)
+	end
 	f.BackgroundColor3 = color
-	f.BackgroundTransparency = 1 - (strength or 0.35)
+	f.BackgroundTransparency = 1 - k
 	TweenService:Create(f, TweenInfo.new(0.45, Enum.EasingStyle.Quad), { BackgroundTransparency = 1 }):Play()
 end
 
 function Juice.destroy()
 	RunService:UnbindFromRenderStep("JuiceCamera")
+	RunService:UnbindFromRenderStep("JuiceCameraUndo")
 	if flashGui then
 		flashGui:Destroy()
 	end

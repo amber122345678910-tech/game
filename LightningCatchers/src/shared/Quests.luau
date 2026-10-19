@@ -2,11 +2,13 @@
 -- Задания дня: 3 задания, одинаковые для игрока в течение суток (зависят от дня и UserId).
 
 local Prng = require(script.Parent.Prng)
+local Format = require(script.Parent.Format)
 
 export type QuestDef = {
 	Id: string,
 	Event: string, -- какое событие двигает прогресс: catch, perfect, combo, rare, sell, hatch, gold, shards
-	Text: string, -- %d = цель
+	Text: string, -- %d = цель, %s = слово из Forms в нужном числе (см. Quests.text)
+	Forms: { string }?, -- формы для 1 / 2–4 / 5+ (молнию / молнии / молний)
 	Target: number,
 	MinZone: number,
 	Shards: number, -- награда осколками
@@ -16,15 +18,27 @@ export type QuestDef = {
 
 local Quests = {}
 
+local LIGHTNING = { "молнию", "молнии", "молний" }
+local TIMES = { "раз", "раза", "раз" }
+
 Quests.Pool = {
-	{ Id = "catch", Event = "catch", Text = "Поймай %d молний", Target = 60, MinZone = 1, Shards = 40, Minutes = 4 },
-	{ Id = "perfect", Event = "perfect", Text = "%d раз ИДЕАЛЬНО", Target = 20, MinZone = 1, Shards = 50, Minutes = 5 },
+	{ Id = "catch", Event = "catch", Text = "Поймай %d %s", Forms = LIGHTNING, Target = 60, MinZone = 1, Shards = 40, Minutes = 4 },
+	{ Id = "perfect", Event = "perfect", Text = "%d %s ИДЕАЛЬНО", Forms = TIMES, Target = 20, MinZone = 1, Shards = 50, Minutes = 5 },
 	{ Id = "combo", Event = "combo", Text = "Набери комбо %d", Target = 12, MinZone = 1, Shards = 60, Minutes = 6, Max = true },
-	{ Id = "rare", Event = "rare", Text = "Поймай %d фиолетовых или реже", Target = 8, MinZone = 1, Shards = 50, Minutes = 5 },
-	{ Id = "sell", Event = "sell", Text = "Сдай банку %d раз", Target = 8, MinZone = 1, Shards = 40, Minutes = 4 },
-	{ Id = "hatch", Event = "hatch", Text = "Вылупи %d питомца", Target = 1, MinZone = 1, Shards = 30, Minutes = 3 },
-	{ Id = "gold", Event = "gold", Text = "Поймай %d золотую молнию", Target = 1, MinZone = 2, Shards = 80, Minutes = 8 },
-	{ Id = "shards", Event = "shards", Text = "Собери %d осколков с земли", Target = 30, MinZone = 1, Shards = 40, Minutes = 4 },
+	{
+		Id = "rare",
+		Event = "rare",
+		Text = "Поймай %d %s",
+		Forms = { "фиолетовую или более редкую", "фиолетовые или более редкие", "фиолетовых или более редких" },
+		Target = 8,
+		MinZone = 1,
+		Shards = 50,
+		Minutes = 5,
+	},
+	{ Id = "sell", Event = "sell", Text = "Сдай банку %d %s", Forms = TIMES, Target = 8, MinZone = 1, Shards = 40, Minutes = 4 },
+	{ Id = "hatch", Event = "hatch", Text = "Вылупи %d %s", Forms = { "питомца", "питомцев", "питомцев" }, Target = 1, MinZone = 1, Shards = 30, Minutes = 3 },
+	{ Id = "gold", Event = "gold", Text = "Поймай %d %s", Forms = { "золотую молнию", "золотые молнии", "золотых молний" }, Target = 1, MinZone = 2, Shards = 80, Minutes = 8 },
+	{ Id = "shards", Event = "shards", Text = "Собери %d %s с земли", Forms = { "осколок", "осколка", "осколков" }, Target = 30, MinZone = 1, Shards = 40, Minutes = 4 },
 } :: { QuestDef }
 
 function Quests.def(id: string): QuestDef?
@@ -34,6 +48,15 @@ function Quests.def(id: string): QuestDef?
 		end
 	end
 	return nil
+end
+
+-- Текст задания для цели target с согласованным словом: «Поймай 1 молнию», «Поймай 60 молний»
+function Quests.text(def: QuestDef, target: number): string
+	local forms = def.Forms
+	if forms then
+		return string.format(def.Text, target, Format.plural(target, forms[1], forms[2], forms[3]))
+	end
+	return string.format(def.Text, target)
 end
 
 -- Номер дня (UTC) по os.time()

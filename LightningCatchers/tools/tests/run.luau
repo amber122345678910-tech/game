@@ -336,6 +336,34 @@ test("фульгуриты: распределение редкости по ц�
 	truthy((gold.legendary or 0) + (gold.mythic or 0) > 0, "gold can be legendary+")
 end)
 
+test("радужный фульгурит: чаще легендарный, иногда мифический; Перунов — всегда мифический", function()
+	-- редкость радужного решает только качество формы: RainbowScore + качество × QualityScore
+	eq(Fulgurite.rarityOf("rainbow", 0, "rainbow"), "legendary")
+	eq(Fulgurite.rarityOf("rainbow", 0.5, "rainbow"), "legendary")
+	eq(Fulgurite.rarityOf("rainbow", 0.99, "rainbow"), "mythic")
+	eq(Fulgurite.rarityOf("rainbow", 0.5, nil), "legendary", "мутация не меняет")
+	eq(Fulgurite.rarityOf("black", 0, "perun"), "mythic")
+	eq(Fulgurite.rarityOf("black", 0, nil), "mythic")
+	eq(Fulgurite.rarityOf("gold", 0.9, "perun"), "mythic")
+	-- остальные цвета — как раньше
+	eq(Fulgurite.rarityOf("gold", 0, nil), "epic")
+	eq(Fulgurite.rarityOf("gold", 0.5, nil), "legendary")
+	eq(Fulgurite.rarityOf("purple", 0, "golden"), "rare")
+	local counts = {}
+	for seed = 1, 400 do
+		local r = Fulgurite.generate(seed, "rainbow", "rainbow").Rarity
+		counts[r] = (counts[r] or 0) + 1
+	end
+	eq((counts.legendary or 0) + (counts.mythic or 0), 400, "только легендарные и мифические")
+	truthy((counts.legendary or 0) > 260, "легендарных большинство: " .. tostring(counts.legendary))
+	truthy((counts.mythic or 0) > 30, "мифические бывают: " .. tostring(counts.mythic))
+	-- детерминизм
+	local a = Fulgurite.generate(777, "rainbow", "rainbow")
+	local b = Fulgurite.generate(777, "rainbow", "rainbow")
+	eq(a.Rarity, b.Rarity)
+	eq(#a.Parts, #b.Parts)
+end)
+
 ----------------------------------------------------------------------
 -- Питомцы
 ----------------------------------------------------------------------
@@ -455,6 +483,36 @@ test("задания дня: 3 разных, детерминированы", fu
 		seen[q.Id] = true
 		truthy(Quests.def(q.Id).MinZone <= 1, "zone ok")
 	end
+end)
+
+test("тексты заданий: число и слово согласованы", function()
+	for _, def in Quests.Pool do
+		for _, n in { 1, 2, 5, 11, 21, 22, def.Target } do
+			local text = Quests.text(def, n)
+			falsy(string.find(text, "%", 1, true), "нет незаполненных %: " .. text)
+			truthy(string.find(text, tostring(n), 1, true) ~= nil, "есть число: " .. text)
+		end
+	end
+	local catch = Quests.def("catch") :: any
+	eq(Quests.text(catch, 1), "Поймай 1 молнию")
+	eq(Quests.text(catch, 3), "Поймай 3 молнии")
+	eq(Quests.text(catch, 60), "Поймай 60 молний")
+	eq(Quests.text(Quests.def("rare") :: any, 8), "Поймай 8 фиолетовых или более редких")
+	eq(Quests.text(Quests.def("sell") :: any, 2), "Сдай банку 2 раза")
+	eq(Quests.text(Quests.def("shards") :: any, 21), "Собери 21 осколок с земли")
+	eq(Quests.text(Quests.def("combo") :: any, 12), "Набери комбо 12")
+end)
+
+test("осколки за разбитый фульгурит: редкость × ценность острова", function()
+	eq(Fulgurite.shatterValue("common", 1), Fulgurite.ShatterShards.common * Config.Zones[1].ShardValue)
+	eq(Fulgurite.shatterValue("mythic", 5), Fulgurite.ShatterShards.mythic * Config.Zones[5].ShardValue)
+	eq(Fulgurite.shatterValue("rare", 99), Fulgurite.shatterValue("rare", #Config.Zones), "остров за пределами — последний")
+	eq(Fulgurite.shatterValue("rare", 0), Fulgurite.shatterValue("rare", 1), "остров 0 — первый")
+end)
+
+test("текст улучшения банки без несогласованного слова", function()
+	eq(Economy.effectText("Jar", 0), "вместимость 25")
+	truthy(string.find(Economy.effectText("Jar", 20), "K", 1, true) ~= nil or string.find(Economy.effectText("Jar", 20), "M", 1, true) ~= nil, "крупные числа коротко")
 end)
 
 test("форматирование чисел", function()

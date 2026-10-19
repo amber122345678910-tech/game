@@ -16,6 +16,7 @@ local Geom = require(Shared:WaitForChild("Geom"))
 local Net = require(Shared:WaitForChild("Net"))
 local Format = require(Shared:WaitForChild("Format"))
 local Zones = require(Shared:WaitForChild("Zones"))
+local Signal = require(Shared:WaitForChild("Signal"))
 
 local ClientState = require(script.Parent.Parent.ClientState)
 local Sounds = require(script.Parent.Sounds)
@@ -25,6 +26,10 @@ local Theme = require(script.Parent.Parent.UI.Theme)
 
 local StrikeController = {}
 
+-- (id, hit, colorId, zone) — удар пришёл, а свой игрок стоял в кольце и ещё не нажимал
+-- (CatchController решает, «Шарахнуло» это или подсказка, когда закроется окно нажатия)
+StrikeController.UntappedHit = Signal.new() :: Signal.Signal<number, number, string, number>
+
 local player = Players.LocalPlayer
 
 ----------------------------------------------------------------------
@@ -33,10 +38,14 @@ local player = Players.LocalPlayer
 local SEGMENTS = 24 -- деталей во внешнем кольце
 local OUTER_START = 2.4 -- внешнее кольцо стартует с такого радиуса (× радиус кольца)
 local SEG_HEIGHT = 0.16
+local SEG_RESIZE = 0.05 -- размер деталей внешнего кольца меняем, только когда он изменился больше чем на 5%
+local SEG_WIDTH_STEP = 0.03
 local EDGE_CANVAS = 512 -- предел размера холста края кольца (точек)
 local EDGE_STROKE = 0.36 -- толщина края кольца (стадов)
 local CLOUD_GLOW_TIME = 0.6 -- туча разгорается за столько секунд до удара
 local LEADER_TIME = 0.3 -- «ниточка» молнии в последние столько секунд
+local LEADER_JITTER = 0.05 -- «ниточка» меняет форму не чаще (с)
+local LEADER_LEN_STEP = 0.5 -- длина её деталей — с таким шагом (размер меняется реже)
 local WARN_LEAD = 0.7 -- звук-предупреждение для редких цветов
 local WARN_MIN_ORDER = 3 -- редкие цвета: изумрудная и реже
 local CLOUD_SHARE = 0.6 -- туча над кольцом: GroundY + CloudHeight × столько
@@ -47,13 +56,17 @@ local FLASH_TIME = 0.25
 local FLASH_RANGE = 50
 local FLASH_BRIGHTNESS = 6
 local MAX_LIGHTS = 3 -- динамических источников света на всё сразу
-local MAX_FULL_FLASHES = 3 -- полных вспышек в секунду
+-- светочувствительность: полных вспышек (яркая молния со светом) не больше стольких в секунду на всё сразу;
+-- своя молния сверх лимита рисуется приглушённой, чужие — только пока молний в секунду меньше MAX_BOLTS
+local MAX_FULL_FLASHES = 3
+local MAX_BOLTS = 3
 local MAX_BOLT_PARTS = 480
 local MAX_SPARK_BURSTS = 10 -- выбросов искр в секунду
 local SPARK_EMITTERS = 4
 local SHOCKWAVE_POOL = 8
 local SHOCKWAVE_TIME = 0.42
 local TARGET_SLACK = 1.5 -- допуск к радиусу при выборе кольца для нажатия
+local ZAP_PREDICT_SLACK = -0.5 -- «стоял в кольце» для прогноза «Шарахнуло»: чуть строже сервера (позиция у него старее)
 local LATE_SLACK = 0.1 -- после окна ХОРОШО удар ещё можно выбрать (сервер всё равно оценит)
 -- кольцо живёт после последнего удара (чтобы успело погаснуть и можно было нажать чуть позже)
 local RING_TAIL = math.max(0.45, Config.Catch.MaxGoodWindow + LATE_SLACK + 0.05)
@@ -62,7 +75,12 @@ local SHARD_POP = 0.25
 local SHARD_GROW = 0.3
 local SHARD_FADE = 0.4
 local SHARD_LADDER_GAP = 1.1 -- осколки, собранные чаще, звенят всё выше
-local PENTATONIC = { 0, 2, 4, 7, 9, 12, 14, 16, 19, 21, 24 }
+local LADDER = { 0, 2, 4, 7, 9, 12 } -- пентатоника на одну октаву (выше звук становится визгливым)
+-- подбор осколка: сервер видит игрока с задержкой, поэтому ShardCollect повторяем, пока не придёт подтверждение
+-- (рост Shards в DataSync); «+N 💎» — только после него. Не подтвердили — осколок возвращается на землю (один раз).
+local SHARD_RESEND = 0.15
+local SHARD_CONFIRM_TIME = 2
+local SHARD_RESEND_REACH = 8 -- повторяем, только пока игрок не дальше радиуса сбора + допуска сервера + столько
 local ARROW_MARGIN = 54 -- отступ стрелок от края экрана (точки)
 local ARROW_TOUCH_BOTTOM = 0.3 -- на телефоне нижние 30% экрана — джойстик и кнопки
 local HIDDEN = CFrame.new(0, 1e4, 0)
@@ -116,6 +134,9 @@ type RingVisual = {
 	cloud: { Part },
 	core: Part,
 	leader: { Part },
+	leaderJit: { Vector3 },
+	leaderLen: { number },
+	leaderNext: number,
 	segLen: number,
 	segWidth: number,
 	segTransp: number,
@@ -161,6 +182,7 @@ type Bolt = {
 	cores: { Part },
 	sheaths: { Part },
 	t0: number,
+	flick: boolean, -- короткое «перезажигание» (нет при мягких вспышках и сверх лимита)
 	coreBase: number,
 	sheathBase: number,
 	lastCore: number,
@@ -183,6 +205,19 @@ type Shard = {
 	collectT: number,
 	fadeT: number?,
 	lastScale: number,
+	restored: boolean, -- уже возвращали на землю после неподтверждённого подбора
+}
+
+-- Подобранный осколок, который ждёт подтверждения сервера
+type PendingShard = {
+	id: number,
+	pos: Vector3,
+	amount: number,
+	expires: number,
+	zone: number,
+	t0: number,
+	nextSend: number,
+	restored: boolean,
 }
 
 type Arrow = { frame: Frame, pointer: TextLabel, dot: TextLabel }
@@ -364,20 +399,44 @@ local function acquireGlow(owner: any): LightSlot?
 	return nil
 end
 
-local flashTimes: { number } = {}
+local flashTimes: { number } = {} -- полные вспышки за последнюю секунду
+local boltTimes: { number } = {} -- все нарисованные молнии за последнюю секунду
 
--- Вспышка света в точке удара. Вспышки важнее свечения туч: могут забрать у тучи источник.
--- own = false (чужая молния): только если недавно вспышек не было, чтобы не съесть лимит своих.
-local function flashLight(pos: Vector3, color: Color3, strength: number, own: boolean)
-	local clock = os.clock()
-	for i = #flashTimes, 1, -1 do
-		if clock - flashTimes[i] > 1 then
-			table.remove(flashTimes, i)
+local function pruneTimes(list: { number }, clock: number)
+	for i = #list, 1, -1 do
+		if clock - list[i] > 1 then
+			table.remove(list, i)
 		end
 	end
+end
+
+-- Можно ли сейчас полную вспышку (яркая молния + свет). Своим — до MAX_FULL_FLASHES в секунду,
+-- чужим — только если недавно вспышек не было, чтобы не съесть лимит своих.
+local function takeFlash(own: boolean): boolean
+	local clock = os.clock()
+	pruneTimes(flashTimes, clock)
 	if #flashTimes >= (if own then MAX_FULL_FLASHES else 1) then
-		return
+		return false
 	end
+	table.insert(flashTimes, clock)
+	return true
+end
+
+-- Учёт молний: своя рисуется всегда, чужая — только пока молний за секунду меньше MAX_BOLTS
+local function takeBolt(own: boolean): boolean
+	local clock = os.clock()
+	pruneTimes(boltTimes, clock)
+	if not own and #boltTimes >= MAX_BOLTS then
+		return false
+	end
+	table.insert(boltTimes, clock)
+	return true
+end
+
+-- Вспышка света в точке удара (лимит — takeFlash у вызывающего). Вспышки важнее свечения туч:
+-- могут забрать у тучи источник.
+local function flashLight(pos: Vector3, color: Color3, strength: number)
+	local clock = os.clock()
 	local slot: LightSlot? = nil
 	for _, s in lights do
 		if s.owner == nil and not s.flashing then
@@ -400,7 +459,6 @@ local function flashLight(pos: Vector3, color: Color3, strength: number, own: bo
 	if not slot then
 		return
 	end
-	table.insert(flashTimes, clock)
 	slot.owner = nil
 	slot.flashing = true
 	slot.t0 = clock
@@ -571,8 +629,9 @@ local function takeBoltPart(): Part?
 	return nil
 end
 
--- Нарисовать молнию от точки в туче до точки удара
-local function drawBolt(seed: number, from: Vector3, to: Vector3, colorId: string, detail: number, dim: boolean)
+-- Нарисовать молнию от точки в туче до точки удара.
+-- dim — приглушённая (чужая или сверх лимита вспышек), flick — короткое «перезажигание» (двойная вспышка)
+local function drawBolt(seed: number, from: Vector3, to: Vector3, colorId: string, detail: number, dim: boolean, flick: boolean)
 	local clock = os.clock()
 	local segs = BoltGeometry.build(seed, from, to, detail)
 	local black = colorId == "black"
@@ -583,6 +642,7 @@ local function drawBolt(seed: number, from: Vector3, to: Vector3, colorId: strin
 		cores = {},
 		sheaths = {},
 		t0 = clock,
+		flick = flick,
 		coreBase = if dim then 0.25 else 0,
 		sheathBase = if dim then 0.5 else 0.3,
 		lastCore = -1,
@@ -634,8 +694,8 @@ local function updateBolts(clock: number)
 		else
 			local coreT, sheathT
 			if age < BOLT_HOLD then
-				-- короткое мерцание: молния «перезажигается»
-				local flick = if age > 0.045 and age < 0.075 then 0.55 else 0
+				-- короткое мерцание: молния «перезажигается» (только у полной вспышки без «мягких вспышек»)
+				local flick = if b.flick and age > 0.045 and age < 0.075 then 0.55 else 0
 				coreT = math.min(1, b.coreBase + flick)
 				sheathT = math.min(1, b.sheathBase + flick * 0.5)
 			else
@@ -659,9 +719,11 @@ local function updateBolts(clock: number)
 	end
 end
 
--- Всё, что происходит в точке удара
-local function impact(groundPos: Vector3, hitPos: Vector3, color: Color3, radius: number, own: boolean)
-	flashLight(hitPos + Vector3.new(0, 3, 0), color, if own then 1 else 0.5, own)
+-- Всё, что происходит в точке удара (full — с полной вспышкой света, см. takeFlash)
+local function impact(groundPos: Vector3, hitPos: Vector3, color: Color3, radius: number, own: boolean, full: boolean)
+	if full then
+		flashLight(hitPos + Vector3.new(0, 3, 0), color, if own then 1 else 0.5)
+	end
 	shockwave(groundPos, color, radius)
 	sparks(hitPos, color, if own then 14 else 8)
 	if own then
@@ -795,6 +857,9 @@ local function makeVisual(): RingVisual
 		cloud = cloud,
 		core = core,
 		leader = leader,
+		leaderJit = { Vector3.zero, Vector3.zero, Vector3.zero },
+		leaderLen = { -1, -1, -1 },
+		leaderNext = 0,
 		segLen = -1,
 		segWidth = -1,
 		segTransp = -1,
@@ -1043,8 +1108,14 @@ local function strikeHit(r: Ring, index: number, center: Vector3)
 		target = rodTipOf(player.Character) or center
 	end
 	local color = lineColor(r.colorId, os.clock())
-	drawBolt(r.id * 7 + index, cloudPt, target, r.colorId, 4, false)
-	impact(center, target, color, r.radius, true)
+	takeBolt(true)
+	local full = takeFlash(true)
+	drawBolt(r.id * 7 + index, cloudPt, target, r.colorId, 4, not full, full and not softFlash())
+	impact(center, target, color, r.radius, true, full)
+	-- стоял в кольце и не нажимал: CatchController решит, «Шарахнуло» это или подсказка
+	if not r.judged[index] and r.results[index] == nil and insideRing(r, center, ZAP_PREDICT_SLACK) then
+		StrikeController.UntappedHit:Fire(r.id, index, r.colorId, r.zone)
+	end
 end
 
 -- Обновить одно кольцо за кадр. Возвращает false, если кольцо пора убрать.
@@ -1154,7 +1225,8 @@ local function updateRing(r: Ring, now: number, clock: number, dt: number): bool
 		local width = 0.28 + 0.22 * p
 		local transp = 1 - (0.35 + 0.65 * p ^ 1.4) * fadeIn
 		local color = line:Lerp(WHITE, 0.65 * p ^ 6)
-		if math.abs(segLen - vis.segLen) > 0.01 or math.abs(width - vis.segWidth) > 0.01 then
+		-- размер деталей менять дорого (телефоны): только при заметной разнице, а не каждый кадр
+		if math.abs(segLen - vis.segLen) > vis.segLen * SEG_RESIZE or math.abs(width - vis.segWidth) > SEG_WIDTH_STEP then
 			vis.segLen = segLen
 			vis.segWidth = width
 			local size = Vector3.new(segLen, SEG_HEIGHT, width)
@@ -1241,17 +1313,27 @@ local function updateRing(r: Ring, now: number, clock: number, dt: number): bool
 		local k = 1 - remaining / LEADER_TIME
 		local from = cloudBase + Vector3.new(0, -3, 0)
 		local tip = from:Lerp(center + Vector3.new(0, 1, 0), k)
+		local parts = #vis.leader
+		-- форма дрожит не каждый кадр, а раз в LEADER_JITTER (дешевле и без стробоскопа)
+		local rejitter = not vis.leaderShown or clock >= vis.leaderNext
+		if rejitter then
+			vis.leaderNext = clock + LEADER_JITTER
+		end
 		local prevPt = from
 		for i, l in vis.leader do
-			local f = i / #vis.leader
-			local pt = from:Lerp(tip, f)
-			if i < #vis.leader then
-				pt += Vector3.new((math.random() - 0.5) * 2.4, 0, (math.random() - 0.5) * 2.4)
+			if rejitter then
+				vis.leaderJit[i] = if i < parts then Vector3.new((math.random() - 0.5) * 2.4, 0, (math.random() - 0.5) * 2.4) else Vector3.zero
+				l.Color = WHITE:Lerp(line, 0.4)
+				l.Transparency = 0.1 + math.random() * 0.55
 			end
+			local pt = from:Lerp(tip, i / parts) + vis.leaderJit[i]
 			local cf, len = Geom.axisCFrame(prevPt, pt)
-			l.Size = Vector3.new(len + 0.1, 0.14, 0.14)
-			l.Color = WHITE:Lerp(line, 0.4)
-			l.Transparency = 0.1 + math.random() * 0.55
+			-- длина с шагом и запасом (без щелей между частями): размер меняется редко
+			local q = math.ceil((len + 0.1) / LEADER_LEN_STEP) * LEADER_LEN_STEP
+			if q ~= vis.leaderLen[i] then
+				vis.leaderLen[i] = q
+				l.Size = Vector3.new(q, 0.14, 0.14)
+			end
 			queueMove(l, cf)
 			prevPt = pt
 		end
@@ -1325,10 +1407,13 @@ local function onBoltFX(msg: any)
 			target = tip
 		end
 	end
+	if not takeBolt(false) then
+		return -- и так много молний за секунду (светочувствительность)
+	end
 	local seed = if typeof(msg.Seed) == "number" then msg.Seed else math.random(1, 1e6)
 	local color = lineColor(msg.Color, os.clock())
-	drawBolt(seed, from, target, msg.Color, 3, true)
-	impact(pos, target, color, Config.Catch.RingRadius, false)
+	drawBolt(seed, from, target, msg.Color, 3, true, false)
+	impact(pos, target, color, Config.Catch.RingRadius, false, takeFlash(false))
 end
 
 ----------------------------------------------------------------------
@@ -1344,6 +1429,8 @@ local CRYSTALS = {
 local shardPool: { ShardVis } = {}
 local shards: { [number]: Shard } = {}
 local shardCount = 0
+local pendingShards: { [number]: PendingShard } = {}
+local knownShards: number? = nil -- data.Shards из последнего DataSync (для подтверждения подбора)
 local shardStep = 0
 local lastShardPick = 0
 local shardCollectEvent: RemoteEvent? = nil
@@ -1390,14 +1477,7 @@ local function clearShards()
 	flushMoves()
 end
 
-local function onShardSpawn(msg: any)
-	if typeof(msg) ~= "table" or typeof(msg.Id) ~= "number" or typeof(msg.Pos) ~= "Vector3" then
-		return
-	end
-	local id: number = msg.Id
-	if shards[id] then
-		return
-	end
+local function addShard(id: number, pos: Vector3, amount: number, expires: number, restored: boolean)
 	-- лимит: убираем самый старый
 	if shardCount >= Config.Server.MaxShards then
 		local oldestId, oldestT = nil, math.huge
@@ -1411,11 +1491,10 @@ local function onShardSpawn(msg: any)
 		end
 	end
 	local vis = table.remove(shardPool) or makeShardVis()
-	local expires = if typeof(msg.Expires) == "number" then msg.Expires else ClientState.now() + Config.Catch.ShardLifetime
 	shards[id] = {
 		id = id,
-		pos = msg.Pos,
-		amount = if typeof(msg.Amount) == "number" then msg.Amount else 1,
+		pos = pos,
+		amount = amount,
 		expires = expires,
 		vis = vis,
 		t0 = os.clock(),
@@ -1424,26 +1503,113 @@ local function onShardSpawn(msg: any)
 		collectT = 0,
 		fadeT = nil,
 		lastScale = -1,
+		restored = restored,
 	}
 	shardCount += 1
 end
 
-local function collectShard(s: Shard)
-	s.collected = true
-	s.collectT = os.clock()
+local function onShardSpawn(msg: any)
+	if typeof(msg) ~= "table" or typeof(msg.Id) ~= "number" or typeof(msg.Pos) ~= "Vector3" then
+		return
+	end
+	local id: number = msg.Id
+	if shards[id] or pendingShards[id] then
+		return
+	end
+	local expires = if typeof(msg.Expires) == "number" then msg.Expires else ClientState.now() + Config.Catch.ShardLifetime
+	addShard(id, msg.Pos, if typeof(msg.Amount) == "number" then msg.Amount else 1, expires, false)
+end
+
+local function sendShardCollect(id: number)
 	local ev = shardCollectEvent
 	if ev then
-		ev:FireServer(s.id)
+		ev:FireServer(id)
 	end
+end
+
+-- Подобрал (по своей позиции): осколок лопается со звоном сразу, а «+N 💎» — когда сервер подтвердит
+local function collectShard(s: Shard)
 	local clock = os.clock()
+	s.collected = true
+	s.collectT = clock
+	sendShardCollect(s.id)
+	pendingShards[s.id] = {
+		id = s.id,
+		pos = s.pos,
+		amount = s.amount,
+		expires = s.expires,
+		zone = ClientState.zone(),
+		t0 = clock,
+		nextSend = clock + SHARD_RESEND,
+		restored = s.restored,
+	}
 	if clock - lastShardPick < SHARD_LADDER_GAP then
-		shardStep = math.min(shardStep + 1, #PENTATONIC)
+		shardStep = math.min(shardStep + 1, #LADDER)
 	else
 		shardStep = 1
 	end
 	lastShardPick = clock
-	Sounds.play("Shard", Sounds.ladderPitch(PENTATONIC[shardStep], 24))
-	Juice.popup(s.pos + Vector3.new(0, 1.5, 0), "+" .. Format.short(s.amount) .. " 💎", Theme.Shard, false)
+	Sounds.play("Shard", Sounds.ladderPitch(LADDER[shardStep], 12))
+end
+
+-- Повторы ShardCollect и истёкшие ожидания
+local function updatePendingShards(now: number, clock: number)
+	local done: { number }? = nil
+	local root = localRoot()
+	local reach = Config.Catch.ShardPickupRadius + Config.Server.ShardPickupSlack + SHARD_RESEND_REACH
+	for id, p in pendingShards do
+		if clock - p.t0 >= SHARD_CONFIRM_TIME then
+			done = done or {}
+			table.insert(done :: { number }, id)
+		elseif clock >= p.nextSend then
+			p.nextSend = clock + SHARD_RESEND
+			-- далеко ушёл — сервер его рядом уже не увидит, повторять бесполезно
+			if root and Zones.flatDist(root.Position, p.pos) <= reach then
+				sendShardCollect(id)
+			end
+		end
+	end
+	if not done then
+		return
+	end
+	for _, id in done do
+		local p = pendingShards[id]
+		pendingShards[id] = nil
+		-- сервер так и не засчитал (видел игрока дальше): осколок снова на земле, можно подобрать ещё раз
+		if p and not p.restored and not shards[id] and p.zone == ClientState.zone() and now < p.expires - 1 then
+			addShard(id, p.pos, p.amount, p.expires, true)
+		end
+	end
+end
+
+-- Пришли данные: рост осколков подтверждает ждущие подборы (сначала самые старые)
+local function onShardData(d: any)
+	local total = d.Shards
+	if typeof(total) ~= "number" then
+		return
+	end
+	local before = knownShards
+	knownShards = total
+	if before == nil or total <= before or next(pendingShards) == nil then
+		return
+	end
+	local gained = total - before
+	local list: { PendingShard } = {}
+	for _, p in pendingShards do
+		table.insert(list, p)
+	end
+	table.sort(list, function(a: PendingShard, b: PendingShard): boolean
+		return a.t0 < b.t0
+	end)
+	local root = localRoot()
+	for _, p in list do
+		if p.amount <= gained then
+			gained -= p.amount
+			pendingShards[p.id] = nil
+			local at = if root then root.Position + Vector3.new(0, 3, 0) else p.pos + Vector3.new(0, 1.5, 0)
+			Juice.popup(at, "+" .. Format.short(p.amount) .. " 💎", Theme.Shard, false)
+		end
+	end
 end
 
 local function updateShards(now: number, clock: number)
@@ -1667,6 +1833,9 @@ local function step(dt: number)
 		end
 	end
 	updateShards(now, clock)
+	if next(pendingShards) ~= nil then
+		updatePendingShards(now, clock)
+	end
 	updateBolts(clock)
 	updateWaves(clock)
 	updateFlashes(clock)
@@ -1725,17 +1894,21 @@ function StrikeController.hitTime(id: number, hit: number): number?
 	return if r then r.hits[hit] else nil
 end
 
--- Кольцо для нажатия: центр (с учётом бегущего) в пределах Radius + 1.5 от игрока,
--- а ближайший ещё не оценённый удар ближе всех по времени к нажатию.
-function StrikeController.targetFor(rootPos: Vector3, tapTime: number): (number?, number?)
+-- Удар для нажатия: из колец, в которых стоит игрок (центр с учётом бегущего, Radius + TARGET_SLACK),
+-- берём ещё не оценённый удар, окно которого не закрылось, ближайший по времени к нажатию
+-- (у двойного и вилки это может быть и не первый: пропустил удар — нажатие идёт следующему).
+-- Третье значение — стоит ли игрок хоть в каком-то кольце (даже если ловить там уже нечего).
+function StrikeController.targetFor(rootPos: Vector3, tapTime: number): (number?, number?, boolean)
 	local _, good = ClientState.windows()
 	local now = ClientState.now()
 	local bestId: number? = nil
 	local bestHit: number? = nil
 	local bestErr = math.huge
+	local inside = false
 	for id, r in rings do
 		local c = currentCenter(r, now)
 		if Zones.flatDist(rootPos, c) <= r.radius + TARGET_SLACK and math.abs(rootPos.Y - c.Y) <= CATCH_HEIGHT then
+			inside = true
 			for i, t in r.hits do
 				if not r.judged[i] and tapTime <= t + good + LATE_SLACK then
 					local err = math.abs(tapTime - t)
@@ -1744,12 +1917,11 @@ function StrikeController.targetFor(rootPos: Vector3, tapTime: number): (number?
 						bestId = id
 						bestHit = i
 					end
-					break -- у кольца считается только ближайший неоценённый удар
 				end
 			end
 		end
 	end
-	return bestId, bestHit
+	return bestId, bestHit, inside
 end
 
 -- Нажатие на этот удар уже отправлено (второй раз его выбрать нельзя)
@@ -1780,6 +1952,10 @@ function StrikeController.start()
 	started = true
 	ClientState.StrikeSpawned:Connect(onStrikeSpawned)
 	ClientState.StrikeResolved:Connect(onStrikeResolved)
+	if ClientState.data then
+		onShardData(ClientState.data)
+	end
+	ClientState.Changed:Connect(onShardData)
 	ClientState.ZoneChanged:Connect(function(zone: number)
 		clearRings(zone)
 		clearShards()

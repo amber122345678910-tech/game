@@ -33,6 +33,12 @@ local FLASH_RANGE = 60
 local FLASH_PEAK = 5
 local FLASH_TIME = 0.32
 local TESLA_RANGE = 350 -- дуги башни видно, когда камера ближе
+-- дуга башни плавно появляется и гаснет, форма меняется только пока её не видно: не чаще ~3 раз в секунду
+-- (светочувствительность), с «мягкими вспышками» ещё медленнее и тусклее
+local TESLA_CYCLE_MIN = 0.35
+local TESLA_CYCLE_MAX = 0.7
+local TESLA_SOFT_SLOW = 1.6
+local TESLA_SOFT_OPACITY = 0.6
 local CITY_WAVE = 1.6 -- окна квартала зажигаются за столько секунд волной от центра
 local CITY_STAGGER = 0.4 -- следующий квартал — с задержкой
 local WHITE = Color3.new(1, 1, 1)
@@ -51,9 +57,9 @@ local SUPERCELL_MIX = 0.6
 
 type Sky = typeof(Config.Hub.Sky)
 
-type FlashState = { part: Part, light: PointLight, t0: number, peak: number, active: boolean }
+type FlashState = { part: Part, light: PointLight, t0: number, peak: number, active: boolean, soft: boolean }
 
-type TeslaArc = { core: Beam, glow: Beam }
+type TeslaArc = { core: Beam, glow: Beam, t0: number, dur: number, lastT: number }
 
 type WindowRec = {
 	part: BasePart,
@@ -292,7 +298,7 @@ local function makeFlash()
 	l.Shadows = false
 	l.Enabled = false
 	l.Parent = p
-	flash = { part = p, light = l, t0 = 0, peak = 0, active = false }
+	flash = { part = p, light = l, t0 = 0, peak = 0, active = false, soft = true }
 end
 
 local function scheduleFlash(clock: number)
@@ -321,6 +327,7 @@ local function skyFlash(clock: number)
 	local d0 = ClientState.data
 	local soft = d0 == nil or d0.Settings.SoftFlash
 	f.peak = FLASH_PEAK * (if soft then 0.5 else 1)
+	f.soft = soft
 	f.t0 = clock
 	f.active = true
 	f.light.Color = WHITE:Lerp(TESLA_GLOW, math.random() * 0.5)
@@ -343,9 +350,12 @@ local function updateFlash(clock: number)
 			f.light.Enabled = false
 			f.light.Brightness = 0
 		else
-			-- двойное мигание
+			-- двойное мигание (с «мягкими вспышками» — одно плавное)
 			local b
-			if t < 0.06 then
+			if f.soft then
+				local k = 1 - t / FLASH_TIME
+				b = k * k
+			elseif t < 0.06 then
 				b = 1
 			elseif t < 0.11 then
 				b = 0.1
@@ -419,8 +429,22 @@ local function setupTesla()
 			b.Parent = fxFolder
 			return b
 		end
-		table.insert(teslaArcs, { core = beam(0.18, TESLA_CORE, 0), glow = beam(0.7, TESLA_GLOW, 0.4) })
+		table.insert(teslaArcs, { core = beam(0.18, TESLA_CORE, 1), glow = beam(0.7, TESLA_GLOW, 1), t0 = 0, dur = 0, lastT = 1 })
 	end
+end
+
+-- Новая форма дуги и её длительность (пока дуга невидима)
+local function newTeslaCycle(a: TeslaArc, clock: number, soft: boolean)
+	local slow = if soft then TESLA_SOFT_SLOW else 1
+	a.t0 = clock
+	a.dur = (TESLA_CYCLE_MIN + (TESLA_CYCLE_MAX - TESLA_CYCLE_MIN) * math.random()) * slow
+	local c0 = (math.random() - 0.5) * 12
+	local c1 = (math.random() - 0.5) * 12
+	a.core.CurveSize0, a.core.CurveSize1 = c0, c1
+	a.glow.CurveSize0, a.glow.CurveSize1 = c0, c1
+	local w = 0.12 + 0.12 * math.random()
+	a.core.Width0 = w
+	a.glow.Width0 = w * 4
 end
 
 local function updateTesla(clock: number)
@@ -439,23 +463,36 @@ local function updateTesla(clock: number)
 		end
 		return
 	end
-	teslaOn = true
+	local d = ClientState.data
+	local soft = d == nil or d.Settings.SoftFlash
+	if not teslaOn then
+		teslaOn = true
+		-- дуги вразнобой: каждая начинает с случайного места своего цикла
+		for _, a in teslaArcs do
+			newTeslaCycle(a, clock, soft)
+			a.t0 = clock - a.dur * math.random()
+			a.core.Enabled = true
+			a.glow.Enabled = true
+		end
+	end
 	if clock < nextTesla then
 		return
 	end
-	nextTesla = clock + 0.06 + 0.07 * math.random()
+	nextTesla = clock + 1 / 30 -- плавности хватает и 30 обновлений в секунду
+	local opacity = if soft then TESLA_SOFT_OPACITY else 1
 	for _, a in teslaArcs do
-		local on = math.random() < 0.82
-		a.core.Enabled = on
-		a.glow.Enabled = on
-		if on then
-			local c0 = (math.random() - 0.5) * 12
-			local c1 = (math.random() - 0.5) * 12
-			a.core.CurveSize0, a.core.CurveSize1 = c0, c1
-			a.glow.CurveSize0, a.glow.CurveSize1 = c0, c1
-			local w = 0.12 + 0.12 * math.random()
-			a.core.Width0 = w
-			a.glow.Width0 = w * 4
+		local k = (clock - a.t0) / math.max(0.05, a.dur)
+		if k >= 1 then
+			newTeslaCycle(a, clock, soft)
+			k = 0
+		end
+		-- огибающая: плавно разгорается (первая четверть) и плавно гаснет (последняя треть)
+		local env = math.clamp(math.min(k / 0.25, (1 - k) / 0.35), 0, 1)
+		local tr = 1 - env * opacity
+		if math.abs(tr - a.lastT) > 0.03 or (tr == 1 and a.lastT ~= 1) then
+			a.lastT = tr
+			a.core.Transparency = NumberSequence.new(tr)
+			a.glow.Transparency = NumberSequence.new(0.4 + 0.6 * tr)
 		end
 	end
 end

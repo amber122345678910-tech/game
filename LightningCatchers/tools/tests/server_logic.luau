@@ -235,6 +235,24 @@ T.test("правдоподобие нажатия", function()
 	T.falsy(L.tapPlausible(96.9, 97.5, spawn, 1.2, 0.15), "раньше появления кольца")
 end)
 
+T.test("какой удар оценивать: ближайший неоценённый", function()
+	local hits = { 10, 10.5, 10.85 } -- вилка
+	local judged = {}
+	local function open(i)
+		return not judged[i]
+	end
+	T.eq(L.nearestHit(hits, 10.02, open, 1), 1)
+	T.eq(L.nearestHit(hits, 10.86, open, 2), 3, "клиент назвал 2, но нажатие ближе к 3")
+	judged[1] = true
+	T.eq(L.nearestHit(hits, 10.86, open, 2), 3, "пропустил второй — оценивается третий")
+	T.eq(L.nearestHit(hits, 10.6, open, 3), 2)
+	T.eq(L.nearestHit(hits, 10.675, open, 3), 3, "ровно посередине — номер клиента")
+	T.eq(L.nearestHit(hits, 10.675, open, 1), 2, "посередине без подсказки — более ранний")
+	judged[2] = true
+	judged[3] = true
+	T.eq(L.nearestHit(hits, 10.86, open, 3), nil, "все оценены")
+end)
+
 T.test("комбо", function()
 	T.eq(L.nextCombo(3, "perfect"), 4)
 	T.eq(L.nextCombo(3, "good"), 3)

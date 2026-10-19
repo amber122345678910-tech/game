@@ -3,10 +3,13 @@
 --  * Личный поток колец для каждого игрока на острове 1..5 (не в хабе и не на мосту):
 --    интервал Interval / (магнит × событие) ±разброс, лимит MaxActive + кольца магнита (+ событие),
 --    место — рядом, в игровой зоне, с зазором от других колец и достижимое бегом.
---  * Общие удары событий (spawnShared): видят все на острове, поймать может каждый — по разу.
---  * Проверка Catch: удар есть и этот удар ещё не оценён, время нажатия правдоподобно,
---    игрок в кольце (+допуск), оценка Strikes.judge. Заряд, комбо, цепная молния, Молниедекс,
---    фульгурит (dropHook), «Шарахнуло».
+--  * Общие удары событий (spawnShared): видят все на острове (и кто пришёл, пока кольцо ещё сжимается),
+--    поймать может каждый — по разу. Общие кольца не дают цепную молнию, Молниедекс обычных цветов
+--    и золотую статистику.
+--  * Проверка Catch: удар есть, время нажатия правдоподобно (не старше 2 × пинг + запас, не из будущего);
+--    оценивается ближайший по времени к нажатию ещё не оценённый удар кольца (номер от клиента —
+--    только проверка); игрок в кольце (+допуск), оценка Strikes.judge. Заряд, комбо, цепная молния,
+--    Молниедекс, фульгурит (dropHook), «Шарахнуло» (одно кольцо оглушает не больше одного раза).
 --  * Удар без нажатия: игрок стоял в кольце — «Шарахнуло» (с острова 2) / подсказка;
 --    был вне кольца — осколок на земле (ShardSpawn, сбор — ShardCollect).
 --  * BoltFX — чужие молнии игрокам той же зоны (только для красоты).
@@ -86,6 +89,8 @@ type Ring = {
 	Viewers: { [Player]: boolean }, -- кому отправлено общее кольцо
 	Judged: { [Player]: { [number]: boolean } },
 	Samples: { [number]: { [Player]: Vector3 } }, -- где стоял игрок в момент удара k
+	Zapped: { [Player]: boolean }, -- кого это кольцо уже ударило током (второй раз не оглушает)
+	Grace: number, -- сколько ждать нажатие после каждого удара
 	OnCatch: ((Player, CatchGrade) -> ())?,
 }
 
@@ -144,6 +149,44 @@ local modifiers: Modifiers = {}
 
 local function now(): number
 	return Workspace:GetServerTimeNow()
+end
+
+-- Пинг игрока (туда и обратно, секунды) или nil, если неизвестен
+local function pingOf(player: Player): number?
+	local ok, ping = pcall(function(): number
+		return player:GetNetworkPing()
+	end)
+	if ok and ServerLogic.isFinite(ping) and ping >= 0 then
+		return math.min(ping, 2)
+	end
+	return nil
+end
+
+-- Поправка задержки касания из настроек игрока (секунды, как её прибавляет клиент)
+local function calibrationOf(d: Data): number
+	local limit = Config.Catch.MaxCalibration
+	return math.clamp(d.Settings.Offset / 1000, -limit, limit)
+end
+
+-- Окно правдоподобного времени нажатия: (насколько старым, насколько «из будущего»)
+local function tapLimits(player: Player, d: Data): (number, number)
+	local c = Config.Catch
+	local offset = calibrationOf(d)
+	local ping = pingOf(player)
+	local age = if ping then ping * 2 + c.TapLateSlack else c.TapFallbackAge
+	return age + math.max(0, -offset), c.TapAheadSlack + math.max(0, offset)
+end
+
+-- Сколько ждать нажатие после удара личного кольца: окно ХОРОШО + пинг + запас
+-- (не дольше LatencyGrace) — чтобы «Шарахнуло» приходило сразу, а не через 0.6 с
+local function resolveGrace(player: Player, d: Data): number
+	local c = Config.Catch
+	local ping = pingOf(player)
+	if not ping then
+		return c.LatencyGrace
+	end
+	local _, good = Strikes.windows(d.Upgrades.Rod, Economy.petBonuses(d).window)
+	return math.min(c.LatencyGrace, good + ping + math.max(0, -calibrationOf(d)) + c.ResolveSlack)
 end
 
 ----------------------------------------------------------------------
@@ -340,6 +383,8 @@ local function newRing(
 		Viewers = {},
 		Judged = {},
 		Samples = {},
+		Zapped = {},
+		Grace = Config.Catch.LatencyGrace,
 		OnCatch = nil,
 	}
 end
@@ -526,12 +571,15 @@ local function applyCatch(player: Player, ps: PState, d: Data, ring: Ring, k: nu
 	ps.LastCatch = t
 
 	local charge = Economy.catchCharge(zone, ring.Color, grade, combo, d.Upgrades.Rod, chargeMult())
-	local partners = chainPartners(ps, zone, hitTime, center)
+	-- цепная молния — только между своими ударами (общее кольцо ловят все сразу — это не цепь)
+	local partners = if ring.Shared then {} else chainPartners(ps, zone, hitTime, center)
 	local bonus = if #partners > 0 then charge * Config.Catch.ChainBonus else 0
 	local added, burst, lost = EconomyService.addCharge(player, charge + bonus, zone)
 
 	local mark: ChainMark = { Time = hitTime, Pos = center, Charge = charge, Zone = zone, Linked = {} }
-	ps.Chain = mark
+	if not ring.Shared then
+		ps.Chain = mark
+	end
 	if #partners > 0 then
 		local ids = {}
 		for _, qs in partners do
@@ -555,11 +603,14 @@ local function applyCatch(player: Player, ps: PState, d: Data, ring: Ring, k: nu
 		msg.Chain = ids
 	end
 
-	-- статистика и Молниедекс
+	-- статистика и Молниедекс. Общие кольца событий (шаровая) не открывают ячейки обычных цветов
+	-- и не идут в золотую статистику; радужная/чёрная открываются только так — их считаем всегда.
 	local color = ring.Color
+	local special = table.find(Config.NormalColors, color) == nil
+	local countsIndex = special or not ring.Shared
 	local bestBefore = d.Stats.BestCombo
 	local key = zone .. ":" .. color
-	local isNew = d.Index[key] ~= true
+	local isNew = countsIndex and d.Index[key] ~= true
 	DataService.update(player, function(data)
 		local s = data.Stats
 		s.Catches += 1
@@ -570,13 +621,17 @@ local function applyCatch(player: Player, ps: PState, d: Data, ring: Ring, k: nu
 			s.BestCombo = combo
 		end
 		if color == "gold" then
-			s.Golds += 1
+			if not ring.Shared then
+				s.Golds += 1
+			end
 		elseif color == "rainbow" then
 			s.Rainbows += 1
 		elseif color == "black" then
 			s.Blacks += 1
 		end
-		data.Index[key] = true
+		if countsIndex then
+			data.Index[key] = true
+		end
 	end)
 	if combo > bestBefore then
 		player:SetAttribute(Net.PlayerAttrs.BestCombo, combo)
@@ -600,6 +655,14 @@ local function applyCatch(player: Player, ps: PState, d: Data, ring: Ring, k: nu
 	end
 
 	msg.Grade = if burst then "burst" else grade
+	if burst then
+		-- соседи по острову видят, как банка разлетается
+		for _, other in Players:GetPlayers() do
+			if other ~= player and other:GetAttribute("Zone") == zone then
+				EffectRemote:FireClient(other, { Kind = "burst", UserId = player.UserId } :: Net.EffectMsg)
+			end
+		end
+	end
 	msg.Charge = added
 	msg.Lost = if lost > 0 then lost else nil
 	return info(ring, k, ps, grade, added, burst)
@@ -615,8 +678,10 @@ local function judgeTap(player: Player, ps: PState, d: Data, ring: Ring, k: numb
 		result = applyCatch(player, ps, d, ring, k, grade, center, msg)
 	else
 		setCombo(ps, 0)
-		-- током бьёт, только если молния попала в игрока (он в кольце, но не попал в окно)
-		if not outside and Config.Zones[ring.Zone].Penalties then
+		-- током бьёт, только если молния попала в игрока (он в кольце, но не попал в окно);
+		-- одно кольцо (двойное, вилка) оглушает не больше одного раза
+		if not outside and Config.Zones[ring.Zone].Penalties and not ring.Zapped[player] then
+			ring.Zapped[player] = true
 			PlayerService.zap(player, Economy.zapStun(d.Upgrades.Insulation))
 		end
 		result = info(ring, k, ps, grade, 0, false)
@@ -653,11 +718,14 @@ local function resolveMissed(player: Player, ring: Ring, k: number, center: Vect
 	if inside then
 		-- молния попала в игрока, который не нажал
 		setCombo(ps, 0)
-		if Config.Zones[ring.Zone].Penalties then
+		if Config.Zones[ring.Zone].Penalties and not ring.Zapped[player] then
 			grade = "zap"
+			ring.Zapped[player] = true
 			PlayerService.zap(player, Economy.zapStun(d.Upgrades.Insulation))
 		else
-			grade = "miss" -- на первом острове — только подсказка у клиента
+			-- на первом острове — только подсказка у клиента; второй удар того же кольца
+			-- по уже оглушённому — просто промах (он не мог убежать)
+			grade = "miss"
 		end
 	else
 		grade = "ground"
@@ -695,7 +763,7 @@ local function sampleHit(ring: Ring, k: number)
 	ring.Samples[k] = samples
 end
 
--- Через LatencyGrace после удара: всё, что не оценено нажатием, решается по позиции
+-- Через ring.Grace после удара: всё, что не оценено нажатием, решается по позиции
 local function resolveHit(ring: Ring, k: number)
 	if ring.Done then
 		return
@@ -731,7 +799,7 @@ local function scheduleHits(ring: Ring)
 	local t = now()
 	for k, hitTime in ring.Hits do
 		task.delay(math.max(0, hitTime - t), sampleHit, ring, k)
-		task.delay(math.max(0, hitTime + Config.Catch.LatencyGrace - t), resolveHit, ring, k)
+		task.delay(math.max(0, hitTime + ring.Grace - t), resolveHit, ring, k)
 	end
 end
 
@@ -813,6 +881,7 @@ local function spawnPersonal(ps: PState, d: Data, zone: number, root: BasePart, 
 		table.insert(hits, t + warning + offset)
 	end
 	local ring = newRing(player, zone, pos, to, radius, color, kind, tag, t, hits)
+	ring.Grace = resolveGrace(player, d)
 	ps.Rings[ring.Id] = ring
 	ps.Count += 1
 	if first then
@@ -896,17 +965,26 @@ local function onCatch(player: Player, strikeId: any, hit: any, tapTime: any)
 	if ring.Shared and PlayerService.getZone(player) ~= ring.Zone then
 		return
 	end
-	local k: number = hit
-	if k < 1 or k > #ring.Hits or isJudged(ring, player, k) then
-		return
-	end
-	local t = now()
-	if not ServerLogic.tapPlausible(tapTime, t, ring.Spawn, Config.Catch.MaxTapAge, Config.Catch.MaxCalibration) then
-		return
+	if hit < 1 or hit > #ring.Hits then
+		return -- номер удара от клиента — только проверка на мусор
 	end
 	local d = DataService.get(player)
 	local root = PlayerService.getRoot(player)
 	if not d or not root then
+		return
+	end
+	-- время нажатия: не старше 2 × пинг + запас и не «из будущего»; иначе нажатие просто не считается
+	-- (без оценки и без наказания, удар остаётся неоценённым)
+	local t = now()
+	local maxAge, maxAhead = tapLimits(player, d)
+	if not ServerLogic.tapPlausible(tapTime, t, ring.Spawn, maxAge, maxAhead) then
+		return
+	end
+	-- какой удар оценивать, решает сервер: ближайший по времени к нажатию из ещё не оценённых
+	local k = ServerLogic.nearestHit(ring.Hits, tapTime, function(i: number): boolean
+		return not isJudged(ring, player, i)
+	end, hit)
+	if not k then
 		return
 	end
 
@@ -1039,6 +1117,24 @@ local function clearShards(ps: PState)
 	ps.ShardCount = 0
 end
 
+-- Пришёл на остров, где сейчас общее кольцо события (радужная, шаровая): показать его,
+-- если до удара ещё успеваешь
+local function offerShared(ps: PState)
+	local player = ps.Player
+	local zone = PlayerService.getZone(player)
+	if zone < 1 then
+		return
+	end
+	local t = now()
+	for _, ring in sharedRings do
+		local fresh = not ring.Viewers[player] and ring.Judged[player] == nil -- уже ловил его — второй раз не показываем
+		if not ring.Done and ring.Zone == zone and fresh and ring.Hits[1] - t > Config.Server.SharedJoinMinLeft then
+			ring.Viewers[player] = true
+			StrikeSpawn:FireClient(player, toMsg(ring, nil, nil))
+		end
+	end
+end
+
 function StrikeService.start()
 	local map = Workspace:FindFirstChild("Map")
 	if map then
@@ -1082,6 +1178,7 @@ function StrikeService.start()
 			cancelRings(ps)
 			clearShards(ps)
 			ps.NextSpawn = now() + entryDelay(ps)
+			offerShared(ps)
 		end
 	end)
 	PlayerService.Died:Connect(function(player)
@@ -1097,6 +1194,7 @@ function StrikeService.start()
 		if ps then
 			cancelRings(ps)
 			ps.NextSpawn = now() + entryDelay(ps)
+			offerShared(ps)
 		end
 	end)
 	for _, player in Players:GetPlayers() do

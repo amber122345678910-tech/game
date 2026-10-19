@@ -2,10 +2,13 @@
 -- Обучение без стен текста: одна короткая подсказка за раз (не больше 6 слов), луч-стрелка в мире к цели
 -- и пульсирующая кнопка интерфейса. Ничего не блокирует: все элементы не перехватывают касания.
 -- Шаги (флаги data.Tutorial): catch -> sell -> shop -> zone2, а overcharge — когда впервые можно перегрузить банку.
+-- zone2: острова открываются в магазине (вкладка «Острова»), поэтому подсвечиваем кнопку магазина, а не барьер;
+-- шаг выполнен, когда остров 2 открыт.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
 local Workspace = game:GetService("Workspace")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
@@ -31,17 +34,17 @@ local HINT_W, HINT_H = 600, 66
 local TOP_OFFSET = 168 -- под верхней панелью HUD (точки макета 1280×720)
 local GRADE_PAUSE = 1.1 -- пока видна надпись оценки, подсказку прячем
 local OVERCHARGE_SHOW = 6
-local GATE_REACHED = 14 -- подошёл к барьеру — шаг «новый остров» выполнен
 local BEAM_MIN = 4 -- ближе луч не нужен
 local PULSE_COLOR = Theme.Volt
 
 local TEXT = {
 	ring = "Встань в светящийся круг",
 	tapTouch = "Жми ⚡, когда кольцо сомкнётся",
-	tapKeys = "Жми E, когда кольцо сомкнётся",
+	tapKeys = "Жми ⚡ или E, когда кольцо сомкнётся",
+	tapPad = "Жми R2, когда кольцо сомкнётся",
 	sell = "Сдай заряд на подстанции",
 	shop = "Купи улучшение",
-	zone2 = "Открой новый остров!",
+	zone2 = "Открой новый остров в магазине!",
 	overcharge = "Можно рискнуть: перегрузи банку!",
 }
 
@@ -99,14 +102,26 @@ local function anyWindowOpen(): boolean
 	return next(openWindows) ~= nil
 end
 
-local function marker(name: string): BasePart?
-	local map = Workspace:FindFirstChild("Map")
-	local mk = map and map:FindFirstChild("Markers")
-	local p = mk and mk:FindFirstChild(name)
-	if p and p:IsA("BasePart") then
-		return p
+-- Играет с геймпада? (PreferredInput — новое API, читаем в pcall; иначе — по последнему вводу)
+local hasPreferredInput = pcall(function()
+	return UserInputService.PreferredInput
+end)
+
+local function usesGamepad(): boolean
+	if hasPreferredInput then
+		return UserInputService.PreferredInput == Enum.PreferredInput.Gamepad
 	end
-	return nil
+	return string.sub(UserInputService:GetLastInputType().Name, 1, 7) == "Gamepad"
+end
+
+-- «Жми ⚡» на телефоне, «Жми ⚡ или E» на ПК, «Жми R2» на геймпаде
+local function tapText(): string
+	if UIKit.isTouch() then
+		return TEXT.tapTouch
+	elseif usesGamepad() then
+		return TEXT.tapPad
+	end
+	return TEXT.tapKeys
 end
 
 -- Ближайшая подстанция: метки SellPad_N, иначе геометрия Zones
@@ -134,15 +149,6 @@ local function nearestStation(pos: Vector3): Vector3?
 		return Zones.Geo[zone].SellPad
 	end
 	return Zones.HubCenter
-end
-
-local function gatePos(zone: number): Vector3?
-	local m = marker("Gate_" .. zone)
-	if m then
-		return m.Position
-	end
-	local g = Zones.Geo[zone]
-	return if g then g.Gate else nil
 end
 
 -- Кнопка интерфейса по имени (HUD создаёт их сам; ищем один раз и проверяем)
@@ -222,6 +228,11 @@ end
 ----------------------------------------------------------------------
 -- Выбор подсказки
 ----------------------------------------------------------------------
+-- Пора открывать остров 2: хватает Вольт, а остров ещё закрыт (и шаг «купи улучшение» уже пройден)
+local function wantsIslandsTab(d: any): boolean
+	return isDone("shop") and not isDone("zone2") and d.Zone == 1 and d.Volts >= Config.Zones[2].Cost
+end
+
 local function cheapestUpgrade(d: any): number
 	local best = math.huge
 	for _, id in Config.UpgradeOrder do
@@ -260,7 +271,7 @@ local function evaluate(clock: number): Hint?
 			return nil
 		end
 		if bestD <= best.Radius then
-			return { text = if UIKit.isTouch() then TEXT.tapTouch else TEXT.tapKeys, target = nil, button = "CatchButton" }
+			return { text = tapText(), target = nil, button = "CatchButton" }
 		end
 		return { text = TEXT.ring, target = best.Center, button = nil }
 	end
@@ -274,7 +285,9 @@ local function evaluate(clock: number): Hint?
 	end
 
 	-- 5. перегрузка (впервые банка полна там, где можно рисковать)
-	if not isDone("overcharge") and zone >= 1 and zone <= #Config.Zones and Config.Zones[zone].Overcharge and jarFill() >= 1 then
+	local dd = ClientState.get()
+	local droneOn = dd ~= nil and dd.Drone and dd.DroneOn
+	if not isDone("overcharge") and not droneOn and zone >= 1 and zone <= #Config.Zones and Config.Zones[zone].Overcharge and jarFill() >= 1 then
 		overchargeUntil = clock + OVERCHARGE_SHOW
 		complete("overcharge")
 	end
@@ -289,14 +302,9 @@ local function evaluate(clock: number): Hint?
 		end
 	end
 
-	-- 4. открыть второй остров
-	if not isDone("zone2") and d.Zone == 1 and d.Volts >= Config.Zones[2].Cost then
-		local gate = gatePos(2)
-		if gate and (gate - rootPos).Magnitude <= GATE_REACHED then
-			complete("zone2")
-			return nil
-		end
-		return { text = TEXT.zone2, target = gate, button = nil }
+	-- 4. открыть второй остров — в магазине (барьер на мосту только не пускает)
+	if wantsIslandsTab(d) then
+		return { text = TEXT.zone2, target = nil, button = "ShopButton" }
 	end
 	return nil
 end
@@ -649,6 +657,11 @@ function Tutorial.start()
 	ClientState.WindowOpened:Connect(function(name: string)
 		openWindows[name] = true
 		if name == "Shop" then
+			-- открыл магазин, когда пора открывать остров 2, — сразу на вкладку «Острова»
+			local d = ClientState.data
+			if d and wantsIslandsTab(d) then
+				ClientState.OpenWindow:Fire("Shop:islands")
+			end
 			complete("shop")
 		end
 	end)

@@ -8,6 +8,7 @@
 local roblox = require("@lune/roblox")
 local Bot = require("../lib/bot")
 local Services = require("../lib/services")
+local Classes = require("../lib/classes")
 
 local Vector2, Vector3, CFrame, Enum = roblox.Vector2, roblox.Vector3, roblox.CFrame, roblox.Enum
 
@@ -506,6 +507,21 @@ function Core.run(S, cfg)
 	b2:run(function()
 		b2:clientModule("Client.UI.UIKit").closeWindows()
 	end)
+	-- phone HUD (BotTwo, back to 844x390): the menu stays in the top third — the lower left is the thumbstick zone
+	runTo(at("devices", 234) + 1.8)
+	do
+		local HUD = b2:clientModule("Client.UI.HUD")
+		local shop = HUD and HUD.menuButton("ShopButton")
+		local shopD = shop and DATA[shop]
+		local menuD = shopD and shopD.parent and DATA[shopD.parent]
+		if menuD then
+			local pos, size = Classes.absPos(menuD, b2.realm), Classes.absSize(menuD, b2.realm)
+			local limit = b2.realm.viewport.Y / 3
+			check("phone HUD menu stays in the top third (thumbstick zone free)", pos.Y + size.Y <= limit + 1, string.format("menu bottom %.0f px, limit %.0f px", pos.Y + size.Y, limit))
+		else
+			check("phone HUD menu found", false, "no ShopButton parent")
+		end
+	end
 
 	----------------------------------------------------------------
 	-- Settings
@@ -666,6 +682,27 @@ function Core.run(S, cfg)
 		local sd = serverData(b2)
 		check("BotTwo bought the drone", sd ~= nil and sd.Drone == true and sd.DroneOn == true, sd and string.format("Drone=%s DroneOn=%s", tostring(sd.Drone), tostring(sd.DroneOn)) or "")
 		check("BotTwo teleported to island 3", b2:zone() == 3, "Zone attribute = " .. tostring(b2:zone()))
+		-- the drone takes a full jar away at once (the jar is empty during the trip) and sells it after TripTime;
+		-- the bot does not walk to the pad meanwhile (it would only go at 200%, which a drone jar never reaches)
+		local EconomyS = serverModule("EconomyService")
+		local DataS = serverModule("DataService")
+		b2.skill.overcharge = 2
+		local droneBefore = b2.metrics.effects.drone or 0
+		local voltsBefore = sd and sd.Volts or 0
+		local cap = 0
+		inServer(function()
+			cap = EconomyS.capacity(b2.pd.proxy)
+			DataS.update(b2.pd.proxy, function(d)
+				d.Charge = cap
+			end)
+		end)
+		runTo(Sched.now + 0.6)
+		local sd2 = serverData(b2)
+		check("Tesla drone takes a full jar away at once", sd2 ~= nil and sd2.Charge < cap, sd2 and string.format("Charge=%s cap=%s", tostring(sd2.Charge), tostring(cap)) or "")
+		runTo(Sched.now + Config.Drone.TripTime + 0.6)
+		local sd3 = serverData(b2)
+		local drones = (b2.metrics.effects.drone or 0) - droneBefore
+		check("Tesla drone sold the jar after its trip", drones >= 2 and sd3 ~= nil and sd3.Volts > voltsBefore, string.format("drone effects=%d Volts %s -> %s", drones, tostring(voltsBefore), tostring(sd3 and sd3.Volts)))
 		b2.skill.overcharge = 1.0
 		b2.allowBuy = true
 		local home = b2:homePos(3)

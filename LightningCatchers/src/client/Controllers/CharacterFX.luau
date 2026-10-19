@@ -42,6 +42,9 @@ local SEARCH_EVERY = 0.5 -- как часто искать банку и гро�
 local FAR_UPDATE = 120 -- дальше этого чужие персонажи обновляются редко
 local FAR_UPDATE_EVERY = 0.25
 local JAR_LIGHT_DISTANCE = 70 -- дальше этого свет чужой банки выключаем
+local JAR_LIGHTS_OTHERS = 2 -- свет чужих банок — только у стольких ближайших (лимит источников света)
+local JAR_LIGHT_MIN_FILL = 0.05 -- почти пустая чужая банка не светит
+local JAR_LIGHT_EVERY = 0.1 -- яркость и цвет света банки обновляем не чаще
 local TIP_FX_DISTANCE = 90
 local HIGHLIGHT_DISTANCE = 150
 local COMBO_FULL = Config.Catch.ComboCap -- при таком комбо громоотвод сияет на максимум
@@ -83,6 +86,7 @@ type Track = {
 	nextSearch: number,
 	nextUpdate: number,
 	nextCrackle: number,
+	nextLight: number,
 	lastClock: number,
 	conns: { RBXScriptConnection },
 }
@@ -154,6 +158,11 @@ end
 local function shakeOn(): boolean
 	local d = ClientState.data
 	return d ~= nil and d.Settings.Shake
+end
+
+local function softFlash(): boolean
+	local d = ClientState.data
+	return d == nil or d.Settings.SoftFlash
 end
 
 local function cameraPos(): Vector3
@@ -424,8 +433,14 @@ local function stopZap(t: Track)
 	end
 end
 
+-- Прогноз «Шарахнуло» у своего игрока (CatchController): показываем сразу, атрибут сервера потом только продлевает
+local predictedZapUntil = 0
+
 local function checkZap(t: Track)
 	local untilT = attrNumber(t.player, Net.PlayerAttrs.ZappedUntil)
+	if t.player == player then
+		untilT = math.max(untilT, predictedZapUntil)
+	end
 	local on = t.char ~= nil and untilT > ClientState.now()
 	if on and not t.zapping then
 		startZap(t)
@@ -434,7 +449,7 @@ local function checkZap(t: Track)
 	end
 end
 
-local function updateJar(t: Track, dt: number, clock: number, near: boolean)
+local function updateJar(t: Track, dt: number, clock: number, lightOn: boolean)
 	local core = t.core
 	local fill = t.fill
 	local weld = t.weld
@@ -485,15 +500,50 @@ local function updateJar(t: Track, dt: number, clock: number, near: boolean)
 	fill.Color = color
 	local light = t.jarLight
 	if light and light.Parent then
-		local on = near or t.player == player
-		if light.Enabled ~= on then
-			light.Enabled = on
+		if light.Enabled ~= lightOn then
+			light.Enabled = lightOn
+			t.nextLight = 0
 		end
-		if on then
+		-- свет меняем ~10 раз в секунду, а не каждый кадр (дорого на телефонах)
+		if lightOn and clock >= t.nextLight then
+			t.nextLight = clock + JAR_LIGHT_EVERY
 			light.Color = color
 			light.Brightness = 0.3 + 1.8 * math.min(f, 1) + 1.4 * pulse
 			light.Range = 5 + 5 * math.min(f, 1.5)
 		end
+	end
+end
+
+-- Чьи чужие банки светят: только JAR_LIGHTS_OTHERS ближайших к камере и не пустых (пересчёт раз в SEARCH_EVERY)
+local jarLightAllowed: { [Player]: boolean } = {}
+local nextJarLightPick = 0
+
+local function pickJarLights(clock: number)
+	if clock < nextJarLightPick then
+		return
+	end
+	nextJarLightPick = clock + SEARCH_EVERY
+	table.clear(jarLightAllowed)
+	local cam = cameraPos()
+	local picked: { Player } = {}
+	local dists: { [Player]: number } = {}
+	for p, t in tracks do
+		if p ~= player and t.jarLight and attrNumber(p, Net.PlayerAttrs.JarFill) >= JAR_LIGHT_MIN_FILL then
+			local root = rootOf(t.char)
+			if root then
+				local d = (root.Position - cam).Magnitude
+				if d <= JAR_LIGHT_DISTANCE then
+					dists[p] = d
+					table.insert(picked, p)
+				end
+			end
+		end
+	end
+	table.sort(picked, function(a: Player, b: Player): boolean
+		return dists[a] < dists[b]
+	end)
+	for i = 1, math.min(JAR_LIGHTS_OTHERS, #picked) do
+		jarLightAllowed[picked[i]] = true
 	end
 end
 
@@ -553,13 +603,14 @@ local function updateTrack(t: Track, clock: number)
 		end
 	end
 
-	updateJar(t, dt, clock, dist <= JAR_LIGHT_DISTANCE)
+	updateJar(t, dt, clock, isLocal or (dist <= JAR_LIGHT_DISTANCE and jarLightAllowed[t.player] == true))
 	updateTip(t, isLocal or dist <= TIP_FX_DISTANCE)
 	checkZap(t)
 	if t.zapping then
 		local h = t.highlight
 		if h and h.Enabled then
-			h.OutlineTransparency = math.random() * 0.6
+			-- контур искрит; с «мягкими вспышками» — плавно дрожит (~3 раза в секунду), без стробоскопа
+			h.OutlineTransparency = if softFlash() then 0.3 + 0.25 * math.sin(clock * 18) else math.random() * 0.6
 		end
 	end
 end
@@ -603,6 +654,7 @@ local function addPlayer(p: Player)
 		nextSearch = 0,
 		nextUpdate = 0,
 		nextCrackle = 0,
+		nextLight = 0,
 		lastClock = os.clock(),
 		conns = {},
 	}
@@ -959,8 +1011,9 @@ local function onEffect(msg: Net.EffectMsg)
 				end
 			end
 		end
-		for i = 1, #ids - 1 do
-			startArc(ids[i], ids[i + 1])
+		-- дуги от поймавшего (первый в списке) к каждому напарнику, а не между напарниками
+		for i = 2, #ids do
+			startArc(ids[1], ids[i])
 		end
 		if table.find(ids, player.UserId) then
 			Sounds.play("PerfectZap", 1.25, 0.8)
@@ -1007,6 +1060,25 @@ function CharacterFX.jarPosition(p: Player): Vector3?
 	return jarPosOf(p)
 end
 
+-- Прогноз «Шарахнуло» у своего игрока: сажа, искры, звук и тряска сразу, на duration секунд.
+-- Когда придёт ZappedUntil от сервера, эффект просто продолжится (без второго звука).
+function CharacterFX.predictZap(duration: number)
+	predictedZapUntil = ClientState.now() + math.max(0, duration)
+	local t = tracks[player]
+	if t then
+		checkZap(t)
+	end
+end
+
+-- Прогноз не подтвердился (сервер не шарахнул): убрать эффект, если сервер сам его не включил
+function CharacterFX.cancelPredictedZap()
+	predictedZapUntil = 0
+	local t = tracks[player]
+	if t then
+		checkZap(t)
+	end
+end
+
 ----------------------------------------------------------------------
 -- Запуск
 ----------------------------------------------------------------------
@@ -1029,6 +1101,7 @@ function CharacterFX.start()
 		local clock = os.clock()
 		local dt = math.clamp(clock - last, 0, 0.1)
 		last = clock
+		pickJarLights(clock)
 		for _, t in tracks do
 			updateTrack(t, clock)
 		end

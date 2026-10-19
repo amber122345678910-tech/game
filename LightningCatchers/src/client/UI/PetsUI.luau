@@ -505,7 +505,16 @@ local function buildMine(page: Frame)
 		if not kind then
 			return
 		end
-		win.confirm("Отпустить «" .. Pets.Kinds[kind].Name .. "»?\nЕго нельзя будет вернуть.", "Удалить", function()
+		-- кого именно отпускаем: редкость, бонус и надет ли он сейчас — чтобы не удалить лучшего по ошибке
+		local lines = {
+			string.format("Отпустить питомца «%s»?", Pets.Kinds[kind].Name),
+			rarityOf(kind).Name .. " · " .. Pets.bonusText(kind),
+		}
+		if isEquipped(d, id) then
+			table.insert(lines, "⚠ Он сейчас надет!")
+		end
+		table.insert(lines, "Вернуть его будет нельзя.")
+		win.confirm(table.concat(lines, "\n"), "Удалить", function()
 			busy = true
 			local ok = ClientState.request(Net.Actions.DeletePet, id)
 			busy = false
@@ -656,9 +665,12 @@ local function refreshCocoons(d: PlayerData.Data)
 			c.req.Text = "🔒 Нужен остров «" .. zoneName .. "»"
 			c.req.TextColor3 = Theme.Miss
 		end
+		-- как в Pets.roll: гарантирован кокон, на котором pity + 1 >= PityAt
 		local pity = d.Pity[c.id] or 0
 		local left = math.max(1, def.PityAt - pity)
-		c.pity.Text = "Легендарный гарантирован через " .. left
+		c.pity.Text = if left <= 1
+			then "Следующий кокон — точно легендарный!"
+			else string.format("Легендарный точно выпадет за %d %s", left, Format.plural(left, "кокон", "кокона", "коконов"))
 		local affordable = unlocked and d.Shards >= def.Cost and #d.Pets < Pets.MaxInventory
 		UIKit.setButtonColor(c.button, if affordable then Theme.Green else Theme.Gray)
 		if not c.model then
@@ -690,7 +702,6 @@ local hatchName: TextLabel
 local hatchRarity: TextLabel
 local hatchBonus: TextLabel
 local hatchHint: TextLabel
-local hatchFlash: Frame
 local hatchState = "idle" -- idle | wobble | reveal
 local hatchModel: Model? = nil
 local hatchConn: RBXScriptConnection? = nil
@@ -821,14 +832,6 @@ local function buildHatch()
 		Visible = false,
 		Parent = hatchContent,
 	})
-	hatchFlash = UIKit.new("Frame", {
-		Name = "Flash",
-		Size = UDim2.fromScale(1, 1),
-		BackgroundColor3 = WHITE,
-		BackgroundTransparency = 1,
-		ZIndex = 10,
-		Parent = hatchGui,
-	}) :: Frame
 
 	hatchBg.Activated:Connect(function()
 		if hatchState ~= "reveal" then
@@ -887,10 +890,12 @@ local function revealPet(kind: string)
 		hatchModel = model
 		center, dist = UIKit.frameModel(model, hatchCam.FieldOfView, 0.62)
 	end
-	-- вспышка и показ
-	hatchFlash.BackgroundColor3 = rar.Color:Lerp(WHITE, 0.6)
-	hatchFlash.BackgroundTransparency = 0
-	UIKit.tween(hatchFlash, 0.6, { BackgroundTransparency = 1 })
+	-- вспышка (через Juice: «Мягкие вспышки» её приглушают) и показ
+	if rar.Rank >= 3 then
+		Juice.flash(rar.Color:Lerp(WHITE, 0.35), 0.9)
+	else
+		Juice.flash(rar.Color:Lerp(WHITE, 0.6), 0.75)
+	end
 	setGlow(rar.Color, 1)
 	hatchRays.Visible = true
 	for _, ray in hatchRays:GetChildren() do
@@ -917,7 +922,6 @@ local function revealPet(kind: string)
 	end
 	if rar.Rank >= 3 then
 		Sounds.play("RareReveal")
-		Juice.flash(rar.Color, 0.45)
 	else
 		Sounds.play("Ding", 1.2)
 	end
@@ -1078,7 +1082,8 @@ hatchCocoon = function(id: string)
 end
 
 ----------------------------------------------------------------------
--- Вращение превью (только видимые карточки, ~30 раз в секунду)
+-- Вращение превью (~30 раз в секунду): крутятся только выбранная карточка и большое превью,
+-- остальные карточки стоят под своим углом — каждый сдвиг камеры перерисовывает ViewportFrame
 ----------------------------------------------------------------------
 local spinAccum = 0
 local spinClock = 0
@@ -1099,13 +1104,13 @@ local function spinStep(dt: number)
 	local tab = win.tab()
 	if tab == "mine" then
 		local builds = 0
-		for _, c in petCards do
+		for cid, c in petCards do
 			if isVisibleIn(c.button, grid) then
 				if not c.model and builds < MAX_BUILDS_PER_STEP then
 					builds += 1
 					ensureCardModel(c)
 				end
-				if c.model then
+				if c.model and cid == selectedId then
 					c.phase += step * SPIN_SPEED
 					UIKit.orbit(c.camera, c.center, c.dist, c.phase, 0.25)
 				end

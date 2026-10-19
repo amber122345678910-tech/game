@@ -341,20 +341,35 @@ local function deletePet(player: Player, payload: any): (boolean, any)
 	return true, id
 end
 
--- Лучшие питомцы: выше редкость; при равной — бонус Вольт первым; потом больше значение бонуса
+-- Самое большое значение бонуса каждого вида среди всех питомцев (чтобы сравнивать мс окна с долями)
+local KIND_MAX: { [string]: number } = {}
+for _, def in Pets.Kinds do
+	KIND_MAX[def.Bonus] = math.max(KIND_MAX[def.Bonus] or 0, def.Value)
+end
+
+-- Польза питомца: бонус Вольт множит весь доход — он всегда впереди и сравнивается по величине;
+-- остальные виды — по доле от лучшего питомца своего вида (0..1)
+local function petScore(kind: string): number
+	local def = Pets.Kinds[kind]
+	if not def then
+		return -1
+	end
+	if def.Bonus == "volts" then
+		return 10 + def.Value
+	end
+	local top = KIND_MAX[def.Bonus] or 0
+	return if top > 0 then def.Value / top else 0
+end
+
+-- Лучшие питомцы: больше польза (см. petScore); при равной — выше редкость, потом раньше получен
 local function better(a: PetRecord, b: PetRecord): boolean
+	local sa, sb = petScore(a.Kind), petScore(b.Kind)
+	if sa ~= sb then
+		return sa > sb
+	end
 	local ra, rb = rank(a.Kind), rank(b.Kind)
 	if ra ~= rb then
 		return ra > rb
-	end
-	local da, db = Pets.Kinds[a.Kind], Pets.Kinds[b.Kind]
-	local va = if da.Bonus == "volts" then 1 else 0
-	local vb = if db.Bonus == "volts" then 1 else 0
-	if va ~= vb then
-		return va > vb
-	end
-	if da.Value ~= db.Value then
-		return da.Value > db.Value
 	end
 	return a.Id < b.Id
 end

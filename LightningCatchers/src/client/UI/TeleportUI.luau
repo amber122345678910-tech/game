@@ -1,5 +1,7 @@
 --!strict
 -- Острова: быстрый перелёт в хаб и на открытые острова; закрытые показывают цену.
+-- Телепорт заряжается Config.Server.TeleportCooldown секунд (сервер проверяет сам) — кнопки показывают отсчёт;
+-- ShopUI летает через TeleportUI.request, чтобы пауза была общей.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
@@ -34,6 +36,27 @@ local win: UIKit.Window
 local voltsLabel: TextLabel
 local cards: { Card } = {}
 local busy = false
+local lastTeleport = -math.huge -- os.clock последнего удачного телепорта
+
+-- Сколько секунд ещё заряжается телепорт (у сервера пауза отсчитывается чуть раньше — не опережаем его)
+function TeleportUI.cooldownLeft(): number
+	return math.max(0, Config.Server.TeleportCooldown - (os.clock() - lastTeleport))
+end
+
+-- Запрос телепорта с общей паузой (TeleportUI и вкладка «Острова» в магазине). true — полетели
+function TeleportUI.request(z: number): boolean
+	local left = TeleportUI.cooldownLeft()
+	if left > 0 then
+		Sounds.play("Error")
+		ClientState.Toast:Fire(string.format("Телепорт заряжается: ещё %d с", math.ceil(left)), "info")
+		return false
+	end
+	local ok = ClientState.request(Net.Actions.Teleport, z)
+	if ok then
+		lastTeleport = os.clock()
+	end
+	return ok
+end
 
 local function zoneName(z: number): string
 	return if z == 0 then Config.Hub.Name else Config.Zones[z].Name
@@ -44,8 +67,12 @@ local function zoneAccent(z: number): Color3
 end
 
 local function teleport(z: number)
+	if TeleportUI.cooldownLeft() > 0 then
+		TeleportUI.request(z) -- покажет, сколько ждать
+		return
+	end
 	busy = true
-	local ok = ClientState.request(Net.Actions.Teleport, z)
+	local ok = TeleportUI.request(z)
 	busy = false
 	if ok then
 		Juice.flash(Theme.Electric, 0.35)
@@ -184,8 +211,14 @@ local function refreshCard(c: Card, d: PlayerData.Data, here: number)
 	elseif open then
 		c.status.Text = if z == 0 then "Магазин, питомцы, награды" else "✔ Открыт"
 		c.status.TextColor3 = if z == 0 then Theme.TextDim else Theme.Green
-		UIKit.setButtonText(c.button, "🌀 Лететь")
-		UIKit.setButtonColor(c.button, Theme.Electric, Theme.ElectricDark)
+		local cooldown = TeleportUI.cooldownLeft()
+		if cooldown > 0 then
+			UIKit.setButtonText(c.button, string.format("⏳ %d с", math.ceil(cooldown)))
+			UIKit.setButtonColor(c.button, Theme.GrayDark)
+		else
+			UIKit.setButtonText(c.button, "🌀 Лететь")
+			UIKit.setButtonColor(c.button, Theme.Electric, Theme.ElectricDark)
+		end
 	elseif z == d.Zone + 1 then
 		local cost = Economy.zoneCost(z)
 		c.status.Text = "Цена: ⚡ " .. Format.short(cost)
@@ -248,6 +281,18 @@ function TeleportUI.start()
 	ClientState.Changed:Connect(refresh)
 	ClientState.ZoneChanged:Connect(function()
 		refresh()
+	end)
+	-- отсчёт паузы телепорта на кнопках (и последнее обновление, когда пауза кончилась)
+	task.spawn(function()
+		local wasCooling = false
+		while win.Gui.Parent do
+			local cooling = TeleportUI.cooldownLeft() > 0
+			if win.isOpen() and (cooling or wasCooling) then
+				refresh()
+			end
+			wasCooling = cooling
+			task.wait(0.5)
+		end
 	end)
 	ClientState.OpenWindow:Connect(function(name: string)
 		local base = UIKit.parseWindowName(name)

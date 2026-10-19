@@ -1,12 +1,14 @@
 --!strict
 -- HUD: Вольты и осколки, банка с перегрузкой и риском, кнопка ⚡ ЛОВИ с комбо, надписи оценки,
--- меню слева (выше джойстика), таймер события, шкала Электрограда и множитель справа сверху.
+-- меню слева (на сенсорных экранах — только в верхней трети, выше зоны джойстика; что не влезло — в «Ещё»),
+-- таймер события, шкала Электрограда и множитель справа сверху.
 -- Сначала телефон: на телефоне всё компактнее, кнопка ЛОВИ левее кнопки прыжка.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
+local UserInputService = game:GetService("UserInputService")
 local Workspace = game:GetService("Workspace")
 local GuiService = game:GetService("GuiService")
 
@@ -41,6 +43,8 @@ local RIGHT_W = 300
 local CATCH_PX_PHONE = 100 -- реальный размер кнопки ЛОВИ на экране
 local CATCH_PX_PC = 120
 local MENU_GAP = 10
+local MENU_MIN_TILE = 48 -- сенсорный экран: плитка меню не мельче (реальные точки), иначе часть уходит в «Ещё»
+local MORE_AUTO_CLOSE = 6 -- раскрытое «Ещё» само закрывается через столько секунд
 
 local MENU = {
 	{ Name = "ShopButton", Window = "Shop", Icon = "🛒", Text = "Магазин", Color = Theme.Green },
@@ -76,6 +80,13 @@ local rightInnerScale: UIScale
 local menuRoot: Frame
 local menuScale: UIScale
 local menuGrid: UIGridLayout
+-- «Ещё»: на маленьком сенсорном экране не все кнопки помещаются в верхнюю треть — лишние в выпадающем блоке
+local moreRoot: Frame
+local moreGrid: UIGridLayout
+local morePad = 6
+local moreOpen = false
+local moreToken = 0
+local hiddenTiles: { string } = {} -- имена плиток, которые сейчас в «Ещё»
 local catchRoot: Frame
 local catchScale: UIScale
 local gradeRoot: Frame
@@ -131,6 +142,7 @@ local voltsPill: Frame
 
 type Tile = { button: TextButton, badge: Frame, glow: Frame, glowTween: Tween?, scale: UIScale }
 local tiles: { [string]: Tile } = {}
+local moreTile: Tile
 
 ----------------------------------------------------------------------
 -- Помощники
@@ -387,10 +399,12 @@ local function updateJar()
 	local cap = ClientState.capacity()
 	local zone = ClientState.zone()
 	local zdef = Config.Zones[zone]
-	local overAllowed = zdef ~= nil and zdef.Overcharge
+	local d = ClientState.get()
+	-- с включённым Тесла-дроном банка не перегружается: дрон забирает её на 100%
+	local droneOn = d ~= nil and d.Drone and d.DroneOn
+	local overAllowed = zdef ~= nil and zdef.Overcharge and not droneOn
 	local overMode = overAllowed or fill > 1.001
 	local normalFrac = if overMode then 1 / Config.Overcharge.MaxFill else 1
-	local d = ClientState.get()
 	-- атрибут JarFill приходит сразу после поимки; точное число берём из данных, если они свежие
 	local charge = fill * cap
 	if d and math.abs(d.Charge / math.max(1, cap) - fill) < 0.02 then
@@ -647,7 +661,7 @@ local function updateRight()
 	multPill.Visible = m > 1.001
 	multLabel.Text = "⚡ " .. multText(m)
 	local untilT = if d then d.Boosts.Volts2x else 0
-	local left = untilT - os.time()
+	local left = untilT - now -- буст хранит серверный os.time()
 	if left > 0 then
 		boostPill.Visible = true
 		boostLabel.Text = "×2 ⚡ " .. Format.time(left)
@@ -657,8 +671,143 @@ local function updateRight()
 end
 
 ----------------------------------------------------------------------
--- Меню слева (выше зоны джойстика)
+-- Меню: на ПК — два столбца по центру слева; на сенсорном экране — только верхняя треть
+-- (левые 40% нижних 2/3 — зона джойстика): что не поместилось крупно, прячется в «Ещё»
 ----------------------------------------------------------------------
+local function setGlow(tile: Tile, on: boolean)
+	if on and not tile.glowTween then
+		tile.glow.Visible = true
+		tile.glow.BackgroundTransparency = 0.75
+		tile.glowTween = loopTween(tile.glow, 0.6, { BackgroundTransparency = 0.25 })
+	elseif not on and tile.glowTween then
+		tile.glowTween:Cancel()
+		tile.glowTween = nil
+		tile.glow.Visible = false
+	end
+end
+
+local function makeTile(name: string, icon: string, text: string, color: Color3, order: number, onClick: () -> ()): (Tile, TextLabel)
+	local button = UIKit.new("TextButton", {
+		Name = name,
+		BackgroundColor3 = color:Lerp(BLACK, 0.45),
+		AutoButtonColor = false,
+		Text = "",
+		LayoutOrder = order,
+		Active = true,
+		Parent = menuRoot,
+	}) :: TextButton
+	UIKit.round(button)
+	UIKit.stroke(button, 3, Theme.Stroke)
+	local scale = UIKit.new("UIScale", { Scale = 1, Parent = button }) :: UIScale
+	local glow = UIKit.new("Frame", {
+		Name = "Glow",
+		Size = UDim2.fromScale(1.3, 1.3),
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Position = UDim2.fromScale(0.5, 0.5),
+		BackgroundColor3 = Theme.Volt,
+		BackgroundTransparency = 0.5,
+		Visible = false,
+		ZIndex = 0,
+		Parent = button,
+	}) :: Frame
+	UIKit.round(glow)
+	local face = UIKit.new("Frame", {
+		Name = "Face",
+		Size = UDim2.fromScale(1, 0.93),
+		BackgroundColor3 = WHITE,
+		ZIndex = 1,
+		Parent = button,
+	}) :: Frame
+	UIKit.round(face)
+	UIKit.gradient(face, color:Lerp(WHITE, 0.25), color:Lerp(BLACK, 0.12))
+	local shine = UIKit.new("Frame", {
+		Name = "Shine",
+		Size = UDim2.fromScale(0.7, 0.32),
+		AnchorPoint = Vector2.new(0.5, 0),
+		Position = UDim2.fromScale(0.5, 0.06),
+		BackgroundColor3 = WHITE,
+		BackgroundTransparency = 0.78,
+		ZIndex = 1,
+		Parent = face,
+	})
+	UIKit.round(shine)
+	local iconLabel = UIKit.label({
+		Name = "Icon",
+		Text = icon,
+		Size = UDim2.fromScale(0.56, 0.5),
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Position = UDim2.fromScale(0.5, 0.38),
+		MaxTextSize = 60,
+		NoStroke = true,
+		ZIndex = 2,
+		Parent = face,
+	})
+	UIKit.label({
+		Name = "Label",
+		Text = text,
+		Size = UDim2.fromScale(1.12, 0.3),
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Position = UDim2.fromScale(0.5, 0.82),
+		MaxTextSize = 40,
+		ZIndex = 3,
+		Parent = face,
+	})
+	local badge = UIKit.badge(button, "!", 28)
+	badge.Size = UDim2.fromScale(0.34, 0.34)
+	badge.Position = UDim2.fromScale(0.88, 0.12)
+
+	button.MouseButton1Down:Connect(function()
+		UIKit.tween(scale, 0.07, { Scale = 0.9 })
+	end)
+	button.MouseLeave:Connect(function()
+		UIKit.tween(scale, 0.12, { Scale = 1 })
+	end)
+	button.MouseButton1Up:Connect(function()
+		UIKit.tween(scale, 0.22, { Scale = 1 }, Enum.EasingStyle.Back)
+	end)
+	button.Activated:Connect(function()
+		UIKit.playClick()
+		UIKit.tween(scale, 0.22, { Scale = 1 }, Enum.EasingStyle.Back)
+		onClick()
+	end)
+	return { button = button, badge = badge, glow = glow, glowTween = nil, scale = scale }, iconLabel
+end
+
+local moreIcon: TextLabel
+
+-- Значок и свечение «Ещё» повторяют спрятанные кнопки (например, «!» у наград)
+local function refreshMore()
+	if not moreTile then
+		return
+	end
+	local badge, glow = false, false
+	for _, name in hiddenTiles do
+		local t = tiles[name]
+		if t then
+			badge = badge or t.badge.Visible
+			glow = glow or t.glowTween ~= nil
+		end
+	end
+	moreTile.badge.Visible = badge and not moreOpen
+	setGlow(moreTile, glow and not moreOpen)
+end
+
+local function setMoreOpen(open: boolean)
+	moreToken += 1
+	moreOpen = open and #hiddenTiles > 0
+	moreRoot.Visible = moreOpen
+	moreIcon.Text = if moreOpen then "➖" else "➕"
+	refreshMore()
+	if moreOpen then
+		local token = moreToken
+		task.delay(MORE_AUTO_CLOSE, function()
+			if token == moreToken and moreOpen then
+				setMoreOpen(false)
+			end
+		end)
+	end
+end
+
 local function buildMenu()
 	menuRoot = UIKit.new("Frame", {
 		Name = "Menu",
@@ -672,108 +821,42 @@ local function buildMenu()
 	menuGrid.FillDirection = Enum.FillDirection.Horizontal
 
 	for i, m in MENU do
-		local button = UIKit.new("TextButton", {
-			Name = m.Name,
-			BackgroundColor3 = m.Color:Lerp(BLACK, 0.45),
-			AutoButtonColor = false,
-			Text = "",
-			LayoutOrder = i,
-			Active = true,
-			Parent = menuRoot,
-		}) :: TextButton
-		UIKit.round(button)
-		UIKit.stroke(button, 3, Theme.Stroke)
-		local scale = UIKit.new("UIScale", { Scale = 1, Parent = button }) :: UIScale
-		local glow = UIKit.new("Frame", {
-			Name = "Glow",
-			Size = UDim2.fromScale(1.3, 1.3),
-			AnchorPoint = Vector2.new(0.5, 0.5),
-			Position = UDim2.fromScale(0.5, 0.5),
-			BackgroundColor3 = Theme.Volt,
-			BackgroundTransparency = 0.5,
-			Visible = false,
-			ZIndex = 0,
-			Parent = button,
-		}) :: Frame
-		UIKit.round(glow)
-		local face = UIKit.new("Frame", {
-			Name = "Face",
-			Size = UDim2.fromScale(1, 0.93),
-			BackgroundColor3 = WHITE,
-			ZIndex = 1,
-			Parent = button,
-		}) :: Frame
-		UIKit.round(face)
-		UIKit.gradient(face, m.Color:Lerp(WHITE, 0.25), m.Color:Lerp(BLACK, 0.12))
-		local shine = UIKit.new("Frame", {
-			Name = "Shine",
-			Size = UDim2.fromScale(0.7, 0.32),
-			AnchorPoint = Vector2.new(0.5, 0),
-			Position = UDim2.fromScale(0.5, 0.06),
-			BackgroundColor3 = WHITE,
-			BackgroundTransparency = 0.78,
-			ZIndex = 1,
-			Parent = face,
-		})
-		UIKit.round(shine)
-		UIKit.label({
-			Name = "Icon",
-			Text = m.Icon,
-			Size = UDim2.fromScale(0.56, 0.5),
-			AnchorPoint = Vector2.new(0.5, 0.5),
-			Position = UDim2.fromScale(0.5, 0.38),
-			MaxTextSize = 60,
-			NoStroke = true,
-			ZIndex = 2,
-			Parent = face,
-		})
-		UIKit.label({
-			Name = "Label",
-			Text = m.Text,
-			Size = UDim2.fromScale(1.12, 0.3),
-			AnchorPoint = Vector2.new(0.5, 0.5),
-			Position = UDim2.fromScale(0.5, 0.82),
-			MaxTextSize = 40,
-			ZIndex = 3,
-			Parent = face,
-		})
-		local badge = UIKit.badge(button, "!", 28)
-		badge.Size = UDim2.fromScale(0.34, 0.34)
-		badge.Position = UDim2.fromScale(0.88, 0.12)
-
-		button.MouseButton1Down:Connect(function()
-			UIKit.tween(scale, 0.07, { Scale = 0.9 })
-		end)
-		button.MouseLeave:Connect(function()
-			UIKit.tween(scale, 0.12, { Scale = 1 })
-		end)
-		button.MouseButton1Up:Connect(function()
-			UIKit.tween(scale, 0.22, { Scale = 1 }, Enum.EasingStyle.Back)
-		end)
-		button.Activated:Connect(function()
-			UIKit.playClick()
-			UIKit.tween(scale, 0.22, { Scale = 1 }, Enum.EasingStyle.Back)
+		tiles[m.Name] = makeTile(m.Name, m.Icon, m.Text, m.Color, i, function()
+			if moreOpen then
+				setMoreOpen(false)
+			end
 			ClientState.OpenWindow:Fire(m.Window)
 		end)
-		tiles[m.Name] = { button = button, badge = badge, glow = glow, glowTween = nil, scale = scale }
 	end
-end
 
-local function setGlow(tile: Tile, on: boolean)
-	if on and not tile.glowTween then
-		tile.glow.Visible = true
-		tile.glow.BackgroundTransparency = 0.75
-		tile.glowTween = loopTween(tile.glow, 0.6, { BackgroundTransparency = 0.25 })
-	elseif not on and tile.glowTween then
-		tile.glowTween:Cancel()
-		tile.glowTween = nil
-		tile.glow.Visible = false
-	end
+	-- «Ещё» — последняя плитка ряда; раскрывает блок со спрятанными кнопками прямо под собой
+	local more, icon = makeTile("MoreButton", "➕", "Ещё", Theme.ElectricDark, #MENU + 1, function()
+		setMoreOpen(not moreOpen)
+	end)
+	more.button.Visible = false
+	moreTile, moreIcon = more, icon
+	moreRoot = UIKit.new("Frame", {
+		Name = "MenuMore",
+		Size = UDim2.fromOffset(100, 100),
+		BackgroundColor3 = Theme.PanelDark,
+		BackgroundTransparency = 0.2,
+		Visible = false,
+		ZIndex = 4,
+		Parent = gui,
+	}) :: Frame
+	UIKit.corner(moreRoot, Theme.CornerSmall)
+	UIKit.stroke(moreRoot, 3, Theme.Stroke)
+	UIKit.autoScale(moreRoot, "hud", 1280, 720)
+	UIKit.padding(moreRoot, morePad)
+	moreGrid = UIKit.grid(moreRoot, Vector2.new(84, 84), MENU_GAP)
+	moreGrid.HorizontalAlignment = Enum.HorizontalAlignment.Left
+	moreGrid.FillDirection = Enum.FillDirection.Horizontal
 end
 
 -- Значки "!" на кнопках меню: можно забрать награду, купить улучшение, надеть питомца...
 local function updateBadges(d: PlayerData.Data)
-	local today = Quests.dayNumber(os.time())
+	-- день считаем по серверному времени (как DailyService), а не по часам устройства
+	local today = Quests.dayNumber(math.floor(ClientState.now()))
 	local dailyReady = today > d.Daily.LastDay
 	if not dailyReady then
 		for _, q in d.Quests.List do
@@ -822,6 +905,7 @@ local function updateBadges(d: PlayerData.Data)
 	tiles.PetsButton.badge.Visible = petsReady
 
 	tiles.CollectionButton.badge.Visible = #d.EquippedFulgs < math.min(Fulgurite.MaxEquipped, #d.Fulgs)
+	refreshMore()
 end
 
 ----------------------------------------------------------------------
@@ -1092,6 +1176,39 @@ end
 ----------------------------------------------------------------------
 -- Раскладка под экран (телефон / планшет / ПК)
 ----------------------------------------------------------------------
+-- Самая крупная квадратная плитка для count кнопок в полосе availW × availH (реальные точки): (столбцы, ряды, плитка)
+local function fitMenu(count: number, availW: number, availH: number, gap: number, maxTile: number): (number, number, number)
+	local bestCols, bestRows, bestTile = count, 1, -math.huge
+	for r = 1, count do
+		local cols = math.ceil(count / r)
+		local rows = math.ceil(count / cols)
+		local tile = math.min((availW - (cols - 1) * gap) / cols, (availH - (rows - 1) * gap) / rows, maxTile)
+		if tile > bestTile + 0.5 then
+			bestCols, bestRows, bestTile = cols, rows, tile
+		end
+	end
+	return bestCols, bestRows, bestTile
+end
+
+-- Первые shown кнопок — в меню, остальные — в блок «Ещё»
+local function applyMenuSplit(shown: number)
+	table.clear(hiddenTiles)
+	for i, m in MENU do
+		local t = tiles[m.Name]
+		if i <= shown then
+			t.button.Parent = menuRoot
+		else
+			t.button.Parent = moreRoot
+			table.insert(hiddenTiles, m.Name)
+		end
+	end
+	moreTile.button.Visible = #hiddenTiles > 0
+	if moreOpen and #hiddenTiles == 0 then
+		setMoreOpen(false)
+	end
+	refreshMore()
+end
+
 local function layout()
 	local phone = UIKit.isPhone()
 	local touch = UIKit.isTouch()
@@ -1121,37 +1238,69 @@ local function layout()
 	comboLabel.Size = UDim2.fromOffset(btn + 2 * spare, comboH)
 	comboLabel.Position = UDim2.new(1, -math.floor(btn / 2), 1, -(btn + math.floor(8 / sCatch)))
 
-	-- меню: на сенсорных экранах — сетка сразу под верхней панелью и не ниже 55% экрана
-	-- (ниже — зона джойстика), на ПК — два столбца по центру слева
+	-- правый блок: на телефоне крупнее; на портретном экране уходит под верхний блок
+	local portrait = vp.X < vp.Y
+	rightInnerScale.Scale = if phone then 1.22 else 1
+	if portrait then
+		rightRoot.Position = UDim2.new(1, -8, 0, math.floor((PILL_H + JAR_H + STATUS_H + 30) * baseScale(topScale)))
+	else
+		rightRoot.Position = UDim2.new(1, -8, 0, 6)
+	end
+
+	-- меню: на сенсорных экранах — ряд(ы) сразу под верхней панелью и только в верхней трети экрана
+	-- (левые 40% нижних 2/3 — зона джойстика); что не помещается крупно — в «Ещё». На ПК — два столбца слева
 	if touch then
-		-- сколько столбцов: самая крупная кнопка, которая помещается и по ширине (левее верхнего блока),
-		-- и по высоте (полоса до 55% экрана)
+		local guiW = if gui.AbsoluteSize.X > 0 then gui.AbsoluteSize.X else vp.X
+		local guiH = if gui.AbsoluteSize.Y > 0 then gui.AbsoluteSize.Y else vp.Y - inset
 		local top = 6
 		local gapReal = if phone then 8 else 10
 		local maxTile = if phone then 64 else 80
-		local availW = (vp.X - TOP_W * baseScale(topScale)) / 2 - 20
-		local availH = vp.Y * 0.55 - inset - top
-		local bestCols, bestTile = 4, 0
-		for cols = 4, 2, -1 do
-			local rows = math.ceil(#MENU / cols)
-			local tile = math.min((availW - (cols - 1) * gapReal) / cols, (availH - (rows - 1) * gapReal) / rows, maxTile)
-			if tile > bestTile + 0.5 then
-				bestCols, bestTile = cols, tile
+		local topW = TOP_W * baseScale(topScale)
+		local rightW = if portrait then 0 else RIGHT_W * baseScale(topScale) * rightInnerScale.Scale + 8
+		-- ширина: левее верхнего блока (по центру или, если тесно, сдвинутого вплотную к правому блоку)
+		local availW = math.max((guiW - topW) / 2 - 20, guiW - rightW - topW - 30)
+		-- высота: до верхней трети экрана
+		local availH = vp.Y / 3 - inset - top
+		local shown = #MENU
+		local cols, rows, tile = fitMenu(#MENU, availW, availH, gapReal, maxTile)
+		if tile < MENU_MIN_TILE then
+			-- все не помещаются: последние кнопки уходят в «Ещё» (оно само — ещё одна плитка)
+			for n = #MENU - 1, 1, -1 do
+				shown = n
+				cols, rows, tile = fitMenu(n + 1, availW, availH, gapReal, maxTile)
+				if tile >= MENU_MIN_TILE then
+					break
+				end
 			end
 		end
-		local tile = math.max(52, math.floor(bestTile))
-		local rows = math.ceil(#MENU / bestCols)
+		tile = math.max(1, math.floor(tile))
+		applyMenuSplit(shown)
 		local gap = math.floor(gapReal / sMenu)
 		local t = math.floor(tile / sMenu)
 		menuGrid.CellSize = UDim2.fromOffset(t, t)
 		menuGrid.CellPadding = UDim2.fromOffset(gap, gap)
-		menuRoot.Size = UDim2.fromOffset(bestCols * t + (bestCols - 1) * gap, rows * t + (rows - 1) * gap)
+		menuRoot.Size = UDim2.fromOffset(cols * t + (cols - 1) * gap, rows * t + (rows - 1) * gap)
 		menuRoot.AnchorPoint = Vector2.new(0, 0)
 		menuRoot.Position = UDim2.new(0, 10, 0, top)
+		-- блок «Ещё» — под своей плиткой: столбцом, а если не влезает по высоте — в несколько
+		local hidden = #MENU - shown
+		if hidden > 0 then
+			local x = 10 + (shown % cols) * (tile + gapReal)
+			local y = top + (shown // cols + 1) * (tile + gapReal)
+			local pad = morePad * sMenu
+			local fitRows = math.max(1, math.floor((guiH - y - 2 * pad - 6 + gapReal) / (tile + gapReal)))
+			local mCols = math.ceil(hidden / fitRows)
+			local mRows = math.ceil(hidden / mCols)
+			local w = mCols * t + (mCols - 1) * gap + 2 * morePad
+			local h = mRows * t + (mRows - 1) * gap + 2 * morePad
+			moreGrid.CellSize = UDim2.fromOffset(t, t)
+			moreGrid.CellPadding = UDim2.fromOffset(gap, gap)
+			moreRoot.Size = UDim2.fromOffset(w, h)
+			moreRoot.Position = UDim2.fromOffset(math.max(4, math.min(x - pad, guiW - w * sMenu - 6)), y)
+		end
 		-- узкий экран: верхний блок сдвигается правее меню, чтобы не наезжать на кнопки
-		local menuRight = 10 + bestCols * tile + (bestCols - 1) * gapReal + 10
-		local topW = TOP_W * baseScale(topScale)
-		if vp.X / 2 - topW / 2 < menuRight then
+		local menuRight = 10 + cols * tile + (cols - 1) * gapReal + 10
+		if guiW / 2 - topW / 2 < menuRight then
 			topRoot.AnchorPoint = Vector2.new(0, 0)
 			topRoot.Position = UDim2.new(0, menuRight, 0, 6)
 		else
@@ -1159,6 +1308,7 @@ local function layout()
 			topRoot.Position = UDim2.new(0.5, 0, 0, 6)
 		end
 	else
+		applyMenuSplit(#MENU)
 		topRoot.AnchorPoint = Vector2.new(0.5, 0)
 		topRoot.Position = UDim2.new(0.5, 0, 0, 6)
 		local t = 84
@@ -1171,14 +1321,6 @@ local function layout()
 
 	-- оценка — над персонажем; на телефоне ниже, чтобы не спорить с тостами
 	gradeRoot.Position = UDim2.fromScale(0.5, if phone then 0.47 else 0.31)
-
-	-- правый блок: на телефоне крупнее; на портретном экране уходит под верхний блок
-	rightInnerScale.Scale = if phone then 1.22 else 1
-	if vp.X < vp.Y then
-		rightRoot.Position = UDim2.new(1, -8, 0, math.floor((PILL_H + JAR_H + STATUS_H + 30) * baseScale(topScale)))
-	else
-		rightRoot.Position = UDim2.new(1, -8, 0, 6)
-	end
 end
 
 ----------------------------------------------------------------------
@@ -1225,10 +1367,49 @@ function HUD.start()
 	buildGrade()
 	layout()
 
-	-- пересчитать раскладку, когда меняется экран или тип ввода
-	catchScale:GetPropertyChangedSignal("Scale"):Connect(layout)
-	UIKit.onInputTypeChanged(function()
-		task.defer(layout)
+	-- пересчитать раскладку, когда меняется экран (размер, поворот, вырезы и верхняя панель) или тип ввода;
+	-- в следующем кадре и один раз на пачку изменений — после того, как UIKit пересчитал масштабы
+	local layoutQueued = false
+	local function queueLayout()
+		if layoutQueued then
+			return
+		end
+		layoutQueued = true
+		task.defer(function()
+			layoutQueued = false
+			layout()
+		end)
+	end
+	catchScale:GetPropertyChangedSignal("Scale"):Connect(queueLayout)
+	gui:GetPropertyChangedSignal("AbsoluteSize"):Connect(queueLayout)
+	GuiService:GetPropertyChangedSignal("TopbarInset"):Connect(queueLayout)
+	local cameraConn: RBXScriptConnection? = nil
+	local function bindCamera()
+		local old = cameraConn
+		if old then
+			old:Disconnect()
+		end
+		local camera = Workspace.CurrentCamera
+		cameraConn = if camera then camera:GetPropertyChangedSignal("ViewportSize"):Connect(queueLayout) else nil
+		queueLayout()
+	end
+	Workspace:GetPropertyChangedSignal("CurrentCamera"):Connect(bindCamera)
+	bindCamera()
+	UIKit.onInputTypeChanged(queueLayout)
+
+	-- раскрытое «Ещё» закрывается касанием мимо интерфейса и при открытии любого окна
+	UserInputService.InputBegan:Connect(function(input: InputObject, processed: boolean)
+		if moreOpen and not processed then
+			local t = input.UserInputType
+			if t == Enum.UserInputType.Touch or t == Enum.UserInputType.MouseButton1 then
+				setMoreOpen(false)
+			end
+		end
+	end)
+	ClientState.OpenWindow:Connect(function(_name: string)
+		if moreOpen then
+			setMoreOpen(false)
+		end
 	end)
 
 	onZone(ClientState.zone())
@@ -1252,17 +1433,21 @@ function HUD.start()
 			showGrade("ХОРОШО", Theme.Good, 0.9, false)
 		elseif grade == "miss" then
 			showGrade("МИМО", Theme.Miss, 0.8, false)
+		elseif grade == "zap" then
+			-- прогноз CatchController: стоял в кольце и не нажал
+			showGrade("ШАРАХНУЛО!", Theme.Zap, 1.1, true)
 		end
 	end)
 	ClientState.StrikeResolved:Connect(function(msg: Net.StrikeResultMsg)
 		if msg.Grade == "zap" then
-			showGrade("ШАРАХНУЛО!", Theme.Zap, 1.1, true)
+			-- уже показано прогнозом клиента — ответ сервера только подтверждает
+			if ClientState.predictedGrade(msg.Id, msg.Hit) ~= "zap" then
+				showGrade("ШАРАХНУЛО!", Theme.Zap, 1.1, true)
+			end
 		elseif msg.Grade == "burst" then
 			showGrade("БАНКА ЛОПНУЛА!", Theme.Red, 1.0, true)
 		end
-		if msg.NewIndex then
-			ClientState.Toast:Fire("Новая молния в Молниедексе!", "rare")
-		end
+		-- новая ячейка Молниедекса: тост с цветом и островом присылает сервер (Notify), свой не дублируем
 	end)
 
 	-- киоски в хабе (ProximityPrompt на сервере) открывают окна через Effect

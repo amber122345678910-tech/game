@@ -2,8 +2,10 @@
 -- События сервера по расписанию от серверного времени (workspace:GetServerTimeNow()):
 --  * Суперячейка — каждые Period с от старта сервера + Offset, Duration с: удары чаще и дороже, больше золотых
 --    (модификаторы StrikeService.setModifiers);
---  * Шаровая молния — плывёт над островом, где больше всего игроков, и роняет общие кольца каждые HitInterval;
---    каждая поимка (ИДЕАЛЬНО/ХОРОШО) отнимает 1 HP; HP = игроки × HpPerPlayer; награда — по вкладу;
+--  * Шаровая молния — плывёт над островом, где больше всего игроков, и роняет общие кольца каждые HitInterval
+--    (цвет — как у обычных колец острова, но не ниже фиолетового); каждая поимка (ИДЕАЛЬНО/ХОРОШО) отнимает 1 HP;
+--    HP = игроки × HpPerPlayer (ушли игроки — HP не больше, чем на оставшихся); награда — по вкладу;
+--    на острове никого EmptyLeave с — шар улетает;
 --  * Радужная молния — объявление за Announce с (Effect rainbowWarn), потом огромное общее кольцо;
 --    награду получает каждый поймавший (доход за RewardMinutes + гарантированный радужный фульгурит);
 --  * Чёрная молния Перуна — StrikeService.onPerun: баннер и Effect perun всем; когда её ловят — «Я видел!»
@@ -21,6 +23,7 @@ local Economy = require(Shared:WaitForChild("Economy"))
 local Format = require(Shared:WaitForChild("Format"))
 local Net = require(Shared:WaitForChild("Net"))
 local Signal = require(Shared:WaitForChild("Signal"))
+local Strikes = require(Shared:WaitForChild("Strikes"))
 local Zones = require(Shared:WaitForChild("Zones"))
 
 local DataService = require(script.Parent.DataService)
@@ -53,6 +56,7 @@ local BALL_CONSOLATION_MINUTES = 1 -- если улетела: утешител�
 local BALL_MIN_PATH = 50 -- концы пути шара не ближе этого
 local BALL_PATH_TRIES = 24
 local BALL_JITTER = 0.8 -- кольцо падает в пределах доли радиуса кольца от точки под шаром
+local BALL_MIN_COLOR: Config.ColorId = "purple" -- кольца шаровой не бывают голубыми
 local SUPERCELL_EXTRA_RINGS = 1
 local RAINBOW_SPOT_TRIES = 12
 local RAINBOW_SPOT_SPREAD = 0.35 -- доля игрового радиуса вокруг центра острова
@@ -267,6 +271,15 @@ end
 -- Шаровая молния
 ----------------------------------------------------------------------
 
+-- Цвет кольца шаровой: обычный бросок острова (без удачи — кольцо общее), но не ниже фиолетового
+local function ballColor(zone: number): Config.ColorId
+	local color = Strikes.rollColor(zone, 0, math.random(), 1)
+	if Config.Colors[color].Order < Config.Colors[BALL_MIN_COLOR].Order then
+		return BALL_MIN_COLOR
+	end
+	return color
+end
+
 local function ballPath(zone: number): (Vector3, Vector3)
 	local margin = BALL.RingRadius
 	for _ = 1, BALL_PATH_TRIES do
@@ -343,10 +356,28 @@ local function runBall(t0: number): boolean
 		end
 	end
 
+	local emptySince: number? = nil
 	while not dead and now() < ends do
 		local t = now()
+		local here = #playersIn(zone)
+		if here == 0 then
+			-- все ушли с острова: шар немного ждёт и улетает (не держит очередь событий)
+			local since = emptySince or t
+			emptySince = since
+			if t - since >= BALL.EmptyLeave then
+				break
+			end
+		else
+			emptySince = nil
+			-- игроки ушли: HP не больше, чем по силам оставшимся
+			local cap = here * BALL.HpPerPlayer
+			if hp > cap then
+				hp = cap
+				setAttr("BallHp", hp)
+			end
+		end
 		-- кольцо, которое ударит уже после ухода шара, не роняем
-		if t + BALL.Warning <= ends then
+		if here > 0 and t + BALL.Warning <= ends then
 			-- кольцо падает туда, где шар будет в момент удара (с разбросом вокруг)
 			local under = posAt(t + BALL.Warning)
 			local a = math.random() * math.pi * 2
@@ -358,7 +389,7 @@ local function runBall(t0: number): boolean
 				tag = "ball",
 				onCatch = onCatch,
 			}
-			local ok, err = pcall(StrikeService.spawnShared, zone, spot, "gold", opts)
+			local ok, err = pcall(StrikeService.spawnShared, zone, spot, ballColor(zone), opts)
 			if not ok then
 				warn("[EventService] кольцо шаровой: " .. tostring(err))
 			end

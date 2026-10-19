@@ -54,6 +54,26 @@ Fulgurite.RarityBonus = {
 Fulgurite.MaxInventory = 100
 Fulgurite.MaxEquipped = 3
 
+-- Осколки за разбитый фульгурит по редкости (× ценность осколка острова, где он найден).
+-- Общие для сервера (FulguriteService) и окна «Разбить», чтобы игрок заранее видел, сколько получит.
+Fulgurite.ShatterShards = {
+	common = 5,
+	rare = 15,
+	epic = 50,
+	legendary = 200,
+	mythic = 1000,
+} :: { [Pets.Rarity]: number }
+
+function Fulgurite.shatterValue(rarity: Pets.Rarity, zone: number): number
+	local z = Config.Zones[math.clamp(math.floor(zone), 1, #Config.Zones)]
+	return (Fulgurite.ShatterShards[rarity] or 0) * z.ShardValue
+end
+
+-- Радужный фульгурит (гарантирован каждому поймавшему Радужную молнию): редкость решает только форма —
+-- чаще легендарный, иногда мифический (мутация «Радужный» очков не добавляет)
+Fulgurite.RainbowScore = 5.3
+Fulgurite.QualityScore = 1.6 -- сколько очков редкости даёт качество формы (0..1)
+
 -- Выпал ли фульгурит при ИДЕАЛЬНОЙ поимке
 function Fulgurite.rollDrop(color: Config.ColorId, roll: number, luck: number?): boolean
 	local chance = Config.Colors[color].FulgChance * (1 + 0.5 * math.max(0, luck or 0))
@@ -75,14 +95,20 @@ function Fulgurite.rollMutation(zone: number, roll: number, color: Config.ColorI
 	return nil
 end
 
--- Редкость: цвет молнии + качество формы + мутация
+-- Редкость: цвет молнии + качество формы + мутация. Чёрная/Перунов — всегда мифический,
+-- радужный — Fulgurite.RainbowScore + качество (мутация не считается).
 function Fulgurite.rarityOf(color: Config.ColorId, quality: number, mut: MutId?): Pets.Rarity
-	local score = Config.Colors[color].Order + quality * 1.6
-	if mut then
-		score += Fulgurite.Mutations[mut].Score
-	end
 	if color == "black" or mut == "perun" then
 		return "mythic"
+	end
+	local score: number
+	if color == "rainbow" then
+		score = Fulgurite.RainbowScore + quality * Fulgurite.QualityScore
+	else
+		score = Config.Colors[color].Order + quality * Fulgurite.QualityScore
+		if mut then
+			score += Fulgurite.Mutations[mut].Score
+		end
 	end
 	if score >= 6.6 then
 		return "mythic"

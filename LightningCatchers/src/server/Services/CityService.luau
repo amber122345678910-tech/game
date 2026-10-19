@@ -1,6 +1,7 @@
 --!strict
 -- Электроград — общая цель сервера:
---  * каждая сдача банки (EconomyService.Sold) добавляет очки = заполнение банки (от 0.2 до 1.5);
+--  * каждая сдача банки (EconomyService.Sold) добавляет очки = заполнение банки (до 1.5);
+--    почти пустая банка (меньше Config.City.MinFill) очков не даёт;
 --  * цель = PointsBase + PointsPerPlayer × игроков; кварталы горят по доле: CityLit = ⌊очки / цель × Districts⌋;
 --  * шкала полна → «Город сияет»: ×CityBoost Вольт всем на CityBoostDuration с, все кварталы горят,
 --    баннер и Effect cityLit всем; очки начинаются заново (во время сияния шкала не копится);
@@ -25,7 +26,6 @@ local CityService = {}
 CityService.Lit = Signal.new() :: Signal.Signal<>
 
 local TICK = 0.5
-local MIN_POINTS = 0.2 -- очки за сдачу почти пустой банки
 local C = Config.City
 
 local gameState: Instance? = nil
@@ -104,8 +104,10 @@ local function onSold(_player: Player, _volts: number, fill: number)
 	if boosting then
 		return -- во время сияния шкала не копится: цикл начнётся заново после него
 	end
-	local add = if typeof(fill) == "number" and fill == fill then math.clamp(fill, MIN_POINTS, Config.Overcharge.MaxFill) else MIN_POINTS
-	points += add
+	if typeof(fill) ~= "number" or fill ~= fill or fill < C.MinFill then
+		return -- почти пустая банка: город не зажигает (иначе выгодно сдавать по одной молнии)
+	end
+	points += math.min(fill, Config.Overcharge.MaxFill)
 	lit = math.max(lit, litByPoints())
 	checkFull()
 	publish()

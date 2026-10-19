@@ -3,13 +3,16 @@
 --  * leaderstats (список игроков Roblox): NumberValue «Вольты» и IntValue «Перезапуски» (обновление с троттлингом);
 --  * глобальная таблица лучших по TotalVolts (OrderedDataStore): запись раз в WRITE_EVERY с на игрока,
 --    чтение топа раз в READ_EVERY с — всё в pcall с повторами; без доступа к API (Studio) — топ этого сервера;
+--    из Studio и тестовых игроков (UserId ≤ 0) в глобальную таблицу не пишем никогда;
 --  * табло в хабе (Map.Markers.Board_*: SurfaceGui "Gui" → Frame "Content"): «Лучшие ловцы»,
 --    «Зал Славы» (последние поймавшие Радужную/Чёрную молнию на сервере), «Прогноз» (обратный отсчёт событий);
---  * FriendCount — сколько друзей игрока на сервере (Player:IsFriendsWithAsync в pcall, кэш по паре).
+--  * FriendCount — сколько друзей игрока на сервере (Player:IsFriendsWithAsync в pcall, кэш по паре;
+--    неудачные проверки повторяются в фоне раз в Config.Server.FriendRetryEvery с).
 
 local DataStoreService = game:GetService("DataStoreService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
 local Workspace = game:GetService("Workspace")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
@@ -53,6 +56,9 @@ local lastWritten: { [Player]: number } = {}
 local lastWriteAt: { [Player]: number } = {}
 local statsPending: { [Player]: boolean } = {}
 local friendCache: { [string]: boolean } = {}
+-- пары, которые не удалось проверить (сбой API): повторяем в фоне
+type PendingPair = { A: Player, B: Player, Tries: number }
+local friendPending: { [string]: PendingPair } = {}
 local hall: { { Name: string, Kind: string } } = {}
 
 local leadersBoard: Board? = nil
@@ -134,10 +140,15 @@ local function nameOf(userId: number): string
 	return NAME_FALLBACK
 end
 
+-- Писать ли игрока в глобальную таблицу: только настоящие игроки на настоящем сервере
+local function canWriteGlobal(player: Player): boolean
+	return not RunService:IsStudio() and player.UserId > 0 and DataService.isPersistent(player)
+end
+
 local function writeScore(player: Player)
 	local d = DataService.get(player)
-	if not d or not DataService.isPersistent(player) then
-		return -- без сохранений (Studio) — и в таблицу не пишем
+	if not d or not canWriteGlobal(player) then
+		return -- Studio, тестовый игрок или без сохранений — в таблицу не пишем
 	end
 	local score = math.clamp(math.floor(d.TotalVolts), 0, MAX_SCORE)
 	if lastWritten[player] == score then
@@ -168,7 +179,7 @@ local function readTop()
 		for _, item in pages:GetCurrentPage() do
 			local id = tonumber(item.key)
 			local value = item.value
-			if id and typeof(value) == "number" then
+			if id and id > 0 and typeof(value) == "number" then
 				table.insert(entries, { UserId = id, Name = "", Score = value })
 			end
 		end
@@ -453,6 +464,17 @@ local function pairKey(a: number, b: number): string
 	return if a < b then a .. ":" .. b else b .. ":" .. a
 end
 
+-- Один запрос «друзья ли»: true/false или nil (не удалось)
+local function askFriends(a: Player, b: Player): boolean?
+	local ok, result = pcall(function(): boolean
+		return a:IsFriendsWithAsync(b.UserId)
+	end)
+	if ok then
+		return result == true
+	end
+	return nil
+end
+
 local function checkPair(a: Player, b: Player)
 	local key = pairKey(a.UserId, b.UserId)
 	if friendCache[key] ~= nil then
@@ -462,14 +484,17 @@ local function checkPair(a: Player, b: Player)
 		if a.Parent ~= Players or b.Parent ~= Players then
 			return
 		end
-		local ok, result = pcall(function(): boolean
-			return a:IsFriendsWithAsync(b.UserId)
-		end)
-		if ok then
-			friendCache[key] = result == true
+		local result = askFriends(a, b)
+		if result ~= nil then
+			friendCache[key] = result
+			friendPending[key] = nil
 			return
 		end
 		task.wait(attempt)
+	end
+	-- API не отвечает (часто при старте сервера): проверим ещё раз позже, в фоне
+	if not friendPending[key] then
+		friendPending[key] = { A = a, B = b, Tries = 0 }
 	end
 end
 
@@ -487,6 +512,30 @@ local function recountFriends(leaving: Player?)
 				p:SetAttribute(Net.PlayerAttrs.FriendCount, n)
 			end
 		end
+	end
+end
+
+-- Фоновый повтор неудачных проверок дружбы
+local function retryFriends()
+	local changed = false
+	-- копия: запросы ждут ответа, а новые пары могут добавиться в это время
+	for key, pair in table.clone(friendPending) do
+		if pair.A.Parent ~= Players or pair.B.Parent ~= Players or friendCache[key] ~= nil then
+			friendPending[key] = nil
+		else
+			local result = askFriends(pair.A, pair.B)
+			pair.Tries += 1
+			if result ~= nil then
+				friendCache[key] = result
+				friendPending[key] = nil
+				changed = changed or result
+			elseif pair.Tries >= Config.Server.FriendLateTries then
+				friendPending[key] = nil -- сдаёмся: без бонуса за эту пару в этой сессии
+			end
+		end
+	end
+	if changed then
+		recountFriends(nil)
 	end
 end
 
@@ -569,13 +618,24 @@ function LeaderboardService.start()
 		end
 	end)
 
+	-- повтор неудачных проверок дружбы
+	task.spawn(function()
+		while true do
+			task.wait(Config.Server.FriendRetryEvery)
+			local ok, err = pcall(retryFriends)
+			if not ok then
+				warn("[LeaderboardService] друзья: " .. tostring(err))
+			end
+		end
+	end)
+
 	-- запись игроков в глобальную таблицу (каждый не чаще раза в WRITE_EVERY с)
 	task.spawn(function()
 		while true do
 			task.wait(WRITE_TICK)
 			for _, player in Players:GetPlayers() do
 				local last = lastWriteAt[player]
-				if (last == nil or os.clock() - last >= WRITE_EVERY) and DataService.isPersistent(player) then
+				if (last == nil or os.clock() - last >= WRITE_EVERY) and canWriteGlobal(player) then
 					writeScore(player)
 					lastWriteAt[player] = os.clock()
 				end

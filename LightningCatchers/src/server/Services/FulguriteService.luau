@@ -2,7 +2,9 @@
 -- Фульгуриты на сервере:
 --  * tryDrop — шанс фульгурита при ИДЕАЛЬНОЙ поимке (ставится в StrikeService.dropHook):
 --    Fulgurite.rollDrop с удачей питомцев; grant — гарантированный фульгурит (Радужная, Перун).
---    Номер = data.NextFulgId, seed = Prng.hash(UserId, номер), мутация Fulgurite.rollMutation;
+--    Номер = data.NextFulgId, seed = Prng.hash(UserId, номер), мутация Fulgurite.rollMutation.
+--    Коллекция полна: обычный фульгурит не выпадает, а гарантированный освобождает себе место —
+--    самый простой ненадетый разбивается в осколки (все надеты — кладём сверх лимита);
 --  * Request: EquipFulg / UnequipFulg (до Fulgurite.MaxEquipped), DeleteFulg (разбить → осколки по редкости);
 --  * Галерея в хабе: каждому игроку на сервере — свой пьедестал (Map.Markers.Pedestal_N), на нём лучший
 --    надетый (или лучший из всех) фульгурит и табличка «Имя / редкость · №000123». Перестраивается,
@@ -36,25 +38,23 @@ local FulguriteService = {}
 local LOADING = "Данные ещё загружаются"
 local NO_FULG = "Нет такого фульгурита"
 
--- Осколки за разбитый фульгурит по редкости (умножаются на ShardValue острова, где он найден)
-local SHATTER_SHARDS = {
-	common = 5,
-	rare = 15,
-	epic = 50,
-	legendary = 200,
-	mythic = 1000,
-} :: { [Pets.Rarity]: number }
+-- Осколки за разбитый фульгурит по редкости (умножаются на ShardValue острова, где он найден).
+-- Таблица общая с клиентом: окно «Разбить» показывает ту же сумму
+local SHATTER_SHARDS = Fulgurite.ShatterShards
 
 local NOTIFY_RARE_RANK = 4 -- легендарный+ — тост «редкий»
 local BANNER_RANK = 5 -- мифический — баннер на весь сервер
 
--- Витрина галереи (только вид)
+-- Витрина галереи (только вид). Пьедесталы стоят дугой через ~4.3 стада — витрины и таблички уже этого.
 local DISPLAY_HEIGHT = 5 -- целевая высота фульгурита на пьедестале (4–6 стадов)
 local DISPLAY_MIN_HEIGHT = 4
-local DISPLAY_MAX_FOOTPRINT = 5 -- шире не раздуваем (верх пьедестала ~3 стада)
+local DISPLAY_MAX_FOOTPRINT = 3.2 -- шире не раздуваем: не залезать на соседний пьедестал
+local DISPLAY_MAX_PARTS = 48 -- витрин до 12 и их видят все телефоны: без узелков и не больше стольких деталей
+local DISPLAY_LIGHT_RANK = 4 -- своё свечение только у легендарных и мифических
 local LABEL_GAP = 1.6 -- табличка над верхушкой
-local LABEL_SIZE = UDim2.fromScale(7, 2) -- в стадах
-local LABEL_DISTANCE = 80
+local LABEL_STAGGER = 1.3 -- у чётных пьедесталов табличка выше, чтобы соседние не налезали
+local LABEL_SIZE = UDim2.fromScale(4, 1.5) -- в стадах
+local LABEL_DISTANCE = 40
 local LABEL_FONT = Font.fromEnum(Enum.Font.BuilderSansExtraBold)
 local LABEL_STROKE = Color3.fromRGB(10, 12, 26)
 local DIM_TEXT = Color3.fromRGB(176, 186, 220)
@@ -98,6 +98,22 @@ end
 
 local function isColor(v: any): boolean
 	return typeof(v) == "string" and (Config.Colors :: any)[v] ~= nil
+end
+
+-- Облегчённая копия для витрины: без стеклянных узелков на стыках, не больше DISPLAY_MAX_PARTS деталей
+local function displaySpec(spec: Fulgurite.Spec): Fulgurite.Spec
+	local parts: { Fulgurite.PartSpec } = {}
+	for _, ps in spec.Parts do
+		if not (ps.Kind == "glass" and ps.Shape == "Ball") then
+			table.insert(parts, ps)
+			if #parts >= DISPLAY_MAX_PARTS then
+				break
+			end
+		end
+	end
+	local copy = table.clone(spec)
+	copy.Parts = parts
+	return copy
 end
 
 ----------------------------------------------------------------------
@@ -174,26 +190,27 @@ local function buildDisplay(ped: Pedestal, player: Player, f: FulgRecord?)
 		local spec = specOf(f)
 		local mut: Fulgurite.MutId? = f.Mut :: any
 		local glass = Fulgurite.glassColor(f.Color, mut)
-		local model = Models.fulgurite(spec, glass)
+		local model = Models.fulgurite(displaySpec(spec), glass)
 		Models.setAnchored(model, true)
 		local _, size = model:GetBoundingBox()
 		if size.Y > 0 then
 			local footprint = math.max(size.X, size.Z, 1e-3)
 			local k = DISPLAY_HEIGHT / size.Y
-			k = math.min(k, DISPLAY_MAX_FOOTPRINT / footprint)
 			k = math.max(k, DISPLAY_MIN_HEIGHT / size.Y)
+			k = math.min(k, DISPLAY_MAX_FOOTPRINT / footprint) -- ширина важнее высоты: соседи рядом
 			model:ScaleTo(k)
 			height = size.Y * k
 		end
 		model:PivotTo(top)
 		model.Parent = holder
 		local root = model.PrimaryPart
-		if root then
-			-- мягкое свечение витрины (без теней)
+		local rank = Pets.Rarities[spec.Rarity].Rank
+		if root and rank >= DISPLAY_LIGHT_RANK then
+			-- мягкое свечение витрины (без теней) — только у самых редких
 			local light = Instance.new("PointLight")
 			light.Color = glass
-			light.Range = 6 + Pets.Rarities[spec.Rarity].Rank * 1.5
-			light.Brightness = 0.6 + Pets.Rarities[spec.Rarity].Rank * 0.3
+			light.Range = 3 + rank * 1.2
+			light.Brightness = 0.6 + rank * 0.3
 			light.Shadows = false
 			light.Parent = root
 		end
@@ -212,7 +229,8 @@ local function buildDisplay(ped: Pedestal, player: Player, f: FulgRecord?)
 	anchor.CastShadow = false
 	anchor.Transparency = 1
 	anchor.Size = Vector3.one * 0.2
-	anchor.CFrame = top + Vector3.new(0, height + LABEL_GAP, 0)
+	local stagger = if ped.Index % 2 == 0 then LABEL_STAGGER else 0
+	anchor.CFrame = top + Vector3.new(0, height + LABEL_GAP + stagger, 0)
 	anchor.Parent = holder
 	local gui = Instance.new("BillboardGui")
 	gui.Name = "Label"
@@ -276,6 +294,14 @@ local function releasePedestal(player: Player)
 	if ped then
 		ped.Owner = nil
 		clearDisplay(ped)
+		-- освободилось место: отдать его тому, кому пьедестала не хватило (когда ушедший уже вышел)
+		task.defer(function()
+			for _, p in Players:GetPlayers() do
+				if p ~= player and not byPlayer[p] and DataService.get(p) then
+					assignPedestal(p)
+				end
+			end
+		end)
 	end
 end
 
@@ -308,19 +334,72 @@ end
 -- Выпадение
 ----------------------------------------------------------------------
 
+-- Разбить фульгурит в осколки (по редкости × ценность осколков острова, где он найден). Возвращает осколки.
+local function shatter(player: Player, f: FulgRecord): number
+	local spec = specOf(f)
+	local zone = math.clamp(f.Zone, 1, #Config.Zones)
+	local shards = (SHATTER_SHARDS[spec.Rarity] or 0) * Config.Zones[zone].ShardValue
+	local id = f.Id
+	local ok = DataService.update(player, function(data)
+		local e = table.find(data.EquippedFulgs, id)
+		if e then
+			table.remove(data.EquippedFulgs, e)
+		end
+		for i, rec in data.Fulgs do
+			if rec.Id == id then
+				table.remove(data.Fulgs, i)
+				break
+			end
+		end
+	end)
+	if not ok then
+		return 0
+	end
+	fullNotified[player] = nil
+	return EconomyService.grantShards(player, shards)
+end
+
+-- Коллекция полна, а фульгурит гарантированный: разбить самый простой ненадетый
+-- (при равной редкости — самый новый, старые номера ценнее). Все надеты — ничего не трогаем.
+local function makeRoom(player: Player, d: Data)
+	local worst: FulgRecord? = nil
+	local worstBonus = math.huge
+	for _, f in d.Fulgs do
+		if not table.find(d.EquippedFulgs, f.Id) then
+			local bonus = Economy.fulgRecordBonus(f)
+			local cur = worst
+			if bonus < worstBonus or (bonus == worstBonus and cur ~= nil and f.Serial > cur.Serial) then
+				worst = f
+				worstBonus = bonus
+			end
+		end
+	end
+	local f = worst
+	if not f then
+		return
+	end
+	local title = Fulgurite.title(specOf(f), f.Mut :: any)
+	local shards = shatter(player, f)
+	notify(player, string.format("Коллекция полна: %s %s разбит, +%d 💎 — место для нового!", title, serialText(f.Serial), shards), "info")
+end
+
 -- Гарантированный фульгурит (без броска шанса): Радужная молния, Перун.
--- Возвращает запись или nil (коллекция полна, данные не загружены, неверный цвет).
+-- Возвращает запись или nil (коллекция полна и фульгурит обычный, данные не загружены, неверный цвет).
 function FulguriteService.grant(player: Player, color: Config.ColorId, zone: number, tag: string?): FulgRecord?
 	local d = DataService.get(player)
 	if not d or not isColor(color) then
 		return nil
 	end
 	if #d.Fulgs >= Fulgurite.MaxInventory then
-		if not fullNotified[player] then
-			fullNotified[player] = true
-			notify(player, "Коллекция фульгуритов полна — разбей лишние в «Коллекции»", "bad")
+		local guaranteed = tag == "rainbow" or tag == "perun" or Config.Colors[color].FulgChance >= 1
+		if not guaranteed then
+			if not fullNotified[player] then
+				fullNotified[player] = true
+				notify(player, "Коллекция фульгуритов полна — разбей лишние в «Коллекции»", "bad")
+			end
+			return nil
 		end
-		return nil
+		makeRoom(player, d)
 	end
 	fullNotified[player] = nil
 	local z = if ServerLogic.isInteger(zone) then math.clamp(zone, 1, #Config.Zones) else 1
@@ -435,23 +514,7 @@ local function deleteFulg(player: Player, payload: any): (boolean, any)
 	if not f then
 		return false, NO_FULG
 	end
-	local spec = specOf(f)
-	local zone = math.clamp(f.Zone, 1, #Config.Zones)
-	local shards = (SHATTER_SHARDS[spec.Rarity] or 0) * Config.Zones[zone].ShardValue
-	DataService.update(player, function(data)
-		local e = table.find(data.EquippedFulgs, id)
-		if e then
-			table.remove(data.EquippedFulgs, e)
-		end
-		for i, rec in data.Fulgs do
-			if rec.Id == id then
-				table.remove(data.Fulgs, i)
-				break
-			end
-		end
-	end)
-	local granted = EconomyService.grantShards(player, shards)
-	return true, granted
+	return true, shatter(player, f)
 end
 
 ----------------------------------------------------------------------

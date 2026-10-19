@@ -28,7 +28,8 @@ ClientState.StrikeSpawned = Signal.new() :: Signal.Signal<Net.StrikeMsg>
 ClientState.StrikeResolved = Signal.new() :: Signal.Signal<Net.StrikeResultMsg>
 -- (msg) — разовый эффект от сервера
 ClientState.Effect = Signal.new() :: Signal.Signal<Net.EffectMsg>
--- (grade, color, combo) — локальная мгновенная оценка нажатия (до ответа сервера)
+-- (grade, color, combo) — локальная мгновенная оценка нажатия (до ответа сервера): "perfect" | "good" | "miss";
+-- "zap" — прогноз «ШАРАХНУЛО» (стоял в кольце и не нажал); "miss" ещё и поправка, если сервер не засчитал поимку
 ClientState.LocalGrade = Signal.new() :: Signal.Signal<string, string, number>
 -- (zone, oldZone) — игрок перешёл в другую зону (0 = хаб)
 ClientState.ZoneChanged = Signal.new() :: Signal.Signal<number, number>
@@ -94,8 +95,45 @@ function ClientState.multiplier(): number
 	return Economy.multiplier(d, {
 		friends = if typeof(friends) == "number" then friends else 0,
 		cityBoost = ClientState.cityBoost(),
-		now = os.time(),
+		-- бусты хранят серверный os.time(): сравниваем с серверным временем, а не с часами устройства
+		now = math.floor(ClientState.now()),
 	})
+end
+
+-- Прогнозы клиента по ударам ("id:hit" -> оценка и os.clock()), например «ШАРАХНУЛО» до ответа сервера:
+-- ответ сервера с той же оценкой второй раз не показываем. Старые записи чистятся сами.
+local PREDICT_KEEP = 10
+local predicted: { [string]: { grade: string, at: number } } = {}
+local predictedCount = 0
+
+local function predictKey(id: number, hit: number): string
+	return tostring(id) .. ":" .. tostring(hit)
+end
+
+function ClientState.markPredicted(id: number, hit: number, grade: string)
+	local clock = os.clock()
+	if predictedCount >= 32 then
+		for k, p in predicted do
+			if clock - p.at > PREDICT_KEEP then
+				predicted[k] = nil
+				predictedCount -= 1
+			end
+		end
+	end
+	local k = predictKey(id, hit)
+	if not predicted[k] then
+		predictedCount += 1
+	end
+	predicted[k] = { grade = grade, at = clock }
+end
+
+-- Оценка, которую клиент уже показал для удара сам (nil — не показывал)
+function ClientState.predictedGrade(id: number, hit: number): string?
+	local p = predicted[predictKey(id, hit)]
+	if p and os.clock() - p.at <= PREDICT_KEEP then
+		return p.grade
+	end
+	return nil
 end
 
 -- Окна тайминга с учётом громоотвода и питомцев
@@ -134,6 +172,20 @@ function ClientState.start()
 	started = true
 	Net.event("DataSync").OnClientEvent:Connect(function(data: any)
 		if typeof(data) == "table" then
+			-- неизменные тяжёлые разделы (Pets, Fulgs, Index) сервер не присылает: Keep = их имена
+			local keep = data.Keep
+			if typeof(keep) == "table" then
+				local prev: any = ClientState.data
+				if not prev then
+					return -- полного снимка ещё не было: дождёмся следующего полного
+				end
+				for _, key in keep do
+					if typeof(key) == "string" then
+						data[key] = prev[key]
+					end
+				end
+				data.Keep = nil
+			end
 			ClientState.data = data :: PlayerData.Data
 			ClientState.Changed:Fire(data)
 		end

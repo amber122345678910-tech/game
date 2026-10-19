@@ -62,19 +62,11 @@ end
 
 ClientState.start()
 
--- Звуки: клик для всех кнопок интерфейса и настройки музыки/звуков из данных игрока
+-- Звуки: клик для всех кнопок интерфейса. Музыку и звуки включает/выключает только SettingsUI:
+-- он знает о ещё не сохранённых переключениях и не даёт старому снимку с сервера их откатить
 UIKit.setClickHandler(function()
 	Sounds.play("Click")
 end)
-local function applySettings(data: any)
-	if typeof(data) ~= "table" or typeof(data.Settings) ~= "table" then
-		return
-	end
-	Sounds.setMusicEnabled(data.Settings.Music ~= false)
-	Sounds.setSfxEnabled(data.Settings.Sfx ~= false)
-end
-ClientState.Changed:Connect(applySettings)
-applySettings(ClientState.data)
 
 -- Juice создаёт свои объекты при загрузке модуля
 startModule("Juice", Controllers:WaitForChild("Juice"))

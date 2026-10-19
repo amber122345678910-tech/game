@@ -28,6 +28,7 @@ local BLACK = Color3.new(0, 0, 0)
 local CELL = Vector2.new(124, 152)
 local GRID_W = 556
 local SPIN_SPEED = 0.6
+local MODEL_RELEASE = 8 -- превью карточки, которую столько секунд не видно (прокрутили), удаляется — построится снова
 local SPECIAL = { "rainbow", "black" } :: { Config.ColorId }
 
 local win: UIKit.Window
@@ -94,6 +95,7 @@ type FulgCard = {
 	check: Frame,
 	stroke: UIStroke,
 	phase: number,
+	seenAt: number, -- os.clock, когда карточка последний раз была видна
 }
 
 local grid: ScrollingFrame
@@ -281,6 +283,7 @@ local function makeCard(f: PlayerData.FulgRecord): FulgCard
 		check = check,
 		stroke = stroke,
 		phase = (f.Id * 2.3) % (math.pi * 2),
+		seenAt = os.clock(),
 	}
 	button.Activated:Connect(function()
 		UIKit.playClick()
@@ -534,7 +537,18 @@ local function buildFulgs(page: Frame)
 		if not f then
 			return
 		end
-		win.confirm("Разбить на осколки " .. serialText(f) .. "?\nОн исчезнет, а ты получишь 💎", "Разбить", function()
+		-- что именно разбиваем и сколько получим (как посчитает сервер) — разбитый не вернуть
+		local spec = specOf(f)
+		local mut = mutOf(f)
+		local lines = {
+			string.format("Разбить фульгурит «%s» %s?", spec.ShapeName, serialText(f)),
+			(if mut then Fulgurite.Mutations[mut].Name .. " · " else "") .. Pets.Rarities[spec.Rarity].Name .. " · " .. bonusText(spec),
+		}
+		if isEquipped(d, id) then
+			table.insert(lines, "⚠ Он сейчас надет!")
+		end
+		table.insert(lines, string.format("Получишь 💎 %s, а он исчезнет навсегда.", Format.short(Fulgurite.shatterValue(spec.Rarity, f.Zone))))
+		win.confirm(table.concat(lines, "\n"), "Разбить", function()
 			busy = true
 			local ok, result = ClientState.request(Net.Actions.DeleteFulg, id)
 			busy = false
@@ -783,7 +797,8 @@ local function refreshIndex(d: PlayerData.Data)
 end
 
 ----------------------------------------------------------------------
--- Вращение видимых превью
+-- Превью: крутятся только выбранная карточка и большое превью (каждый сдвиг камеры перерисовывает
+-- ViewportFrame), остальные стоят под своим углом; модели давно не видных карточек удаляются
 ----------------------------------------------------------------------
 local spinAccum = 0
 local spinClock = 0
@@ -808,15 +823,23 @@ local function spinStep(dt: number)
 	end
 	-- фульгурит — до 90 деталей: строим не больше одного превью за шаг
 	local built = false
-	for _, c in cards do
+	local clock = os.clock()
+	for cid, c in cards do
 		if isVisibleIn(c.button, grid) then
+			c.seenAt = clock
 			if not c.model and not built then
 				built = true
 				ensureModel(c)
 			end
-			if c.model then
+			if c.model and cid == selectedId then
 				c.phase += step * SPIN_SPEED
 				UIKit.orbit(c.camera, c.center, c.dist, c.phase, 0.3)
+			end
+		elseif c.model and clock - c.seenAt > MODEL_RELEASE then
+			local model = c.model
+			c.model = nil
+			if model then
+				model:Destroy()
 			end
 		end
 	end

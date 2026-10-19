@@ -3,6 +3,7 @@
 -- острова, перезапуск. Чистые функции — их же гоняет симуляция баланса.
 
 local Config = require(script.Parent.Config)
+local Format = require(script.Parent.Format)
 local Pets = require(script.Parent.Pets)
 local Fulgurite = require(script.Parent.Fulgurite)
 local PlayerData = require(script.Parent.PlayerData)
@@ -59,7 +60,8 @@ function Economy.effectText(id: Config.UpgradeId, level: number): string
 	if id == "Rod" then
 		return string.format("заряд ×%s", Economy.shortMult(Economy.rodMult(level)))
 	elseif id == "Jar" then
-		return string.format("%d заряда", Economy.jarCapacity(level))
+		-- «вместимость 25», «вместимость 1.2K»: без слова после числа — не нужно согласовывать падеж
+		return "вместимость " .. Format.short(Economy.jarCapacity(level))
 	elseif id == "Boots" then
 		return string.format("скорость %d", Economy.walkSpeed(level))
 	elseif id == "Magnet" then

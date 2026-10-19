@@ -26,6 +26,7 @@ local TOAST_H = 52
 local TOAST_GAP = 6
 local MAX_TOASTS = 3
 local TOAST_LIFE = 2.5
+local TOAST_PHONE_SCALE = 1.3 -- на телефоне HUD мельче (до ×0.5) — тосты крупнее, чтобы читались
 local BANNER_TIME = 4
 local BANNER_H = 112
 local MAX_BANNER_QUEUE = 3
@@ -63,6 +64,8 @@ type Toast = {
 
 local gui: ScreenGui
 local toastRoot: Frame
+local toastStack: Frame -- внутри toastRoot: свой масштаб для телефона
+local toastStackScale: UIScale
 local active: { Toast } = {}
 local pool: { Toast } = {}
 local tokenCounter = 0
@@ -75,7 +78,7 @@ local function makeToast(): Toast
 		Position = UDim2.fromScale(0.5, 0),
 		BackgroundColor3 = WHITE,
 		Visible = false,
-		Parent = toastRoot,
+		Parent = toastStack,
 	}) :: Frame
 	UIKit.round(frame)
 	local stroke = UIKit.stroke(frame, 3, Theme.Stroke)
@@ -427,6 +430,21 @@ function Notifications.start()
 		Parent = gui,
 	}) :: Frame
 	UIKit.autoScale(toastRoot, "hud", 1280, 720)
+	toastStack = UIKit.new("Frame", {
+		Name = "Inner",
+		Size = UDim2.fromScale(1, 1),
+		AnchorPoint = Vector2.new(0.5, 0),
+		Position = UDim2.fromScale(0.5, 0),
+		BackgroundTransparency = 1,
+		Parent = toastRoot,
+	}) :: Frame
+	toastStackScale = UIKit.new("UIScale", { Scale = 1, Parent = toastStack }) :: UIScale
+	local function fitPhone()
+		toastStackScale.Scale = if UIKit.isPhone() then TOAST_PHONE_SCALE else 1
+	end
+	fitPhone()
+	UIKit.onInputTypeChanged(fitPhone)
+	toastRoot:GetPropertyChangedSignal("AbsoluteSize"):Connect(fitPhone)
 	for _ = 1, MAX_TOASTS + 1 do
 		table.insert(pool, makeToast())
 	end

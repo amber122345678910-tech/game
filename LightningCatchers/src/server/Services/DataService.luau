@@ -4,7 +4,9 @@
 --    (идентификатор сессии + время). Чужой свежий замок ждём, устаревший забираем.
 --  * Каждое сохранение проверяет, что замок всё ещё наш, иначе не перезаписывает данные.
 --  * Автосохранение, сохранение при выходе и при выключении сервера (BindToClose).
+--    Сохранения одной сессии идут по одному: последнее (с снятием замка) ждёт идущее автосохранение.
 --  * Если DataStore недоступен (Studio без доступа к API), игра работает без сохранений.
+--    Если данные не загрузились из-за сбоя, игрок видит предупреждение, что прогресс не сохраняется.
 -- Схема данных (значения по умолчанию и проверка) задаётся модулем PlayerData.
 
 local DataStoreService = game:GetService("DataStoreService")
@@ -14,6 +16,7 @@ local HttpService = game:GetService("HttpService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
+local Net = require(Shared:WaitForChild("Net"))
 local Signal = require(Shared:WaitForChild("Signal"))
 local PlayerData = require(Shared:WaitForChild("PlayerData"))
 
@@ -31,7 +34,11 @@ type Session = {
 	Released: boolean,
 	LockId: string,
 	LastSave: number,
+	Saving: boolean, -- идёт сохранение этой сессии
 }
+
+-- Хук перед сохранением: (игрок, данные, последнее ли это сохранение — игрок уходит)
+export type BeforeSaveHook = (Player, Data, boolean) -> ()
 
 local DataService = {}
 
@@ -47,13 +54,17 @@ local AUTOSAVE_INTERVAL = 75
 local LOCK_STALE_AFTER = 150 -- замок без обновления дольше этого считается брошенным
 local LOCK_WAIT_TRIES = 3 -- сколько раз подождать чужой свежий замок (по 4 секунды), потом забрать
 local RETRIES = 5
+local SAVE_WAIT = 30 -- последнее сохранение ждёт идущее автосохранение не дольше этого
+local NOT_SAVING_FIRST = 6 -- предупреждение «прогресс не сохраняется»: через столько секунд после входа
+local NOT_SAVING_EVERY = 300 -- и потом раз в столько секунд
+local NOT_SAVING_TEXT = "⚠ Прогресс сейчас не сохраняется (сбой серверов Roblox). Перезайди в игру попозже"
 
 local store: DataStore? = nil
 local storeDisabled = false
 local sessions: { [Player]: Session } = {}
 local inFlight = 0
 local closing = false
-local beforeSaveHooks: { (Player, Data) -> () } = {}
+local beforeSaveHooks: { BeforeSaveHook } = {}
 
 local function now(): number
 	return os.time()
@@ -162,6 +173,32 @@ local function load(player: Player, lockId: string): (Data, boolean)
 	return PlayerData.default(), false
 end
 
+-- Снять свой замок, не трогая данные (игрок ушёл, пока данные грузились: сессии ещё не было,
+-- офлайн-доход не начислен — LastOnline в записи остаётся прежним)
+local function releaseLock(player: Player, lockId: string)
+	local ds = getStore()
+	if not ds then
+		return
+	end
+	inFlight += 1
+	withRetries("unlock " .. player.Name, function()
+		(ds :: DataStore):UpdateAsync(key(player), function(old: any)
+			if typeof(old) ~= "table" then
+				return nil
+			end
+			local lock = old.Lock
+			if typeof(lock) ~= "table" or lock.Id ~= lockId then
+				return nil -- замок уже не наш
+			end
+			return { Data = old.Data, Lock = nil }
+		end)
+		return true
+	end)
+	inFlight -= 1
+end
+
+local warnNotSaving: (session: Session) -> ()
+
 -- Сохранить сессию. release = снять замок (игрок вышел).
 local function save(session: Session, release: boolean)
 	if not session.Persistent then
@@ -171,9 +208,26 @@ local function save(session: Session, release: boolean)
 	if not ds then
 		return
 	end
+	if session.Saving then
+		if not release then
+			return -- автосохранение уже идёт
+		end
+		-- последнее сохранение ждёт идущее: иначе повтор старого автосохранения
+		-- перезапишет свежие данные и снова возьмёт замок закончившейся сессии
+		inFlight += 1
+		local deadline = os.clock() + SAVE_WAIT
+		while session.Saving and os.clock() < deadline do
+			task.wait(0.1)
+		end
+		inFlight -= 1
+		if not session.Persistent then
+			return
+		end
+	end
+	session.Saving = true
 	DataService.BeforeSave:Fire(session.Player)
 	for _, hook in beforeSaveHooks do
-		local okHook, err = pcall(hook, session.Player, session.Data)
+		local okHook, err = pcall(hook, session.Player, session.Data, release)
 		if not okHook then
 			warn("[DataService] before-save hook: " .. tostring(err))
 		end
@@ -182,8 +236,14 @@ local function save(session: Session, release: boolean)
 	inFlight += 1
 	local lostLock = false
 	withRetries("save " .. session.Player.Name, function()
+		if not release and session.Released then
+			return true -- игрок уже вышел: свежие данные запишет последнее сохранение
+		end
 		(ds :: DataStore):UpdateAsync(key(session.Player), function(old: any)
 			lostLock = false
+			if not release and session.Released then
+				return nil
+			end
 			local record: StoredRecord = if typeof(old) == "table" then old else { Data = nil, Lock = nil }
 			local lock = record.Lock
 			if lock and typeof(lock) == "table" and lock.Id ~= session.LockId then
@@ -199,11 +259,32 @@ local function save(session: Session, release: boolean)
 		return true
 	end)
 	inFlight -= 1
+	session.Saving = false
 	session.LastSave = os.clock()
 	if lostLock then
 		warn("[DataService] Замок данных перехвачен другим сервером, сохранения для " .. session.Player.Name .. " отключены")
 		session.Persistent = false
+		if not session.Released then
+			warnNotSaving(session)
+		end
 	end
+end
+
+-- Сказать игроку, что прогресс не сохраняется (и напоминать, пока он играет)
+warnNotSaving = function(session: Session)
+	task.delay(NOT_SAVING_FIRST, function()
+		local player = session.Player
+		while sessions[player] == session and not session.Released and not session.Persistent do
+			local ok, err = pcall(function()
+				Net.event("Notify"):FireClient(player, NOT_SAVING_TEXT, "bad")
+			end)
+			if not ok then
+				warn("[DataService] Notify: " .. tostring(err))
+				return
+			end
+			task.wait(NOT_SAVING_EVERY)
+		end
+	end)
 end
 
 ----------------------------------------------------------------------
@@ -242,7 +323,8 @@ function DataService.markChanged(player: Player)
 	end
 end
 
-function DataService.addBeforeSave(fn: (Player, Data) -> ())
+-- fn(игрок, данные, последнее ли сохранение): синхронно, перед каждым сохранением
+function DataService.addBeforeSave(fn: BeforeSaveHook)
 	table.insert(beforeSaveHooks, fn)
 end
 
@@ -266,14 +348,14 @@ local function onPlayerAdded(player: Player)
 	local lockId = HttpService:GenerateGUID(false)
 	local data, persistent = load(player, lockId)
 	if not player.Parent then
-		-- ушёл, пока грузились: сразу снять замок
+		-- ушёл, пока грузились: только снять замок (данные не трогаем — без хуков и без LastOnline)
 		if persistent then
-			local tmp: Session = { Player = player, Data = data, Persistent = true, Released = true, LockId = lockId, LastSave = 0 }
-			save(tmp, true)
+			releaseLock(player, lockId)
 		end
 		return
 	end
-	if not persistent and not storeDisabled and getStore() ~= nil then
+	local failed = not persistent and not storeDisabled and getStore() ~= nil
+	if failed then
 		warn("[DataService] " .. player.Name .. ": данные не загрузились, прогресс в этой сессии не сохранится")
 	end
 	PlayerData.onSessionStart(data, now())
@@ -284,8 +366,12 @@ local function onPlayerAdded(player: Player)
 		Released = false,
 		LockId = lockId,
 		LastSave = os.clock(),
+		Saving = false,
 	}
 	sessions[player] = session
+	if failed then
+		warnNotSaving(session)
+	end
 	DataService.Loaded:Fire(player, data)
 	DataService.Changed:Fire(player)
 end

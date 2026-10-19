@@ -305,8 +305,12 @@ Config.Catch = {
 	GoodMult = 1,
 	RingRadius = 7, -- радиус кольца (стадов)
 	PositionTolerance = 4.5, -- допуск сервера на позицию
-	LatencyGrace = 0.6, -- сколько ждать нажатие после удара (пинг)
-	MaxTapAge = 1.2, -- нажатие старше этого (по серверному времени) отбрасывается
+	LatencyGrace = 0.6, -- сколько ждать нажатие после удара (пинг), не больше
+	ResolveSlack = 0.1, -- личное кольцо: ждём окно ХОРОШО + пинг + столько (но не дольше LatencyGrace)
+	MaxTapAge = 1.2, -- клиент: нажатие старше этого (по серверному времени) уже не ждёт ответа
+	TapLateSlack = 0.35, -- сервер: нажатие не старше 2 × пинг + столько (+ отрицательная поправка задержки)
+	TapAheadSlack = 0.05, -- сервер: и не «из будущего» больше чем на столько (+ положительная поправка)
+	TapFallbackAge = 0.5, -- если пинг игрока неизвестен: вместо 2 × пинг + TapLateSlack
 	MaxCalibration = 0.15, -- поправка задержки касания в настройках, ±с
 	ComboStep = 0.08,
 	ComboCap = 25,
@@ -409,7 +413,8 @@ Config.Multipliers = {
 ----------------------------------------------------------------------
 Config.Events = {
 	Supercell = { Period = 540, Offset = 240, Duration = 60, GoldBoost = 3 },
-	BallLightning = { Period = 960, Offset = 600, Duration = 90, HitInterval = 2.4, HpPerPlayer = 6, RingRadius = 10, Warning = 2.4 },
+	-- EmptyLeave: столько секунд на острове никого — шар улетает
+	BallLightning = { Period = 960, Offset = 600, Duration = 90, HitInterval = 2.4, HpPerPlayer = 6, RingRadius = 10, Warning = 2.4, EmptyLeave = 10 },
 	Rainbow = { Period = 2400, Offset = 1500, Announce = 10, Warning = 6, RingRadius = 18, RewardMinutes = 6 },
 	Perun = { Zone = 5, Chance = 1 / 6000, Warning = 3.0, WitnessMinutes = 1, WitnessRadius = 140 },
 	WarnBefore = 30, -- за сколько секунд предупреждать о событии
@@ -420,6 +425,7 @@ Config.City = {
 	PointsPerPlayer = 6,
 	Districts = 6,
 	DecayDelay = 60, -- после буста город гаснет постепенно
+	MinFill = 0.25, -- сдача банки меньше этой доли не идёт ни в город, ни в задание «Сдай банку»
 }
 
 ----------------------------------------------------------------------
@@ -462,7 +468,7 @@ Config.Server = {
 	SellCooldown = 1, -- пауза между сдачами банки
 	SellPadSlack = 1.5, -- допуск к радиусу подстанции
 	SellPadHeight = 10, -- допуск по высоте над подстанцией
-	DroneIdle = 2, -- на островах с перегрузкой дрон вылетает, если столько секунд не было поимок
+	TeleportCooldown = 8, -- пауза между телепортами (Request Teleport)
 	IncomeWindow = 60, -- доход в минуту считаем окнами по столько секунд
 	JarFullNotifyEvery = 6, -- не чаще этого напоминать «Банка полна!»
 	StrikeTick = 0.1, -- шаг цикла ударов
@@ -483,6 +489,10 @@ Config.Server = {
 	ShardPickupSlack = 3, -- допуск к радиусу сбора осколка
 	ShardCollectRate = 20, -- ShardCollect в секунду на игрока
 	ShardScatter = 2, -- осколки нескольких ударов одного кольца раскладываются в этом радиусе
+	SharedJoinMinLeft = 0.5, -- пришёл на остров во время общего кольца: покажем, если до удара ещё столько секунд
+	FullSyncEvery = 10, -- полный снимок данных не реже (в остальных — без неизменных Pets/Fulgs/Index)
+	FriendRetryEvery = 60, -- повтор неудачной проверки дружбы (с)
+	FriendLateTries = 10, -- столько повторов, потом пара считается «не друзья»
 }
 
 ----------------------------------------------------------------------

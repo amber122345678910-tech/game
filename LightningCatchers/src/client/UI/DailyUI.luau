@@ -67,8 +67,13 @@ local spinConn: RBXScriptConnection? = nil
 -- Календарь
 ----------------------------------------------------------------------
 -- (можно забрать сегодня, номер дня для подсветки, сколько дней уже отмечено)
+-- День — по серверному времени (как DailyService), а не по часам устройства: они могут врать
+local function serverNow(): number
+	return math.floor(ClientState.now())
+end
+
 local function dailyState(d: PlayerData.Data): (boolean, number, number)
-	local today = Quests.dayNumber(os.time())
+	local today = Quests.dayNumber(serverNow())
 	local claimable = today > d.Daily.LastDay
 	local streak = math.clamp(d.Daily.Streak, 0, #Config.DailyRewards)
 	if claimable then
@@ -299,7 +304,7 @@ local function refreshCalendar(d: PlayerData.Data)
 		UIKit.setButtonText(claimButton, "🎁 Забрать")
 		UIKit.setButtonColor(claimButton, Theme.Green)
 	else
-		local left = 86400 - (os.time() % 86400)
+		local left = 86400 - (serverNow() % 86400)
 		UIKit.setButtonText(claimButton, "Ещё через " .. Format.time(left))
 		UIKit.setButtonColor(claimButton, Theme.GrayDark)
 	end
@@ -350,7 +355,7 @@ local function buildCalendar(body: Frame)
 		local claimable, current = dailyState(d)
 		if not claimable then
 			Sounds.play("Error")
-			ClientState.Toast:Fire("Сегодня уже забрал — приходи завтра!", "info")
+			ClientState.Toast:Fire("Сегодняшний подарок уже получен — приходи завтра!", "info")
 			return
 		end
 		busy = true
@@ -383,7 +388,7 @@ local function buildCalendar(body: Frame)
 	})
 	UIKit.label({
 		Name = "Freeze",
-		Text = "Пропустил один день? Серия не сгорит!",
+		Text = "Пропущен один день? Серия не сгорит!",
 		Size = UDim2.fromOffset(LEFT_W, 24),
 		Position = UDim2.fromOffset(0, 40 + BIG_TILE.Y + 92),
 		TextXAlignment = Enum.TextXAlignment.Left,
@@ -402,7 +407,7 @@ local function questText(q: { Id: string, Target: number }): string
 	if not def then
 		return q.Id
 	end
-	local ok, text = pcall(string.format, def.Text, q.Target)
+	local ok, text = pcall(Quests.text, def, q.Target)
 	return if ok then text else def.Text
 end
 
@@ -421,7 +426,8 @@ local function refreshQuests(d: PlayerData.Data)
 		row.bar.set(progress / math.max(1, q.Target), string.format("%d/%d", progress, q.Target))
 		row.bar.setColor(if complete then Theme.Green else Theme.Electric)
 		if def then
-			row.reward.Text = string.format("💎%d + ⚡ %d мин", def.Shards, def.Minutes)
+			-- сколько Вольт — как посчитает сервер: минуты дохода от текущего дохода в минуту
+			row.reward.Text = string.format("💎 %s + ⚡ %s", Format.short(def.Shards), Format.short(Economy.incomeMinutes(d, def.Minutes)))
 		else
 			row.reward.Text = ""
 		end
@@ -503,15 +509,18 @@ local function buildQuests(body: Frame)
 			end
 			if q.Progress < q.Target then
 				Sounds.play("Error")
-				ClientState.Toast:Fire("Ещё не выполнено: " .. math.max(0, q.Target - q.Progress) .. " осталось", "info")
+				ClientState.Toast:Fire(string.format("Ещё не выполнено: осталось %d", math.max(0, q.Target - q.Progress)), "info")
 				return
 			end
 			busy = true
-			local ok = ClientState.request(Net.Actions.ClaimQuest, i)
+			local ok, result = ClientState.request(Net.Actions.ClaimQuest, i)
 			busy = false
 			if ok then
 				Sounds.play("Coins")
 				Sounds.play("PowerUp")
+				-- сервер отвечает текстом награды («+1.2K ⚡ и +50 💎»)
+				local reward = if typeof(result) == "string" and result ~= "" and result ~= "✅" then result else nil
+				ClientState.Toast:Fire(if reward then "✅ Награда: " .. reward else "✅ Награда получена!", "good")
 				local scale = frame:FindFirstChildOfClass("UIScale") or UIKit.new("UIScale", { Parent = frame }) :: UIScale
 				UIKit.bump(scale, 0.06)
 			else

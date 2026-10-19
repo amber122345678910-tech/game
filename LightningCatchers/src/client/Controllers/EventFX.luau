@@ -45,6 +45,14 @@ local ARCS = 6
 local ARC_REACH = 8
 local ARC_HOLD_MIN = 0.05
 local ARC_HOLD_MAX = 0.16
+-- «Мягкие вспышки»: дуги перескакивают не чаще ~3 раз в секунду и не мигают
+local ARC_SOFT_HOLD_MIN = 0.35
+local ARC_SOFT_HOLD_MAX = 0.6
+-- всплески света шара — по таймеру (не зависят от частоты кадров), не чаще ~2.5 раз в секунду
+local SPIKE_MIN = 0.4
+local SPIKE_MAX = 0.9
+local SPIKE_TIME = 0.12
+local SPIKE_AMOUNT = 0.4
 local LIGHT_RANGE = 40
 local LIGHT_BRIGHTNESS = 3
 local HP_SIZE = UDim2.fromOffset(260, 56)
@@ -88,6 +96,8 @@ type Ball = {
 	hpScale: UIScale,
 	lastHp: number,
 	hitFlash: number, -- os.clock удара по шару (вспышка оболочки)
+	spikeAt: number, -- os.clock последнего всплеска света
+	nextSpike: number,
 	dyingSince: number?, -- HP кончились: ждём Effect ballBurst
 }
 
@@ -347,6 +357,8 @@ local function buildBall(parent: Instance): Ball
 		hpScale = hpScale,
 		lastHp = ballHp,
 		hitFlash = 0,
+		spikeAt = -math.huge,
+		nextSpike = os.clock() + SPIKE_MIN,
 		dyingSince = nil,
 	}
 	updateHpBar(b)
@@ -397,19 +409,26 @@ local function updateBall(b: Ball, clock: number, t: number)
 	end
 	-- пульс: свет и свечение, вспышка оболочки после удара по шару
 	local soft = settings()
-	local pulse = 0.7 + 0.3 * math.sin(clock * 9) + (if math.random() < 0.06 then 0.4 else 0)
+	if clock >= b.nextSpike then
+		b.nextSpike = clock + SPIKE_MIN + math.random() * (SPIKE_MAX - SPIKE_MIN)
+		b.spikeAt = clock
+	end
+	local spike = math.max(0, 1 - (clock - b.spikeAt) / SPIKE_TIME) * SPIKE_AMOUNT * (if soft then 0.5 else 1)
+	local pulse = 0.7 + 0.3 * math.sin(clock * 9) + spike
 	local hit = math.clamp(1 - (clock - b.hitFlash) / 0.25, 0, 1)
 	b.light.Brightness = LIGHT_BRIGHTNESS * pulse * (if soft then 0.7 else 1) + hit * 3
 	b.glow.Transparency = 0.35 + 0.15 * math.sin(clock * 5)
 	b.shell.Transparency = 0.55 - 0.35 * hit
 	-- дуги перескакивают на новые точки
+	local holdMin = if soft then ARC_SOFT_HOLD_MIN else ARC_HOLD_MIN
+	local holdMax = if soft then ARC_SOFT_HOLD_MAX else ARC_HOLD_MAX
 	for _, a in b.arcs do
 		if clock >= a.nextAt then
-			a.nextAt = clock + ARC_HOLD_MIN + math.random() * (ARC_HOLD_MAX - ARC_HOLD_MIN)
+			a.nextAt = clock + holdMin + math.random() * (holdMax - holdMin)
 			a.tip.Position = randomUnit() * ARC_REACH * (0.6 + 0.4 * math.random())
 			a.beam.CurveSize0 = (math.random() * 2 - 1) * 4
 			a.beam.CurveSize1 = (math.random() * 2 - 1) * 4
-			a.beam.Enabled = math.random() > 0.15
+			a.beam.Enabled = soft or math.random() > 0.15
 		end
 	end
 end
@@ -552,8 +571,8 @@ local function ballBurst(msg: Net.EffectMsg)
 	end)
 	if shake then
 		Juice.shake(0.55)
+		Juice.fovPunch(6)
 	end
-	Juice.fovPunch(6)
 	Juice.flash(Theme.Gold, if soft then 0.25 else 0.45)
 	Sounds.play("ThunderNear")
 	Sounds.play("Victory")

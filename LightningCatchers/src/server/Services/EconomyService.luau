@@ -39,18 +39,22 @@ local LOADING = "Данные ещё загружаются"
 
 type State = {
 	LastSell: number, -- os.clock последней сдачи
-	LastCatch: number, -- os.clock последнего заряда (для дрона на островах с перегрузкой)
 	DroneBusy: boolean,
 	DroneToken: number,
+	Cargo: number, -- заряд, который дрон везёт на подстанцию (банка в это время пуста)
+	CargoCap: number, -- вместимость банки в момент вылета (для перегрузочной части)
 	Earned: number, -- Вольт с продаж в текущем окне дохода
 	Active: boolean, -- был на острове в текущем окне
 	WindowStart: number,
 	LastFullNotify: number,
+	LastTeleport: number, -- os.clock последнего телепорта по запросу
 }
 
 type Pad = { Pos: Vector3, Reach: number }
 
 local states: { [Player]: State } = {}
+-- груз дрона игрока, который вышел, пока дрон летел: вернётся в банку при последнем сохранении
+local orphanCargo: { [Player]: number } = {}
 local pads: { Pad } = {}
 local cityBoostProvider: (() -> boolean)? = nil
 local notifyRemote: RemoteEvent? = nil
@@ -72,6 +76,25 @@ local function effect(player: Player, msg: Net.EffectMsg)
 	local r = effectRemote
 	if r then
 		r:FireClient(player, msg)
+	end
+end
+
+-- Тот же эффект — другим игрокам на этом острове поблизости (видят, как кто-то сдаёт банку)
+local NEARBY_EFFECT_RADIUS = 160
+local function effectNearby(player: Player, msg: Net.EffectMsg)
+	local r = effectRemote
+	local zone = player:GetAttribute("Zone")
+	local root = PlayerService.getRoot(player)
+	if not r or not root or typeof(zone) ~= "number" then
+		return
+	end
+	for _, other in Players:GetPlayers() do
+		if other ~= player and other:GetAttribute("Zone") == zone then
+			local otherRoot = PlayerService.getRoot(other)
+			if otherRoot and (otherRoot.Position - root.Position).Magnitude <= NEARBY_EFFECT_RADIUS then
+				r:FireClient(other, msg)
+			end
+		end
 	end
 end
 
@@ -124,13 +147,15 @@ local function ensureState(player: Player): State?
 	local clock = os.clock()
 	st = {
 		LastSell = -math.huge,
-		LastCatch = clock,
 		DroneBusy = false,
 		DroneToken = 0,
+		Cargo = 0,
+		CargoCap = 0,
 		Earned = 0,
 		Active = false,
 		WindowStart = clock,
 		LastFullNotify = -math.huge,
+		LastTeleport = -math.huge,
 	}
 	states[player] = st
 	refreshJarFill(player)
@@ -163,6 +188,8 @@ end
 -- Добавить заряд за поимку на острове zone.
 -- Возвращает (поместилось, лопнула ли банка, сколько потеряно: не влезло + сгорело при "лопнула").
 -- safe = true — без риска лопнуть (бонус, который игрок не "ловил" сам, например цепная молния).
+-- С включённым дроном банка не перегружается: дрон забирает её ровно полной
+-- (хочешь перегружать — выключи дрон).
 function EconomyService.addCharge(player: Player, amount: number, zone: number, safe: boolean?): (number, boolean, number)
 	local d = DataService.get(player)
 	local st = ensureState(player)
@@ -170,7 +197,7 @@ function EconomyService.addCharge(player: Player, amount: number, zone: number, 
 		return 0, false, 0
 	end
 	local capacity = capacityOf(d)
-	local allowOver = zoneAllowsOvercharge(zone)
+	local allowOver = zoneAllowsOvercharge(zone) and not droneActive(d)
 	local insulation = d.Upgrades.Insulation
 	local before = d.Charge
 	local r = ServerLogic.addToJar(before, amount, capacity, allowOver, Config.Overcharge.MaxFill, function(fill: number): number
@@ -183,7 +210,6 @@ function EconomyService.addCharge(player: Player, amount: number, zone: number, 
 	if not stored then
 		return 0, false, 0 -- игрок уже выходит
 	end
-	st.LastCatch = os.clock()
 	setJarFill(player, r.After, capacity)
 
 	-- напоминание сдать банку (дрон сам справится — тогда молчим)
@@ -221,19 +247,18 @@ function EconomyService.setCityBoostProvider(fn: (() -> boolean)?)
 	cityBoostProvider = fn
 end
 
--- Сдать банку. source: "pad" (подстанция) или "drone". pos — где (для эффекта у клиента).
-function EconomyService.sell(player: Player, source: string?, pos: Vector3?): number
-	local d = DataService.get(player)
-	local st = ensureState(player)
-	if not d or not st or d.Charge <= 0 then
+-- Вольты за заряд charge из банки вместимостью capacity (перегрузочная часть дороже).
+-- Подстанция берёт заряд из банки; дрон (isDrone) сдаёт свой груз и банку не трогает.
+local function payout(player: Player, st: State, charge: number, capacity: number, isDrone: boolean, pos: Vector3?): number
+	if charge <= 0 or capacity <= 0 then
 		return 0
 	end
-	local capacity = capacityOf(d)
-	local charge = d.Charge
 	local fill = math.min(charge / capacity, Config.Overcharge.MaxFill)
 	local volts = Economy.sellValue(charge, capacity, EconomyService.multiplierFor(player))
 	local ok = DataService.update(player, function(data)
-		data.Charge = 0
+		if not isDrone then
+			data.Charge = 0
+		end
 		data.Volts += volts
 		data.TotalVolts += volts
 		data.Stats.Sells += 1
@@ -243,17 +268,32 @@ function EconomyService.sell(player: Player, source: string?, pos: Vector3?): nu
 	end
 	st.LastSell = os.clock()
 	st.Earned += volts
-	setJarFill(player, 0, capacity)
-	local isDrone = source == "drone"
-	effect(player, {
+	if not isDrone then
+		setJarFill(player, 0, capacity)
+	end
+	local sellMsg: Net.EffectMsg = {
 		Kind = if isDrone then "drone" else "sell",
 		Text = if isDrone then "sold" else nil,
 		Value = volts,
 		UserId = player.UserId,
 		Pos = pos,
-	})
+	}
+	effect(player, sellMsg)
+	if not isDrone then
+		effectNearby(player, sellMsg)
+	end
 	EconomyService.Sold:Fire(player, volts, fill)
 	return volts
+end
+
+-- Сдать банку на подстанции. pos — где (для эффекта у клиента).
+function EconomyService.sell(player: Player, _source: string?, pos: Vector3?): number
+	local d = DataService.get(player)
+	local st = ensureState(player)
+	if not d or not st or d.Charge <= 0 then
+		return 0
+	end
+	return payout(player, st, d.Charge, capacityOf(d), false, pos)
 end
 
 -- Начислить Вольты (награды). Учитываются в TotalVolts, но не в доходе в минуту.
@@ -317,26 +357,28 @@ local function padNear(pos: Vector3): Pad?
 	return nil
 end
 
--- Дрон сдаёт банку, когда она полная: сразу на островах без перегрузки,
--- а там, где перегрузка разрешена, — если игрок DroneIdle секунд ничего не ловил
--- (значит, он не перегружает банку нарочно) или банка уже на пределе перегрузки.
--- Банка «улетает» на TripTime: пока дрон в пути, новый заряд в полную банку не влезает
--- (как в симуляции баланса).
+-- Дрон на любом острове: как только банка полная, сразу забирает весь заряд с собой
+-- (банка пустеет — можно ловить дальше без риска), через TripTime сдаёт груз по тем же правилам,
+-- что и подстанция. Перегрузочная часть бывает, только если банку перегрузили с выключенным дроном.
 local function droneCheck(player: Player, st: State, d: Data)
 	if not droneActive(d) or st.DroneBusy then
 		return
 	end
 	local capacity = capacityOf(d)
-	if d.Charge < capacity then
+	local cargo = d.Charge
+	if cargo < capacity then
 		return
 	end
-	if zoneAllowsOvercharge(PlayerService.getZone(player)) then
-		local atLimit = d.Charge >= capacity * Config.Overcharge.MaxFill - 1e-6
-		if not atLimit and os.clock() - st.LastCatch < Config.Server.DroneIdle then
-			return
-		end
+	local taken = DataService.update(player, function(data)
+		data.Charge = 0
+	end)
+	if not taken then
+		return
 	end
+	setJarFill(player, 0, capacity)
 	st.DroneBusy = true
+	st.Cargo = cargo
+	st.CargoCap = capacity
 	st.DroneToken += 1
 	local token = st.DroneToken
 	effect(player, { Kind = "drone", Text = "depart", Value = Config.Drone.TripTime, UserId = player.UserId })
@@ -344,16 +386,33 @@ local function droneCheck(player: Player, st: State, d: Data)
 		if states[player] ~= st or st.DroneToken ~= token then
 			return
 		end
+		local carried, cap = st.Cargo, st.CargoCap
 		st.DroneBusy = false
-		local data = DataService.get(player)
-		if not data or not data.Drone then
-			return
-		end
-		if EconomyService.sell(player, "drone", nil) <= 0 then
-			-- банку успели сдать сами: дрон вернулся пустым (клиенту — чтобы закончить анимацию)
+		st.Cargo = 0
+		if payout(player, st, carried, cap, true, nil) <= 0 then
+			-- груз не сдался (данные уже не пишутся): клиенту — чтобы закончить анимацию
 			effect(player, { Kind = "drone", Text = "sold", Value = 0, UserId = player.UserId })
 		end
 	end)
+end
+
+-- Последнее сохранение игрока, который вышел, пока дрон летел: груз возвращается в банку
+local function returnCargo(player: Player, d: Data, final: boolean)
+	if not final then
+		return
+	end
+	local st = states[player]
+	local cargo = orphanCargo[player] or 0
+	orphanCargo[player] = nil
+	if st and st.Cargo > 0 then
+		cargo += st.Cargo
+		st.Cargo = 0
+		st.DroneBusy = false
+		st.DroneToken += 1
+	end
+	if cargo > 0 then
+		d.Charge += cargo
+	end
 end
 
 local function updateIncome(player: Player, st: State)
@@ -510,7 +569,8 @@ local function rebirth(player: Player, _payload: any): (boolean, any)
 	end
 	local rebirths = d.Rebirths + 1
 	DataService.update(player, function(data)
-		-- сбрасываем прогресс забега; питомцы, фульгуриты, Молниедекс, осколки и рекорды остаются
+		-- сбрасываем прогресс забега; питомцы, фульгуриты, Молниедекс, осколки, рекорды и Тесла-дрон остаются.
+		-- Доход в минуту — тоже с нуля: награды «N минут дохода» считаются от минимума, пока не начнёшь сдавать банки
 		data.Volts = 0
 		data.Charge = 0
 		for id in Config.Upgrades do
@@ -518,13 +578,16 @@ local function rebirth(player: Player, _payload: any): (boolean, any)
 		end
 		data.Zone = 1
 		data.LastZone = 1
-		data.Drone = false
-		data.DroneOn = true
+		data.IncomeRate = 0
 		data.Rebirths = rebirths
 	end)
-	-- дрон в пути больше не прилетит
+	-- дрон в пути больше не прилетит (его груз сгорает вместе с Вольтами), окно дохода — заново
 	st.DroneToken += 1
 	st.DroneBusy = false
+	st.Cargo = 0
+	st.Earned = 0
+	st.Active = false
+	st.WindowStart = os.clock()
 	setJarFill(player, 0, capacityOf(d))
 	PlayerService.refreshStats(player)
 	PlayerService.teleport(player, 1)
@@ -539,10 +602,23 @@ local function rebirth(player: Player, _payload: any): (boolean, any)
 end
 
 local function teleport(player: Player, payload: any): (boolean, any)
+	local st = ensureState(player)
+	if not st then
+		return false, LOADING
+	end
+	-- уже стоишь там (на мосту или в пустоте — можно)
+	if ServerLogic.isInteger(payload) and payload == PlayerService.getArea(player) then
+		return false, if payload == 0 then "Ты уже в городе" else "Ты уже на этом острове"
+	end
+	local left = Config.Server.TeleportCooldown - (os.clock() - st.LastTeleport)
+	if left > 0 then
+		return false, string.format("Телепорт заряжается: ещё %d с", math.ceil(left))
+	end
 	local ok, err = PlayerService.teleport(player, payload)
 	if not ok then
 		return false, err
 	end
+	st.LastTeleport = os.clock()
 	return true, payload
 end
 
@@ -563,6 +639,7 @@ function EconomyService.start()
 	RequestService.handle(Net.Actions.Rebirth, rebirth)
 	RequestService.handle(Net.Actions.Teleport, teleport)
 
+	DataService.addBeforeSave(returnCargo)
 	DataService.Loaded:Connect(function(player)
 		ensureState(player)
 	end)
@@ -573,6 +650,14 @@ function EconomyService.start()
 		local st = states[player]
 		if st then
 			st.DroneToken += 1
+			if st.Cargo > 0 then
+				-- последнее сохранение могло ещё не начаться: груз вернёт returnCargo
+				orphanCargo[player] = (orphanCargo[player] or 0) + st.Cargo
+				st.Cargo = 0
+				task.delay(60, function()
+					orphanCargo[player] = nil
+				end)
+			end
 		end
 		states[player] = nil
 	end)
