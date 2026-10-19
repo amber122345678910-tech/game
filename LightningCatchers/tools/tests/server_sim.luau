@@ -377,6 +377,10 @@ function load(path)
 			fromEnum = function(e)
 				return { Enum = e }
 			end,
+			-- шрифты игры (src/shared/Fonts.luau) создаются через Font.new(путь, вес, стиль)
+			new = function(family, weight, style)
+				return { Family = family, Weight = weight, Style = style }
+			end,
 		},
 		task = task,
 		typeof = function(v)

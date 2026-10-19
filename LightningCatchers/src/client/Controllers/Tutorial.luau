@@ -71,7 +71,7 @@ local panel: Frame? = nil
 local panelScale: UIScale? = nil
 local panelStroke: UIStroke? = nil
 local hintLabel: TextLabel? = nil
-local hintArrow: TextLabel? = nil
+local hintArrow: Frame? = nil
 
 local folder = Instance.new("Folder")
 folder.Name = "TutorialFX"
@@ -355,15 +355,29 @@ local function ensureGui(): boolean
 		ZIndexBehavior = Enum.ZIndexBehavior.Sibling,
 		Parent = pg,
 	}) :: ScreenGui
-	local p = UIKit.panel({
+	-- лента-подсказка в стиле тостов (§8.4): Ink с наклоном −2°, полоса Volt и значок-шеврон слева
+	local p = UIKit.new("Frame", {
 		Name = "Hint",
 		Size = UDim2.fromOffset(HINT_W, HINT_H),
 		AnchorPoint = Vector2.new(0.5, 0),
 		Position = UDim2.new(0.5, 0, 0, TOP_OFFSET),
-		BackgroundTransparency = 0.12,
+		Rotation = -2,
+		BackgroundColor3 = Color3.new(1, 1, 1),
 		Active = false, -- не перехватывает касания
 		Visible = false,
 		Parent = ng,
+	}) :: Frame
+	UIKit.corner(p, Theme.CornerSmall)
+	UIKit.stroke(p, 3, Theme.Ink)
+	UIKit.new("UIGradient", {
+		Rotation = 0,
+		Color = UIKit.seq({
+			{ 0, Theme.Volt },
+			{ 0.03, Theme.Volt },
+			{ 0.04, Theme.Night700 },
+			{ 1, Theme.Ink },
+		}),
+		Parent = p,
 	})
 	local s = UIKit.autoScale(p, "hud", 1280, 720)
 	-- место под верхней панелью HUD зависит от масштаба экрана (не от анимации появления)
@@ -374,23 +388,28 @@ local function ensureGui(): boolean
 	end
 	s:GetAttributeChangedSignal("BaseScale"):Connect(place)
 	place()
-	local arrow = UIKit.label({
-		Name = "Arrow",
-		Text = "👉",
-		Size = UDim2.fromOffset(52, 52),
+	local badge = UIKit.iconBadge(p, "", PULSE_COLOR, 52, {
+		Name = "Badge",
 		AnchorPoint = Vector2.new(0, 0.5),
-		Position = UDim2.new(0, 10, 0.5, 0),
-		MaxTextSize = 44,
-		NoStroke = true,
-		Parent = p,
+		Position = UDim2.new(0, -14, 0.5, 0),
+		ZIndex = 2,
+	})
+	local arrow = UIKit.glyph(badge, "chevronRight", {
+		Name = "Arrow",
+		Size = UDim2.fromScale(0.58, 0.58),
+		Position = UDim2.fromScale(0.52, 0.5),
+		Color = Theme.Cream,
+		Stroke = 2,
+		ZIndex = 3,
 	})
 	local label = UIKit.label({
 		Name = "Text",
 		Text = "",
-		Size = UDim2.new(1, -84, 1, -14),
+		FontFace = Theme.FontBodyHeavy,
+		Size = UDim2.new(1, -72, 1, -14),
 		AnchorPoint = Vector2.new(0, 0.5),
-		Position = UDim2.new(0, 70, 0.5, 0),
-		MaxTextSize = 32,
+		Position = UDim2.new(0, 54, 0.5, 0),
+		MaxTextSize = 28,
 		TextXAlignment = Enum.TextXAlignment.Left,
 		Parent = p,
 	})
@@ -452,14 +471,15 @@ local function ensureWorldArrow(): boolean
 	glyph.Name = "Glyph"
 	glyph.BackgroundTransparency = 1
 	glyph.Size = UDim2.fromScale(1, 1)
-	glyph.Text = "▼"
+	glyph.Text = "▼" -- есть только в Montserrat (FontDisplayFlat)
 	glyph.TextScaled = true
-	glyph.FontFace = Theme.Font
+	glyph.FontFace = Theme.FontDisplayFlat
 	glyph.TextColor3 = PULSE_COLOR
 	glyph.Parent = bg
 	local stroke = Instance.new("UIStroke")
 	stroke.Thickness = 3
-	stroke.Color = Theme.TextStroke
+	stroke.Color = Theme.Ink
+	stroke.LineJoinMode = Enum.LineJoinMode.Round
 	stroke.Parent = glyph
 	targetPart = p
 	targetGui = bg
@@ -544,14 +564,20 @@ local function setPulse(button: GuiObject?)
 	local arrow = UIKit.label({
 		Name = "Arrow",
 		Text = "▼",
+		FontFace = Theme.FontDisplayFlat,
 		Size = UDim2.fromOffset(44, 44),
 		AnchorPoint = Vector2.new(0.5, 1),
 		Position = UDim2.new(0.5, 0, 0, -4),
 		TextColor3 = PULSE_COLOR,
 		MaxTextSize = 40,
+		NoStroke = false,
 		ZIndex = 41,
 		Parent = f,
 	})
+	local arrowStroke = arrow:FindFirstChildOfClass("UIStroke")
+	if arrowStroke then
+		arrowStroke.Thickness = 3
+	end
 	pulseButton = button
 	pulseFrame = f
 	pulseStroke = stroke
@@ -628,11 +654,11 @@ local function animate(clock: number)
 	if p and p.Visible then
 		local stroke = panelStroke
 		if stroke then
-			stroke.Color = Theme.Stroke:Lerp(PULSE_COLOR, wave)
+			stroke.Color = Theme.Ink:Lerp(PULSE_COLOR, wave)
 		end
 		local arrow = hintArrow
 		if arrow then
-			arrow.Position = UDim2.new(0, 10 + 6 * wave, 0.5, 0)
+			arrow.Position = UDim2.new(0.46 + 0.12 * wave, 0, 0.5, 0)
 		end
 	end
 	local b = beam

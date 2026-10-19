@@ -18,6 +18,7 @@ local Workspace = game:GetService("Workspace")
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Config = require(Shared:WaitForChild("Config"))
 local Economy = require(Shared:WaitForChild("Economy"))
+local Fonts = require(Shared:WaitForChild("Fonts"))
 local Format = require(Shared:WaitForChild("Format"))
 local Geom = require(Shared:WaitForChild("Geom"))
 local Net = require(Shared:WaitForChild("Net"))
@@ -86,11 +87,12 @@ local COPPER = Color3.fromRGB(196, 120, 66)
 local COPPER_DARK = Color3.fromRGB(132, 74, 40)
 local RUBBER = Color3.fromRGB(38, 34, 46)
 local GLASS = Color3.fromRGB(196, 228, 255)
-local TAG_NAME = Color3.fromRGB(255, 255, 255)
-local TAG_TITLE = Color3.fromRGB(255, 214, 90)
-local TAG_SERIES = Color3.fromRGB(130, 214, 255)
-local TAG_STROKE = Color3.fromRGB(10, 12, 26)
-local TAG_FONT = Font.fromEnum(Enum.Font.BuilderSansExtraBold) -- с кириллицей
+-- Табличка над головой (docs/STYLE.md §8.3.8): звание — Montserrat Black Italic (Fonts.Display),
+-- ник и серия — Nunito ExtraBold (Fonts.BodyHeavy); обводка UIStroke цвета Ink
+local TAG_NAME = Color3.fromRGB(255, 248, 232)
+local TAG_TITLE = Color3.fromRGB(255, 210, 60)
+local TAG_SERIES = Color3.fromRGB(120, 230, 255)
+local TAG_STROKE = Color3.fromRGB(18, 14, 40)
 local PERUN_GOLD = Config.Colors.gold.Color
 local PERUN_BLACK = Config.Colors.black.Color
 local PERUN_ARC_STEPS = 7 -- отрезков в одной дуге Перуна
@@ -256,7 +258,7 @@ local function titleFor(d: Data): string
 	elseif d.Stats.Rainbows > 0 then
 		base = "🌈 Радужный ловец"
 	elseif d.Stats.Golds > 0 then
-		base = "✦ Золотой ловец"
+		base = "🌟 Золотой ловец" -- ✦ нет ни в одном шрифте игры (STYLE §8.3.4): значок — эмодзи
 	end
 	if d.Rebirths > 0 then
 		return if base ~= "" then string.format("%s · ♻%d", base, d.Rebirths) else string.format("♻ Перезапуск ×%d", d.Rebirths)
@@ -432,19 +434,22 @@ local function buildJar(): (Model, BasePart, CFrame)
 	return simpleJar()
 end
 
-local function makeLabel(name: string, order: number, height: number, color: Color3): TextLabel
+local function makeLabel(name: string, order: number, height: number, color: Color3, font: Font): TextLabel
 	local label = Instance.new("TextLabel")
 	label.Name = name
 	label.LayoutOrder = order
 	label.BackgroundTransparency = 1
 	label.Size = UDim2.new(1, 0, 0, height)
-	label.FontFace = TAG_FONT
+	label.FontFace = font
 	label.TextSize = height
 	label.TextColor3 = color
-	label.TextStrokeColor3 = TAG_STROKE
-	label.TextStrokeTransparency = 0.3
 	label.TextTruncate = Enum.TextTruncate.AtEnd
 	label.Text = ""
+	local stroke = Instance.new("UIStroke")
+	stroke.Color = TAG_STROKE
+	stroke.Thickness = if height >= 20 then 2 else 1.5
+	stroke.LineJoinMode = Enum.LineJoinMode.Round
+	stroke.Parent = label
 	return label
 end
 
@@ -464,11 +469,11 @@ local function buildNametag(player: Player): BillboardGui
 	layout.VerticalAlignment = Enum.VerticalAlignment.Bottom
 	layout.Parent = gui
 
-	makeLabel("Title", 1, 16, TAG_TITLE).Parent = gui
-	local name = makeLabel("PlayerName", 2, 24, TAG_NAME)
+	makeLabel("Title", 1, 17, TAG_TITLE, Fonts.Display).Parent = gui
+	local name = makeLabel("PlayerName", 2, 24, TAG_NAME, Fonts.BodyHeavy)
 	name.Text = player.DisplayName
 	name.Parent = gui
-	makeLabel("Series", 3, 16, TAG_SERIES).Parent = gui
+	makeLabel("Series", 3, 16, TAG_SERIES, Fonts.BodyHeavy).Parent = gui
 	return gui
 end
 

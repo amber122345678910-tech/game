@@ -24,13 +24,13 @@ local W, H = 780, 560
 local CONFIRM_TIME = 3 -- сколько секунд ждём второе нажатие
 local CONFIRM_GUARD = 0.8 -- первые столько секунд после «Точно?» нажатия не считаются
 local CONFETTI = 28
-local CONFETTI_COLORS = { Theme.Volt, Theme.Electric, Theme.Pink, Theme.Green, Theme.Purple, Theme.Orange }
+local CONFETTI_COLORS = { Theme.Volt, Theme.Spark, Theme.Pink, Theme.Go, Theme.Violet, Theme.Orange }
 
 local win: UIKit.Window
 local multLabel: TextLabel
 local multScale: UIScale
-local zoneReq: TextLabel
-local voltsReq: TextLabel
+local zoneReq: UIKit.Status
+local voltsReq: UIKit.Status
 local voltsBar: UIKit.Bar
 local bonusLabel: TextLabel
 local countLabel: TextLabel -- число перезапусков в заголовке
@@ -52,34 +52,32 @@ local function refresh()
 		return
 	end
 	local r = d.Rebirths
-	multLabel.Text = string.format("Множитель %s → %s", multText(Economy.rebirthMult(r)), multText(Economy.rebirthMult(r + 1)))
+	multLabel.Text = string.format("%s  ›  %s", multText(Economy.rebirthMult(r)), multText(Economy.rebirthMult(r + 1)))
 	countLabel.Text = tostring(r)
 
 	local needZone = Config.Rebirth.RequiredZone
 	local zoneOk = d.Zone >= needZone
-	zoneReq.Text = string.format("%s Открыть остров %d «%s»", if zoneOk then "✅" else "❌", needZone, Config.Zones[needZone].Name)
-	zoneReq.TextColor3 = if zoneOk then Theme.Green else Theme.Miss
+	zoneReq.set(if zoneOk then "check" else "cross", string.format("Открыть остров %d «%s»", needZone, Config.Zones[needZone].Name), if zoneOk then Theme.GoHi else Theme.DangerHi)
 
 	local cost = Economy.rebirthCost(r)
 	local voltsOk = d.Volts >= cost
-	voltsReq.Text = string.format("%s Накопить ⚡ %s", if voltsOk then "✅" else "❌", Format.short(cost))
-	voltsReq.TextColor3 = if voltsOk then Theme.Green else Theme.Miss
+	voltsReq.set(if voltsOk then "check" else "cross", "Накопить ⚡ " .. Format.short(cost), if voltsOk then Theme.GoHi else Theme.DangerHi)
 	voltsBar.set(d.Volts / cost, string.format("%s / %s", Format.short(math.min(d.Volts, cost)), Format.short(cost)))
-	voltsBar.setColor(if voltsOk then Theme.Green else Theme.Volt)
+	voltsBar.setColor(if voltsOk then Theme.Go else Theme.Volt)
 
 	local extraSlot = table.find(Config.Rebirth.PetSlotsAt, r + 1) ~= nil
 	bonusLabel.Visible = extraSlot
-	bonusLabel.Text = "🎁 Бонус: +1 место для питомца!"
+	bonusLabel.Text = "Бонус: +1 место для питомца!"
 
 	if os.clock() < confirmUntil then
 		return
 	end
 	if Economy.canRebirth(d) then
-		UIKit.setButtonText(rebirthButton, "♻ ПЕРЕЗАПУСК")
-		UIKit.setButtonColor(rebirthButton, Theme.Red)
+		UIKit.setButtonText(rebirthButton, "Перезапуск")
+		UIKit.setButtonVariant(rebirthButton, "Danger")
 	else
-		UIKit.setButtonText(rebirthButton, "♻ Пока рано")
-		UIKit.setButtonColor(rebirthButton, Theme.GrayDark)
+		UIKit.setButtonText(rebirthButton, "Пока рано")
+		UIKit.setButtonVariant(rebirthButton, "Disabled")
 	end
 end
 
@@ -87,7 +85,7 @@ local function buildConfetti()
 	for i = 1, CONFETTI do
 		local f = UIKit.new("Frame", {
 			Name = "Confetti" .. i,
-			Size = UDim2.fromOffset(14, 22),
+			Size = if i % 3 == 0 then UDim2.fromOffset(18, 18) else UDim2.fromOffset(12, 24),
 			AnchorPoint = Vector2.new(0.5, 0.5),
 			BackgroundColor3 = CONFETTI_COLORS[(i - 1) % #CONFETTI_COLORS + 1],
 			Visible = false,
@@ -100,15 +98,23 @@ local function buildConfetti()
 	celebrateLabel = UIKit.label({
 		Name = "Celebrate",
 		Text = "",
-		Size = UDim2.fromOffset(W - 60, 100),
+		FontFace = Theme.FontDisplay,
+		Size = UDim2.fromOffset(W - 60, 130),
 		AnchorPoint = Vector2.new(0.5, 0.5),
 		Position = UDim2.fromScale(0.5, 0.45),
-		TextColor3 = Theme.Volt,
-		MaxTextSize = 60,
+		Rotation = -4,
+		MaxTextSize = 56,
+		NoStroke = false,
 		Visible = false,
 		ZIndex = 31,
 		Parent = win.Root,
 	})
+	local cs = celebrateLabel:FindFirstChildOfClass("UIStroke")
+	if cs then
+		cs.Thickness = 5
+	end
+	UIKit.italicPad(celebrateLabel, 16)
+	UIKit.gradientText(celebrateLabel, Color3.fromRGB(255, 255, 240), Theme.Volt, Theme.VoltLo)
 	celebrateScale = UIKit.new("UIScale", { Scale = 1, Parent = celebrateLabel }) :: UIScale
 end
 
@@ -130,7 +136,7 @@ local function celebrate(newMult: number)
 			UIKit.tween(f, 0.5, { BackgroundTransparency = 1 })
 		end)
 	end
-	celebrateLabel.Text = "Генератор перезапущен!\nВольты " .. multText(newMult)
+	celebrateLabel.Text = "ГЕНЕРАТОР ПЕРЕЗАПУЩЕН!\nВОЛЬТЫ " .. multText(newMult)
 	celebrateLabel.Visible = true
 	celebrateScale.Scale = 0.3
 	UIKit.tween(celebrateScale, 0.45, { Scale = 1 }, Enum.EasingStyle.Back)
@@ -166,10 +172,10 @@ local function onRebirthPressed()
 		confirmUntil = confirmFrom + CONFIRM_TIME
 		UIKit.setButtonText(rebirthButton, "Точно? Жми ещё раз!")
 		-- пока второе нажатие не засчитывается, кнопка серая; потом — оранжевая с пружинкой
-		UIKit.setButtonColor(rebirthButton, Theme.GrayDark)
+		UIKit.setButtonVariant(rebirthButton, "Disabled")
 		task.delay(CONFIRM_GUARD, function()
 			if os.clock() < confirmUntil and not busy then
-				UIKit.setButtonColor(rebirthButton, Theme.Orange)
+				UIKit.setButtonVariant(rebirthButton, "Orange")
 				local scale = rebirthButton:FindFirstChildOfClass("UIScale")
 				if scale then
 					UIKit.bump(scale, 0.1)
@@ -206,82 +212,80 @@ local function build()
 	UIKit.label({
 		Name = "Line1",
 		Text = "Начни заново — и получай больше Вольт навсегда!",
+		FontFace = Theme.FontBodyHeavy,
 		Size = UDim2.new(1, -20, 0, 30),
 		Position = UDim2.fromOffset(10, 0),
-		MaxTextSize = 26,
+		MaxTextSize = 24,
 		Parent = body,
 	})
 	UIKit.label({
 		Name = "Line2",
 		Text = "Питомцы, фульгуриты, Тесла-дрон и Молниедекс остаются с тобой.",
-		Size = UDim2.new(1, -20, 0, 26),
+		Size = UDim2.new(1, -20, 0, 24),
 		Position = UDim2.fromOffset(10, 32),
-		FontFace = Theme.FontBold,
 		TextColor3 = Theme.TextDim,
-		MaxTextSize = 22,
+		MaxTextSize = 19,
 		Parent = body,
 	})
 
-	-- главное: множитель
+	-- главное: множитель (D3 Oswald с градиентом Volt) и тег «МНОЖИТЕЛЬ ВОЛЬТ»
 	local multCard = UIKit.card({
 		Name = "Mult",
-		Size = UDim2.new(1, -20, 0, 76),
+		Size = UDim2.new(1, -20, 0, 80),
 		Position = UDim2.fromOffset(10, 64),
 		Parent = body,
 	})
-	UIKit.tintCard(multCard, Theme.GoldDark, Theme.PanelDark)
+	UIKit.tintCard(multCard, Theme.Night700:Lerp(Theme.Volt, 0.16), Theme.Night800, Theme.Volt)
+	local tag, tagText = UIKit.tag({
+		Name = "Tag",
+		Size = UDim2.fromOffset(196, 26),
+		Position = UDim2.new(0, 16, 0.5, 0),
+		AnchorPoint = Vector2.new(0, 0.5),
+		Rotation = -3,
+		Parent = multCard,
+	}, "Множитель вольт", 15)
+	tag.ZIndex = 2
+	tagText.TextColor3 = Theme.Volt
 	multLabel = UIKit.label({
 		Name = "Text",
 		Text = "",
-		Size = UDim2.new(1, -30, 1, -12),
-		Position = UDim2.fromScale(0.5, 0.5),
-		AnchorPoint = Vector2.new(0.5, 0.5),
-		TextColor3 = Theme.Volt,
-		MaxTextSize = 46,
+		FontFace = Theme.FontNumber,
+		Size = UDim2.new(1, -250, 1, -10),
+		Position = UDim2.new(0, 230, 0.5, 0),
+		AnchorPoint = Vector2.new(0, 0.5),
+		MaxTextSize = 52,
+		NoStroke = false,
 		Parent = multCard,
 	})
+	local ms = multLabel:FindFirstChildOfClass("UIStroke")
+	if ms then
+		ms.Thickness = 3
+	end
+	UIKit.gradientText(multLabel, Theme.VoltHi, Theme.Volt)
 	multScale = UIKit.new("UIScale", { Scale = 1, Parent = multLabel }) :: UIScale
 
 	-- что нужно
 	local req = UIKit.card({
 		Name = "Requirements",
-		Size = UDim2.new(1, -20, 0, 112),
-		Position = UDim2.fromOffset(10, 150),
+		Size = UDim2.new(1, -20, 0, 110),
+		Position = UDim2.fromOffset(10, 154),
 		Parent = body,
 	})
-	UIKit.label({
+	local _rt, rtText = UIKit.tag({
 		Name = "Title",
-		Text = "Что нужно:",
-		Size = UDim2.fromOffset(200, 26),
-		Position = UDim2.fromOffset(14, 6),
-		TextXAlignment = Enum.TextXAlignment.Left,
-		MaxTextSize = 22,
+		Size = UDim2.fromOffset(120, 24),
+		Position = UDim2.fromOffset(14, 8),
 		Parent = req,
-	})
-	zoneReq = UIKit.label({
-		Name = "Zone",
-		Text = "",
-		Size = UDim2.new(1, -28, 0, 26),
-		Position = UDim2.fromOffset(14, 34),
-		TextXAlignment = Enum.TextXAlignment.Left,
-		MaxTextSize = 22,
-		Parent = req,
-	})
-	voltsReq = UIKit.label({
-		Name = "Volts",
-		Text = "",
-		Size = UDim2.new(0.42, -14, 0, 26),
-		Position = UDim2.fromOffset(14, 70),
-		TextXAlignment = Enum.TextXAlignment.Left,
-		MaxTextSize = 22,
-		Parent = req,
-	})
+	}, "Что нужно", 14)
+	rtText.TextColor3 = Theme.TextDim
+	zoneReq = UIKit.status(req, UDim2.new(1, -28, 0, 26), UDim2.fromOffset(14, 40), 21)
+	voltsReq = UIKit.status(req, UDim2.new(0.42, -14, 0, 26), UDim2.fromOffset(14, 74), 21)
 	voltsBar = UIKit.bar({
 		Name = "VoltsBar",
-		Size = UDim2.new(0.58, -20, 0, 28),
-		Position = UDim2.new(0.42, 4, 0, 69),
+		Size = UDim2.new(0.58, -30, 0, 28),
+		Position = UDim2.new(0.42, 4, 0, 73),
 		Color = Theme.Volt,
-		TextSize = 18,
+		TextSize = 17,
 		Parent = req,
 	})
 
@@ -289,55 +293,53 @@ local function build()
 	local function listCard(name: string, title: string, color: Color3, text: string, x: number)
 		local c = UIKit.card({
 			Name = name,
-			Size = UDim2.new(0.5, -15, 0, 88),
-			Position = UDim2.new(x, if x == 0 then 10 else 5, 0, 270),
+			Size = UDim2.new(0.5, -15, 0, 86),
+			Position = UDim2.new(x, if x == 0 then 10 else 5, 0, 272),
 			Parent = body,
 		})
-		UIKit.label({
+		UIKit.tintCard(c, Theme.Night700:Lerp(color, 0.12), Theme.Night800, color)
+		local _tf, tl = UIKit.tag({
 			Name = "Title",
-			Text = title,
-			Size = UDim2.new(1, -20, 0, 26),
-			Position = UDim2.fromOffset(10, 6),
-			TextXAlignment = Enum.TextXAlignment.Left,
-			TextColor3 = color,
-			MaxTextSize = 22,
+			Size = UDim2.fromOffset(130, 24),
+			Position = UDim2.fromOffset(10, 10),
 			Parent = c,
-		})
+		}, title, 14)
+		tl.TextColor3 = color
 		UIKit.label({
 			Name = "Text",
 			Text = text,
-			Size = UDim2.new(1, -20, 0, 54),
-			Position = UDim2.fromOffset(10, 32),
+			Size = UDim2.new(1, -20, 0, 48),
+			Position = UDim2.fromOffset(12, 36),
 			TextXAlignment = Enum.TextXAlignment.Left,
 			TextYAlignment = Enum.TextYAlignment.Top,
-			FontFace = Theme.FontBold,
-			MaxTextSize = 18,
+			MaxTextSize = 17,
 			Parent = c,
 		})
 	end
 	-- как в EconomyService.rebirth: доход в минуту тоже с нуля (награды «N минут дохода» — от минимума)
-	listCard("Reset", "Сбросится:", Theme.Miss, "⚡ Вольты и банка\n🔱 улучшения, 🏝 острова\n📈 доход в минуту", 0)
-	listCard("Keep", "Останется:", Theme.Green, "🐾 питомцы, 🔮 фульгуриты\n💎 осколки, 📖 Молниедекс\n🤖 Тесла-дрон", 0.5)
+	listCard("Reset", "Сбросится", Theme.DangerHi, "• Вольты и банка\n• улучшения и острова\n• доход в минуту", 0)
+	listCard("Keep", "Останется", Theme.GoHi, "• питомцы и фульгуриты\n• осколки и Молниедекс\n• Тесла-дрон", 0.5)
 
 	bonusLabel = UIKit.label({
 		Name = "Bonus",
 		Text = "",
-		Size = UDim2.new(1, -20, 0, 24),
-		Position = UDim2.fromOffset(10, 361),
+		FontFace = Theme.FontBodyHeavy,
+		Size = UDim2.new(1, -20, 0, 22),
+		Position = UDim2.fromOffset(10, 362),
 		TextColor3 = Theme.Pink,
-		MaxTextSize = 22,
+		MaxTextSize = 20,
 		Visible = false,
 		Parent = body,
 	})
 
 	rebirthButton = UIKit.button({
 		Name = "Rebirth",
-		Text = "♻ ПЕРЕЗАПУСК",
-		Color = Theme.Red,
-		Size = UDim2.fromOffset(380, 72),
+		Text = "Перезапуск",
+		Color = Theme.Danger,
+		Size = UDim2.fromOffset(380, 68),
 		AnchorPoint = Vector2.new(0.5, 1),
-		Position = UDim2.new(0.5, 0, 1, -2),
-		TextSize = 32,
+		Position = UDim2.new(0.5, 0, 1, 2),
+		TextSize = 30,
 		Parent = body,
 	}, onRebirthPressed)
 end
@@ -348,11 +350,11 @@ function RebirthUI.start()
 	end
 	win = UIKit.window({
 		Name = "Rebirth",
-		Title = "Перезапуск генератора",
+		Title = "Перезапуск",
 		Icon = "♻",
 		Width = W,
 		Height = H,
-		Accent = Theme.RedDark,
+		Accent = Theme.Orange,
 		OnOpen = function()
 			confirmUntil = 0
 			confirmFrom = 0
@@ -365,7 +367,7 @@ function RebirthUI.start()
 			ClientState.WindowClosed:Fire("Rebirth")
 		end,
 	})
-	countLabel = UIKit.headerCounter(win, "♻", Theme.Orange, 120)
+	countLabel = UIKit.headerCounter(win, "♻", Theme.Orange, 110)
 	build()
 	buildConfetti()
 

@@ -39,6 +39,9 @@ function ctx.place(model, cf, parent)
 			d.CanQuery = false
 			d.CanTouch = false
 			B.count += 1
+			if d:IsA("Part") and d.Shape == roblox.Enum.PartType.Ball then
+				B.balls += 1
+			end
 		end
 	end
 	model.Parent = parent
@@ -54,9 +57,9 @@ local islands = B.folder(root, "Islands")
 
 local counts = {}
 local function section(name, fn)
-	local before = B.count
+	local before, ballsBefore = B.count, B.balls
 	fn()
-	table.insert(counts, string.format("  %-10s %5d", name, B.count - before))
+	table.insert(counts, string.format("  %-10s %5d   шаров %3d", name, B.count - before, B.balls - ballsBefore))
 end
 
 for i = 1, #ctx.Config.Zones do
@@ -95,6 +98,6 @@ print("Деталей по разделам:")
 for _, line in counts do
 	print(line)
 end
-print(string.format("Всего деталей: %d", B.count))
+print(string.format("Всего деталей: %d, из них шаров: %d (бюджет STYLE §11: ≤ 6900 и ≤ 300)", B.count, B.balls))
 fs.writeFile("src/map/Map.rbxmx", roblox.serializeModel({ root }, true))
 print("src/map/Map.rbxmx записан")

@@ -8,6 +8,7 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 
 const params = new URLSearchParams(location.search);
 const W = +(params.get('w') || 1280), H = +(params.get('h') || 720);
@@ -182,6 +183,15 @@ composer.addPass(new RenderPass(s, camera));
 const bloom = L.bloom || { intensity: 0.6, size: 24, threshold: 1.4 };
 composer.addPass(new UnrealBloomPass(new THREE.Vector2(W, H), Math.min(1.6, bloom.intensity * 1.2), 0.5, 0.92));
 composer.addPass(new OutputPass());
+// Цветокоррекция как у ColorCorrectionEffect (только если её передали: dump_scene --cc / --sky)
+if (L.cc) {
+  const cc = new ShaderPass({
+    uniforms: { tDiffuse: { value: null }, tint: { value: new THREE.Vector3(...L.cc.tint) }, sat: { value: L.cc.saturation }, con: { value: L.cc.contrast }, bri: { value: L.cc.brightness } },
+    vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix*modelViewMatrix*vec4(position,1.0); }',
+    fragmentShader: 'uniform sampler2D tDiffuse; uniform vec3 tint; uniform float sat; uniform float con; uniform float bri; varying vec2 vUv; void main(){ vec4 t = texture2D(tDiffuse, vUv); vec3 c = t.rgb * tint + bri; c = (c - 0.5) * (1.0 + con) + 0.5; float l = dot(c, vec3(0.299, 0.587, 0.114)); c = mix(vec3(l), c, 1.0 + sat); gl_FragColor = vec4(clamp(c, 0.0, 1.0), t.a); }'
+  });
+  composer.addPass(cc);
+}
 composer.render();
 document.title = 'done ' + scene.parts.length;
 </script></body></html>

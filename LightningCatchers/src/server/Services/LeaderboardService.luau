@@ -17,6 +17,7 @@ local Workspace = game:GetService("Workspace")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Config = require(Shared:WaitForChild("Config"))
+local Fonts = require(Shared:WaitForChild("Fonts"))
 local Format = require(Shared:WaitForChild("Format"))
 local Net = require(Shared:WaitForChild("Net"))
 
@@ -38,15 +39,17 @@ local FRIEND_RETRIES = 3
 local MAX_SCORE = 9e18 -- OrderedDataStore хранит 64-битные целые
 local NAME_FALLBACK = "Ловец"
 
-local BOARD_FONT = Font.fromEnum(Enum.Font.BuilderSansBold)
-local BOARD_FONT_HEAVY = Font.fromEnum(Enum.Font.BuilderSansExtraBold)
-local WHITE = Color3.new(1, 1, 1)
-local DIM = Color3.fromRGB(176, 186, 220)
-local STROKE = Color3.fromRGB(10, 12, 26)
+-- Шрифты табло (docs/STYLE.md §9): заголовок — Montserrat Black Italic, строки — Nunito, числа — Oswald
+local BOARD_FONT = Fonts.Body
+local BOARD_FONT_HEAVY = Fonts.Display
+local BOARD_FONT_NUM = Fonts.Number
+local WHITE = Color3.fromRGB(255, 248, 232)
+local DIM = Color3.fromRGB(170, 174, 220)
+local STROKE = Color3.fromRGB(18, 14, 40)
 local MEDALS = { Color3.fromRGB(255, 214, 80), Color3.fromRGB(220, 226, 240), Color3.fromRGB(235, 160, 100) }
 
 type Entry = { UserId: number, Name: string, Score: number }
-type Board = { Gui: SurfaceGui, Content: Frame, Rows: { TextLabel }, Footer: TextLabel? }
+type Board = { Gui: SurfaceGui, Content: Frame, Rows: { TextLabel }, Values: { TextLabel }, Footer: TextLabel? }
 
 local store: OrderedDataStore? = nil
 local storeDisabled = false
@@ -241,9 +244,13 @@ local function newText(parent: Instance, name: string, pos: UDim2, size: UDim2, 
 	l.TextColor3 = WHITE
 	l.TextScaled = true
 	l.TextXAlignment = align
-	l.TextStrokeColor3 = STROKE
-	l.TextStrokeTransparency = 0.4
 	l.Parent = parent
+	local stroke = Instance.new("UIStroke")
+	stroke.Color = STROKE
+	stroke.Thickness = if font == BOARD_FONT_HEAVY then 3 else 1.5
+	stroke.Transparency = if font == BOARD_FONT_HEAVY then 0 else 0.3
+	stroke.LineJoinMode = Enum.LineJoinMode.Round
+	stroke.Parent = l
 	local pad = Instance.new("UIPadding")
 	pad.PaddingTop = UDim.new(0.12, 0)
 	pad.PaddingBottom = UDim.new(0.12, 0)
@@ -254,7 +261,8 @@ local function newText(parent: Instance, name: string, pos: UDim2, size: UDim2, 
 end
 
 -- Найти (или создать) SurfaceGui табло и разложить строки: cols × rows (+ строка-подпись внизу)
-local function setupBoard(name: string, title: string, cols: number, rows: number, footer: boolean): Board?
+-- values: у каждой строки справа отдельное число (Oswald), сама строка — имя (Nunito)
+local function setupBoard(name: string, title: string, cols: number, rows: number, footer: boolean, values: boolean?): Board?
 	local folder = markers()
 	local marker = if folder then folder:FindFirstChild(name) else nil
 	if not marker or not marker:IsA("BasePart") then
@@ -296,17 +304,31 @@ local function setupBoard(name: string, title: string, cols: number, rows: numbe
 	end
 	local listH = if footer then 0.86 else 1
 	local list: { TextLabel } = {}
+	local vals: { TextLabel } = {}
+	local nameW = if values then 0.64 else 1
 	for col = 0, cols - 1 do
 		for row = 0, rows - 1 do
 			local l = newText(
 				content,
 				string.format("Row_%d", col * rows + row + 1),
 				UDim2.fromScale(col / cols, row * listH / rows),
-				UDim2.fromScale(1 / cols, listH / rows),
+				UDim2.fromScale(nameW / cols, listH / rows),
 				Enum.TextXAlignment.Left,
 				BOARD_FONT
 			)
 			table.insert(list, l)
+			if values then
+				local v = newText(
+					content,
+					string.format("Value_%d", col * rows + row + 1),
+					UDim2.fromScale((col + nameW) / cols, row * listH / rows),
+					UDim2.fromScale((1 - nameW) / cols, listH / rows),
+					Enum.TextXAlignment.Right,
+					BOARD_FONT_NUM
+				)
+				v.TextColor3 = Color3.fromRGB(255, 210, 60)
+				table.insert(vals, v)
+			end
 		end
 	end
 	local foot: TextLabel? = nil
@@ -315,7 +337,7 @@ local function setupBoard(name: string, title: string, cols: number, rows: numbe
 		f.TextColor3 = DIM
 		foot = f
 	end
-	return { Gui = gui, Content = content, Rows = list, Footer = foot }
+	return { Gui = gui, Content = content, Rows = list, Values = vals, Footer = foot }
 end
 
 local function setRow(l: TextLabel, text: string, color: Color3?)
@@ -338,10 +360,17 @@ local function renderLeaders()
 	local list: { Entry } = if top and isGlobal then top else localTop()
 	for i, l in board.Rows do
 		local e = list[i]
+		local v = board.Values[i]
 		if e then
-			setRow(l, string.format("%d. %s — %s ⚡", i, e.Name, Format.short(e.Score)), MEDALS[i])
+			setRow(l, string.format("%d. %s", i, e.Name), MEDALS[i])
+			if v then
+				setRow(v, Format.short(e.Score) .. " ⚡", Color3.fromRGB(255, 210, 60))
+			end
 		else
 			setRow(l, if i == 1 then "Пока пусто — лови молнии!" else "", DIM)
+			if v then
+				setRow(v, "", DIM)
+			end
 		end
 	end
 	local foot = board.Footer
@@ -601,9 +630,9 @@ function LeaderboardService.start()
 	end)
 
 	-- табло (если на карте есть метки)
-	leadersBoard = setupBoard("Board_Leaders", "🏆 Лучшие ловцы", 2, TOP_N // 2, true)
-	hallBoard = setupBoard("Board_Hall", "🌈 Зал Славы", 2, HALL_SIZE // 2, true)
-	forecastBoard = setupBoard("Board_Forecast", "Прогноз погоды", 1, #FORECAST + 1, false)
+	leadersBoard = setupBoard("Board_Leaders", "ЛУЧШИЕ ЛОВЦЫ", 2, TOP_N // 2, true, true)
+	hallBoard = setupBoard("Board_Hall", "ЗАЛ СЛАВЫ", 2, HALL_SIZE // 2, true)
+	forecastBoard = setupBoard("Board_Forecast", "ПРОГНОЗ ПОГОДЫ", 1, #FORECAST + 1, false)
 	renderLeaders()
 	renderHall()
 

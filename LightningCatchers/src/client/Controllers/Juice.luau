@@ -17,66 +17,129 @@ local Juice = {}
 local player = Players.LocalPlayer
 
 ----------------------------------------------------------------------
--- Всплывающий текст над точкой мира ("+12 ✨")
+-- Всплывающий текст над точкой мира («+12 ⚡», «Цепная молния!»): §8.4 — D3 (Oswald) с градиентом цвета,
+-- обводкой 3 Ink и случайным наклоном ±5°; слова (с русскими буквами) — Montserrat Black Italic.
+-- Детали берутся из пула (без создания и удаления на каждое событие)
 ----------------------------------------------------------------------
 local popupFolder = Instance.new("Folder")
 popupFolder.Name = "Popups"
 popupFolder.Parent = Workspace
 
-local activePopups = 0
 local MAX_POPUPS = 14
+local HIDDEN = CFrame.new(0, 3000, 0) -- свободные детали пула стоят высоко над картой (ниже FallenPartsDestroyHeight нельзя)
+local WHITE = Color3.new(1, 1, 1)
 
-function Juice.popup(position: Vector3, text: string, color: Color3?, big: boolean?)
-	if activePopups >= MAX_POPUPS then
-		return
-	end
-	activePopups += 1
+type Popup = {
+	anchor: Part,
+	gui: BillboardGui,
+	label: TextLabel,
+	stroke: UIStroke,
+	grad: UIGradient,
+	scale: UIScale,
+	busy: boolean,
+	token: number,
+}
+local popups: { Popup } = {}
+
+local function makePopup(): Popup
 	local anchor = Instance.new("Part")
 	anchor.Name = "PopupAnchor"
 	anchor.Anchored = true
 	anchor.CanCollide = false
 	anchor.CanQuery = false
 	anchor.CanTouch = false
+	anchor.CastShadow = false
 	anchor.Transparency = 1
 	anchor.Size = Vector3.new(0.2, 0.2, 0.2)
-	anchor.CFrame = CFrame.new(position + Vector3.new((math.random() - 0.5) * 1.5, 1.5, (math.random() - 0.5) * 1.5))
+	anchor.CFrame = HIDDEN
 	anchor.Parent = popupFolder
-
-	local size = if big then 3.2 else 2.2
 	local gui = Instance.new("BillboardGui")
-	gui.Size = UDim2.fromScale(size * 2.5, size)
 	gui.AlwaysOnTop = true
 	gui.LightInfluence = 0
 	gui.MaxDistance = 120
+	gui.Enabled = false
 	gui.Parent = anchor
-
 	local label = Instance.new("TextLabel")
 	label.BackgroundTransparency = 1
 	label.Size = UDim2.fromScale(1, 1)
-	label.Text = text
 	label.TextScaled = true
-	label.FontFace = Theme.Font
-	label.TextColor3 = color or Theme.Text
+	label.FontFace = Theme.FontNumber
+	label.TextColor3 = WHITE
 	label.Parent = gui
 	local stroke = Instance.new("UIStroke")
-	stroke.Thickness = 2.5
-	stroke.Color = Theme.TextStroke
+	stroke.Thickness = 3
+	stroke.Color = Theme.Ink
+	stroke.LineJoinMode = Enum.LineJoinMode.Round
 	stroke.Parent = label
+	local grad = Instance.new("UIGradient")
+	grad.Rotation = 90
+	grad.Parent = label
 	local scale = Instance.new("UIScale")
-	scale.Scale = 0.3
 	scale.Parent = label
+	return { anchor = anchor, gui = gui, label = label, stroke = stroke, grad = grad, scale = scale, busy = false, token = 0 }
+end
 
-	TweenService:Create(scale, TweenInfo.new(0.25, Enum.EasingStyle.Back, Enum.EasingDirection.Out), { Scale = 1 }):Play()
-	TweenService:Create(anchor, TweenInfo.new(1.1, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
-		CFrame = anchor.CFrame + Vector3.new(0, 4, 0),
+-- Есть ли в строке русские буквы (UTF-8: ведущие байты 0xD0/0xD1)
+local function hasCyrillic(text: string): boolean
+	return string.find(text, "[\208\209]") ~= nil
+end
+
+function Juice.popup(position: Vector3, text: string, color: Color3?, big: boolean?)
+	local p: Popup? = nil
+	for _, q in popups do
+		if not q.busy then
+			p = q
+			break
+		end
+	end
+	if not p then
+		if #popups >= MAX_POPUPS then
+			return
+		end
+		p = makePopup()
+		table.insert(popups, p)
+	end
+	local pop = p :: Popup
+	pop.busy = true
+	pop.token += 1
+	local token = pop.token
+
+	local base = color or Theme.Cream
+	local h, sat, v = base:ToHSV()
+	if v < 0.45 then
+		base = Color3.fromHSV(h, sat * 0.8, 0.75) -- тёмный цвет (Чёрная Перуна) не читается на обводке Ink
+	end
+	local size = if big then 3.2 else 2.2
+	local words = hasCyrillic(text)
+	pop.gui.Size = UDim2.fromScale(size * (if words then 3.2 else 2.5), size)
+	pop.label.FontFace = if words then Theme.FontDisplay else Theme.FontNumber
+	pop.label.Text = text
+	pop.label.TextTransparency = 0
+	pop.label.Rotation = math.random(-5, 5)
+	pop.stroke.Transparency = 0
+	pop.grad.Color = ColorSequence.new(base:Lerp(WHITE, 0.55), base)
+	pop.scale.Scale = 0.3
+	pop.anchor.CFrame = CFrame.new(position + Vector3.new((math.random() - 0.5) * 1.5, 1.5, (math.random() - 0.5) * 1.5))
+	pop.gui.Enabled = true
+
+	TweenService:Create(pop.scale, TweenInfo.new(0.25, Enum.EasingStyle.Back, Enum.EasingDirection.Out), { Scale = 1 }):Play()
+	TweenService:Create(pop.anchor, TweenInfo.new(1.1, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+		CFrame = pop.anchor.CFrame + Vector3.new(0, 4, 0),
 	}):Play()
 	task.delay(0.65, function()
-		TweenService:Create(label, TweenInfo.new(0.45), { TextTransparency = 1 }):Play()
-		TweenService:Create(stroke, TweenInfo.new(0.45), { Transparency = 1 }):Play()
+		if pop.token ~= token then
+			return
+		end
+		TweenService:Create(pop.label, TweenInfo.new(0.45), { TextTransparency = 1 }):Play()
+		TweenService:Create(pop.stroke, TweenInfo.new(0.45), { Transparency = 1 }):Play()
 	end)
 	task.delay(1.15, function()
-		activePopups -= 1
-		anchor:Destroy()
+		if pop.token ~= token then
+			return
+		end
+		pop.gui.Enabled = false
+		pop.anchor.CFrame = HIDDEN
+		pop.busy = false
 	end)
 end
 

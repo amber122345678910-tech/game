@@ -45,7 +45,7 @@ type QuestRow = {
 	bar: UIKit.Bar,
 	reward: TextLabel,
 	button: TextButton,
-	done: TextLabel,
+	done: Frame,
 }
 
 local win: UIKit.Window
@@ -108,51 +108,32 @@ end
 
 local function makeTile(parent: Instance, day: number, size: Vector2, pos: UDim2): DayTile
 	local big = day == #Config.DailyRewards
-	local frame = UIKit.new("Frame", {
+	local frame = UIKit.card({
 		Name = "Day" .. day,
 		Size = UDim2.fromOffset(size.X, size.Y),
 		Position = pos,
-		BackgroundColor3 = WHITE,
 		Parent = parent,
-	}) :: Frame
-	UIKit.corner(frame, Theme.CornerSmall)
-	local stroke = UIKit.stroke(frame, 3, Theme.Stroke)
+	})
 	if big then
-		UIKit.gradient(frame, Theme.GoldDark, Theme.PanelDark)
-	else
-		UIKit.gradient(frame, Theme.CardHover, Theme.Card)
+		UIKit.tintCard(frame, Theme.Night700:Lerp(Theme.Volt, 0.2), Theme.Night800, Theme.Volt)
 	end
+	local stroke = frame:FindFirstChildOfClass("UIStroke") :: UIStroke
 	local scale = UIKit.new("UIScale", { Scale = 1, Parent = frame }) :: UIScale
 	local dayLabel = UIKit.label({
 		Name = "Day",
-		Text = "День " .. day,
-		Size = UDim2.new(1, -40, 0, 24),
-		Position = UDim2.fromOffset(8, 4),
+		Text = "ДЕНЬ " .. day,
+		FontFace = Theme.FontBodyHeavy,
+		Size = UDim2.new(1, -40, 0, 22),
+		Position = UDim2.fromOffset(10, if big then 10 else 6),
 		TextXAlignment = Enum.TextXAlignment.Left,
 		TextColor3 = if big then Theme.Volt else Theme.TextDim,
-		MaxTextSize = 22,
+		MaxTextSize = 17,
 		Parent = frame,
 	})
-	local check = UIKit.new("Frame", {
+	local check = UIKit.checkBadge(frame, 30, {
 		Name = "Check",
-		Size = UDim2.fromOffset(30, 30),
 		AnchorPoint = Vector2.new(0.5, 0.5),
-		Position = UDim2.new(1, -6, 0, 6),
-		BackgroundColor3 = Theme.Green,
-		Visible = false,
-		ZIndex = 5,
-		Parent = frame,
-	}) :: Frame
-	UIKit.round(check)
-	UIKit.stroke(check, 2, Theme.Stroke)
-	UIKit.label({
-		Text = "✔",
-		Size = UDim2.fromScale(0.75, 0.75),
-		Position = UDim2.fromScale(0.5, 0.5),
-		AnchorPoint = Vector2.new(0.5, 0.5),
-		MaxTextSize = 26,
-		ZIndex = 6,
-		Parent = check,
+		Position = UDim2.new(1, -8, 0, 8),
 	})
 	return { day = day, frame = frame, scale = scale, stroke = stroke, check = check, dayLabel = dayLabel, glowTween = nil }
 end
@@ -160,22 +141,28 @@ end
 local function fillSmallTile(t: DayTile)
 	local r = Config.DailyRewards[t.day]
 	local a, b = rewardLines(r, nil)
-	UIKit.label({
+	local main = UIKit.label({
 		Name = "Main",
 		Text = a,
-		Size = UDim2.new(1, -10, 0, 40),
-		Position = UDim2.fromOffset(5, 30),
-		TextColor3 = if r.Kind == "volts" then Theme.Volt else WHITE,
+		FontFace = Theme.FontNumber,
+		Size = UDim2.new(1, -12, 0, 40),
+		Position = UDim2.fromOffset(6, 32),
+		TextColor3 = if r.Kind == "volts" then Theme.Volt else Theme.Cream,
 		MaxTextSize = 30,
+		NoStroke = false,
 		Parent = t.frame,
 	})
+	if r.Kind == "volts" then
+		UIKit.gradientText(main, Theme.VoltHi, Theme.Volt)
+	end
 	UIKit.label({
 		Name = "Second",
 		Text = b,
-		Size = UDim2.new(1, -10, 0, 36),
-		Position = UDim2.fromOffset(5, 72),
+		FontFace = if r.Kind == "volts" then Theme.FontNumber else Theme.FontBodyHeavy,
+		Size = UDim2.new(1, -12, 0, 34),
+		Position = UDim2.fromOffset(6, 74),
 		TextColor3 = if r.Kind == "volts" then Theme.Shard else Theme.TextDim,
-		MaxTextSize = 20,
+		MaxTextSize = if r.Kind == "volts" then 22 else 17,
 		Parent = t.frame,
 	})
 end
@@ -186,10 +173,9 @@ local function fillBigTile(t: DayTile)
 	if petKind and Pets.Kinds[petKind] then
 		local def = Pets.Kinds[petKind]
 		local rar = Pets.Rarities[def.Rarity]
-		local vp, cam = UIKit.viewport({
-			Name = "Preview",
-			Size = UDim2.new(1, -12, 0, 130),
-			Position = UDim2.fromOffset(6, 30),
+		local _well, vp, cam = UIKit.previewWell({
+			Size = UDim2.new(1, -16, 0, 120),
+			Position = UDim2.fromOffset(8, 36),
 			Parent = t.frame,
 		})
 		local ok, model = pcall(function()
@@ -204,29 +190,32 @@ local function fillBigTile(t: DayTile)
 		UIKit.label({
 			Name = "Name",
 			Text = def.Name,
-			Size = UDim2.new(1, -10, 0, 32),
+			FontFace = Theme.FontDisplayFlat,
+			Size = UDim2.new(1, -10, 0, 28),
 			Position = UDim2.fromOffset(5, 160),
-			TextColor3 = rar.Color:Lerp(WHITE, 0.3),
-			MaxTextSize = 30,
+			TextColor3 = rar.Color:Lerp(WHITE, 0.35),
+			MaxTextSize = 22,
 			Parent = t.frame,
 		})
-		UIKit.label({
+		local tag, tagText = UIKit.tag({
 			Name = "Rarity",
-			Text = rar.Name,
-			Size = UDim2.new(1, -10, 0, 22),
-			Position = UDim2.fromOffset(5, 192),
-			TextColor3 = rar.Color,
-			MaxTextSize = 20,
+			Size = UDim2.new(1, -24, 0, 22),
+			AnchorPoint = Vector2.new(0.5, 0),
+			Position = UDim2.new(0.5, 0, 0, 190),
+			Rotation = -2,
+			BackgroundColor3 = rar.Color,
 			Parent = t.frame,
-		})
+		}, rar.Name, 13)
+		tag.ZIndex = 1
+		tagText.TextColor3 = Theme.Ink
 		UIKit.label({
 			Name = "Bonus",
 			Text = Pets.bonusText(petKind),
-			Size = UDim2.new(1, -46, 0, 22),
-			Position = UDim2.fromOffset(5, 216),
-			FontFace = Theme.FontBold,
+			FontFace = Theme.FontBodyHeavy,
+			Size = UDim2.new(1, -12, 0, 20),
+			Position = UDim2.fromOffset(6, 218),
 			TextColor3 = Theme.Volt,
-			MaxTextSize = 16,
+			MaxTextSize = 15,
 			Parent = t.frame,
 		})
 	else
@@ -234,17 +223,20 @@ local function fillBigTile(t: DayTile)
 		UIKit.label({
 			Name = "Main",
 			Text = a,
+			FontFace = Theme.FontNumber,
 			Size = UDim2.new(1, -10, 0, 80),
 			Position = UDim2.fromOffset(5, 60),
-			MaxTextSize = 60,
+			MaxTextSize = 56,
+			NoStroke = false,
 			Parent = t.frame,
 		})
 		UIKit.label({
 			Name = "Second",
 			Text = b,
+			FontFace = Theme.FontBodyHeavy,
 			Size = UDim2.new(1, -10, 0, 40),
 			Position = UDim2.fromOffset(5, 150),
-			MaxTextSize = 26,
+			MaxTextSize = 24,
 			Parent = t.frame,
 		})
 	end
@@ -264,9 +256,9 @@ local function setTileGlow(t: DayTile, on: boolean)
 			tw:Cancel()
 		end
 		t.glowTween = nil
-		t.stroke.Color = Theme.Stroke
-		t.stroke.Thickness = 3
-		t.stroke.Transparency = 0
+		t.stroke.Color = Theme.LineLight
+		t.stroke.Thickness = 1.5
+		t.stroke.Transparency = 0.7
 	end
 end
 
@@ -288,36 +280,39 @@ local function refreshCalendar(d: PlayerData.Data)
 		local highlight = t.day == current
 		setTileGlow(t, highlight and claimable)
 		if highlight and claimable then
-			t.dayLabel.Text = "Сегодня!"
+			t.dayLabel.Text = "СЕГОДНЯ!"
 			t.dayLabel.TextColor3 = Theme.Volt
 		elseif highlight and claimed then
-			t.dayLabel.Text = "Сегодня ✔"
-			t.dayLabel.TextColor3 = Theme.Green
+			t.dayLabel.Text = "СЕГОДНЯ"
+			t.dayLabel.TextColor3 = Theme.GoHi
 		else
-			t.dayLabel.Text = "День " .. t.day
+			t.dayLabel.Text = "ДЕНЬ " .. t.day
 			t.dayLabel.TextColor3 = if t.day == #Config.DailyRewards then Theme.Volt else Theme.TextDim
 		end
 	end
 	local streak = math.max(done, if claimable then 0 else d.Daily.Streak)
-	streakLabel.Text = string.format("🔥 Серия: %d %s", streak, Format.plural(streak, "день", "дня", "дней"))
+	streakLabel.Text = string.format("Серия: %d %s", streak, Format.plural(streak, "день", "дня", "дней"))
 	if claimable then
-		UIKit.setButtonText(claimButton, "🎁 Забрать")
-		UIKit.setButtonColor(claimButton, Theme.Green)
+		UIKit.setButtonStyle(claimButton, "verb")
+		UIKit.setButtonText(claimButton, "Забрать")
+		UIKit.setButtonVariant(claimButton, "Go")
 	else
 		local left = 86400 - (serverNow() % 86400)
+		UIKit.setButtonStyle(claimButton, "plain")
 		UIKit.setButtonText(claimButton, "Ещё через " .. Format.time(left))
-		UIKit.setButtonColor(claimButton, Theme.GrayDark)
+		UIKit.setButtonVariant(claimButton, "Disabled")
 	end
 end
 
 local function buildCalendar(body: Frame)
 	UIKit.label({
 		Name = "CalTitle",
-		Text = "📅 Заходи каждый день — подарок!",
+		Text = "Заходи каждый день — подарок!",
+		FontFace = Theme.FontBodyHeavy,
 		Size = UDim2.fromOffset(LEFT_W, 32),
 		Position = UDim2.fromOffset(0, 0),
 		TextXAlignment = Enum.TextXAlignment.Left,
-		MaxTextSize = 26,
+		MaxTextSize = 24,
 		Parent = body,
 	})
 	local cal = UIKit.new("Frame", {
@@ -341,8 +336,8 @@ local function buildCalendar(body: Frame)
 
 	claimButton = UIKit.button({
 		Name = "Claim",
-		Text = "🎁 Забрать",
-		Color = Theme.Green,
+		Text = "Забрать",
+		Color = Theme.Go,
 		Size = UDim2.fromOffset(300, 72),
 		Position = UDim2.fromOffset(0, 40 + BIG_TILE.Y + 14),
 		TextSize = 32,
@@ -379,11 +374,12 @@ local function buildCalendar(body: Frame)
 	streakLabel = UIKit.label({
 		Name = "Streak",
 		Text = "",
+		FontFace = Theme.FontBodyHeavy,
 		Size = UDim2.fromOffset(LEFT_W - 316, 40),
-		Position = UDim2.fromOffset(312, 40 + BIG_TILE.Y + 30),
+		Position = UDim2.fromOffset(316, 40 + BIG_TILE.Y + 30),
 		TextXAlignment = Enum.TextXAlignment.Left,
 		TextColor3 = Theme.Orange,
-		MaxTextSize = 26,
+		MaxTextSize = 24,
 		Parent = body,
 	})
 	UIKit.label({
@@ -392,9 +388,8 @@ local function buildCalendar(body: Frame)
 		Size = UDim2.fromOffset(LEFT_W, 24),
 		Position = UDim2.fromOffset(0, 40 + BIG_TILE.Y + 92),
 		TextXAlignment = Enum.TextXAlignment.Left,
-		FontFace = Theme.FontBold,
 		TextColor3 = Theme.TextDim,
-		MaxTextSize = 19,
+		MaxTextSize = 17,
 		Parent = body,
 	})
 end
@@ -424,7 +419,7 @@ local function refreshQuests(d: PlayerData.Data)
 		local progress = math.min(q.Progress, q.Target)
 		local complete = q.Progress >= q.Target
 		row.bar.set(progress / math.max(1, q.Target), string.format("%d/%d", progress, q.Target))
-		row.bar.setColor(if complete then Theme.Green else Theme.Electric)
+		row.bar.setColor(if complete then Theme.Go else Theme.Spark)
 		if def then
 			-- сколько Вольт — как посчитает сервер: минуты дохода от текущего дохода в минуту
 			row.reward.Text = string.format("💎 %s + ⚡ %s", Format.short(def.Shards), Format.short(Economy.incomeMinutes(d, def.Minutes)))
@@ -437,7 +432,7 @@ local function refreshQuests(d: PlayerData.Data)
 		else
 			row.done.Visible = false
 			row.button.Visible = true
-			UIKit.setButtonColor(row.button, if complete then Theme.Green else Theme.GrayDark)
+			UIKit.setButtonVariant(row.button, if complete then "Go" else "Disabled")
 			UIKit.setButtonText(row.button, "Забрать")
 		end
 	end
@@ -447,11 +442,12 @@ local function buildQuests(body: Frame)
 	local w = 848 - RIGHT_X
 	UIKit.label({
 		Name = "QuestTitle",
-		Text = "📋 Задания дня",
+		Text = "Задания дня",
+		FontFace = Theme.FontBodyHeavy,
 		Size = UDim2.fromOffset(w, 32),
 		Position = UDim2.fromOffset(RIGHT_X, 0),
 		TextXAlignment = Enum.TextXAlignment.Left,
-		MaxTextSize = 26,
+		MaxTextSize = 24,
 		Parent = body,
 	})
 	for i = 1, 3 do
@@ -464,35 +460,35 @@ local function buildQuests(body: Frame)
 		local text = UIKit.label({
 			Name = "Text",
 			Text = "",
+			FontFace = Theme.FontBodyHeavy,
 			Size = UDim2.new(1, -118, 0, 28),
-			Position = UDim2.fromOffset(10, 6),
+			Position = UDim2.fromOffset(12, 6),
 			TextXAlignment = Enum.TextXAlignment.Left,
-			MaxTextSize = 21,
+			MaxTextSize = 19,
 			Parent = frame,
 		})
 		local bar = UIKit.bar({
 			Name = "Progress",
-			Size = UDim2.new(1, -122, 0, 22),
-			Position = UDim2.fromOffset(10, 36),
-			Color = Theme.Electric,
-			TextSize = 16,
+			Size = UDim2.new(1, -134, 0, 22),
+			Position = UDim2.fromOffset(12, 36),
+			Color = Theme.Spark,
+			TextSize = 15,
 			Parent = frame,
 		})
 		local reward = UIKit.label({
 			Name = "Reward",
 			Text = "",
 			Size = UDim2.new(1, -118, 0, 22),
-			Position = UDim2.fromOffset(10, 62),
+			Position = UDim2.fromOffset(12, 62),
 			TextXAlignment = Enum.TextXAlignment.Left,
-			FontFace = Theme.FontBold,
 			TextColor3 = Theme.Shard,
-			MaxTextSize = 18,
+			MaxTextSize = 16,
 			Parent = frame,
 		})
 		local button = UIKit.button({
 			Name = "Claim",
 			Text = "Забрать",
-			Color = Theme.Green,
+			Color = Theme.Go,
 			Size = UDim2.fromOffset(100, 64),
 			AnchorPoint = Vector2.new(1, 0.5),
 			Position = UDim2.new(1, -8, 0.5, 0),
@@ -520,23 +516,17 @@ local function buildQuests(body: Frame)
 				Sounds.play("PowerUp")
 				-- сервер отвечает текстом награды («+1.2K ⚡ и +50 💎»)
 				local reward = if typeof(result) == "string" and result ~= "" and result ~= "✅" then result else nil
-				ClientState.Toast:Fire(if reward then "✅ Награда: " .. reward else "✅ Награда получена!", "good")
+				ClientState.Toast:Fire(if reward then "Награда: " .. reward else "Награда получена!", "good")
 				local scale = frame:FindFirstChildOfClass("UIScale") or UIKit.new("UIScale", { Parent = frame }) :: UIScale
 				UIKit.bump(scale, 0.06)
 			else
 				Sounds.play("Error")
 			end
 		end)
-		local done = UIKit.label({
+		local done = UIKit.checkBadge(frame, 50, {
 			Name = "Done",
-			Text = "✔",
-			Size = UDim2.fromOffset(60, 60),
 			AnchorPoint = Vector2.new(1, 0.5),
-			Position = UDim2.new(1, -28, 0.5, 0),
-			TextColor3 = Theme.Green,
-			MaxTextSize = 48,
-			Visible = false,
-			Parent = frame,
+			Position = UDim2.new(1, -34, 0.5, 0),
 		})
 		table.insert(questRows, { frame = frame, text = text, bar = bar, reward = reward, button = button, done = done })
 	end
@@ -576,24 +566,24 @@ local function buildCode(body: Frame)
 		Position = UDim2.fromOffset(RIGHT_X, y),
 		Parent = body,
 	})
-	UIKit.tintCard(frame, Theme.PurpleDark, Theme.PanelDark)
+	UIKit.tintCard(frame, Theme.Night700:Lerp(Theme.Violet, 0.2), Theme.Night800, Theme.Violet)
 	codeBox = UIKit.new("TextBox", {
 		Name = "Input",
-		Size = UDim2.new(1, -124, 0, 60),
-		Position = UDim2.new(0, 10, 0.5, 0),
+		Size = UDim2.new(1, -128, 0, 58),
+		Position = UDim2.new(0, 12, 0.5, 2),
 		AnchorPoint = Vector2.new(0, 0.5),
-		BackgroundColor3 = Theme.PanelDark,
+		BackgroundColor3 = Theme.Well,
 		Text = "",
-		PlaceholderText = "🎟 Ввести код",
+		PlaceholderText = "Ввести код",
 		PlaceholderColor3 = Theme.TextDim,
-		TextColor3 = WHITE,
-		FontFace = Theme.Font,
+		TextColor3 = Theme.Cream,
+		FontFace = Theme.FontBody,
 		TextScaled = true,
 		ClearTextOnFocus = false,
 		Parent = frame,
 	}) :: TextBox
-	UIKit.corner(codeBox, 10)
-	UIKit.stroke(codeBox, 2.5, Theme.Stroke)
+	UIKit.corner(codeBox, 8)
+	UIKit.stroke(codeBox, 2, Theme.LineLight, 0.55)
 	UIKit.padding(codeBox, 12, 10)
 	UIKit.new("UITextSizeConstraint", { MaxTextSize = 26, MinTextSize = 10, Parent = codeBox })
 	codeBox.FocusLost:Connect(function(enter: boolean)
@@ -604,7 +594,7 @@ local function buildCode(body: Frame)
 	UIKit.button({
 		Name = "Redeem",
 		Text = "ОК",
-		Color = Theme.Purple,
+		Color = Theme.Violet,
 		Size = UDim2.fromOffset(100, 64),
 		AnchorPoint = Vector2.new(1, 0.5),
 		Position = UDim2.new(1, -8, 0.5, 0),
@@ -635,7 +625,7 @@ function DailyUI.start()
 		Icon = "🎁",
 		Width = 880,
 		Height = 560,
-		Accent = Theme.GoldDark,
+		Accent = Theme.Go,
 		OnOpen = function()
 			refresh()
 			local vp, cam = bigVp, bigCam

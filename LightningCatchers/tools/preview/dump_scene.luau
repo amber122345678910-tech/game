@@ -4,6 +4,9 @@
 --   --skip    — не выгружать экземпляры с такими именами (и всё внутри них), например --skip=Clouds
 --   --only    — выгружать только поддеревья с таким именем (например --only=Hub)
 --   --project — взять освещение (Lighting, Atmosphere, Bloom) из Rojo-проекта, если рендерим .rbxmx
+--   --sky=N   — освещение зоны как в игре (WorldFX): Ambient, OutdoorAmbient, Atmosphere, Tint и Saturation
+--               из Config.Zones[N].Sky (0 — Config.Hub.Sky); включает и цветокоррекцию (--cc)
+--   --cc      — передать в рендер цветокоррекцию (ColorCorrection: Tint, Saturation, Contrast, Brightness)
 local fs = require("@lune/fs")
 local roblox = require("@lune/roblox")
 local serde = require("@lune/serde")
@@ -16,6 +19,8 @@ local skip: { [string]: boolean } = {}
 local only: { [string]: boolean }? = nil
 local files = {}
 local projectFile = nil
+local skyZone: number? = nil
+local withCC = false
 
 for i = 2, #process.args do
 	local a = process.args[i]
@@ -31,6 +36,11 @@ for i = 2, #process.args do
 		end
 	elseif k == "project" then
 		projectFile = v
+	elseif k == "sky" then
+		skyZone = tonumber(v)
+		withCC = true
+	elseif a == "--cc" then
+		withCC = true
 	else
 		table.insert(files, a)
 	end
@@ -140,6 +150,31 @@ if lighting == nil and projectFile and fs.isFile(projectFile) then
 			bloom = bloom and { intensity = bloom.Intensity or 0.6, size = bloom.Size or 24, threshold = bloom.Threshold or 1 } or nil,
 		}
 	end
+end
+
+-- Цветокоррекция из проекта и освещение зоны из Config (как его ставит клиент)
+if lighting and projectFile and fs.isFile(projectFile) and withCC then
+	local proj = serde.decode("json", fs.readFile(projectFile))
+	local L = proj.tree and proj.tree.Lighting
+	local cc = L and L.ColorCorrection and L.ColorCorrection["$properties"]
+	if cc then
+		lighting.cc = { tint = arr(cc.TintColor or { 1, 1, 1 }), saturation = cc.Saturation or 0, contrast = cc.Contrast or 0, brightness = cc.Brightness or 0 }
+	end
+end
+if lighting and skyZone ~= nil then
+	local root = if projectFile then (string.match(projectFile, "^(.*)/[^/]+$") or ".") else "../.."
+	local Loader = require("../lib/loader")
+	local Config = Loader.load(root .. "/src/shared/Config")
+	local sky = if skyZone >= 1 and Config.Zones[skyZone] then Config.Zones[skyZone].Sky else Config.Hub.Sky
+	local function c3(c)
+		return { c.R, c.G, c.B }
+	end
+	lighting.ambient = c3(sky.Ambient)
+	lighting.outdoorAmbient = c3(sky.OutdoorAmbient)
+	lighting.atmosphere = { density = sky.Density, color = c3(sky.AtmosphereColor) }
+	lighting.cc = lighting.cc or { tint = { 1, 1, 1 }, saturation = 0, contrast = 0, brightness = 0 }
+	lighting.cc.tint = c3(sky.Tint)
+	lighting.cc.saturation = sky.Saturation
 end
 
 fs.writeFile(outFile, serde.encode("json", { parts = parts, lights = lights, lighting = lighting }))

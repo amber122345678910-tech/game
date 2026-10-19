@@ -1,6 +1,7 @@
 --!nocheck
--- Пять островов: тело острова, рельеф и декор вне игровой зоны, мелкая флора внутри неё,
--- входная арка с названием, ориентир (landmark) каждого острова.
+-- Пять островов (docs/STYLE.md §3.2, §6.6–6.13, §6.17): тело острова, гребни-«чаша» и холмы вне игровой зоны,
+-- рощи и одиночные деревья, кусты у подножий, цветы полосами по ветру, входная арка с гербом зоны,
+-- ориентир (landmark) каждого острова.
 -- Правила: внутри PlayRadius земля плоская (GroundY), там только мелкие цветы/травинки без коллизий
 -- и плоские камешки дорожки не выше GroundY + 0.04 (кольца рисуются выше).
 local roblox = require("@lune/roblox")
@@ -9,15 +10,21 @@ local P = require("../lib/props")
 local Island = require("./island")
 local Vector3 = roblox.Vector3
 local CFrame = roblox.CFrame
-local Color3 = roblox.Color3
 local Enum = roblox.Enum
 local M = Enum.Material
 
 local ZonesMap = {}
 
+local W = B.W
+local TAU = math.pi * 2
+
 local function flatDist(a, b)
 	local dx, dz = a.X - b.X, a.Z - b.Z
 	return math.sqrt(dx * dx + dz * dz)
+end
+
+local function angDiff(a: number, b: number): number
+	return math.abs(((a - b + math.pi) % TAU) - math.pi)
 end
 
 ----------------------------------------------------------------------
@@ -44,13 +51,31 @@ local function newSampler(C, rng, outline)
 	function S.take(pos, r)
 		table.insert(S.placed, { pos, r })
 	end
-	-- точка в кольце [minR, maxR] от центра, не ближе r к краю острова и к другим объектам
-	function S.ring(minR, maxR, r, tries)
+	-- годится ли точка: в кольце [minR, maxR], не ближе r к краю острова и к другим объектам
+	function S.ok(pos, minR, maxR, r)
+		local d = flatDist(pos, C)
+		local th = math.atan2(pos.Z - C.Z, pos.X - C.X)
+		return d >= minR and d <= maxR and d + r <= outline(th) - 1.2 and S.free(pos, r)
+	end
+	-- точка в кольце [minR, maxR]; bias = {angle, spread} — предпочесть сектор (дальняя от моста сторона)
+	function S.ring(minR, maxR, r, tries, bias)
 		for _ = 1, tries or 40 do
-			local th = rng:range(0, math.pi * 2)
+			local th = if bias then bias[1] + rng:range(-bias[2], bias[2]) else rng:range(0, TAU)
 			local d = rng:range(minR, maxR)
 			local pos = C + Vector3.new(math.cos(th) * d, 0, math.sin(th) * d)
-			if d + r <= outline(th) - 1.2 and S.free(pos, r) then
+			if S.ok(pos, minR, maxR, r) then
+				S.take(pos, r)
+				return pos
+			end
+		end
+		return nil
+	end
+	-- точка рядом с center на расстоянии [d0, d1] (рощи, кусты у подножия)
+	function S.near(center, d0, d1, minR, maxR, r, tries)
+		for _ = 1, tries or 24 do
+			local a = rng:range(0, TAU)
+			local pos = center + Vector3.new(math.cos(a), 0, math.sin(a)) * rng:range(d0, d1)
+			if S.ok(pos, minR, maxR, r) then
 				S.take(pos, r)
 				return pos
 			end
@@ -61,93 +86,84 @@ local function newSampler(C, rng, outline)
 end
 
 ----------------------------------------------------------------------
--- Темы островов
+-- Темы островов: палитры STYLE §3.2 (основа; тень и свет считают B.shade / B.tint)
 ----------------------------------------------------------------------
 local rgb = B.rgb
 
 local THEMES = {
-	-- 1. Грозовой Луг
+	-- 1. Грозовой Луг: дружелюбный, зелёный с циановой молнией
 	{
-		dirt = rgb(146, 100, 66),
-		rock = rgb(132, 128, 136),
-		rock2 = rgb(150, 136, 126),
-		rockMaterial = M.Slate,
-		hill = rgb(84, 158, 76),
-		leaves = { rgb(66, 146, 62), rgb(88, 166, 68), rgb(116, 184, 78) },
-		flowers = { rgb(255, 120, 160), rgb(255, 214, 90), rgb(250, 248, 255), rgb(196, 146, 255), rgb(255, 156, 96) },
-		tuft = rgb(76, 150, 66),
-		path = rgb(168, 162, 150),
-		moss = rgb(86, 150, 70),
-		lamp = rgb(255, 214, 150),
-		arch = rgb(112, 80, 56),
-		patches = { rgb(76, 150, 70), rgb(112, 182, 92), rgb(86, 160, 96) },
+		ground = rgb(96, 170, 74),
+		groundMat = M.Grass,
+		dirt = rgb(150, 100, 66),
+		rock = rgb(132, 128, 144),
+		trunk = rgb(124, 84, 58),
+		leafA = rgb(78, 158, 70),
+		leafB = rgb(122, 186, 72),
+		flowers = { rgb(255, 120, 160), rgb(255, 214, 90), rgb(250, 248, 255), rgb(196, 146, 255) },
+		path = rgb(184, 170, 150),
+		lamp = rgb(255, 206, 140),
+		arch = rgb(124, 84, 58),
+		patches = { rgb(84, 156, 68), rgb(118, 186, 88), rgb(102, 176, 92) },
 	},
-	-- 2. Медные Холмы
+	-- 2. Медные Холмы: тёплые сумерки, ржавчина и медь, бирюзовая патина
 	{
-		dirt = rgb(150, 90, 56),
-		rock = rgb(124, 98, 86),
-		rock2 = rgb(150, 112, 88),
-		rockMaterial = M.Slate,
-		hill = rgb(168, 116, 66),
-		leaves = { rgb(176, 112, 58), rgb(150, 96, 52), rgb(204, 146, 74) },
-		tuft = rgb(196, 140, 76),
-		path = rgb(92, 76, 70),
-		copper = rgb(198, 112, 64),
-		vein = rgb(255, 150, 70),
+		ground = rgb(196, 128, 66),
+		groundMat = M.Grass,
+		dirt = rgb(150, 88, 56),
+		rock = rgb(128, 98, 90),
+		trunk = rgb(110, 74, 58),
+		leafA = rgb(214, 140, 60),
+		copper = rgb(204, 116, 64),
+		patina = rgb(96, 164, 138),
+		path = rgb(112, 86, 78),
 		lamp = rgb(255, 176, 100),
-		arch = rgb(150, 86, 52),
-		-- рыжие пятна и зеленоватая медная патина
-		patches = { rgb(156, 106, 60), rgb(192, 140, 82), rgb(120, 150, 118) },
+		arch = rgb(204, 116, 64),
+		patches = { rgb(182, 116, 60), rgb(214, 152, 84), rgb(120, 156, 120) },
 	},
-	-- 3. Стеклянные Дюны
+	-- 3. Стеклянные Дюны: бирюзовый вечер, песок и стекло
 	{
-		dirt = rgb(214, 174, 122),
-		rock = rgb(190, 150, 108),
-		rock2 = rgb(208, 164, 116),
-		rockMaterial = M.Sandstone,
-		hill = rgb(236, 206, 148),
-		stone = rgb(200, 162, 118),
-		cactus = rgb(92, 146, 82),
+		ground = rgb(232, 198, 140),
+		groundMat = M.Sand,
+		dirt = rgb(206, 160, 108),
+		rock = rgb(204, 160, 112),
+		stone = rgb(204, 160, 112),
+		cactus = rgb(84, 150, 96),
 		cactusFlower = rgb(255, 120, 170),
-		glass = rgb(150, 245, 236),
-		glow = rgb(110, 240, 230),
-		tuft = rgb(176, 160, 98),
-		path = rgb(204, 168, 120),
+		glass = rgb(140, 240, 228),
+		path = rgb(214, 176, 126),
 		lamp = rgb(255, 210, 150),
-		arch = rgb(196, 156, 110),
-		patches = { rgb(220, 188, 130), rgb(240, 216, 166), rgb(206, 176, 128) },
+		arch = rgb(204, 160, 112),
+		patches = { rgb(220, 184, 128), rgb(244, 216, 162), rgb(214, 180, 130) },
 	},
-	-- 4. Ледяной Пик
+	-- 4. Ледяной Пик: холодное сияние, тени снега сине-лиловые
 	{
-		dirt = rgb(204, 222, 246),
-		rock = rgb(148, 166, 198),
-		rock2 = rgb(124, 140, 182),
-		rockMaterial = M.Slate,
-		hill = rgb(240, 245, 255),
-		ice = rgb(164, 210, 248),
-		pine = { rgb(58, 118, 98), rgb(72, 134, 108), rgb(92, 152, 120) },
-		tuft = rgb(210, 226, 246),
-		path = rgb(170, 206, 240),
+		ground = rgb(232, 238, 252),
+		groundMat = M.Snow,
+		dirt = rgb(200, 210, 240),
+		rock = rgb(140, 156, 196),
+		ice = rgb(156, 206, 246),
+		needles = rgb(52, 120, 104),
+		snow = rgb(246, 250, 255),
+		trunk = rgb(124, 84, 58),
+		path = rgb(178, 210, 242),
 		lamp = rgb(200, 170, 255),
-		arch = rgb(130, 150, 186),
-		-- замёрзшие лужицы
-		patches = { rgb(180, 214, 246), rgb(206, 228, 252) },
+		arch = rgb(140, 156, 196),
+		patches = { rgb(186, 216, 246), rgb(206, 228, 252) },
 		patchMaterial = M.Ice,
 	},
-	-- 5. Око Бури
+	-- 5. Око Бури: зловещее, фиолет и золото на чёрном
 	{
-		dirt = rgb(52, 44, 64),
-		rock = rgb(48, 40, 60),
-		rock2 = rgb(66, 50, 84),
-		rockMaterial = M.Basalt,
-		hill = rgb(60, 52, 74),
-		crack = rgb(176, 96, 255),
+		ground = rgb(62, 52, 82),
+		groundMat = M.Basalt,
+		dirt = rgb(52, 44, 70),
+		rock = rgb(50, 42, 64),
+		crack = rgb(186, 104, 255),
 		gold = rgb(255, 200, 80),
-		tuft = rgb(90, 70, 120),
-		path = rgb(40, 34, 50),
+		path = rgb(44, 38, 56),
 		lamp = rgb(255, 200, 90),
-		arch = rgb(56, 46, 70),
-		patches = { rgb(72, 60, 92), rgb(48, 42, 58), rgb(82, 66, 104) },
+		arch = rgb(56, 46, 72),
+		patches = { rgb(72, 60, 94), rgb(52, 44, 66), rgb(84, 68, 106) },
 	},
 }
 
@@ -155,64 +171,62 @@ local THEMES = {
 -- Ориентиры
 ----------------------------------------------------------------------
 
--- 1. Старая мельница-громоотвод: каменная башня, шатровая крыша, 4 крыла, громоотвод с неоновым остриём
+-- 1. Старая мельница-громоотвод: шестигранная каменная башня ярусами, шатёр-пирамида, 4 крыла,
+-- медный громоотвод с неоновым гранёным остриём
 local function windmill(parent, pos, facing, rng, accent)
 	local m = B.model(parent, "Landmark_Windmill")
-	local stone = rgb(176, 168, 156)
+	local stone = rgb(182, 172, 160)
 	local base = B.facing(pos, facing)
-	-- башня: 4 сужающихся яруса (восьмигранник ≈ два повёрнутых бруска)
+	local yaw = B.yawOf(facing)
 	local y = 0
-	local w = 9
+	local R = 5.2
 	for t = 1, 4 do
 		local h = 5
-		local col = B.vary(if t % 2 == 0 then stone else B.shade(stone, 0.06), rng, 0.03)
-		for k = 0, 1 do
-			B.block(m, base * CFrame.new(0, y + h / 2, 0) * CFrame.Angles(0, k * math.pi / 4, 0), Vector3.new(w, h, w), col, { Material = M.Cobblestone, Shadow = true })
-		end
-		-- пояс-карниз
-		B.block(m, base * CFrame.new(0, y + h, 0), Vector3.new(w + 0.8, 0.6, w + 0.8), rgb(120, 96, 76), B.deco({ Material = M.Wood }))
+		local col = if t % 2 == 0 then B.tint(stone, 0.4) else B.shade(stone, 0.25)
+		B.hexPrism(m, pos + Vector3.new(0, y + h / 2, 0), R, h, yaw + math.pi / 6, B.vary(col, rng, 0.02), { Shadow = true, Collide = t <= 2 })
 		y += h
-		w -= 1.3
+		R -= 0.65
+		if t == 2 or t == 4 then
+			-- карниз-пояс: тёмное дерево
+			B.hexPlate(m, pos + Vector3.new(0, y, 0), R + 1.05, 0.6, yaw + math.pi / 6, 0, nil, rgb(110, 78, 60), B.deco())
+		end
 	end
 	-- дверь и окошки (тёплый свет внутри)
-	B.block(m, base * CFrame.new(0, 2.2, -4.55), Vector3.new(2.6, 4.4, 0.4), P.WOOD_DARK, B.deco({ Material = M.Wood }))
-	local win = B.block(m, base * CFrame.new(0, 12, -3.85), Vector3.new(1.4, 1.8, 0.3), rgb(255, 200, 120), B.neon())
+	B.block(m, base * CFrame.new(0, 2.2, -4.6), Vector3.new(2.6, 4.4, 0.4), P.WOOD_DARK, B.deco())
+	local win = B.block(m, base * CFrame.new(0, 12, -3.95), Vector3.new(1.4, 1.8, 0.3), rgb(255, 200, 120), B.neon())
 	B.light(win, rgb(255, 190, 110), 14, 0.8)
-	B.block(m, base * CFrame.new(2.9, 7, -2.9) * CFrame.Angles(0, math.pi / 4, 0), Vector3.new(1.2, 1.6, 0.3), rgb(255, 200, 120), B.neon())
-	-- шатровая крыша из 4 клиньев
-	local roofW = w + 2.4
-	local roofH = 6
-	for q = 0, 3 do
-		local cf = base * CFrame.new(0, y + roofH / 2, 0) * CFrame.Angles(0, q * math.pi / 2, 0) * CFrame.new(0, 0, -roofW / 4)
-		B.wedge(m, cf, Vector3.new(roofW, roofH, roofW / 2), B.vary(rgb(150, 70, 56), rng, 0.03), B.deco({ Material = M.WoodPlanks, Shadow = true }))
+	B.block(m, base * CFrame.new(2.6, 7, -3.3) * CFrame.Angles(0, math.rad(30), 0), Vector3.new(1.2, 1.6, 0.3), rgb(255, 200, 120), B.neon())
+	-- шатровая крыша: настоящая пирамида
+	local roof = rgb(176, 76, 62)
+	B.pyramid4(m, pos + Vector3.new(0, y + 0.3, 0), (R + 1.5) * 2, 6.5, yaw + math.rad(45), roof, B.deco({ Shadow = true }))
+	local top = y + 6.8
+	-- громоотвод: медный шпиль, изоляторы и гранёное неоновое остриё
+	local copper = P.COPPER
+	B.block(m, CFrame.new(pos + Vector3.new(0, top + 3, 0)) * CFrame.Angles(0, math.rad(45), 0), Vector3.new(0.45, 8, 0.45), copper, B.deco({ Material = M.Metal }))
+	for k = 0, 1 do
+		B.cylY(m, pos + Vector3.new(0, top + 1.6 + k * 1.8, 0), 0.3, 1.3 - k * 0.3, P.PORCELAIN, B.deco())
 	end
-	local top = y + roofH
-	-- громоотвод: шпиль, кольца и неоновое остриё
-	B.rod(m, base * Vector3.new(0, top - 1, 0), base * Vector3.new(0, top + 7, 0), 0.5, rgb(196, 112, 66), B.deco({ Material = M.Metal }))
-	for k = 0, 2 do
-		B.cylY(m, (base * CFrame.new(0, top + 1 + k * 1.6, 0)).Position, 0.25, 1.3 - k * 0.25, rgb(220, 140, 80), B.deco({ Material = M.Metal }))
-	end
-	local tip = B.ball(m, (base * CFrame.new(0, top + 7.4, 0)).Position, 1.1, accent, B.neon())
+	local tip = B.gem(m, pos + Vector3.new(0, top + 7.6, 0), 1.2, 0.4, accent, B.neon())
 	B.light(tip, accent, 30, 2)
 	-- провод громоотвода по стене вниз
-	B.rod(m, (base * CFrame.new(1.6, top - 1, -1.6)).Position, (base * CFrame.new(4.5, 0.5, -4.5)).Position, 0.25, rgb(196, 112, 66), B.deco({ Material = M.Metal }))
-	-- ступица и 4 крыла (решётчатые полотна), смотрят к центру острова
-	local hubPos = base * CFrame.new(0, 15.5, -4.2)
-	B.cyl(m, hubPos * CFrame.Angles(0, math.pi / 2, 0), 2, 1.6, P.WOOD_DARK, B.deco({ Material = M.Wood }))
+	B.bar(m, (base * CFrame.new(1.6, top - 2, -1.6)).Position, (base * CFrame.new(4.2, 0.5, -3.4)).Position, 0.25, 0.25, copper, B.deco({ Material = M.Metal }))
+	-- ступица и 4 крыла: брус, полотно и две рейки (крылья развёрнуты с разбросом, не ровным крестом)
+	local hubPos = base * CFrame.new(0, 15.5, -4.4)
+	B.cyl(m, hubPos * CFrame.Angles(0, math.pi / 2, 0), 2, 1.6, P.WOOD_DARK, B.deco())
 	local rot = rng:range(0, 1)
 	for k = 0, 3 do
-		local arm = hubPos * CFrame.new(0, 0, -1.1) * CFrame.Angles(0, 0, rot + k * math.pi / 2)
-		B.block(m, arm * CFrame.new(0, 7, 0), Vector3.new(0.6, 14, 0.5), P.WOOD, B.deco({ Material = M.Wood, Shadow = true }))
-		B.block(m, arm * CFrame.new(1.7, 8, -0.05), Vector3.new(2.8, 11, 0.2), B.vary(rgb(236, 226, 206), rng, 0.03), B.deco({ Material = M.Fabric, Shadow = true }))
-		for r = 0, 3 do
-			B.block(m, arm * CFrame.new(1.7, 3.5 + r * 3, -0.2), Vector3.new(3, 0.25, 0.2), P.WOOD_DARK, B.deco({ Material = M.Wood }))
+		local arm = hubPos * CFrame.new(0, 0, -1.1) * CFrame.Angles(0, 0, rot + k * math.pi / 2 + rng:range(-0.06, 0.06))
+		B.block(m, arm * CFrame.new(0, 7, 0), Vector3.new(0.7, 14, 0.5), P.WOOD, B.deco({ Shadow = true }))
+		B.block(m, arm * CFrame.new(1.75, 8, -0.05), Vector3.new(2.8, 11, 0.2), B.vary(rgb(240, 228, 206), rng, 0.02), B.deco({ Material = M.Fabric, Shadow = true }))
+		for r = 0, 1 do
+			B.block(m, arm * CFrame.new(1.75, 4.5 + r * 6, -0.2), Vector3.new(3.1, 0.3, 0.2), P.WOOD_DARK, B.deco())
 		end
 	end
 	return m
 end
 
--- 2. Медная вышка: решётчатая башня из 4 сужающихся ног, раскосы, площадка, неоновый маяк
-local function copperTower(parent, pos, facing, rng, accent, copper)
+-- 2. Медная вышка: решётчатая башня из 4 сужающихся ног, раскосы, площадка, гранёный неоновый маяк
+local function copperTower(parent, pos, facing, rng, accent, copper, patina)
 	local m = B.model(parent, "Landmark_CopperTower")
 	local H = 44
 	local base = B.facing(pos, facing)
@@ -221,24 +235,23 @@ local function copperTower(parent, pos, facing, rng, accent, copper)
 		return (base * CFrame.new(sx * w, t * H, sz * w)).Position
 	end
 	local levels = { 0, 0.22, 0.42, 0.6, 0.76, 0.9 }
-	-- ноги
-	for _, s in { { 1, 1 }, { -1, 1 }, { -1, -1 }, { 1, -1 } } do
+	local corners = { { 1, 1 }, { -1, 1 }, { -1, -1 }, { 1, -1 } }
+	for _, s in corners do
 		for li = 1, #levels - 1 do
-			B.rod(m, leg(s[1], s[2], levels[li]), leg(s[1], s[2], levels[li + 1]), 1.1, B.vary(copper, rng, 0.03), { Material = M.Metal, Shadow = true, Collide = li == 1 })
+			B.bar(m, leg(s[1], s[2], levels[li]), leg(s[1], s[2], levels[li + 1]), 1.0, 1.0, B.vary(copper, rng, 0.03), { Material = M.Metal, Shadow = true, Collide = li == 1 })
 		end
 	end
-	-- пояса и раскосы
-	local corners = { { 1, 1 }, { -1, 1 }, { -1, -1 }, { 1, -1 } }
+	-- пояса и раскосы (раскосы — бирюзовая патина)
 	for li = 2, #levels do
 		for c = 1, 4 do
 			local a, b = corners[c], corners[c % 4 + 1]
-			B.rod(m, leg(a[1], a[2], levels[li]), leg(b[1], b[2], levels[li]), 0.5, B.shade(copper, 0.15), B.deco({ Material = M.Metal }))
-			if li <= #levels - 1 then
-				B.rod(m, leg(a[1], a[2], levels[li - 1]), leg(b[1], b[2], levels[li]), 0.35, B.shade(copper, 0.25), B.deco({ Material = M.Metal }))
+			B.bar(m, leg(a[1], a[2], levels[li]), leg(b[1], b[2], levels[li]), 0.5, 0.5, B.shade(copper, 0.6), B.deco({ Material = M.Metal }))
+			if li <= #levels - 1 and (li + c) % 2 == 0 then
+				B.bar(m, leg(a[1], a[2], levels[li - 1]), leg(b[1], b[2], levels[li]), 0.35, 0.35, patina, B.deco({ Material = M.Metal }))
 			end
 		end
 	end
-	-- светящиеся кольца-изоляторы на поясах
+	-- светящиеся пояса-изоляторы
 	for li = 3, #levels - 1, 2 do
 		local y = levels[li] * H
 		local cf = base * CFrame.new(0, y + 0.6, 0)
@@ -246,54 +259,71 @@ local function copperTower(parent, pos, facing, rng, accent, copper)
 		B.block(m, cf, Vector3.new(w * 2 + 0.6, 0.3, 0.3), accent, B.neon())
 		B.block(m, cf, Vector3.new(0.3, 0.3, w * 2 + 0.6), accent, B.neon())
 	end
-	-- площадка, шпиль и маяк
+	-- площадка, шпиль, изоляторы и маяк
 	local topY = levels[#levels] * H
-	B.block(m, base * CFrame.new(0, topY + 0.3, 0), Vector3.new(5, 0.6, 5), B.shade(copper, 0.2), B.deco({ Material = M.DiamondPlate }))
-	B.rod(m, (base * CFrame.new(0, topY, 0)).Position, (base * CFrame.new(0, H + 6, 0)).Position, 0.6, copper, B.deco({ Material = M.Metal }))
-	local beacon = B.ball(m, (base * CFrame.new(0, H + 6.6, 0)).Position, 2, accent, B.neon())
-	B.light(beacon, accent, 34, 2)
+	B.block(m, base * CFrame.new(0, topY + 0.3, 0), Vector3.new(5, 0.6, 5), B.shade(copper, 1), B.deco({ Material = M.Metal }))
+	B.block(m, base * CFrame.new(0, (topY + H + 6) / 2, 0) * CFrame.Angles(0, math.rad(45), 0), Vector3.new(0.6, H + 6 - topY, 0.6), copper, B.deco({ Material = M.Metal }))
 	for k = 0, 2 do
-		B.cylY(m, (base * CFrame.new(0, topY + 2 + k * 1.4, 0)).Position, 0.3, 2.2 - k * 0.5, rgb(230, 220, 200), B.deco({ Material = M.SmoothPlastic }))
+		B.cylY(m, (base * CFrame.new(0, topY + 2 + k * 1.4, 0)).Position, 0.3, 2.2 - k * 0.5, P.PORCELAIN, B.deco())
 	end
+	local beacon = B.gem(m, (base * CFrame.new(0, H + 7, 0)).Position, 2.2, 0.3, accent, B.neon())
+	B.light(beacon, accent, 34, 2)
 	-- бетонные опоры под ногами
 	for _, s in corners do
-		B.block(m, CFrame.new(leg(s[1], s[2], 0) + Vector3.new(0, 0.5, 0)), Vector3.new(2.6, 1.4, 2.6), rgb(120, 112, 108), { Material = M.Concrete })
+		B.block(m, CFrame.new(leg(s[1], s[2], 0) + Vector3.new(0, 0.5, 0)) * CFrame.Angles(0, B.yawOf(facing), 0), Vector3.new(2.6, 1.4, 2.6), rgb(128, 112, 108), {})
 	end
-	-- трансформаторная будка у подножия
-	B.block(m, base * CFrame.new(0, 2, 0), Vector3.new(4, 4, 3.5), B.shade(copper, 0.35), { Material = M.CorrodedMetal })
-	B.block(m, base * CFrame.new(0, 2.6, -1.8), Vector3.new(2.6, 0.4, 0.1), accent, B.neon())
+	-- трансформаторная будка у подножия с зигзагом-«осторожно»
+	B.block(m, base * CFrame.new(0, 2, 0), Vector3.new(4, 4, 3.5), B.shade(copper, 1.2), { Material = M.Metal })
+	B.zigzag(m, (base * CFrame.new(0, 3.4, -1.8)).Position, (base * CFrame.new(0.2, 1.0, -1.8)).Position, 3, 0.3, accent, B.neon(), base.LookVector * -1)
 	return m
 end
 
--- 3. Гигантский стеклянный фульгурит (из того же генератора, что и коллекционные), на каменном постаменте
-local function giantFulgurite(parent, pos, rng, glass, glow, Fulgurite)
+-- 3. Гигантский стеклянный фульгурит (из того же генератора, что и коллекционные) на гранёном постаменте
+local function giantFulgurite(parent, pos, rng, glass, glow, Fulgurite, stone, outside)
 	local m = B.model(parent, "Landmark_Fulgurite")
 	local spec = Fulgurite.generate(1010, "gold", nil) -- «Корона»: пышная и симметричная
 	local scale = 5.4
-	-- стебли начинаются прямо на постаменте (верх 1.2), каменные глыбы основания не строим
-	local base = CFrame.new(pos + Vector3.new(0, 1.2 - 0.55 * scale, 0)) * CFrame.Angles(0, rng:range(0, 6.28), 0)
-	-- постамент: оплавленная песчаная плита и кольцо камней
-	B.cylY(m, pos + Vector3.new(0, 0.6, 0), 1.2, 15, rgb(150, 120, 92), { Material = M.Sandstone, Shadow = true })
-	B.cylY(m, pos + Vector3.new(0, 1.3, 0), 0.3, 13, B.mix(glass, rgb(60, 50, 50), 0.4), B.deco({ Material = M.Glass, Transparency = 0.2 }))
+	-- стебли начинаются прямо на постаменте (верх 1.2), каменные глыбы основания не строим;
+	-- разворот выбираем так, чтобы ни одна ветка не заходила в игровую зону
+	local bestYaw, bestScore = 0, -math.huge
+	for k = 0, 11 do
+		local yaw = k * math.pi / 6 + rng:range(-0.1, 0.1)
+		local cf0 = CFrame.new(pos + Vector3.new(0, 1.2 - 0.55 * scale, 0)) * CFrame.Angles(0, yaw, 0)
+		local score = math.huge
+		for _, ps in spec.Parts do
+			if ps.Kind ~= "base" then
+				score = math.min(score, outside((cf0 * CFrame.new(ps.CFrame.Position * scale)).Position))
+			end
+		end
+		if score > bestScore then
+			bestYaw, bestScore = yaw, score
+		end
+	end
+	local base = CFrame.new(pos + Vector3.new(0, 1.2 - 0.55 * scale, 0)) * CFrame.Angles(0, bestYaw, 0)
+	B.hexPlate(m, pos + Vector3.new(0, 0.6, 0), 7.4, 1.2, rng:range(0, 1), 0, nil, B.shade(stone, 0.6), { Shadow = true })
+	B.hexPlate(m, pos + Vector3.new(0, 1.25, 0), 6.2, 0.3, rng:range(0, 1), 0, nil, B.mix(glass, rgb(60, 50, 60), 0.35), B.deco({ Reflectance = 0.15 }))
 	for _, ps in spec.Parts do
 		local cf = base * (CFrame.new(ps.CFrame.Position * scale) * (ps.CFrame - ps.CFrame.Position))
 		local size = ps.Size * scale
 		if ps.Kind ~= "base" then
-			local p
-			local opts
+			local col, opts
 			if ps.Kind == "glass" then
+				col = B.vary(glass, rng, 0.03)
 				opts = B.deco({ Material = M.Glass, Transparency = 0.3, Shadow = false })
-				if ps.Shape == "Cylinder" then
-					p = B.cyl(m, cf, size.X, size.Y, B.vary(glass, rng, 0.03), opts)
-				elseif ps.Shape == "Ball" then
-					p = B.ball(m, cf.Position, size.X, glass, opts)
-				else
-					p = B.block(m, cf, size, glass, opts)
-				end
 			elseif ps.Kind == "core" then
-				p = B.cyl(m, cf, size.X, size.Y, B.tint(glow, 0.35), B.neon())
+				col = B.tint(glow, 0.6)
+				opts = B.neon()
 			else -- tip
-				p = B.ball(m, cf.Position, size.X, B.tint(glow, 0.5), B.neon())
+				col = B.tint(glow, 1)
+				opts = B.neon()
+			end
+			-- форма детали — как в генераторе (Block / Cylinder / Ball)
+			if ps.Shape == "Cylinder" then
+				B.cyl(m, cf, size.X, math.min(size.Y, size.Z), col, opts)
+			elseif ps.Shape == "Ball" then
+				B.ball(m, cf.Position, math.min(size.X, size.Y, size.Z), col, opts)
+			else
+				B.block(m, cf, size, col, opts)
 			end
 		end
 	end
@@ -302,72 +332,129 @@ local function giantFulgurite(parent, pos, rng, glass, glow, Fulgurite)
 	return m, spec.Height * scale
 end
 
--- 4. Ледяной шпиль: витая колонна из повёрнутых ледяных брусков, светящееся ядро, кристаллы у основания
-local function iceSpire(parent, pos, rng, ice, accent)
+-- 4. Ледяной шпиль: витая колонна из повёрнутых брусков с зазорами, сквозь которые видна неоновая жила;
+-- остриё-пирамида и гранёная звезда, ступенчатый снежный холм и кристаллы у подножия
+local function iceSpire(parent, pos, rng, ice, accent, snow, outside)
 	local m = B.model(parent, "Landmark_IceSpire")
 	local H = 46
-	local n = 9
-	local y = 0
+	local n = 8
+	local y = 0.4
 	for k = 1, n do
 		local t = (k - 1) / n
-		local w = 8.5 * (1 - t) ^ 0.9 + 1.2
-		local h = H / n * 1.25
+		local w = 8.2 * (1 - t) ^ 0.85 + 1.4
+		local h = H / n - 0.55
 		local cf = CFrame.new(pos + Vector3.new(0, y + h / 2, 0)) * CFrame.Angles(0, k * 0.42, 0) * CFrame.Angles(rng:range(-0.04, 0.04), 0, rng:range(-0.04, 0.04))
-		local col = B.vary(B.mix(ice, rgb(240, 248, 255), t * 0.5), rng, 0.03)
-		B.block(m, cf, Vector3.new(w, h, w), col, { Material = M.Ice, Shadow = k <= 3, Collide = k <= 2, Transparency = 0.05 })
+		-- низ холоднее и темнее, верх светлее и теплее (тон по высоте)
+		local col = if t < 0.3 then B.shade(ice, 0.5) elseif t > 0.7 then B.tint(ice, 1) else ice
+		B.block(m, cf, Vector3.new(w, h, w), B.vary(col, rng, 0.02), { Shadow = k <= 3, Collide = k <= 2, Reflectance = 0.08 })
 		y += H / n
 	end
-	-- остриё
-	for q = 0, 3 do
-		local cf = CFrame.new(pos + Vector3.new(0, y + 3, 0)) * CFrame.Angles(0, n * 0.42 + q * math.pi / 2, 0) * CFrame.new(0, 0, -0.7)
-		B.wedge(m, cf, Vector3.new(1.4, 6, 1.4), rgb(236, 246, 255), B.deco({ Material = M.Ice }))
-	end
-	-- светящееся ядро (виден сквозь лёд) и навершие
-	B.block(m, CFrame.new(pos + Vector3.new(0, H * 0.5, 0)), Vector3.new(1.2, H * 0.9, 1.2), accent, B.neon({ Transparency = 0.15 }))
-	local star = B.ball(m, pos + Vector3.new(0, y + 6.5, 0), 2, accent, B.neon())
+	B.pyramid4(m, pos + Vector3.new(0, y - 0.2, 0), 2.4, 6, n * 0.42, B.tint(ice, 1.2), B.deco())
+	-- неоновая жила по всей высоте (видна в зазорах) и гранёная звезда сверху
+	B.block(m, CFrame.new(pos + Vector3.new(0, H * 0.5, 0)) * CFrame.Angles(0, math.rad(45), 0), Vector3.new(1.3, H * 0.95, 1.3), accent, B.neon())
+	local star = B.gem(m, pos + Vector3.new(0, y + 7.4, 0), 2.2, 0.3, accent, B.neon())
 	B.light(star, accent, 36, 2)
-	-- кольцо кристаллов у основания
-	for k = 1, 7 do
-		local a = k / 7 * math.pi * 2 + rng:range(-0.2, 0.2)
-		P.crystals(m, pos + Vector3.new(math.cos(a) * 7.5, 0, math.sin(a) * 7.5), rng, ice, rng:range(1.4, 2.2), M.Ice, if k % 2 == 0 then accent else nil)
+	-- кристаллы у подножия (не по кругу: разные углы и размеры)
+	local placed = 0
+	for k = 1, 12 do
+		local a = k / 5 * TAU + rng:range(-0.5, 0.5)
+		local p = pos + Vector3.new(math.cos(a), 0, math.sin(a)) * rng:range(6.5, 8.5)
+		if placed < 4 and outside(p) > 2.5 then
+			placed += 1
+			P.crystals(m, p, rng, ice, rng:range(1.2, 1.9), if placed % 2 == 0 then accent else nil, nil)
+		end
 	end
-	-- снежный холмик у подножия
-	B.ball(m, pos - Vector3.new(0, 7.5, 0), 19, rgb(240, 245, 255), { Material = M.Snow, Shadow = false })
+	-- ступенчатый снежный холмик у подножия (без коллизий: шпиль у края игровой зоны)
+	for k = 1, 2 do
+		B.hexPlate(m, pos + Vector3.new(0, -0.35 + k * 0.4, 0), 9.5 - k * 2.6, 0.8, 0.3 * k, 0.5, rng, if k == 1 then B.shade(snow, 0.2) else snow, B.deco({ Material = M.Snow, Shadow = false }))
+	end
 	return m
 end
 
--- 5. Золотой столб света: круглый алтарь с ободом, 4 обелиска и сияющий столб до туч
+-- 5. Золотой столб света: гранёный алтарь, 4 обелиска с рунами и сияющий столб до туч
 local function lightPillar(parent, pos, rng, gold, crack, cloudY, outward)
 	local m = B.model(parent, "Landmark_LightPillar")
-	local dark = rgb(40, 34, 50)
-	B.cylY(m, pos + Vector3.new(0, 0.6, 0), 1.2, 14.6, dark, { Material = M.Basalt, Shadow = true })
-	B.cylY(m, pos + Vector3.new(0, 1.3, 0), 0.3, 12.5, gold, { Material = M.Metal, Collide = false, Query = false })
-	B.cylY(m, pos + Vector3.new(0, 1.5, 0), 0.4, 11, rgb(56, 46, 70), B.deco({ Material = M.Basalt }))
+	local dark = rgb(40, 34, 52)
+	B.hexPlate(m, pos + Vector3.new(0, 0.6, 0), 7.4, 1.2, 0, 0, nil, dark, { Shadow = true })
+	B.hexPlate(m, pos + Vector3.new(0, 1.35, 0), 6.6, 0.3, math.rad(30), 0, nil, gold, B.deco({ Material = M.Metal }))
+	B.hexPlate(m, pos + Vector3.new(0, 1.6, 0), 5.8, 0.4, 0, 0, nil, rgb(56, 46, 72), B.deco())
 	-- светящаяся «ступица»
-	local coreBase = B.cylY(m, pos + Vector3.new(0, 1.9, 0), 0.5, 6, gold, B.neon())
+	local coreBase = B.cylY(m, pos + Vector3.new(0, 1.95, 0), 0.5, 6, gold, B.neon())
 	B.light(coreBase, gold, 40, 3)
 	-- столб: яркое ядро и мягкое свечение вокруг (уходит в тучи)
 	local h = cloudY - pos.Y + 10
-	B.cylY(m, pos + Vector3.new(0, 2 + h / 2, 0), h, 2.6, B.tint(gold, 0.4), B.neon())
+	B.cylY(m, pos + Vector3.new(0, 2 + h / 2, 0), h, 2.6, B.tint(gold, 1), B.neon())
 	B.cylY(m, pos + Vector3.new(0, 2 + h / 2, 0), h, 5.5, gold, B.neon({ Transparency = 0.82 }))
 	B.cylY(m, pos + Vector3.new(0, 2 + h / 2, 0), h, 9, gold, B.neon({ Transparency = 0.93 }))
-	-- обелиски с фиолетовыми рунами
+	-- обелиски с фиолетовыми рунами по диагоналям относительно «наружу» (к центру острова не выступают)
 	local baseA = math.atan2(outward.Z, outward.X)
 	for k = 0, 3 do
-		-- обелиски по диагоналям относительно направления «наружу»: к центру острова не выступают
 		local a = baseA + ({ -1, 1, -2, 2 })[k + 1] * math.rad(55)
 		local p = pos + Vector3.new(math.cos(a) * 9.5, 0, math.sin(a) * 9.5)
 		local hh = 9 + rng:range(-1, 1.5)
-		local cf = CFrame.new(p + Vector3.new(0, hh / 2, 0)) * CFrame.Angles(0, -a, 0)
-		B.block(m, cf, Vector3.new(1.8, hh, 1.8), B.vary(dark, rng, 0.03), { Material = M.Basalt, Shadow = true })
-		B.wedge(m, cf * CFrame.new(0, hh / 2 + 0.6, 0.45), Vector3.new(1.8, 1.2, 0.9), dark, B.deco({ Material = M.Basalt }))
-		B.wedge(m, cf * CFrame.new(0, hh / 2 + 0.6, -0.45) * CFrame.Angles(0, math.pi, 0), Vector3.new(1.8, 1.2, 0.9), dark, B.deco({ Material = M.Basalt }))
-		for r = 0, 2 do
-			B.block(m, cf * CFrame.new(0, -hh / 2 + 2.5 + r * 2.2, -0.92), Vector3.new(0.7, 0.9, 0.1), crack, B.neon())
-		end
-		B.ball(m, p + Vector3.new(0, hh + 2.6, 0), 1, gold, B.neon())
+		local cf = CFrame.new(p + Vector3.new(0, hh / 2, 0)) * CFrame.Angles(0, -a, 0) * CFrame.Angles(rng:range(-0.03, 0.03), 0, rng:range(-0.03, 0.03))
+		B.block(m, cf, Vector3.new(1.8, hh, 1.8), B.vary(dark, rng, 0.03), { Shadow = true })
+		B.pyramid4(m, (cf * CFrame.new(0, hh / 2, 0)).Position, 1.8, 1.6, -a, B.tint(dark, 0.5), B.deco())
+		B.zigzag(m, (cf * CFrame.new(0, hh / 2 - 1.5, -0.92)).Position, (cf * CFrame.new(0, -hh / 2 + 2.2, -0.92)).Position, 3, 0.32, crack, B.neon(), cf.LookVector * -1, 0.1)
+		B.gem(m, p + Vector3.new(0, hh + 2.6, 0), 1, a, gold, B.neon())
 	end
 	return m
+end
+
+----------------------------------------------------------------------
+-- Входная арка острова (≤ 16): столбы на цоколях, перекладина-вывеска SkewPlate, фонари, герб зоны из неона
+----------------------------------------------------------------------
+local function emblem(m, i, cf, col)
+	local opts = B.neon()
+	if i == 1 then
+		-- лист: два клина
+		B.wedge(m, cf * CFrame.new(0, 1.0, 0) * CFrame.Angles(0, 0, math.rad(-25)), Vector3.new(0.3, 2.2, 1.0), col, opts)
+		B.wedge(m, cf * CFrame.new(0, 1.0, 0) * CFrame.Angles(0, math.pi, math.rad(25)), Vector3.new(0.3, 2.2, 1.0), col, opts)
+	elseif i == 2 then
+		-- шестерня: диск и два скрещённых бруска-зубца
+		B.cyl(m, cf * CFrame.new(0, 1.3, 0) * CFrame.Angles(0, math.pi / 2, 0), 0.3, 1.8, col, opts)
+		B.block(m, cf * CFrame.new(0, 1.3, 0), Vector3.new(2.5, 0.5, 0.25), col, opts)
+		B.block(m, cf * CFrame.new(0, 1.3, 0), Vector3.new(0.5, 2.5, 0.25), col, opts)
+	elseif i == 3 then
+		-- шип фульгурита: два ромбовых бруска с изломом
+		B.block(m, cf * CFrame.new(-0.2, 0.9, 0) * CFrame.Angles(0, 0, math.rad(-12)) * CFrame.Angles(0, math.rad(45), 0), Vector3.new(0.5, 1.8, 0.5), col, opts)
+		B.block(m, cf * CFrame.new(0.15, 2.2, 0) * CFrame.Angles(0, 0, math.rad(18)) * CFrame.Angles(0, math.rad(45), 0), Vector3.new(0.4, 1.4, 0.4), col, opts)
+	elseif i == 4 then
+		-- снежинка: три скрещённых тонких бруска
+		for k = 0, 2 do
+			B.block(m, cf * CFrame.new(0, 1.4, 0) * CFrame.Angles(0, 0, k * math.pi / 3), Vector3.new(0.25, 2.6, 0.25), col, opts)
+		end
+	else
+		-- глаз: два диска (белок-кольцо и зрачок)
+		B.cyl(m, cf * CFrame.new(0, 1.3, 0) * CFrame.Angles(0, math.pi / 2, 0), 0.2, 2.2, col, opts)
+		B.cyl(m, cf * CFrame.new(0, 1.3, -0.12) * CFrame.Angles(0, math.pi / 2, 0), 0.2, 0.9, rgb(30, 20, 46), B.deco())
+	end
+end
+
+local function entranceArch(ctx, i, decor, ground)
+	local Config, Zones = ctx.Config, ctx.Zones
+	local z = Config.Zones[i]
+	local g = Zones.Geo[i]
+	local th = THEMES[i]
+	local C = g.Center
+	local a = C + g.ToHub * (z.Radius - 3)
+	local half = Config.BridgeWidth / 2 + 1.8
+	local col = th.arch
+	local metal = i == 2
+	local arch = B.model(decor, "EntranceArch")
+	for side = -1, 1, 2 do
+		local p = ground(a + g.Right * side * half)
+		B.block(arch, CFrame.new(p + Vector3.new(0, 0.6, 0)) * CFrame.Angles(0, B.yawOf(g.ToHub), 0), Vector3.new(2.8, 1.2, 2.8), B.shade(th.rock, 1), {})
+		B.block(arch, CFrame.new(p + Vector3.new(0, 5.7, 0)) * CFrame.Angles(0, B.yawOf(g.ToHub), 0), Vector3.new(2, 9, 2), col, { Material = if metal then M.Metal else M.SmoothPlastic, Shadow = true })
+		local lampTop = B.block(arch, CFrame.new(p + Vector3.new(0, 10.9, 0)) * CFrame.Angles(0, math.rad(45), 0), Vector3.new(1.1, 1.3, 1.1), th.lamp, B.neon())
+		B.light(lampTop, th.lamp, 18, 1.1)
+		B.gem(arch, p + Vector3.new(0, 12.3, 0), 1.3, math.rad(45), B.shade(col, 0.8), B.deco())
+	end
+	-- перекладина-вывеска: SkewPlate с названием острова (лицом к мосту и с обратной стороны)
+	local cf = B.facing(ground(a) + Vector3.new(0, 9.2, 0), g.ToHub)
+	B.sign(arch, cf, half * 2 - 1.2, 2.8, { { Text = z.Name } }, { Back = true, Underline = z.Accent, Slant = 1.2, Thickness = 0.6, PixelsPerStud = 40 })
+	emblem(arch, i, cf * CFrame.new(0, 1.4, 0), B.tint(z.Accent, 0.2))
+	return arch
 end
 
 ----------------------------------------------------------------------
@@ -385,46 +472,49 @@ function ZonesMap.build(ctx, i, parent)
 	local model = B.model(parent, "Island_" .. i)
 	local decor = B.model(model, "Decor")
 	local flora = B.model(model, "Flora")
+	local accent = z.Accent
 
 	-- подвески снизу по теме
 	local hang
 	if i == 1 then
 		hang = function(m, p, out, r)
-			local len = r:range(4, 9)
-			B.rod(m, p, p - Vector3.new(r:range(-0.6, 0.6), len, r:range(-0.6, 0.6)) + out * 0.8, r:range(0.3, 0.5), B.vary(rgb(98, 72, 52), r, 0.05), B.deco({ Material = M.Wood }))
+			local len = r:range(4, 8)
+			local q = p - Vector3.new(0, len, 0) + out * 0.8 + W * 0.8
+			B.diamondBar(m, p, q, r:range(0.35, 0.55), B.vary(B.shade(th.trunk, 0.6), r, 0.04), B.deco({ Shadow = false }))
 			if r:chance(0.5) then
-				B.rod(m, p + out * 0.4, p + out * 1.2 - Vector3.new(0, len * 0.7, 0), 0.35, B.vary(rgb(70, 140, 62), r, 0.05), B.deco({ Material = M.Grass }))
+				B.diamondBar(m, q, q + Vector3.new(r:range(-0.6, 0.6), -r:range(1.5, 3), r:range(-0.6, 0.6)), 0.3, B.shade(th.trunk, 1), B.deco({ Shadow = false }))
 			end
 		end
 	elseif i == 2 then
 		hang = function(m, p, out, r)
 			local q = p + out * 2.5 - Vector3.new(0, 1, 0)
-			B.rod(m, p - out, q, 1, B.vary(th.copper, r, 0.04), B.deco({ Material = M.Metal }))
-			B.rod(m, q, q - Vector3.new(0, r:range(2, 5), 0), 1, B.vary(th.copper, r, 0.04), B.deco({ Material = M.Metal }))
-			B.ball(m, q, 1.15, B.shade(th.copper, 0.2), B.deco({ Material = M.Metal }))
+			local col = if r:chance(0.35) then th.patina else B.vary(th.copper, r, 0.04)
+			B.rod(m, p - out, q, 1, col, B.deco({ Material = M.Metal }))
+			B.rod(m, q, q - Vector3.new(0, r:range(2, 5), 0), 1, col, B.deco({ Material = M.Metal }))
+			B.block(m, B.facing(q, out), Vector3.new(1.25, 1.25, 1.25), B.shade(th.copper, 1), B.deco({ Material = M.Metal }))
 		end
 	elseif i == 3 then
 		hang = function(m, p, out, r)
-			local len = r:range(3, 7)
-			local cf = CFrame.new(p - Vector3.new(0, len / 2, 0) + out * 0.5) * CFrame.Angles(r:range(-0.2, 0.2), r:range(0, 3), r:range(-0.2, 0.2)) * CFrame.Angles(0, math.pi / 4, 0)
-			B.block(m, cf, Vector3.new(1.2, len, 1.2), th.glass, B.deco({ Material = M.Glass, Transparency = 0.25 }))
-			B.block(m, cf, Vector3.new(0.4, len * 0.8, 0.4), th.glow, B.neon())
+			local len = r:range(3, 6)
+			local q = p - Vector3.new(0, len, 0) + out * 0.5 + W * 0.5
+			B.diamondBar(m, p, q, 1.2, th.glass, B.deco({ Material = M.Glass, Transparency = 0.25, Shadow = false }))
+			B.diamondBar(m, p, q, 0.42, accent, B.neon())
 		end
 	elseif i == 4 then
 		hang = function(m, p, out, r)
-			for k = 0, r:int(1, 2) do
-				local len = r:range(3, 8)
-				local q = p + out * (0.5 + k * 0.8) + Vector3.new(r:range(-1, 1), 0, r:range(-1, 1))
+			for k = 0, r:int(0, 1) do
+				local len = r:range(3, 7)
+				local q = p + out * (0.5 + k * 0.9) + Vector3.new(r:range(-1, 1), 0, r:range(-1, 1))
 				local cf = CFrame.new(q - Vector3.new(0, len / 2, 0)) * CFrame.Angles(0, r:range(0, 3), 0)
-				B.wedge(m, cf * CFrame.Angles(math.pi, 0, 0), Vector3.new(r:range(0.8, 1.4), len, r:range(0.8, 1.4)), B.vary(th.ice, r, 0.03), B.deco({ Material = M.Ice }))
+				B.wedge(m, cf * CFrame.Angles(math.pi, 0, 0), Vector3.new(r:range(0.8, 1.4), len, r:range(0.8, 1.4)), B.vary(B.tint(th.ice, 0.4), r, 0.03), B.deco({ Reflectance = 0.1, Shadow = false }))
 			end
 		end
 	else
 		hang = function(m, p, out, r)
 			local len = r:range(3, 6)
-			local cf = CFrame.new(p - Vector3.new(0, len / 2, 0) + out * 0.6) * CFrame.Angles(r:range(-0.25, 0.25), r:range(0, 3), r:range(-0.25, 0.25)) * CFrame.Angles(0, math.pi / 4, 0)
-			B.block(m, cf, Vector3.new(1.3, len, 1.3), B.vary(rgb(120, 70, 200), r, 0.04), B.deco({ Material = M.Glass, Transparency = 0.15 }))
-			B.block(m, cf, Vector3.new(0.45, len * 0.85, 0.45), th.crack, B.neon())
+			local q = p - Vector3.new(0, len, 0) + out * 0.6
+			B.diamondBar(m, p, q, 1.3, B.vary(rgb(120, 70, 200), r, 0.04), B.deco({ Material = M.Glass, Transparency = 0.15, Shadow = false }))
+			B.diamondBar(m, p, q, 0.45, th.crack, B.neon())
 		end
 	end
 
@@ -433,23 +523,22 @@ function ZonesMap.build(ctx, i, parent)
 		center = C,
 		radius = R,
 		seed = 100 + i * 31,
-		segments = 34,
+		segments = 28,
 		base = 2.2,
-		amp = 7,
-		top = z.Grass,
-		topMaterial = z.GrassMaterial,
+		amp = R * 0.1,
+		capes = 2,
+		top = th.ground,
+		topMaterial = th.groundMat,
 		dirt = th.dirt,
-		dirtMaterial = if i == 3 then M.Sandstone elseif i == 4 then M.Glacier elseif i == 5 then M.Basalt else M.Ground,
 		rock = th.rock,
-		rock2 = th.rock2,
-		rockMaterial = th.rockMaterial,
 		depth = 62 + i * 3,
 		openings = { g.ToHub },
 		openHalfDeg = 9,
-		drips = if i == 5 then 0 else 16,
+		drips = if i == 5 then 0 else 10,
 		dripColor = if i == 4 then rgb(244, 248, 255) else nil,
 		hang = hang,
-		hangCount = if i == 4 then 16 else 10,
+		hangCount = if i == 4 then 10 else 8,
+		energy = accent,
 		walls = { radius = R + 0.8, height = 18 },
 		wallParent = ctx.Walls,
 	})
@@ -464,81 +553,121 @@ function ZonesMap.build(ctx, i, parent)
 	S.reserve(g.SellPad, 9)
 	S.reserve(g.SellPad + stationOut * 12, 9)
 	S.reserve(g.Landmark, 12)
-	-- игровая зона: колонны и деревья только снаружи
+	-- игровая зона: всё с коллизией и крупное — только снаружи
 	local rimMin = PR + 2.5
+	local far = math.atan2(g.Dir.Z, g.Dir.X) -- дальняя от моста сторона
+	local farBias = { far, math.rad(110) }
 
 	local function ground(pos)
 		return Vector3.new(pos.X, GY, pos.Z)
 	end
+	-- насколько точка дальше границы игровой зоны (отрицательно — внутри)
+	local function outsideBy(p)
+		return flatDist(p, C) - PR
+	end
 
-	-- холмы-бугры по краю (только снаружи игровой зоны и не свисают с обрыва)
-	local hillCount = if i == 3 then 9 elseif i == 5 then 4 else 6
+	-- годится ли деталь с коллизией: все её углы выше земли — снаружи игровой зоны и внутри кромки
+	local function fitsOutside(cf, size)
+		local s = size / 2
+		for _, x in { -1, 1 } do
+			for _, y in { -1, 1 } do
+				for _, zz in { -1, 1 } do
+					local c = cf:PointToWorldSpace(Vector3.new(s.X * x, s.Y * y, s.Z * zz))
+					local d = flatDist(c, C)
+					if c.Y > GY + 0.05 and d < PR + 0.6 then
+						return false
+					end
+					if d > outline(math.atan2(c.Z - C.Z, c.X - C.X)) - 0.8 then
+						return false
+					end
+				end
+			end
+		end
+		return true
+	end
+
+	-- 1) «чаша»: гребни вне игровой зоны на дальней стороне — пологий скат-клин к поляне (верх +3…+7)
+	-- и гранёный «гребешок» сверху; рамка игровой зоны без стен
+	local ridges = 0
+	for _ = 1, 50 do
+		if ridges >= 4 then
+			break
+		end
+		local a = far + rng:range(-1.7, 1.7)
+		local out = Vector3.new(math.cos(a), 0, math.sin(a))
+		local len = rng:range(14, 20)
+		local d = rng:range(9, 12)
+		local top = rng:range(3, 6.5)
+		local rr = PR + 1.5 + d / 2 + rng:range(0, 2.5)
+		local pos = ground(C + out * rr) + Vector3.new(0, top / 2 - 0.3, 0)
+		-- клин: высокая грань (+Z) снаружи, скат смотрит на поляну
+		local cf = B.facing(pos, out) * CFrame.Angles(0, math.pi + rng:range(-0.12, 0.12), 0)
+		local size = Vector3.new(len, top, d)
+		local capCf = B.facing(pos + out * (d / 2 - 1.8) + Vector3.new(0, top / 2 + 0.2, 0), out) * CFrame.Angles(math.rad(rng:range(-16, -8)), rng:range(-0.2, 0.2), math.rad(rng:range(-6, 6)))
+		local capSize = Vector3.new(len * rng:range(0.55, 0.8), 2.2, 4)
+		if fitsOutside(cf, size) and fitsOutside(capCf, capSize) and S.free(pos, len * 0.42) then
+			B.wedge(decor, cf, size, B.vary(B.tint(th.ground, 0.25), rng, 0.02), { Material = th.groundMat, Shadow = true, Name = "Ridge" })
+			B.block(decor, capCf, capSize, B.vary(B.shade(th.ground, 0.2), rng, 0.02), { Material = th.groundMat, Shadow = true, Name = "Ridge" })
+			S.take(pos, len * 0.42)
+			ridges += 1
+		end
+	end
+	-- мысы: приподнятая терраса за пределом игровой зоны
+	for _, cape in body.capes do
+		local out = Vector3.new(math.cos(cape.angle), 0, math.sin(cape.angle))
+		local rr = math.max(PR + 9, outline(cape.angle) - 8)
+		local pos = ground(C + out * rr) + Vector3.new(0, rng:range(1, 2) - 2, 0)
+		local cf = B.facing(pos, out) * CFrame.Angles(0, rng:range(-0.3, 0.3), 0)
+		if fitsOutside(cf, Vector3.new(12, 4, 10)) and S.free(pos, 6) then
+			B.block(decor, cf, Vector3.new(12, 4, 10), B.vary(B.tint(th.ground, 0.2), rng, 0.02), { Material = th.groundMat, Shadow = true, Name = "Terrace" })
+			B.block(decor, cf * CFrame.new(0, -1.2, 0) * CFrame.Angles(0, 0.2, 0), Vector3.new(11, 3.2, 10.6), th.dirt, B.deco({ Shadow = false }))
+			S.take(pos, 6)
+		end
+	end
+	-- холмы: ступенчатые шестигранные плиты (только снаружи игровой зоны)
+	local hillCount = if i == 3 then 4 elseif i == 5 then 2 else 3
 	for _ = 1, hillCount do
-		local s = rng:range(9, 13)
-		local cap = rng:range(2.5, 4.8)
-		local foot = math.sqrt(s * s - (s - cap) * (s - cap))
-		local pos = S.ring(PR + foot + 1, R - foot + 4, foot * 0.8, 50)
+		local Rh = rng:range(6.5, 9)
+		local pos = S.ring(PR + Rh + 1.5, R + 2, Rh, 40)
 		if pos then
-			Island.hill(decor, ground(pos), s * 2, cap, th.hill, z.GrassMaterial, rng)
+			Island.hill(decor, ground(pos), Rh, if Rh > 7.5 then 3 else 2, th.ground, th.groundMat, rng, rng:range(1.4, 2.2))
 		end
 	end
 
-	-- входная арка с названием острова (на краю у моста)
-	do
-		local a = C + g.ToHub * (R - 3)
-		local half = Config.BridgeWidth / 2 + 1.8
-		local col = th.arch
-		local arch = B.model(decor, "EntranceArch")
-		for side = -1, 1, 2 do
-			local p = ground(a + g.Right * side * half)
-			B.block(arch, CFrame.new(p + Vector3.new(0, 0.6, 0)), Vector3.new(2.8, 1.2, 2.8), B.shade(col, 0.15), { Material = M.Cobblestone })
-			B.block(arch, CFrame.new(p + Vector3.new(0, 6, 0)), Vector3.new(1.9, 10, 1.9), col, { Material = if i == 2 then M.Metal else M.Wood, Shadow = true })
-			local lampTop = B.block(arch, CFrame.new(p + Vector3.new(0, 11.6, 0)), Vector3.new(1.2, 1.2, 1.2), th.lamp, B.neon())
-			B.light(lampTop, th.lamp, 18, 1.1)
-			B.block(arch, CFrame.new(p + Vector3.new(0, 12.4, 0)), Vector3.new(1.8, 0.4, 1.8), B.shade(col, 0.25), B.deco({ Material = M.Metal }))
-		end
-		local beamCf = B.facing(ground(a) + Vector3.new(0, 10.4, 0), g.ToHub)
-		B.block(arch, beamCf, Vector3.new(half * 2 + 2.6, 1.1, 1.3), B.shade(col, 0.05), B.deco({ Material = if i == 2 then M.Metal else M.Wood, Shadow = true }))
-		local sign = B.block(arch, beamCf * CFrame.new(0, -1.9, 0), Vector3.new(16, 2.6, 0.4), rgb(36, 34, 48), B.deco({ Material = M.Wood }))
-		B.text(sign, { { Text = z.Name, Color = z.Accent:Lerp(Color3.new(1, 1, 1), 0.45) } }, { Face = Enum.NormalId.Front, PixelsPerStud = 30 })
-		B.text(sign, { { Text = z.Name, Color = z.Accent:Lerp(Color3.new(1, 1, 1), 0.45) } }, { Face = Enum.NormalId.Back, PixelsPerStud = 30, Name = "SignBack" })
-		for side = -1, 1, 2 do
-			B.block(arch, beamCf * CFrame.new(side * 6, -0.55, 0), Vector3.new(0.2, 1.2, 0.2), P.IRON, B.deco({ Material = M.Metal }))
-		end
-	end
+	-- 2) входная арка с названием острова (на краю у моста)
+	entranceArch(ctx, i, decor, ground)
 
-	-- дорожка из плоских камней: от моста к точке появления и к подстанции (не выше GroundY + 0.04)
+	-- 3) дорожка из плоских камней: от моста к точке появления и к подстанции (не выше GroundY + 0.04)
 	local function pathStones(a, b, count, color)
 		for k = 0, count do
 			local t = k / count
 			local p = a:Lerp(b, t) + g.Right * rng:range(-2.2, 2.2) + g.ToHub * rng:range(-0.6, 0.6)
 			local w, d = rng:range(2, 3.4), rng:range(1.8, 3)
-			B.block(flora, CFrame.new(ground(p) + Vector3.new(0, -0.035, 0)) * CFrame.Angles(0, rng:range(0, 3.14), 0), Vector3.new(w, 0.15, d), B.vary(color, rng, 0.05), B.deco({ Material = if i == 4 then M.Ice elseif i == 5 then M.Basalt else M.Slate, Shadow = false, Name = "PathStone" }))
+			B.block(flora, CFrame.new(ground(p) + Vector3.new(0, -0.035, 0)) * CFrame.Angles(0, rng:range(0, 3.14), 0), Vector3.new(w, 0.15, d), B.vary(color, rng, 0.04), B.deco({ Shadow = false, Name = "PathStone" }))
 		end
 	end
-	pathStones(C + g.ToHub * (R - 1), g.Spawn - Vector3.new(0, 3, 0) - g.ToHub * 4, 9, th.path)
-	pathStones(g.Spawn - Vector3.new(0, 3, 0), g.SellPad - stationOut * 1 + g.ToHub * 5, 6, th.path)
+	pathStones(C + g.ToHub * (R - 1), g.Spawn - Vector3.new(0, 3, 0) - g.ToHub * 4, 8, th.path)
+	pathStones(g.Spawn - Vector3.new(0, 3, 0), g.SellPad - stationOut * 1 + g.ToHub * 5, 5, th.path)
 
-	-- пятна другого оттенка на земле (оживляют плоскую игровую зону): 2-3 перекрывающихся диска,
+	-- 4) пятна другого оттенка на земле (оживляют плоскую игровую зону): 2 перекрывающихся диска,
 	-- каждый на своей высоте (+0.012 / +0.027), без коллизий — кольца рисуются выше (+0.05 и больше)
-	local patchColors = th.patches or { B.shade(z.Grass, 0.1), B.tint(z.Grass, 0.07) }
 	local function groundPatch(pos, size)
-		local col = rng:pick(patchColors)
-		for k = 1, rng:int(2, 3) do
-			local off = if k == 1 then Vector3.zero else rng:disc(size * 0.45)
+		local col = rng:pick(th.patches)
+		for k = 1, 2 do
+			local off = if k == 1 then Vector3.zero else rng:disc(size * 0.4) + W * size * 0.25
 			local d = size * rng:range(0.55, 1)
 			local top = if k == 1 then 0.012 else 0.027
-			B.cylY(flora, ground(pos + off) + Vector3.new(0, top - 0.05, 0), 0.1, d, B.vary(col, rng, 0.015), B.deco({ Material = th.patchMaterial or z.GrassMaterial, Shadow = false, Name = "Patch" }))
+			B.cylY(flora, ground(pos + off) + Vector3.new(0, top - 0.05, 0), 0.1, d, B.vary(col, rng, 0.012), B.deco({ Material = th.patchMaterial or th.groundMat, Shadow = false, Name = "Patch" }))
 		end
 	end
-	for _ = 1, th.patchCount or 9 do
+	for _ = 1, 7 do
 		local p = C + rng:disc(PR - 6)
 		if flatDist(p, g.SellPad) > 10 then
 			groundPatch(p, rng:range(10, 20))
 		end
 	end
 
-	-- мелкая флора внутри игровой зоны (без коллизий): цветы/травинки/блёстки
+	-- мелкая флора внутри игровой зоны (без коллизий)
 	local function insideSpot(minGap)
 		for _ = 1, 30 do
 			local p = C + rng:disc(PR - 3)
@@ -548,6 +677,34 @@ function ZonesMap.build(ctx, i, parent)
 		end
 		return nil
 	end
+	local function isHero(p)
+		return flatDist(p, g.Spawn) < 25
+	end
+
+	-- рощи: одно большое дерево и меньшие вокруг; bigFn/smallFn(pos, scale)
+	local function grove(minR, maxR, n, bigFn, smallFn, bias)
+		local c = S.ring(minR, maxR, 4.5, 50, bias)
+		if not c then
+			return 0
+		end
+		bigFn(ground(c), rng:range(1.15, 1.3))
+		local placed = 1
+		for _ = 1, n - 1 do
+			local p = S.near(c, 6, 10, minR, maxR, 3.6)
+			if p then
+				smallFn(ground(p), rng:range(0.8, 1.0))
+				placed += 1
+			end
+		end
+		return placed
+	end
+	-- куст у подножия дерева или камня
+	local function anchorBush(at, pal, scale)
+		local p = S.near(at, 3.2, 5, rimMin, R + 4, 1.6)
+		if p then
+			P.bush(decor, ground(p), rng, pal, scale)
+		end
+	end
 
 	local landmarkFacing = -g.Dir -- ориентир «смотрит» к центру острова
 
@@ -555,130 +712,169 @@ function ZonesMap.build(ctx, i, parent)
 		----------------------------------------------------------------
 		-- Грозовой Луг
 		----------------------------------------------------------------
-		local pal = { leaves = th.leaves, wood = P.WOOD, rock = th.rock, moss = th.moss, berries = rgb(220, 60, 80), fruit = rgb(230, 70, 60) }
-		windmill(decor, ground(g.Landmark), landmarkFacing, rng, z.Accent)
-		for _ = 1, 15 do
+		local pal = { trunk = th.trunk, leafA = th.leafA, leafB = th.leafB, rock = th.rock, fruit = rgb(230, 70, 70), berries = rgb(220, 60, 80) }
+		windmill(decor, ground(g.Landmark), landmarkFacing, rng, accent)
+		local treeAt = {}
+		local function bigTree(p, s)
+			P.tree(decor, p, rng, pal, s)
+			table.insert(treeAt, p)
+		end
+		local function smallTree(p, s)
+			if rng:chance(0.35) then
+				P.poplar(decor, p, rng, pal, s)
+			else
+				P.tree(decor, p, rng, pal, s * 0.9)
+			end
+			table.insert(treeAt, p)
+		end
+		for k = 1, 4 do
+			grove(rimMin + 2, R + 3, rng:int(3, 4), bigTree, smallTree, if k <= 2 then farBias else nil)
+		end
+		for _ = 1, 3 do
 			local p = S.ring(rimMin + 2, R + 3, 4.5)
 			if p then
-				P.tree(decor, ground(p), rng, pal)
+				bigTree(ground(p), rng:range(0.9, 1.1))
 			end
 		end
-		for _ = 1, 12 do
-			local p = S.ring(rimMin, R + 4, 2.5)
+		-- ветреные деревья на наветренном краю (штормовой акцент)
+		local windward = math.atan2(-W.Z, -W.X)
+		for _ = 1, 3 do
+			local p = S.ring(rimMin + 3, R + 3, 4.5, 40, { windward, math.rad(70) })
 			if p then
-				P.bush(decor, ground(p), rng, pal)
+				P.windyTree(decor, ground(p), rng, pal)
 			end
 		end
-		for _ = 1, 8 do
-			local p = S.ring(rimMin, R + 4, 2.5)
+		for k = 1, math.min(#treeAt, 8) do
+			anchorBush(treeAt[k], pal)
+		end
+		local rockAt = {}
+		for _ = 1, 5 do
+			local p = S.ring(rimMin, R + 4, 2.8)
 			if p then
 				P.rock(decor, ground(p), rng, pal)
+				table.insert(rockAt, p)
 			end
 		end
-		for _ = 1, 7 do
+		for k = 1, math.min(#rockAt, 3) do
+			anchorBush(rockAt[k], pal, 0.85)
+		end
+		-- цветочные полосы у подножий деревьев (снаружи игровой зоны)
+		for k = 1, math.min(#treeAt, 4) do
+			local p = S.near(treeAt[k], 4, 7, rimMin, R + 2, 2)
+			if p then
+				P.flowerStrip(flora, ground(p), rng, th.flowers, 5, false, 5)
+			end
+		end
+		for _ = 1, 3 do
+			local p = S.ring(rimMin, R + 4, 2.4)
+			if p then
+				P.flagstone(decor, ground(p), rng, pal)
+			end
+		end
+		for _ = 1, 3 do
 			local p = S.ring(rimMin, R + 4, 1.2)
 			if p then
-				P.mushroom(decor, ground(p), rng, rng:pick({ rgb(220, 60, 60), rgb(240, 150, 60) }))
+				P.mushroom(decor, ground(p), rng, rng:pick({ rgb(220, 64, 60), rgb(240, 150, 60) }))
 			end
 		end
-		-- заборчики вдоль дуги края (не по сетке: ломаная с разными углами)
-		for _ = 1, 4 do
-			local a0 = rng:range(0, math.pi * 2)
+		-- заборчики вдоль дуги края (ломаная с разными углами) и тополь у каждого
+		for _ = 1, 3 do
+			local a0 = rng:range(0, TAU)
 			local pts = {}
-			local rr = PR + rng:range(4, 8)
+			local rr = PR + rng:range(4, 7)
 			for k = 0, 3 do
 				local a = a0 + k * rng:range(0.07, 0.11)
-				local p = C + Vector3.new(math.cos(a) * rr, 0, math.sin(a) * rr)
-				rr += rng:range(-1.5, 1.5)
-				table.insert(pts, p)
+				table.insert(pts, C + Vector3.new(math.cos(a) * rr, 0, math.sin(a) * rr))
+				rr += rng:range(-1.2, 1.2)
 			end
 			local ok = true
 			for _, p in pts do
-				if not S.free(p, 1) then
+				if not S.free(p, 1) or flatDist(p, C) < PR + 1.5 then
 					ok = false
 				end
 			end
 			if ok then
 				for k = 1, #pts - 1 do
 					if rng:chance(0.85) then
-						P.fence(decor, ground(pts[k]), ground(pts[k + 1]), P.WOOD, rng)
+						P.fence(decor, ground(pts[k]), ground(pts[k + 1]), th.trunk, rng)
 					end
 				end
 				for _, p in pts do
 					S.take(p, 1.5)
 				end
+				local pp = S.near(pts[#pts], 3, 5, rimMin + 1, R + 2, 2.6)
+				if pp then
+					P.poplar(decor, ground(pp), rng, pal)
+				end
 			end
 		end
-		-- колодец у края
+		-- колодец у края и тюки сена
 		do
 			local p = S.ring(rimMin + 3, R - 3, 4)
 			if p then
 				P.well(decor, ground(p), rng)
 			end
 		end
-		-- стожки сена
-		for _ = 1, 3 do
+		for _ = 1, 2 do
 			local p = S.ring(rimMin + 2, R, 3)
 			if p then
-				local hay = B.model(decor, "Hay")
-				B.cylY(hay, ground(p) + Vector3.new(0, 1.6, 0), 3.2, 5, B.vary(rgb(222, 186, 96), rng, 0.04), { Material = M.Grass })
-				B.ball(hay, ground(p) + Vector3.new(0, 3.1, 0), 4.6, B.vary(rgb(230, 196, 104), rng, 0.04), B.deco({ Material = M.Grass }))
+				P.hayBales(decor, ground(p), rng)
 			end
 		end
-		for _ = 1, 13 do
-			local p = insideSpot(5)
+		-- цветы полосами вдоль ветра и травинки внутри
+		for _ = 1, 6 do
+			local p = insideSpot(4)
 			if p then
-				P.flowerPatch(flora, p, rng, th.flowers, rng:int(4, 6), rng:range(1.8, 3.2))
+				P.flowerStrip(flora, p, rng, th.flowers, rng:int(5, 6), isHero(p))
 			end
 		end
-		for _ = 1, 26 do
+		for _ = 1, 18 do
 			local p = insideSpot(3)
 			if p then
-				P.tuft(flora, p, rng, th.tuft)
-			end
-		end
-		-- цветы и трава у края (снаружи)
-		for _ = 1, 6 do
-			local p = S.ring(rimMin, R + 3, 1.5)
-			if p then
-				P.flowerPatch(flora, ground(p), rng, th.flowers, 5, 2.4)
+				P.tuft(flora, p, rng, th.ground, nil, isHero(p))
 			end
 		end
 	elseif i == 2 then
 		----------------------------------------------------------------
 		-- Медные Холмы
 		----------------------------------------------------------------
-		local pal = { leaves = th.leaves, rock = th.rock, vein = th.vein, copper = th.copper, wood = rgb(98, 70, 56) }
-		copperTower(decor, ground(g.Landmark), landmarkFacing, rng, z.Accent, th.copper)
-		for _ = 1, 14 do
+		local pal = { trunk = th.trunk, leafA = th.leafA, rock = th.rock, vein = accent, copper = th.copper }
+		copperTower(decor, ground(g.Landmark), landmarkFacing, rng, accent, th.copper, th.patina)
+		local rockAt = {}
+		for _ = 1, 10 do
 			local p = S.ring(rimMin + 1, R + 3, 3.5)
 			if p then
 				P.veinRock(decor, ground(p), rng, pal)
+				table.insert(rockAt, p)
 			end
 		end
-		for _ = 1, 7 do
+		for _ = 1, 5 do
 			local p = S.ring(rimMin + 3, R, 5)
 			if p then
-				-- труба идёт вдоль края (по касательной), а не в игровую зону
+				-- труба идёт вдоль края (по касательной), а не в игровую зону; часть — в бирюзовой патине
 				local out = B.flat(p - C).Unit
-				local tangent = Vector3.new(-out.Z, 0, out.X) * (if rng:chance(0.5) then 1 else -1)
-				P.pipe(decor, ground(p), rng, pal, nil, (tangent + out * 0.25).Unit)
+				local tangent = Vector3.new(-out.Z, 0, out.X) * rng:sign()
+				local ppal = if rng:chance(0.35) then { copper = th.patina, vein = accent } else pal
+				P.pipe(decor, ground(p), rng, ppal, nil, (tangent + out * 0.25).Unit)
 			end
 		end
-		for _ = 1, 9 do
+		-- сухие деревья: две маленькие рощицы и одиночки
+		local function dead(p, s)
+			P.deadTree(decor, p, rng, pal, s)
+		end
+		grove(rimMin + 1, R + 3, 3, dead, dead, farBias)
+		grove(rimMin + 1, R + 3, 2, dead, dead)
+		for _ = 1, 3 do
 			local p = S.ring(rimMin + 1, R + 3, 3.5)
 			if p then
 				P.deadTree(decor, ground(p), rng, pal)
 			end
 		end
-		for _ = 1, 10 do
-			local p = S.ring(rimMin, R + 4, 2.5)
-			if p then
-				P.bush(decor, ground(p), rng, pal, rng:range(0.6, 1))
-			end
+		for k = 1, math.min(#rockAt, 6) do
+			anchorBush(rockAt[k], pal, rng:range(0.6, 0.9))
 		end
-		for _ = 1, 7 do
-			local p = S.ring(rimMin, R + 4, 2.5)
+		for _ = 1, 5 do
+			local p = S.ring(rimMin, R + 4, 2.8)
 			if p then
 				P.rock(decor, ground(p), rng, pal)
 			end
@@ -688,37 +884,37 @@ function ZonesMap.build(ctx, i, parent)
 			local p = S.ring(rimMin + 4, R - 4, 5)
 			if p then
 				local out = B.flat(p - C).Unit
-				P.mineCart(decor, ground(p), Vector3.new(-out.Z, 0, out.X), rng, th.vein)
+				P.mineCart(decor, ground(p), Vector3.new(-out.Z, 0, out.X), rng, accent)
 			end
 		end
 		-- бочки и ящики шахтёров
-		for _ = 1, 4 do
+		for _ = 1, 3 do
 			local p = S.ring(rimMin + 2, R, 3)
 			if p then
 				P.barrel(decor, ground(p), rng)
 				P.crate(decor, ground(p + Vector3.new(rng:range(1.8, 2.4), 0, rng:range(-1, 1))), rng)
 			end
 		end
-		for _ = 1, 30 do
+		for _ = 1, 22 do
 			local p = insideSpot(3)
 			if p then
-				P.tuft(flora, p, rng, B.vary(th.tuft, rng, 0.05))
+				P.tuft(flora, p, rng, B.tint(th.ground, 0.3), nil, isHero(p))
 			end
 		end
-		-- рыжие цветы-«медянки» внутри (редко)
-		for _ = 1, 8 do
+		-- рыжие цветы-«медянки» полосами по ветру
+		for _ = 1, 5 do
 			local p = insideSpot(5)
 			if p then
-				P.flowerPatch(flora, p, rng, { rgb(255, 196, 90), rgb(255, 130, 70), rgb(240, 230, 200) }, 4, 2)
+				P.flowerStrip(flora, p, rng, { rgb(255, 196, 90), rgb(255, 130, 70), rgb(240, 230, 200) }, 4, isHero(p))
 			end
 		end
 	elseif i == 3 then
 		----------------------------------------------------------------
 		-- Стеклянные Дюны
 		----------------------------------------------------------------
-		local pal = { cactus = th.cactus, cactusFlower = th.cactusFlower, stone = th.stone, rock = th.rock, rockMaterial = M.Sandstone }
-		giantFulgurite(decor, ground(g.Landmark), rng, th.glass, th.glow, ctx.Fulgurite)
-		for _ = 1, 5 do
+		local pal = { cactus = th.cactus, cactusFlower = th.cactusFlower, stone = th.stone, rock = th.rock }
+		giantFulgurite(decor, ground(g.Landmark), rng, th.glass, accent, ctx.Fulgurite, th.stone, outsideBy)
+		for _ = 1, 4 do
 			local p = S.ring(rimMin + 4, R - 2, 6)
 			if p then
 				P.ruinArch(decor, ground(p), rng, pal)
@@ -729,80 +925,101 @@ function ZonesMap.build(ctx, i, parent)
 			local p = S.ring(rimMin + 7, R - 6, 8)
 			if p then
 				local o = B.model(decor, "Oasis")
-				B.cylY(o, ground(p) + Vector3.new(0, -0.02, 0), 0.12, 9, rgb(70, 170, 190), B.deco({ Material = M.Glass, Transparency = 0.15, Shadow = false, Name = "Water" }))
-				B.cylY(o, ground(p) + Vector3.new(0, -0.05, 0), 0.12, 10.5, rgb(200, 176, 120), B.deco({ Material = M.Sand, Shadow = false }))
-				for k = 1, 2 do
-					local a = rng:range(0, 6.28)
+				B.cylY(o, ground(p) + Vector3.new(0, -0.02, 0), 0.12, 9, rgb(70, 170, 190), B.deco({ Reflectance = 0.2, Shadow = false, Name = "Water" }))
+				B.cylY(o, ground(p) + Vector3.new(0, -0.05, 0), 0.12, 10.5, B.shade(th.ground, 0.3), B.deco({ Shadow = false }))
+				for _ = 1, 2 do
+					local a = rng:range(0, TAU)
 					P.palm(o, ground(p + Vector3.new(math.cos(a) * 5.6, 0, math.sin(a) * 5.6)), rng)
 				end
 				for _ = 1, 4 do
-					local a = rng:range(0, 6.28)
-					P.tuft(o, ground(p + Vector3.new(math.cos(a) * 4.6, 0, math.sin(a) * 4.6)), rng, rgb(90, 150, 80), 1.6)
+					local a = rng:range(0, TAU)
+					P.tuft(o, ground(p + Vector3.new(math.cos(a) * 4.6, 0, math.sin(a) * 4.6)), rng, rgb(90, 150, 80), 1.6, true)
 				end
 			end
 		end
-		for _ = 1, 15 do
+		-- кактусы: группками по 2–3 и одиночками
+		local function cact(p, s)
+			P.cactus(decor, p, rng, pal, s)
+		end
+		for _ = 1, 3 do
+			grove(rimMin + 1, R + 3, rng:int(2, 3), cact, cact)
+		end
+		for _ = 1, 3 do
 			local p = S.ring(rimMin + 1, R + 3, 3)
 			if p then
-				P.cactus(decor, ground(p), rng, pal)
+				cact(ground(p))
 			end
 		end
-		for _ = 1, 15 do
+		for _ = 1, 9 do
 			local p = S.ring(rimMin, R + 3, 2.8)
 			if p then
-				P.glassSpike(decor, ground(p), rng, th.glass, th.glow)
+				P.glassSpike(decor, ground(p), rng, th.glass, accent)
 			end
 		end
-		for _ = 1, 7 do
-			local p = S.ring(rimMin, R + 4, 2.5)
+		for _ = 1, 5 do
+			local p = S.ring(rimMin, R + 4, 2.8)
 			if p then
-				P.rock(decor, ground(p), rng, pal)
+				if rng:chance(0.5) then
+					P.rock(decor, ground(p), rng, pal)
+				else
+					P.flagstone(decor, ground(p), rng, pal)
+				end
 			end
 		end
 		-- осколки стекла внутри (блёстки без коллизий)
-		for _ = 1, 22 do
+		for _ = 1, 16 do
 			local p = insideSpot(4)
 			if p then
-				local cf = CFrame.new(p + Vector3.new(0, 0.25, 0)) * CFrame.Angles(rng:range(-0.5, 0.5), rng:range(0, 3), rng:range(-0.5, 0.5))
-				B.block(flora, cf, Vector3.new(0.35, rng:range(0.6, 1.2), 0.35), th.glass, B.deco({ Material = M.Glass, Transparency = 0.2, Shadow = false }))
+				local cf = CFrame.new(p + Vector3.new(0, 0.25, 0)) * B.windLean(rng:range(10, 30)) * CFrame.Angles(0, rng:range(0, 3), 0) * CFrame.Angles(0, math.rad(45), 0)
+				B.block(flora, cf, Vector3.new(0.35, rng:range(0.6, 1.2), 0.35), th.glass, B.deco({ Material = M.Glass, Transparency = 0.2, Shadow = false, Name = "Shard" }))
 			end
 		end
-		for _ = 1, 26 do
+		for _ = 1, 20 do
 			local p = insideSpot(3)
 			if p then
-				P.tuft(flora, p, rng, th.tuft, 0.8)
+				P.tuft(flora, p, rng, rgb(176, 160, 98), 0.8, isHero(p))
 			end
 		end
 	elseif i == 4 then
 		----------------------------------------------------------------
 		-- Ледяной Пик
 		----------------------------------------------------------------
-		local pal = { pine = th.pine, snowy = true, rock = th.rock }
-		iceSpire(decor, ground(g.Landmark), rng, th.ice, z.Accent)
-		for _ = 1, 17 do
+		local pal = { needles = th.needles, snow = th.snow, trunk = th.trunk, rock = th.rock }
+		iceSpire(decor, ground(g.Landmark), rng, th.ice, accent, th.snow, outsideBy)
+		-- ели рощами по 3–4 разной высоты (меньше штук, но крупнее)
+		local function pine(p, s)
+			P.pine(decor, p, rng, pal, s)
+		end
+		local function pineSmall(p, s)
+			P.pine(decor, p, rng, pal, rng:pick({ 0.85, 1.0 }) * (s + 0.1))
+		end
+		for k = 1, 3 do
+			grove(rimMin + 2, R + 3, rng:int(3, 4), pine, pineSmall, if k <= 2 then farBias else nil)
+		end
+		for _ = 1, 2 do
 			local p = S.ring(rimMin + 2, R + 3, 4.5)
 			if p then
-				P.pine(decor, ground(p), rng, pal)
+				pine(ground(p), rng:range(0.95, 1.2))
 			end
 		end
-		for _ = 1, 9 do
+		for _ = 1, 6 do
 			local p = S.ring(rimMin, R + 3, 2.5)
 			if p then
-				P.crystals(decor, ground(p), rng, th.ice, rng:range(0.9, 1.6), M.Ice, if rng:chance(0.4) then z.Accent else nil)
+				P.crystals(decor, ground(p), rng, th.ice, rng:range(0.9, 1.5), if rng:chance(0.4) then accent else nil, th.rock)
+			end
+		end
+		for _ = 1, 5 do
+			local p = S.ring(rimMin, R + 4, 2.8)
+			if p then
+				local r = P.rock(decor, ground(p), rng, pal)
+				-- снежная шапка: плоская плита сверху
+				B.block(r, CFrame.new(ground(p) + Vector3.new(0, 2.15 * 1.1, 0)) * CFrame.Angles(0, rng:range(0, 3), 0), Vector3.new(2.8, 0.45, 2.2), th.snow, B.deco({ Material = M.Snow, Shadow = false }))
 			end
 		end
 		for _ = 1, 8 do
-			local p = S.ring(rimMin, R + 4, 2.5)
-			if p then
-				local r = P.rock(decor, ground(p), rng, pal)
-				-- снежная шапка
-				B.ball(r, ground(p) + Vector3.new(0, 2.2, 0), 2.4, rgb(244, 248, 255), B.deco({ Material = M.Snow, Shadow = false }))
-			end
-		end
-		for _ = 1, 10 do
 			local p = S.ring(rimMin, R + 2, 3)
 			if p then
-				P.drift(decor, ground(p), rng, rgb(240, 245, 255))
+				P.drift(decor, ground(p), rng, th.snow)
 			end
 		end
 		-- снеговик смотрит на игровую поляну
@@ -812,18 +1029,17 @@ function ZonesMap.build(ctx, i, parent)
 				P.snowman(decor, ground(p), C - p, rng)
 			end
 		end
-		-- ледяные «блюдца» и снежные травинки внутри
-		for _ = 1, 30 do
+		for _ = 1, 20 do
 			local p = insideSpot(3)
 			if p then
-				P.tuft(flora, p, rng, th.tuft, 0.9)
+				P.tuft(flora, p, rng, rgb(196, 214, 240), 0.9, isHero(p))
 			end
 		end
 		for _ = 1, 10 do
 			local p = insideSpot(4)
 			if p then
-				local cf = CFrame.new(p + Vector3.new(0, 0.3, 0)) * CFrame.Angles(rng:range(-0.4, 0.4), rng:range(0, 3), rng:range(-0.4, 0.4)) * CFrame.Angles(0, math.pi / 4, 0)
-				B.block(flora, cf, Vector3.new(0.4, rng:range(0.7, 1.3), 0.4), th.ice, B.deco({ Material = M.Ice, Shadow = false }))
+				local cf = CFrame.new(p + Vector3.new(0, 0.3, 0)) * B.windLean(rng:range(8, 22)) * CFrame.Angles(0, rng:range(0, 3), 0) * CFrame.Angles(0, math.pi / 4, 0)
+				B.block(flora, cf, Vector3.new(0.4, rng:range(0.7, 1.3), 0.4), B.tint(th.ice, 0.3), B.deco({ Reflectance = 0.1, Shadow = false, Name = "Shard" }))
 			end
 		end
 	else
@@ -832,25 +1048,32 @@ function ZonesMap.build(ctx, i, parent)
 		----------------------------------------------------------------
 		local pal = { rock = th.rock, crack = th.crack }
 		lightPillar(decor, ground(g.Landmark), rng, th.gold, th.crack, GY + Config.CloudHeight, g.Dir)
-		for _ = 1, 12 do
+		for _ = 1, 8 do
 			local p = S.ring(rimMin + 1, R + 3, 3.5)
 			if p then
 				P.basalt(decor, ground(p), rng, pal)
 			end
 		end
-		for k = 1, 10 do
+		for k = 1, 8 do
 			local p = S.ring(rimMin, R + 3, 2.8)
 			if p then
-				local cr = P.crystals(decor, ground(p), rng, rgb(130, 80, 220), rng:range(1, 1.7), M.Glass, th.crack)
+				local cr = P.crystals(decor, ground(p), rng, rgb(130, 80, 220), rng:range(1, 1.6), th.crack, th.rock)
 				if k % 3 == 1 then
 					local lp = B.block(cr, CFrame.new(ground(p) + Vector3.new(0, 2.5, 0)), Vector3.new(0.5, 0.5, 0.5), th.crack, B.deco({ Transparency = 1, Shadow = false }))
 					B.light(lp, th.crack, 18, 1.2)
 				end
 			end
 		end
+		-- светящиеся грибы (единственное исключение «неон на природе»)
+		for _ = 1, 4 do
+			local p = S.ring(rimMin, R + 3, 1.4)
+			if p then
+				P.mushroom(decor, ground(p), rng, th.crack, rng:range(0.8, 1.3), true)
+			end
+		end
 		-- парящие камни над краем и над обрывом (без коллизий)
-		for _ = 1, 14 do
-			local a = rng:range(0, math.pi * 2)
+		for _ = 1, 12 do
+			local a = rng:range(0, TAU)
 			local d = rng:range(PR + 6, R + 14)
 			local p = C + Vector3.new(math.cos(a) * d, rng:range(7, 24), math.sin(a) * d)
 			if flatDist(p, C + g.ToHub * R) > 22 then
@@ -858,12 +1081,12 @@ function ZonesMap.build(ctx, i, parent)
 			end
 		end
 		-- неоновые трещины по земле у края (ломаные из тонких полосок)
-		for _ = 1, 9 do
+		for _ = 1, 8 do
 			local p = S.ring(rimMin, R - 2, 2)
 			if p then
 				local q = ground(p)
 				local dir = B.dir(rng:range(0, 360))
-				for _ = 1, rng:int(3, 5) do
+				for _ = 1, rng:int(3, 4) do
 					local nextQ = q + (dir + Vector3.new(rng:range(-0.6, 0.6), 0, rng:range(-0.6, 0.6))).Unit * rng:range(2, 4)
 					if flatDist(nextQ, C) > PR + 1 and flatDist(nextQ, C) < outline(math.atan2(nextQ.Z - C.Z, nextQ.X - C.X)) - 1 then
 						B.bar(flora, q + Vector3.new(0, 0.02, 0), nextQ + Vector3.new(0, 0.02, 0), rng:range(0.25, 0.45), 0.1, th.crack, B.neon())
@@ -872,17 +1095,17 @@ function ZonesMap.build(ctx, i, parent)
 				end
 			end
 		end
-		-- фиолетовые искорки-камешки внутри (тусклые, плоские)
-		for _ = 1, 24 do
+		-- тёмные гранёные камешки внутри (плоские) и травинки
+		for _ = 1, 20 do
 			local p = insideSpot(3)
 			if p then
-				B.block(flora, CFrame.new(p + Vector3.new(0, -0.02, 0)) * CFrame.Angles(0, rng:range(0, 3), 0), Vector3.new(rng:range(0.6, 1.2), 0.1, rng:range(0.5, 1)), rgb(64, 54, 80), B.deco({ Material = M.Basalt, Shadow = false }))
+				B.block(flora, CFrame.new(p + Vector3.new(0, -0.02, 0)) * CFrame.Angles(0, rng:range(0, 3), 0), Vector3.new(rng:range(0.6, 1.2), 0.1, rng:range(0.5, 1)), rgb(74, 62, 96), B.deco({ Shadow = false }))
 			end
 		end
 		for _ = 1, 10 do
 			local p = insideSpot(3)
 			if p then
-				P.tuft(flora, p, rng, B.rgb(120, 90, 170), 0.7)
+				P.tuft(flora, p, rng, rgb(120, 90, 170), 0.7, isHero(p))
 			end
 		end
 	end

@@ -122,25 +122,27 @@ function Fulgurite.rarityOf(color: Config.ColorId, quality: number, mut: MutId?)
 	return "common"
 end
 
-local MAX_PARTS = 90 -- ограничение числа деталей (телефоны)
+local MAX_PARTS = 60 -- ограничение числа деталей (телефоны)
+local BASE_PARTS = 6 -- основание: 3 глыбы и лужица-шестиугольник из 3 брусков
+local DIAMOND = CFrame.Angles(math.pi / 4, 0, 0) -- поворот бруска вокруг своей оси: ромбовидное сечение
+local GEM_TILT = CFrame.Angles(math.rad(35.264), 0, math.rad(45)) -- куб на вершине (кончики)
 
--- Отрезок стекла: трубка + светящаяся сердцевина + «узелок» оплавленного стекла на стыке
-local function segment(parts: { PartSpec }, a: Vector3, b: Vector3, thickness: number)
+-- Отрезок стекла: брусок с ромбовидным сечением (удлинён для нахлёста на изломе, без шаров-суставов)
+-- и тонкая светящаяся сердцевина. roll — поворот грани вокруг оси отрезка (разные грани ловят свет)
+local function segment(parts: { PartSpec }, a: Vector3, b: Vector3, thickness: number, roll: number?)
 	local cf, len = Geom.axisCFrame(a, b)
 	if len < 0.05 or #parts >= MAX_PARTS - 2 then
 		return
 	end
-	table.insert(parts, { CFrame = cf, Size = Vector3.new(len + thickness * 0.3, thickness, thickness), Kind = "glass", Shape = "Cylinder" } :: PartSpec)
+	local rcf = cf * DIAMOND * CFrame.Angles(roll or 0, 0, 0)
+	table.insert(parts, { CFrame = rcf, Size = Vector3.new(len + thickness * 0.35, thickness, thickness), Kind = "glass", Shape = "Block" } :: PartSpec)
 	if thickness >= 0.3 then
 		table.insert(parts, {
-			CFrame = cf,
-			Size = Vector3.new(len + thickness * 0.2, thickness * 0.36, thickness * 0.36),
+			CFrame = rcf,
+			Size = Vector3.new(len + thickness * 0.2, thickness * 0.3, thickness * 0.3),
 			Kind = "core",
-			Shape = "Cylinder",
+			Shape = "Block",
 		} :: PartSpec)
-	end
-	if thickness >= 0.32 then
-		table.insert(parts, { CFrame = CFrame.new(b), Size = Vector3.one * thickness * 1.18, Kind = "glass", Shape = "Ball" } :: PartSpec)
 	end
 end
 
@@ -182,7 +184,7 @@ local function branch(parts: { PartSpec }, rng: Prng.Prng, pos: Vector3, dir: Ve
 		if nextP.Y < 0.4 then
 			nextP = Vector3.new(nextP.X, 0.4 + rng:range(0, 0.3), nextP.Z)
 		end
-		segment(parts, p, nextP, t)
+		segment(parts, p, nextP, t, (i % 2) * 0.35)
 		p = nextP
 		t = math.max(0.16, t * 0.82)
 		if depth > 0 and #parts < limit - 8 and rng:chance(if style == "bush" then 0.6 else 0.45) then
@@ -190,9 +192,9 @@ local function branch(parts: { PartSpec }, rng: Prng.Prng, pos: Vector3, dir: Ve
 			branch(parts, rng, p, sideDir, len * 0.6, t * 0.75, depth - 1, style, limit)
 		end
 	end
-	-- светящийся кончик
+	-- светящийся кончик-кристалл (куб на вершине)
 	if #parts < MAX_PARTS then
-		table.insert(parts, { CFrame = CFrame.new(p), Size = Vector3.one * math.max(0.3, t * 1.25), Kind = "tip", Shape = "Ball" } :: PartSpec)
+		table.insert(parts, { CFrame = CFrame.new(p) * CFrame.Angles(0, d.X * 3 + d.Z * 2, 0) * GEM_TILT, Size = Vector3.one * math.max(0.2, t * 0.95), Kind = "tip", Shape = "Block" } :: PartSpec)
 	end
 end
 
@@ -205,16 +207,23 @@ function Fulgurite.generate(seed: number, color: Config.ColorId, mut: MutId?): S
 	local rarity = Fulgurite.rarityOf(color, quality, mut)
 	local rank = Pets.Rarities[rarity].Rank
 	local parts: { PartSpec } = {}
-	-- основание: тёмный оплавленный камень (2-3 глыбы) и лужица стекла
+	-- основание: тёмный оплавленный камень (3 глыбы) и лужица стекла — плоский шестиугольник
 	local yaw = rng:range(0, math.pi * 2)
 	table.insert(parts, { CFrame = CFrame.new(0, 0.3, 0) * CFrame.Angles(0, yaw, 0), Size = Vector3.new(2.8, 0.6, 2.3), Kind = "base", Shape = "Block" } :: PartSpec)
 	table.insert(parts, { CFrame = CFrame.new(0.2, 0.32, 0.1) * CFrame.Angles(0.12, yaw + 0.8, -0.1), Size = Vector3.new(2.2, 0.6, 2.0), Kind = "base", Shape = "Block" } :: PartSpec)
 	table.insert(parts, { CFrame = CFrame.new(-0.9, 0.25, -0.6) * CFrame.Angles(0.2, yaw + 2.1, 0.15), Size = Vector3.new(1.1, 0.7, 1.0), Kind = "base", Shape = "Block" } :: PartSpec)
-	table.insert(parts, { CFrame = CFrame.new(0, 0.62, 0) * CFrame.Angles(0, 0, math.pi / 2), Size = Vector3.new(0.12, 2.1, 2.1), Kind = "glass", Shape = "Cylinder" } :: PartSpec)
+	for q = 0, 2 do
+		table.insert(parts, {
+			CFrame = CFrame.new(0, 0.63, 0) * CFrame.Angles(0, yaw + 0.3 + q * math.pi / 3, 0),
+			Size = Vector3.new(1.08, 0.12, 1.08 * math.sqrt(3) * (1 + 0.08 * (q - 1))),
+			Kind = "glass",
+			Shape = "Block",
+		} :: PartSpec)
+	end
 	local depth = 1 + math.min(3, rank - 1)
 	local height = 3.2 + rank * 0.55 + quality
 	local function share(i: number, n: number): number
-		return 4 + math.floor((MAX_PARTS - 4) * i / n)
+		return BASE_PARTS + math.floor((MAX_PARTS - BASE_PARTS) * i / n)
 	end
 	if shape == "crown" then
 		local n = 4 + math.min(rank, 4)

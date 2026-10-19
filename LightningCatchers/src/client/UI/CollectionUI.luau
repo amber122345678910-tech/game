@@ -1,6 +1,7 @@
 --!strict
 -- Коллекция: фульгуриты (3D-превью строятся лениво и кэшируются, надеть/снять/разбить)
 -- и Молниедекс (острова × цвета + Радужная и Чёрная, бонус за полную строку).
+-- Знаки цветов молний (● ◆ ▲ ★ ✦ ✺ ☯) нарисованы примитивами: в шрифтах игры их нет (docs/STYLE.md §8.5).
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
@@ -23,7 +24,6 @@ local UIKit = require(script.Parent.UIKit)
 local CollectionUI = {}
 
 local WHITE = Color3.new(1, 1, 1)
-local BLACK = Color3.new(0, 0, 0)
 
 local CELL = Vector2.new(124, 152)
 local GRID_W = 556
@@ -93,7 +93,6 @@ type FulgCard = {
 	center: Vector3,
 	dist: number,
 	check: Frame,
-	stroke: UIStroke,
 	phase: number,
 	seenAt: number, -- os.clock, когда карточка последний раз была видна
 }
@@ -114,6 +113,7 @@ local detailCenter = Vector3.zero
 local detailDist = 8
 local detailTitle: TextLabel
 local detailSerial: TextLabel
+local detailRarityTag: Frame
 local detailRarity: TextLabel
 local detailBonus: TextLabel
 local detailZone: TextLabel
@@ -132,19 +132,13 @@ end
 local function selectFulg(id: number?)
 	selectedId = id
 	for cid, c in cards do
-		if cid == id then
-			c.stroke.Color = WHITE
-			c.stroke.Thickness = 4.5
-		else
-			c.stroke.Color = Pets.Rarities[specOf(c.record).Rarity].Color
-			c.stroke.Thickness = 3
-		end
+		UIKit.selectCard(c.button, cid == id)
 	end
 	local d = ClientState.get()
 	local f = if d and id then PlayerData.findFulg(d, id) else nil
 	local show = f ~= nil
 	detailHint.Visible = not show
-	for _, l in { detailTitle, detailSerial, detailRarity, detailBonus, detailZone } do
+	for _, l in { detailTitle, detailSerial, detailRarityTag, detailBonus, detailZone } :: { GuiObject } do
 		l.Visible = show
 	end
 	equipButton.Visible = show
@@ -160,19 +154,19 @@ local function selectFulg(id: number?)
 	local spec = specOf(f)
 	local rar = Pets.Rarities[spec.Rarity]
 	detailTitle.Text = Fulgurite.title(spec, mutOf(f))
-	detailTitle.TextColor3 = rar.Color:Lerp(WHITE, 0.3)
+	detailTitle.TextColor3 = rar.Color:Lerp(WHITE, 0.35)
 	detailSerial.Text = serialText(f)
-	detailRarity.Text = rar.Name
-	detailRarity.TextColor3 = rar.Color
+	detailRarity.Text = UIKit.upper(rar.Name)
+	detailRarityTag.BackgroundColor3 = rar.Color
 	detailBonus.Text = bonusText(spec)
 	local zdef = Config.Zones[f.Zone]
 	detailZone.Text = if zdef then "Найден: " .. zdef.Name else ""
 	if isEquipped(d, id) then
 		UIKit.setButtonText(equipButton, "Снять")
-		UIKit.setButtonColor(equipButton, Theme.Gray)
+		UIKit.setButtonVariant(equipButton, "Slate")
 	else
 		UIKit.setButtonText(equipButton, "Надеть")
-		UIKit.setButtonColor(equipButton, if #d.EquippedFulgs >= Fulgurite.MaxEquipped then Theme.GrayDark else Theme.Green)
+		UIKit.setButtonVariant(equipButton, if #d.EquippedFulgs >= Fulgurite.MaxEquipped then "Disabled" else "Go")
 	end
 	local key = keyOf(f)
 	if key ~= detailKey then
@@ -201,12 +195,12 @@ local function makeCard(f: PlayerData.FulgRecord): FulgCard
 		Parent = grid,
 	}) :: TextButton
 	UIKit.corner(button, Theme.CornerSmall)
-	local stroke = UIKit.stroke(button, 3, rar.Color)
-	UIKit.gradient(button, rar.Color:Lerp(Theme.Card, 0.6), Theme.PanelDark)
-	local vp, camera = UIKit.viewport({
-		Name = "Preview",
-		Size = UDim2.new(1, -8, 0, 86),
-		Position = UDim2.fromOffset(4, 4),
+	UIKit.stroke(button, 1.5, Theme.LineLight, 0.7)
+	UIKit.new("UIGradient", { Name = "CardGrad", Rotation = 90, Parent = button })
+	UIKit.rarityCard(button, rar.Color)
+	local _well, vp, camera = UIKit.previewWell({
+		Size = UDim2.new(1, -12, 0, 80),
+		Position = UDim2.fromOffset(6, 10),
 		Parent = button,
 	})
 	-- на карточке коротко: форма и мутация (полное название — в панели справа)
@@ -214,63 +208,45 @@ local function makeCard(f: PlayerData.FulgRecord): FulgCard
 	UIKit.label({
 		Name = "Shape",
 		Text = "«" .. spec.ShapeName .. "»",
-		Size = UDim2.new(1, -8, 0, 24),
-		Position = UDim2.fromOffset(4, 90),
-		TextColor3 = rar.Color:Lerp(WHITE, 0.35),
-		MaxTextSize = 21,
+		FontFace = Theme.FontDisplayFlat,
+		Size = UDim2.new(1, -10, 0, 22),
+		Position = UDim2.fromOffset(5, 92),
+		TextColor3 = rar.Color:Lerp(WHITE, 0.4),
+		MaxTextSize = 18,
 		Parent = button,
 	})
 	UIKit.label({
 		Name = "Kind",
-		Text = if mut then Fulgurite.Mutations[mut].Name else rar.Name,
-		Size = UDim2.new(1, -8, 0, 16),
-		Position = UDim2.fromOffset(4, 113),
-		TextColor3 = if mut then Fulgurite.Mutations[mut].Color:Lerp(WHITE, 0.2) else rar.Color,
-		FontFace = Theme.FontBold,
-		MaxTextSize = 15,
+		Text = UIKit.upper(if mut then Fulgurite.Mutations[mut].Name else rar.Name),
+		FontFace = Theme.FontBodyHeavy,
+		Size = UDim2.new(1, -10, 0, 16),
+		Position = UDim2.fromOffset(5, 114),
+		TextColor3 = if mut then Fulgurite.Mutations[mut].Color:Lerp(WHITE, 0.25) else rar.Color,
+		MaxTextSize = 13,
 		Parent = button,
 	})
 	UIKit.label({
 		Name = "Serial",
 		Text = serialText(f),
 		Size = UDim2.new(0.55, -4, 0, 18),
-		Position = UDim2.fromOffset(4, 131),
+		Position = UDim2.fromOffset(5, 131),
 		TextXAlignment = Enum.TextXAlignment.Left,
-		FontFace = Theme.FontBold,
 		TextColor3 = Theme.TextDim,
-		MaxTextSize = 15,
+		MaxTextSize = 14,
 		Parent = button,
 	})
 	UIKit.label({
 		Name = "Bonus",
 		Text = bonusText(spec),
-		Size = UDim2.new(0.45, -4, 0, 18),
+		FontFace = Theme.FontNumber,
+		Size = UDim2.new(0.45, -6, 0, 18),
 		Position = UDim2.new(0.55, 0, 0, 131),
 		TextXAlignment = Enum.TextXAlignment.Right,
 		TextColor3 = Theme.Volt,
 		MaxTextSize = 16,
 		Parent = button,
 	})
-	local check = UIKit.new("Frame", {
-		Name = "Equipped",
-		Size = UDim2.fromOffset(30, 30),
-		Position = UDim2.fromOffset(4, 4),
-		BackgroundColor3 = Theme.Green,
-		Visible = false,
-		ZIndex = 4,
-		Parent = button,
-	}) :: Frame
-	UIKit.round(check)
-	UIKit.stroke(check, 2, Theme.Stroke)
-	UIKit.label({
-		Text = "✔",
-		Size = UDim2.fromScale(0.75, 0.75),
-		Position = UDim2.fromScale(0.5, 0.5),
-		AnchorPoint = Vector2.new(0.5, 0.5),
-		MaxTextSize = 22,
-		ZIndex = 5,
-		Parent = check,
-	})
+	local check = UIKit.checkBadge(button, 28, { Name = "Equipped", Position = UDim2.fromOffset(2, 4) })
 	local card: FulgCard = {
 		id = f.Id,
 		record = f,
@@ -281,7 +257,6 @@ local function makeCard(f: PlayerData.FulgRecord): FulgCard
 		center = Vector3.zero,
 		dist = 8,
 		check = check,
-		stroke = stroke,
 		phase = (f.Id * 2.3) % (math.pi * 2),
 		seenAt = os.clock(),
 	}
@@ -370,36 +345,40 @@ local function buildFulgs(page: Frame)
 	equippedLabel = UIKit.label({
 		Name = "Equipped",
 		Text = "",
-		Size = UDim2.fromOffset(220, 40),
+		FontFace = Theme.FontBodyHeavy,
+		Size = UDim2.fromOffset(220, 34),
 		Position = UDim2.new(0, 4, 0.5, 0),
 		AnchorPoint = Vector2.new(0, 0.5),
 		TextXAlignment = Enum.TextXAlignment.Left,
-		TextColor3 = Theme.Good,
-		MaxTextSize = 28,
+		TextColor3 = Theme.SparkHi,
+		MaxTextSize = 26,
 		Parent = top,
 	})
 	countLabel = UIKit.label({
 		Name = "Count",
 		Text = "",
-		Size = UDim2.fromOffset(220, 40),
+		FontFace = Theme.FontBodyHeavy,
+		Size = UDim2.fromOffset(220, 34),
 		Position = UDim2.new(0, 230, 0.5, 0),
 		AnchorPoint = Vector2.new(0, 0.5),
 		TextXAlignment = Enum.TextXAlignment.Left,
 		TextColor3 = Theme.TextDim,
-		MaxTextSize = 24,
+		MaxTextSize = 22,
 		Parent = top,
 	})
 	totalLabel = UIKit.label({
 		Name = "Total",
 		Text = "",
+		FontFace = Theme.FontNumber,
 		Size = UDim2.fromOffset(300, 40),
 		AnchorPoint = Vector2.new(1, 0.5),
 		Position = UDim2.new(1, -4, 0.5, 0),
 		TextXAlignment = Enum.TextXAlignment.Right,
-		TextColor3 = Theme.Volt,
-		MaxTextSize = 28,
+		MaxTextSize = 30,
+		NoStroke = false,
 		Parent = top,
 	})
+	UIKit.gradientText(totalLabel, Theme.VoltHi, Theme.Volt)
 
 	grid = UIKit.scroll({
 		Name = "Grid",
@@ -408,79 +387,84 @@ local function buildFulgs(page: Frame)
 		Parent = page,
 	})
 	UIKit.grid(grid, CELL, 10).HorizontalAlignment = Enum.HorizontalAlignment.Left
-	UIKit.padding(grid, 4, 4)
+	UIKit.padding(grid, 6, 6)
 	emptyHint = UIKit.label({
 		Name = "Empty",
 		Text = "Лови молнии на ИДЕАЛЬНО —\nиногда они оставляют стеклянный фульгурит!",
+		FontFace = Theme.FontBodyHeavy,
 		Size = UDim2.new(0, GRID_W - 40, 0, 110),
 		Position = UDim2.new(0, GRID_W / 2, 0.45, 0),
 		AnchorPoint = Vector2.new(0.5, 0.5),
-		MaxTextSize = 28,
+		MaxTextSize = 26,
 		Visible = false,
 		Parent = page,
 	})
 
 	local detail = UIKit.card({
 		Name = "Detail",
-		Size = UDim2.new(1, -(GRID_W + 12), 1, -58),
-		Position = UDim2.fromOffset(GRID_W + 12, 58),
+		Size = UDim2.new(1, -(GRID_W + 14), 1, -60),
+		Position = UDim2.fromOffset(GRID_W + 14, 58),
 		Parent = page,
 	})
-	detailVp, detailCam = UIKit.viewport({
-		Name = "Preview",
-		Size = UDim2.new(1, -16, 0, 120),
-		Position = UDim2.fromOffset(8, 6),
+	local _dw: Frame
+	_dw, detailVp, detailCam = UIKit.previewWell({
+		Size = UDim2.new(1, -16, 0, 118),
+		Position = UDim2.fromOffset(8, 8),
 		Parent = detail,
 	})
 	detailTitle = UIKit.label({
 		Name = "Title",
 		Text = "",
-		Size = UDim2.new(1, -16, 0, 42),
-		Position = UDim2.fromOffset(8, 128),
-		MaxTextSize = 23,
+		FontFace = Theme.FontDisplayFlat,
+		Size = UDim2.new(1, -16, 0, 40),
+		Position = UDim2.fromOffset(8, 130),
+		MaxTextSize = 20,
 		Parent = detail,
 	})
 	detailSerial = UIKit.label({
 		Name = "Serial",
 		Text = "",
+		FontFace = Theme.FontBodyHeavy,
 		Size = UDim2.new(0.5, -8, 0, 22),
-		Position = UDim2.fromOffset(8, 172),
+		Position = UDim2.fromOffset(8, 174),
 		TextXAlignment = Enum.TextXAlignment.Left,
 		TextColor3 = Theme.TextDim,
-		MaxTextSize = 20,
+		MaxTextSize = 17,
 		Parent = detail,
 	})
-	detailRarity = UIKit.label({
+	detailRarityTag, detailRarity = UIKit.tag({
 		Name = "Rarity",
-		Text = "",
-		Size = UDim2.new(0.5, -8, 0, 22),
-		Position = UDim2.new(0.5, 0, 0, 172),
-		TextXAlignment = Enum.TextXAlignment.Right,
-		MaxTextSize = 20,
+		Size = UDim2.fromOffset(128, 24),
+		AnchorPoint = Vector2.new(1, 0),
+		Position = UDim2.new(1, -8, 0, 172),
+		Rotation = -2,
 		Parent = detail,
-	})
+	}, "", 14)
+	detailRarity.TextColor3 = Theme.Ink
 	detailBonus = UIKit.label({
 		Name = "Bonus",
 		Text = "",
-		Size = UDim2.new(1, -16, 0, 28),
-		Position = UDim2.fromOffset(8, 196),
-		TextColor3 = Theme.Volt,
-		MaxTextSize = 26,
+		FontFace = Theme.FontNumber,
+		Size = UDim2.new(1, -16, 0, 30),
+		Position = UDim2.fromOffset(8, 200),
+		MaxTextSize = 28,
+		NoStroke = false,
 		Parent = detail,
 	})
+	UIKit.gradientText(detailBonus, Theme.VoltHi, Theme.Volt)
 	detailZone = UIKit.label({
 		Name = "Zone",
 		Text = "",
 		Size = UDim2.new(1, -16, 0, 20),
-		Position = UDim2.fromOffset(8, 226),
-		FontFace = Theme.FontBold,
+		Position = UDim2.fromOffset(8, 232),
 		TextColor3 = Theme.TextDim,
-		MaxTextSize = 18,
+		MaxTextSize = 17,
 		Parent = detail,
 	})
 	detailHint = UIKit.label({
 		Name = "Hint",
 		Text = "Нажми на фульгурит",
+		FontFace = Theme.FontBodyHeavy,
 		Size = UDim2.new(1, -24, 0, 40),
 		Position = UDim2.new(0.5, 0, 0, 190),
 		AnchorPoint = Vector2.new(0.5, 0),
@@ -491,7 +475,7 @@ local function buildFulgs(page: Frame)
 	equipButton = UIKit.button({
 		Name = "Equip",
 		Text = "Надеть",
-		Color = Theme.Green,
+		Color = Theme.Go,
 		Size = UDim2.new(0.5, -14, 0, 62),
 		AnchorPoint = Vector2.new(0, 1),
 		Position = UDim2.new(0, 10, 1, -10),
@@ -520,8 +504,8 @@ local function buildFulgs(page: Frame)
 	end)
 	breakButton = UIKit.button({
 		Name = "Break",
-		Text = "💎 Разбить",
-		Color = Theme.Red,
+		Text = "Разбить",
+		Color = Theme.Danger,
 		Size = UDim2.new(0.5, -14, 0, 62),
 		AnchorPoint = Vector2.new(1, 1),
 		Position = UDim2.new(1, -10, 1, -10),
@@ -545,7 +529,7 @@ local function buildFulgs(page: Frame)
 			(if mut then Fulgurite.Mutations[mut].Name .. " · " else "") .. Pets.Rarities[spec.Rarity].Name .. " · " .. bonusText(spec),
 		}
 		if isEquipped(d, id) then
-			table.insert(lines, "⚠ Он сейчас надет!")
+			table.insert(lines, "Он сейчас надет!")
 		end
 		table.insert(lines, string.format("Получишь 💎 %s, а он исчезнет навсегда.", Format.short(Fulgurite.shatterValue(spec.Rarity, f.Zone))))
 		win.confirm(table.concat(lines, "\n"), "Разбить", function()
@@ -567,13 +551,14 @@ end
 ----------------------------------------------------------------------
 -- Вкладка "Молниедекс"
 ----------------------------------------------------------------------
-type Cell = { frame: Frame, grad: UIGradient, icon: TextLabel, name: TextLabel, stroke: UIStroke }
-type Row = { cells: { [string]: Cell }, progress: TextLabel, reward: TextLabel }
+type Cell = { frame: Frame, grad: UIGradient, glyph: Frame, unknown: TextLabel, name: TextLabel, stroke: UIStroke }
+type Row = { cells: { [string]: Cell }, progress: TextLabel, reward: UIKit.Status }
 local rows: { Row } = {}
 local specialCells: { [string]: Cell } = {}
 local indexTotal: TextLabel
 
-local function makeCell(parent: Instance, order: number, size: Vector2): Cell
+local function makeCell(parent: Instance, order: number, size: Vector2, color: Config.ColorId): Cell
+	local def = Config.Colors[color]
 	local frame = UIKit.new("Frame", {
 		Name = "Cell" .. order,
 		Size = UDim2.fromOffset(size.X, size.Y),
@@ -581,62 +566,75 @@ local function makeCell(parent: Instance, order: number, size: Vector2): Cell
 		LayoutOrder = order,
 		Parent = parent,
 	}) :: Frame
-	UIKit.corner(frame, 10)
-	local stroke = UIKit.stroke(frame, 2.5, Theme.Stroke)
-	local grad = UIKit.gradient(frame, Theme.PanelLight, Theme.PanelDark)
-	local icon = UIKit.label({
+	UIKit.corner(frame, 8)
+	local stroke = UIKit.stroke(frame, 2, Theme.Ink)
+	local grad = UIKit.gradient(frame, Theme.Night700, Theme.Night900)
+	-- знак цвета нарисован: ● ◆ ▲ ★ ✦ ✺ ☯ (Чёрная Перуна — молния в тёмном круге)
+	local glyph = UIKit.glyph(frame, UIKit.colorGlyphKind(color), {
 		Name = "Icon",
+		Size = UDim2.fromScale(0.42, 0.42),
+		Position = UDim2.fromScale(0.5, 0.36),
+		Color = if color == "black" then Theme.Ink else Theme.Cream,
+		Stroke = 2,
+		Visible = false,
+	})
+	local unknown = UIKit.label({
+		Name = "Unknown",
 		Text = "?",
-		Size = UDim2.new(1, -6, 0.6, 0),
+		FontFace = Theme.FontDisplay,
+		Size = UDim2.new(1, -6, 0.56, 0),
 		Position = UDim2.fromScale(0.5, 0.36),
 		AnchorPoint = Vector2.new(0.5, 0.5),
-		MaxTextSize = 34,
+		TextColor3 = Theme.Slate,
+		MaxTextSize = 30,
 		Parent = frame,
 	})
 	local name = UIKit.label({
 		Name = "Name",
-		Text = "",
+		Text = def.Name,
+		FontFace = Theme.FontBodyHeavy,
 		Size = UDim2.new(1, -6, 0.3, 0),
 		Position = UDim2.fromScale(0.5, 0.82),
 		AnchorPoint = Vector2.new(0.5, 0.5),
-		MaxTextSize = 15,
+		MaxTextSize = 14,
 		Parent = frame,
 	})
-	return { frame = frame, grad = grad, icon = icon, name = name, stroke = stroke }
+	return { frame = frame, grad = grad, glyph = glyph, unknown = unknown, name = name, stroke = stroke }
 end
 
 local function setCell(cell: Cell, color: Config.ColorId, caught: boolean)
 	local def = Config.Colors[color]
+	cell.glyph.Visible = caught
+	cell.unknown.Visible = not caught
+	cell.name.Text = def.Name
 	if caught then
 		local c = def.Color
 		if color == "black" then
 			cell.grad.Color = ColorSequence.new(Color3.fromRGB(90, 60, 130), Color3.fromRGB(20, 10, 30))
-			cell.icon.TextColor3 = Theme.Gold
 			cell.stroke.Color = Theme.Gold
 		elseif color == "rainbow" then
-			cell.grad.Color = ColorSequence.new({
-				ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 110, 110)),
-				ColorSequenceKeypoint.new(0.33, Color3.fromRGB(255, 220, 90)),
-				ColorSequenceKeypoint.new(0.66, Color3.fromRGB(110, 230, 160)),
-				ColorSequenceKeypoint.new(1, Color3.fromRGB(150, 120, 255)),
+			cell.grad.Color = UIKit.seq({
+				{ 0, Color3.fromRGB(255, 110, 110) },
+				{ 0.33, Color3.fromRGB(255, 220, 90) },
+				{ 0.66, Color3.fromRGB(110, 230, 160) },
+				{ 1, Color3.fromRGB(150, 120, 255) },
 			})
-			cell.icon.TextColor3 = WHITE
-			cell.stroke.Color = WHITE
+			cell.stroke.Color = Theme.Cream
 		else
-			cell.grad.Color = ColorSequence.new(c:Lerp(WHITE, 0.25), c:Lerp(BLACK, 0.35))
-			cell.icon.TextColor3 = WHITE
-			cell.stroke.Color = Theme.Stroke
+			cell.grad.Color = ColorSequence.new(c:Lerp(WHITE, 0.2), c:Lerp(Theme.Ink, 0.45))
+			cell.stroke.Color = Theme.Ink
 		end
-		cell.icon.Text = def.Icon
-		cell.name.Text = def.Name
-		cell.name.TextColor3 = WHITE
+		cell.name.TextColor3 = Theme.Cream
+		local s = cell.name:FindFirstChildOfClass("UIStroke") or UIKit.textStroke(cell.name, 1.5)
+		s.Enabled = true
 	else
-		cell.grad.Color = ColorSequence.new(Theme.PanelLight, Theme.PanelDark)
-		cell.icon.Text = "?"
-		cell.icon.TextColor3 = Theme.GrayDark
-		cell.name.Text = def.Name
-		cell.name.TextColor3 = Theme.GrayDark
-		cell.stroke.Color = Theme.Stroke
+		cell.grad.Color = ColorSequence.new(Theme.Well, Theme.Well)
+		cell.name.TextColor3 = Theme.Slate
+		cell.stroke.Color = Theme.Ink
+		local s = cell.name:FindFirstChildOfClass("UIStroke")
+		if s then
+			s.Enabled = false
+		end
 	end
 end
 
@@ -644,11 +642,12 @@ local function buildIndex(page: Frame)
 	indexTotal = UIKit.label({
 		Name = "Total",
 		Text = "",
-		Size = UDim2.new(1, -8, 0, 34),
+		FontFace = Theme.FontBodyHeavy,
+		Size = UDim2.new(0.4, -8, 0, 34),
 		Position = UDim2.fromOffset(4, 0),
 		TextXAlignment = Enum.TextXAlignment.Left,
 		TextColor3 = Theme.Volt,
-		MaxTextSize = 28,
+		MaxTextSize = 26,
 		Parent = page,
 	})
 	UIKit.label({
@@ -658,9 +657,8 @@ local function buildIndex(page: Frame)
 		AnchorPoint = Vector2.new(1, 0),
 		Position = UDim2.new(1, -4, 0, 2),
 		TextXAlignment = Enum.TextXAlignment.Right,
-		FontFace = Theme.FontBold,
 		TextColor3 = Theme.TextDim,
-		MaxTextSize = 20,
+		MaxTextSize = 19,
 		Parent = page,
 	})
 	local scroller = UIKit.scroll({
@@ -669,35 +667,46 @@ local function buildIndex(page: Frame)
 		Position = UDim2.fromOffset(0, 40),
 		Parent = page,
 	})
-	UIKit.list(scroller, Enum.FillDirection.Vertical, 6, Enum.HorizontalAlignment.Left, Enum.VerticalAlignment.Top)
-	UIKit.padding(scroller, 2, 2)
+	UIKit.list(scroller, Enum.FillDirection.Vertical, 8, Enum.HorizontalAlignment.Left, Enum.VerticalAlignment.Top)
+	UIKit.padding(scroller, 4, 4)
 	local cellSize = Vector2.new(92, 60)
 	local function rowFrame(order: number, title: string, accent: Color3): Frame
 		local row = UIKit.new("Frame", {
 			Name = "Row" .. order,
-			Size = UDim2.fromOffset(826, 66),
+			Size = UDim2.fromOffset(816, 70),
 			BackgroundColor3 = WHITE,
 			LayoutOrder = order,
 			Parent = scroller,
 		}) :: Frame
 		UIKit.corner(row, Theme.CornerSmall)
-		UIKit.stroke(row, 2, Theme.Stroke)
-		UIKit.gradient(row, Theme.Card:Lerp(accent, 0.15), Theme.PanelDark)
+		UIKit.stroke(row, 1.5, Theme.LineLight, 0.7)
+		-- полоса акцента острова слева (градиентом — повторяет скругление)
+		UIKit.new("UIGradient", {
+			Rotation = 0,
+			Color = UIKit.seq({
+				{ 0, accent },
+				{ 0.008, accent },
+				{ 0.012, Theme.Night700:Lerp(accent, 0.12) },
+				{ 1, Theme.Night800 },
+			}),
+			Parent = row,
+		})
 		UIKit.label({
 			Name = "Title",
 			Text = title,
-			Size = UDim2.fromOffset(170, 50),
-			Position = UDim2.new(0, 10, 0.5, 0),
+			FontFace = Theme.FontDisplayFlat,
+			Size = UDim2.fromOffset(166, 46),
+			Position = UDim2.new(0, 16, 0.5, 0),
 			AnchorPoint = Vector2.new(0, 0.5),
 			TextXAlignment = Enum.TextXAlignment.Left,
-			TextColor3 = accent:Lerp(WHITE, 0.4),
-			MaxTextSize = 22,
+			TextColor3 = accent:Lerp(WHITE, 0.45),
+			MaxTextSize = 20,
 			Parent = row,
 		})
 		local cellsFrame = UIKit.new("Frame", {
 			Name = "Cells",
 			Size = UDim2.fromOffset(5 * cellSize.X + 4 * 6, cellSize.Y),
-			Position = UDim2.new(0, 186, 0.5, 0),
+			Position = UDim2.new(0, 190, 0.5, 0),
 			AnchorPoint = Vector2.new(0, 0.5),
 			BackgroundTransparency = 1,
 			Parent = row,
@@ -710,46 +719,36 @@ local function buildIndex(page: Frame)
 		local cellsFrame = row:FindFirstChild("Cells") :: Frame
 		local cellMap: { [string]: Cell } = {}
 		for i, c in Config.NormalColors do
-			cellMap[c] = makeCell(cellsFrame, i, cellSize)
+			cellMap[c] = makeCell(cellsFrame, i, cellSize, c)
 		end
 		local progress = UIKit.label({
 			Name = "Progress",
 			Text = "0/5",
-			Size = UDim2.fromOffset(60, 30),
+			FontFace = Theme.FontNumber,
+			Size = UDim2.fromOffset(64, 30),
 			AnchorPoint = Vector2.new(1, 0),
-			Position = UDim2.new(1, -10, 0, 6),
+			Position = UDim2.new(1, -12, 0, 6),
 			TextXAlignment = Enum.TextXAlignment.Right,
-			MaxTextSize = 24,
+			MaxTextSize = 26,
 			Parent = row,
 		})
-		local reward = UIKit.label({
-			Name = "Reward",
-			Text = "+10% ⚡",
-			Size = UDim2.fromOffset(110, 24),
-			AnchorPoint = Vector2.new(1, 1),
-			Position = UDim2.new(1, -10, 1, -6),
-			TextXAlignment = Enum.TextXAlignment.Right,
-			TextColor3 = Theme.TextDim,
-			MaxTextSize = 20,
-			Parent = row,
-		})
+		local reward = UIKit.status(row, UDim2.fromOffset(104, 22), UDim2.new(1, -116, 1, -28), 17)
 		table.insert(rows, { cells = cellMap, progress = progress, reward = reward })
 	end
-	local special = rowFrame(#Config.Zones + 1, "✨ Особые", Theme.Rainbow)
+	local special = rowFrame(#Config.Zones + 1, "Особые", Theme.Rainbow)
 	local cellsFrame = special:FindFirstChild("Cells") :: Frame
 	for i, c in SPECIAL do
-		specialCells[c] = makeCell(cellsFrame, i, cellSize)
+		specialCells[c] = makeCell(cellsFrame, i, cellSize, c)
 	end
 	UIKit.label({
 		Name = "Note",
 		Text = "Радужная — на событии, Чёрная — на Оке Бури",
 		Size = UDim2.fromOffset(300, 40),
 		AnchorPoint = Vector2.new(1, 0.5),
-		Position = UDim2.new(1, -10, 0.5, 0),
+		Position = UDim2.new(1, -12, 0.5, 0),
 		TextXAlignment = Enum.TextXAlignment.Right,
-		FontFace = Theme.FontBold,
 		TextColor3 = Theme.TextDim,
-		MaxTextSize = 18,
+		MaxTextSize = 17,
 		Parent = special,
 	})
 end
@@ -782,9 +781,8 @@ local function refreshIndex(d: PlayerData.Data)
 		total += n
 		row.progress.Text = string.format("%d/%d", n, #Config.NormalColors)
 		local full = n >= #Config.NormalColors
-		row.progress.TextColor3 = if full then Theme.Green else WHITE
-		row.reward.Text = if full then "✔ +10% ⚡" else "+10% ⚡"
-		row.reward.TextColor3 = if full then Theme.Green else Theme.TextDim
+		row.progress.TextColor3 = if full then Theme.GoHi else Theme.Cream
+		row.reward.set(if full then "check" else nil, "+10% ⚡", if full then Theme.GoHi else Theme.TextDim)
 	end
 	for _, c in SPECIAL do
 		local caught = hasSpecial(d, c)
@@ -793,7 +791,7 @@ local function refreshIndex(d: PlayerData.Data)
 		end
 		setCell(specialCells[c], c, caught)
 	end
-	indexTotal.Text = string.format("📖 Поймано: %d/%d", total, max)
+	indexTotal.Text = string.format("Поймано: %d/%d", total, max)
 end
 
 ----------------------------------------------------------------------
@@ -876,10 +874,10 @@ function CollectionUI.start()
 		Icon = "🔮",
 		Width = 880,
 		Height = 560,
-		Accent = Theme.ElectricDark,
+		Accent = Theme.Spark,
 		Tabs = {
-			{ Id = "fulgs", Text = "🔮 Фульгуриты" },
-			{ Id = "index", Text = "📖 Молниедекс" },
+			{ Id = "fulgs", Text = "Фульгуриты" },
+			{ Id = "index", Text = "Молниедекс" },
 		},
 		OnOpen = function()
 			refresh()

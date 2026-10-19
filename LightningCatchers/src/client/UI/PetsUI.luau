@@ -1,6 +1,7 @@
 --!strict
 -- Питомцы: мои (сетка с 3D-превью, надеть/снять/удалить, "Надеть лучших"), коконы (шансы, гарантия)
--- и анимация вылупления на весь экран: кокон дрожит всё быстрее, светится цветом редкости, лопается.
+-- и анимация вылупления на весь экран: кокон дрожит всё быстрее, светится цветом редкости, лопается
+-- вращающимся зигзаг-взрывом лучей цвета редкости (docs/STYLE.md §8.4).
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -70,7 +71,6 @@ type PetCard = {
 	center: Vector3,
 	dist: number,
 	check: Frame,
-	stroke: UIStroke,
 	phase: number,
 }
 
@@ -91,6 +91,7 @@ local detailCenter = Vector3.zero
 local detailDist = 8
 local detailKind = ""
 local detailName: TextLabel
+local detailRarityTag: Frame
 local detailRarity: TextLabel
 local detailBonus: TextLabel
 local detailHint: TextLabel
@@ -124,20 +125,14 @@ end
 local function selectPet(id: number?)
 	selectedId = id
 	for cid, c in petCards do
-		if cid == id then
-			c.stroke.Color = WHITE
-			c.stroke.Thickness = 4.5
-		else
-			c.stroke.Color = rarityOf(c.kind).Color
-			c.stroke.Thickness = 3
-		end
+		UIKit.selectCard(c.button, cid == id)
 	end
 	local d = ClientState.get()
 	local kind = if d and id then PlayerData.petKind(d, id) else nil
 	if not kind or not d or not id then
 		detailHint.Visible = true
 		detailName.Visible = false
-		detailRarity.Visible = false
+		detailRarityTag.Visible = false
 		detailBonus.Visible = false
 		equipButton.Visible = false
 		deleteButton.Visible = false
@@ -151,21 +146,21 @@ local function selectPet(id: number?)
 	local rar = rarityOf(kind)
 	detailHint.Visible = false
 	detailName.Visible = true
-	detailRarity.Visible = true
+	detailRarityTag.Visible = true
 	detailBonus.Visible = true
 	equipButton.Visible = true
 	deleteButton.Visible = true
 	detailName.Text = Pets.Kinds[kind].Name
-	detailName.TextColor3 = rar.Color
-	detailRarity.Text = rar.Name
-	detailRarity.TextColor3 = rar.Color
+	detailName.TextColor3 = rar.Color:Lerp(WHITE, 0.35)
+	detailRarity.Text = UIKit.upper(rar.Name)
+	detailRarityTag.BackgroundColor3 = rar.Color
 	detailBonus.Text = Pets.bonusText(kind)
 	if isEquipped(d, id) then
 		UIKit.setButtonText(equipButton, "Снять")
-		UIKit.setButtonColor(equipButton, Theme.Gray)
+		UIKit.setButtonVariant(equipButton, "Slate")
 	else
 		UIKit.setButtonText(equipButton, "Надеть")
-		UIKit.setButtonColor(equipButton, Theme.Green)
+		UIKit.setButtonVariant(equipButton, "Go")
 	end
 	if kind ~= detailKind then
 		if detailModel then
@@ -187,6 +182,7 @@ end
 local function makePetCard(id: number, kind: string): PetCard
 	local rar = rarityOf(kind)
 	local def = Pets.Kinds[kind]
+	-- карточка редкости: полоса цвета редкости сверху, превью на колодце, имя Montserrat, бонус Nunito
 	local button = UIKit.new("TextButton", {
 		Name = "Pet" .. id,
 		BackgroundColor3 = WHITE,
@@ -195,53 +191,34 @@ local function makePetCard(id: number, kind: string): PetCard
 		Parent = grid,
 	}) :: TextButton
 	UIKit.corner(button, Theme.CornerSmall)
-	local stroke = UIKit.stroke(button, 3, rar.Color)
-	UIKit.gradient(button, rar.Color:Lerp(Theme.Card, 0.55), Theme.PanelDark)
-	local vp, camera = UIKit.viewport({
-		Name = "Preview",
-		Size = UDim2.new(1, -8, 0, 94),
-		Position = UDim2.fromOffset(4, 4),
+	UIKit.stroke(button, 1.5, Theme.LineLight, 0.7)
+	UIKit.new("UIGradient", { Name = "CardGrad", Rotation = 90, Parent = button })
+	UIKit.rarityCard(button, rar.Color)
+	local _well, vp, camera = UIKit.previewWell({
+		Size = UDim2.new(1, -12, 0, 88),
+		Position = UDim2.fromOffset(6, 10),
 		Parent = button,
 	})
 	UIKit.label({
 		Name = "Name",
 		Text = if def then def.Name else kind,
-		Size = UDim2.new(1, -8, 0, 24),
-		Position = UDim2.fromOffset(4, 98),
-		TextColor3 = rar.Color:Lerp(WHITE, 0.35),
-		MaxTextSize = 22,
+		FontFace = Theme.FontDisplayFlat,
+		Size = UDim2.new(1, -10, 0, 22),
+		Position = UDim2.fromOffset(5, 100),
+		TextColor3 = rar.Color:Lerp(WHITE, 0.4),
+		MaxTextSize = 19,
 		Parent = button,
 	})
 	UIKit.label({
 		Name = "Bonus",
 		Text = Pets.bonusText(kind),
-		Size = UDim2.new(1, -8, 0, 22),
-		Position = UDim2.fromOffset(4, 124),
-		FontFace = Theme.FontBold,
+		Size = UDim2.new(1, -10, 0, 20),
+		Position = UDim2.fromOffset(5, 124),
 		TextColor3 = Theme.TextDim,
-		MaxTextSize = 17,
+		MaxTextSize = 16,
 		Parent = button,
 	})
-	local check = UIKit.new("Frame", {
-		Name = "Equipped",
-		Size = UDim2.fromOffset(32, 32),
-		Position = UDim2.fromOffset(4, 4),
-		BackgroundColor3 = Theme.Green,
-		Visible = false,
-		ZIndex = 4,
-		Parent = button,
-	}) :: Frame
-	UIKit.round(check)
-	UIKit.stroke(check, 2, Theme.Stroke)
-	UIKit.label({
-		Text = "✔",
-		Size = UDim2.fromScale(0.75, 0.75),
-		Position = UDim2.fromScale(0.5, 0.5),
-		AnchorPoint = Vector2.new(0.5, 0.5),
-		MaxTextSize = 24,
-		ZIndex = 5,
-		Parent = check,
-	})
+	local check = UIKit.checkBadge(button, 28, { Name = "Equipped", Position = UDim2.fromOffset(2, 4) })
 	local card: PetCard = {
 		id = id,
 		kind = kind,
@@ -252,7 +229,6 @@ local function makePetCard(id: number, kind: string): PetCard
 		center = Vector3.zero,
 		dist = 8,
 		check = check,
-		stroke = stroke,
 		phase = (id * 1.7) % (math.pi * 2),
 	}
 	button.Activated:Connect(function()
@@ -321,34 +297,36 @@ local function buildMine(page: Frame)
 	slotsLabel = UIKit.label({
 		Name = "Slots",
 		Text = "",
-		Size = UDim2.fromOffset(220, 40),
+		FontFace = Theme.FontBodyHeavy,
+		Size = UDim2.fromOffset(220, 34),
 		Position = UDim2.new(0, 4, 0.5, 0),
 		AnchorPoint = Vector2.new(0, 0.5),
 		TextXAlignment = Enum.TextXAlignment.Left,
-		TextColor3 = Theme.Good,
-		MaxTextSize = 28,
+		TextColor3 = Theme.SparkHi,
+		MaxTextSize = 26,
 		Parent = top,
 	})
 	countLabel = UIKit.label({
 		Name = "Count",
 		Text = "",
-		Size = UDim2.fromOffset(220, 40),
+		FontFace = Theme.FontBodyHeavy,
+		Size = UDim2.fromOffset(220, 34),
 		Position = UDim2.new(0, 230, 0.5, 0),
 		AnchorPoint = Vector2.new(0, 0.5),
 		TextXAlignment = Enum.TextXAlignment.Left,
 		TextColor3 = Theme.TextDim,
-		MaxTextSize = 24,
+		MaxTextSize = 22,
 		Parent = top,
 	})
 	UIKit.button({
 		Name = "EquipBest",
 		Text = "Надеть лучших",
-		Icon = "⭐",
-		Color = Theme.Purple,
+		Icon = "#star",
+		Color = Theme.Violet,
 		Size = UDim2.fromOffset(290, 60),
 		AnchorPoint = Vector2.new(1, 0.5),
-		Position = UDim2.new(1, 0, 0.5, 0),
-		TextSize = 26,
+		Position = UDim2.new(1, -4, 0.5, 0),
+		TextSize = 22,
 		Parent = top,
 	}, function()
 		local d = ClientState.get()
@@ -377,7 +355,7 @@ local function buildMine(page: Frame)
 		Parent = page,
 	})
 	UIKit.grid(grid, CELL, 10).HorizontalAlignment = Enum.HorizontalAlignment.Left
-	UIKit.padding(grid, 4, 4)
+	UIKit.padding(grid, 6, 6)
 
 	emptyHint = UIKit.new("Frame", {
 		Name = "Empty",
@@ -389,16 +367,16 @@ local function buildMine(page: Frame)
 	}) :: Frame
 	UIKit.label({
 		Text = "Пока нет питомцев.\nВылупи их из кокона!",
+		FontFace = Theme.FontBodyHeavy,
 		Size = UDim2.new(1, -40, 0, 100),
 		Position = UDim2.new(0.5, 0, 0.32, 0),
 		AnchorPoint = Vector2.new(0.5, 0.5),
-		MaxTextSize = 30,
+		MaxTextSize = 28,
 		Parent = emptyHint,
 	})
 	UIKit.button({
 		Text = "К коконам",
-		Icon = "🥚",
-		Color = Theme.Green,
+		Color = Theme.Go,
 		Size = UDim2.fromOffset(260, 66),
 		AnchorPoint = Vector2.new(0.5, 0.5),
 		Position = UDim2.new(0.5, 0, 0.68, 0),
@@ -410,60 +388,63 @@ local function buildMine(page: Frame)
 	-- панель выбранного
 	detail = UIKit.card({
 		Name = "Detail",
-		Size = UDim2.new(1, -(GRID_W + 12), 1, -70),
-		Position = UDim2.fromOffset(GRID_W + 12, 70),
+		Size = UDim2.new(1, -(GRID_W + 14), 1, -72),
+		Position = UDim2.fromOffset(GRID_W + 14, 70),
 		Parent = page,
 	})
-	detailVp, detailCam = UIKit.viewport({
-		Name = "Preview",
-		Size = UDim2.new(1, -16, 0, 136),
-		Position = UDim2.fromOffset(8, 6),
+	local _dw: Frame
+	_dw, detailVp, detailCam = UIKit.previewWell({
+		Size = UDim2.new(1, -16, 0, 134),
+		Position = UDim2.fromOffset(8, 8),
 		Parent = detail,
 	})
 	detailName = UIKit.label({
 		Name = "Name",
 		Text = "",
-		Size = UDim2.new(1, -16, 0, 32),
-		Position = UDim2.fromOffset(8, 144),
-		MaxTextSize = 32,
+		FontFace = Theme.FontDisplayFlat,
+		Size = UDim2.new(1, -16, 0, 30),
+		Position = UDim2.fromOffset(8, 146),
+		MaxTextSize = 26,
 		Parent = detail,
 	})
-	detailRarity = UIKit.label({
+	detailRarityTag, detailRarity = UIKit.tag({
 		Name = "Rarity",
-		Text = "",
-		Size = UDim2.new(1, -16, 0, 22),
-		Position = UDim2.fromOffset(8, 176),
-		FontFace = Theme.FontBold,
-		MaxTextSize = 22,
+		Size = UDim2.fromOffset(150, 24),
+		AnchorPoint = Vector2.new(0.5, 0),
+		Position = UDim2.new(0.5, 0, 0, 178),
+		Rotation = -2,
 		Parent = detail,
-	})
+	}, "", 15)
+	detailRarity.TextColor3 = Theme.Ink
 	detailBonus = UIKit.label({
 		Name = "Bonus",
 		Text = "",
+		FontFace = Theme.FontBodyHeavy,
 		Size = UDim2.new(1, -16, 0, 26),
-		Position = UDim2.fromOffset(8, 200),
+		Position = UDim2.fromOffset(8, 208),
 		TextColor3 = Theme.Volt,
-		MaxTextSize = 24,
+		MaxTextSize = 22,
 		Parent = detail,
 	})
 	detailHint = UIKit.label({
 		Name = "Hint",
 		Text = "Нажми на питомца",
+		FontFace = Theme.FontBodyHeavy,
 		Size = UDim2.new(1, -24, 0, 40),
 		Position = UDim2.new(0.5, 0, 0, 170),
 		AnchorPoint = Vector2.new(0.5, 0),
 		TextColor3 = Theme.TextDim,
-		MaxTextSize = 26,
+		MaxTextSize = 24,
 		Parent = detail,
 	})
 	equipButton = UIKit.button({
 		Name = "Equip",
 		Text = "Надеть",
-		Color = Theme.Green,
+		Color = Theme.Go,
 		Size = UDim2.new(1, -96, 0, 62),
 		AnchorPoint = Vector2.new(0, 1),
-		Position = UDim2.new(0, 10, 1, -10),
-		TextSize = 28,
+		Position = UDim2.new(0, 10, 1, -12),
+		TextSize = 24,
 		Parent = detail,
 	}, function()
 		local d = ClientState.get()
@@ -488,12 +469,12 @@ local function buildMine(page: Frame)
 	end)
 	deleteButton = UIKit.button({
 		Name = "Delete",
-		Text = "🗑",
-		Color = Theme.Red,
+		Text = "",
+		Icon = "#cross",
+		Color = Theme.Danger,
 		Size = UDim2.fromOffset(66, 62),
 		AnchorPoint = Vector2.new(1, 1),
-		Position = UDim2.new(1, -10, 1, -10),
-		TextSize = 30,
+		Position = UDim2.new(1, -10, 1, -12),
 		Parent = detail,
 	}, function()
 		local d = ClientState.get()
@@ -511,7 +492,7 @@ local function buildMine(page: Frame)
 			rarityOf(kind).Name .. " · " .. Pets.bonusText(kind),
 		}
 		if isEquipped(d, id) then
-			table.insert(lines, "⚠ Он сейчас надет!")
+			table.insert(lines, "Он сейчас надет!")
 		end
 		table.insert(lines, "Вернуть его будет нельзя.")
 		win.confirm(table.concat(lines, "\n"), "Удалить", function()
@@ -523,6 +504,13 @@ local function buildMine(page: Frame)
 			end
 		end)
 	end)
+	-- у кнопки-крестика глиф по центру
+	local face = deleteButton:FindFirstChild("Face")
+	local g = face and face:FindFirstChild("IconGlyph")
+	if g and g:IsA("Frame") then
+		g.Position = UDim2.fromScale(0.5, 0.5)
+		g.Size = UDim2.fromScale(0.46, 0.46)
+	end
 end
 
 ----------------------------------------------------------------------
@@ -530,7 +518,7 @@ end
 ----------------------------------------------------------------------
 type CocoonCard = {
 	id: string,
-	req: TextLabel,
+	req: UIKit.Status,
 	pity: TextLabel,
 	button: TextButton,
 	vp: ViewportFrame,
@@ -549,47 +537,40 @@ local function buildCocoons(page: Frame)
 		Parent = page,
 	})
 	UIKit.list(scroller, Enum.FillDirection.Horizontal, 12, Enum.HorizontalAlignment.Center, Enum.VerticalAlignment.Top)
-	UIKit.padding(scroller, 2, 4)
+	UIKit.padding(scroller, 4, 2)
 	for i, id in Pets.CocoonOrder do
 		local def = Pets.Cocoons[id]
 		local chances = Pets.chances(id)
 		local rows = #chances
-		local h = 248 + rows * 19
+		local h = 256 + rows * 19
 		local card = UIKit.card({
 			Name = id,
 			Size = UDim2.fromOffset(268, h),
 			LayoutOrder = i,
 			Parent = scroller,
 		})
-		UIKit.tintCard(card, def.Color:Lerp(Theme.Card, 0.6), Theme.PanelDark)
+		UIKit.tintCard(card, Theme.Night700:Lerp(def.Color, 0.18), Theme.Night800, def.Color)
 		UIKit.label({
 			Name = "Title",
 			Text = def.Name,
+			FontFace = Theme.FontDisplayFlat,
 			Size = UDim2.new(1, -16, 0, 28),
-			Position = UDim2.fromOffset(8, 6),
-			MaxTextSize = 26,
+			Position = UDim2.fromOffset(8, 12),
+			MaxTextSize = 22,
 			Parent = card,
 		})
-		local vp, camera = UIKit.viewport({
-			Name = "Preview",
-			Size = UDim2.new(1, -16, 0, 76),
-			Position = UDim2.fromOffset(8, 34),
+		local _well, vp, camera = UIKit.previewWell({
+			Size = UDim2.new(1, -20, 0, 64),
+			Position = UDim2.fromOffset(10, 42),
 			Parent = card,
 		})
-		local req = UIKit.label({
-			Name = "Req",
-			Text = "",
-			Size = UDim2.new(1, -16, 0, 20),
-			Position = UDim2.fromOffset(8, 112),
-			MaxTextSize = 17,
-			Parent = card,
-		})
+		local req = UIKit.status(card, UDim2.new(1, -20, 0, 20), UDim2.fromOffset(12, 112), 16)
 		local list = UIKit.new("Frame", {
 			Name = "Odds",
-			Size = UDim2.new(1, -20, 0, rows * 19),
+			Size = UDim2.new(1, -20, 0, rows * 19 + 6),
 			Position = UDim2.fromOffset(10, 136),
-			BackgroundColor3 = Theme.PanelDark,
-			BackgroundTransparency = 0.4,
+			BackgroundColor3 = Theme.Well,
+			BackgroundTransparency = 0.25,
 			Parent = card,
 		}) :: Frame
 		UIKit.corner(list, 8)
@@ -599,19 +580,19 @@ local function buildCocoons(page: Frame)
 			UIKit.label({
 				Name = "Kind" .. r,
 				Text = (if kdef then kdef.Name else e.kind) .. " · " .. rar.Name,
-				Size = UDim2.new(0.74, -6, 0, 18),
-				Position = UDim2.fromOffset(6, (r - 1) * 19),
+				Size = UDim2.new(0.74, -8, 0, 18),
+				Position = UDim2.fromOffset(8, 3 + (r - 1) * 19),
 				TextXAlignment = Enum.TextXAlignment.Left,
-				TextColor3 = rar.Color,
-				FontFace = Theme.FontBold,
-				MaxTextSize = 17,
+				TextColor3 = rar.Color:Lerp(WHITE, 0.2),
+				MaxTextSize = 16,
 				Parent = list,
 			})
 			UIKit.label({
 				Name = "Chance" .. r,
 				Text = Format.percent(e.chance),
-				Size = UDim2.new(0.26, -6, 0, 18),
-				Position = UDim2.new(0.74, 0, 0, (r - 1) * 19),
+				FontFace = Theme.FontNumber,
+				Size = UDim2.new(0.26, -8, 0, 18),
+				Position = UDim2.new(0.74, 0, 0, 3 + (r - 1) * 19),
 				TextXAlignment = Enum.TextXAlignment.Right,
 				MaxTextSize = 17,
 				Parent = list,
@@ -621,24 +602,24 @@ local function buildCocoons(page: Frame)
 			Name = "Pity",
 			Text = "",
 			Size = UDim2.new(1, -16, 0, 34),
-			Position = UDim2.fromOffset(8, 140 + rows * 19),
+			Position = UDim2.fromOffset(8, 144 + rows * 19),
 			TextColor3 = Pets.Rarities.legendary.Color,
-			FontFace = Theme.FontBold,
-			MaxTextSize = 16,
+			MaxTextSize = 15,
 			Parent = card,
 		})
 		local button = UIKit.button({
 			Name = "Hatch",
-			Text = "Вылупить 💎" .. Format.short(def.Cost),
-			Color = Theme.Green,
-			Size = UDim2.new(1, -20, 0, 62),
+			Text = "",
+			Color = Theme.Go,
+			Size = UDim2.new(1, -20, 0, 66),
 			AnchorPoint = Vector2.new(0.5, 1),
-			Position = UDim2.new(0.5, 0, 1, -8),
-			TextSize = 24,
+			Position = UDim2.new(0.5, 0, 1, -10),
+			TextSize = 20,
 			Parent = card,
 		}, function()
 			hatchCocoon(id)
 		end)
+		UIKit.setButtonPrice(button, "Вылупить", "💎 " .. Format.short(def.Cost))
 		table.insert(cocoonCards, {
 			id = id,
 			req = req,
@@ -659,11 +640,9 @@ local function refreshCocoons(d: PlayerData.Data)
 		local zoneName = Config.Zones[def.Zone].Name
 		local unlocked = d.Zone >= def.Zone
 		if unlocked then
-			c.req.Text = "Остров: " .. zoneName
-			c.req.TextColor3 = Theme.TextDim
+			c.req.set("pin", "Остров: " .. zoneName, Theme.TextDim)
 		else
-			c.req.Text = "🔒 Нужен остров «" .. zoneName .. "»"
-			c.req.TextColor3 = Theme.Miss
+			c.req.set("lock", "Нужен остров «" .. zoneName .. "»", Theme.DangerHi)
 		end
 		-- как в Pets.roll: гарантирован кокон, на котором pity + 1 >= PityAt
 		local pity = d.Pity[c.id] or 0
@@ -672,7 +651,13 @@ local function refreshCocoons(d: PlayerData.Data)
 			then "Следующий кокон — точно легендарный!"
 			else string.format("Легендарный точно выпадет за %d %s", left, Format.plural(left, "кокон", "кокона", "коконов"))
 		local affordable = unlocked and d.Shards >= def.Cost and #d.Pets < Pets.MaxInventory
-		UIKit.setButtonColor(c.button, if affordable then Theme.Green else Theme.Gray)
+		UIKit.setButtonVariant(c.button, if affordable then "Go" elseif unlocked then "Slate" else "Disabled")
+		if unlocked and not affordable then
+			local price = UIKit.buttonPart(c.button, "Price")
+			if price then
+				price.TextColor3 = Theme.DangerHi
+			end
+		end
 		if not c.model then
 			local model = buildModel(function()
 				return Models.cocoon(c.id)
@@ -699,6 +684,9 @@ local hatchGlow: { Frame } = {}
 local hatchRays: Frame
 local hatchRaysTween: Tween? = nil
 local hatchName: TextLabel
+local hatchNameGrad: UIGradient
+local hatchRarityTag: Frame
+local hatchRarityGrad: UIGradient
 local hatchRarity: TextLabel
 local hatchBonus: TextLabel
 local hatchHint: TextLabel
@@ -736,51 +724,55 @@ local function buildHatch()
 	}) :: Frame
 	UIKit.autoScale(hatchContent, "modal", 720, 640)
 
-	-- лучи за питомцем
+	-- зигзаг-взрыв за питомцем: 4 бруска через центр = 8 лучей, длинные и короткие через один (1 : 0.6)
 	hatchRays = UIKit.new("Frame", {
 		Name = "Rays",
-		Size = UDim2.fromOffset(900, 900),
+		Size = UDim2.fromOffset(820, 820),
 		AnchorPoint = Vector2.new(0.5, 0.5),
 		Position = UDim2.new(0.5, 0, 0, 250),
 		BackgroundTransparency = 1,
 		Visible = false,
 		Parent = hatchContent,
 	}) :: Frame
-	for i = 0, 5 do
+	for i = 0, 3 do
+		local long = i % 2 == 0
 		local bar = UIKit.new("Frame", {
 			Name = "Ray" .. i,
-			Size = UDim2.new(0, 70, 1, 0),
+			Size = UDim2.new(0, if long then 54 else 40, if long then 1 else 0.6, 0),
 			AnchorPoint = Vector2.new(0.5, 0.5),
 			Position = UDim2.fromScale(0.5, 0.5),
-			Rotation = i * 30,
+			Rotation = i * 45,
 			BackgroundColor3 = WHITE,
-			BackgroundTransparency = 0.55,
+			BackgroundTransparency = 0.25,
 			Parent = hatchRays,
 		}) :: Frame
 		UIKit.new("UIGradient", {
 			Rotation = 90,
 			Transparency = NumberSequence.new({
 				NumberSequenceKeypoint.new(0, 1),
-				NumberSequenceKeypoint.new(0.5, 0.2),
+				NumberSequenceKeypoint.new(0.32, 0.35),
+				NumberSequenceKeypoint.new(0.5, 0.1),
+				NumberSequenceKeypoint.new(0.68, 0.35),
 				NumberSequenceKeypoint.new(1, 1),
 			}),
 			Parent = bar,
 		})
 	end
-	-- свечение цвета редкости (подсказка до вскрытия)
-	for i, s in { 480, 380, 290 } do
-		local ring = UIKit.new("Frame", {
+	-- свечение цвета редкости (подсказка до вскрытия): вложенные ромбы
+	for i, sz in { 440, 340, 250 } do
+		local glow = UIKit.new("Frame", {
 			Name = "Glow" .. i,
-			Size = UDim2.fromOffset(s, s),
+			Size = UDim2.fromOffset(sz, sz),
 			AnchorPoint = Vector2.new(0.5, 0.5),
 			Position = UDim2.new(0.5, 0, 0, 250),
+			Rotation = 45,
 			BackgroundColor3 = WHITE,
 			BackgroundTransparency = 1,
 			Parent = hatchContent,
 		}) :: Frame
-		UIKit.round(ring)
-		UIKit.new("UIScale", { Scale = 1, Parent = ring })
-		table.insert(hatchGlow, ring)
+		UIKit.corner(glow, math.floor(sz * 0.18))
+		UIKit.new("UIScale", { Scale = 1, Parent = glow })
+		table.insert(hatchGlow, glow)
 	end
 	hatchVp, hatchCam = UIKit.viewport({
 		Name = "Preview",
@@ -790,34 +782,48 @@ local function buildHatch()
 		Ambient = Color3.fromRGB(170, 175, 210),
 		Parent = hatchContent,
 	})
+	-- имя (D2 с градиентом редкости), тег редкости (лента Ink с полосой редкости), бонус, подсказка
 	hatchName = UIKit.label({
 		Name = "Name",
 		Text = "",
-		Size = UDim2.fromOffset(680, 64),
+		FontFace = Theme.FontDisplay,
+		Size = UDim2.fromOffset(680, 66),
 		AnchorPoint = Vector2.new(0.5, 0),
-		Position = UDim2.new(0.5, 0, 0, 470),
-		MaxTextSize = 60,
+		Position = UDim2.new(0.5, 0, 0, 462),
+		MaxTextSize = 58,
+		NoStroke = false,
 		Visible = false,
+		ZIndex = 3,
 		Parent = hatchContent,
 	})
-	hatchRarity = UIKit.label({
+	local ns = hatchName:FindFirstChildOfClass("UIStroke")
+	if ns then
+		ns.Thickness = 4
+	end
+	UIKit.italicPad(hatchName, 16)
+	hatchNameGrad = UIKit.gradientText(hatchName, Theme.Cream, Theme.Volt)
+	UIKit.textShadow(hatchName, 6)
+	hatchRarityTag, hatchRarity = UIKit.tag({
 		Name = "Rarity",
-		Text = "",
-		Size = UDim2.fromOffset(600, 36),
+		Size = UDim2.fromOffset(250, 36),
 		AnchorPoint = Vector2.new(0.5, 0),
-		Position = UDim2.new(0.5, 0, 0, 532),
-		MaxTextSize = 34,
+		Position = UDim2.new(0.5, 0, 0, 530),
+		Rotation = -3,
+		BackgroundColor3 = WHITE,
 		Visible = false,
 		Parent = hatchContent,
-	})
+	}, "", 22)
+	hatchRarityGrad = UIKit.new("UIGradient", { Rotation = 90, Parent = hatchRarityTag }) :: UIGradient
 	hatchBonus = UIKit.label({
 		Name = "Bonus",
 		Text = "",
+		FontFace = Theme.FontBodyHeavy,
 		Size = UDim2.fromOffset(600, 32),
 		AnchorPoint = Vector2.new(0.5, 0),
-		Position = UDim2.new(0.5, 0, 0, 568),
+		Position = UDim2.new(0.5, 0, 0, 572),
 		TextColor3 = Theme.Volt,
-		MaxTextSize = 30,
+		MaxTextSize = 28,
+		NoStroke = false,
 		Visible = false,
 		Parent = hatchContent,
 	})
@@ -826,9 +832,9 @@ local function buildHatch()
 		Text = "Нажми, чтобы продолжить",
 		Size = UDim2.fromOffset(600, 28),
 		AnchorPoint = Vector2.new(0.5, 0),
-		Position = UDim2.new(0.5, 0, 0, 606),
+		Position = UDim2.new(0.5, 0, 0, 608),
 		TextColor3 = Theme.TextDim,
-		MaxTextSize = 24,
+		MaxTextSize = 22,
 		Visible = false,
 		Parent = hatchContent,
 	})
@@ -868,9 +874,9 @@ local function buildHatch()
 end
 
 local function setGlow(color: Color3, strength: number)
-	for i, ring in hatchGlow do
-		ring.BackgroundColor3 = color
-		ring.BackgroundTransparency = 1 - strength * (0.12 + 0.1 * i)
+	for i, glow in hatchGlow do
+		glow.BackgroundColor3 = color
+		glow.BackgroundTransparency = 1 - strength * (0.12 + 0.1 * i)
 	end
 end
 
@@ -909,12 +915,14 @@ local function revealPet(kind: string)
 	if rt then
 		rt:Play()
 	end
-	hatchName.Text = if def then def.Name else kind
-	hatchName.TextColor3 = rar.Color:Lerp(WHITE, 0.25)
-	hatchRarity.Text = rar.Name
-	hatchRarity.TextColor3 = rar.Color
+	hatchName.Text = UIKit.upper(if def then def.Name else kind)
+	local tones = UIKit.tones(rar.Color)
+	hatchNameGrad.Color = UIKit.seq({ { 0, Theme.Cream }, { 0.45, tones.Hi }, { 1, tones.Base } })
+	hatchRarity.Text = UIKit.upper(rar.Name)
+	hatchRarity.TextColor3 = rar.Color:Lerp(WHITE, 0.3)
+	hatchRarityGrad.Color = UIKit.seq({ { 0, Theme.Ink }, { 0.78, Theme.Ink }, { 0.8, rar.Color }, { 1, rar.Color } })
 	hatchBonus.Text = Pets.bonusText(kind)
-	for _, l in { hatchName, hatchRarity, hatchBonus } do
+	for _, l in { hatchName, hatchRarityTag, hatchBonus } :: { GuiObject } do
 		l.Visible = true
 		local s = l:FindFirstChildOfClass("UIScale") or UIKit.new("UIScale", { Parent = l }) :: UIScale
 		s.Scale = 0.3
@@ -976,7 +984,7 @@ hatchCocoon = function(id: string)
 	end)
 
 	-- подготовить экран
-	for _, l in { hatchName, hatchRarity, hatchBonus, hatchHint } do
+	for _, l in { hatchName, hatchRarityTag, hatchBonus, hatchHint } :: { GuiObject } do
 		l.Visible = false
 	end
 	hatchRays.Visible = false
@@ -1043,8 +1051,8 @@ hatchCocoon = function(id: string)
 			if g and t > 0.9 then
 				local pulse = 0.75 + 0.25 * math.sin(t * 14)
 				setGlow(g, math.clamp((t - 0.9) / 1.0, 0, 1) * pulse)
-				for i, ring in hatchGlow do
-					local s = ring:FindFirstChildOfClass("UIScale")
+				for i, glow in hatchGlow do
+					local s = glow:FindFirstChildOfClass("UIScale")
 					if s then
 						s.Scale = 1 + 0.06 * math.sin(t * 10 + i)
 					end
@@ -1169,10 +1177,10 @@ function PetsUI.start()
 		Icon = "🐾",
 		Width = 880,
 		Height = 560,
-		Accent = Color3.fromRGB(200, 70, 150),
+		Accent = Theme.Pink,
 		Tabs = {
-			{ Id = "mine", Text = "🐾 Мои" },
-			{ Id = "cocoons", Text = "🥚 Коконы" },
+			{ Id = "mine", Text = "Мои питомцы" },
+			{ Id = "cocoons", Text = "Коконы" },
 		},
 		OnOpen = function()
 			refresh()

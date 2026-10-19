@@ -1,7 +1,8 @@
 --!strict
 -- Клиентские эффекты событий сервера (только вид, на игру не влияют):
 --  * киоски хаба: ProximityPrompt с атрибутом Window открывает окно (ClientState.OpenWindow) без запроса к серверу;
---  * Шаровая молния — огромный светящийся шар из неоновых сфер: пульсирующий свет, трескучие дуги (Beam),
+--  * Шаровая молния — яркое ядро-шар в двух колючих полупрозрачных оболочках с иглами и искрами-ромбами
+--    на орбите (Models.ballLightning, «колючая гроза» вместо шаров на шаре): пульсирующий свет, трескучие дуги (Beam),
 --    искры; плывёт по BallFrom → BallTo между BallStart и BallEnd (атрибуты GameState), над ним полоска
 --    «Шаровая молния ♥ HP/макс»; его кольца связаны с ним дрожащими нитями; Effect ballBurst — взрыв искр,
 --    тряска, гром и победный звук; улетел сам — тает и поднимается в тучи;
@@ -20,6 +21,7 @@ local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Format = require(Shared:WaitForChild("Format"))
 local Net = require(Shared:WaitForChild("Net"))
 local Pets = require(Shared:WaitForChild("Pets"))
+local Models = require(Shared:WaitForChild("Models"))
 
 local ClientState = require(script.Parent.Parent.ClientState)
 local Sounds = require(script.Parent.Sounds)
@@ -35,11 +37,9 @@ local player = Players.LocalPlayer
 ----------------------------------------------------------------------
 local BALL_HEIGHT = 16 -- шар висит над землёй
 local BALL_BOB = 1.2
-local CORE_D = 5
-local SHELL_D = 8.5
-local GLOW_D = 12.5
-local ORBITERS = 4
-local ORBITER_D = 1.3
+local CORE_D = 5 -- размер вспышки взрыва
+local SHELL_D = 8.5 -- и её волны
+local GLOW_D = 12.5 -- габарит шара с иглами: над ним полоска HP
 local ORBIT_R = 6.4
 local ARCS = 6
 local ARC_REACH = 8
@@ -71,9 +71,9 @@ local POPUP_UP = 3.5
 
 local SPARK_TEXTURE = "rbxasset://textures/particles/sparkles_main.dds"
 local WHITE = Color3.new(1, 1, 1)
-local BALL_GOLD = Color3.fromRGB(255, 196, 70)
-local BALL_CORE = Color3.fromRGB(255, 248, 225)
-local BALL_ARC = Color3.fromRGB(255, 236, 150)
+local BALL_GOLD = Models.BallColors.Gold
+local BALL_CORE = Models.BallColors.Core
+local BALL_ARC = Models.BallColors.Arc
 local HP_BG = Color3.fromRGB(14, 16, 32)
 
 ----------------------------------------------------------------------
@@ -83,10 +83,14 @@ type Arc = { beam: Beam, tip: Attachment, nextAt: number }
 
 type Ball = {
 	model: Model,
-	core: Part,
-	shell: Part,
-	glow: Part,
-	orbiters: { Part },
+	core: BasePart,
+	shells: { BasePart }, -- две колючие оболочки (крутятся навстречу друг другу)
+	shellOffsets: { CFrame },
+	shellBase: { number }, -- их исходная прозрачность
+	spikes: { BasePart }, -- иглы крутятся вместе с первой оболочкой
+	spikeOffsets: { CFrame },
+	orbiters: { BasePart },
+	orbiterRot: CFrame, -- поворот искры-ромба (куб на вершине)
 	light: PointLight,
 	sparks: ParticleEmitter,
 	center: Attachment,
@@ -219,25 +223,38 @@ local function updateHpBar(b: Ball)
 	local max = math.max(1, ballMax)
 	local hp = math.clamp(ballHp, 0, max)
 	b.hpFill.Size = UDim2.fromScale(hp / max, 1)
-	b.hpText.Text = string.format("🔮 Шаровая молния ♥ %d/%d", hp, max)
+	b.hpText.Text = string.format("ШАРОВАЯ МОЛНИЯ  %d/%d", hp, max)
 end
 
 local function buildBall(parent: Instance): Ball
-	local model = Instance.new("Model")
+	local model = Models.ballLightning()
 	model.Name = "BallLightning"
-	local start = CFrame.new(ballPosition(ClientState.now()))
-	local core = newPart("Core", Enum.PartType.Ball, Enum.Material.Neon, Vector3.one * CORE_D, BALL_CORE, 0, model)
-	local shell = newPart("Shell", Enum.PartType.Ball, Enum.Material.Neon, Vector3.one * SHELL_D, BALL_GOLD, 0.55, model)
-	local glow = newPart("Glow", Enum.PartType.Ball, Enum.Material.ForceField, Vector3.one * GLOW_D, BALL_GOLD, 0.35, model)
-	for _, p in { core, shell, glow } do
-		p.CFrame = start
+	local core = model.PrimaryPart :: BasePart
+	-- детали модели собраны вокруг (0, 0, 0): запоминаем смещения групп до переноса
+	local shells: { BasePart } = {}
+	local shellOffsets: { CFrame } = {}
+	local shellBase: { number } = {}
+	local spikes: { BasePart } = {}
+	local spikeOffsets: { CFrame } = {}
+	local orbiters: { BasePart } = {}
+	local orbiterRot = CFrame.identity
+	for _, d in model:GetChildren() do
+		if d:IsA("BasePart") and d ~= core then
+			local name = d.Name
+			if string.sub(name, 1, 5) == "Shell" then
+				table.insert(shells, d)
+				table.insert(shellOffsets, d.CFrame)
+				table.insert(shellBase, d.Transparency)
+			elseif string.sub(name, 1, 5) == "Spike" then
+				table.insert(spikes, d)
+				table.insert(spikeOffsets, d.CFrame)
+			elseif string.sub(name, 1, 7) == "Orbiter" then
+				table.insert(orbiters, d)
+				orbiterRot = d.CFrame.Rotation
+			end
+		end
 	end
-	local orbiters: { Part } = {}
-	for i = 1, ORBITERS do
-		local o = newPart("Orbiter" .. i, Enum.PartType.Ball, Enum.Material.Neon, Vector3.one * ORBITER_D, BALL_ARC, 0, model)
-		o.CFrame = start
-		table.insert(orbiters, o)
-	end
+	model:PivotTo(CFrame.new(ballPosition(ClientState.now())))
 
 	local light = Instance.new("PointLight")
 	light.Color = BALL_GOLD
@@ -308,14 +325,15 @@ local function buildBall(parent: Instance): Ball
 	text.BackgroundTransparency = 1
 	text.Size = UDim2.new(1, -16, 0.58, 0)
 	text.Position = UDim2.fromOffset(8, 2)
-	text.FontFace = Theme.Font
-	text.TextColor3 = WHITE
+	text.FontFace = Theme.FontDisplay -- заголовок плашки события: Montserrat Black Italic (§8.3.8)
+	text.TextColor3 = Theme.Cream
 	text.TextScaled = true
 	text.Text = ""
 	text.Parent = panel
 	local textStroke = Instance.new("UIStroke")
-	textStroke.Color = Theme.TextStroke
-	textStroke.Thickness = 1.5
+	textStroke.Color = Theme.Ink
+	textStroke.Thickness = 2
+	textStroke.LineJoinMode = Enum.LineJoinMode.Round
 	textStroke.Parent = text
 	local bar = Instance.new("Frame")
 	bar.Name = "Bar"
@@ -345,9 +363,13 @@ local function buildBall(parent: Instance): Ball
 	local b: Ball = {
 		model = model,
 		core = core,
-		shell = shell,
-		glow = glow,
+		shells = shells,
+		shellOffsets = shellOffsets,
+		shellBase = shellBase,
+		spikes = spikes,
+		spikeOffsets = spikeOffsets,
 		orbiters = orbiters,
+		orbiterRot = orbiterRot,
 		light = light,
 		sparks = sparks,
 		center = center,
@@ -399,13 +421,21 @@ end
 local function updateBall(b: Ball, clock: number, t: number)
 	local pos = ballPosition(t)
 	local spin = clock * 1.3
-	b.core.CFrame = CFrame.new(pos) * CFrame.Angles(spin * 0.6, spin, 0)
-	b.shell.CFrame = CFrame.new(pos) * CFrame.Angles(0, -spin * 0.8, spin * 0.4)
-	b.glow.CFrame = CFrame.new(pos)
+	local base = CFrame.new(pos)
+	b.core.CFrame = base * CFrame.Angles(spin * 0.6, spin, 0)
+	-- оболочки крутятся навстречу друг другу: колючий силуэт всё время меняется
+	local rotA = base * CFrame.Angles(0, -spin * 0.8, spin * 0.4)
+	local rotB = base * CFrame.Angles(spin * 0.5, spin * 0.9, 0)
+	for i, sh in b.shells do
+		sh.CFrame = (if i == 1 then rotA else rotB) * b.shellOffsets[i]
+	end
+	for i, sp in b.spikes do
+		sp.CFrame = rotA * b.spikeOffsets[i]
+	end
 	for i, o in b.orbiters do
 		local a = spin * 1.6 + i * (math.pi * 2 / #b.orbiters)
 		local tilt = math.sin(clock * 0.9 + i) * 0.6
-		o.CFrame = CFrame.new(pos + Vector3.new(math.cos(a) * ORBIT_R, math.sin(a * 0.5 + i) * ORBIT_R * tilt, math.sin(a) * ORBIT_R))
+		o.CFrame = CFrame.new(pos + Vector3.new(math.cos(a) * ORBIT_R, math.sin(a * 0.5 + i) * ORBIT_R * tilt, math.sin(a) * ORBIT_R)) * CFrame.Angles(0, a * 2, 0) * b.orbiterRot
 	end
 	-- пульс: свет и свечение, вспышка оболочки после удара по шару
 	local soft = settings()
@@ -417,8 +447,10 @@ local function updateBall(b: Ball, clock: number, t: number)
 	local pulse = 0.7 + 0.3 * math.sin(clock * 9) + spike
 	local hit = math.clamp(1 - (clock - b.hitFlash) / 0.25, 0, 1)
 	b.light.Brightness = LIGHT_BRIGHTNESS * pulse * (if soft then 0.7 else 1) + hit * 3
-	b.glow.Transparency = 0.35 + 0.15 * math.sin(clock * 5)
-	b.shell.Transparency = 0.55 - 0.35 * hit
+	-- оболочки «дышат», а после удара по шару вспыхивают
+	for i, sh in b.shells do
+		sh.Transparency = math.clamp(b.shellBase[i] + 0.05 * math.sin(clock * 5 + i) - 0.4 * hit, 0, 1)
+	end
 	-- дуги перескакивают на новые точки
 	local holdMin = if soft then ARC_SOFT_HOLD_MIN else ARC_HOLD_MIN
 	local holdMax = if soft then ARC_SOFT_HOLD_MAX else ARC_HOLD_MAX

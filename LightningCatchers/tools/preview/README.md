@@ -31,6 +31,9 @@ node render.mjs /tmp/map.json /tmp/map /tmp/cams.json 1280 720     # -> /tmp/map
 ```
 
 * `--project=…` — взять освещение (Lighting, Atmosphere, Bloom) из Rojo-проекта; без него у `.rbxmx` нет освещения.
+* `--sky=N` — освещение зоны, как его ставит клиент (WorldFX): Ambient, OutdoorAmbient, Atmosphere, Tint и Saturation
+  из `Config.Zones[N].Sky` (`0` — `Config.Hub.Sky`), плюс цветокоррекция. Для видов с острова N берите `--sky=N`.
+* `--cc` — добавить цветокоррекцию из проекта (ColorCorrection: Tint, Saturation, Contrast, Brightness).
 * `--skip=Clouds_1,Clouds_2` — не выгружать экземпляры с такими именами (например, убрать тучи для вида сверху).
 * `--only=Hub` — выгрузить только поддерево с этим именем.
 * Можно рендерить и собранное место: `dump_scene.luau out.json LightningCatchers.rbxl` (освещение берётся из места).
@@ -44,16 +47,31 @@ node render.mjs /tmp/map.json /tmp/map /tmp/cams.json 1280 720     # -> /tmp/map
 `clockTime` 19.6 — вечерняя гроза, как в игре (ночное освещение откалибровано под OutdoorAmbient Roblox).
 Переменная `PREVIEW_TMP` задаёт папку для временных файлов (по умолчанию системная `/tmp`).
 
+## Лист пропов (docs/STYLE.md §12, п. 2)
+
+```
+.tools/lune run tools/preview/props_sheet.luau /tmp/props.rbxmx     # деревья, ели, кусты, камни, кристаллы, фонарь, примитивы
+cd tools/preview
+../../.tools/lune run dump_scene.luau /tmp/props.json /tmp/props.rbxmx
+node render.mjs /tmp/props.json /tmp/props /tmp/props_cams.json 1280 720
+```
+
+Лист проверяет и «кирпичики» стиля из `tools/lib/builder.luau` (GemCube, Pyramid4, HexPrism, HexPlate, Lobe, SkewPlate, Zigzag).
+Высокий угол CornerWedge рендерер считает локальным (+X, +Y, −Z); если в Studio пирамиды выйдут «звёздами», поправьте `B.CORNER_YAW`.
+
 ## Модели (Models.luau)
 
 ```
-.tools/lune run tools/preview/models_sheet.luau /tmp/sheet.rbxmx    # питомцы, коконы, громоотводы, банка, фульгуриты
+.tools/lune run tools/preview/models_sheet.luau /tmp/sheet.rbxmx    # питомцы, коконы, громоотводы, банка, фульгуриты, тучка удара, шаровая молния
 cd tools/preview
 ../../.tools/lune run dump_scene.luau /tmp/sheet.json /tmp/sheet.rbxmx
 node render.mjs /tmp/sheet.json /tmp/sheet /tmp/sheet_cams.json 1280 720
 ```
 
-`models_sheet.luau` сам пишет файл камер `<имя>_cams.json` рядом с `.rbxmx` (виды: pets, petsclose, gear, fulg, fulgclose).
+`models_sheet.luau` сам пишет файл камер `<имя>_cams.json` рядом с `.rbxmx` (виды: archetypes, archetypes34, archetypesback,
+archetypes12 — игровой масштаб, close_* и mark_* — крупные планы, pets, rarity, silhouette — тест силуэта, petsgame, cocoons,
+cocoonclose, rods, rodheads, fulg, fulgclose, strike, shards, ball) и печатает число деталей, шаров и неона у каждой модели.
+Второй аргумент — другая папка shared (копия «до»): так снимаются кадры «до/после» с теми же камерами.
 
 ## Как смотреть результат
 

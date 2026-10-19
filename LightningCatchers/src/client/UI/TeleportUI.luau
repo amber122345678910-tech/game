@@ -20,16 +20,14 @@ local UIKit = require(script.Parent.UIKit)
 
 local TeleportUI = {}
 
-local WHITE = Color3.new(1, 1, 1)
-local BLACK = Color3.new(0, 0, 0)
 local CARD = Vector2.new(268, 196)
 
 type Card = {
 	zone: number,
 	frame: Frame,
-	status: TextLabel,
+	status: UIKit.Status,
 	button: TextButton,
-	lock: TextLabel,
+	lock: Frame,
 }
 
 local win: UIKit.Window
@@ -75,7 +73,7 @@ local function teleport(z: number)
 	local ok = TeleportUI.request(z)
 	busy = false
 	if ok then
-		Juice.flash(Theme.Electric, 0.35)
+		Juice.flash(Theme.Spark, 0.35)
 		win.close()
 	else
 		Sounds.play("Error")
@@ -116,65 +114,42 @@ local function makeCard(parent: Instance, z: number): Card
 		Parent = parent,
 	})
 	UIKit.new("UIScale", { Scale = 1, Parent = frame })
-	UIKit.tintCard(frame, Theme.CardHover:Lerp(accent, 0.25), Theme.PanelDark)
-	-- значок острова
-	local circle = UIKit.new("Frame", {
-		Name = "Icon",
-		Size = UDim2.fromOffset(64, 64),
-		Position = UDim2.fromOffset(12, 12),
-		BackgroundColor3 = WHITE,
-		Parent = frame,
-	}) :: Frame
-	UIKit.round(circle)
-	UIKit.stroke(circle, 3, Theme.Stroke)
-	UIKit.gradient(circle, accent:Lerp(WHITE, 0.3), accent:Lerp(BLACK, 0.3))
-	UIKit.label({
-		Name = "Glyph",
-		Text = if z == 0 then "🏙" else tostring(z),
-		Size = UDim2.fromScale(0.66, 0.66),
-		Position = UDim2.fromScale(0.5, 0.5),
-		AnchorPoint = Vector2.new(0.5, 0.5),
-		MaxTextSize = 40,
-		NoStroke = z == 0,
-		Parent = circle,
-	})
+	UIKit.tintCard(frame, Theme.Night700:Lerp(accent, 0.16), Theme.Night800, accent)
+	-- значок острова: номер (Montserrat Black Italic) или город
+	if z == 0 then
+		UIKit.iconBadge(frame, "🏙", accent, 62, { Name = "Icon", Position = UDim2.fromOffset(44, 50) })
+	else
+		UIKit.numberBadge(frame, tostring(z), accent, 62, { Name = "Icon", Position = UDim2.fromOffset(44, 50) })
+	end
 	UIKit.label({
 		Name = "Name",
 		Text = zoneName(z),
-		Size = UDim2.new(1, -96, 0, 60),
-		Position = UDim2.fromOffset(86, 14),
+		FontFace = Theme.FontDisplayFlat,
+		Size = UDim2.new(1, -100, 0, 58),
+		Position = UDim2.fromOffset(86, 20),
 		TextXAlignment = Enum.TextXAlignment.Left,
-		MaxTextSize = 28,
+		MaxTextSize = 23,
 		Parent = frame,
 	})
-	local status = UIKit.label({
-		Name = "Status",
-		Text = "",
-		Size = UDim2.new(1, -24, 0, 28),
-		Position = UDim2.fromOffset(12, 84),
-		MaxTextSize = 22,
-		Parent = frame,
-	})
-	local lock = UIKit.label({
+	local status = UIKit.status(frame, UDim2.new(1, -28, 0, 24), UDim2.fromOffset(14, 88), 18)
+	local lock = UIKit.glyph(frame, "lock", {
 		Name = "Lock",
-		Text = "🔒",
-		Size = UDim2.fromOffset(36, 36),
+		Size = UDim2.fromOffset(26, 26),
 		AnchorPoint = Vector2.new(1, 0),
-		Position = UDim2.new(1, -8, 0, 8),
-		MaxTextSize = 30,
-		NoStroke = true,
+		Position = UDim2.new(1, -10, 0, 14),
+		Color = Theme.TextDim,
+		Stroke = 2,
 		Visible = false,
-		Parent = frame,
 	})
 	local card: Card
 	local button = UIKit.button({
 		Name = "Action",
 		Text = "",
-		Color = Theme.Electric,
-		Size = UDim2.new(1, -24, 0, 66),
+		Color = Theme.Spark,
+		Size = UDim2.new(1, -24, 0, 68),
 		AnchorPoint = Vector2.new(0.5, 1),
 		Position = UDim2.new(0.5, 0, 1, -12),
-		TextSize = 26,
+		TextSize = 22,
 		Parent = frame,
 	}, function()
 		local d = ClientState.get()
@@ -204,32 +179,40 @@ local function refreshCard(c: Card, d: PlayerData.Data, here: number)
 	local open = z == 0 or z <= d.Zone
 	c.lock.Visible = not open
 	if z == here then
-		c.status.Text = "📍 Ты здесь"
-		c.status.TextColor3 = Theme.Good
+		c.status.set("pin", "Ты здесь", Theme.SparkHi)
 		UIKit.setButtonText(c.button, "Ты здесь")
-		UIKit.setButtonColor(c.button, Theme.GrayDark)
+		UIKit.setButtonVariant(c.button, "Disabled")
 	elseif open then
-		c.status.Text = if z == 0 then "Магазин, питомцы, награды" else "✔ Открыт"
-		c.status.TextColor3 = if z == 0 then Theme.TextDim else Theme.Green
+		if z == 0 then
+			c.status.set(nil, "Магазин, питомцы, награды", Theme.TextDim)
+		else
+			c.status.set("check", "Открыт", Theme.GoHi)
+		end
 		local cooldown = TeleportUI.cooldownLeft()
 		if cooldown > 0 then
-			UIKit.setButtonText(c.button, string.format("⏳ %d с", math.ceil(cooldown)))
-			UIKit.setButtonColor(c.button, Theme.GrayDark)
+			UIKit.setButtonText(c.button, string.format("Ещё %d с", math.ceil(cooldown)))
+			UIKit.setButtonVariant(c.button, "Disabled")
 		else
-			UIKit.setButtonText(c.button, "🌀 Лететь")
-			UIKit.setButtonColor(c.button, Theme.Electric, Theme.ElectricDark)
+			UIKit.setButtonText(c.button, "Лететь")
+			UIKit.setButtonVariant(c.button, "Spark")
 		end
 	elseif z == d.Zone + 1 then
 		local cost = Economy.zoneCost(z)
-		c.status.Text = "Цена: ⚡ " .. Format.short(cost)
-		c.status.TextColor3 = Theme.Volt
-		UIKit.setButtonText(c.button, "Открыть за ⚡" .. Format.short(cost))
-		UIKit.setButtonColor(c.button, if d.Volts >= cost then Theme.Green else Theme.Gray)
+		c.status.set("bolt", "Можно открыть", Theme.Volt)
+		UIKit.setButtonPrice(c.button, "Открыть", "⚡ " .. Format.short(cost))
+		if d.Volts >= cost then
+			UIKit.setButtonVariant(c.button, "Go")
+		else
+			UIKit.setButtonVariant(c.button, "Slate")
+			local price = UIKit.buttonPart(c.button, "Price")
+			if price then
+				price.TextColor3 = Theme.DangerHi
+			end
+		end
 	else
-		c.status.Text = "Сначала открой предыдущий"
-		c.status.TextColor3 = Theme.TextDim
-		UIKit.setButtonText(c.button, "⚡ " .. Format.short(Economy.zoneCost(z)))
-		UIKit.setButtonColor(c.button, Theme.GrayDark)
+		c.status.set(nil, "Сначала открой предыдущий", Theme.TextDim)
+		UIKit.setButtonPrice(c.button, "Закрыт", "⚡ " .. Format.short(Economy.zoneCost(z)))
+		UIKit.setButtonVariant(c.button, "Disabled")
 	end
 end
 
@@ -255,7 +238,7 @@ function TeleportUI.start()
 		Icon = "🌀",
 		Width = 880,
 		Height = 540,
-		Accent = Theme.PurpleDark,
+		Accent = Theme.Violet,
 		OnOpen = function()
 			refresh()
 			ClientState.WindowOpened:Fire("Teleport")

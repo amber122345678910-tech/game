@@ -20,8 +20,6 @@ local HUD = require(script.Parent.HUD)
 local WelcomeUI = {}
 
 local player = Players.LocalPlayer
-local WHITE = Color3.new(1, 1, 1)
-local BLACK = Color3.new(0, 0, 0)
 local W, H = 620, 440
 local COINS = 14
 local OPEN_DELAY = 1.5
@@ -125,55 +123,44 @@ end
 
 local function build()
 	local body = win.Body
-	local icon = UIKit.new("Frame", {
+	-- значок станции: нарисованная молния на значке Volt
+	UIKit.iconBadge(body, "#bolt", Theme.Volt, 96, {
 		Name = "Icon",
-		Size = UDim2.fromOffset(96, 96),
-		AnchorPoint = Vector2.new(0.5, 0),
-		Position = UDim2.new(0.5, 0, 0, 4),
-		BackgroundColor3 = WHITE,
-		Parent = body,
-	}) :: Frame
-	UIKit.round(icon)
-	UIKit.stroke(icon, 3, Theme.Stroke)
-	UIKit.gradient(icon, Theme.Volt:Lerp(WHITE, 0.3), Theme.Orange:Lerp(BLACK, 0.2))
-	UIKit.label({
-		Name = "Glyph",
-		Text = "⚡",
-		Size = UDim2.fromScale(0.66, 0.66),
-		Position = UDim2.fromScale(0.5, 0.5),
-		AnchorPoint = Vector2.new(0.5, 0.5),
-		MaxTextSize = 60,
-		NoStroke = true,
-		Parent = icon,
+		Position = UDim2.new(0.5, 0, 0, 54),
 	})
 	UIKit.label({
 		Name = "Text",
 		Text = "Пока тебя не было, станция накопила",
+		FontFace = Theme.FontBodyHeavy,
 		Size = UDim2.new(1, -20, 0, 32),
-		Position = UDim2.fromOffset(10, 108),
-		MaxTextSize = 28,
+		Position = UDim2.fromOffset(10, 112),
+		MaxTextSize = 24,
 		Parent = body,
 	})
 	amountLabel = UIKit.label({
 		Name = "Amount",
 		Text = "+0 ⚡",
-		Size = UDim2.new(1, -40, 0, 70),
-		Position = UDim2.fromOffset(20, 142),
-		TextColor3 = Theme.Volt,
-		FontFace = Theme.Font,
-		MaxTextSize = 66,
+		FontFace = Theme.FontNumber,
+		Size = UDim2.new(1, -40, 0, 76),
+		Position = UDim2.fromOffset(20, 146),
+		MaxTextSize = 70,
+		NoStroke = false,
 		Parent = body,
 	})
+	local st = amountLabel:FindFirstChildOfClass("UIStroke")
+	if st then
+		st.Thickness = 3
+	end
+	UIKit.gradientText(amountLabel, Theme.VoltHi, Theme.Volt)
 	amountScale = UIKit.new("UIScale", { Scale = 1, Parent = amountLabel }) :: UIScale
 	claimButton = UIKit.button({
 		Name = "Claim",
 		Text = "Забрать",
-		Icon = "🎁",
-		Color = Theme.Green,
+		Color = Theme.Go,
 		Size = UDim2.fromOffset(320, 78),
 		AnchorPoint = Vector2.new(0.5, 1),
-		Position = UDim2.new(0.5, 0, 1, -6),
-		TextSize = 36,
+		Position = UDim2.new(0.5, 0, 1, -8),
+		TextSize = 32,
 		Parent = body,
 	}, claim)
 end
@@ -207,7 +194,7 @@ function WelcomeUI.start()
 		Icon = "👋",
 		Width = W,
 		Height = H,
-		Accent = Theme.ElectricDark,
+		Accent = Theme.Spark,
 		DisplayOrder = 22,
 		OnOpen = function()
 			ClientState.WindowOpened:Fire("Welcome")

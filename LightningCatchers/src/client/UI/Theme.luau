@@ -1,52 +1,104 @@
 --!strict
--- Цвета и шрифты интерфейса: ночная гроза — тёмно-синие панели, электрические акценты.
--- BuilderSans поддерживает кириллицу (FredokaOne/LuckiestGuy — нет, поэтому только для цифр).
+-- Цвета и шрифты интерфейса «электро-наклейка» (docs/STYLE.md §8). Шрифты — из общего Shared/Fonts (§8.3):
+-- BuilderSans и FredokaOne без кириллицы, в UI их нет. Три семейства, у каждого своя роль:
+-- Montserrat — слова-события и заголовки, Oswald — числа, Nunito — читаемый текст.
+
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Fonts = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Fonts"))
+
+local function rgb(r: number, g: number, b: number): Color3
+	return Color3.fromRGB(r, g, b)
+end
 
 local Theme = {
-	Font = Font.fromEnum(Enum.Font.BuilderSansExtraBold),
-	FontBold = Font.fromEnum(Enum.Font.BuilderSansBold),
-	FontBody = Font.fromEnum(Enum.Font.BuilderSansMedium),
-	FontNumber = Font.fromEnum(Enum.Font.FredokaOne), -- только цифры и латиница
+	-- Шрифты по ролям (§8.3.3)
+	FontDisplay = Fonts.Display, -- D1 оценки, D2 заголовки окон, D4 кнопки-глаголы
+	FontDisplayFlat = Fonts.DisplayFlat, -- D5 названия предметов, глифы ◆ ▲ ▼
+	FontNumber = Fonts.Number, -- D3 валюта, цены, множители
+	FontBody = Fonts.Body, -- B1/B2 описания, тосты, строки
+	FontBodyHeavy = Fonts.BodyHeavy, -- L теги, S вкладки, T таймеры (цифры Nunito одной ширины)
+	-- Алиасы старых имён: по умолчанию «безопасный» BodyHeavy, а не Display
+	Font = Fonts.BodyHeavy,
+	FontBold = Fonts.Body,
 
-	Panel = Color3.fromRGB(22, 26, 48),
-	PanelLight = Color3.fromRGB(36, 42, 74),
-	PanelDark = Color3.fromRGB(14, 16, 32),
-	Card = Color3.fromRGB(44, 52, 90),
-	CardHover = Color3.fromRGB(58, 68, 116),
-	Stroke = Color3.fromRGB(8, 10, 22),
+	-- Токены цвета (§8.2)
+	Ink = rgb(18, 14, 40), -- внешние обводки, жёсткие тени, тёмный текст на жёлтом
+	Night900 = rgb(20, 18, 46), -- низ градиента окна
+	Night800 = rgb(30, 28, 66), -- фон окна, плитки меню
+	Night700 = rgb(42, 42, 92), -- верх градиента окна, карточки
+	Night600 = rgb(56, 58, 120), -- наведение, активная карточка
+	Well = rgb(12, 10, 30), -- «колодцы»: трек полос, поле ввода, счётчики
+	LineLight = rgb(124, 132, 214), -- внутренняя светлая рамка (прозрачность LineLightT)
+	LineLightT = 0.55,
+	Cream = rgb(255, 248, 232), -- основной текст
+	TextDim = rgb(170, 174, 220), -- второстепенный текст
 
-	Text = Color3.fromRGB(255, 255, 255),
-	TextDim = Color3.fromRGB(176, 186, 220),
-	TextStroke = Color3.fromRGB(10, 12, 26),
+	Volt = rgb(255, 210, 60), -- ⚡, главная кнопка, ИДЕАЛЬНО
+	VoltHi = rgb(255, 240, 150),
+	VoltLo = rgb(224, 138, 24),
+	Spark = rgb(80, 206, 255), -- энергия, навигация, ХОРОШО
+	SparkHi = rgb(186, 242, 255),
+	SparkLo = rgb(28, 118, 214),
+	Go = rgb(78, 212, 112), -- «Купить», «Забрать»
+	GoHi = rgb(168, 244, 160),
+	GoLo = rgb(24, 136, 72),
+	Danger = rgb(244, 72, 92), -- закрыть, ошибка, перегрузка
+	DangerHi = rgb(255, 152, 150),
+	DangerLo = rgb(158, 26, 58),
+	Shard = rgb(120, 230, 255), -- 💎
+	ShardHi = rgb(214, 250, 255),
+	ShardLo = rgb(40, 150, 214),
+	Violet = rgb(160, 104, 255), -- события, Молниедекс
+	VioletHi = rgb(214, 186, 255),
+	VioletLo = rgb(96, 54, 196),
+	Pink = rgb(255, 112, 190), -- питомцы
+	PinkHi = rgb(255, 196, 228),
+	PinkLo = rgb(186, 48, 132),
+	Orange = rgb(255, 150, 52), -- перезапуск
+	OrangeHi = rgb(255, 214, 150),
+	OrangeLo = rgb(196, 82, 20),
+	Slate = rgb(78, 82, 128), -- нейтральные и неактивные кнопки
+	SlateHi = rgb(122, 128, 182),
+	SlateLo = rgb(48, 50, 84),
+	DisabledFace = rgb(70, 72, 100),
 
-	Volt = Color3.fromRGB(255, 220, 70), -- ⚡ Вольты
-	Shard = Color3.fromRGB(120, 230, 255), -- 💎 Осколки
-	Electric = Color3.fromRGB(110, 200, 255),
-	ElectricDark = Color3.fromRGB(40, 110, 210),
-	Green = Color3.fromRGB(70, 210, 110),
-	GreenDark = Color3.fromRGB(30, 140, 70),
-	Red = Color3.fromRGB(240, 70, 80),
-	RedDark = Color3.fromRGB(160, 30, 45),
-	Orange = Color3.fromRGB(255, 150, 50),
-	Purple = Color3.fromRGB(170, 100, 255),
-	PurpleDark = Color3.fromRGB(100, 50, 190),
-	Pink = Color3.fromRGB(255, 110, 190),
-	Gray = Color3.fromRGB(110, 118, 150),
-	GrayDark = Color3.fromRGB(70, 76, 104),
+	-- Слова оценок (градиенты текста, §8.4)
+	Perfect = rgb(255, 226, 80),
+	Good = rgb(120, 230, 255),
+	Miss = rgb(255, 110, 120),
+	Zap = rgb(255, 120, 60),
 
-	Perfect = Color3.fromRGB(255, 235, 90),
-	Good = Color3.fromRGB(120, 230, 255),
-	Miss = Color3.fromRGB(255, 120, 120),
+	-- События и особые цвета
+	Gold = rgb(255, 196, 40),
+	GoldDark = rgb(190, 120, 20),
+	Supercell = rgb(90, 230, 120),
+	Ball = rgb(255, 150, 70),
+	Rainbow = rgb(255, 120, 210),
 
-	Gold = Color3.fromRGB(255, 196, 40),
-	GoldDark = Color3.fromRGB(190, 120, 20),
-	Zap = Color3.fromRGB(255, 240, 120),
-	Supercell = Color3.fromRGB(90, 230, 120),
-	Ball = Color3.fromRGB(255, 150, 70),
-	Rainbow = Color3.fromRGB(255, 120, 210),
+	-- Старые имена (их читают контроллеры мира и ещё не переведённый код)
+	Panel = rgb(30, 28, 66),
+	PanelLight = rgb(42, 42, 92),
+	PanelDark = rgb(20, 18, 46),
+	Card = rgb(42, 42, 92),
+	CardHover = rgb(56, 58, 120),
+	Stroke = rgb(18, 14, 40),
+	Text = rgb(255, 248, 232),
+	TextStroke = rgb(18, 14, 40),
+	Electric = rgb(80, 206, 255),
+	ElectricDark = rgb(28, 118, 214),
+	Green = rgb(78, 212, 112),
+	GreenDark = rgb(24, 136, 72),
+	Red = rgb(244, 72, 92),
+	RedDark = rgb(158, 26, 58),
+	Purple = rgb(160, 104, 255),
+	PurpleDark = rgb(96, 54, 196),
+	Gray = rgb(78, 82, 128),
+	GrayDark = rgb(48, 50, 84),
 
-	Corner = 16,
-	CornerSmall = 12,
+	-- Скругления (§8.4): тег 6, кнопка и карточка 10, окно 14
+	CornerTag = 6,
+	CornerSmall = 10,
+	Corner = 14,
 }
 
 return Theme

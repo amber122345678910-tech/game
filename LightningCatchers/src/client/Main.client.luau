@@ -4,6 +4,9 @@
 -- ошибка или ожидание в одном не останавливает остальные.
 
 local StarterGui = game:GetService("StarterGui")
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local ContentProvider = game:GetService("ContentProvider")
 
 -- Main — LocalScript в папке Client, рядом с ClientState, Controllers и UI
 local Client = script.Parent
@@ -61,6 +64,38 @@ local function startModule(label: string, module: Instance)
 end
 
 ClientState.start()
+
+-- Прогрев шрифтов (docs/STYLE.md §8.3.5): Montserrat Black Italic и Nunito 700/800 — облачные начертания,
+-- качаются при первом использовании. Невидимые лейблы со всеми пятью начертаниями до показа HUD и окон,
+-- чтобы первая оценка и заголовки не мелькнули запасным шрифтом
+task.spawn(function()
+	local ok, err = pcall(function()
+		local Fonts = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Fonts"))
+		local warm = Instance.new("ScreenGui")
+		warm.Name = "FontWarmup"
+		warm.ResetOnSpawn = false
+		warm.Enabled = true
+		warm.Parent = Players.LocalPlayer:WaitForChild("PlayerGui")
+		local probes: { Instance } = {}
+		for _, face in Fonts.All do
+			local l = Instance.new("TextLabel")
+			l.FontFace = face
+			l.Text = "ЛОВЦЫ МОЛНИЙ Ёё ×0123456789"
+			l.BackgroundTransparency = 1
+			l.TextTransparency = 1
+			l.Size = UDim2.fromOffset(4, 4)
+			l.Parent = warm
+			table.insert(probes, l)
+		end
+		ContentProvider:PreloadAsync(probes)
+		task.delay(5, function()
+			warm:Destroy()
+		end)
+	end)
+	if not ok then
+		warn("[Client] прогрев шрифтов: " .. tostring(err))
+	end
+end)
 
 -- Звуки: клик для всех кнопок интерфейса. Музыку и звуки включает/выключает только SettingsUI:
 -- он знает о ещё не сохранённых переключениях и не даёт старому снимку с сервера их откатить

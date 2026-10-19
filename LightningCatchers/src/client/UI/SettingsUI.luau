@@ -26,6 +26,13 @@ local SAVE_DELAY = 0.6
 type Settings = { Music: boolean, Sfx: boolean, SoftFlash: boolean, Shake: boolean, Offset: number }
 type Toggle = { key: string, button: TextButton, knob: Frame, label: TextLabel, grad: UIGradient }
 
+local ROW_ACCENTS = {
+	Music = Theme.Pink,
+	Sfx = Theme.Spark,
+	SoftFlash = Theme.Volt,
+	Shake = Theme.Orange,
+} :: { [string]: Color3 }
+
 local win: UIKit.Window
 local settings: Settings = { Music = true, Sfx = true, SoftFlash = true, Shake = true, Offset = 0 }
 local toggles: { Toggle } = {}
@@ -80,13 +87,18 @@ end
 local function refreshControls()
 	for _, t in toggles do
 		local on = (settings :: any)[t.key] == true
-		UIKit.tween(t.knob, 0.15, { Position = if on then UDim2.new(1, -4, 0.5, 0) else UDim2.new(0, 4, 0.5, 0), AnchorPoint = if on then Vector2.new(1, 0.5) else Vector2.new(0, 0.5) })
+		UIKit.tween(t.knob, 0.15, { Position = if on then UDim2.new(1, -5, 0.5, -2) else UDim2.new(0, 5, 0.5, -2), AnchorPoint = if on then Vector2.new(1, 0.5) else Vector2.new(0, 0.5) })
 		t.grad.Color = if on
-			then ColorSequence.new(Theme.Green:Lerp(WHITE, 0.2), Theme.GreenDark)
-			else ColorSequence.new(Theme.Gray, Theme.GrayDark)
+			then ColorSequence.new(Theme.Go:Lerp(Theme.GoHi, 0.4), Theme.GoLo)
+			else ColorSequence.new(Theme.Well, Theme.Well)
 		t.label.Text = if on then "ВКЛ" else "ВЫКЛ"
+		t.label.TextColor3 = if on then Theme.Cream else Theme.TextDim
 		t.label.Position = if on then UDim2.new(0, 14, 0.5, 0) else UDim2.new(1, -14, 0.5, 0)
 		t.label.AnchorPoint = if on then Vector2.new(0, 0.5) else Vector2.new(1, 0.5)
+		local s = t.label:FindFirstChildOfClass("UIStroke")
+		if s then
+			s.Enabled = on
+		end
 	end
 	offsetLabel.Text = offsetText(settings.Offset)
 end
@@ -102,60 +114,69 @@ end
 ----------------------------------------------------------------------
 -- Строки
 ----------------------------------------------------------------------
-local function rowFrame(parent: Instance, order: number, icon: string, text: string): Frame
+local function rowFrame(parent: Instance, order: number, icon: string, text: string, accent: Color3): Frame
 	local row = UIKit.card({
 		Name = "Row" .. order,
 		Size = UDim2.fromOffset(ROW_W, 72),
 		LayoutOrder = order,
 		Parent = parent,
 	})
+	UIKit.iconBadge(row, icon, accent, 46, {
+		Name = "Icon",
+		Position = UDim2.new(0, 36, 0.5, 0),
+	})
 	UIKit.label({
 		Name = "Title",
-		Text = icon .. "  " .. text,
-		Size = UDim2.new(1, -260, 1, -12),
-		Position = UDim2.new(0, 16, 0.5, 0),
+		Text = text,
+		FontFace = Theme.FontBodyHeavy,
+		Size = UDim2.new(1, -320, 1, -16),
+		Position = UDim2.new(0, 70, 0.5, 0),
 		AnchorPoint = Vector2.new(0, 0.5),
 		TextXAlignment = Enum.TextXAlignment.Left,
-		MaxTextSize = 28,
+		MaxTextSize = 24,
 		Parent = row,
 	})
 	return row
 end
 
+-- Переключатель (§8.4: меньше пилюль): трек-колодец со скруглением 10, квадратная ручка Cream, ВКЛ/ВЫКЛ
 local function toggleRow(parent: Instance, order: number, key: string, icon: string, text: string)
-	local row = rowFrame(parent, order, icon, text)
+	local row = rowFrame(parent, order, icon, text, ROW_ACCENTS[key] or Theme.Slate)
 	local button = UIKit.new("TextButton", {
 		Name = "Toggle",
-		Size = UDim2.fromOffset(150, 58),
+		Size = UDim2.fromOffset(150, 54),
 		AnchorPoint = Vector2.new(1, 0.5),
-		Position = UDim2.new(1, -12, 0.5, 0),
+		Position = UDim2.new(1, -14, 0.5, 0),
 		BackgroundColor3 = WHITE,
 		AutoButtonColor = false,
 		Text = "",
 		Parent = row,
 	}) :: TextButton
-	UIKit.round(button)
-	UIKit.stroke(button, 3, Theme.Stroke)
-	local grad = UIKit.gradient(button, Theme.Green, Theme.GreenDark)
+	UIKit.corner(button, 10)
+	UIKit.stroke(button, 2.5, Theme.Ink)
+	local grad = UIKit.gradient(button, Theme.Go, Theme.GoLo)
 	local knob = UIKit.new("Frame", {
 		Name = "Knob",
-		Size = UDim2.fromOffset(50, 50),
+		Size = UDim2.fromOffset(52, 40),
 		AnchorPoint = Vector2.new(1, 0.5),
-		Position = UDim2.new(1, -4, 0.5, 0),
+		Position = UDim2.new(1, -5, 0.5, -2),
 		BackgroundColor3 = WHITE,
 		ZIndex = 2,
 		Parent = button,
 	}) :: Frame
-	UIKit.round(knob)
-	UIKit.stroke(knob, 2.5, Theme.Stroke)
+	UIKit.corner(knob, 8)
+	UIKit.stroke(knob, 2.5, Theme.Ink)
+	UIKit.gradient(knob, Theme.Cream, Theme.TextDim)
 	local label = UIKit.label({
 		Name = "State",
 		Text = "ВКЛ",
-		Size = UDim2.fromOffset(80, 36),
+		FontFace = Theme.FontBodyHeavy,
+		Size = UDim2.fromOffset(76, 32),
 		AnchorPoint = Vector2.new(0, 0.5),
 		Position = UDim2.new(0, 14, 0.5, 0),
 		TextXAlignment = Enum.TextXAlignment.Center,
-		MaxTextSize = 24,
+		MaxTextSize = 20,
+		NoStroke = false,
 		ZIndex = 2,
 		Parent = button,
 	})
@@ -171,15 +192,15 @@ local function toggleRow(parent: Instance, order: number, key: string, icon: str
 end
 
 local function offsetRow(parent: Instance, order: number)
-	local row = rowFrame(parent, order, "⏱", "Задержка касания")
-	UIKit.button({
+	local row = rowFrame(parent, order, "⏱", "Задержка касания", Theme.Violet)
+	local minus = UIKit.button({
 		Name = "Minus",
-		Text = "−",
-		Color = Theme.Electric,
-		Size = UDim2.fromOffset(64, 62),
+		Text = "",
+		Icon = "#minus",
+		Color = Theme.Spark,
+		Size = UDim2.fromOffset(62, 60),
 		AnchorPoint = Vector2.new(1, 0.5),
 		Position = UDim2.new(1, -198, 0.5, 0),
-		TextSize = 36,
 		Parent = row,
 	}, function()
 		setOffset(settings.Offset - OFFSET_STEP)
@@ -187,25 +208,36 @@ local function offsetRow(parent: Instance, order: number)
 	offsetLabel = UIKit.label({
 		Name = "Value",
 		Text = "0 мс",
+		FontFace = Theme.FontNumber,
 		Size = UDim2.fromOffset(110, 44),
 		AnchorPoint = Vector2.new(1, 0.5),
 		Position = UDim2.new(1, -82, 0.5, 0),
-		TextColor3 = Theme.Volt,
-		MaxTextSize = 28,
+		MaxTextSize = 30,
+		NoStroke = false,
 		Parent = row,
 	})
-	UIKit.button({
+	UIKit.gradientText(offsetLabel, Theme.VoltHi, Theme.Volt)
+	local plus = UIKit.button({
 		Name = "Plus",
-		Text = "+",
-		Color = Theme.Electric,
-		Size = UDim2.fromOffset(64, 62),
+		Text = "",
+		Icon = "#plus",
+		Color = Theme.Spark,
+		Size = UDim2.fromOffset(62, 60),
 		AnchorPoint = Vector2.new(1, 0.5),
-		Position = UDim2.new(1, -12, 0.5, 0),
-		TextSize = 36,
+		Position = UDim2.new(1, -14, 0.5, 0),
 		Parent = row,
 	}, function()
 		setOffset(settings.Offset + OFFSET_STEP)
 	end)
+	-- глифы «−» и «+» по центру кнопок
+	for _, b in { minus, plus } do
+		local face = b:FindFirstChild("Face")
+		local g = face and face:FindFirstChild("IconGlyph")
+		if g and g:IsA("Frame") then
+			g.Position = UDim2.fromScale(0.5, 0.5)
+			g.Size = UDim2.fromScale(0.5, 0.5)
+		end
+	end
 end
 
 -- Автоподстройка: средняя ошибка последних нажатий из CatchController (если он умеет)
@@ -247,24 +279,25 @@ local function build()
 	toggleRow(list, 3, "SoftFlash", "✨", "Мягкие вспышки")
 	toggleRow(list, 4, "Shake", "📳", "Тряска камеры")
 	offsetRow(list, 5)
-	UIKit.button({
+	local auto = UIKit.button({
 		Name = "Auto",
 		Text = "Подстроить автоматически",
-		Icon = "🎯",
-		Color = Theme.Purple,
+		Icon = "#bolt",
+		Color = Theme.Violet,
 		Size = UDim2.fromOffset(ROW_W, 64),
 		LayoutOrder = 6,
-		TextSize = 26,
+		TextSize = 24,
 		Parent = list,
 	}, autoCalibrate)
+	UIKit.setButtonStyle(auto, "plain")
+	UIKit.setButtonText(auto, "Подстроить автоматически")
 	UIKit.label({
 		Name = "Hint",
 		Text = "Не выходит ИДЕАЛЬНО? Поймай пару молний и нажми «Подстроить».",
 		Size = UDim2.fromOffset(ROW_W, 26),
 		LayoutOrder = 7,
-		FontFace = Theme.FontBold,
 		TextColor3 = Theme.TextDim,
-		MaxTextSize = 19,
+		MaxTextSize = 17,
 		Parent = list,
 	})
 end
@@ -301,7 +334,7 @@ function SettingsUI.start()
 		Icon = "⚙",
 		Width = W,
 		Height = H,
-		Accent = Theme.GrayDark,
+		Accent = Theme.Slate,
 		OnOpen = function()
 			local d = ClientState.get()
 			if d then

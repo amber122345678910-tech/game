@@ -1,6 +1,7 @@
 --!strict
--- Уведомления: короткие тосты под банкой (до 3 сразу, исчезают сами) и большие баннеры
--- на весь сервер (редкая поимка, событие) — лента через верхнюю треть экрана.
+-- Уведомления (docs/STYLE.md §8.4): короткие тосты под банкой — ленты Ink с наклоном −2°, полосой акцента
+-- и значком слева (до 3 сразу, исчезают сами) — и большие баннеры на весь сервер (редкая поимка, событие):
+-- наклонная лента через экран со словами Montserrat Black Italic.
 -- Свои праздники: открыт новый остров (баннер, фанфары, вспышка); при входе на остров — его название.
 
 local Players = game:GetService("Players")
@@ -22,11 +23,10 @@ local Notifications = {}
 
 local player = Players.LocalPlayer
 local WHITE = Color3.new(1, 1, 1)
-local BLACK = Color3.new(0, 0, 0)
 
 local TOAST_W = 470
 local TOAST_H = 52
-local TOAST_GAP = 6
+local TOAST_GAP = 8
 local MAX_TOASTS = 3
 local TOAST_LIFE = 2.5
 local TOAST_PHONE_SCALE = 1.3 -- на телефоне HUD мельче (до ×0.5) — тосты крупнее, чтобы читались
@@ -37,11 +37,11 @@ local TITLE_TIME = 2.2 -- название острова при входе
 local TITLE_FADE = 0.4
 
 local KINDS = {
-	info = { Color = Theme.ElectricDark, Icon = "💬" },
-	good = { Color = Theme.GreenDark, Icon = "✅" },
-	bad = { Color = Theme.RedDark, Icon = "⛔" },
-	rare = { Color = Theme.PurpleDark, Icon = "✨" },
-} :: { [string]: { Color: Color3, Icon: string } }
+	info = { Color = Theme.Spark, Glyph = "bolt" },
+	good = { Color = Theme.Go, Glyph = "check" },
+	bad = { Color = Theme.Danger, Glyph = "cross" },
+	rare = { Color = Theme.Violet, Glyph = "diamond" },
+} :: { [string]: { Color: Color3, Glyph: string } }
 
 local SHIMMER_KINDS = {
 	rare = true,
@@ -59,7 +59,8 @@ type Toast = {
 	frame: Frame,
 	scale: UIScale,
 	grad: UIGradient,
-	icon: TextLabel,
+	badge: Frame,
+	glyphs: { [string]: Frame },
 	label: TextLabel,
 	stroke: UIStroke,
 	text: string,
@@ -81,39 +82,65 @@ local function makeToast(): Toast
 		Size = UDim2.fromOffset(TOAST_W, TOAST_H),
 		AnchorPoint = Vector2.new(0.5, 0),
 		Position = UDim2.fromScale(0.5, 0),
-		BackgroundColor3 = WHITE,
+		Rotation = -2,
+		BackgroundTransparency = 1,
 		Visible = false,
 		Parent = toastStack,
 	}) :: Frame
-	UIKit.round(frame)
-	local stroke = UIKit.stroke(frame, 3, Theme.Stroke)
-	local grad = UIKit.gradient(frame, WHITE, WHITE)
 	local scale = UIKit.new("UIScale", { Scale = 1, Parent = frame }) :: UIScale
-	local icon = UIKit.label({
-		Name = "Icon",
-		Text = "",
-		Size = UDim2.fromOffset(TOAST_H - 12, TOAST_H - 12),
-		Position = UDim2.new(0, 10, 0.5, 0),
-		AnchorPoint = Vector2.new(0, 0.5),
-		MaxTextSize = 30,
-		NoStroke = true,
+	local shadow = UIKit.new("Frame", {
+		Name = "Shadow",
+		Size = UDim2.new(1, -10, 1, 0),
+		Position = UDim2.fromOffset(10, 4),
+		BackgroundColor3 = Theme.Ink,
+		BackgroundTransparency = 0.35,
 		Parent = frame,
 	})
+	UIKit.corner(shadow, Theme.CornerSmall)
+	-- лента Ink: полоса акцента слева (градиентом — повторяет скругление)
+	local ribbon = UIKit.new("Frame", {
+		Name = "Ribbon",
+		Size = UDim2.new(1, -10, 1, 0),
+		Position = UDim2.fromOffset(10, 0),
+		BackgroundColor3 = WHITE,
+		Parent = frame,
+	}) :: Frame
+	UIKit.corner(ribbon, Theme.CornerSmall)
+	local stroke = UIKit.stroke(ribbon, 2.5, Theme.Ink)
+	local grad = UIKit.new("UIGradient", { Rotation = 0, Parent = ribbon }) :: UIGradient
+	local badge = UIKit.iconBadge(frame, "", Theme.Spark, TOAST_H - 12, {
+		Name = "Icon",
+		AnchorPoint = Vector2.new(0, 0.5),
+		Position = UDim2.new(0, 0, 0.5, 0),
+		ZIndex = 2,
+	})
+	local glyphs: { [string]: Frame } = {}
+	for kind, def in KINDS do
+		glyphs[kind] = UIKit.glyph(badge, def.Glyph, {
+			Name = "Glyph_" .. kind,
+			Size = UDim2.fromScale(0.6, 0.6),
+			Stroke = 2,
+			ZIndex = 2,
+			Visible = false,
+		})
+	end
 	local label = UIKit.label({
 		Name = "Text",
 		Text = "",
-		Size = UDim2.new(1, -(TOAST_H + 18), 1, -10),
-		Position = UDim2.new(0, TOAST_H + 2, 0.5, 0),
+		Size = UDim2.new(1, -(TOAST_H + 22), 1, -12),
+		Position = UDim2.new(0, TOAST_H + 4, 0.5, 0),
 		AnchorPoint = Vector2.new(0, 0.5),
 		TextXAlignment = Enum.TextXAlignment.Left,
-		MaxTextSize = 26,
+		MaxTextSize = 22,
+		ZIndex = 2,
 		Parent = frame,
 	})
 	return {
 		frame = frame,
 		scale = scale,
 		grad = grad,
-		icon = icon,
+		badge = badge,
+		glyphs = glyphs,
 		label = label,
 		stroke = stroke,
 		text = "",
@@ -161,9 +188,19 @@ local function showToast(text: string, kind: string)
 	t.text = text
 	t.expires = os.clock() + TOAST_LIFE
 	t.label.Text = text
-	t.icon.Text = def.Icon
-	t.grad.Color = ColorSequence.new(def.Color:Lerp(WHITE, 0.25), def.Color:Lerp(BLACK, 0.2))
-	t.stroke.Color = if kind == "rare" then Theme.Volt else Theme.Stroke
+	local k = if KINDS[kind] then kind else "info"
+	for gk, g in t.glyphs do
+		g.Visible = gk == k
+	end
+	UIKit.setIconBadge(t.badge, nil, def.Color)
+	local tones = UIKit.tones(def.Color)
+	t.grad.Color = UIKit.seq({
+		{ 0, tones.Base },
+		{ 0.035, tones.Base },
+		{ 0.045, Theme.Night700:Lerp(tones.Lo, 0.4) },
+		{ 1, Theme.Ink:Lerp(tones.Lo, 0.15) },
+	})
+	t.stroke.Color = if kind == "rare" then Theme.Volt else Theme.Ink
 	t.frame.Position = UDim2.new(0.5, 0, 0, 0)
 	t.frame.Visible = true
 	t.scale.Scale = 0.4
@@ -227,8 +264,10 @@ end
 ----------------------------------------------------------------------
 local bannerGui: ScreenGui
 local band: Frame
+local bandShadow: Frame
 local bandGrad: UIGradient
-local bandLines: { Frame } = {}
+local bandChevrons: { Frame } = {}
+local bannerGradText: UIGradient
 local shine: Frame
 local shineGrad: UIGradient
 local bannerContent: Frame
@@ -252,15 +291,15 @@ local function bannerColor(kind: string, color: Color3?): Color3
 	elseif kind == "mythic" or kind == "rainbow" then
 		return Theme.Rainbow
 	elseif kind == "perun" then
-		return Color3.fromRGB(90, 50, 140)
+		return Theme.VioletLo
 	elseif kind == "rare" or kind == "epic" then
-		return Theme.Purple
+		return Theme.Violet
 	elseif kind == "event" then
 		return Theme.Supercell
 	elseif kind == "city" then
 		return Theme.Volt
 	end
-	return Theme.Electric
+	return Theme.Spark
 end
 
 local function buildBanner()
@@ -272,46 +311,31 @@ local function buildBanner()
 		DisplayOrder = 31,
 		Parent = player:WaitForChild("PlayerGui"),
 	}) :: ScreenGui
-	band = UIKit.new("Frame", {
-		Name = "Band",
-		Size = UDim2.new(1, 0, 0, BANNER_H),
-		AnchorPoint = Vector2.new(0, 0.5),
-		Position = UDim2.fromScale(-1, 0.24),
-		BackgroundColor3 = WHITE,
+	-- наклонная лента шире экрана (края уходят за границы), тень снизу, полосы акцента сверху и снизу
+	bandShadow = UIKit.new("Frame", {
+		Name = "BandShadow",
+		Size = UDim2.new(1.2, 0, 0, BANNER_H),
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Position = UDim2.fromScale(-0.7, 0.24),
+		Rotation = -2,
+		BackgroundColor3 = Theme.Ink,
+		BackgroundTransparency = 0.4,
 		Visible = false,
 		Parent = bannerGui,
 	}) :: Frame
-	bandGrad = UIKit.new("UIGradient", {
-		Color = ColorSequence.new(Theme.Electric),
-		Transparency = NumberSequence.new({
-			NumberSequenceKeypoint.new(0, 1),
-			NumberSequenceKeypoint.new(0.18, 0.12),
-			NumberSequenceKeypoint.new(0.82, 0.12),
-			NumberSequenceKeypoint.new(1, 1),
-		}),
-		Parent = band,
-	}) :: UIGradient
-	for i = 1, 2 do
-		local line = UIKit.new("Frame", {
-			Name = "Line" .. i,
-			Size = UDim2.new(1, 0, 0, 4),
-			AnchorPoint = Vector2.new(0, if i == 1 then 0 else 1),
-			Position = UDim2.fromScale(0, if i == 1 then 0 else 1),
-			BackgroundColor3 = Theme.Volt,
-			ZIndex = 2,
-			Parent = band,
-		}) :: Frame
-		UIKit.new("UIGradient", {
-			Transparency = NumberSequence.new({
-				NumberSequenceKeypoint.new(0, 1),
-				NumberSequenceKeypoint.new(0.2, 0),
-				NumberSequenceKeypoint.new(0.8, 0),
-				NumberSequenceKeypoint.new(1, 1),
-			}),
-			Parent = line,
-		})
-		table.insert(bandLines, line)
-	end
+	band = UIKit.new("Frame", {
+		Name = "Band",
+		Size = UDim2.new(1.2, 0, 0, BANNER_H),
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Position = UDim2.fromScale(-0.7, 0.24),
+		Rotation = -2,
+		BackgroundColor3 = WHITE,
+		Visible = false,
+		ZIndex = 2,
+		Parent = bannerGui,
+	}) :: Frame
+	UIKit.stroke(band, 3, Theme.Ink)
+	bandGrad = UIKit.new("UIGradient", { Rotation = 90, Parent = band }) :: UIGradient
 	-- блик, пробегающий по редким баннерам
 	shine = UIKit.new("Frame", {
 		Name = "Shine",
@@ -327,7 +351,7 @@ local function buildBanner()
 		Transparency = NumberSequence.new({
 			NumberSequenceKeypoint.new(0, 1),
 			NumberSequenceKeypoint.new(0.42, 1),
-			NumberSequenceKeypoint.new(0.5, 0.55),
+			NumberSequenceKeypoint.new(0.5, 0.6),
 			NumberSequenceKeypoint.new(0.58, 1),
 			NumberSequenceKeypoint.new(1, 1),
 		}),
@@ -345,20 +369,39 @@ local function buildBanner()
 		Parent = band,
 	}) :: Frame
 	bannerScale = UIKit.autoScale(bannerContent, "hud", 1280, 720)
+	-- шевроны-«молнии» по краям надписи
+	for i, side in { -1, 1 } do
+		for j = 0, 1 do
+			local g = UIKit.glyph(bannerContent, "chevronRight", {
+				Name = "Chevron" .. i .. j,
+				Size = UDim2.fromOffset(34, 34),
+				Position = UDim2.new(0.5, side * (500 - j * 30), 0.5, 0),
+				Rotation = if side < 0 then 0 else 180,
+				Color = Theme.Volt,
+				Stroke = 2,
+				ZIndex = 5,
+			})
+			table.insert(bandChevrons, g)
+		end
+	end
 	bannerLabel = UIKit.label({
 		Name = "Text",
 		Text = "",
-		Size = UDim2.new(1, -40, 1, -20),
+		FontFace = Theme.FontDisplay,
+		Size = UDim2.new(1, -170, 1, -26),
 		Position = UDim2.fromScale(0.5, 0.5),
 		AnchorPoint = Vector2.new(0.5, 0.5),
-		MaxTextSize = 58,
-		ZIndex = 5,
+		MaxTextSize = 52,
+		NoStroke = false,
+		ZIndex = 6,
 		Parent = bannerContent,
 	})
 	local stroke = bannerLabel:FindFirstChildOfClass("UIStroke")
 	if stroke then
 		stroke.Thickness = 3.5
 	end
+	UIKit.italicPad(bannerLabel, 10)
+	bannerGradText = UIKit.gradientText(bannerLabel, Theme.Cream, Theme.Cream)
 	bannerTextScale = UIKit.new("UIScale", { Scale = 1, Parent = bannerLabel }) :: UIScale
 end
 
@@ -373,22 +416,34 @@ local function playNextBanner()
 	bannerBusy = true
 	local color = bannerColor(item.kind, item.color)
 	local shimmer = SHIMMER_KINDS[item.kind] == true
-	bandGrad.Color = ColorSequence.new({
-		ColorSequenceKeypoint.new(0, color:Lerp(BLACK, 0.55)),
-		ColorSequenceKeypoint.new(0.5, color:Lerp(BLACK, 0.15)),
-		ColorSequenceKeypoint.new(1, color:Lerp(BLACK, 0.55)),
+	local t = UIKit.tones(color)
+	local stripe = if shimmer then Theme.Volt else t.Base
+	bandGrad.Color = UIKit.seq({
+		{ 0, stripe },
+		{ 0.07, stripe },
+		{ 0.08, t.Lo:Lerp(Theme.Ink, 0.35) },
+		{ 0.5, Theme.Night800 },
+		{ 0.92, Theme.Ink },
+		{ 0.93, stripe },
+		{ 1, stripe },
 	})
-	for _, line in bandLines do
-		line.BackgroundColor3 = if shimmer then Theme.Volt else color:Lerp(WHITE, 0.4)
+	for _, g in bandChevrons do
+		UIKit.setGlyphColor(g, stripe)
 	end
+	bannerGradText.Color = ColorSequence.new(Theme.Cream, t.Hi:Lerp(Theme.Cream, 0.3))
 	bannerLabel.Text = item.text
-	band.Size = UDim2.new(1, 0, 0, math.floor(BANNER_H * baseScaleOf(bannerScale)))
+	local h = math.floor(BANNER_H * baseScaleOf(bannerScale))
+	band.Size = UDim2.new(1.2, 0, 0, h)
+	bandShadow.Size = band.Size
 	-- под верхним блоком HUD (на телефоне он занимает бóльшую долю высоты)
 	local y = if UIKit.isPhone() then 0.43 else 0.36
-	band.Position = UDim2.fromScale(-1, y)
+	band.Position = UDim2.fromScale(-0.7, y)
+	bandShadow.Position = UDim2.new(-0.7, 0, y, 8)
 	band.Visible = true
+	bandShadow.Visible = true
 	bannerTextScale.Scale = 0.6
-	UIKit.tween(band, 0.4, { Position = UDim2.fromScale(0, y) }, Enum.EasingStyle.Back)
+	UIKit.tween(band, 0.4, { Position = UDim2.fromScale(0.5, y) }, Enum.EasingStyle.Back)
+	UIKit.tween(bandShadow, 0.4, { Position = UDim2.new(0.5, 0, y, 8) }, Enum.EasingStyle.Back)
 	UIKit.tween(bannerTextScale, 0.5, { Scale = 1 }, Enum.EasingStyle.Back)
 	Sounds.play(item.sound or "Notify")
 	if shimmer then
@@ -407,9 +462,11 @@ local function playNextBanner()
 		shine.Visible = false
 	end
 	task.delay(BANNER_TIME - 0.4, function()
-		local tw = UIKit.tween(band, 0.35, { Position = UDim2.fromScale(1, y) }, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
+		UIKit.tween(bandShadow, 0.35, { Position = UDim2.new(1.7, 0, y, 8) }, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
+		local tw = UIKit.tween(band, 0.35, { Position = UDim2.fromScale(1.7, y) }, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
 		tw.Completed:Once(function()
 			band.Visible = false
+			bandShadow.Visible = false
 			local st = shimmerTween
 			if st then
 				st:Cancel()
@@ -435,36 +492,59 @@ end
 ----------------------------------------------------------------------
 local titleRoot: Frame
 local titleName: TextLabel
+local titleShadow: TextLabel
+local titleGrad: UIGradient
+local titleTag: Frame
 local titleSub: TextLabel
+local titleScale: UIScale
 local titleToken = 0
 
 local function buildTitle()
 	titleRoot = UIKit.new("Frame", {
 		Name = "ZoneTitle",
-		Size = UDim2.fromOffset(760, 116),
+		Size = UDim2.fromOffset(780, 130),
 		AnchorPoint = Vector2.new(0.5, 0.5),
 		Position = UDim2.fromScale(0.5, 0.64),
+		Rotation = -3,
 		BackgroundTransparency = 1,
 		Visible = false,
 		Parent = bannerGui,
 	}) :: Frame
 	UIKit.autoScale(titleRoot, "hud", 1280, 720)
-	titleSub = UIKit.label({
-		Name = "Sub",
-		Text = "",
-		Size = UDim2.new(1, 0, 0, 34),
-		TextColor3 = Theme.TextDim,
-		MaxTextSize = 30,
+	local word = UIKit.new("Frame", {
+		Name = "Word",
+		Size = UDim2.fromScale(1, 1),
+		BackgroundTransparency = 1,
 		Parent = titleRoot,
-	})
+	}) :: Frame
+	titleScale = UIKit.new("UIScale", { Scale = 1, Parent = word }) :: UIScale
+	-- тег «ОСТРОВ 2» и название D1-стилем: градиент акцента острова, обводка, жёсткая тень
+	titleTag, titleSub = UIKit.tag({
+		Name = "Sub",
+		Size = UDim2.fromOffset(150, 30),
+		AnchorPoint = Vector2.new(0.5, 0),
+		Position = UDim2.new(0.5, 0, 0, 0),
+		ZIndex = 3,
+		Parent = word,
+	}, "Остров 1", 19)
 	titleName = UIKit.label({
 		Name = "Name",
 		Text = "",
-		Size = UDim2.new(1, 0, 0, 78),
-		Position = UDim2.fromOffset(0, 36),
-		MaxTextSize = 70,
-		Parent = titleRoot,
+		FontFace = Theme.FontDisplay,
+		Size = UDim2.new(1, 0, 0, 90),
+		Position = UDim2.fromOffset(0, 34),
+		MaxTextSize = 72,
+		NoStroke = false,
+		ZIndex = 2,
+		Parent = word,
 	})
+	local stroke = titleName:FindFirstChildOfClass("UIStroke")
+	if stroke then
+		stroke.Thickness = 4
+	end
+	UIKit.italicPad(titleName, 16)
+	titleGrad = UIKit.gradientText(titleName, Theme.Cream, Theme.Volt)
+	titleShadow = UIKit.textShadow(titleName, 6)
 end
 
 local function fadeTitle(target: number, time: number)
@@ -475,33 +555,40 @@ local function fadeTitle(target: number, time: number)
 			UIKit.tween(stroke, time, { Transparency = target })
 		end
 	end
+	local ss = titleShadow:FindFirstChildOfClass("UIStroke")
+	if ss then
+		UIKit.tween(ss, time, { Transparency = target })
+	end
+	UIKit.tween(titleTag, time, { BackgroundTransparency = target })
+	local ts = titleTag:FindFirstChildOfClass("UIStroke")
+	if ts then
+		UIKit.tween(ts, time, { Transparency = target })
+	end
 end
 
 local function showTitle(zone: number)
-	local name = "🏙 " .. Config.Hub.Name
+	local name = Config.Hub.Name
 	local sub = "Город"
 	local color = Theme.Volt
 	if zone >= 1 and zone <= #Config.Zones then
 		local def = Config.Zones[zone]
 		name = def.Name
 		sub = "Остров " .. tostring(zone)
-		color = def.Accent:Lerp(WHITE, 0.25)
+		color = def.Accent
 	elseif zone ~= 0 then
 		return
 	end
 	titleToken += 1
 	local token = titleToken
-	titleName.Text = name
-	titleName.TextColor3 = color
-	titleSub.Text = sub
-	for _, l in { titleName, titleSub } do
-		l.TextTransparency = 1
-		local stroke = l:FindFirstChildOfClass("UIStroke")
-		if stroke then
-			stroke.Transparency = 1
-		end
-	end
+	titleName.Text = UIKit.upper(name)
+	local t = UIKit.tones(color)
+	titleGrad.Color = UIKit.seq({ { 0, Theme.Cream }, { 0.45, t.Hi }, { 1, t.Base } })
+	titleSub.Text = UIKit.upper(sub)
+	titleTag.Size = UDim2.fromOffset(math.max(120, (utf8.len(sub) or #sub) * 15 + 30), 30)
+	fadeTitle(1, 0)
 	titleRoot.Visible = true
+	titleScale.Scale = 0.7
+	UIKit.tween(titleScale, 0.35, { Scale = 1 }, Enum.EasingStyle.Back)
 	fadeTitle(0, TITLE_FADE)
 	task.delay(TITLE_TIME, function()
 		if token ~= titleToken then
@@ -522,9 +609,9 @@ local function onZoneUnlocked(zone: number)
 	if not def then
 		return
 	end
-	showBanner(string.format("🏝 Открыт остров %d: %s!", zone, def.Name), "rare", def.Accent, "LevelUp")
+	showBanner(string.format("Открыт остров %d: %s!", zone, def.Name), "rare", def.Accent, "LevelUp")
 	Juice.flash(def.Accent, 0.3)
-	showToast("Жми «🌀 Лететь» — и ты там!", "good")
+	showToast("Жми «Лететь» в окне «Острова» — и ты там!", "good")
 end
 
 ----------------------------------------------------------------------

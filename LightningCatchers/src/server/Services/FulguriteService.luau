@@ -17,6 +17,7 @@ local Workspace = game:GetService("Workspace")
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Config = require(Shared:WaitForChild("Config"))
 local Economy = require(Shared:WaitForChild("Economy"))
+local Fonts = require(Shared:WaitForChild("Fonts"))
 local Fulgurite = require(Shared:WaitForChild("Fulgurite"))
 local Models = require(Shared:WaitForChild("Models"))
 local Net = require(Shared:WaitForChild("Net"))
@@ -55,9 +56,9 @@ local LABEL_GAP = 1.6 -- табличка над верхушкой
 local LABEL_STAGGER = 1.3 -- у чётных пьедесталов табличка выше, чтобы соседние не налезали
 local LABEL_SIZE = UDim2.fromScale(4, 1.5) -- в стадах
 local LABEL_DISTANCE = 40
-local LABEL_FONT = Font.fromEnum(Enum.Font.BuilderSansExtraBold)
-local LABEL_STROKE = Color3.fromRGB(10, 12, 26)
-local DIM_TEXT = Color3.fromRGB(176, 186, 220)
+local LABEL_FONT = Fonts.BodyHeavy -- Nunito ExtraBold: ник и редкость (кириллица), docs/STYLE.md §8.3.8
+local LABEL_STROKE = Color3.fromRGB(18, 14, 40)
+local DIM_TEXT = Color3.fromRGB(170, 174, 220)
 
 local notifyRemote: RemoteEvent? = nil
 local bannerRemote: RemoteEvent? = nil
@@ -166,9 +167,12 @@ local function newLabel(parent: Instance, name: string, text: string, color: Col
 	l.Text = text
 	l.TextColor3 = color
 	l.TextScaled = true
-	l.TextStrokeColor3 = LABEL_STROKE
-	l.TextStrokeTransparency = 0.15
 	l.Parent = parent
+	local stroke = Instance.new("UIStroke")
+	stroke.Color = LABEL_STROKE
+	stroke.Thickness = 2
+	stroke.LineJoinMode = Enum.LineJoinMode.Round
+	stroke.Parent = l
 	return l
 end
 
@@ -239,7 +243,7 @@ local function buildDisplay(ped: Pedestal, player: Player, f: FulgRecord?)
 	gui.MaxDistance = LABEL_DISTANCE
 	gui.ResetOnSpawn = false
 	gui.Parent = anchor
-	newLabel(gui, "PlayerName", player.DisplayName, Color3.new(1, 1, 1), 0, 0.55)
+	newLabel(gui, "PlayerName", player.DisplayName, Color3.fromRGB(255, 248, 232), 0, 0.55)
 	newLabel(gui, "Info", line2, line2Color, 0.55, 0.45)
 
 	holder.Parent = folder

@@ -17,6 +17,7 @@ local Net = require(Shared:WaitForChild("Net"))
 local Format = require(Shared:WaitForChild("Format"))
 local Zones = require(Shared:WaitForChild("Zones"))
 local Signal = require(Shared:WaitForChild("Signal"))
+local Models = require(Shared:WaitForChild("Models"))
 
 local ClientState = require(script.Parent.Parent.ClientState)
 local Sounds = require(script.Parent.Sounds)
@@ -97,7 +98,12 @@ local ARROW_TOUCH_BOTTOM = 0.3 -- на телефоне нижние 30% экр�
 local HIDDEN = CFrame.new(0, 1e4, 0)
 
 local WHITE = Color3.new(1, 1, 1)
-local CLOUD_DARK = Color3.fromRGB(38, 40, 58)
+local CLOUD_DARK = Color3.fromRGB(52, 53, 78) -- ядро тучи, если у острова нет своего цвета
+local CLOUD_DEEP = Color3.fromRGB(30, 26, 52) -- к нему тянем «брюхо» острова, получая ядро (STYLE §3.2)
+local CLOUD_LIGHT = Color3.fromRGB(170, 176, 230) -- а к нему — кромку
+local CLOUD_DROP = 2.6 -- низ тучи ниже cloudY: молния и «ниточка» выходят из кристалла под брюхом
+local CLOUD_CORE_STEP = 0.2 -- размер кристалла-ядра меняем ступенями (реже меняется Size)
+local ICON_ALPHA_STEP = 0.04 -- прозрачность значка цвета обновляем, только когда она заметно изменилась
 local BLACK_FILL = Color3.fromRGB(70, 30, 110)
 local BLACK_LINE = Color3.fromRGB(255, 200, 70)
 local BLACK_CORE = Color3.fromRGB(24, 10, 34)
@@ -132,6 +138,16 @@ type LightSlot = {
 	peak: number,
 }
 
+-- Значок цвета молнии, нарисованный примитивами UI (● ★ ✦ ✺ ☯ нет в шрифтах игры, STYLE §8.5)
+type IconGlyph = {
+	holder: Frame,
+	items: { GuiObject }, -- всё, что гасим при появлении/исчезновении кольца
+	base: { number }, -- их исходная прозрачность
+	strokes: { UIStroke },
+	labels: { TextLabel },
+	fills: { GuiObject }, -- слой заливки (перекраска радужной)
+}
+
 type RingVisual = {
 	disk: Part,
 	carrier: Part,
@@ -139,13 +155,21 @@ type RingVisual = {
 	edgeStroke: UIStroke,
 	edgeFill: Frame,
 	iconGui: BillboardGui,
-	icon: TextLabel,
+	glyphs: { [string]: IconGlyph }, -- по виду значка, строятся по требованию и остаются в пуле
+	glyph: IconGlyph?,
+	glyphAlpha: number,
 	count: TextLabel,
 	hintGui: BillboardGui,
 	hint: TextLabel,
 	segs: { Part },
-	cloud: { Part },
+	cloud: { Part }, -- тучка удара (Models.strikeCloudRecipe), без кристалла-ядра
+	cloudOffsets: { CFrame },
+	cloudTones: { string },
+	cloudColor: Color3,
+	cloudT: number,
 	core: Part,
+	coreOffset: CFrame,
+	coreSize: number,
 	leader: { Part },
 	leaderJit: { Vector3 },
 	leaderLen: { number },
@@ -167,6 +191,10 @@ type Ring = {
 	groundY: number,
 	normal: Vector3,
 	cloudY: number,
+	cloudYaw: number,
+	cloudCore: Color3, -- цвета тучи острова: ядро (низ), брюхо, кромка
+	cloudBelly: Color3,
+	cloudEdge: Color3,
 	spawn: number,
 	hits: { number },
 	finalColor: Config.ColorId,
@@ -205,7 +233,7 @@ type Bolt = {
 
 type Shockwave = { part: Part, t0: number, from: number, to: number, cf: CFrame }
 
-type ShardVis = { parts: { Part }, offsets: { CFrame }, sizes: { Vector3 }, transp: { number } }
+type ShardVis = { parts: { BasePart }, offsets: { CFrame }, sizes: { Vector3 }, transp: { number } }
 
 type Shard = {
 	id: number,
@@ -255,6 +283,26 @@ local function newPart(shape: Enum.PartType, material: Enum.Material): Part
 	p.Locked = true
 	p.TopSurface = Enum.SurfaceType.Smooth
 	p.BottomSurface = Enum.SurfaceType.Smooth
+	p.Transparency = 1
+	p.Size = Vector3.one
+	p.CFrame = HIDDEN
+	p.Parent = fxFolder
+	return p
+end
+
+-- Деталь по рецепту из Models (Block или CornerWedge), с теми же настройками, что newPart
+local function newRecipePart(kind: string, material: Enum.Material): BasePart
+	if kind ~= "CornerWedge" then
+		return newPart(Enum.PartType.Block, material)
+	end
+	local p = Instance.new("CornerWedgePart")
+	p.Material = material
+	p.Anchored = true
+	p.CanCollide = false
+	p.CanQuery = false
+	p.CanTouch = false
+	p.CastShadow = false
+	p.Locked = true
 	p.Transparency = 1
 	p.Size = Vector3.one
 	p.CFrame = HIDDEN
@@ -750,11 +798,66 @@ end
 ----------------------------------------------------------------------
 -- Кольца: визуальные комплекты из пула
 ----------------------------------------------------------------------
-local PUFFS = {
-	{ off = Vector3.new(0, 0, 0), size = 10 },
-	{ off = Vector3.new(4.2, -0.9, 1.6), size = 7.5 },
-	{ off = Vector3.new(-3.8, -0.6, -1.9), size = 8 },
-}
+-- Тучка удара — угловатая «гроза» без шаров (STYLE §6.3): плита-шестиугольник, два наклонных клуба
+-- и неоновый кристалл-ядро под брюхом. Рецепт общий с листом превью (Models.strikeCloudRecipe).
+local CLOUD_RECIPE = Models.strikeCloudRecipe()
+
+-- Вид значка цвета: ◆ и ▲ есть в Montserrat, остальные — нарисованные примитивы (UIKit.glyph)
+local function iconKind(colorId: string): string
+	return UIKit.colorGlyphKind(colorId)
+end
+
+-- Построить значок вида kind в BillboardGui кольца и запомнить, что в нём гасить и перекрашивать
+local function buildIconGlyph(parent: Instance, kind: string, color: Color3): IconGlyph
+	local isPerun = kind == "perun"
+	local holder = UIKit.glyph(parent, kind, {
+		Name = "Glyph_" .. kind,
+		Color = if isPerun then BLACK_CORE else color,
+		StrokeColor = if isPerun then BLACK_LINE else Theme.Ink,
+		Stroke = 3,
+		Size = UDim2.fromScale(0.74, 0.74),
+		Visible = false,
+	})
+	local g: IconGlyph = { holder = holder, items = {}, base = {}, strokes = {}, labels = {}, fills = {} }
+	for _, d in holder:GetDescendants() do
+		if d:IsA("Frame") then
+			table.insert(g.items, d)
+			table.insert(g.base, d.BackgroundTransparency)
+			if string.sub(d.Name, 1, 1) == "F" and not isPerun then
+				table.insert(g.fills, d)
+			end
+		elseif d:IsA("TextLabel") then
+			table.insert(g.labels, d)
+		elseif d:IsA("UIStroke") then
+			table.insert(g.strokes, d)
+		end
+	end
+	return g
+end
+
+-- Прозрачность значка: a = 1 — виден полностью, 0 — спрятан
+local function setIconAlpha(g: IconGlyph, a: number)
+	local t = 1 - a
+	for i, item in g.items do
+		local b = g.base[i]
+		item.BackgroundTransparency = 1 - (1 - b) * a
+	end
+	for _, s in g.strokes do
+		s.Transparency = t
+	end
+	for _, l in g.labels do
+		l.TextTransparency = t
+	end
+end
+
+local function setIconColor(g: IconGlyph, color: Color3)
+	for _, f in g.fills do
+		f.BackgroundColor3 = color
+	end
+	for _, l in g.labels do
+		l.TextColor3 = color
+	end
+end
 
 local visualPool: { RingVisual } = {}
 
@@ -806,18 +909,6 @@ local function makeVisual(): RingVisual
 	iconGui.ResetOnSpawn = false
 	iconGui.Enabled = false
 	iconGui.Parent = carrier
-	local icon = Instance.new("TextLabel")
-	icon.Name = "Glyph"
-	icon.BackgroundTransparency = 1
-	icon.Size = UDim2.fromScale(1, 1)
-	icon.TextScaled = true
-	icon.FontFace = Theme.Font
-	icon.Text = ""
-	icon.Parent = iconGui
-	local iconStroke = Instance.new("UIStroke")
-	iconStroke.Thickness = 3
-	iconStroke.Color = Theme.TextStroke
-	iconStroke.Parent = icon
 	local count = Instance.new("TextLabel")
 	count.Name = "Count"
 	count.BackgroundTransparency = 1
@@ -865,16 +956,33 @@ local function makeVisual(): RingVisual
 		segs[i] = s
 	end
 	local cloud: { Part } = {}
-	for i, puff in PUFFS do
-		local c = newPart(Enum.PartType.Ball, Enum.Material.SmoothPlastic)
-		c.Name = "Cloud"
-		c.Size = Vector3.one * puff.size
-		c.Color = CLOUD_DARK
-		cloud[i] = c
+	local cloudOffsets: { CFrame } = {}
+	local cloudTones: { string } = {}
+	local core: Part? = nil
+	local coreOffset = CFrame.identity
+	local coreSize = 1.6
+	for _, rp in CLOUD_RECIPE do
+		if rp.Tone == "glow" then
+			local c = newPart(Enum.PartType.Block, Enum.Material.Neon)
+			c.Name = "CloudCore"
+			c.Size = rp.Size
+			core = c
+			coreOffset = rp.CFrame
+			coreSize = rp.Size.X
+		else
+			local c = newPart(Enum.PartType.Block, Enum.Material.SmoothPlastic)
+			c.Name = "Cloud"
+			c.Size = rp.Size
+			c.Color = CLOUD_DARK
+			table.insert(cloud, c)
+			table.insert(cloudOffsets, rp.CFrame)
+			table.insert(cloudTones, rp.Tone)
+		end
 	end
-	local core = newPart(Enum.PartType.Ball, Enum.Material.Neon)
-	core.Name = "CloudCore"
-	core.Size = Vector3.one * 3
+	if not core then
+		core = newPart(Enum.PartType.Block, Enum.Material.Neon)
+	end
+	local coreP = core :: Part
 	local leader: { Part } = {}
 	for i = 1, 3 do
 		local l = newPart(Enum.PartType.Cylinder, Enum.Material.Neon)
@@ -888,13 +996,21 @@ local function makeVisual(): RingVisual
 		edgeStroke = edgeStroke,
 		edgeFill = edgeFill,
 		iconGui = iconGui,
-		icon = icon,
+		glyphs = {},
+		glyph = nil,
+		glyphAlpha = -1,
 		count = count,
 		hintGui = hintGui,
 		hint = hint,
 		segs = segs,
 		cloud = cloud,
-		core = core,
+		cloudOffsets = cloudOffsets,
+		cloudTones = cloudTones,
+		cloudColor = CLOUD_DARK,
+		cloudT = -1,
+		core = coreP,
+		coreOffset = coreOffset,
+		coreSize = coreSize,
 		leader = leader,
 		leaderJit = { Vector3.zero, Vector3.zero, Vector3.zero },
 		leaderLen = { -1, -1, -1 },
@@ -935,6 +1051,9 @@ local function hideVisual(vis: RingVisual)
 	vis.segTransp = -1
 	vis.segsShown = false
 	vis.leaderShown = false
+	vis.glyphAlpha = -1
+	vis.coreSize = -1
+	vis.cloudT = -1
 end
 
 local function acquireVisual(): RingVisual
@@ -1006,8 +1125,25 @@ local function applyRingColor(r: Ring, clock: number)
 	vis.disk.Color = fill
 	vis.edgeStroke.Color = line
 	vis.edgeFill.BackgroundColor3 = fill
-	vis.icon.Text = def.Icon
-	vis.icon.TextColor3 = line
+	-- значок вида цвета: строится один раз на вид и остаётся в комплекте пула
+	local kind = iconKind(def.Id)
+	local g = vis.glyphs[kind]
+	if not g then
+		g = buildIconGlyph(vis.iconGui, kind, line)
+		vis.glyphs[kind] = g
+	end
+	local cur = vis.glyph
+	if cur ~= g then
+		if cur then
+			cur.holder.Visible = false
+		end
+		g.holder.Visible = true
+		vis.glyph = g
+		vis.glyphAlpha = -1
+	end
+	if def.Id ~= "black" then
+		setIconColor(g, line)
+	end
 	r.appliedColor = line
 end
 
@@ -1096,6 +1232,9 @@ local function onStrikeSpawned(msg: Net.StrikeMsg)
 		runTo = m.To
 	end
 	local vis = acquireVisual()
+	-- цвета тучи — от «брюха» туч острова (Config.Zones[i].Sky.CloudColor): ядро темнее, кромка светлее
+	local zoneDef = Config.Zones[zone]
+	local belly = if zoneDef then zoneDef.Sky.CloudColor else Config.Hub.Sky.CloudColor
 	local r: Ring = {
 		id = id,
 		kind = msg.Kind,
@@ -1105,6 +1244,10 @@ local function onStrikeSpawned(msg: Net.StrikeMsg)
 		groundY = groundY,
 		normal = normal,
 		cloudY = math.max(zoneGround, groundY) + Config.CloudHeight * CLOUD_SHARE,
+		cloudYaw = (id * 2.39996) % (2 * math.pi),
+		cloudCore = belly:Lerp(CLOUD_DEEP, 0.45),
+		cloudBelly = belly,
+		cloudEdge = belly:Lerp(CLOUD_LIGHT, 0.36),
 		spawn = math.min(msg.Spawn, hits[1] - 0.05),
 		hits = hits,
 		finalColor = msg.Color,
@@ -1147,6 +1290,11 @@ local function onStrikeSpawned(msg: Net.StrikeMsg)
 	vis.edgeFill.Size = UDim2.new(1, -2 * stroke, 1, -2 * stroke)
 	vis.edgeGui.Enabled = true
 	vis.iconGui.Enabled = true
+	for i, c in vis.cloud do
+		local tone = vis.cloudTones[i]
+		c.Color = if tone == "edge" then r.cloudEdge elseif tone == "belly" then r.cloudBelly else r.cloudCore
+	end
+	vis.cloudColor = r.cloudCore
 	applyRingColor(r, os.clock())
 	rings[id] = r
 end
@@ -1292,7 +1440,11 @@ local function updateRing(r: Ring, now: number, clock: number, dt: number): bool
 	vis.disk.Transparency = 1 - (0.45 + 0.25 * p * p * p) * vis01
 	vis.edgeStroke.Transparency = 1 - 0.92 * vis01
 	vis.edgeFill.BackgroundTransparency = 1 - 0.2 * vis01
-	vis.icon.TextTransparency = 1 - vis01
+	local glyph = vis.glyph
+	if glyph and (math.abs(vis01 - vis.glyphAlpha) >= ICON_ALPHA_STEP or (vis01 >= 1 and vis.glyphAlpha < 1) or (vis01 <= 0 and vis.glyphAlpha > 0)) then
+		vis.glyphAlpha = vis01
+		setIconAlpha(glyph, vis01)
+	end
 
 	-- сколько ударов осталось (двойной, вилка)
 	local left = 0
@@ -1371,19 +1523,36 @@ local function updateRing(r: Ring, now: number, clock: number, dt: number): bool
 		glow = math.clamp(1 - (now - last) / 0.2, 0, 1)
 	end
 	local cloudBase = Vector3.new(center.X, r.cloudY, center.Z)
-	local cloudT = 1 - (0.85 - 0.35 * glow) * vis01
-	local cloudColor = CLOUD_DARK:Lerp(line, 0.35 * glow)
-	for i, c in vis.cloud do
-		local puff = PUFFS[i]
-		local wob = Vector3.new(math.sin(clock * 0.7 + i) * 0.4, math.sin(clock * 0.9 + i * 2) * 0.3, 0)
-		queueMove(c, CFrame.new(cloudBase + puff.off + wob))
-		c.Transparency = cloudT
-		c.Color = cloudColor
+	-- тучка плотная, как потолок туч: проявляется и тает вместе с кольцом; перед ударом её ядро (низ)
+	-- наливается цветом молнии, а кристалл под брюхом растёт, крутится и светится
+	local sway = math.sin(clock * 0.6 + r.cloudYaw) * 0.06
+	local wob = Vector3.new(math.sin(clock * 0.7 + r.id) * 0.35, math.sin(clock * 0.9 + r.id * 2) * 0.25 - CLOUD_DROP, 0)
+	local cloudCF = CFrame.new(cloudBase + wob) * CFrame.Angles(0, r.cloudYaw + sway, 0)
+	local cloudT = 1 - vis01
+	local fadeCloud = math.abs(cloudT - vis.cloudT) > 0.01 or (cloudT <= 0 and vis.cloudT > 0)
+	if fadeCloud then
+		vis.cloudT = cloudT
 	end
-	local coreP = cloudBase + Vector3.new(0, -1, 0)
+	local cloudColor = r.cloudCore:Lerp(line, 0.45 * glow)
+	local recolor = cloudColor ~= vis.cloudColor
+	vis.cloudColor = cloudColor
+	for i, c in vis.cloud do
+		queueMove(c, cloudCF * vis.cloudOffsets[i])
+		if fadeCloud then
+			c.Transparency = cloudT
+		end
+		if recolor and vis.cloudTones[i] == "core" then
+			c.Color = cloudColor
+		end
+	end
+	local coreP = (cloudCF * vis.coreOffset).Position - Vector3.new(0, 0.35 * glow, 0)
 	if glow > 0.01 then
-		queueMove(vis.core, CFrame.new(coreP))
-		vis.core.Size = Vector3.one * (3 + 4 * glow)
+		local s = math.floor((1.6 + 1.6 * glow) / CLOUD_CORE_STEP + 0.5) * CLOUD_CORE_STEP
+		if s ~= vis.coreSize then
+			vis.coreSize = s
+			vis.core.Size = Vector3.new(s, s, s)
+		end
+		queueMove(vis.core, CFrame.new(coreP) * CFrame.Angles(0, clock * 2.2, 0) * vis.coreOffset.Rotation)
 		vis.core.Color = line:Lerp(WHITE, 0.3)
 		vis.core.Transparency = 1 - 0.85 * glow * vis01
 		local slot = r.light
@@ -1526,12 +1695,8 @@ end
 ----------------------------------------------------------------------
 -- Осколки на земле
 ----------------------------------------------------------------------
-local CRYSTALS = {
-	{ cf = CFrame.new(0, 0.8, 0) * CFrame.Angles(0, 0.3, 0.12), size = Vector3.new(0.55, 1.7, 0.55), neon = false },
-	{ cf = CFrame.new(0.38, 0.55, 0.12) * CFrame.Angles(0.25, 0.8, -0.55), size = Vector3.new(0.45, 1.15, 0.45), neon = false },
-	{ cf = CFrame.new(-0.32, 0.45, -0.22) * CFrame.Angles(-0.3, 0.4, 0.6), size = Vector3.new(0.4, 0.95, 0.4), neon = false },
-	{ cf = CFrame.new(0, 0.55, 0), size = Vector3.new(0.6, 0.6, 0.6), neon = true },
-}
+-- Осколок: три стеклянных шипа-уголка разной высоты и неоновая сердцевина-ромб (Models.shardRecipe)
+local CRYSTALS = Models.shardRecipe()
 
 local shardPool: { ShardVis } = {}
 local shards: { [number]: Shard } = {}
@@ -1544,15 +1709,16 @@ local shardCollectEvent: RemoteEvent? = nil
 local function makeShardVis(): ShardVis
 	local vis: ShardVis = { parts = {}, offsets = {}, sizes = {}, transp = {} }
 	for i, c in CRYSTALS do
-		local p = newPart(if c.neon then Enum.PartType.Ball else Enum.PartType.Block, if c.neon then Enum.Material.Neon else Enum.Material.Glass)
+		local neon = c.Tone == "glow"
+		local p = newRecipePart(c.Kind, if neon then Enum.Material.Neon else Enum.Material.Glass)
 		p.Name = "Shard"
-		p.Color = if c.neon then Theme.Shard else SHARD_COLOR
-		p.Reflectance = if c.neon then 0 else 0.15
-		p.Size = c.size
+		p.Color = if neon then Theme.Shard else SHARD_COLOR
+		p.Reflectance = if neon then 0 else 0.15
+		p.Size = c.Size
 		vis.parts[i] = p
-		vis.offsets[i] = c.cf
-		vis.sizes[i] = c.size
-		vis.transp[i] = if c.neon then 0.15 else 0.25
+		vis.offsets[i] = c.CFrame
+		vis.sizes[i] = c.Size
+		vis.transp[i] = if neon then 0.15 else 0.25
 	end
 	return vis
 end
@@ -1831,10 +1997,12 @@ local function makeArrow(parent: Frame): Arrow
 	local pointer = UIKit.label({
 		Name = "Pointer",
 		Text = "▲",
+		FontFace = Theme.FontDisplayFlat, -- ▲ есть только в Montserrat
 		Size = UDim2.fromOffset(40, 40),
 		AnchorPoint = Vector2.new(0.5, 0.5),
 		Position = UDim2.fromScale(0.5, 0.5),
 		MaxTextSize = 40,
+		NoStroke = false,
 		Parent = frame,
 	})
 	local dot = UIKit.label({
@@ -1844,6 +2012,7 @@ local function makeArrow(parent: Frame): Arrow
 		AnchorPoint = Vector2.new(0.5, 0.5),
 		Position = UDim2.fromScale(0.5, 0.5),
 		MaxTextSize = 30,
+		NoStroke = false,
 		Parent = frame,
 	})
 	return { frame = frame, pointer = pointer, dot = dot }
