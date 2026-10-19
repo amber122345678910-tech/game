@@ -13,6 +13,7 @@
 -- Зона постановки вокруг (0,0,0) свободна (ближе z=+20 нет ничего, кроме травы; невидимый объём пыльцы z∈[3,23]).
 
 local roblox = require("@lune/roblox")
+local lookAtFixed = require("../lib/LookAt") -- CFrame.lookAt в Lune неверен
 local Vector3 = roblox.Vector3
 local CFrame = roblox.CFrame
 local Color3 = roblox.Color3
@@ -79,7 +80,7 @@ return function(B)
 		if math.abs(dir.Y) > 0.995 then
 			cf = CFrame.new(mid) * CFrame.Angles(0, 0, math.pi / 2)
 		else
-			cf = CFrame.lookAt(mid, b) * CFrame.Angles(0, math.pi / 2, 0)
+			cf = lookAtFixed(mid, b) * CFrame.Angles(0, math.pi / 2, 0)
 		end
 		local spec = { cf = cf, size = V(len, d, d), shape = "Cylinder", color = color, material = material, parent = parent }
 		for k, v in extra or {} do

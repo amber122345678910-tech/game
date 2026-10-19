@@ -2,6 +2,7 @@
 -- Голова коня: череп, морда, ноздри, глаза, уши, хохолок, брови, рот (зубы, дёсны, губы, язык), шея.
 -- Морда проектируется «ровно» (смотрит в -Z) и затем наклоняется носом вниз на PITCH вокруг точки Q.
 local roblox = require("@lune/roblox")
+local lookAtFixed = require("../../lib/LookAt") -- CFrame.lookAt в Lune неверен
 local Vector3 = roblox.Vector3
 local CFrame = roblox.CFrame
 local V = Vector3.new
@@ -195,7 +196,7 @@ function Head.build(g, opts)
 		local side = if s == 1 then "Right" else "Left"
 		local c = V(s * 0.38, 6.21, -0.58)
 		local look = V(s * 0.5, 0.0, -1).Unit
-		local cf = CFrame.lookAt(c, c + look)
+		local cf = lookAtFixed(c, c + look)
 		g:ell("Head", cf, V(0.2, 0.16, 0.14), P.eyeWhite, "SmoothPlastic")
 		g:ell("Head", cf * CFrame.new(0, -0.01, -0.062), V(0.11, 0.11, 0.03), P.iris, "SmoothPlastic")
 		g:ell("Head", cf * CFrame.new(0, -0.01, -0.072), V(0.055, 0.07, 0.016), P.pupil, "SmoothPlastic")

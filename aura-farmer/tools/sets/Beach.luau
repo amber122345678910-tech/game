@@ -16,6 +16,7 @@
 --   * Цвет Terrain-песка задаёт скрипт BeachTerrainColors (атрибуты TerrainColor_* модели) — детали-песок подобраны под него.
 
 local roblox = require("@lune/roblox")
+local lookAtFixed = require("../lib/LookAt") -- CFrame.lookAt в Lune неверен
 local Vector3 = roblox.Vector3
 local CFrame = roblox.CFrame
 local Color3 = roblox.Color3
@@ -119,7 +120,7 @@ return function(B)
 		local len = (b - a).Magnitude
 		local dir = (b - a).Unit
 		local up = if math.abs(dir.Y) > 0.98 then V(1, 0, 0) else V(0, 1, 0)
-		local cf = CFrame.lookAt(mid, b, up) -- -Z смотрит на b
+		local cf = lookAtFixed(mid, b, up) -- -Z смотрит на b
 		local spec = { cf = cf, size = V(w, t, len), color = color, material = material or "Metal", parent = parent }
 		for k, v in extra or {} do
 			spec[k] = v

@@ -2,6 +2,7 @@
 -- Торс: пиджак (широкие лацканы), рубашка в горох с огромным воротником, мех в вырезе,
 -- кубинская цепь, ремень из крокодиловой кожи с пряжкой «A», таз в джинсах, эмиттеры.
 local roblox = require("@lune/roblox")
+local lookAtFixed = require("../../lib/LookAt") -- CFrame.lookAt в Lune неверен
 local Instance = roblox.Instance
 local CFrame = roblox.CFrame
 local Color3 = roblox.Color3
@@ -263,7 +264,7 @@ function Body.build(g, opts)
 			local z = 0.04 - 0.675 * math.cos(a)
 			local nrm = V(math.sin(a) / 1.04, 0, -math.cos(a) / 0.675).Unit
 			local y = by + (if row == 0 then 0.055 else -0.055)
-			local cf = CFrame.lookAt(V(x, y, z), V(x, y, z) + nrm)
+			local cf = lookAtFixed(V(x, y, z), V(x, y, z) + nrm)
 			local shade = if (i + row) % 3 == 0 then P.croc else P.belt:Lerp(P.croc, 0.6)
 			g:rbox("LowerTorso", cf, V(0.085, 0.07, 0.012), shade, "Leather", nil, { reflectance = 0.04 })
 		end
@@ -273,7 +274,7 @@ function Body.build(g, opts)
 		local a = math.asin(x / 1.04)
 		local z = 0.04 - 0.69 * math.cos(a)
 		local nrm = V(math.sin(a), 0, -math.cos(a)).Unit
-		g:box("LowerTorso", CFrame.lookAt(V(x, by, z), V(x, by, z) + nrm), V(0.06, 0.3, 0.025), P.jeansDark, "Fabric")
+		g:box("LowerTorso", lookAtFixed(V(x, by, z), V(x, by, z) + nrm), V(0.06, 0.3, 0.025), P.jeansDark, "Fabric")
 	end
 
 	-- ===== Пряжка «A» =====
