@@ -5,8 +5,8 @@ local Config = require(script.Parent.Parent:WaitForChild("Config"))
 -- Камера неподвижна (locked-off), фронтально по оси груди, чуть сверху (≈−8°: у нашей цепи дуга глубже, чем в клипе,
 -- взгляд сверху «уплощает» её к «улыбке» с концами под воротником), vFOV 30. Цепь — x 0.30–0.69, низ дуги y≈0.36 кадра
 -- (в клипе x 0.29–0.69, y 0.08–0.37). «Грув» (наезд/отъезд 1–2.3 %) делает сам конь (tools/anims/S05.luau).
-local CAM = Config.at("Beach", 0, 4.44, -2.35)
-local LOOK = Config.at("Beach", 0, 4.1, 0)
+local CAM = Config.at("Beach", 7, 4, -11)
+local LOOK = Config.at("Beach", 0, 3.4, 0)
 local FOCUS = 1.9 -- дистанция до цепи (плоскость фокуса — цепь и внутренние края воротника)
 
 return {
@@ -21,11 +21,11 @@ return {
 	camera = {
 		-- Неподвижная камера; единственный «ход» — смаз (blur) на 1 кадр в момент «качка» цепи на 5.40.
 		keys = {
-			{ t = 4.9667, pos = CAM, look = LOOK, fov = 30, focus = FOCUS, blur = 0 },
-			{ t = 5.367, pos = CAM, look = LOOK, fov = 30, focus = FOCUS, blur = 0 },
-			{ t = 5.4, pos = CAM, look = LOOK, fov = 30, focus = FOCUS, blur = 1.5 },
-			{ t = 5.45, pos = CAM, look = LOOK, fov = 30, focus = FOCUS, blur = 0 },
-			{ t = 5.9, pos = CAM, look = LOOK, fov = 30, focus = FOCUS, blur = 0 },
+			{ t = 4.9667, pos = CAM, look = LOOK, fov = 40, focus = FOCUS, blur = 0 },
+			{ t = 5.367, pos = CAM, look = LOOK, fov = 40, focus = FOCUS, blur = 0 },
+			{ t = 5.4, pos = CAM, look = LOOK, fov = 40, focus = FOCUS, blur = 1.5 },
+			{ t = 5.45, pos = CAM, look = LOOK, fov = 40, focus = FOCUS, blur = 0 },
+			{ t = 5.9, pos = CAM, look = LOOK, fov = 40, focus = FOCUS, blur = 0 },
 		},
 	},
 	-- Низкий ключ, как в клипе (средняя яркость кадра ≈54/255): тёплое солнце сбоку-сверху слева по кадру
