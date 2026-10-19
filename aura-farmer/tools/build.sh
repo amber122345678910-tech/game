@@ -9,4 +9,5 @@ tools/analyze.sh
 $T/rojo build default.project.json -o build/base.rbxl
 $T/lune run tools/build.luau build/base.rbxl AuraFarmer.rbxl
 $T/lune run tools/verify.luau AuraFarmer.rbxl
+$T/lune run tools/tests/runtime_sim.luau AuraFarmer.rbxl
 echo "Built AuraFarmer.rbxl"
