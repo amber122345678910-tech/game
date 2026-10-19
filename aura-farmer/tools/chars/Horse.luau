@@ -6,6 +6,7 @@
 --   sparkles = true                                     — включить золотые искры ауры (эмиттер AuraSparkles)
 -- Всегда есть (выключены): эмиттеры ChainSparkles (цепь), BuckleGlint (вершина «A»), AuraSparkles (тело),
 -- деталь BuckleFlare (белый Neon, Transparency 1) у вершины «A» — для твинов.
+-- Доп. сустав LowerLip (на Jaw): нижняя губа; канал grin опускает её вместе с подъёмом верхней.
 local roblox = require("@lune/roblox")
 local V = roblox.Vector3.new
 
@@ -22,6 +23,10 @@ return function(opts)
 	local rig = Skel.new("Horse")
 	local g = Geo.new(rig)
 	Head.build(g, opts)
+	-- нижняя губа участвует в улыбке
+	local grin = table.clone(rig.face.grin)
+	table.insert(grin, { joint = "LowerLip", pos = Head.LOWER_LIP_GRIN.pos, rot = Head.LOWER_LIP_GRIN.rot })
+	rig.face.grin = grin
 	Glasses.build(g, opts)
 	Body.build(g, opts)
 	Limbs.build(g, opts)

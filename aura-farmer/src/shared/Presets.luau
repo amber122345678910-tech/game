@@ -83,7 +83,7 @@ Presets.Gym = {
 		ColorShift_Bottom = Color3.fromRGB(0, 0, 0),
 	},
 	atmosphere = { Density = 0, Offset = 0, Color = Color3.fromRGB(0, 0, 0), Decay = Color3.fromRGB(0, 0, 0), Glare = 0, Haze = 0 },
-	bloom = { Intensity = 1.1, Size = 36, Threshold = 0.95 },
+	bloom = { Intensity = 1.1, Size = 36, Threshold = 0.85 },
 	sunRays = { Intensity = 0, Spread = 0 },
 	cc = { Brightness = 0.02, Contrast = 0.16, Saturation = 0.12, TintColor = Color3.fromRGB(250, 240, 255) },
 	dof = { Enabled = true, FarIntensity = 0.3, NearIntensity = 0, InFocusRadius = 9, FocusDistance = 10 },

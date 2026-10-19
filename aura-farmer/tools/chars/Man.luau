@@ -18,7 +18,7 @@ return function(opts)
 		brows = rgb(40, 28, 22),
 		browThick = 1.25,
 		hairStyle = "quiff",
-		beard = rgb(122, 88, 74),
+		beard = rgb(84, 56, 44),
 		top = rgb(244, 243, 239),
 		topStyle = "tank",
 		scoop = 0.55,

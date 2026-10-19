@@ -36,14 +36,14 @@ S.PROPORTIONS = {
 -- Дополнительные суставы головы (опора в char space покоя). Имена — часть контракта с аниматорами.
 -- Голова: шея поднимается от Neck (y=4.95) вверх-вперёд, череп ~y 6.0, морда вытянута вперёд до z≈-1.5.
 S.EXTRA = {
-	Jaw = { parent = "Head", pivot = { 0, 5.789, -0.061 } }, -- нижняя челюсть, открывается вниз (вращение по X)
-	RightEar = { parent = "Head", pivot = { 0.4, 6.723, 0.004 } },
-	LeftEar = { parent = "Head", pivot = { -0.4, 6.723, 0.004 } },
-	Glasses = { parent = "Head", pivot = { 0, 6.096, -0.732 } },
-	RightBrow = { parent = "Head", pivot = { 0.3, 6.354, -0.702 } },
-	LeftBrow = { parent = "Head", pivot = { -0.3, 6.354, -0.702 } },
-	UpperLip = { parent = "Head", pivot = { 0, 5.747, -0.86 } }, -- верхняя губа (оскал/улыбка: подъём)
-	Mane = { parent = "Head", pivot = { 0, 6.772, -0.114 } }, -- хохолок между ушами
+	Jaw = { parent = "Head", pivot = { 0, 5.75, -0.2 } }, -- нижняя челюсть (височно-челюстной сустав), открывается вниз (вращение по X)
+	RightEar = { parent = "Head", pivot = { 0.36, 7.0, 0.04 } },
+	LeftEar = { parent = "Head", pivot = { -0.36, 7.0, 0.04 } },
+	Glasses = { parent = "Head", pivot = { 0, 6.42, -0.88 } }, -- центр очков (перемычка на переносице)
+	RightBrow = { parent = "Head", pivot = { 0.34, 6.72, -0.66 } },
+	LeftBrow = { parent = "Head", pivot = { -0.34, 6.72, -0.66 } },
+	UpperLip = { parent = "Head", pivot = { 0, 5.64, -1.04 } }, -- верхняя губа под ноздрями (оскал/улыбка: подъём)
+	Mane = { parent = "Head", pivot = { 0, 7.12, -0.1 } }, -- кок-помпадур между ушами
 }
 
 function S.new(name)

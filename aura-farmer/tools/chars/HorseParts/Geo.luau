@@ -320,4 +320,26 @@ function Geo.inset(pts, e)
 	return out
 end
 
+-- Звено цепи (скруглённый прямоугольник из 4 цилиндров — настоящие детали, видно Material).
+-- cf — центр звена: X — длинная ось, Y — ширина, Z — нормаль. L×W — габарит, t — толщина проволоки.
+function Geo:link(bone, cf, L, W, t, color, mat, extra)
+	local a, b = (L - t) / 2, (W - t) / 2
+	local parts = {}
+	for _, sy in { 1, -1 } do
+		local p = self:put(bone, merge({ cf = cf * CFrame.new(0, sy * b, 0), size = V(L - t * 0.2, t, t), color = color, material = mat, shape = "Cylinder" }, extra))
+		table.insert(parts, p)
+	end
+	for _, sx in { 1, -1 } do
+		local p = self:put(bone, merge({ cf = cf * CFrame.new(sx * a, 0, 0) * CFrame.Angles(0, 0, math.pi / 2), size = V(W - t * 0.2, t * 0.98, t * 0.98), color = color, material = mat, shape = "Cylinder" }, extra))
+		table.insert(parts, p)
+	end
+	return parts
+end
+
+-- Плоский четырёхугольник по 4 точкам (2 треугольника-клина).
+function Geo:quad(bone, a, b, c, d, thick, color, mat, extra)
+	self:tri3(bone, a, b, c, thick, color, mat, extra)
+	self:tri3(bone, a, c, d, thick, color, mat, extra)
+end
+
 return Geo

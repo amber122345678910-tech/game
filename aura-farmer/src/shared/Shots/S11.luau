@@ -10,16 +10,16 @@ local START, FINISH = 13.1333, 15.6333
 -- az > 0 — камера уходит к правому боку персонажа (+X, слева в кадре).
 local ARC = {
 	center = Vector3.new(0, 0, 0.2),
-	az0 = -5,
-	az1 = 30,
-	r0 = 8.3,
-	r1 = 7.7,
-	h0 = 1.8,
-	h1 = 2.0,
-	look0 = Vector3.new(-0.48, 4.07, 0),
-	look1 = Vector3.new(-1.07, 3.93, 0.4),
-	roll0 = -6,
-	roll1 = 20,
+	az0 = -6,
+	az1 = 26,
+	r0 = 7.6,
+	r1 = 7.44,
+	h0 = 1.68,
+	h1 = 1.81,
+	look0 = Vector3.new(0.04, 3.67, -1.74),
+	look1 = Vector3.new(-1.25, 4.45, 0.22),
+	roll0 = -11,
+	roll1 = 17.1,
 	fov = 55,
 }
 
@@ -52,6 +52,14 @@ return {
 	finish = FINISH,
 	set = "Throne",
 	preset = "Throne",
+	-- Клип: жёсткий тёплый верхний прожектор, всё вокруг — чистый чёрный; насыщенный фиолетовый пиджак и красный
+	-- бархат, сильный ореол (bloom) на золоте; глубокая резкость (всё от колена до гребня резкое).
+	lighting = {
+		lighting = { Ambient = Color3.fromRGB(20, 15, 28), ExposureCompensation = 0.25 },
+		bloom = { Intensity = 1.5, Size = 44, Threshold = 0.85 },
+		cc = { Brightness = 0.01, Contrast = 0.22, Saturation = 0.2, TintColor = Color3.fromRGB(255, 244, 236) },
+		dof = { FarIntensity = 0.08, NearIntensity = 0, InFocusRadius = 10 },
+	},
 	actors = {
 		Horse = { char = "Horse", place = Config.place("Throne", 0, 0, 0), opts = { sparkles = true } },
 	},
@@ -59,5 +67,12 @@ return {
 		keys = camKeys(),
 		focus = { actor = "Horse", part = "Head" },
 	},
-	effects = {},
+	effects = {
+		-- искры на золотой цепи и бляхе «A» весь план (аура включена opts.sparkles)
+		{ t = START, kind = "enable", name = "ChainSparkles", on = true },
+		{ t = START, kind = "enable", name = "BuckleGlint", on = true },
+		-- доля 13.334: кулаки вверх — вспышка золотых искр у трона; пик хохота 13.50 — всплеск ауры
+		{ t = 13.334, kind = "emit", name = "ThroneSparkles", count = 14 },
+		{ t = 13.5, kind = "emit", name = "AuraSparkles", count = 18 },
+	},
 }
