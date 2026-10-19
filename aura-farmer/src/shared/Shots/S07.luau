@@ -6,6 +6,7 @@ local Config = require(script.Parent.Parent:WaitForChild("Config"))
 -- камера стоит в −Z и смотрит в +Z сцены — на город, повернув на YAW° к +X мира, чтобы высотки
 -- (x < 0) оказались справа в кадре, а слева — пустой пляж до горизонта.
 local YAW = 15
+local FOV = 80
 local STAGE = Config.place("Beach", 0, 0, YAW)
 local function W(x: number, y: number, z: number): Vector3
 	return (STAGE * CFrame.new(x, y, z)).Position
@@ -17,7 +18,7 @@ local function camKey(t: number, p: { number }, yaw: number, pitch: number, ease
 	local dir = Vector3.new(math.sin(y) * math.cos(pt), math.sin(pt), math.cos(y) * math.cos(pt))
 	local pos = W(p[1], p[2], p[3])
 	local look = (STAGE * CFrame.new(Vector3.new(p[1], p[2], p[3]) + dir * 3)).Position
-	return { t = t, pos = pos, look = look, fov = 72, roll = -13, ease = ease }
+	return { t = t, pos = pos, look = look, fov = FOV, roll = -13, ease = ease }
 end
 
 return {
