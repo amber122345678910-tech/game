@@ -9,7 +9,8 @@
 -- Имена для эффектов планов (shot.effects):
 --   ParticleEmitter: "ThroneSparkles" (золотые искры), "Dust" (пылинки), "ThroneGlints" / "ThroneGlintsL" / "ThroneGlintsR" (блики на золоте)
 --   SpotLight "KeyLight" (+ мягкий ореол "KeySoft") в детали "SpotLamp"; слабые "FillFrontLight", "RimBackLight"
---   Beam "LightShaftBack1..N" (конус за троном), "LightShaftFront1..N" (дымка перед сценой)
+--   Beam "LightShaftBack01..24" (конус за троном), "LightShaftFront06..24" (дымка перед сценой) — в детали "ShaftTop"
+--   Атрибуты модели: SeatTopY=2.2, DaisTopY=0.8
 
 local roblox = require("@lune/roblox")
 local Instance = roblox.Instance
@@ -865,16 +866,16 @@ return function(B)
 	end
 	local TOP_P = LAMP + (TARGET - LAMP).Unit * 0.9
 	local BACK_P = V(0, 0.02, 6.6)
-	local FRONT_P = V(0, 0.02, -5.6)
+	local FRONT_P = V(0, 0.02, -4.65)
 	local top = anchor("ShaftTop", TOP_P)
 	local backEnd = anchor("ShaftBackEnd", BACK_P)
 	local frontEnd = anchor("ShaftFrontEnd", FRONT_P)
 	local coneTan = math.tan(rad(8.5))
 	local Lb = (BACK_P - TOP_P).Magnitude
 	local Lf = (FRONT_P - TOP_P).Magnitude
-	-- Ленты стоят не на оси конуса: из камеры плана (0,4,−14) задняя кажется меньше, передняя — больше.
-	-- Поправка ширины у пола, чтобы обе проецировались на настоящий силуэт конуса.
-	local CAM_Z = -14
+	-- Ленты стоят не на оси конуса: из камеры плана S11 (≈9 студов перед троном, облёт ±30°) задняя
+	-- кажется меньше, передняя — больше. Поправка ширины, чтобы обе проецировались на силуэт конуса.
+	local CAM_Z = -9
 	local axisZ0 = LAMP.Z + (TARGET.Z - LAMP.Z) * (LAMP.Y / (LAMP.Y - TARGET.Y)) -- ось конуса на высоте пола
 	local kBack = (BACK_P.Z - CAM_Z) / (axisZ0 - CAM_Z)
 	local kFront = (FRONT_P.Z - CAM_Z) / (axisZ0 - CAM_Z)
@@ -886,16 +887,16 @@ return function(B)
 		local e = math.clamp((r - 0.55) / (1.12 - 0.55), 0, 1)
 		return (1 - e * e * (3 - 2 * e)) * (0.8 + 0.2 * (1 - math.min(1, r * r)))
 	end
-	local N = 14
+	local N = 24
 	local prev = profile(0)
 	for i = 1, N do
 		local f = 0.1 + (1.12 - 0.1) * (i - 1) / (N - 1)
 		local p = profile(f)
 		local a = prev - p
 		prev = p
-		beam(string.format("LightShaftBack%02d", i), top, backEnd, 0.35 + f * 0.5, 2 * Lc * coneTan * f * kBack, math.min(1, a * 0.45), warm)
+		beam(string.format("LightShaftBack%02d", i), top, backEnd, 0.35 + f * 0.5, 2 * Lc * coneTan * f * kBack, math.min(1, a * 0.8), warm)
 		if f > 0.3 then
-			beam(string.format("LightShaftFront%02d", i), top, frontEnd, 0.35 + f * 0.5, 2 * Lc * coneTan * f * kFront, math.min(1, a * 0.18), warm)
+			beam(string.format("LightShaftFront%02d", i), top, frontEnd, 0.35 + f * 0.5, 2 * Lc * coneTan * f * kFront, math.min(1, a * 0.24), warm)
 		end
 	end
 
@@ -963,7 +964,7 @@ return function(B)
 		Speed = NumberRange.new(0, 0),
 		Rotation = NumberRange.new(-15, 15),
 		RotSpeed = NumberRange.new(-30, 30),
-		Size = ns({ { 0, 0 }, { 0.4, 0.75, 0.2 }, { 1, 0 } }),
+		Size = ns({ { 0, 0 }, { 0.4, 0.55, 0.15 }, { 1, 0 } }),
 		Transparency = ns({ { 0, 0.3 }, { 0.5, 0 }, { 1, 1 } }),
 		Color = ColorSequence.new(rgb(255, 236, 190)),
 		LightEmission = 1,

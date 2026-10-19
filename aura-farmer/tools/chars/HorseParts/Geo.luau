@@ -133,7 +133,7 @@ function Geo:tube(bone, pts, d, color, mat, extra, caps)
 end
 
 -- Цепочка капсул (эллипсоиды по отрезкам с перекрытием концов) — гладкий жгут вдвое дешевле tube.
-function Geo:caps(bone, pts, d, color, mat, extra, up)
+function Geo:caps(bone, pts, d, color, mat, extra, up, overlap)
 	local function dia(i)
 		return if type(d) == "function" then d(i) else d
 	end
@@ -144,7 +144,7 @@ function Geo:caps(bone, pts, d, color, mat, extra, up)
 		if l > 1e-4 then
 			local u = dir / l
 			local di = (dia(i) + dia(i + 1)) / 2
-			local ext = di * 0.42
+			local ext = di * (overlap or 0.42)
 			self:ellSeg(bone, a - u * ext, b + u * ext, di, di, color, mat, up, extra)
 		end
 	end

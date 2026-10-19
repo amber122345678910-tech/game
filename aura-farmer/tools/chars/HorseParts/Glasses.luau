@@ -13,10 +13,10 @@ local Head = require("./Head")
 local Glasses = {}
 
 -- Геометрия линзы (правая; u — наружу, v — вверх) относительно центра оправы.
-local LENS_C = { 0.012, -0.022 } -- центр эллипса
-local LENS_A, LENS_B = 0.238, 0.188 -- полуоси
+local LENS_C = { 0.014, -0.026 } -- центр эллипса
+local LENS_A, LENS_B = 0.3, 0.232 -- полуоси
 local LENS_ROT = -17 -- наклон большой оси (наружу-вниз): каплевидный силуэт
-local BAR_V = 0.152 -- высота брау-планки (верх линзы)
+local BAR_V = 0.186 -- высота брау-планки (верх линзы)
 
 local function lensPt(t)
 	-- точка эллипса по углу t (градусы) в координатах оправы (правая линза)
@@ -34,7 +34,7 @@ function Glasses.build(g, opts)
 	local frames = {}
 	for _, s in { 1, -1 } do
 		-- плоскость оправы: разворот наружу (обтекание лица) и лёгкий наклон
-		local frame = CFrame.new(V(s * 0.3, cy, cz)) * CFrame.Angles(0, rad(-s * 14), 0) * CFrame.Angles(rad(-6), 0, 0)
+		local frame = CFrame.new(V(s * 0.38, cy, cz)) * CFrame.Angles(0, rad(-s * 16), 0) * CFrame.Angles(rad(-6), 0, 0)
 		frames[s] = frame
 		-- линза: один эллипсоид (без швов), верхняя «шапка» спрятана за планкой
 		local lcf = frame * CFrame.new(s * LENS_C[1], LENS_C[2], 0) * CFrame.Angles(0, 0, rad(s * LENS_ROT))
@@ -59,21 +59,21 @@ function Glasses.build(g, opts)
 		return frames[s] * V(s * u, v, -0.004)
 	end
 	-- брау-планка: от внешнего края одной линзы до другой (прямая, двойная толщина)
-	g:caps("Glasses", { fp(1, 0.23, BAR_V - 0.004), fp(1, -0.2, BAR_V + 0.004), fp(-1, -0.2, BAR_V + 0.004), fp(-1, 0.23, BAR_V - 0.004) }, 0.038, P.frame, "Metal")
+	g:caps("Glasses", { fp(1, 0.29, BAR_V - 0.005), fp(1, -0.25, BAR_V + 0.004), fp(-1, -0.25, BAR_V + 0.004), fp(-1, 0.29, BAR_V - 0.005) }, 0.038, P.frame, "Metal")
 	-- нижний мост-дуга между линзами
-	local a, b = fp(1, -0.205, 0.06), fp(-1, -0.205, 0.06)
+	local a, b = fp(1, -0.27, 0.08), fp(-1, -0.27, 0.08)
 	local m = a:Lerp(b, 0.5) + V(0, 0.045, -0.015)
 	g:caps("Glasses", { a, m, b }, frameD * 0.9, P.frame, "Metal")
 	-- носоупоры
 	for _, s in { 1, -1 } do
-		local p = fp(s, -0.17, -0.06) + V(-s * 0.03, 0, 0.04)
+		local p = fp(s, -0.22, -0.07) + V(-s * 0.03, 0, 0.04)
 		g:ell("Glasses", p, V(0.04, 0.07, 0.03), P.frame, "Metal")
 	end
 	-- дужки: от внешнего верхнего угла назад к ушам
 	for _, s in { 1, -1 } do
-		local hinge = fp(s, 0.245, BAR_V - 0.01)
-		local mid = V(s * 0.5, 6.3, -0.5)
-		local back = V(s * 0.49, 6.31, -0.02)
+		local hinge = fp(s, 0.31, BAR_V - 0.014)
+		local mid = V(s * 0.58, 6.31, -0.48)
+		local back = V(s * 0.56, 6.32, -0.02)
 		g:box("Glasses", Geo.axisX((hinge + mid) / 2, mid - hinge), V((mid - hinge).Magnitude + 0.02, 0.032, 0.02), P.frame, "Metal")
 		g:cylSeg("Glasses", mid, back, 0.02, P.frame, "Metal")
 		g:ball("Glasses", hinge, 0.036, P.frame, "Metal")

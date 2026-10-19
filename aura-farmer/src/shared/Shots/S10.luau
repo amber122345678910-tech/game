@@ -2,7 +2,7 @@
 -- S10 (11.133–13.133 с): Спортзал с фиолетовым неоном: конь качает гантель 500 кг.
 local Config = require(script.Parent.Parent:WaitForChild("Config"))
 
-local HZ = -1.0 -- таз коня на переднем конце скамьи (сиденье z∈[-1.4,-0.18], верх Y=1.55)
+local HZ = -1.25 -- таз коня на переднем конце скамьи (сиденье z∈[-1.4,-0.18], верх Y=1.55)
 
 return {
 	id = "S10",
@@ -14,7 +14,7 @@ return {
 		Horse = { char = "Horse", place = Config.place("Gym", 0, HZ, 0), opts = { props = { "dumbbell" } } },
 		Ginger = {
 			char = "Human",
-			place = Config.place("Gym", 4.6, 0.6, 90),
+			place = Config.place("Gym", 4.1, -0.9, 90),
 			opts = {
 				female = true,
 				height = 0.98,
@@ -34,7 +34,7 @@ return {
 		},
 		Curly = {
 			char = "Human",
-			place = Config.place("Gym", -5.0, 0.8, -55),
+			place = Config.place("Gym", -4.5, -0.3, -80),
 			opts = {
 				height = 1.0,
 				build = 0.95,

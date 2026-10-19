@@ -30,7 +30,7 @@ return function(opts)
 		glasses = "aviator",
 		glassesFrame = rgb(206, 170, 96),
 		glassesLens = rgb(20, 38, 28),
-		glassesLensTransparency = 0.08,
+		glassesLensTransparency = 0,
 		build = 1.04,
 		height = 1.04,
 	}

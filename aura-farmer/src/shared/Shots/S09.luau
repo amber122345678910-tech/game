@@ -13,8 +13,8 @@ return {
 	},
 	camera = {
 		keys = {
-			{ t = 9.5333, pos = Config.at("Park", 0, 0.95, -7.2), look = Config.at("Park", 0, 2.05, 0), fov = 40 },
-			{ t = 11.1333, pos = Config.at("Park", 0, 0.95, -7.2), look = Config.at("Park", 0, 2.05, 0), fov = 41.3 },
+			{ t = 9.5333, pos = Config.at("Park", 0, 0.95, -7.6), look = Config.at("Park", 0, 1.99, 0), fov = 40 },
+			{ t = 11.1333, pos = Config.at("Park", 0, 0.95, -7.6), look = Config.at("Park", 0, 1.99, 0), fov = 41.3 },
 		},
 		focus = { actor = "Horse", part = "Head" },
 	},

@@ -42,7 +42,7 @@ return function(opts)
 		glasses = "hex",
 		glassesFrame = rgb(214, 36, 40),
 		glassesLens = rgb(228, 40, 44),
-		glassesLensTransparency = 0.35,
+		glassesLensTransparency = 0.3,
 		build = 0.94,
 		height = 0.97,
 	}

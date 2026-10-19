@@ -29,7 +29,7 @@ return function(opts)
 		if p == "dumbbell" then
 			local S = rig.P
 			local wristY = S.shoulderY - S.upperArm - S.lowerArm
-			Props.dumbbell(g, V(S.shoulderX - 0.1, wristY - S.handLen - 0.12, 0))
+			Props.dumbbell(g, V(S.shoulderX - 0.25, wristY - S.handLen + 0.03, 0))
 		end
 	end
 	return rig

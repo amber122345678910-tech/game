@@ -25,7 +25,7 @@ end
 -- Кисть щипком держит оправу у левой петли: ладонь к стеклу, пальцы вдоль верха оправы к переносице,
 -- большой палец снизу. WRIST — запястье относительно точки щипка (середина кончиков указательного и большого),
 -- посчитано по геометрии рига для PALM/FING (оси головы).
-local WRIST = { -0.094, -0.516, 0.367 }
+local WRIST = { -0.15, -0.516, 0.42 }
 local PALM = { 0.0, -0.2, -1 }
 local FING = { 0.55, 0.8, -0.15 }
 local POLE = { -0.3, -1, 0.25 }
@@ -42,8 +42,9 @@ local function grip(g, d)
 	}
 end
 
+-- Доп. суставы: очки + верхняя губа чуть опущена (рот «О» без зубов, как в клипе).
 local function glasses(g)
-	return { Glasses = { y = g.y or 0, f = g.f or 0, rx = g.rx or 0 } }
+	return { Glasses = { y = g.y or 0, f = g.f or 0, rx = g.rx or 0 }, UpperLip = { y = -0.018, f = 0.008 }, Mouth = { y = 0.036, f = -0.004 } }
 end
 
 -- Сидит на песке: таз опущен, колени согнуты, правая рука опирается о песок сбоку-сзади.
@@ -63,18 +64,18 @@ local PRESS = { index = 0.44, middle = 0.56, ring = 0.78, pinky = 0.88, thumb = 
 local G0 = { y = 0, f = 0, rx = 0 }
 local function gl(k)
 	-- k: доля пути (0..1, допускает перелёт)
-	return { y = -0.17 * k, f = 0.06 * k, rx = -14 * k }
+	return { y = -0.132 * k, f = 0.052 * k, rx = -13 * k }
 end
 
 -- Голова: поворот шеи (к его левому плечу), кивок (+ вниз), наклон к правому плечу.
-local TURN = 17
+local TURN = 22
 local function neck(nod, turn, tilt)
 	return { nod = nod, turn = TURN + (turn or 0), tilt = tilt or 5 }
 end
 
--- Лицо: «О»-рот, брови сводятся, прищур, взгляд влево (к правому краю кадра).
-local function face(jaw, frown, squint, look)
-	return { jaw = jaw, oh = 1, frown = frown, squint = squint, lookX = look or -0.45, lookY = 0.05 }
+-- Лицо: «О»-рот, брови сводятся и опускаются (knit 0..0.6), прищур, взгляд влево (к правому краю кадра).
+local function face(jaw, knit, squint, look)
+	return { jaw = jaw, oh = 1, frown = math.min(1, knit * 1.5), brows = 0, squint = squint * 0.5, lookX = look or -0.45, lookY = 0.05 }
 end
 
 return {
@@ -129,4 +130,23 @@ return {
 			face = face(0.4, 0.6, 0.25, -0.55),
 		},
 	} },
+	-- Друг: полулёжа на локтях, ноги вытянуты; только дыхание.
+	Friend = { keys = (function()
+		local function k(t, breath)
+			return {
+				t = t,
+				root = { y = -1.7, bend = -60 + breath * 0.6 },
+				waist = { bend = -2 + breath * 0.8, turn = -8 },
+				neck = { nod = 46, turn = -40, tilt = -4 },
+				rArm = { ik = { 1.45, 0.28, -0.55 }, pole = { 0.3, -1, -1 } },
+				lArm = { ik = { -1.45, 0.28, -0.5 }, pole = { -0.3, -1, -1 } },
+				rLeg = { ik = { 0.6, 0.26, 1.75 }, pole = { 0, 1, 0.4 } },
+				lLeg = { ik = { -0.55, 0.26, 1.2 }, pole = { 0, 1, 1 } },
+				rHand = "relaxed",
+				lHand = "relaxed",
+				face = { jaw = 0.05, smile = 0.15 },
+			}
+		end
+		return { k(0, 0), k(0.75, 1), k(1.5, 0) }
+	end)() },
 }

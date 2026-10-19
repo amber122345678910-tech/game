@@ -40,7 +40,7 @@ return function(opts)
 		glasses = "rect",
 		glassesFrame = rgb(220, 38, 36),
 		glassesLens = rgb(232, 46, 46),
-		glassesLensTransparency = 0.35,
+		glassesLensTransparency = 0.3,
 		build = 0.96,
 		height = 0.98,
 	}

@@ -27,42 +27,41 @@ function Limbs.build(g, opts)
 		local shoulder = V(sx, S.shoulderY, 0)
 		local elbow = V(sx, elbowY, 0.01)
 		g:tube(UA, { shoulder + V(0, -0.06, 0), elbow + V(0, 0.08, 0) }, function(i)
-			return if i == 1 then 0.6 else 0.54
+			return if i == 1 then 0.64 else 0.58
 		end, P.suit, "SmoothPlastic")
-		g:ball(UA, elbow, 0.53, P.suit, "SmoothPlastic")
-		g:tube(LA, { elbow + V(0, -0.02, 0), V(sx, wristY + 0.32, 0) }, 0.5, P.suit, "SmoothPlastic", nil, false)
+		g:ball(UA, elbow, 0.57, P.suit, "SmoothPlastic")
+		g:tube(LA, { elbow + V(0, -0.02, 0), V(sx, wristY + 0.32, 0) }, 0.54, P.suit, "SmoothPlastic", nil, false)
 		-- манжета: чёткий срез + тёмная «глубина» рукава
-		g:cylSeg(LA, V(sx, wristY + 0.4, 0), V(sx, wristY + 0.13, 0), 0.52, P.suit, "SmoothPlastic")
-		g:cylSeg(LA, V(sx, wristY + 0.14, 0), V(sx, wristY + 0.125, 0), 0.44, P.suitDark, "SmoothPlastic")
+		g:cylSeg(LA, V(sx, wristY + 0.4, 0), V(sx, wristY + 0.13, 0), 0.56, P.suit, "SmoothPlastic")
+		g:cylSeg(LA, V(sx, wristY + 0.14, 0), V(sx, wristY + 0.125, 0), 0.47, P.suitDark, "SmoothPlastic")
 		-- мех предплечья, торчащий из манжеты
 		g:ellSeg(LA, V(sx, wristY + 0.4, 0), V(sx, wristY - 0.04, 0), 0.36, 0.42, P.furHand, "Carpet", V(0, 0, -1))
 
-		-- ===== Кисть =====
-		g:ell(HD, V(sx, wristY - 0.02, 0), V(0.4, 0.4, 0.48), P.furHand, "Carpet") -- запястье (шарнир)
-		g:ell(HD, V(sx, wristY - 0.24, 0.0), V(0.36, 0.6, 0.68), P.furHand, "Carpet") -- ладонь
-		g:ell(HD, V(sx + s * 0.04, wristY - 0.26, 0.02), V(0.3, 0.52, 0.64), P.furHand, "Carpet") -- тыльная сторона
-		g:ell(HD, V(sx, baseY + 0.04, 0.0), V(0.32, 0.2, 0.68), P.furHand, "Carpet") -- ряд костяшек
-		g:ell(HD, V(sx - s * 0.05, wristY - 0.2, -0.24), V(0.24, 0.36, 0.24), P.furHand, "Carpet") -- подушка большого пальца
+		-- ===== Кисть (меховая «варежка»: пальцы толстые, сливаются) =====
+		local fur = P.furHand
+		g:ell(HD, V(sx, wristY - 0.02, 0), V(0.4, 0.42, 0.48), fur, "Carpet") -- запястье (шарнир)
+		g:ell(HD, V(sx, wristY - 0.26, 0.0), V(0.36, 0.62, 0.68), fur, "Carpet") -- ладонь
+		g:ell(HD, V(sx + s * 0.035, wristY - 0.28, 0.02), V(0.3, 0.56, 0.66), fur, "Carpet") -- тыльная сторона
+		g:ell(HD, V(sx, baseY + 0.05, 0.0), V(0.33, 0.24, 0.7), fur, "Carpet") -- ряд костяшек
+		g:ell(HD, V(sx - s * 0.06, wristY - 0.2, -0.22), V(0.24, 0.38, 0.26), fur, "Carpet") -- подушка большого пальца
 		local zs = { Index = -0.36, Middle = -0.12, Ring = 0.12, Pinky = 0.34 }
 		for _, f in { "Index", "Middle", "Ring", "Pinky" } do
 			local z = zs[f] * S.handW
 			local k = if f == "Pinky" then 0.8 elseif f == "Middle" then 1.08 else 1
 			local l1, l2 = S.fingerLen1 * k, S.fingerLen2 * k
-			local w = if f == "Pinky" then 0.155 else 0.178
+			local w = if f == "Pinky" then 0.17 else 0.195
 			local b1, b2 = side .. f .. "1", side .. f .. "2"
-			g:ball(HD, V(sx, baseY + 0.01, z), w * 1.02, P.furHand, "Carpet")
-			g:ellSeg(b1, V(sx, baseY + 0.04, z), V(sx, baseY - l1 - 0.03, z), w, w, P.furHand, "Carpet", V(0, 0, -1))
-			g:ball(b1, V(sx, baseY - l1, z), w * 0.94, P.furHand, "Carpet")
-			g:ellSeg(b2, V(sx, baseY - l1 + 0.03, z), V(sx, baseY - l1 - l2 - 0.02, z), w * 0.92, w * 0.92, P.furHand, "Carpet", V(0, 0, -1))
-			-- подушечка пальца (темнее, со стороны ладони)
-			g:ell(b2, V(sx - s * 0.04, baseY - l1 - l2 * 0.6, z), V(0.08, 0.14, 0.12), P.furDark, "Carpet")
+			g:ball(HD, V(sx, baseY, z), w * 0.92, fur, "Carpet")
+			g:ellSeg(b1, V(sx, baseY + 0.07, z), V(sx, baseY - l1 - 0.06, z), w, w, fur, "Carpet", V(0, 0, -1))
+			g:ball(b1, V(sx, baseY - l1, z), w * 0.9, fur, "Carpet")
+			g:ellSeg(b2, V(sx, baseY - l1 + 0.06, z), V(sx, baseY - l1 - l2 - 0.035, z), w * 0.93, w * 0.93, fur, "Carpet", V(0, 0, -1))
 		end
 		-- большой палец
 		local tz = -0.5 * S.handW
 		local ty = wristY - S.handLen * 0.35
-		g:ellSeg(side .. "Thumb1", V(sx, ty + 0.05, tz), V(sx, ty - S.thumbLen1 - 0.03, tz), 0.2, 0.2, P.furHand, "Carpet", V(1, 0, 0))
-		g:ball(side .. "Thumb1", V(sx, ty - S.thumbLen1, tz), 0.18, P.furHand, "Carpet")
-		g:ellSeg(side .. "Thumb2", V(sx, ty - S.thumbLen1 + 0.03, tz), V(sx, ty - S.thumbLen1 - S.thumbLen2 - 0.02, tz), 0.17, 0.17, P.furHand, "Carpet", V(1, 0, 0))
+		g:ellSeg(side .. "Thumb1", V(sx, ty + 0.07, tz), V(sx, ty - S.thumbLen1 - 0.05, tz), 0.21, 0.21, fur, "Carpet", V(1, 0, 0))
+		g:ball(side .. "Thumb1", V(sx, ty - S.thumbLen1, tz), 0.18, fur, "Carpet")
+		g:ellSeg(side .. "Thumb2", V(sx, ty - S.thumbLen1 + 0.05, tz), V(sx, ty - S.thumbLen1 - S.thumbLen2 - 0.03, tz), 0.185, 0.185, fur, "Carpet", V(1, 0, 0))
 
 		-- ===== Украшения =====
 		local midZ = zs.Middle * S.handW

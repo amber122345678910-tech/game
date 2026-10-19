@@ -37,8 +37,8 @@ S.PROPORTIONS = {
 -- Голова: шея поднимается от Neck (y=4.95) вверх-вперёд, череп ~y 6.0, морда вытянута вперёд до z≈-1.5.
 S.EXTRA = {
 	Jaw = { parent = "Head", pivot = { 0, 5.789, -0.061 } }, -- нижняя челюсть, открывается вниз (вращение по X)
-	RightEar = { parent = "Head", pivot = { 0.36, 6.723, 0.004 } },
-	LeftEar = { parent = "Head", pivot = { -0.36, 6.723, 0.004 } },
+	RightEar = { parent = "Head", pivot = { 0.4, 6.723, 0.004 } },
+	LeftEar = { parent = "Head", pivot = { -0.4, 6.723, 0.004 } },
 	Glasses = { parent = "Head", pivot = { 0, 6.096, -0.732 } },
 	RightBrow = { parent = "Head", pivot = { 0.3, 6.354, -0.702 } },
 	LeftBrow = { parent = "Head", pivot = { -0.3, 6.354, -0.702 } },
@@ -56,8 +56,8 @@ function S.new(name)
 	end
 	-- Лицевые каналы (значения в ключах 0..1 или -1..1)
 	rig.face = {
-		jaw = { { joint = "Jaw", rot = V(-30, 0, 0) } }, -- 1 = рот открыт широко
-		grin = { { joint = "UpperLip", pos = V(0, 0.06, 0.02), rot = V(8, 0, 0) } }, -- 1 = верхняя губа поднята (видны зубы)
+		jaw = { { joint = "Jaw", rot = V(-17, 0, 0) } }, -- 1 = рот открыт широко
+		grin = { { joint = "UpperLip", pos = V(0, 0.04, -0.05), rot = V(4, 0, 0) } }, -- 1 = верхняя губа поднята и вывернута (видны зубы и дёсны)
 		brows = { { joint = "RightBrow", pos = V(0, 0.09, 0) }, { joint = "LeftBrow", pos = V(0, 0.09, 0) } },
 		browR = { { joint = "RightBrow", pos = V(0, 0.09, 0) } },
 		browL = { { joint = "LeftBrow", pos = V(0, 0.09, 0) } },

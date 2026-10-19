@@ -111,7 +111,7 @@ function Body.build(g, opts)
 	g:ell("UpperTorso", E.waist.c, E.waist.r * 2, P.suit, "SmoothPlastic")
 	g:tube("UpperTorso", { V(-1.12, 4.63, 0.06), V(1.12, 4.63, 0.06) }, 0.6, P.suit, "SmoothPlastic") -- линия плеч
 	for _, s in { 1, -1 } do
-		g:tube("UpperTorso", { V(s * 0.36, 4.88, 0.14), V(s * 1.08, 4.66, 0.08) }, 0.5, P.suit, "SmoothPlastic") -- скат плеч
+		g:tube("UpperTorso", { V(s * 0.42, 4.8, 0.14), V(s * 1.04, 4.62, 0.08) }, 0.46, P.suit, "SmoothPlastic") -- скат плеч
 	end
 	g:ell("UpperTorso", E.shirt.c, E.shirt.r * 2, P.shirt, "Fabric")
 	g:ell("UpperTorso", E.fur.c, E.fur.r * 2, P.chestFur, "Carpet")
@@ -235,9 +235,9 @@ function Body.build(g, opts)
 	-- пиджак ниже талии: два вертикальных цилиндра (прямые бока, ровный подол); спереди между ними
 	-- «долина» — там видны ремень и джинсы (полы распахнуты)
 	for _, s in { 1, -1 } do
-		g:cylSeg("LowerTorso", V(s * 0.5, 3.0, 0.08), V(s * 0.5, 2.12, 0.08), 1.12, P.suit, "SmoothPlastic")
+		g:cylSeg("LowerTorso", V(s * 0.5, 3.0, 0.08), V(s * 0.5, 2.28, 0.08), 1.12, P.suit, "SmoothPlastic")
 		g:ell("LowerTorso", V(s * 0.5, 3.0, 0.08), V(1.12, 0.36, 1.12), P.suit, "SmoothPlastic")
-		g:cylSeg("LowerTorso", V(s * 0.5, 2.135, 0.08), V(s * 0.5, 2.11, 0.08), 1.04, P.suitDark, "SmoothPlastic")
+		g:cylSeg("LowerTorso", V(s * 0.5, 2.295, 0.08), V(s * 0.5, 2.27, 0.08), 1.04, P.suitDark, "SmoothPlastic")
 	end
 	g:ell("LowerTorso", V(0, 2.72, 0.3), V(1.6, 1.2, 0.9), P.suit, "SmoothPlastic")
 

@@ -80,7 +80,7 @@ local DEFAULTS = {
 	glasses = nil, -- "aviator" | "hex" | "rect"
 	glassesFrame = rgb(204, 168, 92),
 	glassesLens = rgb(30, 52, 40),
-	glassesLensTransparency = 0.05,
+	glassesLensTransparency = 0,
 	glassesOn = "Head", -- "Head" | "RightHand" | "LeftHand"
 }
 
@@ -127,8 +127,8 @@ return function(opts)
 		torsoD = td,
 		headH = 1.35,
 		fingers = true,
-		fingerLen1 = 0.19 * h * bw,
-		fingerLen2 = 0.17 * h * bw,
+		fingerLen1 = 0.2 * h * bw,
+		fingerLen2 = 0.18 * h * bw,
 		thumbLen1 = 0.17 * h * bw,
 		thumbLen2 = 0.15 * h * bw,
 	})
@@ -174,12 +174,12 @@ return function(opts)
 		local sx, sy, sz = size.X, size.Y, size.Z
 		r = math.min(r, sx / 2 - 0.005, sz / 2 - 0.005)
 		part(bone, cf, v(sx, sy, sz - 2 * r), color, mat, name)
-		part(bone, cf, v(sx - 2 * r, sy - 0.02, sz), color, mat, name)
+		part(bone, cf, v(sx - 2 * r, sy - 0.024, sz), color, mat, name)
 		for _, cx in { -1, 1 } do
 			for _, cz in { -1, 1 } do
 				rig:part(bone, {
 					cf = cf * at(cx * (sx / 2 - r), 0, cz * (sz / 2 - r)) * ang(0, 0, 90),
-					size = v(sy - 0.04, 2 * r, 2 * r),
+					size = v(sy - 0.05, 2 * r, 2 * r),
 					color = color,
 					material = mat or "SmoothPlastic",
 					name = name,
@@ -200,14 +200,14 @@ return function(opts)
 	local topC = o.top
 	local topStyle = o.topStyle
 	local chestBot = yW + (yN - yW) * (if fem then 0.5 else 0.38) -- низ грудной клетки (у девушек талия уже)
-	local waistW = if fem then tw * 0.88 else tw * 0.97
+	local waistW = if fem then tw * 0.88 else tw * 0.95
 	local hipW = if fem then tw * 0.98 else tw * 0.97
 	local cropped = topStyle == "crop"
 	local shirtPad = 0.03
 	local waistTop = yW + (if cropped then 0.16 else 0.24) * h -- верх пояса низа
 	local halfW = tw / 2
 	rboxY("UpperTorso", 0, chestBot, yN, 0, tw, td, 0.2 * bw, skin, "SmoothPlastic", "Chest")
-	rboxY("UpperTorso", 0, yW - 0.18, chestBot + 0.04, 0.0, waistW, td * 0.94, 0.2 * bw, skin, "SmoothPlastic", "Belly")
+	rboxY("UpperTorso", 0, yW - 0.2, chestBot + 0.04, 0.0, waistW, td * 0.94, 0.2 * bw, skin, "SmoothPlastic", "Belly")
 	if cropped or not topStyle then
 		ell("UpperTorso", at(0, yW + 0.42 * h, -td * 0.47 - 0.012), v(0.07, 0.09, 0.04), skinShade:Lerp(BLACK, 0.25), "SmoothPlastic", "Navel")
 	end
@@ -216,11 +216,11 @@ return function(opts)
 	if topStyle == "tee" then
 		-- футболка: оболочка до плеч, круглый вырез, рукава (см. руки)
 		local hem = yW - 0.1
-		rboxY("UpperTorso", 0, chestBot - 0.02, yN + 0.015, 0, tw + shirtPad, td + shirtPad, 0.21 * bw, topC, "Fabric", "Shirt")
-		rboxY("UpperTorso", 0, hem, chestBot + 0.04, 0, math.max(waistW + shirtPad, hipW + 0.06), math.max(td * 0.94 + shirtPad, td * 0.98 + 0.06), 0.21 * bw, topC, "Fabric", "ShirtWaist")
+		rboxY("UpperTorso", 0, chestBot - 0.04, yN + 0.04, 0, tw + shirtPad, td + shirtPad, 0.21 * bw, topC, "Fabric", "Shirt")
+		rboxY("UpperTorso", 0, hem, chestBot - 0.012, 0, math.max(waistW + shirtPad, hipW + 0.06), math.max(td * 0.94 + shirtPad, td * 0.98 + 0.06), 0.21 * bw, topC, "Fabric", "ShirtWaist")
 		neckHole = 0.29 * bw
 		local frontZ = -(td + shirtPad) / 2
-		part("UpperTorso", at(0, yN + 0.024, 0), v(neckHole * 2, 0.02, td * 0.6), skin, "SmoothPlastic", "NeckTop")
+		part("UpperTorso", at(0, yN + 0.05, 0), v(neckHole * 2, 0.02, td * 0.6), skin, "SmoothPlastic", "NeckTop")
 		ell("UpperTorso", at(0, yN, frontZ + 0.012), v(neckHole * 2, 0.24, 0.03), skin, "SmoothPlastic", "NecklineF")
 		ell("UpperTorso", at(0, yN + 0.012, frontZ + 0.006), v(neckHole * 2 + 0.08, 0.3, 0.03), topC:Lerp(BLACK, 0.15), "Fabric", "Collar")
 	elseif topStyle == "tank" or topStyle == "crop" then
@@ -242,11 +242,11 @@ return function(opts)
 		else
 			hem = yW - 0.1 -- навыпуск поверх шорт
 		end
-		rboxY("UpperTorso", 0, math.max(hem, chestBot - 0.02), ya, 0, tw + shirtPad, td + shirtPad, 0.21 * bw, topC, "Fabric", "Shirt")
-		if hem < chestBot - 0.02 then
+		rboxY("UpperTorso", 0, math.max(hem - 0.04, chestBot - 0.04), ya, 0, tw + shirtPad, td + shirtPad, 0.21 * bw, topC, "Fabric", "Shirt")
+		if hem < chestBot - 0.04 then
 			local ww = if fem then waistW + shirtPad else math.max(waistW + shirtPad, hipW + 0.06)
 			local wd = if fem then td * 0.94 + shirtPad else math.max(td * 0.94 + shirtPad, td * 0.98 + 0.06)
-			rboxY("UpperTorso", 0, hem, chestBot + 0.04, 0, ww, wd, 0.21 * bw, topC, "Fabric", "ShirtWaist")
+			rboxY("UpperTorso", 0, hem, chestBot - 0.012, 0, ww, wd, 0.21 * bw, topC, "Fabric", "ShirtWaist")
 		end
 		-- пластины спереди (zs=-1) и сзади (zs=1)
 		local pt2 = 0.02
@@ -293,14 +293,14 @@ return function(opts)
 	-- ===== Таз и низ =====
 	local botC = o.bottom
 	local bstyle = o.bottomStyle
-	rboxY("LowerTorso", 0, yH - 0.22, waistTop, 0, hipW, td * 0.98, 0.2 * bw, botC, "Fabric", "Pelvis")
+	rboxY("LowerTorso", 0, yH - 0.22, waistTop - 0.035, 0, hipW, td * 0.98, 0.2 * bw, botC, "Fabric", "Pelvis")
 	-- пояс
 	local bandC = if bstyle == "track" then botC:Lerp(BLACK, 0.25) else botC:Lerp(BLACK, 0.12)
 	rboxY("LowerTorso", 0, waistTop - 0.16, waistTop + 0.01, 0, hipW + 0.03, td * 0.98 + 0.03, 0.21 * bw, bandC, "Fabric", "Waistband")
 	-- «сиденье»: заполняет зазор у тазобедренных при сгибе ног (спрятано в штанинах стоя)
 	local sleeveW = if bstyle == "baggy" then lw + 0.16 else (if bstyle == "leggings" then lw + 0.02 else lw + 0.07)
-	local seatW = 2 * hipX + sleeveW - 0.08
-	rboxY("LowerTorso", 0, yH - 0.42, yH + 0.05, 0.0, seatW, sleeveW - 0.06, 0.16, botC, "Fabric", "Seat")
+	local seatW = 2 * hipX + lw - 0.06
+	rboxY("LowerTorso", 0, yH - 0.42, yH + 0.05, 0.0, seatW, lw - 0.06, 0.16, botC, "Fabric", "Seat")
 
 	-- ===== Ноги =====
 	for _, side in { "Right", "Left" } do
@@ -325,15 +325,15 @@ return function(opts)
 			hem = kY + 0.18 * h
 		end
 		if bstyle == "leggings" then
-			rboxY(UL, x, kY - 0.02, yH + 0.16, 0, lw + 0.03, lw + 0.03, 0.21, botC, "Fabric", "Legging")
-			rboxY(LL, x, hem, kY + sw * 0.4, 0, sw + 0.03, sw + 0.03, 0.19, botC, "Fabric", "LeggingLow")
+			rboxY(UL, x, kY - 0.035, yH + 0.16, 0, lw + 0.03, lw + 0.03, 0.21, botC, "Fabric", "Legging")
+			rboxY(LL, x, hem, kY + sw * 0.4 - 0.02, 0, sw + 0.03, sw + 0.03, 0.19, botC, "Fabric", "LeggingLow")
 			ell(LL, at(x, kY, -0.01), v(sw + 0.08, 0.44, sw + 0.1), botC, "Fabric", "KneeCloth")
 		else
 			local sleeveTop = yH + 0.2
 			local cx = x + s * (if bstyle == "baggy" then 0.03 else 0.0)
 			rboxY(UL, cx, hem, sleeveTop, 0, sleeveW, sleeveW, 0.22, botC, "Fabric", "ShortsLeg")
 			-- подгиб/кант
-			rboxY(UL, cx, hem - 0.005, hem + 0.07, 0, sleeveW + 0.025, sleeveW + 0.025, 0.23, if bstyle == "track" then botC:Lerp(BLACK, 0.2) else botC:Lerp(BLACK, 0.1), "Fabric", "Hem")
+			rboxY(UL, cx, hem - 0.035, hem + 0.07, 0, sleeveW + 0.025, sleeveW + 0.025, 0.23, if bstyle == "track" then botC:Lerp(BLACK, 0.2) else botC:Lerp(BLACK, 0.1), "Fabric", "Hem")
 			if bstyle == "track" and o.stripe then
 				-- три лампаса по боковому шву
 				local outX = cx + s * (sleeveW / 2 + 0.006)
@@ -349,20 +349,28 @@ return function(opts)
 				part(UL, at(cx + s * (sleeveW / 2 - 0.12), (hem + 0.1 + yH) / 2, fz), v(0.014, yH - hem - 0.1, 0.012), o.stitch, "Fabric", "Stitch")
 			end
 			if o.roses then
-				-- принт: крупные красные розы с листьями на внешней стороне штанины
-				local outX = cx + s * (sleeveW / 2)
-				local spots = { { 0.55, -0.12, 0.2 }, { 0.2, 0.18, 0.16 }, { 0.82, 0.25, 0.14 } }
-				for i, sp in spots do
-					local yy = hem + (yH - hem) * sp[1]
-					local zz = sp[2] * sleeveW
-					local d = sp[3]
-					local rose = o.roses
-					ell(UL, at(outX + s * 0.004, yy, zz), v(0.05, d, d * 1.1), rose, "Fabric", "Rose")
-					ell(UL, at(outX + s * 0.016, yy + 0.01, zz - 0.01), v(0.03, d * 0.5, d * 0.55), rose:Lerp(BLACK, 0.35), "Fabric", "RoseHeart")
-					ell(UL, at(outX + s * 0.004, yy - d * 0.6, zz + d * 0.45 * (if i % 2 == 0 then 1 else -1)), v(0.04, d * 0.45, d * 0.8), rgb(46, 92, 58), "Fabric", "Leaf", { rot = nil })
+				-- принт: крупные красные розы с листьями (наружная сторона, перед, зад штанины)
+				local leaf = rgb(52, 98, 62)
+				local function rose(cf, d)
+					ell(UL, cf, v(d, d * 0.92, 0.036), o.roses, "Fabric", "Rose")
+					ell(UL, cf * at(0.0, d * 0.08, -0.008), v(d * 0.58, d * 0.5, 0.03), o.roses:Lerp(BLACK, 0.4), "Fabric", "RoseHeart")
+					ell(UL, cf * at(-d * 0.1, d * 0.12, -0.014) * ang(0, 0, 30), v(d * 0.34, d * 0.14, 0.024), o.roses:Lerp(WHITE, 0.15), "Fabric", "RosePetal")
+					ell(UL, cf * at(d * 0.42, -d * 0.5, 0.004) * ang(0, 0, 38), v(d * 0.62, d * 0.24, 0.03), leaf, "Fabric", "Leaf")
 				end
-				-- роза спереди
-				ell(UL, at(cx - s * 0.12, hem + 0.35, -(sleeveW / 2) - 0.004), v(0.16, 0.15, 0.05), o.roses, "Fabric", "Rose")
+				local outX = cx + s * (sleeveW / 2 + 0.004)
+				local frontZ = -(sleeveW / 2 + 0.004)
+				local legH = yH + 0.2 - hem
+				-- наружная сторона (локальный -Z смотрит наружу по X)
+				local function onSide(fy, fz, d)
+					rose(CFrame.fromMatrix(v(outX, hem + legH * fy, fz * sleeveW), v(0, 0, s), v(0, 1, 0)), d)
+				end
+				local function onFront(fx, fy, d)
+					rose(CFrame.fromMatrix(v(cx + s * fx * sleeveW, hem + legH * fy, frontZ), v(1, 0, 0), v(0, 1, 0)), d)
+				end
+				onSide(0.62, -0.12, 0.26)
+				onSide(0.24, 0.2, 0.2)
+				onFront(0.18, 0.3, 0.2)
+				onFront(-0.1, 0.78, 0.16)
 			end
 		end
 		-- стопа
@@ -370,7 +378,7 @@ return function(opts)
 		local toeZ = -P.footFwd
 		local fl = P.footLen
 		local midZ = (heelZ + toeZ) / 2
-		local footW = if fem then 0.62 else 0.7
+		local footW = math.max(if fem then 0.62 else 0.7, sw + 0.05)
 		if o.shoes == "barefoot" then
 			rbox(FT, at(x, 0.12, midZ + 0.04), v(footW, 0.24, fl - 0.12), 0.2, skin, "SmoothPlastic", "Foot")
 			ell(FT, at(x, 0.2, heelZ - 0.25), v(footW * 0.92, 0.36, 0.5), skin, "SmoothPlastic", "Heel")
@@ -388,24 +396,26 @@ return function(opts)
 			rbox(FT, at(x, 0.06, midZ), v(footW + 0.06, 0.12, fl + 0.04), 0.26, o.sole, "Rubber", "Sole")
 			ell(FT, at(x, 0.075, toeZ + 0.12), v(footW + 0.06, 0.15, 0.36), o.sole, "Rubber", "SoleToe")
 			-- верх
-			rbox(FT, at(x, 0.27, midZ + 0.06), v(footW, 0.32, fl - 0.1), 0.24, shoe, "Leather", "Upper")
+			rbox(FT, at(x, 0.27, midZ + 0.05), v(footW, 0.32, fl - 0.14), 0.24, shoe, "Leather", "Upper")
 			ell(FT, at(x, 0.15, toeZ + 0.18), v(footW - 0.01, 0.26, 0.5), shoe, "Leather", "ToeCap")
 			ell(FT, at(x, 0.34, heelZ - 0.22), v(footW + 0.02, 0.5, 0.48), shoe, "Leather", "Heel")
 			-- язычок и шнурки
-			part(FT, at(x, 0.43, midZ - 0.05) * ang(-18, 0, 0), v(footW * 0.5, 0.06, 0.42), shoe:Lerp(WHITE, 0.15), "Fabric", "Tongue")
+			local tongueCF = at(x, 0.43, midZ - 0.05) * ang(-18, 0, 0)
+			part(FT, tongueCF, v(footW * 0.5, 0.06, 0.42), shoe:Lerp(WHITE, 0.15), "Fabric", "Tongue")
 			for i = 0, 2 do
-				part(FT, at(x, 0.44 - i * 0.05, midZ - 0.04 - i * 0.1) * ang(-18, 0, 0), v(footW * 0.46, 0.03, 0.04), o.shoeAccent or shoe:Lerp(WHITE, 0.6), "Fabric", "Lace")
+				part(FT, tongueCF * at(0, 0.056, -0.13 + i * 0.11), v(footW * 0.46, 0.03, 0.04), o.shoeAccent or shoe:Lerp(WHITE, 0.6), "Fabric", "Lace")
 			end
 			if o.shoeAccent then
 				-- полоса-«формстрип» на внешней и внутренней стороне
 				for _, ss in { 1, -1 } do
 					local px = x + ss * (footW / 2 + 0.006)
-					part(FT, at(px, 0.24, midZ + 0.02) * ang(-22, 0, 0), v(0.02, 0.07, fl * 0.62), o.shoeAccent, "Leather", "Formstrip")
+					part(FT, at(px, 0.2, midZ - 0.02) * ang(-20, 0, 0), v(0.02, 0.065, fl * 0.56), o.shoeAccent, "Leather", "Formstrip")
 				end
 			end
 			-- носок
 			if o.socks then
 				rboxY(LL, x, aY + 0.02, aY + 0.42, 0, sw + 0.03, sw + 0.03, 0.19, o.socks, "Fabric", "Sock")
+				-- (носок уже ширины кроссовка: footW >= sw + 0.05)
 			end
 			ell(FT, at(x, 0.36, 0.02), v(sw * 0.94, 0.36, sw * 0.94), o.socks or skin, if o.socks then "Fabric" else "SmoothPlastic", "Ankle")
 		end
@@ -423,7 +433,7 @@ return function(opts)
 		rboxY(UA, x, eY, sY, 0, aw, aw, aw * 0.3, skin, "SmoothPlastic", "UpperArm")
 		ell(UA, at(x, sY, 0), v(aw, 0.36 * h, aw), skin, "SmoothPlastic", "ShoulderCap")
 		if topStyle == "tee" then
-			rboxY(UA, x, sY - 0.55 * h, sY, 0, aw + 0.06, aw + 0.06, aw * 0.32, o.top, "Fabric", "Sleeve")
+			rboxY(UA, x, sY - 0.55 * h, sY - 0.045, 0, aw + 0.07, aw + 0.07, aw * 0.3 + 0.035, o.top, "Fabric", "Sleeve")
 			ell(UA, at(x, sY + 0.005, 0), v(aw + 0.06, 0.38 * h, aw + 0.06), o.top, "Fabric", "SleeveCap")
 		end
 		-- локоть + предплечье
@@ -449,7 +459,7 @@ return function(opts)
 			stick(b2, p2, tip, d * 0.94, skin, "SmoothPlastic", "Finger")
 			ball(b2, tip, d * 0.94, skin, "SmoothPlastic", "Fingertip")
 			if o.rings and (f == "Middle" or f == "Index") and side == "Right" then
-				stick(b1, p1 - v(0, (p1 - p2).Magnitude * 0.55 - 0.02, 0), p1 - v(0, (p1 - p2).Magnitude * 0.55 + 0.02, 0), d + 0.03, o.rings, "Metal", "Ring")
+				stick(b1, p1 - v(0, (p1 - p2).Magnitude * 0.5 - 0.014, 0), p1 - v(0, (p1 - p2).Magnitude * 0.5 + 0.014, 0), d + 0.018, o.rings, "Metal", "Ring")
 			end
 		end
 		-- браслеты
@@ -501,7 +511,7 @@ return function(opts)
 	-- ----- глаза -----
 	local eyeY = 0.02
 	local eyeX = if fem then 0.215 else 0.21
-	local eyeW, eyeH, eyeD = (if fem then 0.21 else 0.2), (if fem then 0.17 else 0.15), 0.1
+	local eyeW, eyeH, eyeD = (if fem then 0.21 else 0.19), (if fem then 0.17 else 0.14), 0.1
 	local faceZ = function(x)
 		return -math.sqrt(R * R - x * x)
 	end
@@ -525,6 +535,10 @@ return function(opts)
 		rig:joint(lidJ, "Head", eyeCF.Position, eyeCF.Position, v(0.05, 0.05, 0.05))
 		local lidUp = eyeH * 1.02
 		ell(lidJ, eyeCF * at(0, lidUp, 0.004) * ang(24, 0, 0), v(eyeW + 0.025, eyeH + 0.035, eyeD + 0.03), skin, "SmoothPlastic", "Lid")
+		-- нижнее веко (поднимается при улыбке/прищуре — «смеющиеся» глаза)
+		local llJ = side .. "LowerLid"
+		rig:joint(llJ, "Head", eyeCF.Position, eyeCF.Position, v(0.05, 0.05, 0.05))
+		ell(llJ, eyeCF * at(0, -eyeH * 0.92, 0.054), v(eyeW + 0.025, eyeH * 0.95, eyeD), skin, "SmoothPlastic", "LowerLid")
 		local lashT = if o.lashes then 0.03 else 0.02
 		ell(lidJ, eyeCF * at(0, eyeH * 0.36, -eyeD / 2 + 0.012) * ang(0, 0, 0), v(eyeW * 0.98, lashT, 0.04), rgb(30, 20, 18), "SmoothPlastic", "LashLine")
 		if o.lashes then
@@ -538,7 +552,7 @@ return function(opts)
 	for _, side in { "Right", "Left" } do
 		local s = if side == "Right" then 1 else -1
 		local bx = s * (eyeX + 0.01)
-		local by = eyeY + eyeH / 2 + (if fem then 0.13 else 0.115)
+		local by = eyeY + eyeH / 2 + (if fem then 0.13 else 0.1)
 		local yaw = -s * math.deg(math.asin((eyeX + 0.01) / R))
 		local bz = faceZ(eyeX + 0.01)
 		local browCF = Hc(bx, by, bz) * ang(0, yaw, 0)
@@ -587,15 +601,14 @@ return function(opts)
 		local mj = side .. "Mouth"
 		local mp = H(s * 0.16, my, faceZ(0.16))
 		rig:joint(mj, "Head", mp, mp, v(0.05, 0.05, 0.05))
-		ell(mj, Hc(s * 0.19, my + 0.0, faceZ(0.19) + 0.045) * ang(0, -s * 19, 0), v(0.1, 0.12, 0.09), lowFace, "SmoothPlastic", "MouthCorner")
-		ell(mj, Hc(s * 0.13, my - 0.004, faceZ(0.13) + 0.034) * ang(0, -s * 12, s * 30), v(0.1, 0.045, 0.06), mouthDark, "SmoothPlastic", "CornerCrease")
-		ell(mj, Hc(s * 0.28, my + 0.17, faceZ(0.28) + 0.066) * ang(0, -s * 27, 0), v(0.2, 0.15, 0.12), skin, "SmoothPlastic", "Cheek")
+		ell(mj, Hc(s * 0.205, my + 0.0, faceZ(0.205) + 0.034) * ang(0, -s * 19, 0), v(0.09, 0.12, 0.075), lowFace, "SmoothPlastic", "MouthCorner")
+		ell(mj, Hc(s * 0.115, my - 0.016, faceZ(0.115) + 0.028) * ang(0, -s * 11, s * 13), v(0.1, 0.034, 0.05), mouthDark, "SmoothPlastic", "CornerCrease")
 	end
 
 	-- щетина: бакенбарды и скулы — «линзы» на поверхности головы
 	if o.beard then
 		for _, s in { 1, -1 } do
-			patch("Head", s * 54, -0.22, 0.46, 0.14, 0.22, 0.008, o.beard, "SmoothPlastic", "BeardCheek", s * 18)
+			patch("Head", s * 50, -0.19, 0.4, 0.16, 0.22, 0.008, o.beard, "SmoothPlastic", "BeardCheek", s * 30)
 			patch("Head", s * 71, -0.1, 0.2, 0.32, 0.2, 0.01, o.beard, "SmoothPlastic", "BeardSide", s * 6)
 		end
 	end
@@ -795,7 +808,7 @@ return function(opts)
 				if nk.pendant == "coin" then
 					part("UpperTorso", CFrame.new(v(0, yLow - 0.065, zf(yLow - 0.065, 0.005))) * ang(0, 90, 0), v(0.025, 0.12, 0.12), nk.pendantColor or col, "Metal", "Pendant", { shape = "Cylinder" })
 				elseif nk.pendant == "drop" then
-					ell("UpperTorso", CFrame.new(v(0, yLow - 0.05, zf(yLow - 0.05, 0.01))), v(0.06, 0.1, 0.04), nk.pendantColor or col, "Metal", "Pendant")
+					ball("UpperTorso", v(0, yLow - 0.05, zf(yLow - 0.05, 0.01)), 0.07, nk.pendantColor or col, "Metal", "Pendant")
 				elseif nk.pendant == "cross" then
 					part("UpperTorso", CFrame.new(v(0, yLow - 0.07, zf(yLow - 0.07, 0.005))), v(0.03, 0.12, 0.02), nk.pendantColor or col, "Metal", "Pendant")
 					part("UpperTorso", CFrame.new(v(0, yLow - 0.05, zf(yLow - 0.05, 0.005))), v(0.08, 0.03, 0.02), nk.pendantColor or col, "Metal", "Pendant")
@@ -828,32 +841,41 @@ return function(opts)
 		local function L(x, y, z)
 			return gcf * CFrame.new(x, y, z)
 		end
-		local templeX
+		local templeX = 0.42
+		-- контур оправы: палочки по точкам (локально: x — наружу от носа, y — вверх)
+		local function loop(cf, s, pts, d, z)
+			for i = 1, #pts do
+				local p0, p1 = pts[i], pts[i % #pts + 1]
+				local a0 = cf * v(s * p0[1], p0[2], z)
+				local a1 = cf * v(s * p1[1], p1[2], z)
+				local dir = (a1 - a0).Unit
+				stick("Glasses", a0 - dir * d * 0.35, a1 + dir * d * 0.35, d, frame, fmat, "Rim")
+			end
+		end
 		for _, s in { 1, -1 } do
 			local lx = s * 0.235
 			local yawL = -s * 9
+			local c1 = L(lx, 0.0, 0.0) * ang(0, yawL, 0)
 			if kind == "aviator" then
-				-- «капля»: широкий верх, нижний край уходит наружу-вниз
-				local c1 = L(lx, 0.0, 0.0) * ang(0, yawL, 0)
-				local c2 = L(lx + s * 0.025, -0.07, 0.0) * ang(0, yawL, s * -18)
-				ell("Glasses", c1, v(0.35, 0.25, 0.03), lens, "Glass", "Lens", { transparency = lensT, reflectance = 0.3 })
-				ell("Glasses", c2, v(0.29, 0.2, 0.03), lens, "Glass", "Lens", { transparency = lensT, reflectance = 0.3 })
-				ell("Glasses", c1 * at(0, 0, 0.011), v(0.372, 0.272, 0.02), frame, fmat, "Rim")
-				ell("Glasses", c2 * at(0, 0, 0.011), v(0.312, 0.222, 0.02), frame, fmat, "Rim")
-				templeX = 0.42
+				-- «капля»: широкий верх, низ провисает ближе к виску, к носу сужается
+				local pts = {
+					{ -0.165, 0.085 }, { -0.09, 0.105 }, { 0.0, 0.11 }, { 0.09, 0.108 }, { 0.165, 0.09 }, { 0.185, 0.04 }, { 0.186, -0.02 },
+					{ 0.166, -0.08 }, { 0.122, -0.13 }, { 0.05, -0.158 }, { -0.02, -0.156 }, { -0.08, -0.13 }, { -0.13, -0.07 }, { -0.16, 0.0 },
+				}
+				ell("Glasses", c1 * at(s * 0.01, -0.005, 0), v(0.36, 0.222, 0.028), lens, "SmoothPlastic", "Lens", { reflectance = 0.32 })
+				ell("Glasses", c1 * at(s * 0.03, -0.06, 0.002), v(0.29, 0.2, 0.026), lens, "SmoothPlastic", "Lens", { reflectance = 0.32 })
+				loop(c1, s, pts, 0.017, -0.003)
 			elseif kind == "hex" then
-				-- «геометрическая» оправа: овал со срезанным верхом и низом
-				local c1 = L(lx, -0.005, 0.0) * ang(0, yawL, 0)
-				ell("Glasses", c1, v(0.32, 0.21, 0.026), lens, "Glass", "Lens", { transparency = lensT, reflectance = 0.2 })
-				part("Glasses", c1 * at(0, 0, 0.002), v(0.2, 0.18, 0.022), lens, "Glass", "Lens", { transparency = lensT, reflectance = 0.2 })
-				ell("Glasses", c1 * at(0, 0, 0.014), v(0.35, 0.24, 0.02), frame, fmat, "Rim")
-				part("Glasses", c1 * at(0, 0, 0.016), v(0.23, 0.215, 0.018), frame, fmat, "Rim")
+				-- «геометрическая» восьмиугольная оправа
+				local pts = { { -0.17, 0.04 }, { -0.13, 0.1 }, { 0.13, 0.1 }, { 0.17, 0.04 }, { 0.17, -0.04 }, { 0.13, -0.1 }, { -0.13, -0.1 }, { -0.17, -0.04 } }
+				part("Glasses", c1, v(0.3, 0.17, 0.02), lens, "Glass", "Lens", { transparency = lensT, reflectance = 0.2 })
+				loop(c1, s, pts, 0.034, 0)
 				templeX = 0.41
 			else -- rect
-				local c1 = L(lx, -0.01, 0.0) * ang(0, yawL, 0)
-				part("Glasses", c1, v(0.32, 0.15, 0.024), lens, "Glass", "Lens", { transparency = lensT, reflectance = 0.2 })
-				part("Glasses", c1 * at(0, 0, 0.014), v(0.35, 0.18, 0.02), frame, fmat, "Rim")
-				templeX = 0.42
+				local pts = { { -0.165, 0.075 }, { 0.165, 0.075 }, { 0.165, -0.085 }, { -0.165, -0.085 } }
+				part("Glasses", c1 * at(0, -0.005, 0), v(0.31, 0.14, 0.02), lens, "Glass", "Lens", { transparency = lensT, reflectance = 0.2 })
+				loop(c1, s, pts, 0.032, 0)
+				templeX = 0.41
 			end
 			-- дужки до ушей
 			local hinge = gcf * v(s * templeX, 0.05, 0.03)
@@ -873,12 +895,14 @@ return function(opts)
 	rig.face = {
 		jaw = { { joint = "Jaw", rot = v(-16, 0, 0), pos = v(0, -0.015, 0) }, { joint = "Mouth", pos = v(0, -0.012, -0.036) } },
 		smile = {
-			{ joint = "RightMouth", pos = v(0.035, 0.045, -0.016), rot = v(0, 0, 12) },
-			{ joint = "LeftMouth", pos = v(-0.035, 0.045, -0.016), rot = v(0, 0, -12) },
+			{ joint = "RightMouth", pos = v(0.035, 0.04, -0.013), rot = v(0, 0, 10) },
+			{ joint = "LeftMouth", pos = v(-0.035, 0.04, -0.013), rot = v(0, 0, -10) },
 			{ joint = "UpperLip", pos = v(0, 0.016, 0) },
 			{ joint = "Mouth", pos = v(0, 0.01, -0.006) },
-			{ joint = "RightLid", pos = v(0, -0.02, 0) },
-			{ joint = "LeftLid", pos = v(0, -0.02, 0) },
+			{ joint = "RightLid", pos = v(0, -0.012, 0) },
+			{ joint = "LeftLid", pos = v(0, -0.012, 0) },
+			{ joint = "RightLowerLid", pos = v(0, eyeH * 0.36, -0.04) },
+			{ joint = "LeftLowerLid", pos = v(0, eyeH * 0.36, -0.04) },
 		},
 		oh = {
 			{ joint = "RightMouth", pos = v(-0.04, 0.0, -0.02) },
@@ -891,7 +915,12 @@ return function(opts)
 		browL = { { joint = "LeftBrow", pos = v(0, 0.06, 0), rot = v(0, 0, 4) } },
 		frown = { { joint = "RightBrow", pos = v(-0.01, -0.025, 0), rot = v(0, 0, 12) }, { joint = "LeftBrow", pos = v(0.01, -0.025, 0), rot = v(0, 0, -12) } },
 		blink = { { joint = "RightLid", pos = v(0, -eyeH * 1.02, 0) }, { joint = "LeftLid", pos = v(0, -eyeH * 1.02, 0) } },
-		squint = { { joint = "RightLid", pos = v(0, -eyeH * 0.35, 0) }, { joint = "LeftLid", pos = v(0, -eyeH * 0.35, 0) } },
+		squint = {
+			{ joint = "RightLid", pos = v(0, -eyeH * 0.3, 0) },
+			{ joint = "LeftLid", pos = v(0, -eyeH * 0.3, 0) },
+			{ joint = "RightLowerLid", pos = v(0, eyeH * 0.22, -0.03) },
+			{ joint = "LeftLowerLid", pos = v(0, eyeH * 0.22, -0.03) },
+		},
 		lookX = { { joint = "RightEye", rot = v(0, -22, 0) }, { joint = "LeftEye", rot = v(0, -22, 0) } },
 		lookY = { { joint = "RightEye", rot = v(18, 0, 0) }, { joint = "LeftEye", rot = v(18, 0, 0) } },
 	}

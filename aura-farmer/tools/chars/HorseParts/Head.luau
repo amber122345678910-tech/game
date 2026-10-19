@@ -23,8 +23,8 @@ Head.PIVOTS = {
 	Glasses = V(0, 6.22, -0.78),
 	RightBrow = V(0.3, 6.46, -0.68),
 	LeftBrow = V(-0.3, 6.46, -0.68),
-	RightEar = V(0.36, 6.62, 0.1),
-	LeftEar = V(-0.36, 6.62, 0.1),
+	RightEar = V(0.4, 6.62, 0.1),
+	LeftEar = V(-0.4, 6.62, 0.1),
 	Mane = V(0, 6.7, 0.0),
 }
 
@@ -68,29 +68,31 @@ function Head.build(g, opts)
 
 	g.xf = Head.XF
 	-- ===== Череп =====
-	g:ell("Head", V(0, 6.34, -0.02), V(0.98, 0.92, 1.1), P.fur, "Carpet")
-	g:ell("Head", V(0, 6.34, -0.42), V(0.84, 0.64, 0.66), P.furWarm, "Carpet") -- лоб
+	g:ell("Head", V(0, 6.34, -0.02), V(1.1, 0.94, 1.12), P.fur, "Carpet")
+	g:ell("Head", V(0, 6.34, -0.42), V(0.96, 0.66, 0.66), P.furWarm, "Carpet") -- лоб
 	-- переносица (длинная, светлее)
-	g:ellSeg("Head", V(0, 6.3, -0.42), V(0, 6.1, -1.62), 0.56, 0.42, P.furWarm, "Carpet")
+	g:ellSeg("Head", V(0, 6.3, -0.42), V(0, 6.12, -1.5), 0.56, 0.42, P.furWarm, "Carpet")
 	for _, s in { 1, -1 } do
 		-- боковые плоскости морды (седоватые), низ — по линии верхней губы
-		g:ellSeg("Head", V(s * 0.17, 6.16, -0.4), V(s * 0.15, 6.08, -1.5), 0.42, 0.46, P.furGrey, "Carpet", V(s * 0.25, 1, 0))
+		g:ellSeg("Head", V(s * 0.2, 6.16, -0.4), V(s * 0.15, 6.08, -1.45), 0.44, 0.46, P.furGrey, "Carpet", V(s * 0.25, 1, 0))
 		-- скула под глазом
-		g:ell("Head", V(s * 0.29, 6.04, -0.48), V(0.4, 0.46, 0.66), P.furGrey, "Carpet", V(8, 0, 0))
+		g:ell("Head", V(s * 0.35, 6.04, -0.46), V(0.44, 0.5, 0.7), P.furGrey, "Carpet", V(8, 0, 0))
 		-- ганаши (большие щёки сзади-снизу)
-		g:ell("Head", V(s * 0.25, 5.7, -0.26), V(0.52, 0.8, 0.9), P.fur, "Carpet", V(-10, 0, 0))
+		g:ell("Head", V(s * 0.3, 5.7, -0.26), V(0.6, 0.84, 0.92), P.fur, "Carpet", V(-10, 0, 0))
 		-- переход от щеки к уголку рта
-		g:ellSeg("Head", V(s * 0.27, 5.92, -0.55), V(s * 0.3, 5.9, -0.92), 0.26, 0.24, P.furGrey, "Carpet")
+		g:ellSeg("Head", V(s * 0.3, 5.93, -0.55), V(s * 0.3, 5.9, -0.92), 0.28, 0.26, P.furGrey, "Carpet")
 	end
 	g:ell("Head", V(0, 5.58, -0.12), V(0.66, 0.6, 0.8), P.fur, "Carpet") -- межчелюстное пространство
 
 	-- ===== Морда и нос =====
-	g:ell("Head", V(0, 6.05, -1.43), V(0.76, 0.44, 0.62), P.muzzle, "Carpet")
-	g:ell("Head", V(0, 6.07, -1.55), V(0.68, 0.42, 0.4), P.nose, "Carpet")
+	g:ell("Head", V(0, 6.03, -1.36), V(0.74, 0.46, 0.6), P.muzzle, "Carpet")
+	g:ell("Head", V(0, 6.07, -1.46), V(0.66, 0.4, 0.4), P.muzzle:Lerp(P.nose, 0.5), "Carpet")
 	for _, s in { 1, -1 } do
 		-- ноздри: тёмные «запятые» на переднем торце, верх сходится к центру
-		local c = V(s * 0.155, 6.09, -1.735)
-		g:ell("Head", CFrame.new(c) * CFrame.Angles(rad(-12), rad(s * 18), rad(s * -22)), V(0.12, 0.2, 0.07), P.nostril, "SmoothPlastic")
+		local c = V(s * 0.16, 6.07, -1.632)
+		g:ell("Head", CFrame.new(c) * CFrame.Angles(rad(-18), rad(s * 22), rad(s * -24)), V(0.12, 0.21, 0.05), P.nostril, "SmoothPlastic")
+		-- край ноздри (мягкий валик снаружи-сверху)
+		g:ellSeg("Head", c + V(s * 0.05, 0.11, 0.01), c + V(s * 0.085, -0.06, 0.012), 0.06, 0.05, P.nose, "Carpet")
 	end
 
 	-- ===== Рот: верхняя часть (Head) =====
@@ -98,10 +100,10 @@ function Head.build(g, opts)
 	-- верхние дёсны
 	local gum = {}
 	for phi = -90, 90, 15 do
-		local x, z = arch(0.305, 0.485, Z0, phi)
+		local x, z = arch(0.305, 0.505, Z0, phi)
 		table.insert(gum, V(x, biteY(phi) + 0.14, z))
 	end
-	g:caps("Head", gum, 0.08, P.gum, "SmoothPlastic")
+	g:caps("Head", gum, 0.08, P.gum, "SmoothPlastic", nil, nil, 1.0)
 	-- верхние зубы (крупные, «человеческие»)
 	local upper = {
 		{ 6.2, 0.12, 0.16 },
@@ -115,7 +117,7 @@ function Head.build(g, opts)
 	for _, t in upper do
 		for _, s in { 1, -1 } do
 			local phi = s * t[1]
-			local x, z, n = arch(0.3, 0.48, Z0, phi)
+			local x, z, n = arch(0.3, 0.5, Z0, phi)
 			local h = t[3]
 			g:rbox("Head", archCF(V(x, biteY(phi) + h / 2 - 0.003, z), n, -3), V(t[2], h, 0.075), P.tooth, "SmoothPlastic")
 		end
@@ -134,10 +136,10 @@ function Head.build(g, opts)
 	-- нижние дёсны
 	local lgum = {}
 	for phi = -86, 86, 21.5 do
-		local x, z = arch(0.282, 0.452, Z0, phi)
+		local x, z = arch(0.282, 0.472, Z0, phi)
 		table.insert(lgum, V(x, biteY(phi) - 0.125, z))
 	end
-	g:caps("Jaw", lgum, 0.075, P.gum, "SmoothPlastic")
+	g:caps("Jaw", lgum, 0.075, P.gum, "SmoothPlastic", nil, nil, 1.0)
 	-- нижние зубы
 	local lower = {
 		{ 5.6, 0.1, 0.12 },
@@ -151,7 +153,7 @@ function Head.build(g, opts)
 	for _, t in lower do
 		for _, s in { 1, -1 } do
 			local phi = s * t[1]
-			local x, z, n = arch(0.275, 0.445, Z0, phi)
+			local x, z, n = arch(0.275, 0.465, Z0, phi)
 			local h = t[3]
 			g:rbox("Jaw", archCF(V(x, biteY(phi) - 0.006 - h / 2, z), n, 3), V(t[2], h, 0.07), P.tooth, "SmoothPlastic")
 		end
@@ -159,40 +161,40 @@ function Head.build(g, opts)
 	-- нижняя губа (толстая, персиковая)
 	local llip = {}
 	for phi = -100, 100, 12.5 do
-		local x, z = arch(0.33, 0.51, Z0, phi)
+		local x, z = arch(0.33, 0.55, Z0, phi)
 		local k = math.abs(phi) / 100
 		table.insert(llip, V(x, biteY(phi) - 0.15 + 0.07 * k * k, z))
 	end
 	g:caps("Jaw", llip, function(i)
 		local k = math.abs(i - (#llip + 1) / 2) / ((#llip - 1) / 2)
 		return 0.11 - 0.03 * k
-	end, P.lip, "SmoothPlastic")
+	end, P.lip, "SmoothPlastic", nil, nil, 1.0)
 
-	-- ===== Верхняя губа (UpperLip) =====
+	-- ===== Верхняя губа (UpperLip): толстый персиковый валик у нижнего края морды =====
 	local ulip = {}
 	for phi = -100, 100, 12.5 do
-		local x, z = arch(0.34, 0.53, Z0, phi)
+		local x, z = arch(0.35, 0.6, Z0, phi)
 		local k = math.abs(phi) / 100
-		table.insert(ulip, V(x, biteY(phi) + 0.165 - 0.075 * k * k, z))
+		table.insert(ulip, V(x, biteY(phi) + 0.118 - 0.055 * k * k, z))
 	end
 	g:caps("UpperLip", ulip, function(i)
 		local k = math.abs(i - (#ulip + 1) / 2) / ((#ulip - 1) / 2)
-		return 0.1 - 0.025 * k
-	end, P.lip, "SmoothPlastic")
+		return 0.105 - 0.03 * k
+	end, P.lip, "SmoothPlastic", nil, nil, 1.0)
 	-- тёмная шерсть над губой (переход к носу)
 	local uf = {}
 	for phi = -96, 96, 16 do
-		local x, z = arch(0.33, 0.5, Z0, phi)
+		local x, z = arch(0.34, 0.575, Z0, phi)
 		local k = math.abs(phi) / 100
-		table.insert(uf, V(x, biteY(phi) + 0.24 - 0.06 * k * k, z + 0.015))
+		table.insert(uf, V(x, biteY(phi) + 0.2 - 0.05 * k * k, z + 0.01))
 	end
-	g:caps("UpperLip", uf, 0.12, P.muzzle, "Carpet")
+	g:caps("UpperLip", uf, 0.12, P.muzzle, "Carpet", nil, nil, 1.1)
 
 	-- ===== Глаза =====
 	for _, s in { 1, -1 } do
 		local side = if s == 1 then "Right" else "Left"
-		local c = V(s * 0.335, 6.21, -0.6)
-		local look = V(s * 0.45, 0.0, -1).Unit
+		local c = V(s * 0.38, 6.21, -0.58)
+		local look = V(s * 0.5, 0.0, -1).Unit
 		local cf = CFrame.lookAt(c, c + look)
 		g:ell("Head", cf, V(0.2, 0.16, 0.14), P.eyeWhite, "SmoothPlastic")
 		g:ell("Head", cf * CFrame.new(0, -0.01, -0.062), V(0.11, 0.11, 0.03), P.iris, "SmoothPlastic")
@@ -202,16 +204,16 @@ function Head.build(g, opts)
 		g:ell("Head", cf * CFrame.new(0, 0.04, 0.0) * CFrame.Angles(rad(-6), 0, 0), V(0.23, 0.1, 0.17), P.fur, "Carpet")
 		g:ell("Head", cf * CFrame.new(0, -0.066, 0.005), V(0.22, 0.07, 0.15), P.furGrey, "Carpet")
 		-- надбровная дуга
-		g:ellSeg("Head", V(s * 0.14, 6.37, -0.66), V(s * 0.46, 6.34, -0.48), 0.13, 0.12, P.furWarm, "Carpet")
+		g:ellSeg("Head", V(s * 0.14, 6.37, -0.66), V(s * 0.52, 6.34, -0.46), 0.13, 0.12, P.furWarm, "Carpet")
 		-- брови (на суставах бровей)
-		g:ellSeg(side .. "Brow", V(s * 0.12, 6.48, -0.69), V(s * 0.45, 6.47, -0.55), 0.075, 0.06, P.furDark, "Carpet", V(0, 1, 0))
+		g:ellSeg(side .. "Brow", V(s * 0.1, 6.44, -0.72), V(s * 0.54, 6.45, -0.52), 0.1, 0.075, P.furDark:Lerp(P.fur, 0.4), "Carpet", V(0, 1, 0))
 	end
 
 	-- ===== Уши =====
 	for _, s in { 1, -1 } do
 		local ear = if s == 1 then "RightEar" else "LeftEar"
-		local base = V(s * 0.36, 6.58, 0.1)
-		local tip = V(s * 0.5, 7.24, 0.04)
+		local base = V(s * 0.4, 6.58, 0.1)
+		local tip = V(s * 0.56, 7.22, 0.04)
 		g:ellSeg(ear, base + V(0, -0.04, 0), tip, 0.28, 0.2, P.fur, "Carpet", V(0, 0, -1))
 		g:ellSeg(ear, base:Lerp(tip, 0.45), tip + V(s * 0.01, 0.05, -0.01), 0.16, 0.11, P.fur, "Carpet", V(0, 0, -1))
 		-- внутренняя сторона (смотрит вперёд)
