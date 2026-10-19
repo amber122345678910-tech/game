@@ -3,11 +3,18 @@
 """Иконка (512x512) и обложка (1920x1080) игры из офлайн-рендеров сцены tools/preview/icon_scene.luau.
 Логотип по docs/STYLE.md §10: две строки, «МОЛНИЙ» на 15% крупнее, наклон, градиент 3 цвета,
 двойная обводка, жёсткая тень, голубое свечение, зигзаг-молния за буквами.
-python3 compose_icon.py <квадрат.png> <широкий.png> <MontserratBlackItalic.ttf> <NunitoExtraBold.ttf> <папка>"""
+python3 compose_icon.py <квадрат.png> <широкий.png> <MontserratBlackItalic.ttf> <NunitoExtraBold.ttf> <папка> [en|ru]
+Язык (по умолчанию en): английский логотип «LIGHTNING / CATCHERS» — основной (игра для всего мира), русский — для локализации."""
 import sys, os
 from PIL import Image, ImageDraw, ImageFont, ImageEnhance, ImageFilter
 
 sq_path, wide_path, display_path, body_path, out_dir = sys.argv[1:6]
+LANG = sys.argv[6] if len(sys.argv) > 6 else "en"
+TEXT = {
+    # строки логотипа и масштаб каждой (вторая строка на 15% крупнее — устойчивое «основание»)
+    "ru": {"lines": ("ЛОВЦЫ", "МОЛНИЙ"), "scale": (1.0, 1.15), "sub": "Лови молнию в нужный момент!", "tag": "ИДЕАЛЬНО!"},
+    "en": {"lines": ("LIGHTNING", "CATCHERS"), "scale": (1.0, 1.08), "sub": "Catch the lightning at the perfect moment!", "tag": "PERFECT!"},
+}[LANG]
 os.makedirs(out_dir, exist_ok=True)
 
 FILL = [(255, 248, 190), (255, 212, 60), (242, 146, 22)]
@@ -107,13 +114,14 @@ def bolt(size, box, outline):
 
 
 def logo(width, display_path, cap_frac=0.13):
-    """Двухстрочный логотип «ЛОВЦЫ / МОЛНИЙ» шириной примерно width."""
+    """Двухстрочный логотип («LIGHTNING / CATCHERS» или «ЛОВЦЫ / МОЛНИЙ») шириной примерно width."""
     size1 = int(width * cap_frac * 1.32)
-    f1 = ImageFont.truetype(display_path, size1)
-    f2 = ImageFont.truetype(display_path, int(size1 * 1.15))
-    cap = f1.getbbox("Л")[3] - f1.getbbox("Л")[1]
-    w1 = logo_word("ЛОВЦЫ", f1, cap)
-    w2 = logo_word("МОЛНИЙ", f2, int(cap * 1.15))
+    k1, k2 = TEXT["scale"]
+    f1 = ImageFont.truetype(display_path, int(size1 * k1))
+    f2 = ImageFont.truetype(display_path, int(size1 * k2))
+    cap = f1.getbbox("H")[3] - f1.getbbox("H")[1]
+    w1 = logo_word(TEXT["lines"][0], f1, cap)
+    w2 = logo_word(TEXT["lines"][1], f2, int(cap * k2 / k1))
     W = max(w1.width, w2.width) + cap * 2
     H = int(w1.height * 0.78 + w2.height)
     canvas = Image.new("RGBA", (W, H), (0, 0, 0, 0))
@@ -161,10 +169,10 @@ lg = lg.resize((int(lg.width * scale), int(lg.height * scale)), Image.LANCZOS)
 wide.alpha_composite(lg, (int(W * 0.02), int(H * 0.08)))
 fsub = ImageFont.truetype(body_path, int(H * 0.05))
 sub = Image.new("RGBA", (W, int(H * 0.1)), (0, 0, 0, 0))
-ImageDraw.Draw(sub).text((0, 0), "Лови молнию в нужный момент!", font=fsub, fill=CREAM, stroke_width=int(H * 0.006), stroke_fill=INK)
+ImageDraw.Draw(sub).text((0, 0), TEXT["sub"], font=fsub, fill=CREAM, stroke_width=int(H * 0.006), stroke_fill=INK)
 sub = sub.crop(sub.getbbox())
 wide.alpha_composite(sub.rotate(4, resample=Image.BICUBIC, expand=True), (int(W * 0.06), int(H * 0.08 + lg.height + H * 0.02)))
-t = tag("ИДЕАЛЬНО!", display_path, int(H * 0.08))
+t = tag(TEXT["tag"], display_path, int(H * 0.08))
 wide.alpha_composite(t, (int(W * 0.72), int(H * 0.1)))
 wide.convert("RGB").save(os.path.join(out_dir, "thumbnail_1920x1080.png"))
 print("saved to", out_dir)
