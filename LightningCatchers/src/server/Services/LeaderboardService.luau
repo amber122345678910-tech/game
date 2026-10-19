@@ -1,11 +1,13 @@
 --!strict
 -- Таблицы и табло:
 --  * leaderstats (список игроков Roblox): NumberValue «Вольты» и IntValue «Перезапуски» (обновление с троттлингом);
+--    имена — по-английски (Volts, Rebirths), исходник — в атрибуте Loc_Name (Loc.setWorldText);
 --  * глобальная таблица лучших по TotalVolts (OrderedDataStore): запись раз в WRITE_EVERY с на игрока,
 --    чтение топа раз в READ_EVERY с — всё в pcall с повторами; без доступа к API (Studio) — топ этого сервера;
 --    из Studio и тестовых игроков (UserId ≤ 0) в глобальную таблицу не пишем никогда;
 --  * табло в хабе (Map.Markers.Board_*: SurfaceGui "Gui" → Frame "Content"): «Лучшие ловцы»,
 --    «Зал Славы» (последние поймавшие Радужную/Чёрную молнию на сервере), «Прогноз» (обратный отсчёт событий);
+--    строки ставит Loc.setWorldText: по-английски в Text, исходник в атрибуте — русский клиент подменит сам;
 --  * FriendCount — сколько друзей игрока на сервере (Player:IsFriendsWithAsync в pcall, кэш по паре;
 --    неудачные проверки повторяются в фоне раз в Config.Server.FriendRetryEvery с).
 
@@ -19,6 +21,7 @@ local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Config = require(Shared:WaitForChild("Config"))
 local Fonts = require(Shared:WaitForChild("Fonts"))
 local Format = require(Shared:WaitForChild("Format"))
+local Loc = require(Shared:WaitForChild("Loc"))
 local Net = require(Shared:WaitForChild("Net"))
 
 local DataService = require(script.Parent.DataService)
@@ -37,7 +40,7 @@ local STATS_THROTTLE = 0.5
 local RETRIES = 3
 local FRIEND_RETRIES = 3
 local MAX_SCORE = 9e18 -- OrderedDataStore хранит 64-битные целые
-local NAME_FALLBACK = "Ловец"
+local NAME_FALLBACK = "Ловец" -- исходник: в строке табло переводится как аргумент Loc.setWorldText
 
 -- Шрифты табло (docs/STYLE.md §9): заголовок — Montserrat Black Italic, строки — Nunito, числа — Oswald
 local BOARD_FONT = Fonts.Body
@@ -262,7 +265,7 @@ end
 
 -- Найти (или создать) SurfaceGui табло и разложить строки: cols × rows (+ строка-подпись внизу)
 -- values: у каждой строки справа отдельное число (Oswald), сама строка — имя (Nunito)
-local function setupBoard(name: string, title: string, cols: number, rows: number, footer: boolean, values: boolean?): Board?
+local function setupBoard(name: string, title: Loc.Msg, cols: number, rows: number, footer: boolean, values: boolean?): Board?
 	local folder = markers()
 	local marker = if folder then folder:FindFirstChild(name) else nil
 	if not marker or not marker:IsA("BasePart") then
@@ -285,7 +288,7 @@ local function setupBoard(name: string, title: string, cols: number, rows: numbe
 	end
 	if not gui:FindFirstChild("Title") then
 		local t = newText(gui, "Title", UDim2.fromScale(0, 0.01), UDim2.fromScale(1, 0.17), Enum.TextXAlignment.Center, BOARD_FONT_HEAVY)
-		t.Text = title
+		Loc.setWorldText(t, "Text", "%s", title)
 	end
 	local contentInst = gui:FindFirstChild("Content")
 	local content: Frame
@@ -340,14 +343,21 @@ local function setupBoard(name: string, title: string, cols: number, rows: numbe
 	return { Gui = gui, Content = content, Rows = list, Values = vals, Footer = foot }
 end
 
-local function setRow(l: TextLabel, text: string, color: Color3?)
-	if l.Text ~= text then
-		l.Text = text
-	end
+-- Цвет строки табло. Сам текст строк с надписями ставит Loc.setWorldText (по-английски + исходник
+-- в атрибуте): у такой строки и имя ловца ставится через него, иначе русский клиент покажет старую надпись
+local function setColor(l: TextLabel, color: Color3?)
 	local c = color or WHITE
 	if l.TextColor3 ~= c then
 		l.TextColor3 = c
 	end
+end
+
+-- Число без перевода (колонка значений)
+local function setValue(l: TextLabel, text: string, color: Color3?)
+	if l.Text ~= text then
+		l.Text = text
+	end
+	setColor(l, color)
 end
 
 local function renderLeaders()
@@ -362,20 +372,31 @@ local function renderLeaders()
 		local e = list[i]
 		local v = board.Values[i]
 		if e then
-			setRow(l, string.format("%d. %s", i, e.Name), MEDALS[i])
+			Loc.setWorldText(l, "Text", "%d. %s", i, e.Name)
+			setColor(l, MEDALS[i])
 			if v then
-				setRow(v, Format.short(e.Score) .. " ⚡", Color3.fromRGB(255, 210, 60))
+				setValue(v, Format.short(e.Score) .. " ⚡", Color3.fromRGB(255, 210, 60))
 			end
 		else
-			setRow(l, if i == 1 then "Пока пусто — лови молнии!" else "", DIM)
+			if i == 1 then
+				Loc.setWorldText(l, "Text", "Пока пусто — лови молнии!")
+			else
+				Loc.setWorldText(l, "Text", "")
+			end
+			setColor(l, DIM)
 			if v then
-				setRow(v, "", DIM)
+				setValue(v, "", DIM)
 			end
 		end
 	end
 	local foot = board.Footer
 	if foot then
-		setRow(foot, if isGlobal then "лучшие во всей игре" else "лучшие на этом сервере", DIM)
+		if isGlobal then
+			Loc.setWorldText(foot, "Text", "лучшие во всей игре")
+		else
+			Loc.setWorldText(foot, "Text", "лучшие на этом сервере")
+		end
+		setColor(foot, DIM)
 	end
 end
 
@@ -388,17 +409,25 @@ local function renderHall()
 		local e = hall[i]
 		if e then
 			local icon = if e.Kind == "perun" then "☠" else "🌈"
-			setRow(l, icon .. " " .. e.Name, if e.Kind == "perun" then Config.Colors.gold.Color else Config.Colors.rainbow.Color)
+			Loc.setWorldText(l, "Text", "%s %s", icon, e.Name)
+			setColor(l, if e.Kind == "perun" then Config.Colors.gold.Color else Config.Colors.rainbow.Color)
 		else
-			setRow(l, if i == 1 and #hall == 0 then "Поймай Радужную молнию!" else "", DIM)
+			if i == 1 and #hall == 0 then
+				Loc.setWorldText(l, "Text", "Поймай Радужную молнию!")
+			else
+				Loc.setWorldText(l, "Text", "")
+			end
+			setColor(l, DIM)
 		end
 	end
 	local foot = board.Footer
 	if foot then
-		setRow(foot, "ловцы Радужной и Чёрной молнии на этом сервере", DIM)
+		Loc.setWorldText(foot, "Text", "ловцы Радужной и Чёрной молнии на этом сервере")
+		setColor(foot, DIM)
 	end
 end
 
+-- Name — исходник (перевод в Strings/Server.luau), в строке прогноза переводится как аргумент
 local FORECAST = {
 	{ Event = "supercell", Attr = "NextSupercell", Name = "⚡ Суперячейка", Color = Color3.fromRGB(90, 230, 120) },
 	{ Event = "ball", Attr = "NextBall", Name = "🔮 Шаровая молния", Color = Color3.fromRGB(255, 170, 80) },
@@ -423,10 +452,12 @@ local function renderForecast()
 		if l then
 			if ev == f.Event then
 				local ends = attrNumber(gs, "EventEnds")
-				setRow(l, string.format("%s — СЕЙЧАС! %s", f.Name, if ends > t then Format.time(ends - t) else ""), f.Color)
+				Loc.setWorldText(l, "Text", "%s — СЕЙЧАС! %s", f.Name, if ends > t then Format.time(ends - t) else "")
+				setColor(l, f.Color)
 			else
 				local at = attrNumber(gs, f.Attr)
-				setRow(l, string.format("%s — через %s", f.Name, if at > t then Format.time(at - t) else "…"), WHITE)
+				Loc.setWorldText(l, "Text", "%s — через %s", f.Name, if at > t then Format.time(at - t) else "…")
+				setColor(l, WHITE)
 			end
 		end
 	end
@@ -434,9 +465,11 @@ local function renderForecast()
 	if cityRow then
 		local boost = attrNumber(gs, "CityBoostUntil")
 		if boost > t then
-			setRow(cityRow, "🏙 Электроград сияет! " .. Format.time(boost - t), Color3.fromRGB(255, 220, 70))
+			Loc.setWorldText(cityRow, "Text", "🏙 Электроград сияет! %s", Format.time(boost - t))
+			setColor(cityRow, Color3.fromRGB(255, 220, 70))
 		else
-			setRow(cityRow, string.format("🏙 Электроград — %d/%d", math.floor(attrNumber(gs, "CityPoints")), math.floor(attrNumber(gs, "CityTarget"))), DIM)
+			Loc.setWorldText(cityRow, "Text", "🏙 Электроград — %d/%d", math.floor(attrNumber(gs, "CityPoints")), math.floor(attrNumber(gs, "CityTarget")))
+			setColor(cityRow, DIM)
 		end
 	end
 end
@@ -455,24 +488,26 @@ local function applyStats(player: Player)
 	if not folder then
 		local f = Instance.new("Folder")
 		f.Name = "leaderstats"
+		-- имя столбца видят все в списке игроков: по-английски, исходник — в атрибуте Loc_Name.
+		-- Значения ищутся по классу, не по имени
 		local volts = Instance.new("NumberValue")
-		volts.Name = "Вольты"
+		Loc.setWorldText(volts, "Name", "Вольты")
 		volts.Parent = f
 		local rebirths = Instance.new("IntValue")
-		rebirths.Name = "Перезапуски"
+		Loc.setWorldText(rebirths, "Name", "Перезапуски")
 		rebirths.Parent = f
 		f.Parent = player
 		folder = f
 	end
-	local volts = (folder :: Instance):FindFirstChild("Вольты")
-	if volts and volts:IsA("NumberValue") then
+	local volts = (folder :: Instance):FindFirstChildOfClass("NumberValue")
+	if volts then
 		local v = math.floor(d.Volts)
 		if volts.Value ~= v then
 			volts.Value = v
 		end
 	end
-	local rebirths = (folder :: Instance):FindFirstChild("Перезапуски")
-	if rebirths and rebirths:IsA("IntValue") and rebirths.Value ~= d.Rebirths then
+	local rebirths = (folder :: Instance):FindFirstChildOfClass("IntValue")
+	if rebirths and rebirths.Value ~= d.Rebirths then
 		rebirths.Value = d.Rebirths
 	end
 end
@@ -630,9 +665,9 @@ function LeaderboardService.start()
 	end)
 
 	-- табло (если на карте есть метки)
-	leadersBoard = setupBoard("Board_Leaders", "ЛУЧШИЕ ЛОВЦЫ", 2, TOP_N // 2, true, true)
-	hallBoard = setupBoard("Board_Hall", "ЗАЛ СЛАВЫ", 2, HALL_SIZE // 2, true)
-	forecastBoard = setupBoard("Board_Forecast", "ПРОГНОЗ ПОГОДЫ", 1, #FORECAST + 1, false)
+	leadersBoard = setupBoard("Board_Leaders", Loc.msg("ЛУЧШИЕ ЛОВЦЫ"), 2, TOP_N // 2, true, true)
+	hallBoard = setupBoard("Board_Hall", Loc.msg("ЗАЛ СЛАВЫ"), 2, HALL_SIZE // 2, true)
+	forecastBoard = setupBoard("Board_Forecast", Loc.msg("ПРОГНОЗ ПОГОДЫ"), 1, #FORECAST + 1, false)
 	renderLeaders()
 	renderHall()
 

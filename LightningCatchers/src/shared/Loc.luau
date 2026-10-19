@@ -306,9 +306,18 @@ end
 function Loc.setWorldText(inst: Instance, prop: string, src: string, ...: any)
 	local msg: Msg = { src, ... }
 	local text = renderIn("en", msg)
+	if inst:GetAttribute("LocUpper") then
+		text = Loc.upper(text)
+	end
+	-- пишем только изменения: табло обновляются часто, а лишняя запись того же значения ничего не даёт
 	local anyInst: any = inst
-	anyInst[prop] = if inst:GetAttribute("LocUpper") then Loc.upper(text) else text
-	inst:SetAttribute(Loc.attr(prop), Loc.encode(msg))
+	if anyInst[prop] ~= text then
+		anyInst[prop] = text
+	end
+	local attr, raw = Loc.attr(prop), Loc.encode(msg)
+	if inst:GetAttribute(attr) ~= raw then
+		inst:SetAttribute(attr, raw)
+	end
 end
 
 -- Текст надписи в мире на языке lang по её атрибуту (nil — у свойства нет исходника)

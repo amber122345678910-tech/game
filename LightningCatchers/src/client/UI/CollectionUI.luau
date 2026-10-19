@@ -15,6 +15,7 @@ local Format = require(Shared:WaitForChild("Format"))
 local PlayerData = require(Shared:WaitForChild("PlayerData"))
 local Net = require(Shared:WaitForChild("Net"))
 local Models = require(Shared:WaitForChild("Models"))
+local Loc = require(Shared:WaitForChild("Loc"))
 
 local ClientState = require(script.Parent.Parent.ClientState)
 local Sounds = require(script.Parent.Parent.Controllers.Sounds)
@@ -63,7 +64,7 @@ local function mutOf(f: PlayerData.FulgRecord): Fulgurite.MutId?
 end
 
 local function serialText(f: PlayerData.FulgRecord): string
-	return string.format("№%06d", f.Serial)
+	return Loc.t("№%06d", f.Serial)
 end
 
 local function bonusText(spec: Fulgurite.Spec): string
@@ -156,16 +157,16 @@ local function selectFulg(id: number?)
 	detailTitle.Text = Fulgurite.title(spec, mutOf(f))
 	detailTitle.TextColor3 = rar.Color:Lerp(WHITE, 0.35)
 	detailSerial.Text = serialText(f)
-	detailRarity.Text = UIKit.upper(rar.Name)
+	detailRarity.Text = UIKit.upper(Loc.t(rar.Name))
 	detailRarityTag.BackgroundColor3 = rar.Color
 	detailBonus.Text = bonusText(spec)
 	local zdef = Config.Zones[f.Zone]
-	detailZone.Text = if zdef then "Найден: " .. zdef.Name else ""
+	detailZone.Text = if zdef then Loc.t("Найден: %s", zdef.Name) else ""
 	if isEquipped(d, id) then
-		UIKit.setButtonText(equipButton, "Снять")
+		UIKit.setButtonText(equipButton, Loc.t("Снять"))
 		UIKit.setButtonVariant(equipButton, "Slate")
 	else
-		UIKit.setButtonText(equipButton, "Надеть")
+		UIKit.setButtonText(equipButton, Loc.t("Надеть"))
 		UIKit.setButtonVariant(equipButton, if #d.EquippedFulgs >= Fulgurite.MaxEquipped then "Disabled" else "Go")
 	end
 	local key = keyOf(f)
@@ -207,7 +208,7 @@ local function makeCard(f: PlayerData.FulgRecord): FulgCard
 	local mut = mutOf(f)
 	UIKit.label({
 		Name = "Shape",
-		Text = "«" .. spec.ShapeName .. "»",
+		Text = Loc.t("«%s»", spec.ShapeName),
 		FontFace = Theme.FontDisplayFlat,
 		Size = UDim2.new(1, -10, 0, 22),
 		Position = UDim2.fromOffset(5, 92),
@@ -217,7 +218,7 @@ local function makeCard(f: PlayerData.FulgRecord): FulgCard
 	})
 	UIKit.label({
 		Name = "Kind",
-		Text = UIKit.upper(if mut then Fulgurite.Mutations[mut].Name else rar.Name),
+		Text = UIKit.upper(Loc.t(if mut then Fulgurite.Mutations[mut].Name else rar.Name)),
 		FontFace = Theme.FontBodyHeavy,
 		Size = UDim2.new(1, -10, 0, 16),
 		Position = UDim2.fromOffset(5, 114),
@@ -282,9 +283,9 @@ local function ensureModel(c: FulgCard)
 end
 
 local function refreshFulgs(d: PlayerData.Data)
-	equippedLabel.Text = string.format("Надето: %d/%d", #d.EquippedFulgs, Fulgurite.MaxEquipped)
-	countLabel.Text = string.format("Всего: %d/%d", #d.Fulgs, Fulgurite.MaxInventory)
-	totalLabel.Text = "Бонус: +" .. math.floor(Economy.fulgBonus(d) * 100 + 0.5) .. "% ⚡"
+	equippedLabel.Text = Loc.t("Надето: %d/%d", #d.EquippedFulgs, Fulgurite.MaxEquipped)
+	countLabel.Text = Loc.t("Всего: %d/%d", #d.Fulgs, Fulgurite.MaxInventory)
+	totalLabel.Text = Loc.t("Бонус: +%d%% ⚡", math.floor(Economy.fulgBonus(d) * 100 + 0.5))
 	local list: { PlayerData.FulgRecord } = table.clone(d.Fulgs)
 	table.sort(list, function(a: PlayerData.FulgRecord, b: PlayerData.FulgRecord): boolean
 		local ea, eb = isEquipped(d, a.Id), isEquipped(d, b.Id)
@@ -390,7 +391,7 @@ local function buildFulgs(page: Frame)
 	UIKit.padding(grid, 6, 6)
 	emptyHint = UIKit.label({
 		Name = "Empty",
-		Text = "Лови молнии на ИДЕАЛЬНО —\nиногда они оставляют стеклянный фульгурит!",
+		Text = Loc.t("Лови молнии на ИДЕАЛЬНО —\nиногда они оставляют стеклянный фульгурит!"),
 		FontFace = Theme.FontBodyHeavy,
 		Size = UDim2.new(0, GRID_W - 40, 0, 110),
 		Position = UDim2.new(0, GRID_W / 2, 0.45, 0),
@@ -463,7 +464,7 @@ local function buildFulgs(page: Frame)
 	})
 	detailHint = UIKit.label({
 		Name = "Hint",
-		Text = "Нажми на фульгурит",
+		Text = Loc.t("Нажми на фульгурит"),
 		FontFace = Theme.FontBodyHeavy,
 		Size = UDim2.new(1, -24, 0, 40),
 		Position = UDim2.new(0.5, 0, 0, 190),
@@ -474,7 +475,7 @@ local function buildFulgs(page: Frame)
 	})
 	equipButton = UIKit.button({
 		Name = "Equip",
-		Text = "Надеть",
+		Text = Loc.t("Надеть"),
 		Color = Theme.Go,
 		Size = UDim2.new(0.5, -14, 0, 62),
 		AnchorPoint = Vector2.new(0, 1),
@@ -490,7 +491,7 @@ local function buildFulgs(page: Frame)
 		local equipped = isEquipped(d, id)
 		if not equipped and #d.EquippedFulgs >= Fulgurite.MaxEquipped then
 			Sounds.play("Error")
-			ClientState.Toast:Fire("Надеть можно только " .. Fulgurite.MaxEquipped .. " — сними один", "bad")
+			ClientState.Toast:Fire(Loc.t("Надеть можно только %d — сними один", Fulgurite.MaxEquipped), "bad")
 			return
 		end
 		busy = true
@@ -504,7 +505,7 @@ local function buildFulgs(page: Frame)
 	end)
 	breakButton = UIKit.button({
 		Name = "Break",
-		Text = "Разбить",
+		Text = Loc.t("Разбить"),
 		Color = Theme.Danger,
 		Size = UDim2.new(0.5, -14, 0, 62),
 		AnchorPoint = Vector2.new(1, 1),
@@ -525,14 +526,14 @@ local function buildFulgs(page: Frame)
 		local spec = specOf(f)
 		local mut = mutOf(f)
 		local lines = {
-			string.format("Разбить фульгурит «%s» %s?", spec.ShapeName, serialText(f)),
-			(if mut then Fulgurite.Mutations[mut].Name .. " · " else "") .. Pets.Rarities[spec.Rarity].Name .. " · " .. bonusText(spec),
+			Loc.t("Разбить фульгурит «%s» %s?", spec.ShapeName, serialText(f)),
+			(if mut then Loc.t(Fulgurite.Mutations[mut].Name) .. " · " else "") .. Loc.t(Pets.Rarities[spec.Rarity].Name) .. " · " .. bonusText(spec),
 		}
 		if isEquipped(d, id) then
-			table.insert(lines, "Он сейчас надет!")
+			table.insert(lines, Loc.t("Он сейчас надет!"))
 		end
-		table.insert(lines, string.format("Получишь 💎 %s, а он исчезнет навсегда.", Format.short(Fulgurite.shatterValue(spec.Rarity, f.Zone))))
-		win.confirm(table.concat(lines, "\n"), "Разбить", function()
+		table.insert(lines, Loc.t("Получишь 💎 %s, а он исчезнет навсегда.", Format.short(Fulgurite.shatterValue(spec.Rarity, f.Zone))))
+		win.confirm(table.concat(lines, "\n"), Loc.t("Разбить"), function()
 			busy = true
 			local ok, result = ClientState.request(Net.Actions.DeleteFulg, id)
 			busy = false
@@ -591,7 +592,7 @@ local function makeCell(parent: Instance, order: number, size: Vector2, color: C
 	})
 	local name = UIKit.label({
 		Name = "Name",
-		Text = def.Name,
+		Text = Loc.t(def.Name),
 		FontFace = Theme.FontBodyHeavy,
 		Size = UDim2.new(1, -6, 0.3, 0),
 		Position = UDim2.fromScale(0.5, 0.82),
@@ -606,7 +607,7 @@ local function setCell(cell: Cell, color: Config.ColorId, caught: boolean)
 	local def = Config.Colors[color]
 	cell.glyph.Visible = caught
 	cell.unknown.Visible = not caught
-	cell.name.Text = def.Name
+	cell.name.Text = Loc.t(def.Name)
 	if caught then
 		local c = def.Color
 		if color == "black" then
@@ -652,7 +653,7 @@ local function buildIndex(page: Frame)
 	})
 	UIKit.label({
 		Name = "Hint",
-		Text = "Собери весь остров — Вольты навсегда +10%!",
+		Text = Loc.t("Собери весь остров — Вольты навсегда +10%!"),
 		Size = UDim2.new(0.6, 0, 0, 30),
 		AnchorPoint = Vector2.new(1, 0),
 		Position = UDim2.new(1, -4, 0, 2),
@@ -715,7 +716,7 @@ local function buildIndex(page: Frame)
 		return row
 	end
 	for z, zdef in Config.Zones do
-		local row = rowFrame(z, zdef.Name, zdef.Accent)
+		local row = rowFrame(z, Loc.t(zdef.Name), zdef.Accent)
 		local cellsFrame = row:FindFirstChild("Cells") :: Frame
 		local cellMap: { [string]: Cell } = {}
 		for i, c in Config.NormalColors do
@@ -735,14 +736,14 @@ local function buildIndex(page: Frame)
 		local reward = UIKit.status(row, UDim2.fromOffset(104, 22), UDim2.new(1, -116, 1, -28), 17)
 		table.insert(rows, { cells = cellMap, progress = progress, reward = reward })
 	end
-	local special = rowFrame(#Config.Zones + 1, "Особые", Theme.Rainbow)
+	local special = rowFrame(#Config.Zones + 1, Loc.t("Особые"), Theme.Rainbow)
 	local cellsFrame = special:FindFirstChild("Cells") :: Frame
 	for i, c in SPECIAL do
 		specialCells[c] = makeCell(cellsFrame, i, cellSize, c)
 	end
 	UIKit.label({
 		Name = "Note",
-		Text = "Радужная — на событии, Чёрная — на Оке Бури",
+		Text = Loc.t("Радужная — на событии, Чёрная — на Оке Бури"),
 		Size = UDim2.fromOffset(300, 40),
 		AnchorPoint = Vector2.new(1, 0.5),
 		Position = UDim2.new(1, -12, 0.5, 0),
@@ -791,7 +792,7 @@ local function refreshIndex(d: PlayerData.Data)
 		end
 		setCell(specialCells[c], c, caught)
 	end
-	indexTotal.Text = string.format("Поймано: %d/%d", total, max)
+	indexTotal.Text = Loc.t("Поймано: %d/%d", total, max)
 end
 
 ----------------------------------------------------------------------
@@ -870,14 +871,14 @@ function CollectionUI.start()
 	end
 	win = UIKit.window({
 		Name = "Collection",
-		Title = "Коллекция",
+		Title = Loc.t("Коллекция"),
 		Icon = "🔮",
 		Width = 880,
 		Height = 560,
 		Accent = Theme.Spark,
 		Tabs = {
-			{ Id = "fulgs", Text = "Фульгуриты" },
-			{ Id = "index", Text = "Молниедекс" },
+			{ Id = "fulgs", Text = Loc.t("Фульгуриты") },
+			{ Id = "index", Text = Loc.t("Молниедекс") },
 		},
 		OnOpen = function()
 			refresh()

@@ -16,6 +16,7 @@ local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Config = require(Shared:WaitForChild("Config"))
 local Strikes = require(Shared:WaitForChild("Strikes"))
 local Net = require(Shared:WaitForChild("Net"))
+local Loc = require(Shared:WaitForChild("Loc"))
 
 local ClientState = require(script.Parent.Parent.ClientState)
 local Sounds = require(script.Parent.Sounds)
@@ -150,9 +151,9 @@ local function noTarget(source: Source, inside: boolean, clock: number)
 	end
 	lastNoTarget = clock
 	if ClientState.zone() == 0 then
-		ClientState.Toast:Fire("Молнии бьют на островах!", "info")
+		ClientState.Toast:Fire(Loc.t("Молнии бьют на островах!"), "info")
 	else
-		ClientState.Toast:Fire("Встань в круг!", "info")
+		ClientState.Toast:Fire(Loc.t("Встань в круг!"), "info")
 	end
 	Sounds.play("Error", 1, 0.5)
 end
@@ -183,7 +184,7 @@ local function press(source: Source)
 		-- слишком рано: удар не тратим, подсказываем
 		if clock - lastEarly >= EARLY_COOLDOWN then
 			lastEarly = clock
-			hint("Рано! Жди кольцо", Theme.TextDim)
+			hint(Loc.t("Рано! Жди кольцо"), Theme.TextDim)
 		end
 		return
 	end
@@ -258,7 +259,7 @@ local function onUntappedHit(id: number, hit: number, colorId: string, zone: num
 			local clock = os.clock()
 			if clock - lastHint >= HINT_COOLDOWN then
 				lastHint = clock
-				ClientState.Toast:Fire("Жми ⚡ в момент удара!", "info")
+				ClientState.Toast:Fire(Loc.t("Жми ⚡ в момент удара!"), "info")
 			end
 		end
 	end)
@@ -315,7 +316,7 @@ local function onResolved(msg: Net.StrikeResultMsg)
 				local soft = d == nil or d.Settings.SoftFlash
 				Juice.flash(Theme.Perfect, if soft then 0.18 else 0.35)
 				Sounds.play("PowerUp")
-				ClientState.Toast:Fire("Комбо " .. tostring(mark) .. "! Ты молния! ⚡", "rare")
+				ClientState.Toast:Fire(Loc.t("Комбо %d! Ты молния! ⚡", mark), "rare")
 			end
 		end
 		lastResultCombo = combo

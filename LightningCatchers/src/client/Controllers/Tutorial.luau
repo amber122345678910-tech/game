@@ -17,6 +17,7 @@ local Config = require(Shared:WaitForChild("Config"))
 local Economy = require(Shared:WaitForChild("Economy"))
 local Zones = require(Shared:WaitForChild("Zones"))
 local Net = require(Shared:WaitForChild("Net"))
+local Loc = require(Shared:WaitForChild("Loc"))
 
 local ClientState = require(script.Parent.Parent.ClientState)
 local StrikeController = require(script.Parent.StrikeController)
@@ -40,17 +41,18 @@ local FLY_HINT_TIME = 30 -- столько секунд после открыт�
 local BEAM_MIN = 4 -- ближе луч не нужен
 local PULSE_COLOR = Theme.Volt
 
+-- язык выбран до запуска модуля (Main.client), поэтому тексты переводятся один раз
 local TEXT = {
-	ring = "Встань в светящийся круг",
-	tapTouch = "Жми ⚡, когда круги сойдутся!",
-	tapKeys = "Жми ⚡ или E, когда круги сойдутся!",
-	tapPad = "Жми R2, когда круги сойдутся!",
-	hub = "Беги на остров ловить молнии!",
-	sell = "Сдай заряд на подстанции",
-	shop = "Купи улучшение",
-	zone2 = "Открой новый остров в магазине!",
-	fly = "Лети на новый остров!",
-	overcharge = "Банка полна — лови дальше, если не боишься!",
+	ring = Loc.t("Встань в светящийся круг"),
+	tapTouch = Loc.t("Жми ⚡, когда круги сойдутся!"),
+	tapKeys = Loc.t("Жми ⚡ или E, когда круги сойдутся!"),
+	tapPad = Loc.t("Жми R2, когда круги сойдутся!"),
+	hub = Loc.t("Беги на остров ловить молнии!"),
+	sell = Loc.t("Сдай заряд на подстанции"),
+	shop = Loc.t("Купи улучшение"),
+	zone2 = Loc.t("Открой новый остров в магазине!"),
+	fly = Loc.t("Лети на новый остров!"),
+	overcharge = Loc.t("Банка полна — лови дальше, если не боишься!"),
 }
 
 type Hint = { text: string, target: Vector3?, button: string? }

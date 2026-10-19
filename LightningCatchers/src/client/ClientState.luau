@@ -12,6 +12,7 @@ local PlayerData = require(Shared:WaitForChild("PlayerData"))
 local Economy = require(Shared:WaitForChild("Economy"))
 local Strikes = require(Shared:WaitForChild("Strikes"))
 local Net = require(Shared:WaitForChild("Net"))
+local Loc = require(Shared:WaitForChild("Loc"))
 
 local ClientState = {}
 
@@ -35,7 +36,7 @@ ClientState.LocalGrade = Signal.new() :: Signal.Signal<string, string, number>
 ClientState.ZoneChanged = Signal.new() :: Signal.Signal<number, number>
 -- (name) — открыть окно интерфейса ("Shop", "Pets", "Collection", "Teleport", "Rebirth", "Daily", "Settings")
 ClientState.OpenWindow = Signal.new() :: Signal.Signal<string>
--- (text, kind) — показать тост
+-- (text, kind) — показать тост: текст уже на языке игрока (Loc.t / Loc.render)
 ClientState.Toast = Signal.new() :: Signal.Signal<string, string>
 -- () — нажата кнопка ⚡ ЛОВИ на экране (HUD), CatchController слушает вместе с клавиатурой
 ClientState.CatchPressed = Signal.new() :: Signal.Signal<>
@@ -154,17 +155,22 @@ function ClientState.windows(): (number, number)
 end
 
 -- Запрос к серверу. При ошибке показывает тост и возвращает false.
+-- Ошибку сервер присылает строкой-исходником или Loc.Msg: тост рисует её через Loc.render, а вторым
+-- значением возвращается как есть (вызывающий тоже рисует её через Loc.render, если показывает)
 function ClientState.request(action: string, payload: any?): (boolean, any)
 	local ok, a, b = pcall(function()
 		return requestFn:InvokeServer(action, payload)
 	end)
 	if not ok then
-		ClientState.Toast:Fire("Нет связи с сервером", "bad")
+		ClientState.Toast:Fire(Loc.t("Нет связи с сервером"), "bad")
 		return false, nil
 	end
 	if a ~= true then
-		if typeof(b) == "string" and b ~= "" then
-			ClientState.Toast:Fire(b, "bad")
+		if typeof(b) == "string" or typeof(b) == "table" then
+			local text = Loc.render(b)
+			if text ~= "" then
+				ClientState.Toast:Fire(text, "bad")
+			end
 		end
 		return false, b
 	end
@@ -221,9 +227,13 @@ function ClientState.start()
 			ClientState.Effect:Fire(msg)
 		end
 	end)
+	-- текст от сервера — строка-исходник или Loc.Msg: рисуем на языке игрока
 	Net.event("Notify").OnClientEvent:Connect(function(text: any, kind: any)
-		if typeof(text) == "string" then
-			ClientState.Toast:Fire(text, if typeof(kind) == "string" then kind else "info")
+		if typeof(text) == "string" or typeof(text) == "table" then
+			local s = Loc.render(text)
+			if s ~= "" then
+				ClientState.Toast:Fire(s, if typeof(kind) == "string" then kind else "info")
+			end
 		end
 	end)
 	local lastZone = ClientState.zone()

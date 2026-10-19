@@ -97,6 +97,10 @@
 - **Звуки** (проверенные публичные ID Roblox / ProSoundEffects / APM): `src/shared/SoundIds.luau`
 - **Питомцы и коконы**: `src/shared/Pets.luau`
 - **Карта** генерируется скриптом `tools/gen_map.luau` (+ `tools/map/*`), не правь `src/map/Map.rbxmx` руками.
+- **Тексты и языки (EN/RU)**: игра английская по умолчанию, русская — по локали Roblox или в настройках. В коде строки пишутся
+  по-русски внутри `Loc.t(...)` (на сервере `Loc.msg(...)`), английские переводы — в словарях `src/shared/Strings/*.luau`
+  (глоссарий терминов — `Strings/Shared.luau`). После правок: `python3 tools/check_loc.py`. Подробно — раздел «Локализация»
+  в [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
 - Дизайн игры: [`docs/DESIGN.md`](docs/DESIGN.md), устройство кода: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
 
 ## Что проверено
@@ -118,6 +122,6 @@ Roblox нельзя запустить вне Studio, поэтому качес�
 
 ```bash
 tools/setup.sh   # скачать Rojo, Lune, luau-lsp в .tools/
-tools/build.sh   # карта -> тесты -> баланс -> анализ -> проверка UI -> LightningCatchers.rbxl -> проверка места
+tools/build.sh   # карта -> тесты -> баланс -> анализ -> локализация -> проверка UI -> LightningCatchers.rbxl -> проверка места
 .tools/rojo build default.project.json -o /tmp/place.rbxl && .tools/lune run tools/sim/run.luau /tmp/place.rbxl core   # эмулятор
 ```

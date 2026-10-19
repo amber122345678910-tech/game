@@ -11,6 +11,7 @@ local Economy = require(Shared:WaitForChild("Economy"))
 local Format = require(Shared:WaitForChild("Format"))
 local PlayerData = require(Shared:WaitForChild("PlayerData"))
 local Net = require(Shared:WaitForChild("Net"))
+local Loc = require(Shared:WaitForChild("Loc"))
 
 local ClientState = require(script.Parent.Parent.ClientState)
 local Sounds = require(script.Parent.Parent.Controllers.Sounds)
@@ -57,26 +58,26 @@ local function refresh()
 
 	local needZone = Config.Rebirth.RequiredZone
 	local zoneOk = d.Zone >= needZone
-	zoneReq.set(if zoneOk then "check" else "cross", string.format("Открыть остров %d «%s»", needZone, Config.Zones[needZone].Name), if zoneOk then Theme.GoHi else Theme.DangerHi)
+	zoneReq.set(if zoneOk then "check" else "cross", Loc.t("Открыть остров %d «%s»", needZone, Config.Zones[needZone].Name), if zoneOk then Theme.GoHi else Theme.DangerHi)
 
 	local cost = Economy.rebirthCost(r)
 	local voltsOk = d.Volts >= cost
-	voltsReq.set(if voltsOk then "check" else "cross", "Накопить ⚡ " .. Format.short(cost), if voltsOk then Theme.GoHi else Theme.DangerHi)
+	voltsReq.set(if voltsOk then "check" else "cross", Loc.t("Накопить ⚡ %s", Format.short(cost)), if voltsOk then Theme.GoHi else Theme.DangerHi)
 	voltsBar.set(d.Volts / cost, string.format("%s / %s", Format.short(math.min(d.Volts, cost)), Format.short(cost)))
 	voltsBar.setColor(if voltsOk then Theme.Go else Theme.Volt)
 
 	local extraSlot = table.find(Config.Rebirth.PetSlotsAt, r + 1) ~= nil
 	bonusLabel.Visible = extraSlot
-	bonusLabel.Text = "Бонус: +1 место для питомца!"
+	bonusLabel.Text = Loc.t("Бонус: +1 место для питомца!")
 
 	if os.clock() < confirmUntil then
 		return
 	end
 	if Economy.canRebirth(d) then
-		UIKit.setButtonText(rebirthButton, "Перезапуск")
+		UIKit.setButtonText(rebirthButton, Loc.t("Перезапуск"))
 		UIKit.setButtonVariant(rebirthButton, "Danger")
 	else
-		UIKit.setButtonText(rebirthButton, "Пока рано")
+		UIKit.setButtonText(rebirthButton, Loc.t("Пока рано"))
 		UIKit.setButtonVariant(rebirthButton, "Disabled")
 	end
 end
@@ -136,7 +137,7 @@ local function celebrate(newMult: number)
 			UIKit.tween(f, 0.5, { BackgroundTransparency = 1 })
 		end)
 	end
-	celebrateLabel.Text = "ГЕНЕРАТОР ПЕРЕЗАПУЩЕН!\nВОЛЬТЫ " .. multText(newMult)
+	celebrateLabel.Text = Loc.t("ГЕНЕРАТОР ПЕРЕЗАПУЩЕН!\nВОЛЬТЫ %s", multText(newMult))
 	celebrateLabel.Visible = true
 	celebrateScale.Scale = 0.3
 	UIKit.tween(celebrateScale, 0.45, { Scale = 1 }, Enum.EasingStyle.Back)
@@ -159,9 +160,9 @@ local function onRebirthPressed()
 	if not Economy.canRebirth(d) then
 		Sounds.play("Error")
 		if d.Zone < Config.Rebirth.RequiredZone then
-			ClientState.Toast:Fire("Сначала открой остров «" .. Config.Zones[Config.Rebirth.RequiredZone].Name .. "»", "info")
+			ClientState.Toast:Fire(Loc.t("Сначала открой остров «%s»", Config.Zones[Config.Rebirth.RequiredZone].Name), "info")
 		else
-			ClientState.Toast:Fire("Не хватает ⚡ " .. Format.short(Economy.rebirthCost(d.Rebirths) - d.Volts), "bad")
+			ClientState.Toast:Fire(Loc.t("Не хватает ⚡ %s", Format.short(Economy.rebirthCost(d.Rebirths) - d.Volts)), "bad")
 		end
 		return
 	end
@@ -170,7 +171,7 @@ local function onRebirthPressed()
 	if now > confirmUntil then
 		confirmFrom = now + CONFIRM_GUARD
 		confirmUntil = confirmFrom + CONFIRM_TIME
-		UIKit.setButtonText(rebirthButton, "Точно? Жми ещё раз!")
+		UIKit.setButtonText(rebirthButton, Loc.t("Точно? Жми ещё раз!"))
 		-- пока второе нажатие не засчитывается, кнопка серая; потом — оранжевая с пружинкой
 		UIKit.setButtonVariant(rebirthButton, "Disabled")
 		task.delay(CONFIRM_GUARD, function()
@@ -211,7 +212,7 @@ local function build()
 	-- две короткие строки
 	UIKit.label({
 		Name = "Line1",
-		Text = "Начни заново — и получай больше Вольт навсегда!",
+		Text = Loc.t("Начни заново — и получай больше Вольт навсегда!"),
 		FontFace = Theme.FontBodyHeavy,
 		Size = UDim2.new(1, -20, 0, 30),
 		Position = UDim2.fromOffset(10, 0),
@@ -220,7 +221,7 @@ local function build()
 	})
 	UIKit.label({
 		Name = "Line2",
-		Text = "Питомцы, фульгуриты, Тесла-дрон и Молниедекс остаются с тобой.",
+		Text = Loc.t("Питомцы, фульгуриты, Тесла-дрон и Молниедекс остаются с тобой."),
 		Size = UDim2.new(1, -20, 0, 24),
 		Position = UDim2.fromOffset(10, 32),
 		TextColor3 = Theme.TextDim,
@@ -243,7 +244,7 @@ local function build()
 		AnchorPoint = Vector2.new(0, 0.5),
 		Rotation = -3,
 		Parent = multCard,
-	}, "Множитель вольт", 15)
+	}, Loc.t("Множитель вольт"), 15)
 	tag.ZIndex = 2
 	tagText.TextColor3 = Theme.Volt
 	multLabel = UIKit.label({
@@ -276,7 +277,7 @@ local function build()
 		Size = UDim2.fromOffset(120, 24),
 		Position = UDim2.fromOffset(14, 8),
 		Parent = req,
-	}, "Что нужно", 14)
+	}, Loc.t("Что нужно"), 14)
 	rtText.TextColor3 = Theme.TextDim
 	zoneReq = UIKit.status(req, UDim2.new(1, -28, 0, 26), UDim2.fromOffset(14, 40), 21)
 	voltsReq = UIKit.status(req, UDim2.new(0.42, -14, 0, 26), UDim2.fromOffset(14, 74), 21)
@@ -317,8 +318,8 @@ local function build()
 		})
 	end
 	-- как в EconomyService.rebirth: доход в минуту тоже с нуля (награды «N минут дохода» — от минимума)
-	listCard("Reset", "Сбросится", Theme.DangerHi, "• Вольты и банка\n• улучшения и острова\n• доход в минуту", 0)
-	listCard("Keep", "Останется", Theme.GoHi, "• питомцы и фульгуриты\n• осколки и Молниедекс\n• Тесла-дрон", 0.5)
+	listCard("Reset", Loc.t("Сбросится"), Theme.DangerHi, Loc.t("• Вольты и банка\n• улучшения и острова\n• доход в минуту"), 0)
+	listCard("Keep", Loc.t("Останется"), Theme.GoHi, Loc.t("• питомцы и фульгуриты\n• осколки и Молниедекс\n• Тесла-дрон"), 0.5)
 
 	bonusLabel = UIKit.label({
 		Name = "Bonus",
@@ -334,7 +335,7 @@ local function build()
 
 	rebirthButton = UIKit.button({
 		Name = "Rebirth",
-		Text = "Перезапуск",
+		Text = Loc.t("Перезапуск"),
 		Color = Theme.Danger,
 		Size = UDim2.fromOffset(380, 68),
 		AnchorPoint = Vector2.new(0.5, 1),
@@ -350,7 +351,7 @@ function RebirthUI.start()
 	end
 	win = UIKit.window({
 		Name = "Rebirth",
-		Title = "Перезапуск",
+		Title = Loc.t("Перезапуск"),
 		Icon = "♻",
 		Width = W,
 		Height = H,

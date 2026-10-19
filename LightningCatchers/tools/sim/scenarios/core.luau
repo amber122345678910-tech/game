@@ -5,6 +5,11 @@
 --  (cheat shards), equip pets -> daily reward, codes (request + UI), quests -> open/close every window ->
 --  settings -> hub + kiosks (ProximityPrompt) -> UI button fuzz -> rebirth (cheat) -> Supercell (4:00) and
 --  Ball lightning (10:00) events -> player leaves (save) and rejoins (load) -> server shutdown (BindToClose).
+-- Languages (src/shared/Loc.luau): BotTwo's Roblox locale is "ru-ru" (Russian UI), everyone else "en-us" (English).
+--  English bots must never get a Cyrillic GUI text (except the "Русский" language option and the bilingual
+--  "language changes after rejoin" notice); BotTwo must see the Russian HUD and Russian world text (map signs,
+--  prompts, nametags, leaderstats via Controllers/WorldText); BotTwo picks English in Settings before its
+--  last rejoin and must then come back in English although its locale is Russian.
 local roblox = require("@lune/roblox")
 local Bot = require("../lib/bot")
 local Services = require("../lib/services")
@@ -78,12 +83,133 @@ function Core.run(S, cfg)
 		end
 	end
 
-	local function join(userId, name, viewport, touch, skill)
-		local realm = Runtime.addPlayer({ userId = userId, name = name, viewport = viewport, touch = touch })
+	-- locale: Roblox account locale ("en-us" by default); lang: the UI language the bot must end up with
+	-- (Loc.pick: Settings.Lang wins over the locale)
+	local function join(userId, name, viewport, touch, skill, locale, lang)
+		locale = locale or "en-us"
+		local realm = Runtime.addPlayer({ userId = userId, name = name, viewport = viewport, touch = touch, locale = locale })
 		patchConfig(realm)
 		local b = Bot.new(realm, skill)
+		b.locale = locale
+		b.lang = lang or (if string.sub(locale, 1, 2) == "ru" then "ru" else "en")
 		botByRealm[realm] = b
 		return b
+	end
+
+	----------------------------------------------------------------
+	-- Localization helpers
+	----------------------------------------------------------------
+	local CYR = "[\208\209][\128-\191]"
+	local function hasCyr(t)
+		return type(t) == "string" and string.find(t, CYR) ~= nil
+	end
+	-- Russian on purpose on every client: the language option, the bilingual notice, the font warm-up probe
+	local function allowedRu(t)
+		return t == "Русский"
+			or string.find(t, "Language changes after rejoin", 1, true) ~= nil
+			or string.find(t, "LIGHTNING CATCHERS", 1, true) ~= nil
+	end
+	local function short(t)
+		t = string.gsub(t, "\n", " / ")
+		return if #t > 90 then string.sub(t, 1, 90) .. "…" else t
+	end
+	-- every Cyrillic text an English bot's client writes into a TextLabel/TextButton/TextBox placeholder
+	local enLeaks, enLeakList = {}, {}
+	local enTextWrites = 0 -- GUI text writes seen on English clients (the check below must not be vacuous)
+	table.insert(Engine.propHooks, function(d, key, value, R)
+		if (key ~= "Text" and key ~= "PlaceholderText") or not R or R.kind ~= "client" or type(value) ~= "string" then
+			return
+		end
+		local b = botByRealm[R]
+		if not b or b.lang ~= "en" then
+			return
+		end
+		enTextWrites += 1
+		if not hasCyr(value) then
+			return
+		end
+		local isA = d.cls.isA
+		if not (isA.TextLabel or isA.TextButton or isA.TextBox) or (isA.TextBox and key == "Text") or allowedRu(value) then
+			return
+		end
+		local k = b.name .. "|" .. value
+		if not enLeaks[k] then
+			enLeaks[k] = true
+			table.insert(enLeakList, { bot = b.name, text = value, d = d, at = Sched.now })
+			Report.logLine(string.format("[%s] %s (English): Cyrillic GUI text \"%s\" on %s", Report.fmtTime(Sched.now), b.name, short(value), Engine.fullName(d)))
+		end
+	end)
+	-- texts of a bot's PlayerGui (TextLabel/TextButton .Text, TextBox placeholder)
+	local function guiTexts(b, rootD, visibleOnly)
+		local out = {}
+		rootD = rootD or b:playerGui()
+		if not rootD then
+			return out
+		end
+		Engine.forSubtree(rootD, function(x)
+			if x.destroyed or not Engine.visibleTo(x, b.realm) then
+				return
+			end
+			local isA = x.cls.isA
+			if not (isA.TextLabel or isA.TextButton or isA.TextBox) then
+				return
+			end
+			if visibleOnly and not Bot.effectivelyVisible(x, b.realm) then
+				return
+			end
+			local t = readProp(x, if isA.TextBox then "PlaceholderText" else "Text", b.realm)
+			if type(t) == "string" and t ~= "" then
+				table.insert(out, { d = x, text = t })
+			end
+		end)
+		return out
+	end
+	-- English bot: no visible Cyrillic text in its GUI
+	local function checkEnglishGui(b, label)
+		local bad, n = {}, 0
+		for _, it in guiTexts(b, nil, true) do
+			n += 1
+			if hasCyr(it.text) and not allowedRu(it.text) then
+				table.insert(bad, "\"" .. short(it.text) .. "\" @ " .. Engine.fullName(it.d))
+			end
+		end
+		check(string.format("%s (English) sees no Cyrillic GUI text: %s (%d visible texts)", b.name, label, n), #bad == 0 and n > 0, table.concat(bad, " | ", 1, math.min(#bad, 8)))
+	end
+	-- Russian bot: English dictionary values (Latin words) that show up as whole GUI texts = untranslated back
+	local enValues = nil
+	local function checkRussianGui(b, label)
+		local Loc = b:sharedModule("Loc")
+		if not enValues then
+			enValues = {}
+			for k, v in Loc.EN do
+				if hasCyr(k) and string.find(v, "%a%a%a%a") then
+					enValues[v] = k
+					enValues[Loc.upper(v)] = k
+				end
+			end
+		end
+		local bad, n, ru = {}, 0, 0
+		for _, it in guiTexts(b, nil, true) do
+			n += 1
+			if hasCyr(it.text) then
+				ru += 1
+			elseif enValues[it.text] then
+				table.insert(bad, "\"" .. short(it.text) .. "\" (" .. enValues[it.text] .. ") @ " .. Engine.fullName(it.d))
+			end
+		end
+		check(string.format("%s (Russian) sees Russian GUI texts, no English ones: %s (%d of %d visible texts in Russian)", b.name, label, ru, n), #bad == 0 and ru > 0, table.concat(bad, " | ", 1, math.min(#bad, 8)))
+	end
+	-- the catch button's tag: "ЛОВИ!" / "CATCH!"
+	local function catchText(b)
+		local hud = b:findGui("HUD")
+		local btn = hud and b:findDesc(hud, "CatchButton")
+		local found = {}
+		if btn then
+			for _, it in guiTexts(b, btn, false) do
+				table.insert(found, it.text)
+			end
+		end
+		return found
 	end
 
 	-- per-frame bot driver (registered before anyone joins)
@@ -109,7 +235,7 @@ function Core.run(S, cfg)
 	local b1 = join(1001, "BotOne", Vector2.new(1366, 768), false, skill1)
 	table.insert(bots, b1)
 	Sched.runUntil(2.5)
-	local b2 = join(1002, "BotTwo", Vector2.new(844, 390), true, skill2)
+	local b2 = join(1002, "BotTwo", Vector2.new(844, 390), true, skill2, "ru-ru")
 	table.insert(bots, b2)
 
 	-- wait for DataSync and characters
@@ -125,11 +251,33 @@ function Core.run(S, cfg)
 			b:teleport(home)
 		end
 	end
+	-- language: picked from the Roblox locale (no Settings.Lang yet)
+	for _, b in bots do
+		local lang = nil
+		b:run(function()
+			lang = b:sharedModule("Loc").lang()
+		end)
+		Sched.flush()
+		check(string.format("%s (locale %s) plays in %s", b.name, b.locale, b.lang), lang == b.lang, "Loc.lang() = " .. tostring(lang))
+		local texts = catchText(b)
+		local want = if b.lang == "ru" then "ЛОВИ!" else "CATCH!"
+		check(string.format("%s: catch button says %s", b.name, want), table.find(texts, want) ~= nil, "texts: " .. table.concat(texts, ", "))
+		if b.lang == "en" then
+			checkEnglishGui(b, "HUD after joining")
+		else
+			checkRussianGui(b, "HUD after joining")
+		end
+	end
 
 	local requestLog = {}
 	local function req(b, action, payload, label)
 		b:request(action, payload, function(ok, res)
-			table.insert(requestLog, string.format("%s %s(%s) -> %s %s", b.name, action, label or tostring(payload), if ok then "ok" else "FAIL", tostring(res)))
+			-- texts for the player come as a source string or a Loc.Msg: log them in the bot's language
+			local shown = tostring(res)
+			if type(res) == "table" and type(res[1]) == "string" then
+				shown = "\"" .. b:sharedModule("Loc").renderIn(b.lang, res) .. "\""
+			end
+			table.insert(requestLog, string.format("%s %s(%s) -> %s %s", b.name, action, label or tostring(payload), if ok then "ok" else "FAIL", shown))
 		end)
 	end
 
@@ -250,6 +398,52 @@ function Core.run(S, cfg)
 	-- Island 1: play
 	----------------------------------------------------------------
 	runTo(at("social", 40))
+	-- world text (map signs, kiosk prompts, nametags, boards): the property is English for everyone, the Russian
+	-- client swaps it locally from the Loc_<prop> attribute (Controllers/WorldText)
+	do
+		local Loc = b1:sharedModule("Loc")
+		local ws = Runtime.find("Workspace", nil)
+		local total, signs, badEn, badRu = 0, 0, {}, {}
+		local shopEn, shopRu = nil, nil
+		Engine.forSubtree(DATA[ws], function(x)
+			if x.destroyed then
+				return
+			end
+			for _, prop in { "Text", "ActionText", "ObjectText" } do
+				local raw = Engine.getAttribute(x, "Loc_" .. prop, World.server)
+				if type(raw) == "string" then
+					total += 1
+					local ru = Loc.renderIn("ru", Loc.decode(raw))
+					if Engine.getAttribute(x, "LocUpper", World.server) then
+						ru = Loc.upper(ru)
+					end
+					local serverText = readProp(x, prop, World.server)
+					local isSign = string.find(Engine.fullName(x), "Map", 1, true) ~= nil and x.cls.isA.TextLabel
+					if isSign then
+						signs += 1
+					end
+					for _, b in { b1, b2 } do
+						local seen = readProp(x, prop, b.realm)
+						if b.lang == "en" then
+							if seen ~= serverText or hasCyr(seen) then
+								table.insert(badEn, string.format("%s.%s = \"%s\" (source \"%s\")", Engine.fullName(x), prop, short(tostring(seen)), short(raw)))
+							end
+						elseif seen ~= ru then
+							table.insert(badRu, string.format("%s.%s = \"%s\", want \"%s\"", Engine.fullName(x), prop, short(tostring(seen)), short(ru)))
+						end
+					end
+					if raw == "Магазин" and isSign then
+						shopEn, shopRu = readProp(x, prop, b1.realm), readProp(x, prop, b2.realm)
+					end
+				end
+			end
+		end)
+		Report.logLine(string.format("world text: %d localized properties (%d map signs)", total, signs))
+		check("world text: map signs carry their source (Loc_Text)", signs > 10, string.format("%d signs of %d world texts", signs, total))
+		check("world text: BotOne (English) sees English signs, prompts and labels", #badEn == 0, table.concat(badEn, " | ", 1, math.min(#badEn, 6)))
+		check("world text: BotTwo (Russian) sees Russian signs, prompts and labels", #badRu == 0, table.concat(badRu, " | ", 1, math.min(#badRu, 6)))
+		check("world text: the hub SHOP sign is \"SHOP\" in English and \"МАГАЗИН\" in Russian", shopEn == "SHOP" and shopRu == "МАГАЗИН", string.format("en=%s ru=%s", tostring(shopEn), tostring(shopRu)))
+	end
 	for _, b in bots do
 		local fc = Engine.getAttribute(b.pd, "FriendCount", nil)
 		check(b.name .. " FriendCount attribute = 1 (the other bot is a friend)", fc == 1, "FriendCount=" .. tostring(fc))
@@ -260,6 +454,16 @@ function Core.run(S, cfg)
 			for _, c in Engine.childrenOf(DATA[ls], nil) do
 				local cd = DATA[c]
 				Report.logLine(string.format("leaderstats %s.%s = %s (data Volts %s)", b.name, cd.props.Name, tostring(cd.props.Value), tostring(sd and sd.Volts)))
+			end
+			-- column names as each client sees them: English, Russian on the Russian client
+			for _, viewer in { b1, b2 } do
+				local names = {}
+				for _, c in Engine.childrenOf(DATA[ls], viewer.realm) do
+					table.insert(names, tostring(readProp(DATA[c], "Name", viewer.realm)))
+				end
+				table.sort(names)
+				local want = if viewer.lang == "ru" then "Вольты,Перезапуски" else "Rebirths,Volts"
+				check(string.format("%s sees %s's leaderstats columns as %s", viewer.name, b.name, want), table.concat(names, ",") == want, table.concat(names, ","))
 			end
 		end
 	end
@@ -350,6 +554,7 @@ function Core.run(S, cfg)
 	req(b1, "RedeemCode", "МОЛНИЯ")
 	req(b1, "RedeemCode", "молния", "молния (again, lowercase)")
 	req(b1, "RedeemCode", "НЕТТАКОГО")
+	req(b1, "RedeemCode", "lightning", "lightning (English alias of МОЛНИЯ, must be refused)")
 	for q = 1, 3 do
 		req(b1, "ClaimQuest", q)
 	end
@@ -379,6 +584,8 @@ function Core.run(S, cfg)
 		end
 	end
 	runTo(at("daily", 195) + 4)
+	checkEnglishGui(b1, "toasts after daily reward, codes and quests")
+	checkRussianGui(b2, "Daily window and toasts after codes")
 	b2:run(function()
 		b2:clientModule("Client.UI.UIKit").closeWindows()
 	end)
@@ -394,6 +601,7 @@ function Core.run(S, cfg)
 		local sd2 = serverData(b2)
 		check("BotTwo redeemed ГРОЗА through the UI", sd2 ~= nil and sd2.Codes and sd2.Codes["ГРОЗА"] == true)
 		check("lowercase Cyrillic code \"перун\" is accepted", sd2 ~= nil and sd2.Codes and sd2.Codes["ПЕРУН"] == true)
+		check("English alias LIGHTNING shares the МОЛНИЯ mark (no second reward)", sd ~= nil and sd.Codes and sd.Codes.LIGHTNING == nil)
 	end
 
 	----------------------------------------------------------------
@@ -481,6 +689,11 @@ function Core.run(S, cfg)
 			if open == 0 then
 				Report.add("check", b.realm.name, "OpenWindow(\"" .. w .. "\") did not enable any Window_* ScreenGui", {})
 			end
+			if b.lang == "en" then
+				checkEnglishGui(b, "window " .. w)
+			else
+				checkRussianGui(b, "window " .. w)
+			end
 			b:run(function()
 				b:clientModule("Client.UI.UIKit").closeWindows()
 			end)
@@ -548,7 +761,8 @@ function Core.run(S, cfg)
 		local win = b2:findGui("Window_Settings")
 		if win then
 			for _, btn in b2:visibleButtons(win) do
-				if btn.props.Name ~= "Close" then
+				-- the language is switched on purpose later (before BotTwo's last rejoin)
+				if btn.props.Name ~= "Close" and string.sub(btn.props.Name, 1, 5) ~= "Lang_" then
 					b2:click(btn)
 				end
 			end
@@ -592,7 +806,7 @@ function Core.run(S, cfg)
 		if win then
 			for _, btn in b2:visibleButtons(win) do
 				local n = btn.props.Name
-				if n ~= "Close" and n ~= "Backdrop" then
+				if n ~= "Close" and n ~= "Backdrop" and string.sub(n, 1, 5) ~= "Lang_" then
 					b2:click(btn)
 					clicked += 1
 					Sched.step()
@@ -1109,7 +1323,7 @@ function Core.run(S, cfg)
 		check("session lock released on leave", rec.Lock == nil, "Lock=" .. tostring(rec.Lock and rec.Lock.Id))
 	end
 	runTo(leaveAt + 6)
-	local b3 = join(1002, "BotTwo", Vector2.new(844, 390), true, skill2)
+	local b3 = join(1002, "BotTwo", Vector2.new(844, 390), true, skill2, "ru-ru")
 	table.insert(bots, b3)
 	runTo(leaveAt + 18)
 	do
@@ -1150,6 +1364,27 @@ function Core.run(S, cfg)
 		local sd = serverData(b1)
 		check("next day: daily streak advanced to 2", sd ~= nil and sd.Daily.Streak == 2, sd and ("Streak=" .. tostring(sd.Daily.Streak)) or "")
 	end
+	-- BotTwo (Russian locale) picks English in Settings: it applies after the rejoin below
+	do
+		checkRussianGui(b3, "HUD after rejoining")
+		b3:run(function()
+			b3:state().OpenWindow:Fire("Settings")
+		end)
+		runTo(Sched.now + 1)
+		local win = b3:findGui("Window_Settings")
+		local en = win and b3:findDesc(win, "Lang_en", "GuiButton")
+		check("BotTwo: Settings has a Lang_en button", en ~= nil)
+		if en then
+			b3:click(en)
+		end
+		runTo(Sched.now + 2.5)
+		local sd = serverData(b3)
+		check("BotTwo saved Settings.Lang = \"en\"", sd ~= nil and sd.Settings.Lang == "en", sd and ("Lang=" .. tostring(sd.Settings.Lang)) or "")
+		check("BotTwo still plays in Russian until it rejoins", table.find(catchText(b3), "ЛОВИ!") ~= nil, table.concat(catchText(b3), ","))
+		b3:run(function()
+			b3:clientModule("Client.UI.UIKit").closeWindows()
+		end)
+	end
 	-- BotTwo leaves and comes back "a day later": offline income (Welcome)
 	local b3d = serverData(b3)
 	b3.lastData = Services.deepCopy(b3d)
@@ -1158,9 +1393,19 @@ function Core.run(S, cfg)
 	Runtime.removePlayer(b3.pd, "leave")
 	runTo(leaveAt + 40)
 	Sched.osTimeOffset = 86400 * 2
-	local b4 = join(1002, "BotTwo", Vector2.new(844, 390), true, skill2)
+	local b4 = join(1002, "BotTwo", Vector2.new(844, 390), true, skill2, "ru-ru", "en")
 	table.insert(bots, b4)
 	runTo(leaveAt + 52)
+	do
+		local lang = nil
+		b4:run(function()
+			lang = b4:sharedModule("Loc").lang()
+		end)
+		Sched.flush()
+		check("BotTwo rejoined in English (Settings.Lang = \"en\" beats the ru-ru locale)", lang == "en", "Loc.lang() = " .. tostring(lang))
+		check("BotTwo (now English): catch button says CATCH!", table.find(catchText(b4), "CATCH!") ~= nil, table.concat(catchText(b4), ","))
+		checkEnglishGui(b4, "Welcome window after switching to English")
+	end
 	do
 		local sd = serverData(b4)
 		check("offline income accrued after a day away (IncomeRate " .. string.format("%.0f", incomeRate) .. "/min)", sd ~= nil and (incomeRate <= 0 or sd.Welcome > 0), sd and ("Welcome=" .. tostring(sd.Welcome)) or "")
@@ -1203,7 +1448,20 @@ function Core.run(S, cfg)
 	for _, b in bots do
 		if not b.realm.dead then
 			invariants(b, "end of play")
+			if b.lang == "en" then
+				checkEnglishGui(b, "end of play")
+			end
 		end
+	end
+	do
+		local lines = {}
+		for i, l in enLeakList do
+			if i <= 10 then
+				table.insert(lines, string.format("%s@%s: \"%s\" on %s", l.bot, Report.fmtTime(l.at), short(l.text), Engine.fullName(l.d)))
+			end
+		end
+		Report.logLine(string.format("GUI text writes on English clients: %d, Cyrillic: %d", enTextWrites, #enLeakList))
+		check(string.format("English bots never got a Cyrillic GUI text during the whole run (%d text writes watched)", enTextWrites), #enLeakList == 0 and enTextWrites > 500, string.format("%d texts: %s", #enLeakList, table.concat(lines, " | ")))
 	end
 	----------------------------------------------------------------
 	-- Server shutdown: BindToClose saves everyone

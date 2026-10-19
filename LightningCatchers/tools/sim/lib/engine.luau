@@ -720,9 +720,18 @@ local function fireChanged(d, key, filter, newValue)
 end
 Engine.fireChanged = fireChanged
 
+-- Hooks fn(d, key, value, R) called on every property write (scenarios watch e.g. GUI texts per realm)
+Engine.propHooks = {}
+
 -- Store a property value (realm-aware) and fire change events
 function Engine.setProp(d, key, value, R)
 	R = R or Sched.CUR
+	local hooks = Engine.propHooks
+	if hooks[1] ~= nil then
+		for _, h in hooks do
+			h(d, key, value, R)
+		end
+	end
 	local rid = if R then R.id else 0
 	if rid > 0 and d.owner == 0 and not ownsPhysics(d, R, key) then
 		local ov = d.overlay
@@ -747,7 +756,9 @@ function Engine.setProp(d, key, value, R)
 		old = readProp(d, key, nil)
 	end
 	d.props[key] = value
-	if rid <= 0 and d.overlay then
+	-- a server write replicates only when the value changes (as in Roblox): writing the same value again
+	-- keeps a client's local override (e.g. a sign the client translated locally)
+	if rid <= 0 and d.overlay and old ~= value then
 		for _, o in d.overlay do
 			o[key] = nil
 		end

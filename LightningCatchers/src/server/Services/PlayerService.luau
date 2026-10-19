@@ -21,6 +21,7 @@ local Economy = require(Shared:WaitForChild("Economy"))
 local Fonts = require(Shared:WaitForChild("Fonts"))
 local Format = require(Shared:WaitForChild("Format"))
 local Geom = require(Shared:WaitForChild("Geom"))
+local Loc = require(Shared:WaitForChild("Loc"))
 local Net = require(Shared:WaitForChild("Net"))
 local PlayerData = require(Shared:WaitForChild("PlayerData"))
 local Signal = require(Shared:WaitForChild("Signal"))
@@ -56,11 +57,11 @@ PlayerService.Spawned = Signal.new() :: Signal.Signal<Player, Model>
 PlayerService.Died = Signal.new() :: Signal.Signal<Player>
 
 -- Имена, которые ищет клиент (CharacterFX)
-PlayerService.RodName = "Громоотвод" -- Tool с неоновым "Tip" и атрибутом Tier
+PlayerService.RodName = "Громоотвод" -- noloc: Tool с неоновым "Tip" и атрибутом Tier (имя для поиска, Backpack выключен)
 PlayerService.JarName = "Jar" -- Model в персонаже с неоновым "Core" (внутри — выключенный PointLight)
 PlayerService.NametagName = "Nametag" -- BillboardGui в голове: Title, PlayerName, Series
 
-local CLOSED_TEXT = "Остров закрыт — открой его в магазине"
+local CLOSED_TEXT = Loc.msg("Остров закрыт — открой его в магазине")
 
 type State = {
 	Loaded: boolean,
@@ -102,7 +103,7 @@ local PERUN_ARC_TURNS = 1.25 -- витков вокруг стержня
 -- Вспомогательное
 ----------------------------------------------------------------------
 
-local function notify(player: Player, text: string, kind: string)
+local function notify(player: Player, text: Loc.Msg | string, kind: string)
 	local r = notifyRemote
 	if r then
 		r:FireClient(player, text, kind)
@@ -250,18 +251,19 @@ local function rodLook(d: Data?): RodLook
 	return { Tier = tier, Glow = glow, Perun = perun, Key = string.format("%d:%d:%d", tier, glowIndex, if perun then 1 else 0) }
 end
 
--- Титул на табличке: самое редкое достижение и число перезапусков ("" — пока нечем хвастаться)
-local function titleFor(d: Data): string
-	local base = ""
+-- Титул на табличке: самое редкое достижение и число перезапусков (nil — пока нечем хвастаться).
+-- В атрибут Title игрока он кладётся исходником (Loc.encode), табличка рисует его через Loc.setWorldText
+local function titleFor(d: Data): Loc.Msg?
+	local base: Loc.Msg? = nil
 	if d.Stats.Blacks > 0 then
-		base = "☠ Ловец Перуна"
+		base = Loc.msg("☠ Ловец Перуна")
 	elseif d.Stats.Rainbows > 0 then
-		base = "🌈 Радужный ловец"
+		base = Loc.msg("🌈 Радужный ловец")
 	elseif d.Stats.Golds > 0 then
-		base = "🌟 Золотой ловец" -- ✦ нет ни в одном шрифте игры (STYLE §8.3.4): значок — эмодзи
+		base = Loc.msg("🌟 Золотой ловец") -- ✦ нет ни в одном шрифте игры (STYLE §8.3.4): значок — эмодзи
 	end
 	if d.Rebirths > 0 then
-		return if base ~= "" then string.format("%s · ♻%d", base, d.Rebirths) else string.format("♻ Перезапуск ×%d", d.Rebirths)
+		return if base then Loc.msg("%s · ♻%d", base, d.Rebirths) else Loc.msg("♻ Перезапуск ×%d", d.Rebirths)
 	end
 	return base
 end
@@ -271,7 +273,7 @@ end
 local function simpleRod(tier: number): Tool
 	local tool = Instance.new("Tool")
 	tool.Name = PlayerService.RodName
-	tool.ToolTip = "Громоотвод"
+	tool.ToolTip = "Громоотвод" -- noloc: подсказку никто не видит (Backpack выключен)
 	tool.RequiresHandle = true
 	tool.CanBeDropped = false
 	tool.ManualActivationOnly = true
@@ -482,18 +484,20 @@ local function updateNametag(player: Player, st: State)
 	if not gui then
 		return
 	end
+	-- надписи по-английски, исходник — в атрибуте: русский клиент подменит их сам (Controllers/WorldText)
 	local title = gui:FindFirstChild("Title")
 	if title and title:IsA("TextLabel") then
 		local text = player:GetAttribute(Net.PlayerAttrs.Title)
 		local s = if typeof(text) == "string" then text else ""
-		title.Text = s
+		-- в атрибуте — исходник титула (Loc.encode), ключи проверены в titleFor
+		Loc.setWorldText(title, "Text", "%s", Loc.decode(s))
 		title.Visible = s ~= ""
 	end
 	local series = gui:FindFirstChild("Series")
 	if series and series:IsA("TextLabel") then
 		local best = player:GetAttribute(Net.PlayerAttrs.BestCombo)
 		local n = if typeof(best) == "number" then math.floor(best) else 0
-		series.Text = "Серия: " .. tostring(n)
+		Loc.setWorldText(series, "Text", "Серия: %d", n)
 		series.Visible = n > 0
 	end
 end
@@ -538,7 +542,8 @@ function PlayerService.refreshStats(player: Player)
 	player:SetAttribute(Net.PlayerAttrs.Rebirths, d.Rebirths)
 	player:SetAttribute(Net.PlayerAttrs.BestCombo, d.Stats.BestCombo)
 	player:SetAttribute(Net.PlayerAttrs.RodTier, look.Tier)
-	player:SetAttribute(Net.PlayerAttrs.Title, titleFor(d))
+	local title = titleFor(d)
+	player:SetAttribute(Net.PlayerAttrs.Title, if title then Loc.encode(title) else "")
 	applyWalkSpeed(player, st)
 	-- новый уровень громоотвода, перезапуск или Перун — новая модель в руке
 	local rod = findRod(player, st)
@@ -757,15 +762,15 @@ local function gateHint(player: Player, st: State, zone: number, d: Data)
 	local name = Config.Zones[zone].Name
 	local nextZone = Config.Zones[d.Zone + 1]
 	if zone ~= d.Zone + 1 or not nextZone then
-		notify(player, string.format("Остров закрыт — сначала открой «%s»", if nextZone then nextZone.Name else name), "bad")
+		notify(player, Loc.msg("Остров закрыт — сначала открой «%s»", if nextZone then nextZone.Name else name), "bad")
 		return
 	end
 	local cost = Economy.zoneCost(zone)
 	if d.Volts < cost then
-		notify(player, string.format("Остров закрыт — нужно ⚡ %s, не хватает ⚡ %s", Format.short(cost), Format.short(cost - d.Volts)), "bad")
+		notify(player, Loc.msg("Остров закрыт — нужно ⚡ %s, не хватает ⚡ %s", Format.short(cost), Format.short(cost - d.Volts)), "bad")
 		return
 	end
-	notify(player, string.format("Хватает ⚡! Открой «%s» в магазине", name), "good")
+	notify(player, Loc.msg("Хватает ⚡! Открой «%s» в магазине", name), "good")
 	if clock - st.LastGateShop >= Config.Server.GateShopEvery then
 		st.LastGateShop = clock
 		effect(player, { Kind = "openWindow", Text = "Shop:islands", UserId = player.UserId, Zone = zone })
@@ -870,20 +875,21 @@ function PlayerService.zap(player: Player, stun: number)
 end
 
 -- Перенести игрока на точку появления зоны (0 = хаб). Только на открытые острова.
-function PlayerService.teleport(player: Player, zone: any): (boolean, string?)
+-- Отказ — (false, Loc.msg(...)): текст для игрока, клиент переведёт его сам
+function PlayerService.teleport(player: Player, zone: any): (boolean, Loc.Msg?)
 	if not ServerLogic.isInteger(zone) or not isValidZone(zone) then
-		return false, "Нет такого острова"
+		return false, Loc.msg("Нет такого острова")
 	end
 	local st = states[player]
 	local d = DataService.get(player)
 	if not st or not d then
-		return false, "Данные ещё загружаются"
+		return false, Loc.msg("Данные ещё загружаются")
 	end
 	if zone > d.Zone then
 		return false, CLOSED_TEXT
 	end
 	if not aliveHumanoid(st) or not st.Root then
-		return false, "Подожди, пока появится персонаж"
+		return false, Loc.msg("Подожди, пока появится персонаж")
 	end
 	local cf = spawnCFrame(zone)
 	moveCharacter(st, cf)

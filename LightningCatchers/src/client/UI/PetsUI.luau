@@ -16,6 +16,7 @@ local Format = require(Shared:WaitForChild("Format"))
 local PlayerData = require(Shared:WaitForChild("PlayerData"))
 local Net = require(Shared:WaitForChild("Net"))
 local Models = require(Shared:WaitForChild("Models"))
+local Loc = require(Shared:WaitForChild("Loc"))
 
 local ClientState = require(script.Parent.Parent.ClientState)
 local Sounds = require(script.Parent.Parent.Controllers.Sounds)
@@ -150,16 +151,16 @@ local function selectPet(id: number?)
 	detailBonus.Visible = true
 	equipButton.Visible = true
 	deleteButton.Visible = true
-	detailName.Text = Pets.Kinds[kind].Name
+	detailName.Text = Loc.t(Pets.Kinds[kind].Name)
 	detailName.TextColor3 = rar.Color:Lerp(WHITE, 0.35)
-	detailRarity.Text = UIKit.upper(rar.Name)
+	detailRarity.Text = UIKit.upper(Loc.t(rar.Name))
 	detailRarityTag.BackgroundColor3 = rar.Color
 	detailBonus.Text = Pets.bonusText(kind)
 	if isEquipped(d, id) then
-		UIKit.setButtonText(equipButton, "Снять")
+		UIKit.setButtonText(equipButton, Loc.t("Снять"))
 		UIKit.setButtonVariant(equipButton, "Slate")
 	else
-		UIKit.setButtonText(equipButton, "Надеть")
+		UIKit.setButtonText(equipButton, Loc.t("Надеть"))
 		UIKit.setButtonVariant(equipButton, "Go")
 	end
 	if kind ~= detailKind then
@@ -201,7 +202,7 @@ local function makePetCard(id: number, kind: string): PetCard
 	})
 	UIKit.label({
 		Name = "Name",
-		Text = if def then def.Name else kind,
+		Text = if def then Loc.t(def.Name) else kind,
 		FontFace = Theme.FontDisplayFlat,
 		Size = UDim2.new(1, -10, 0, 22),
 		Position = UDim2.fromOffset(5, 100),
@@ -240,8 +241,8 @@ end
 
 local function refreshMine(d: PlayerData.Data)
 	local n = slots(d)
-	slotsLabel.Text = string.format("Надето: %d/%d", #d.Equipped, n)
-	countLabel.Text = string.format("Всего: %d/%d", #d.Pets, Pets.MaxInventory)
+	slotsLabel.Text = Loc.t("Надето: %d/%d", #d.Equipped, n)
+	countLabel.Text = Loc.t("Всего: %d/%d", #d.Pets, Pets.MaxInventory)
 	local present: { [number]: boolean } = {}
 	local list: { PlayerData.PetRecord } = table.clone(d.Pets)
 	table.sort(list, function(a: PlayerData.PetRecord, b: PlayerData.PetRecord): boolean
@@ -320,7 +321,7 @@ local function buildMine(page: Frame)
 	})
 	UIKit.button({
 		Name = "EquipBest",
-		Text = "Надеть лучших",
+		Text = Loc.t("Надеть лучших"),
 		Icon = "#star",
 		Color = Theme.Violet,
 		Size = UDim2.fromOffset(290, 60),
@@ -335,7 +336,7 @@ local function buildMine(page: Frame)
 		end
 		if #d.Pets == 0 then
 			Sounds.play("Error")
-			ClientState.Toast:Fire("Сначала вылупи питомца!", "info")
+			ClientState.Toast:Fire(Loc.t("Сначала вылупи питомца!"), "info")
 			return
 		end
 		busy = true
@@ -366,7 +367,7 @@ local function buildMine(page: Frame)
 		Parent = page,
 	}) :: Frame
 	UIKit.label({
-		Text = "Пока нет питомцев.\nВылупи их из кокона!",
+		Text = Loc.t("Пока нет питомцев.\nВылупи их из кокона!"),
 		FontFace = Theme.FontBodyHeavy,
 		Size = UDim2.new(1, -40, 0, 100),
 		Position = UDim2.new(0.5, 0, 0.32, 0),
@@ -375,7 +376,7 @@ local function buildMine(page: Frame)
 		Parent = emptyHint,
 	})
 	UIKit.button({
-		Text = "К коконам",
+		Text = Loc.t("К коконам"),
 		Color = Theme.Go,
 		Size = UDim2.fromOffset(260, 66),
 		AnchorPoint = Vector2.new(0.5, 0.5),
@@ -428,7 +429,7 @@ local function buildMine(page: Frame)
 	})
 	detailHint = UIKit.label({
 		Name = "Hint",
-		Text = "Нажми на питомца",
+		Text = Loc.t("Нажми на питомца"),
 		FontFace = Theme.FontBodyHeavy,
 		Size = UDim2.new(1, -24, 0, 40),
 		Position = UDim2.new(0.5, 0, 0, 170),
@@ -439,7 +440,7 @@ local function buildMine(page: Frame)
 	})
 	equipButton = UIKit.button({
 		Name = "Equip",
-		Text = "Надеть",
+		Text = Loc.t("Надеть"),
 		Color = Theme.Go,
 		Size = UDim2.new(1, -96, 0, 62),
 		AnchorPoint = Vector2.new(0, 1),
@@ -455,7 +456,7 @@ local function buildMine(page: Frame)
 		local equipped = isEquipped(d, id)
 		if not equipped and #d.Equipped >= slots(d) then
 			Sounds.play("Error")
-			ClientState.Toast:Fire("Все места заняты — сними кого-нибудь", "bad")
+			ClientState.Toast:Fire(Loc.t("Все места заняты — сними кого-нибудь"), "bad")
 			return
 		end
 		busy = true
@@ -488,14 +489,14 @@ local function buildMine(page: Frame)
 		end
 		-- кого именно отпускаем: редкость, бонус и надет ли он сейчас — чтобы не удалить лучшего по ошибке
 		local lines = {
-			string.format("Отпустить питомца «%s»?", Pets.Kinds[kind].Name),
-			rarityOf(kind).Name .. " · " .. Pets.bonusText(kind),
+			Loc.t("Отпустить питомца «%s»?", Pets.Kinds[kind].Name),
+			Loc.t(rarityOf(kind).Name) .. " · " .. Pets.bonusText(kind),
 		}
 		if isEquipped(d, id) then
-			table.insert(lines, "Он сейчас надет!")
+			table.insert(lines, Loc.t("Он сейчас надет!"))
 		end
-		table.insert(lines, "Вернуть его будет нельзя.")
-		win.confirm(table.concat(lines, "\n"), "Удалить", function()
+		table.insert(lines, Loc.t("Вернуть его будет нельзя."))
+		win.confirm(table.concat(lines, "\n"), Loc.t("Удалить"), function()
 			busy = true
 			local ok = ClientState.request(Net.Actions.DeletePet, id)
 			busy = false
@@ -552,7 +553,7 @@ local function buildCocoons(page: Frame)
 		UIKit.tintCard(card, Theme.Night700:Lerp(def.Color, 0.18), Theme.Night800, def.Color)
 		UIKit.label({
 			Name = "Title",
-			Text = def.Name,
+			Text = Loc.t(def.Name),
 			FontFace = Theme.FontDisplayFlat,
 			Size = UDim2.new(1, -16, 0, 28),
 			Position = UDim2.fromOffset(8, 12),
@@ -579,7 +580,7 @@ local function buildCocoons(page: Frame)
 			local kdef = Pets.Kinds[e.kind]
 			UIKit.label({
 				Name = "Kind" .. r,
-				Text = (if kdef then kdef.Name else e.kind) .. " · " .. rar.Name,
+				Text = (if kdef then Loc.t(kdef.Name) else e.kind) .. " · " .. Loc.t(rar.Name),
 				Size = UDim2.new(0.74, -8, 0, 18),
 				Position = UDim2.fromOffset(8, 3 + (r - 1) * 19),
 				TextXAlignment = Enum.TextXAlignment.Left,
@@ -619,7 +620,7 @@ local function buildCocoons(page: Frame)
 		}, function()
 			hatchCocoon(id)
 		end)
-		UIKit.setButtonPrice(button, "Вылупить", "💎 " .. Format.short(def.Cost))
+		UIKit.setButtonPrice(button, Loc.t("Вылупить"), "💎 " .. Format.short(def.Cost))
 		table.insert(cocoonCards, {
 			id = id,
 			req = req,
@@ -640,16 +641,16 @@ local function refreshCocoons(d: PlayerData.Data)
 		local zoneName = Config.Zones[def.Zone].Name
 		local unlocked = d.Zone >= def.Zone
 		if unlocked then
-			c.req.set("pin", "Остров: " .. zoneName, Theme.TextDim)
+			c.req.set("pin", Loc.t("Остров: %s", zoneName), Theme.TextDim)
 		else
-			c.req.set("lock", "Нужен остров «" .. zoneName .. "»", Theme.DangerHi)
+			c.req.set("lock", Loc.t("Нужен остров «%s»", zoneName), Theme.DangerHi)
 		end
 		-- как в Pets.roll: гарантирован кокон, на котором pity + 1 >= PityAt
 		local pity = d.Pity[c.id] or 0
 		local left = math.max(1, def.PityAt - pity)
 		c.pity.Text = if left <= 1
-			then "Следующий кокон — точно легендарный!"
-			else string.format("Легендарный точно выпадет за %d %s", left, Format.plural(left, "кокон", "кокона", "коконов"))
+			then Loc.t("Следующий кокон — точно легендарный!")
+			else Loc.t("Легендарный точно выпадет за %d %s", left, Loc.plural(left, "кокон|кокона|коконов"))
 		local affordable = unlocked and d.Shards >= def.Cost and #d.Pets < Pets.MaxInventory
 		UIKit.setButtonVariant(c.button, if affordable then "Go" elseif unlocked then "Slate" else "Disabled")
 		if unlocked and not affordable then
@@ -829,7 +830,7 @@ local function buildHatch()
 	})
 	hatchHint = UIKit.label({
 		Name = "Hint",
-		Text = "Нажми, чтобы продолжить",
+		Text = Loc.t("Нажми, чтобы продолжить"),
 		Size = UDim2.fromOffset(600, 28),
 		AnchorPoint = Vector2.new(0.5, 0),
 		Position = UDim2.new(0.5, 0, 0, 608),
@@ -915,10 +916,10 @@ local function revealPet(kind: string)
 	if rt then
 		rt:Play()
 	end
-	hatchName.Text = UIKit.upper(if def then def.Name else kind)
+	hatchName.Text = UIKit.upper(if def then Loc.t(def.Name) else kind)
 	local tones = UIKit.tones(rar.Color)
 	hatchNameGrad.Color = UIKit.seq({ { 0, Theme.Cream }, { 0.45, tones.Hi }, { 1, tones.Base } })
-	hatchRarity.Text = UIKit.upper(rar.Name)
+	hatchRarity.Text = UIKit.upper(Loc.t(rar.Name))
 	hatchRarity.TextColor3 = rar.Color:Lerp(WHITE, 0.3)
 	hatchRarityGrad.Color = UIKit.seq({ { 0, Theme.Ink }, { 0.78, Theme.Ink }, { 0.8, rar.Color }, { 1, rar.Color } })
 	hatchBonus.Text = Pets.bonusText(kind)
@@ -959,17 +960,17 @@ hatchCocoon = function(id: string)
 	end
 	if d.Zone < def.Zone then
 		Sounds.play("Error")
-		ClientState.Toast:Fire("Сначала открой «" .. Config.Zones[def.Zone].Name .. "»", "info")
+		ClientState.Toast:Fire(Loc.t("Сначала открой «%s»", Config.Zones[def.Zone].Name), "info")
 		return
 	end
 	if #d.Pets >= Pets.MaxInventory then
 		Sounds.play("Error")
-		ClientState.Toast:Fire("Нет места — удали лишних питомцев", "bad")
+		ClientState.Toast:Fire(Loc.t("Нет места — удали лишних питомцев"), "bad")
 		return
 	end
 	if d.Shards < def.Cost then
 		Sounds.play("Error")
-		ClientState.Toast:Fire("Не хватает 💎 " .. Format.short(def.Cost - d.Shards), "bad")
+		ClientState.Toast:Fire(Loc.t("Не хватает 💎 %s", Format.short(def.Cost - d.Shards)), "bad")
 		return
 	end
 
@@ -1173,14 +1174,14 @@ function PetsUI.start()
 	end
 	win = UIKit.window({
 		Name = "Pets",
-		Title = "Питомцы",
+		Title = Loc.t("Питомцы"),
 		Icon = "🐾",
 		Width = 880,
 		Height = 560,
 		Accent = Theme.Pink,
 		Tabs = {
-			{ Id = "mine", Text = "Мои питомцы" },
-			{ Id = "cocoons", Text = "Коконы" },
+			{ Id = "mine", Text = Loc.t("Мои питомцы") },
+			{ Id = "cocoons", Text = Loc.t("Коконы") },
 		},
 		OnOpen = function()
 			refresh()

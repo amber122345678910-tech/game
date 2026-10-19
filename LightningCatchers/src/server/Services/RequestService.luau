@@ -4,13 +4,15 @@
 --  * лимит частоты на игрока (ведро токенов: Config.Server.RequestRate / RequestBurst);
 --  * обработчик вызывается в xpcall: ошибка в коде не ломает сервер, игрок видит понятный текст.
 -- Проверка типов payload — забота обработчика (он лучше знает, что ждёт).
--- Обработчик возвращает (true, результат) или (false, "текст ошибки по-русски").
+-- Обработчик возвращает (true, результат) или (false, текст ошибки): строка-исходник по-русски или Loc.msg(...) —
+-- клиент рисует его на языке игрока (Loc.render).
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Config = require(Shared:WaitForChild("Config"))
+local Loc = require(Shared:WaitForChild("Loc"))
 local Net = require(Shared:WaitForChild("Net"))
 
 local ServerLogic = require(script.Parent.Parent.Lib.ServerLogic)
@@ -19,9 +21,9 @@ export type Handler = (player: Player, payload: any) -> (boolean, any)
 
 local RequestService = {}
 
-RequestService.ErrorText = "Ошибка, попробуй ещё раз"
-RequestService.UnknownText = "Неизвестное действие"
-RequestService.TooFastText = "Слишком быстро! Подожди секунду"
+RequestService.ErrorText = Loc.msg("Ошибка, попробуй ещё раз")
+RequestService.UnknownText = Loc.msg("Неизвестное действие")
+RequestService.TooFastText = Loc.msg("Слишком быстро! Подожди секунду")
 
 local handlers: { [string]: Handler } = {}
 local buckets: { [Player]: ServerLogic.Bucket } = {}
@@ -69,8 +71,9 @@ function RequestService.invoke(player: Player, action: string, payload: any): (b
 	if success == true then
 		return true, result
 	end
-	-- обработчик отказал: показываем его текст, если он есть
-	return false, if typeof(result) == "string" and result ~= "" then result else RequestService.ErrorText
+	-- обработчик отказал: показываем его текст (строка-исходник или Loc.msg), если он есть
+	local hasText = (typeof(result) == "string" and result ~= "") or (typeof(result) == "table" and typeof(result[1]) == "string")
+	return false, if hasText then result else RequestService.ErrorText
 end
 
 local function onInvoke(player: Player, action: any, payload: any): (boolean, any)

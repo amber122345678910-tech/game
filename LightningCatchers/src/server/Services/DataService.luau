@@ -16,6 +16,7 @@ local HttpService = game:GetService("HttpService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
+local Loc = require(Shared:WaitForChild("Loc"))
 local Net = require(Shared:WaitForChild("Net"))
 local Signal = require(Shared:WaitForChild("Signal"))
 local PlayerData = require(Shared:WaitForChild("PlayerData"))
@@ -57,7 +58,7 @@ local RETRIES = 5
 local SAVE_WAIT = 30 -- последнее сохранение ждёт идущее автосохранение не дольше этого
 local NOT_SAVING_FIRST = 6 -- предупреждение «прогресс не сохраняется»: через столько секунд после входа
 local NOT_SAVING_EVERY = 300 -- и потом раз в столько секунд
-local NOT_SAVING_TEXT = "⚠ Прогресс сейчас не сохраняется (сбой серверов Roblox). Перезайди в игру попозже"
+local NOT_SAVING_TEXT = Loc.msg("⚠ Прогресс сейчас не сохраняется (сбой серверов Roblox). Перезайди в игру попозже")
 
 local store: DataStore? = nil
 local storeDisabled = false

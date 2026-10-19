@@ -22,6 +22,7 @@ local Fulgurite = require(Shared:WaitForChild("Fulgurite"))
 local Format = require(Shared:WaitForChild("Format"))
 local PlayerData = require(Shared:WaitForChild("PlayerData"))
 local Net = require(Shared:WaitForChild("Net"))
+local Loc = require(Shared:WaitForChild("Loc"))
 
 local ClientState = require(script.Parent.Parent.ClientState)
 local Sounds = require(script.Parent.Parent.Controllers.Sounds)
@@ -54,62 +55,86 @@ local HAZARD_STEP = 16 -- шаг диагональных полос опасн�
 
 -- Порядок = важность: на маленьком экране последние кнопки уходят в «Ещё»
 -- (награды дня нужны с первой минуты, перезапуск — только через час-полтора, настройки — редко).
--- Акценты разделов — §8.2; Short — подпись под плиткой (короче 9 букв: «Перезапуск» не помещается)
+-- Акценты разделов — §8.2; Short — подпись под плиткой (короче 9 букв: «Перезапуск» не помещается).
+-- Тексты — на языке игрока (язык выбран до запуска HUD, Main.client)
 local MENU = {
-	{ Name = "ShopButton", Window = "Shop", Icon = "🛒", Short = "Магазин", Color = Theme.Volt },
-	{ Name = "PetsButton", Window = "Pets", Icon = "🐾", Short = "Питомцы", Color = Theme.Pink },
-	{ Name = "DailyButton", Window = "Daily", Icon = "🎁", Short = "Награды", Color = Theme.Go },
-	{ Name = "TeleportButton", Window = "Teleport", Icon = "🌀", Short = "Острова", Color = Theme.Violet },
-	{ Name = "CollectionButton", Window = "Collection", Icon = "🔮", Short = "Коллекция", Color = Theme.Spark },
-	{ Name = "RebirthButton", Window = "Rebirth", Icon = "♻", Short = "Рестарт", Color = Theme.Orange },
-	{ Name = "SettingsButton", Window = "Settings", Icon = "⚙", Short = "Настройки", Color = Theme.Slate },
+	{ Name = "ShopButton", Window = "Shop", Icon = "🛒", Short = Loc.t("menu::Магазин"), Color = Theme.Volt },
+	{ Name = "PetsButton", Window = "Pets", Icon = "🐾", Short = Loc.t("menu::Питомцы"), Color = Theme.Pink },
+	{ Name = "DailyButton", Window = "Daily", Icon = "🎁", Short = Loc.t("menu::Награды"), Color = Theme.Go },
+	{ Name = "TeleportButton", Window = "Teleport", Icon = "🌀", Short = Loc.t("menu::Острова"), Color = Theme.Violet },
+	{ Name = "CollectionButton", Window = "Collection", Icon = "🔮", Short = Loc.t("menu::Коллекция"), Color = Theme.Spark },
+	{ Name = "RebirthButton", Window = "Rebirth", Icon = "♻", Short = Loc.t("menu::Рестарт"), Color = Theme.Orange },
+	{ Name = "SettingsButton", Window = "Settings", Icon = "⚙", Short = Loc.t("menu::Настройки"), Color = Theme.Slate },
 }
 
 local EVENT_INFO = {
-	supercell = { Now = "Суперячейка", Icon = "⚡", Color = Theme.Supercell },
-	ball = { Now = "Шаровая молния", Icon = "🔮", Color = Theme.Ball },
-	rainbow = { Now = "Радужная молния", Icon = "🌈", Color = Theme.Rainbow },
+	supercell = { Now = Loc.t("Суперячейка"), Icon = "⚡", Color = Theme.Supercell },
+	ball = { Now = Loc.t("Шаровая молния"), Icon = "🔮", Color = Theme.Ball },
+	rainbow = { Now = Loc.t("Радужная молния"), Icon = "🌈", Color = Theme.Rainbow },
 } :: { [string]: { Now: string, Icon: string, Color: Color3 } }
 
-local NEXT_EVENTS = {
-	{ Attr = "NextSupercell", Text = "Суперячейка через ", Icon = "⚡", Color = Theme.Supercell },
-	{ Attr = "NextBall", Text = "Шаровая через ", Icon = "🔮", Color = Theme.Ball },
-	{ Attr = "NextRainbow", Text = "Радужная через ", Icon = "🌈", Color = Theme.Rainbow },
+-- Text(время) — «Суперячейка через 1:23»
+type NextEvent = { Attr: string, Text: (string) -> string, Icon: string, Color: Color3 }
+local NEXT_EVENTS: { NextEvent } = {
+	{
+		Attr = "NextSupercell",
+		Text = function(t: string): string
+			return Loc.t("Суперячейка через %s", t)
+		end,
+		Icon = "⚡",
+		Color = Theme.Supercell,
+	},
+	{
+		Attr = "NextBall",
+		Text = function(t: string): string
+			return Loc.t("Шаровая через %s", t)
+		end,
+		Icon = "🔮",
+		Color = Theme.Ball,
+	},
+	{
+		Attr = "NextRainbow",
+		Text = function(t: string): string
+			return Loc.t("Радужная через %s", t)
+		end,
+		Icon = "🌈",
+		Color = Theme.Rainbow,
+	},
 }
 
 -- Слова-оценки (§8.4): размер, градиент букв, наклон
 type GradeStyle = { Text: string, Size: number, Colors: { Color3 }, Tilt: number, Motion: string }
 local GRADES: { [string]: GradeStyle } = {
 	perfect = {
-		Text = "ИДЕАЛЬНО!",
+		Text = Loc.t("ИДЕАЛЬНО!"),
 		Size = 96,
 		Colors = { Color3.fromRGB(255, 255, 240), Color3.fromRGB(255, 226, 80), Color3.fromRGB(255, 160, 30) },
 		Tilt = -6,
 		Motion = "burst",
 	},
 	good = {
-		Text = "ХОРОШО",
+		Text = Loc.t("ХОРОШО"),
 		Size = 72,
 		Colors = { Color3.fromRGB(255, 255, 255), Color3.fromRGB(120, 230, 255) },
 		Tilt = 3,
 		Motion = "spark",
 	},
 	miss = {
-		Text = "МИМО",
+		Text = Loc.t("МИМО"),
 		Size = 64,
 		Colors = { Color3.fromRGB(230, 220, 240), Color3.fromRGB(255, 110, 120) },
 		Tilt = 0,
 		Motion = "droop",
 	},
 	zap = {
-		Text = "ШАРАХНУЛО!",
+		Text = Loc.t("ШАРАХНУЛО!"),
 		Size = 80,
 		Colors = { Color3.fromRGB(255, 250, 200), Color3.fromRGB(255, 120, 60) },
 		Tilt = 0,
 		Motion = "shake",
 	},
 	burst = {
-		Text = "БАНКА ЛОПНУЛА!",
+		Text = Loc.t("БАНКА ЛОПНУЛА!"),
 		Size = 72,
 		Colors = { Color3.fromRGB(255, 236, 230), Color3.fromRGB(244, 72, 92) },
 		Tilt = 0,
@@ -443,7 +468,7 @@ local function buildJar()
 	UIKit.stroke(jarTick, 1.5, Theme.Ink)
 	jarLabel = UIKit.label({
 		Name = "Label",
-		Text = "БАНКА 0/25",
+		Text = Loc.t("БАНКА 0/25"),
 		FontFace = Theme.FontBodyHeavy,
 		Size = UDim2.new(1, -20, 1, -6),
 		Position = UDim2.fromScale(0.5, 0.5),
@@ -463,7 +488,7 @@ local function buildJar()
 		ZIndex = 6,
 		Visible = false,
 		Parent = jar,
-	}, "Риск 0%", 15, Theme.Danger)
+	}, Loc.t("Риск 0%"), 15, Theme.Danger)
 	riskLabel.TextColor3 = Theme.Cream
 end
 
@@ -611,7 +636,7 @@ local function updateJar()
 	jarOver.Visible = overMode and over > 0.002
 	UIKit.tween(jarOver, 0.18, { Size = UDim2.fromScale(over * (1 - normalFrac), 1) })
 
-	jarLabel.Text = string.format("БАНКА  %s / %s", Format.short(math.floor(charge + 0.5)), Format.short(cap))
+	jarLabel.Text = Loc.t("БАНКА  %s / %s", Format.short(math.floor(charge + 0.5)), Format.short(cap))
 
 	-- цвет заливки: голубая → золотая (почти полна)
 	local key = if fill >= 0.999 then "full" elseif fill >= 0.8 then "high" else "low"
@@ -636,21 +661,21 @@ local function updateJar()
 	end
 	local riskPct = math.max(1, math.floor(risk * 100 + 0.5))
 	riskTag.Visible = risk > 0 or (fill > 1.001 and not full)
-	riskLabel.Text = string.format("РИСК ~%d%%", riskPct)
+	riskLabel.Text = Loc.t("РИСК ~%d%%", riskPct)
 	if full and zone ~= 0 then
-		setStatus(if droneAway then "Банка полна — дрон скоро вернётся" else "Банка полна — сдай заряд!", Theme.Volt, not droneAway)
+		setStatus(if droneAway then Loc.t("Банка полна — дрон скоро вернётся") else Loc.t("Банка полна — сдай заряд!"), Theme.Volt, not droneAway)
 	elseif full then
-		setStatus("Сдай заряд у Тесла-башни!", Theme.Volt, true)
+		setStatus(Loc.t("Сдай заряд у Тесла-башни!"), Theme.Volt, true)
 	elseif fill > 1.001 then
-		setStatus(string.format("Перегрузка! Банка может лопнуть: ~%d%%", riskPct), Theme.DangerHi, false)
+		setStatus(Loc.t("Перегрузка! Банка может лопнуть: ~%d%%", riskPct), Theme.DangerHi, false)
 	elseif overAllowed and fill >= 0.999 then
 		-- ровно полна: можно сдать или рискнуть
-		setStatus(string.format("Банка полна! Дальше риск ~%d%%", riskPct), Theme.Volt, true)
+		setStatus(Loc.t("Банка полна! Дальше риск ~%d%%", riskPct), Theme.Volt, true)
 	elseif risk > 0 then
 		-- следующая поимка, скорее всего, перельётся за 100%
-		setStatus(string.format("Почти полна: риск лопнуть ~%d%%", riskPct), Theme.Orange, false)
+		setStatus(Loc.t("Почти полна: риск лопнуть ~%d%%", riskPct), Theme.Orange, false)
 	elseif droneAway then
-		setStatus("Дрон везёт заряд", Theme.Spark, false)
+		setStatus(Loc.t("Дрон везёт заряд"), Theme.Spark, false)
 	else
 		statusLabel.Visible = false
 		setPulse(false)
@@ -722,7 +747,7 @@ local function buildRight()
 	UIKit.gradient(city, Theme.Night800, Theme.Ink)
 	UIKit.label({
 		Name = "Title",
-		Text = "ЭЛЕКТРОГРАД",
+		Text = Loc.t("ЭЛЕКТРОГРАД"),
 		FontFace = Theme.FontBodyHeavy,
 		TextColor3 = Theme.TextDim,
 		Size = UDim2.new(1, -24, 0, 22),
@@ -748,7 +773,7 @@ local function buildRight()
 		Visible = false,
 		ZIndex = 3,
 		Parent = city,
-	}, "×2 вольт", 16, Theme.Volt)
+	}, Loc.t("×2 вольт"), 16, Theme.Volt)
 	cityBoostLabel.TextColor3 = Theme.Ink
 
 	-- множитель и личный буст
@@ -809,7 +834,7 @@ local function updateRight()
 			UIKit.setIconBadge(eventBadge, bestDef.Icon, bestDef.Color)
 		end
 		if best then
-			eventLabel.Text = bestDef.Text .. Format.time(best - now)
+			eventLabel.Text = bestDef.Text(Format.time(best - now))
 			eventPill.Visible = true
 		else
 			eventPill.Visible = false
@@ -823,9 +848,9 @@ local function updateRight()
 	local boostUntil = attrNumber(gs, "CityBoostUntil") or 0
 	if boostUntil > now then
 		cityBoost.Visible = true
-		cityBoostLabel.Text = "×2 ВОЛЬТ " .. Format.time(boostUntil - now)
+		cityBoostLabel.Text = Loc.t("×2 ВОЛЬТ %s", Format.time(boostUntil - now))
 		cityBar.setColor(Theme.Volt)
-		cityBar.set(1, "Город сияет!")
+		cityBar.set(1, Loc.t("Город сияет!"))
 	else
 		cityBoost.Visible = false
 		cityBar.setColor(Theme.Volt)
@@ -1039,7 +1064,7 @@ local function buildMenu()
 	end
 
 	-- «Ещё» — последняя плитка ряда; раскрывает блок со спрятанными кнопками прямо под собой
-	local more = makeTile("MoreButton", "#plus", "Ещё", Theme.Spark, #MENU + 1, function()
+	local more = makeTile("MoreButton", "#plus", Loc.t("menu::Ещё"), Theme.Spark, #MENU + 1, function()
 		setMoreOpen(not moreOpen)
 	end)
 	more.button.Visible = false
@@ -1223,7 +1248,7 @@ local function buildCatch()
 		Rotation = -4,
 		ZIndex = 5,
 		Parent = catchButton,
-	}, "ЛОВИ!", 40)
+	}, Loc.t("ЛОВИ!"), 40)
 	tagLabel.FontFace = Theme.FontDisplay
 	tagLabel.Size = UDim2.new(1, -8, 1, -4)
 	tagLabel.ZIndex = 5
@@ -1288,7 +1313,7 @@ local function buildCatch()
 		Position = UDim2.fromScale(0.5, 1.04),
 		ZIndex = 3,
 		Parent = comboRoot,
-	}, "Комбо", 18)
+	}, Loc.t("Комбо"), 18)
 	tl.ZIndex = 3
 	tag.ZIndex = 3
 end

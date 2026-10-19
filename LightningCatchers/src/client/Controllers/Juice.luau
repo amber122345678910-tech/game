@@ -5,12 +5,14 @@
 -- «Мягкие вспышки» — вспышка экрана не ярче SOFT_FLASH_MAX.
 
 local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
 local Workspace = game:GetService("Workspace")
 
 local ClientState = require(script.Parent.Parent.ClientState)
 local Theme = require(script.Parent.Parent.UI.Theme)
+local Loc = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Loc"))
 
 local Juice = {}
 
@@ -18,7 +20,7 @@ local player = Players.LocalPlayer
 
 ----------------------------------------------------------------------
 -- Всплывающий текст над точкой мира («+12 ⚡», «Цепная молния!»): §8.4 — D3 (Oswald) с градиентом цвета,
--- обводкой 3 Ink и случайным наклоном ±5°; слова (с русскими буквами) — Montserrat Black Italic.
+-- обводкой 3 Ink и случайным наклоном ±5°; слова (русские или английские) — Montserrat Black Italic.
 -- Детали берутся из пула (без создания и удаления на каждое событие)
 ----------------------------------------------------------------------
 local popupFolder = Instance.new("Folder")
@@ -79,12 +81,15 @@ local function makePopup(): Popup
 	return { anchor = anchor, gui = gui, label = label, stroke = stroke, grad = grad, scale = scale, busy = false, token = 0 }
 end
 
--- Есть ли в строке русские буквы (UTF-8: ведущие байты 0xD0/0xD1)
-local function hasCyrillic(text: string): boolean
-	return string.find(text, "[\208\209]") ~= nil
+-- Слова, а не число: русские буквы (UTF-8: ведущие байты 0xD0/0xD1) или три латинские буквы подряд
+-- (суффиксы чисел K, M, Qa — короче: «+1.2K ⚡» остаётся числом)
+local function hasWords(text: string): boolean
+	return string.find(text, "[\208\209]") ~= nil or string.find(text, "%a%a%a") ~= nil
 end
 
-function Juice.popup(position: Vector3, text: string, color: Color3?, big: boolean?)
+-- source — строка (исходник или уже Loc.t) или Loc.Msg: рисуется на языке игрока
+function Juice.popup(position: Vector3, source: string | Loc.Msg, color: Color3?, big: boolean?)
+	local text = Loc.render(source)
 	local p: Popup? = nil
 	for _, q in popups do
 		if not q.busy then
@@ -110,7 +115,7 @@ function Juice.popup(position: Vector3, text: string, color: Color3?, big: boole
 		base = Color3.fromHSV(h, sat * 0.8, 0.75) -- тёмный цвет (Чёрная Перуна) не читается на обводке Ink
 	end
 	local size = if big then 3.2 else 2.2
-	local words = hasCyrillic(text)
+	local words = hasWords(text)
 	pop.gui.Size = UDim2.fromScale(size * (if words then 3.2 else 2.5), size)
 	pop.label.FontFace = if words then Theme.FontDisplay else Theme.FontNumber
 	pop.label.Text = text

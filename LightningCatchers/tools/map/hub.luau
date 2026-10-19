@@ -5,6 +5,9 @@
 -- и окнами (зажигаются клиентом), гирлянды над улицами, киоски с вывесками, табло, фонари, скамейки, клумбы.
 local roblox = require("@lune/roblox")
 local B = require("../lib/builder")
+-- Локализация надписей (src/shared/Loc.luau): тот же модуль, что у builder (кэш Loader)
+local Loader = require("../lib/loader")
+local Loc = Loader.load("src/shared/Loc")
 local P = require("../lib/props")
 local Island = require("./island")
 local Vector3 = roblox.Vector3
@@ -291,7 +294,8 @@ end
 
 ----------------------------------------------------------------------
 -- Табло: рама «Отделка», экран Night800, лента-заголовок как в окнах UI;
--- метка Board_<name> с SurfaceGui "Gui" → TextLabel "Title" и Frame "Content" (строки заполняет сервер)
+-- метка Board_<name> с SurfaceGui "Gui" → TextLabel "Title" и Frame "Content" (строки заполняет сервер).
+-- title — Loc.msg(исходник): заголовок по-английски ЗАГЛАВНЫМИ, исходник в атрибуте Loc_Text (+ LocUpper)
 ----------------------------------------------------------------------
 local function infoBoard(parent, markers, name, title, pos, accent, rng)
 	local m = B.model(parent, "Board_" .. name .. "_Frame")
@@ -345,7 +349,9 @@ local function infoBoard(parent, markers, name, title, pos, accent, rng)
 	t.Position = UDim2.fromScale(0.08, 0.025)
 	t.Rotation = -2
 	t.FontFace = B.FontDisplay
-	t.Text = B.upper(title)
+	t.Text = B.upper(Loc.renderIn("en", title))
+	t:SetAttribute(Loc.attr("Text"), Loc.encode(title))
+	t:SetAttribute("LocUpper", true)
 	t.TextColor3 = B.CREAM
 	t.TextScaled = true
 	t.ZIndex = 2
@@ -462,7 +468,8 @@ local function hatcheryKiosk(parent, markers, pos, rng, ctx)
 		-- табличка с названием и ценой
 		local plaque = B.block(m, base * CFrame.new(0, 1.6, -1.55) * CFrame.Angles(-0.25, 0, 0), Vector3.new(2.6, 1.4, 0.2), B.SIGN, B.deco({ Name = "Plaque" }))
 		B.text(plaque, {
-			{ Text = string.gsub(def.Name, " кокон", ""), Font = B.FontDisplayFlat, Size = 1, Rotation = 0 },
+			-- «Луговой кокон» → «Луговой»: перевод по ключу "cocoon::Луговой" (Strings/Map.luau)
+			{ Text = "cocoon::" .. string.gsub(def.Name, " кокон", ""), Font = B.FontDisplayFlat, Size = 1, Rotation = 0 }, -- noloc
 			{ Text = tostring(def.Cost) .. " 💎", Font = B.FontNumber, Color = rgb(186, 242, 255), Size = 0.9 },
 		}, { Face = Enum.NormalId.Front, PixelsPerStud = 60 })
 	end
@@ -529,7 +536,7 @@ local function rebirthKiosk(parent, pos, rng)
 		B.block(m, CFrame.new(p + Vector3.new(0, 3, 0)) * CFrame.Angles(0, -a, 0), Vector3.new(1.2, 6, 1.2), dark, { Material = M.Metal, Shadow = true })
 		B.gem(m, p + Vector3.new(0, 6.7, 0), 0.9, a, glow, B.neon())
 	end
-	B.sign(m, cf * CFrame.new(0, 13.4, 0), 11, 3, { { Text = "Перезапуск" }, { Text = "генератора" } }, { Underline = glow })
+	B.sign(m, cf * CFrame.new(0, 13.4, 0), 11, 3, { { Text = "Перезапуск" }, { Text = "sign::генератора" } }, { Underline = glow })
 	local _ = rng
 	return m
 end
@@ -730,9 +737,9 @@ function Hub.build(ctx, parent)
 
 	-- табло
 	local boards = B.model(hub, "Boards")
-	infoBoard(boards, ctx.Markers, "Leaders", "Лучшие ловцы", H.BoardLeaders, rgb(255, 210, 60), rng)
-	infoBoard(boards, ctx.Markers, "Forecast", "Прогноз бури", H.BoardForecast, ENERGY, rng)
-	infoBoard(boards, ctx.Markers, "Hall", "Зал славы", hubPoint(180, 88), rgb(255, 112, 190), rng)
+	infoBoard(boards, ctx.Markers, "Leaders", Loc.msg("Лучшие ловцы"), H.BoardLeaders, rgb(255, 210, 60), rng)
+	infoBoard(boards, ctx.Markers, "Forecast", Loc.msg("Прогноз бури"), H.BoardForecast, ENERGY, rng)
+	infoBoard(boards, ctx.Markers, "Hall", Loc.msg("Зал славы"), hubPoint(180, 88), rgb(255, 112, 190), rng)
 
 	-- скамейки и клумбы вокруг внутреннего круга (между дорогами), тополя в кадках у киосков
 	local pal = { trunk = DOOR, leafA = rgb(78, 158, 70), leafB = rgb(122, 186, 72), flowers = { rgb(255, 120, 160), rgb(255, 214, 90), rgb(250, 248, 255), rgb(196, 146, 255) }, stone = COBBLE }

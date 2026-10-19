@@ -12,6 +12,8 @@
 --                   pets, fulgurites, daily/codes/quests, every window, settings, kiosks, UI fuzz, rebirth, drone,
 --                   barrier/void/death, remote fuzzing, Supercell + Ball lightning, late joiner, session locks,
 --                   leave/rejoin save-load, next-day reward + offline income, BindToClose. ~100 s wall time.
+--                   Languages: BotTwo has the Roblox locale "ru-ru" (Russian UI and world text), the others "en-us";
+--                   English bots must never show Cyrillic GUI text; BotTwo switches to English in Settings and rejoins.
 --   fast            core with event timers patched in Config before boot (Supercell, Ball, Rainbow, Perun, city).
 --   selftest        injects one fault of every kind and checks the harness reports it (detector self-check).
 --   smoke           boot + 2 players idle (quick sanity check).

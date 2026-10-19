@@ -22,6 +22,7 @@ local Format = require(Shared:WaitForChild("Format"))
 local Net = require(Shared:WaitForChild("Net"))
 local Pets = require(Shared:WaitForChild("Pets"))
 local Models = require(Shared:WaitForChild("Models"))
+local Loc = require(Shared:WaitForChild("Loc"))
 
 local ClientState = require(script.Parent.Parent.ClientState)
 local Sounds = require(script.Parent.Sounds)
@@ -223,7 +224,7 @@ local function updateHpBar(b: Ball)
 	local max = math.max(1, ballMax)
 	local hp = math.clamp(ballHp, 0, max)
 	b.hpFill.Size = UDim2.fromScale(hp / max, 1)
-	b.hpText.Text = string.format("ШАРОВАЯ МОЛНИЯ  %d/%d", hp, max)
+	b.hpText.Text = Loc.t("ШАРОВАЯ МОЛНИЯ  %d/%d", hp, max)
 end
 
 local function buildBall(parent: Instance): Ball
@@ -674,7 +675,7 @@ local function onHatchGift(msg: Net.EffectMsg)
 	local color = Pets.Rarities[def.Rarity].Color
 	local root = localRoot()
 	if root then
-		Juice.popup(root.Position + Vector3.new(0, POPUP_UP, 0), "🎁 " .. def.Name .. "!", color, true)
+		Juice.popup(root.Position + Vector3.new(0, POPUP_UP, 0), Loc.t("🎁 %s!", def.Name), color, true)
 	end
 	Sounds.play("RareReveal")
 	local soft = settings()
@@ -685,7 +686,7 @@ local function onWitness(msg: Net.EffectMsg)
 	local root = localRoot()
 	if root then
 		local value = msg.Value
-		local text = if value and value > 0 then "☠ Я видел! +" .. Format.short(value) .. " ⚡" else "☠ Я видел!"
+		local text = if value and value > 0 then Loc.t("☠ Я видел! +%s ⚡", Format.short(value)) else Loc.t("☠ Я видел!")
 		Juice.popup(root.Position + Vector3.new(0, POPUP_UP, 0), text, Theme.Volt, true)
 	end
 	Sounds.play("Coins")
@@ -695,7 +696,7 @@ end
 local function onFulgurite(msg: Net.StrikeResultMsg)
 	Sounds.play("Fulgurite")
 	-- 🔮 и сиреневый — не путать с 💎 осколком
-	Juice.popup(msg.Pos + Vector3.new(0, 2, 0), "🔮 Фульгурит!", Theme.Purple:Lerp(Color3.new(1, 1, 1), 0.35), true)
+	Juice.popup(msg.Pos + Vector3.new(0, 2, 0), Loc.t("🔮 Фульгурит!"), Theme.Purple:Lerp(Color3.new(1, 1, 1), 0.35), true)
 end
 
 ----------------------------------------------------------------------

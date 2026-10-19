@@ -7393,6 +7393,7 @@
           <Item class="TextLabel" referent="225">
             <Properties>
               <string name="Name">Title</string>
+              <BinaryString name="AttributesSerialize">AgAAAAgAAABMb2NVcHBlcgMBCAAAAExvY19UZXh0AhcAAADQm9GD0YfRiNC40LUg0LvQvtCy0YbRiw==</BinaryString>
               <float name="BackgroundTransparency">1</float>
               <Font name="FontFace">
                 <Family>
@@ -7414,7 +7415,7 @@
                 <YS>0.13</YS>
                 <YO>0</YO>
               </UDim2>
-              <string name="Text">ЛУЧШИЕ ЛОВЦЫ</string>
+              <string name="Text">TOP CATCHERS</string>
               <Color3 name="TextColor3">
                 <R>1</R>
                 <G>0.972549</G>
@@ -7560,6 +7561,7 @@
           <Item class="TextLabel" referent="233">
             <Properties>
               <string name="Name">Title</string>
+              <BinaryString name="AttributesSerialize">AgAAAAgAAABMb2NVcHBlcgMBCAAAAExvY19UZXh0AhcAAADQn9GA0L7Qs9C90L7QtyDQsdGD0YDQuA==</BinaryString>
               <float name="BackgroundTransparency">1</float>
               <Font name="FontFace">
                 <Family>
@@ -7581,7 +7583,7 @@
                 <YS>0.13</YS>
                 <YO>0</YO>
               </UDim2>
-              <string name="Text">ПРОГНОЗ БУРИ</string>
+              <string name="Text">STORM FORECAST</string>
               <Color3 name="TextColor3">
                 <R>1</R>
                 <G>0.972549</G>
@@ -7727,6 +7729,7 @@
           <Item class="TextLabel" referent="241">
             <Properties>
               <string name="Name">Title</string>
+              <BinaryString name="AttributesSerialize">AgAAAAgAAABMb2NVcHBlcgMBCAAAAExvY19UZXh0AhEAAADQl9Cw0Lsg0YHQu9Cw0LLRiw==</BinaryString>
               <float name="BackgroundTransparency">1</float>
               <Font name="FontFace">
                 <Family>
@@ -7748,7 +7751,7 @@
                 <YS>0.13</YS>
                 <YO>0</YO>
               </UDim2>
-              <string name="Text">ЗАЛ СЛАВЫ</string>
+              <string name="Text">HALL OF FAME</string>
               <Color3 name="TextColor3">
                 <R>1</R>
                 <G>0.972549</G>
@@ -188430,7 +188433,7 @@
                       <YS>0.84</YS>
                       <YO>0</YO>
                     </UDim2>
-                    <string name="Text">МАГАЗИН</string>
+                    <string name="Text">SHOP</string>
                     <Color3 name="TextColor3">
                       <R>1</R>
                       <G>0.972549</G>
@@ -189467,7 +189470,7 @@
                       <YS>0.84</YS>
                       <YO>0</YO>
                     </UDim2>
-                    <string name="Text">КОКОНЫ</string>
+                    <string name="Text">COCOONS</string>
                     <Color3 name="TextColor3">
                       <R>1</R>
                       <G>0.972549</G>
@@ -190516,7 +190519,7 @@
                 <Item class="TextLabel" referent="6094">
                   <Properties>
                     <string name="Name">Line1</string>
-                    <BinaryString name="AttributesSerialize">AgAAAAgAAABMb2NVcHBlcgMBCAAAAExvY19UZXh0Ag4AAADQm9GD0LPQvtCy0L7QuQ==</BinaryString>
+                    <BinaryString name="AttributesSerialize">AgAAAAgAAABMb2NVcHBlcgMBCAAAAExvY19UZXh0AhYAAABjb2Nvb246OtCb0YPQs9C+0LLQvtC5</BinaryString>
                     <float name="BackgroundTransparency">1</float>
                     <Font name="FontFace">
                       <Family>
@@ -190538,7 +190541,7 @@
                       <YS>0.44210526</YS>
                       <YO>0</YO>
                     </UDim2>
-                    <string name="Text">ЛУГОВОЙ</string>
+                    <string name="Text">MEADOW</string>
                     <Color3 name="TextColor3">
                       <R>1</R>
                       <G>0.972549</G>
@@ -191539,7 +191542,7 @@
                 <Item class="TextLabel" referent="6128">
                   <Properties>
                     <string name="Name">Line1</string>
-                    <BinaryString name="AttributesSerialize">AgAAAAgAAABMb2NVcHBlcgMBCAAAAExvY19UZXh0Ag4AAADQm9C10LTRj9C90L7QuQ==</BinaryString>
+                    <BinaryString name="AttributesSerialize">AgAAAAgAAABMb2NVcHBlcgMBCAAAAExvY19UZXh0AhYAAABjb2Nvb246OtCb0LXQtNGP0L3QvtC5</BinaryString>
                     <float name="BackgroundTransparency">1</float>
                     <Font name="FontFace">
                       <Family>
@@ -191561,7 +191564,7 @@
                       <YS>0.44210526</YS>
                       <YO>0</YO>
                     </UDim2>
-                    <string name="Text">ЛЕДЯНОЙ</string>
+                    <string name="Text">FROST</string>
                     <Color3 name="TextColor3">
                       <R>1</R>
                       <G>0.972549</G>
@@ -192593,7 +192596,7 @@
                 <Item class="TextLabel" referent="6163">
                   <Properties>
                     <string name="Name">Line1</string>
-                    <BinaryString name="AttributesSerialize">AgAAAAgAAABMb2NVcHBlcgMBCAAAAExvY19UZXh0AhAAAADQk9GA0L7Qt9C+0LLQvtC5</BinaryString>
+                    <BinaryString name="AttributesSerialize">AgAAAAgAAABMb2NVcHBlcgMBCAAAAExvY19UZXh0AhgAAABjb2Nvb246OtCT0YDQvtC30L7QstC+0Lk=</BinaryString>
                     <float name="BackgroundTransparency">1</float>
                     <Font name="FontFace">
                       <Family>
@@ -192615,7 +192618,7 @@
                       <YS>0.44210526</YS>
                       <YO>0</YO>
                     </UDim2>
-                    <string name="Text">ГРОЗОВОЙ</string>
+                    <string name="Text">STORM</string>
                     <Color3 name="TextColor3">
                       <R>1</R>
                       <G>0.972549</G>
@@ -192910,7 +192913,7 @@
                       <YS>0.525</YS>
                       <YO>0</YO>
                     </UDim2>
-                    <string name="Text">ГАЛЕРЕЯ</string>
+                    <string name="Text">GALLERY</string>
                     <Color3 name="TextColor3">
                       <R>1</R>
                       <G>0.8862745</G>
@@ -192971,7 +192974,7 @@
                       <YS>0.315</YS>
                       <YO>0</YO>
                     </UDim2>
-                    <string name="Text">фульгуритов</string>
+                    <string name="Text">of Fulgurites</string>
                     <Color3 name="TextColor3">
                       <R>0.6666667</R>
                       <G>0.68235296</G>
@@ -195987,7 +195990,7 @@
                       <YS>0.525</YS>
                       <YO>0</YO>
                     </UDim2>
-                    <string name="Text">ПЕРЕЗАПУСК</string>
+                    <string name="Text">REBIRTH</string>
                     <Color3 name="TextColor3">
                       <R>1</R>
                       <G>0.972549</G>
@@ -196026,7 +196029,7 @@
                 <Item class="TextLabel" referent="6275">
                   <Properties>
                     <string name="Name">Line2</string>
-                    <BinaryString name="AttributesSerialize">AQAAAAgAAABMb2NfVGV4dAIUAAAA0LPQtdC90LXRgNCw0YLQvtGA0LA=</BinaryString>
+                    <BinaryString name="AttributesSerialize">AQAAAAgAAABMb2NfVGV4dAIaAAAAc2lnbjo60LPQtdC90LXRgNCw0YLQvtGA0LA=</BinaryString>
                     <float name="BackgroundTransparency">1</float>
                     <Font name="FontFace">
                       <Family>
@@ -196048,7 +196051,7 @@
                       <YS>0.315</YS>
                       <YO>0</YO>
                     </UDim2>
-                    <string name="Text">генератора</string>
+                    <string name="Text">Generator reboot</string>
                     <Color3 name="TextColor3">
                       <R>0.6666667</R>
                       <G>0.68235296</G>
@@ -196994,7 +196997,7 @@
                       <YS>0.525</YS>
                       <YO>0</YO>
                     </UDim2>
-                    <string name="Text">НАГРАДЫ</string>
+                    <string name="Text">REWARDS</string>
                     <Color3 name="TextColor3">
                       <R>1</R>
                       <G>0.972549</G>
@@ -197055,7 +197058,7 @@
                       <YS>0.315</YS>
                       <YO>0</YO>
                     </UDim2>
-                    <string name="Text">каждый день</string>
+                    <string name="Text">every day</string>
                     <Color3 name="TextColor3">
                       <R>0.6666667</R>
                       <G>0.68235296</G>
@@ -234670,7 +234673,7 @@
                   <YS>0.84</YS>
                   <YO>0</YO>
                 </UDim2>
-                <string name="Text">ПОДСТАНЦИЯ</string>
+                <string name="Text">SUBSTATION</string>
                 <Color3 name="TextColor3">
                   <R>1</R>
                   <G>0.972549</G>
@@ -236200,7 +236203,7 @@
                   <YS>0.84</YS>
                   <YO>0</YO>
                 </UDim2>
-                <string name="Text">ПОДСТАНЦИЯ</string>
+                <string name="Text">SUBSTATION</string>
                 <Color3 name="TextColor3">
                   <R>1</R>
                   <G>0.972549</G>
@@ -237730,7 +237733,7 @@
                   <YS>0.84</YS>
                   <YO>0</YO>
                 </UDim2>
-                <string name="Text">ПОДСТАНЦИЯ</string>
+                <string name="Text">SUBSTATION</string>
                 <Color3 name="TextColor3">
                   <R>1</R>
                   <G>0.972549</G>
@@ -239260,7 +239263,7 @@
                   <YS>0.84</YS>
                   <YO>0</YO>
                 </UDim2>
-                <string name="Text">ПОДСТАНЦИЯ</string>
+                <string name="Text">SUBSTATION</string>
                 <Color3 name="TextColor3">
                   <R>1</R>
                   <G>0.972549</G>
@@ -240790,7 +240793,7 @@
                   <YS>0.84</YS>
                   <YO>0</YO>
                 </UDim2>
-                <string name="Text">ПОДСТАНЦИЯ</string>
+                <string name="Text">SUBSTATION</string>
                 <Color3 name="TextColor3">
                   <R>1</R>
                   <G>0.972549</G>

@@ -11,6 +11,7 @@ local Economy = require(Shared:WaitForChild("Economy"))
 local Format = require(Shared:WaitForChild("Format"))
 local PlayerData = require(Shared:WaitForChild("PlayerData"))
 local Net = require(Shared:WaitForChild("Net"))
+local Loc = require(Shared:WaitForChild("Loc"))
 
 local ClientState = require(script.Parent.Parent.ClientState)
 local Sounds = require(script.Parent.Parent.Controllers.Sounds)
@@ -22,11 +23,12 @@ local ShopUI = {}
 
 local CARD_W = 824
 
+-- язык выбран до запуска модулей (Main.client), поэтому переводим сразу
 local KIND_NAMES = {
-	double = "двойные удары",
-	fork = "молнии-вилки",
-	fake = "молнии-обманки",
-	runner = "бегущие кольца",
+	double = Loc.t("двойные удары"),
+	fork = Loc.t("молнии-вилки"),
+	fake = Loc.t("молнии-обманки"),
+	runner = Loc.t("бегущие кольца"),
 } :: { [string]: string }
 
 local win: UIKit.Window
@@ -48,7 +50,7 @@ local function notEnough(cost: number)
 	local d = ClientState.get()
 	local have = if d then d.Volts else 0
 	Sounds.play("Error")
-	ClientState.Toast:Fire("Не хватает ⚡ " .. Format.short(math.max(0, cost - have)), "bad")
+	ClientState.Toast:Fire(Loc.t("Не хватает ⚡ %s", Format.short(math.max(0, cost - have))), "bad")
 end
 
 -- Кнопка с ценой: хватает — Go, не хватает — Slate и цена цветом DangerHi (§8.4)
@@ -124,14 +126,14 @@ local function buildUpgrades(page: Frame)
 			Name = "Icon",
 			Position = UDim2.new(0, 56, 0.5, 0),
 		})
-		nameLabel(card, def.Name, UDim2.fromOffset(340, 32), UDim2.fromOffset(114, 10), 26)
+		nameLabel(card, Loc.t(def.Name), UDim2.fromOffset(340, 32), UDim2.fromOffset(114, 10), 26)
 		local tag, level = UIKit.tag({
 			Name = "Level",
 			Size = UDim2.fromOffset(104, 26),
 			AnchorPoint = Vector2.new(1, 0),
 			Position = UDim2.fromOffset(594, 12),
 			Parent = card,
-		}, "ур. 0/0", 15)
+		}, Loc.t("УР. %d/%d", 0, 0), 15)
 		tag.Rotation = -2
 		level.TextColor3 = Theme.Volt
 		local effect = UIKit.label({
@@ -147,7 +149,7 @@ local function buildUpgrades(page: Frame)
 		})
 		UIKit.label({
 			Name = "Desc",
-			Text = def.Desc,
+			Text = Loc.t(def.Desc),
 			Size = UDim2.fromOffset(480, 22),
 			Position = UDim2.fromOffset(114, 70),
 			TextXAlignment = Enum.TextXAlignment.Left,
@@ -181,7 +183,7 @@ local function buildUpgrades(page: Frame)
 			local cost = Economy.upgradeCost(id, lvl)
 			if not cost then
 				Sounds.play("Error")
-				ClientState.Toast:Fire("Уже максимум!", "info")
+				ClientState.Toast:Fire(Loc.t("Уже максимум!"), "info")
 				return
 			end
 			if d.Volts < cost then
@@ -208,14 +210,14 @@ local function refreshUpgrades(d: PlayerData.Data)
 		local def = Config.Upgrades[c.id]
 		local lvl = (d.Upgrades :: any)[c.id] :: number
 		local cost = Economy.upgradeCost(c.id, lvl)
-		c.level.Text = string.format("УР. %d/%d", lvl, def.MaxLevel)
+		c.level.Text = Loc.t("УР. %d/%d", lvl, def.MaxLevel)
 		c.bar.set(lvl / def.MaxLevel)
 		if cost then
 			c.effect.Text = effectStep(Economy.effectText(c.id, lvl), Economy.effectText(c.id, lvl + 1))
-			priceButton(c.button, "Купить", cost, d.Volts)
+			priceButton(c.button, Loc.t("Купить"), cost, d.Volts)
 		else
 			c.effect.Text = Economy.effectText(c.id, lvl)
-			UIKit.setButtonText(c.button, "Макс")
+			UIKit.setButtonText(c.button, Loc.t("Макс"))
 			UIKit.setButtonVariant(c.button, "Disabled")
 		end
 	end
@@ -235,14 +237,14 @@ local islandCards: { IslandCard } = {}
 
 local function zoneInfo(i: number): string
 	local z = Config.Zones[i]
-	local parts = { string.format("заряд ×%s", Format.short(z.BaseCharge / Config.Zones[1].BaseCharge)) }
+	local parts = { Loc.t("заряд ×%s", Format.short(z.BaseCharge / Config.Zones[1].BaseCharge)) }
 	for id, k in Config.Kinds do
 		if k.FromZone == i and KIND_NAMES[id] then
-			table.insert(parts, "новое: " .. KIND_NAMES[id])
+			table.insert(parts, Loc.t("новое: %s", KIND_NAMES[id]))
 		end
 	end
 	if z.Overcharge and (i == 1 or not Config.Zones[i - 1].Overcharge) then
-		table.insert(parts, "перегрузка банки")
+		table.insert(parts, Loc.t("перегрузка банки"))
 	end
 	return table.concat(parts, " • ")
 end
@@ -268,7 +270,7 @@ local function buildIslands(page: Frame)
 			Name = "Icon",
 			Position = UDim2.new(0, 54, 0.5, 2),
 		})
-		nameLabel(card, z.Name, UDim2.fromOffset(420, 32), UDim2.fromOffset(108, 12), 26)
+		nameLabel(card, Loc.t(z.Name), UDim2.fromOffset(420, 32), UDim2.fromOffset(108, 12), 26)
 		UIKit.label({
 			Name = "Info",
 			Text = zoneInfo(i),
@@ -296,7 +298,7 @@ local function buildIslands(page: Frame)
 				return
 			end
 			if i <= d.Zone and ClientState.zone() == i then
-				ClientState.Toast:Fire("Ты уже здесь!", "info")
+				ClientState.Toast:Fire(Loc.t("Ты уже здесь!"), "info")
 				return
 			end
 			if i <= d.Zone then
@@ -318,7 +320,7 @@ local function buildIslands(page: Frame)
 			end
 			if i > d.Zone + 1 then
 				Sounds.play("Error")
-				ClientState.Toast:Fire("Сначала открой «" .. Config.Zones[i - 1].Name .. "»", "info")
+				ClientState.Toast:Fire(Loc.t("Сначала открой «%s»", Config.Zones[i - 1].Name), "info")
 				return
 			end
 			local cost = Economy.zoneCost(i)
@@ -346,20 +348,20 @@ local function refreshIslands(d: PlayerData.Data)
 	for _, c in islandCards do
 		local i = c.zone
 		if i <= d.Zone and here == i then
-			c.status.set("pin", "Открыт — ты здесь", Theme.GoHi)
-			UIKit.setButtonText(c.button, "Ты здесь")
+			c.status.set("pin", Loc.t("Открыт — ты здесь"), Theme.GoHi)
+			UIKit.setButtonText(c.button, Loc.t("Ты здесь"))
 			UIKit.setButtonVariant(c.button, "Disabled")
 		elseif i <= d.Zone then
-			c.status.set("check", "Открыт", Theme.GoHi)
-			UIKit.setButtonText(c.button, "Лететь")
+			c.status.set("check", Loc.t("Открыт"), Theme.GoHi)
+			UIKit.setButtonText(c.button, Loc.t("Лететь"))
 			UIKit.setButtonVariant(c.button, "Spark")
 		elseif i == d.Zone + 1 then
 			local cost = Economy.zoneCost(i)
-			c.status.set("bolt", "Можно открыть", Theme.Volt)
-			priceButton(c.button, "Открыть", cost, d.Volts)
+			c.status.set("bolt", Loc.t("Можно открыть"), Theme.Volt)
+			priceButton(c.button, Loc.t("Открыть"), cost, d.Volts)
 		else
-			c.status.set("lock", "Закрыт — сначала открой предыдущий", Theme.TextDim)
-			UIKit.setButtonPrice(c.button, "Закрыт", "⚡ " .. Format.short(Economy.zoneCost(i)))
+			c.status.set("lock", Loc.t("Закрыт — сначала открой предыдущий"), Theme.TextDim)
+			UIKit.setButtonPrice(c.button, Loc.t("Закрыт"), "⚡ " .. Format.short(Economy.zoneCost(i)))
 			UIKit.setButtonVariant(c.button, "Disabled")
 		end
 	end
@@ -389,7 +391,7 @@ local function buildDrone(page: Frame)
 	})
 	local name = UIKit.label({
 		Name = "Name",
-		Text = UIKit.upper(Config.Drone.Name),
+		Text = UIKit.upper(Loc.t(Config.Drone.Name)),
 		FontFace = Theme.FontDisplay,
 		Size = UDim2.fromOffset(560, 40),
 		Position = UDim2.new(0.5, 0, 0, 144),
@@ -401,7 +403,7 @@ local function buildDrone(page: Frame)
 	UIKit.italicPad(name, 10)
 	UIKit.label({
 		Name = "Desc",
-		Text = Config.Drone.Desc,
+		Text = Loc.t(Config.Drone.Desc),
 		Size = UDim2.fromOffset(560, 28),
 		Position = UDim2.new(0.5, 0, 0, 188),
 		AnchorPoint = Vector2.new(0.5, 0),
@@ -435,7 +437,7 @@ local function buildDrone(page: Frame)
 		end
 		if d.Zone < Config.Drone.FromZone then
 			Sounds.play("Error")
-			ClientState.Toast:Fire("Сначала открой «" .. Config.Zones[Config.Drone.FromZone].Name .. "»", "info")
+			ClientState.Toast:Fire(Loc.t("Сначала открой «%s»", Config.Zones[Config.Drone.FromZone].Name), "info")
 			return
 		end
 		if d.Volts < Config.Drone.Cost then
@@ -457,21 +459,21 @@ end
 local function refreshDrone(d: PlayerData.Data)
 	if d.Drone then
 		if d.DroneOn then
-			droneStatus.set("check", "Дрон работает", Theme.GoHi)
-			UIKit.setButtonText(droneButton, "Выключить")
+			droneStatus.set("check", Loc.t("Дрон работает"), Theme.GoHi)
+			UIKit.setButtonText(droneButton, Loc.t("Выключить"))
 			UIKit.setButtonVariant(droneButton, "Slate")
 		else
-			droneStatus.set("minus", "Дрон отдыхает", Theme.TextDim)
-			UIKit.setButtonText(droneButton, "Включить")
+			droneStatus.set("minus", Loc.t("Дрон отдыхает"), Theme.TextDim)
+			UIKit.setButtonText(droneButton, Loc.t("Включить"))
 			UIKit.setButtonVariant(droneButton, "Go")
 		end
 	elseif d.Zone < Config.Drone.FromZone then
-		droneStatus.set("lock", "Нужен остров «" .. Config.Zones[Config.Drone.FromZone].Name .. "»", Theme.TextDim)
-		UIKit.setButtonPrice(droneButton, "Купить", "⚡ " .. Format.short(Config.Drone.Cost))
+		droneStatus.set("lock", Loc.t("Нужен остров «%s»", Config.Zones[Config.Drone.FromZone].Name), Theme.TextDim)
+		UIKit.setButtonPrice(droneButton, Loc.t("Купить"), "⚡ " .. Format.short(Config.Drone.Cost))
 		UIKit.setButtonVariant(droneButton, "Disabled")
 	else
-		droneStatus.set("bolt", "Можно купить", Theme.Volt)
-		priceButton(droneButton, "Купить", Config.Drone.Cost, d.Volts)
+		droneStatus.set("bolt", Loc.t("Можно купить"), Theme.Volt)
+		priceButton(droneButton, Loc.t("Купить"), Config.Drone.Cost, d.Volts)
 	end
 end
 
@@ -516,15 +518,15 @@ function ShopUI.start()
 	end
 	win = UIKit.window({
 		Name = "Shop",
-		Title = "Магазин",
+		Title = Loc.t("Магазин"),
 		Icon = "🛒",
 		Width = 880,
 		Height = 560,
 		Accent = Theme.Volt,
 		Tabs = {
-			{ Id = "upgrades", Text = "Улучшения" },
-			{ Id = "islands", Text = "Острова" },
-			{ Id = "drone", Text = "Дрон" },
+			{ Id = "upgrades", Text = Loc.t("Улучшения") },
+			{ Id = "islands", Text = Loc.t("Острова") },
+			{ Id = "drone", Text = Loc.t("Дрон") },
 		},
 		OnOpen = function()
 			refresh()

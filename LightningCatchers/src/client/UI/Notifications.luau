@@ -11,6 +11,7 @@ local TweenService = game:GetService("TweenService")
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Net = require(Shared:WaitForChild("Net"))
 local Config = require(Shared:WaitForChild("Config"))
+local Loc = require(Shared:WaitForChild("Loc"))
 
 local ClientState = require(script.Parent.Parent.ClientState)
 local Sounds = require(script.Parent.Parent.Controllers.Sounds)
@@ -526,7 +527,7 @@ local function buildTitle()
 		Position = UDim2.new(0.5, 0, 0, 0),
 		ZIndex = 3,
 		Parent = word,
-	}, "Остров 1", 19)
+	}, Loc.t("Остров %d", 1), 19)
 	titleName = UIKit.label({
 		Name = "Name",
 		Text = "",
@@ -567,13 +568,13 @@ local function fadeTitle(target: number, time: number)
 end
 
 local function showTitle(zone: number)
-	local name = Config.Hub.Name
-	local sub = "Город"
+	local name = Loc.t(Config.Hub.Name)
+	local sub = Loc.t("zone::Город")
 	local color = Theme.Volt
 	if zone >= 1 and zone <= #Config.Zones then
 		local def = Config.Zones[zone]
-		name = def.Name
-		sub = "Остров " .. tostring(zone)
+		name = Loc.t(def.Name)
+		sub = Loc.t("Остров %d", zone)
 		color = def.Accent
 	elseif zone ~= 0 then
 		return
@@ -609,9 +610,9 @@ local function onZoneUnlocked(zone: number)
 	if not def then
 		return
 	end
-	showBanner(string.format("Открыт остров %d: %s!", zone, def.Name), "rare", def.Accent, "LevelUp")
+	showBanner(Loc.t("Открыт остров %d: %s!", zone, def.Name), "rare", def.Accent, "LevelUp")
 	Juice.flash(def.Accent, 0.3)
-	showToast("Жми «Лететь» в окне «Острова» — и ты там!", "good")
+	showToast(Loc.t("Жми «Лететь» в окне «Острова» — и ты там!"), "good")
 end
 
 ----------------------------------------------------------------------
@@ -686,16 +687,24 @@ function Notifications.start()
 		end
 	end)
 
-	ClientState.Toast:Connect(function(text: string, kind: string)
-		if typeof(text) == "string" and text ~= "" then
-			showToast(text, if typeof(kind) == "string" then kind else "info")
+	-- текст тоста и баннера — строка-исходник, уже переведённая строка или Loc.Msg от сервера:
+	-- Loc.render рисует его на языке игрока (готовую строку оставляет как есть)
+	ClientState.Toast:Connect(function(text: any, kind: any)
+		if typeof(text) == "string" or typeof(text) == "table" then
+			local s = Loc.render(text)
+			if s ~= "" then
+				showToast(s, if typeof(kind) == "string" then kind else "info")
+			end
 		end
 	end)
 
 	task.spawn(function()
 		Net.event("Banner").OnClientEvent:Connect(function(text: any, kind: any, color: any)
-			if typeof(text) == "string" and text ~= "" then
-				showBanner(text, if typeof(kind) == "string" then kind else "info", if typeof(color) == "Color3" then color else nil)
+			if typeof(text) == "string" or typeof(text) == "table" then
+				local s = Loc.render(text)
+				if s ~= "" then
+					showBanner(s, if typeof(kind) == "string" then kind else "info", if typeof(color) == "Color3" then color else nil)
+				end
 			end
 		end)
 	end)
@@ -711,9 +720,21 @@ function Notifications.setHintLane(bottom: number?)
 	placeToasts(true)
 end
 
--- Показать баннер локально (например, своё событие); sound — вместо обычного звука баннера
-function Notifications.banner(text: string, kind: string?, color: Color3?, sound: string?)
-	showBanner(text, kind or "info", color, sound)
+-- Показать баннер локально (например, своё событие); sound — вместо обычного звука баннера.
+-- text — строка (исходник или уже Loc.t) или Loc.Msg
+function Notifications.banner(text: string | Loc.Msg, kind: string?, color: Color3?, sound: string?)
+	local s = Loc.render(text)
+	if s ~= "" then
+		showBanner(s, kind or "info", color, sound)
+	end
+end
+
+-- Показать тост (то же, что ClientState.Toast:Fire): text — строка (исходник или уже Loc.t) или Loc.Msg
+function Notifications.toast(text: string | Loc.Msg, kind: string?)
+	local s = Loc.render(text)
+	if s ~= "" and gui then
+		showToast(s, kind or "info")
+	end
 end
 
 return Notifications

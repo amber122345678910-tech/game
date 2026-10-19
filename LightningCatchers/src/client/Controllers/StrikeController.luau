@@ -18,6 +18,7 @@ local Format = require(Shared:WaitForChild("Format"))
 local Zones = require(Shared:WaitForChild("Zones"))
 local Signal = require(Shared:WaitForChild("Signal"))
 local Models = require(Shared:WaitForChild("Models"))
+local Loc = require(Shared:WaitForChild("Loc"))
 
 local ClientState = require(script.Parent.Parent.ClientState)
 local Sounds = require(script.Parent.Sounds)
@@ -90,8 +91,8 @@ local SHARD_RESEND_REACH = 8 -- повторяем, только пока игр
 -- (пока это самый дальний открытый остров игрока, столько колец каждого типа за сессию)
 local KIND_HINT_RINGS = 3
 local KIND_HINT_TEXT = {
-	fake = "Обманка! Кольцо замрёт — жди",
-	runner = "Бегущее! Беги за ним",
+	fake = Loc.t("Обманка! Кольцо замрёт — жди"),
+	runner = Loc.t("Бегущее! Беги за ним"),
 } :: { [string]: string }
 local ARROW_MARGIN = 54 -- отступ стрелок от края экрана (точки)
 local ARROW_TOUCH_BOTTOM = 0.3 -- на телефоне нижние 30% экрана — джойстик и кнопки
@@ -1171,11 +1172,11 @@ local function kindHintText(r: Ring, left: number): string
 		return fixed
 	end
 	if left >= #r.hits then
-		return string.format("%s! Жми ⚡ %d раза", Config.Kinds[r.kind].Name, left)
+		return Loc.t("%s! Жми ⚡ %d раза", Loc.t("kind::" .. Config.Kinds[r.kind].Name), left)
 	elseif left >= 2 then
-		return string.format("Ещё %d раза!", left)
+		return Loc.t("Ещё %d раза!", left)
 	end
-	return "Ещё раз!"
+	return Loc.t("Ещё раз!")
 end
 
 -- Сервер прислал новое кольцо
@@ -1651,7 +1652,7 @@ local function onStrikeResolved(msg: Net.StrikeResultMsg)
 		-- поймал, но заряд не влез (банка полна, а перегружать нельзя): объяснить, куда делась награда
 		local pos: Vector3? = if r then r.center elseif typeof(m.Pos) == "Vector3" then m.Pos else nil
 		if pos then
-			local text = if ClientState.droneAway() then "Банка полна — дрон в пути" else "Банка полна!"
+			local text = if ClientState.droneAway() then Loc.t("Банка полна — дрон в пути") else Loc.t("Банка полна!")
 			Juice.popup(pos + Vector3.new(0, 3, 0), text, Theme.Volt, false)
 		end
 	end

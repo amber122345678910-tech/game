@@ -17,6 +17,7 @@ local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Config = require(Shared:WaitForChild("Config"))
 local Net = require(Shared:WaitForChild("Net"))
 local Format = require(Shared:WaitForChild("Format"))
+local Loc = require(Shared:WaitForChild("Loc"))
 
 local ClientState = require(script.Parent.Parent.ClientState)
 local Sounds = require(script.Parent.Sounds)
@@ -1021,7 +1022,7 @@ local function droneDepart(trip: number)
 	end
 	droneOrb.Transparency = 0.05
 	Sounds.play("Sell", 1.25, 0.6)
-	Juice.popup(from + Vector3.new(0, 2.5, 0), "🤖 Дрон везёт заряд", Theme.Electric, false)
+	Juice.popup(from + Vector3.new(0, 2.5, 0), Loc.t("🤖 Дрон везёт заряд"), Theme.Electric, false)
 end
 
 local function droneLand(clock: number)
@@ -1121,10 +1122,7 @@ local function onBurst(p: Player, lost: number?)
 		if shakeOn() then
 			Juice.shake(0.3)
 		end
-		local text = "Банка лопнула!"
-		if lost and lost > 0 then
-			text ..= " −" .. Format.short(lost)
-		end
+		local text = if lost and lost > 0 then Loc.t("Банка лопнула! −%s", Format.short(lost)) else Loc.t("Банка лопнула!")
 		ClientState.Toast:Fire(text, "bad")
 	end
 end
@@ -1183,7 +1181,7 @@ local function onEffect(msg: Net.EffectMsg)
 			Sounds.play("PerfectZap", 1.25, 0.8)
 			local root = rootOf(player.Character)
 			if root then
-				Juice.popup(root.Position + Vector3.new(0, 5, 0), "Цепная молния!", Theme.Electric, true)
+				Juice.popup(root.Position + Vector3.new(0, 5, 0), Loc.t("Цепная молния!"), Theme.Electric, true)
 			end
 		end
 	elseif msg.Kind == "sell" then

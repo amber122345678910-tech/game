@@ -1,6 +1,7 @@
 --!strict
--- Настройки: музыка, звуки, мягкие вспышки, тряска камеры, задержка касания (с автоподстройкой).
+-- Настройки: язык, музыка, звуки, мягкие вспышки, тряска камеры, задержка касания (с автоподстройкой).
 -- Меняется сразу у игрока, на сервер уходит полный набор настроек (с небольшой задержкой).
+-- Язык (Settings.Lang) применяется после перезахода: окна строят тексты один раз при старте (Main.client).
 -- Единственный владелец включения музыки/звуков (Sounds.setMusicEnabled / setSfxEnabled).
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -8,6 +9,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Config = require(Shared:WaitForChild("Config"))
 local PlayerData = require(Shared:WaitForChild("PlayerData"))
+local Loc = require(Shared:WaitForChild("Loc"))
 local Net = require(Shared:WaitForChild("Net"))
 
 local ClientState = require(script.Parent.Parent.ClientState)
@@ -18,13 +20,15 @@ local UIKit = require(script.Parent.UIKit)
 local SettingsUI = {}
 
 local WHITE = Color3.new(1, 1, 1)
-local W, H = 660, 600
+local W, H = 660, 680
 local ROW_W = 612
 local OFFSET_STEP = 10 -- мс
 local SAVE_DELAY = 0.6
+local LANG_W = 232 -- ширина выбора языка
 
-type Settings = { Music: boolean, Sfx: boolean, SoftFlash: boolean, Shake: boolean, Offset: number }
+type Settings = { Music: boolean, Sfx: boolean, SoftFlash: boolean, Shake: boolean, Offset: number, Lang: string }
 type Toggle = { key: string, button: TextButton, knob: Frame, label: TextLabel, grad: UIGradient }
+type LangOption = { lang: Loc.Lang, label: TextLabel }
 
 local ROW_ACCENTS = {
 	Music = Theme.Pink,
@@ -33,10 +37,19 @@ local ROW_ACCENTS = {
 	Shake = Theme.Orange,
 } :: { [string]: Color3 }
 
+-- Варианты языка подписаны каждый на своём языке и не переводятся
+local LANGS: { { lang: Loc.Lang, text: string } } = {
+	{ lang = "en", text = "English" }, -- noloc
+	{ lang = "ru", text = "Русский" }, -- noloc
+}
+
 local win: UIKit.Window
-local settings: Settings = { Music = true, Sfx = true, SoftFlash = true, Shake = true, Offset = 0 }
+local settings: Settings = { Music = true, Sfx = true, SoftFlash = true, Shake = true, Offset = 0, Lang = "" }
 local toggles: { Toggle } = {}
 local offsetLabel: TextLabel
+local langPill: Frame
+local langOptions: { LangOption } = {}
+local langChoice: Loc.Lang? = nil -- язык, выбранный в этой сессии (nil — показываем текущий, Loc.lang())
 local saveToken = 0
 local pendingSave = false
 local appliedOnce = false
@@ -46,7 +59,7 @@ local function maxOffset(): number
 end
 
 local function copySettings(s: Settings): Settings
-	return { Music = s.Music, Sfx = s.Sfx, SoftFlash = s.SoftFlash, Shake = s.Shake, Offset = s.Offset }
+	return { Music = s.Music, Sfx = s.Sfx, SoftFlash = s.SoftFlash, Shake = s.Shake, Offset = s.Offset, Lang = s.Lang }
 end
 
 -- Звук включается/выключается сразу; остальные настройки читают контроллеры из данных
@@ -79,9 +92,9 @@ end
 
 local function offsetText(ms: number): string
 	if ms > 0 then
-		return string.format("+%d мс", ms)
+		return Loc.t("+%d мс", ms)
 	end
-	return string.format("%d мс", ms)
+	return Loc.t("%d мс", ms)
 end
 
 local function refreshControls()
@@ -91,7 +104,7 @@ local function refreshControls()
 		t.grad.Color = if on
 			then ColorSequence.new(Theme.Go:Lerp(Theme.GoHi, 0.4), Theme.GoLo)
 			else ColorSequence.new(Theme.Well, Theme.Well)
-		t.label.Text = if on then "ВКЛ" else "ВЫКЛ"
+		t.label.Text = if on then Loc.t("ВКЛ") else Loc.t("ВЫКЛ")
 		t.label.TextColor3 = if on then Theme.Cream else Theme.TextDim
 		t.label.Position = if on then UDim2.new(0, 14, 0.5, 0) else UDim2.new(1, -14, 0.5, 0)
 		t.label.AnchorPoint = if on then Vector2.new(0, 0.5) else Vector2.new(1, 0.5)
@@ -101,6 +114,19 @@ local function refreshControls()
 		end
 	end
 	offsetLabel.Text = offsetText(settings.Offset)
+	-- язык: плашка Go под выбранным вариантом
+	local lang = langChoice or Loc.lang()
+	for i, o in langOptions do
+		local on = o.lang == lang
+		if on then
+			UIKit.tween(langPill, 0.15, { Position = UDim2.new((i - 1) * 0.5, if i == 1 then 5 else 2, 0.5, -2) })
+		end
+		o.label.TextColor3 = if on then Theme.Cream else Theme.TextDim
+		local s = o.label:FindFirstChildOfClass("UIStroke")
+		if s then
+			s.Enabled = on
+		end
+	end
 end
 
 local function setOffset(ms: number)
@@ -169,7 +195,7 @@ local function toggleRow(parent: Instance, order: number, key: string, icon: str
 	UIKit.gradient(knob, Theme.Cream, Theme.TextDim)
 	local label = UIKit.label({
 		Name = "State",
-		Text = "ВКЛ",
+		Text = Loc.t("ВКЛ"),
 		FontFace = Theme.FontBodyHeavy,
 		Size = UDim2.fromOffset(76, 32),
 		AnchorPoint = Vector2.new(0, 0.5),
@@ -191,8 +217,79 @@ local function toggleRow(parent: Instance, order: number, key: string, icon: str
 	table.insert(toggles, { key = key, button = button, knob = knob, label = label, grad = grad })
 end
 
+-- Язык сохраняется в настройках и включится после перезахода — подсказка сразу на обоих языках
+local function chooseLang(lang: Loc.Lang)
+	if lang == (langChoice or Loc.lang()) then
+		return
+	end
+	UIKit.playClick()
+	langChoice = lang
+	settings.Lang = lang
+	refreshControls()
+	applyLocal()
+	scheduleSave()
+	if lang ~= Loc.lang() then
+		ClientState.Toast:Fire("Язык сменится после перезахода\nLanguage changes after rejoin", "info") -- noloc
+	end
+end
+
+-- Выбор языка: колодец, как у переключателя, и квадратная плашка Go под выбранным вариантом
+local function langRow(parent: Instance, order: number)
+	local row = rowFrame(parent, order, "🌐", Loc.t("Язык"), Theme.Go)
+	local track = UIKit.new("Frame", {
+		Name = "Lang",
+		Size = UDim2.fromOffset(LANG_W, 54),
+		AnchorPoint = Vector2.new(1, 0.5),
+		Position = UDim2.new(1, -14, 0.5, 0),
+		BackgroundColor3 = Theme.Well,
+		Parent = row,
+	}) :: Frame
+	UIKit.corner(track, 10)
+	UIKit.stroke(track, 2.5, Theme.Ink)
+	langPill = UIKit.new("Frame", {
+		Name = "Pill",
+		Size = UDim2.new(0.5, -7, 0, 40),
+		AnchorPoint = Vector2.new(0, 0.5),
+		Position = UDim2.new(0, 5, 0.5, -2),
+		BackgroundColor3 = WHITE,
+		ZIndex = 2,
+		Parent = track,
+	}) :: Frame
+	UIKit.corner(langPill, 8)
+	UIKit.stroke(langPill, 2.5, Theme.Ink)
+	UIKit.gradient(langPill, Theme.Go:Lerp(Theme.GoHi, 0.4), Theme.GoLo)
+	for i, opt in LANGS do
+		local button = UIKit.new("TextButton", {
+			Name = "Lang_" .. opt.lang,
+			Size = UDim2.fromScale(0.5, 1),
+			Position = UDim2.fromScale((i - 1) * 0.5, 0),
+			BackgroundTransparency = 1,
+			AutoButtonColor = false,
+			Text = "",
+			ZIndex = 3,
+			Parent = track,
+		}) :: TextButton
+		local label = UIKit.label({
+			Name = "Text",
+			Text = opt.text,
+			FontFace = Theme.FontBodyHeavy,
+			Size = UDim2.new(1, -16, 0, 30),
+			AnchorPoint = Vector2.new(0.5, 0.5),
+			Position = UDim2.new(0.5, 0, 0.5, -2),
+			MaxTextSize = 20,
+			NoStroke = false,
+			ZIndex = 3,
+			Parent = button,
+		})
+		button.Activated:Connect(function()
+			chooseLang(opt.lang)
+		end)
+		table.insert(langOptions, { lang = opt.lang, label = label })
+	end
+end
+
 local function offsetRow(parent: Instance, order: number)
-	local row = rowFrame(parent, order, "⏱", "Задержка касания", Theme.Violet)
+	local row = rowFrame(parent, order, "⏱", Loc.t("Задержка касания"), Theme.Violet)
 	local minus = UIKit.button({
 		Name = "Minus",
 		Text = "",
@@ -207,7 +304,7 @@ local function offsetRow(parent: Instance, order: number)
 	end)
 	offsetLabel = UIKit.label({
 		Name = "Value",
-		Text = "0 мс",
+		Text = offsetText(0),
 		FontFace = Theme.FontNumber,
 		Size = UDim2.fromOffset(110, 44),
 		AnchorPoint = Vector2.new(1, 0.5),
@@ -256,14 +353,14 @@ local function autoCalibrate()
 	end
 	if typeof(avg) ~= "number" or avg ~= avg then
 		Sounds.play("Error")
-		ClientState.Toast:Fire("Сначала поймай несколько молний!", "info")
+		ClientState.Toast:Fire(Loc.t("Сначала поймай несколько молний!"), "info")
 		return
 	end
 	local m = maxOffset()
 	local ms = math.clamp(math.floor(-avg * 1000 / OFFSET_STEP + 0.5) * OFFSET_STEP, -m, m)
 	setOffset(ms)
 	Sounds.play("PowerUp")
-	ClientState.Toast:Fire("Задержка: " .. offsetText(settings.Offset), "good")
+	ClientState.Toast:Fire(Loc.t("Задержка: %s", offsetText(settings.Offset)), "good")
 end
 
 local function build()
@@ -274,14 +371,15 @@ local function build()
 		Parent = win.Body,
 	}) :: Frame
 	UIKit.list(list, Enum.FillDirection.Vertical, 8, Enum.HorizontalAlignment.Center, Enum.VerticalAlignment.Top)
-	toggleRow(list, 1, "Music", "🎵", "Музыка")
-	toggleRow(list, 2, "Sfx", "🔊", "Звуки")
-	toggleRow(list, 3, "SoftFlash", "✨", "Мягкие вспышки")
-	toggleRow(list, 4, "Shake", "📳", "Тряска камеры")
+	langRow(list, 0)
+	toggleRow(list, 1, "Music", "🎵", Loc.t("Музыка"))
+	toggleRow(list, 2, "Sfx", "🔊", Loc.t("Звуки"))
+	toggleRow(list, 3, "SoftFlash", "✨", Loc.t("Мягкие вспышки"))
+	toggleRow(list, 4, "Shake", "📳", Loc.t("Тряска камеры"))
 	offsetRow(list, 5)
 	local auto = UIKit.button({
 		Name = "Auto",
-		Text = "Подстроить автоматически",
+		Text = Loc.t("Подстроить автоматически"),
 		Icon = "#bolt",
 		Color = Theme.Violet,
 		Size = UDim2.fromOffset(ROW_W, 64),
@@ -290,10 +388,10 @@ local function build()
 		Parent = list,
 	}, autoCalibrate)
 	UIKit.setButtonStyle(auto, "plain")
-	UIKit.setButtonText(auto, "Подстроить автоматически")
+	UIKit.setButtonText(auto, Loc.t("Подстроить автоматически"))
 	UIKit.label({
 		Name = "Hint",
-		Text = "Не выходит ИДЕАЛЬНО? Поймай пару молний и нажми «Подстроить».",
+		Text = Loc.t("Не выходит ИДЕАЛЬНО? Поймай пару молний и нажми «Подстроить»."),
 		Size = UDim2.fromOffset(ROW_W, 26),
 		LayoutOrder = 7,
 		TextColor3 = Theme.TextDim,
@@ -311,12 +409,12 @@ local function syncFromData(d: PlayerData.Data)
 		return
 	end
 	local s = d.Settings
-	local changed = s.Music ~= settings.Music or s.Sfx ~= settings.Sfx or s.SoftFlash ~= settings.SoftFlash or s.Shake ~= settings.Shake or s.Offset ~= settings.Offset
+	local changed = s.Music ~= settings.Music or s.Sfx ~= settings.Sfx or s.SoftFlash ~= settings.SoftFlash or s.Shake ~= settings.Shake or s.Offset ~= settings.Offset or s.Lang ~= settings.Lang
 	if not changed and appliedOnce then
 		return
 	end
 	appliedOnce = true
-	settings = { Music = s.Music, Sfx = s.Sfx, SoftFlash = s.SoftFlash, Shake = s.Shake, Offset = s.Offset }
+	settings = copySettings(s)
 	Sounds.setMusicEnabled(settings.Music)
 	Sounds.setSfxEnabled(settings.Sfx)
 	if win.isOpen() then
@@ -330,7 +428,7 @@ function SettingsUI.start()
 	end
 	win = UIKit.window({
 		Name = "Settings",
-		Title = "Настройки",
+		Title = Loc.t("Настройки"),
 		Icon = "⚙",
 		Width = W,
 		Height = H,

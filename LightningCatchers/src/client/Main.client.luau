@@ -92,7 +92,7 @@ task.spawn(function()
 		for _, face in Fonts.All do
 			local l = Instance.new("TextLabel")
 			l.FontFace = face
-			l.Text = "ЛОВЦЫ МОЛНИЙ Ёё ×0123456789"
+			l.Text = "ЛОВЦЫ МОЛНИЙ Ёё LIGHTNING CATCHERS ×0123456789" -- noloc
 			l.BackgroundTransparency = 1
 			l.TextTransparency = 1
 			l.Size = UDim2.fromOffset(4, 4)

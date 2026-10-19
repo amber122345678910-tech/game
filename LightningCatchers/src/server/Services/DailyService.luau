@@ -5,10 +5,11 @@
 --  * 3 задания в день (Quests.forDay): прогресс от поимок, сдач, вылуплений, собранных осколков; награда —
 --    осколки + минуты дохода; выполненные, но не забранные к смене дня награды зачисляются сами;
 --    общие кольца событий не идут в задания на цвет (фиолетовые/золотые), сдача почти пустой банки — в «Сдай банку»;
---  * коды (Config.Codes): регистр и пробелы не важны (кириллица переводится в верхний регистр вручную —
---    string.upper её не умеет), каждый код — один раз;
+--  * коды (Config.Codes): регистр и пробелы не важны (кириллица переводится в верхний регистр через Loc.upper —
+--    string.upper её не умеет), каждый код — один раз; английский код с AliasOf делит отметку с русским;
 --  * офлайн-доход (Welcome) и настройки игрока (SetSettings);
 --  * перед каждым сохранением: LastOnline и время в игре (Stats.PlaySeconds).
+-- Тексты для игрока (ответы запросов, Notify) — Loc.msg: клиент рисует их на своём языке (Loc.render).
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -17,6 +18,7 @@ local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Config = require(Shared:WaitForChild("Config"))
 local Economy = require(Shared:WaitForChild("Economy"))
 local Format = require(Shared:WaitForChild("Format"))
+local Loc = require(Shared:WaitForChild("Loc"))
 local Net = require(Shared:WaitForChild("Net"))
 local Pets = require(Shared:WaitForChild("Pets"))
 local PlayerData = require(Shared:WaitForChild("PlayerData"))
@@ -34,8 +36,8 @@ type QuestState = PlayerData.QuestState
 
 local DailyService = {}
 
-local LOADING = "Данные ещё загружаются"
-local PET_FULL = "Нет места для питомца — удали лишних в «Питомцах»"
+local LOADING = Loc.msg("Данные ещё загружаются")
+local PET_FULL = Loc.msg("Нет места для питомца — удали лишних в «Питомцах»")
 local DAY_CHECK_EVERY = 30 -- как часто проверять смену дня у игроков онлайн
 local FORGIVEN_DAYS = 2 -- день == прошлый + 1 или + 2 (один пропуск прощается)
 local MAX_CODE_BYTES = 64
@@ -44,7 +46,7 @@ local RARE_ORDER = Config.Colors.purple.Order -- «фиолетовые или �
 local notifyRemote: RemoteEvent? = nil
 local playMarks: { [Player]: number } = {} -- os.clock, с которого ещё не учтено время в игре
 
-local function notify(player: Player, text: string, kind: string)
+local function notify(player: Player, text: Loc.Msg | string, kind: string)
 	local r = notifyRemote
 	if r then
 		r:FireClient(player, text, kind)
@@ -65,21 +67,23 @@ local function grantBoost(player: Player, minutes: number)
 	end)
 end
 
-local function voltsAndShardsText(volts: number, shards: number): string
-	local parts = {}
-	if volts > 0 then
-		table.insert(parts, "+" .. Format.short(volts) .. " ⚡")
+-- «+X ⚡ и +Y 💎» (nil — ничего не выдано)
+local function voltsAndShardsText(volts: number, shards: number): Loc.Msg?
+	if volts > 0 and shards > 0 then
+		return Loc.msg("+%s ⚡ и +%s 💎", Format.short(volts), Format.short(shards))
+	elseif volts > 0 then
+		return Loc.msg("+%s ⚡", Format.short(volts))
+	elseif shards > 0 then
+		return Loc.msg("+%s 💎", Format.short(shards))
 	end
-	if shards > 0 then
-		table.insert(parts, "+" .. Format.short(shards) .. " 💎")
-	end
-	return table.concat(parts, " и ")
+	return nil
 end
 
-local function cocoonText(cocoonId: string, kind: string): string
+-- Имена кокона и питомца — исходники из Pets: клиент переводит их как аргументы
+local function cocoonText(cocoonId: string, kind: string): Loc.Msg
 	local c = Pets.Cocoons[cocoonId]
 	local p = Pets.Kinds[kind]
-	return string.format("🥚 %s: %s!", if c then c.Name else "Кокон", if p then p.Name else kind)
+	return Loc.msg("🥚 %s: %s!", if c then c.Name else Loc.msg("Кокон"), if p then p.Name else kind)
 end
 
 ----------------------------------------------------------------------
@@ -103,7 +107,7 @@ local function claimDaily(player: Player, _payload: any): (boolean, any)
 	end
 	local day = today()
 	if day <= d.Daily.LastDay then
-		return false, "Сегодня уже забрал — приходи завтра!"
+		return false, Loc.msg("Сегодня уже забрал — приходи завтра!")
 	end
 	local streak = nextStreak(d, day)
 	local r = Config.DailyRewards[streak]
@@ -118,41 +122,41 @@ local function claimDaily(player: Player, _payload: any): (boolean, any)
 		data.Daily.LastDay = day
 		data.Daily.Streak = streak
 	end)
-	local text: string
+	local text: Loc.Msg | string
 	if r.Kind == "volts" then
 		local volts = EconomyService.grantVolts(player, Economy.incomeMinutes(d, r.Amount or 0), "daily")
 		local shards = EconomyService.grantShards(player, r.Shards or 0)
-		text = voltsAndShardsText(volts, shards)
+		text = voltsAndShardsText(volts, shards) or ""
 	elseif r.Kind == "shards" then
-		text = voltsAndShardsText(0, EconomyService.grantShards(player, r.Amount or 0))
+		text = voltsAndShardsText(0, EconomyService.grantShards(player, r.Amount or 0)) or ""
 	elseif r.Kind == "cocoon" then
 		local id = r.Cocoon or "meadow"
 		local rec = PetService.hatchFree(player, id)
-		text = if rec then cocoonText(id, rec.Kind) else "🥚 Кокон"
+		text = if rec then cocoonText(id, rec.Kind) else Loc.msg("🥚 Кокон")
 	elseif r.Kind == "boost" then
 		local minutes = r.Amount or 0
 		grantBoost(player, minutes)
-		text = string.format("×2 Вольт на %d мин!", minutes)
+		text = Loc.msg("×2 Вольт на %d мин!", minutes)
 	elseif r.Kind == "pet" then
 		local kind = r.Pet or Pets.StarterPet
 		local rec = PetService.grantPet(player, kind, true)
 		local def = Pets.Kinds[kind]
-		text = if rec and def then "🐾 Новый питомец: " .. def.Name .. "!" else "🐾 Питомец"
+		text = if rec and def then Loc.msg("🐾 Новый питомец: %s!", def.Name) else Loc.msg("🐾 Питомец")
 	else
 		text = "🎁"
 	end
-	return true, string.format("День %d: %s", streak, text)
+	return true, Loc.msg("День %d: %s", streak, text)
 end
 
 ----------------------------------------------------------------------
 -- Задания дня
 ----------------------------------------------------------------------
 
--- Выдать награду за выполненное задание (q уже отмечено как полученное). Текст «+X ⚡ и +Y 💎».
-local function grantQuestReward(player: Player, d: Data, q: QuestState): string
+-- Выдать награду за выполненное задание (q уже отмечено как полученное). Текст «+X ⚡ и +Y 💎» (nil — нечего)
+local function grantQuestReward(player: Player, d: Data, q: QuestState): Loc.Msg?
 	local def = Quests.def(q.Id)
 	if not def then
-		return ""
+		return nil
 	end
 	local volts = EconomyService.grantVolts(player, Economy.incomeMinutes(d, def.Minutes), "quest")
 	local shards = EconomyService.grantShards(player, def.Shards)
@@ -187,8 +191,8 @@ local function ensureQuests(player: Player)
 	end
 	for _, q in done do
 		local text = grantQuestReward(player, d, q)
-		if text ~= "" then
-			notify(player, "✅ Награда за прошлое задание зачислена: " .. text, "good")
+		if text then
+			notify(player, Loc.msg("✅ Награда за прошлое задание зачислена: %s", text), "good")
 		end
 	end
 end
@@ -223,14 +227,14 @@ local function bump(player: Player, event: string, amount: number)
 	end)
 	for _, c in changes do
 		if c.value >= c.q.Target then
-			notify(player, "✅ Задание выполнено! Забери награду в «Наградах»", "good")
+			notify(player, Loc.msg("✅ Задание выполнено! Забери награду в «Наградах»"), "good")
 		end
 	end
 end
 
 local function claimQuest(player: Player, payload: any): (boolean, any)
 	if not ServerLogic.isInteger(payload) then
-		return false, "Нет такого задания"
+		return false, Loc.msg("Нет такого задания")
 	end
 	local index: number = payload
 	local d = DataService.get(player)
@@ -239,45 +243,33 @@ local function claimQuest(player: Player, payload: any): (boolean, any)
 	end
 	if d.Quests.Day ~= today() then
 		ensureQuests(player) -- выполненные вчерашние награды зачислит сама
-		return false, "Наступил новый день — задания обновились"
+		return false, Loc.msg("Наступил новый день — задания обновились")
 	end
 	local q = d.Quests.List[index]
 	if not q then
-		return false, "Нет такого задания"
+		return false, Loc.msg("Нет такого задания")
 	end
 	if q.Claimed then
-		return false, "Награда уже получена"
+		return false, Loc.msg("Награда уже получена")
 	end
 	if q.Progress < q.Target then
-		return false, string.format("Ещё не выполнено: осталось %d", q.Target - q.Progress)
+		return false, Loc.msg("Ещё не выполнено: осталось %d", q.Target - q.Progress)
 	end
 	DataService.update(player, function()
 		q.Claimed = true
 	end)
+	-- ответ: сообщение с наградой или "✅" (клиент сравнивает с ним: награды нет)
 	local text = grantQuestReward(player, d, q)
-	return true, if text ~= "" then text else "✅"
+	return true, if text then text else "✅"
 end
 
 ----------------------------------------------------------------------
 -- Коды
 ----------------------------------------------------------------------
 
--- Верхний регистр с кириллицей (а–я → А–Я, ё → Ё) и латиницей. nil — не UTF-8.
+-- Верхний регистр с кириллицей (а–я → А–Я, ё → Ё) и латиницей. nil — не UTF-8 (utf8.codes падает).
 local function upperUtf8(s: string): string?
-	local ok, out = pcall(function(): string
-		local parts: { string } = {}
-		for _, cp in utf8.codes(s) do
-			if cp >= 0x430 and cp <= 0x44F then
-				cp -= 0x20 -- а..я -> А..Я
-			elseif cp == 0x451 then
-				cp = 0x401 -- ё -> Ё
-			elseif cp >= 0x61 and cp <= 0x7A then
-				cp -= 0x20 -- a..z -> A..Z
-			end
-			table.insert(parts, utf8.char(cp))
-		end
-		return table.concat(parts)
-	end)
+	local ok, out = pcall(Loc.upper, s)
 	return if ok then out else nil
 end
 
@@ -292,38 +284,41 @@ end
 
 local function redeemCode(player: Player, payload: any): (boolean, any)
 	if typeof(payload) ~= "string" or #payload > MAX_CODE_BYTES * 2 then
-		return false, "Неверный код"
+		return false, Loc.msg("Неверный код")
 	end
 	local key = DailyService.normalizeCode(payload)
 	local code = if key then Config.Codes[key] else nil
 	if not key or not code then
-		return false, "Неверный код"
+		return false, Loc.msg("Неверный код")
 	end
+	-- английский код (AliasOf) и русский — одна награда: отметка «использован» общая
+	local mark = code.AliasOf or key
 	local d = DataService.get(player)
 	if not d then
 		return false, LOADING
 	end
-	if d.Codes[key] then
-		return false, "Этот код уже использован"
+	if d.Codes[mark] then
+		return false, Loc.msg("Этот код уже использован")
 	end
 	if code.Kind == "cocoon" and not PetService.hasRoom(player) then
 		return false, PET_FULL
 	end
 	DataService.update(player, function(data)
-		data.Codes[key] = true
+		data.Codes[mark] = true
 	end)
 	if code.Kind == "shards" then
-		return true, "Код сработал! " .. voltsAndShardsText(0, EconomyService.grantShards(player, code.Amount or 0))
+		local reward = voltsAndShardsText(0, EconomyService.grantShards(player, code.Amount or 0))
+		return true, if reward then Loc.msg("Код сработал! %s", reward) else Loc.msg("Код сработал!")
 	elseif code.Kind == "boost" then
 		local minutes = code.Amount or 0
 		grantBoost(player, minutes)
-		return true, string.format("Код сработал! ×2 Вольт на %d мин", minutes)
+		return true, Loc.msg("Код сработал! ×2 Вольт на %d мин", minutes)
 	elseif code.Kind == "cocoon" then
 		local id = code.Cocoon or "meadow"
 		local rec = PetService.hatchFree(player, id)
-		return true, "Код сработал! " .. (if rec then cocoonText(id, rec.Kind) else "🥚")
+		return true, Loc.msg("Код сработал! %s", if rec then cocoonText(id, rec.Kind) else "🥚")
 	end
-	return true, "Код сработал!"
+	return true, Loc.msg("Код сработал!")
 end
 
 ----------------------------------------------------------------------
@@ -337,7 +332,7 @@ local function claimWelcome(player: Player, _payload: any): (boolean, any)
 	end
 	local amount = d.Welcome
 	if amount <= 0 then
-		return false, "Уже забрано"
+		return false, Loc.msg("Уже забрано")
 	end
 	DataService.update(player, function(data)
 		data.Welcome = 0

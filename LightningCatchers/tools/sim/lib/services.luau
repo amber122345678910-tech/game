@@ -399,8 +399,9 @@ define("Player", {
 		MembershipType = function()
 			return Enum.MembershipType.None
 		end,
-		LocaleId = function()
-			return "ru-ru"
+		-- Roblox account locale: Runtime.addPlayer({ locale = "ru-ru" }), "en-us" by default
+		LocaleId = function(d)
+			return d.locale or "en-us"
 		end,
 		CharacterAppearanceId = function(d)
 			return d.props.UserId or 0
@@ -2326,11 +2327,16 @@ define("PhysicsService", {
 
 define("LocalizationService", {
 	getters = {
-		RobloxLocaleId = function()
-			return "ru-ru"
+		-- on a client: its player's locale (Player.LocaleId); on the server: "en-us"
+		RobloxLocaleId = function(_, realm)
+			local r = realm or R()
+			local pd = r and r.kind == "client" and r.playerD
+			return if pd then pd.locale or "en-us" else "en-us"
 		end,
-		SystemLocaleId = function()
-			return "ru-ru"
+		SystemLocaleId = function(_, realm)
+			local r = realm or R()
+			local pd = r and r.kind == "client" and r.playerD
+			return if pd then pd.locale or "en-us" else "en-us"
 		end,
 	},
 })

@@ -131,6 +131,7 @@ function Runtime.addPlayer(opts)
 	local players = svc("Players")
 	local pu, pd = World.new("Player", { Name = name, UserId = userId, DisplayName = opts.displayName or name }, nil, 0)
 	pd.props.Character = nil
+	pd.locale = opts.locale or "en-us" -- Player.LocaleId, and LocalizationService.RobloxLocaleId on its client
 	World.new("Backpack", { Name = "Backpack" }, pu, 0)
 	World.new("PlayerGui", { Name = "PlayerGui" }, pu, 0)
 	World.new("StarterGear", { Name = "StarterGear" }, pu, 0)

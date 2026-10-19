@@ -9,6 +9,7 @@ local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Config = require(Shared:WaitForChild("Config"))
 local Economy = require(Shared:WaitForChild("Economy"))
 local Format = require(Shared:WaitForChild("Format"))
+local Loc = require(Shared:WaitForChild("Loc"))
 local PlayerData = require(Shared:WaitForChild("PlayerData"))
 local Net = require(Shared:WaitForChild("Net"))
 
@@ -46,7 +47,7 @@ function TeleportUI.request(z: number): boolean
 	local left = TeleportUI.cooldownLeft()
 	if left > 0 then
 		Sounds.play("Error")
-		ClientState.Toast:Fire(string.format("Телепорт заряжается: ещё %d с", math.ceil(left)), "info")
+		ClientState.Toast:Fire(Loc.t("Телепорт заряжается: ещё %d с", math.ceil(left)), "info")
 		return false
 	end
 	local ok = ClientState.request(Net.Actions.Teleport, z)
@@ -88,7 +89,7 @@ local function unlock(z: number, card: Card)
 	local cost = Economy.zoneCost(z)
 	if d.Volts < cost then
 		Sounds.play("Error")
-		ClientState.Toast:Fire("Не хватает ⚡ " .. Format.short(cost - d.Volts), "bad")
+		ClientState.Toast:Fire(Loc.t("Не хватает ⚡ %s", Format.short(cost - d.Volts)), "bad")
 		return
 	end
 	busy = true
@@ -123,7 +124,7 @@ local function makeCard(parent: Instance, z: number): Card
 	end
 	UIKit.label({
 		Name = "Name",
-		Text = zoneName(z),
+		Text = Loc.t(zoneName(z)),
 		FontFace = Theme.FontDisplayFlat,
 		Size = UDim2.new(1, -100, 0, 58),
 		Position = UDim2.fromOffset(86, 20),
@@ -158,7 +159,7 @@ local function makeCard(parent: Instance, z: number): Card
 		end
 		local here = ClientState.zone()
 		if z == here then
-			ClientState.Toast:Fire("Ты уже здесь!", "info")
+			ClientState.Toast:Fire(Loc.t("Ты уже здесь!"), "info")
 			return
 		end
 		if z == 0 or z <= d.Zone then
@@ -167,7 +168,7 @@ local function makeCard(parent: Instance, z: number): Card
 			unlock(z, card)
 		else
 			Sounds.play("Error")
-			ClientState.Toast:Fire("Сначала открой «" .. Config.Zones[z - 1].Name .. "»", "info")
+			ClientState.Toast:Fire(Loc.t("Сначала открой «%s»", Config.Zones[z - 1].Name), "info")
 		end
 	end)
 	card = { zone = z, frame = frame, status = status, button = button, lock = lock }
@@ -179,27 +180,27 @@ local function refreshCard(c: Card, d: PlayerData.Data, here: number)
 	local open = z == 0 or z <= d.Zone
 	c.lock.Visible = not open
 	if z == here then
-		c.status.set("pin", "Ты здесь", Theme.SparkHi)
-		UIKit.setButtonText(c.button, "Ты здесь")
+		c.status.set("pin", Loc.t("Ты здесь"), Theme.SparkHi)
+		UIKit.setButtonText(c.button, Loc.t("Ты здесь"))
 		UIKit.setButtonVariant(c.button, "Disabled")
 	elseif open then
 		if z == 0 then
-			c.status.set(nil, "Магазин, питомцы, награды", Theme.TextDim)
+			c.status.set(nil, Loc.t("Магазин, питомцы, награды"), Theme.TextDim)
 		else
-			c.status.set("check", "Открыт", Theme.GoHi)
+			c.status.set("check", Loc.t("Открыт"), Theme.GoHi)
 		end
 		local cooldown = TeleportUI.cooldownLeft()
 		if cooldown > 0 then
-			UIKit.setButtonText(c.button, string.format("Ещё %d с", math.ceil(cooldown)))
+			UIKit.setButtonText(c.button, Loc.t("Ещё %d с", math.ceil(cooldown)))
 			UIKit.setButtonVariant(c.button, "Disabled")
 		else
-			UIKit.setButtonText(c.button, "Лететь")
+			UIKit.setButtonText(c.button, Loc.t("Лететь"))
 			UIKit.setButtonVariant(c.button, "Spark")
 		end
 	elseif z == d.Zone + 1 then
 		local cost = Economy.zoneCost(z)
-		c.status.set("bolt", "Можно открыть", Theme.Volt)
-		UIKit.setButtonPrice(c.button, "Открыть", "⚡ " .. Format.short(cost))
+		c.status.set("bolt", Loc.t("Можно открыть"), Theme.Volt)
+		UIKit.setButtonPrice(c.button, Loc.t("Открыть"), "⚡ " .. Format.short(cost))
 		if d.Volts >= cost then
 			UIKit.setButtonVariant(c.button, "Go")
 		else
@@ -210,8 +211,8 @@ local function refreshCard(c: Card, d: PlayerData.Data, here: number)
 			end
 		end
 	else
-		c.status.set(nil, "Сначала открой предыдущий", Theme.TextDim)
-		UIKit.setButtonPrice(c.button, "Закрыт", "⚡ " .. Format.short(Economy.zoneCost(z)))
+		c.status.set(nil, Loc.t("Сначала открой предыдущий"), Theme.TextDim)
+		UIKit.setButtonPrice(c.button, Loc.t("Закрыт"), "⚡ " .. Format.short(Economy.zoneCost(z)))
 		UIKit.setButtonVariant(c.button, "Disabled")
 	end
 end
@@ -234,7 +235,7 @@ function TeleportUI.start()
 	end
 	win = UIKit.window({
 		Name = "Teleport",
-		Title = "Острова",
+		Title = Loc.t("Острова"),
 		Icon = "🌀",
 		Width = 880,
 		Height = 540,

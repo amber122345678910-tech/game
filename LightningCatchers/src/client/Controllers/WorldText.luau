@@ -4,8 +4,10 @@
 -- в атрибуте "Loc_<свойство>". Здесь клиент с другим языком подменяет свойство локально: изменение на клиенте
 -- не уходит на сервер. Сервер меняет надпись вместе с атрибутом — подписка на атрибут и на само свойство
 -- ставит перевод заново, в каком бы порядке они ни пришли.
+-- Имена столбцов leaderstats (список игроков Roblox) — так же: свойство Name по-английски, исходник в Loc_Name.
 
 local Workspace = game:GetService("Workspace")
+local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Loc = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Loc"))
@@ -69,10 +71,33 @@ local function consider(inst: Instance)
 	end
 end
 
+-- Столбец leaderstats: имя меняется только у себя на клиенте (сервер ищет значения по классу, не по имени)
+local function considerStat(inst: Instance)
+	if not inst:IsA("ValueBase") or hooked[inst] then
+		return
+	end
+	local parent = inst.Parent
+	if not parent or parent.Name ~= "leaderstats" then
+		return
+	end
+	if typeof(inst:GetAttribute(Loc.attr("Name"))) ~= "string" then
+		return
+	end
+	hooked[inst] = true
+	apply(inst, "Name")
+	inst:GetAttributeChangedSignal(Loc.attr("Name")):Connect(function()
+		apply(inst, "Name")
+	end)
+end
+
 function WorldText.start()
 	-- английский — язык, на котором надписи уже стоят: подменять нечего
 	if Loc.lang() == "en" then
 		return
+	end
+	Players.DescendantAdded:Connect(considerStat)
+	for _, inst in Players:GetDescendants() do
+		considerStat(inst)
 	end
 	Workspace.DescendantAdded:Connect(consider)
 	local all = Workspace:GetDescendants()

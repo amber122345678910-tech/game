@@ -59,27 +59,27 @@ local counts = {}
 local function section(name, fn)
 	local before, ballsBefore = B.count, B.balls
 	fn()
-	table.insert(counts, string.format("  %-10s %5d   шаров %3d", name, B.count - before, B.balls - ballsBefore))
+	table.insert(counts, string.format("  %-10s %5d   шаров %3d", name, B.count - before, B.balls - ballsBefore)) -- noloc: лог генератора
 end
 
 for i = 1, #ctx.Config.Zones do
-	section("Остров " .. i, function()
+	section("Остров " .. i, function() -- noloc: лог генератора
 		ZonesMap.build(ctx, i, islands)
 	end)
 end
 
-section("Хаб", function()
+section("Хаб", function() -- noloc: лог генератора
 	Hub.build(ctx, islands)
 end)
-section("Мосты", function()
+section("Мосты", function() -- noloc: лог генератора
 	Bridges.build(ctx, root)
 end)
-section("Небо", function()
+section("Небо", function() -- noloc: лог генератора
 	Sky.build(ctx)
 end)
 
 -- Метки: точки появления и подстанции
-section("Метки", function()
+section("Метки", function() -- noloc: лог генератора
 	local Zones, Config = ctx.Zones, ctx.Config
 	for zone = 0, #Config.Zones do
 		local p = Zones.spawnFor(zone)

@@ -23,7 +23,9 @@ ENTRY = re.compile(r'^\s*\[\s*"((?:[^"\\]|\\.)*)"\s*\]\s*=\s*"((?:[^"\\]|\\.)*)"
 PH = re.compile(r"%[-+ #0]*\d*(?:\.\d+)?[sdifgxXqc%]")
 LOC_CALL = re.compile(r"Loc\.(t|tl|msg|plural|pmsg|setWorldText|has|tc)\(")
 # позиция строки внутри вызова Loc.*: до неё не больше двух простых аргументов
-WRAPPED = re.compile(r"Loc\.(?:t|tl|msg|plural|pmsg|setWorldText|has)\(\s*(?:[^,()\"]*(?:\([^()]*\))?[^,()\"]*,\s*){0,2}$")
+# (простой аргумент — выражение без скобок и запятых, вызов с одним уровнем скобок или строка без кириллицы:
+#  Loc.setWorldText(label, "Text", "…"))
+WRAPPED = re.compile(r"Loc\.(?:t|tl|msg|plural|pmsg|setWorldText|has)\(\s*(?:(?:\"[^\"\nА-Яа-яЁё]*\"|[^,()\"]*(?:\([^()]*\))?[^,()\"]*),\s*){0,2}$")
 DATA_FIELD = re.compile(r'\b(Name|Desc|Title|Text|Hint|Label)\s*=\s*"((?:[^"\\\n]|\\.)*)"')
 
 verbose = "--verbose" in sys.argv

@@ -8,8 +8,10 @@
 local TweenService = game:GetService("TweenService")
 local UserInputService = game:GetService("UserInputService")
 local Lighting = game:GetService("Lighting")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Theme = require(script.Parent.Theme)
+local Loc = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Loc"))
 
 local UIKit = {}
 
@@ -174,21 +176,9 @@ end
 -- обводка и D-шрифт включаются явно (NoStroke = false, FontFace = Theme.FontDisplay)
 ----------------------------------------------------------------------
 
--- Заглавные буквы с кириллицей (string.upper знает только латиницу)
+-- Заглавные буквы и для кириллицы, и для латиницы (string.upper знает только латиницу) — Loc.upper
 function UIKit.upper(s: string): string
-	local out = table.create(#s)
-	for _, c in utf8.codes(s) do
-		local code = c
-		if code >= 0x430 and code <= 0x44F then
-			code -= 0x20
-		elseif code == 0x451 then
-			code = 0x401
-		elseif code >= 0x61 and code <= 0x7A then
-			code -= 0x20
-		end
-		table.insert(out, utf8.char(code))
-	end
-	return table.concat(out)
+	return Loc.upper(s)
 end
 
 -- Текст: TextScaled с ограничением размера. Служебные ключи: MaxTextSize, NoStroke (по умолчанию true)
@@ -2127,7 +2117,7 @@ function UIKit.window(opts: WindowOptions): Window
 	local confirmYes: (() -> ())? = nil
 	local yesButton = UIKit.button({
 		Name = "Yes",
-		Text = "Да",
+		Text = Loc.t("Да"),
 		Color = Theme.Danger,
 		Size = UDim2.fromOffset(220, 68),
 		AnchorPoint = Vector2.new(1, 1),
@@ -2144,7 +2134,7 @@ function UIKit.window(opts: WindowOptions): Window
 	end)
 	UIKit.button({
 		Name = "No",
-		Text = "Нет",
+		Text = Loc.t("Нет"),
 		Color = Theme.Slate,
 		Size = UDim2.fromOffset(220, 68),
 		AnchorPoint = Vector2.new(0, 1),

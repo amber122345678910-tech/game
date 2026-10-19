@@ -7,6 +7,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Format = require(Shared:WaitForChild("Format"))
+local Loc = require(Shared:WaitForChild("Loc"))
 local PlayerData = require(Shared:WaitForChild("PlayerData"))
 local Net = require(Shared:WaitForChild("Net"))
 
@@ -130,7 +131,7 @@ local function build()
 	})
 	UIKit.label({
 		Name = "Text",
-		Text = "Пока тебя не было, станция накопила",
+		Text = Loc.t("Пока тебя не было, станция накопила"),
 		FontFace = Theme.FontBodyHeavy,
 		Size = UDim2.new(1, -20, 0, 32),
 		Position = UDim2.fromOffset(10, 112),
@@ -155,7 +156,7 @@ local function build()
 	amountScale = UIKit.new("UIScale", { Scale = 1, Parent = amountLabel }) :: UIScale
 	claimButton = UIKit.button({
 		Name = "Claim",
-		Text = "Забрать",
+		Text = Loc.t("Забрать"),
 		Color = Theme.Go,
 		Size = UDim2.fromOffset(320, 78),
 		AnchorPoint = Vector2.new(0.5, 1),
@@ -190,7 +191,7 @@ function WelcomeUI.start()
 	end
 	win = UIKit.window({
 		Name = "Welcome",
-		Title = "С возвращением!",
+		Title = Loc.t("С возвращением!"),
 		Icon = "👋",
 		Width = W,
 		Height = H,

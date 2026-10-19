@@ -62,6 +62,13 @@ local EVENTS = { AncestryChanged = true, Died = true, CharacterAdded = true, OnS
 local Fake = {}
 local mt = {}
 local remoteLog = {} -- [remoteName] = { {to = player|"all", args = {...}} }
+-- все тексты для игрока за прогон (Notify, Banner, ошибки Request): в конце проверяется английский перевод
+local shownTexts = {} -- { {src = "Notify"|"Banner"|"Request:<действие>", text = строка или Loc.Msg} }
+local function noteShown(remote, args)
+	if remote == "Notify" or remote == "Banner" then
+		table.insert(shownTexts, { src = remote, text = args[1] })
+	end
+end
 
 local function fakeNew(className, extra)
 	local self = setmetatable({ _class = className, _children = {}, _props = { Name = className }, _attrs = {}, _attrEvents = {}, _events = {} }, mt)
@@ -176,10 +183,12 @@ end
 function methods:FireClient(player, ...)
 	remoteLog[self.Name] = remoteLog[self.Name] or {}
 	table.insert(remoteLog[self.Name], { to = player, args = table.pack(...) })
+	noteShown(self.Name, table.pack(...))
 end
 function methods:FireAllClients(...)
 	remoteLog[self.Name] = remoteLog[self.Name] or {}
 	table.insert(remoteLog[self.Name], { to = "all", args = table.pack(...) })
+	noteShown(self.Name, table.pack(...))
 end
 -- Humanoid
 function methods:EquipTool(tool)
@@ -503,7 +512,11 @@ local function moveTo(p, pos)
 end
 local function request(p, action, payload)
 	local fn = Remotes.Request.OnServerInvoke
-	return fn(p, action, payload)
+	local ok, res = fn(p, action, payload)
+	if ok ~= true and res ~= nil then
+		table.insert(shownTexts, { src = "Request:" .. tostring(action), text = res })
+	end
+	return ok, res
 end
 local function fireCatch(p, id, hit, tap)
 	Remotes.Catch.OnServerEvent:_fire(p, id, hit, tap)
@@ -547,6 +560,9 @@ local EconomyService = load("src/server/Services/EconomyService")
 local PlayerService = load("src/server/Services/PlayerService")
 local StrikeService = load("src/server/Services/StrikeService")
 local RequestService = load("src/server/Services/RequestService")
+local LocM = load("src/shared/Loc")
+local function R(x) return LocM.renderIn("ru", x) end
+local function E(x) return LocM.renderIn("en", x) end
 local FulguriteService = load("src/server/Services/FulguriteService")
 local Fulgurite = load("src/shared/Fulgurite")
 local PlayerData = load("src/shared/PlayerData")
@@ -628,7 +644,7 @@ if first then
 	local d = DataService.get(A)
 	check(d.Stats.Catches == 1 and d.Stats.Perfects == 1 and d.Stats.BestCombo == 1, "статистика")
 	check(A:GetAttribute("BestCombo") == 1, "атрибут BestCombo")
-	check(tag.Series.Visible and tag.Series.Text == "Серия: 1", "табличка: серия")
+	check(tag.Series.Visible and LocM.worldText(tag.Series, "Text", "ru") == "Серия: 1" and tag.Series.Text == "Best Combo: 1", "табличка: серия")
 	check(A:GetAttribute("JarFill") > 0, "JarFill вырос")
 	-- повторное нажатие того же удара игнорируется
 	local before = #messages("StrikeResult", A)
@@ -745,8 +761,11 @@ local added, burst, lost = EconomyService.addCharge(A, 3, 1)
 check(math.abs(added - 0.5) < 1e-9 and not burst and math.abs(lost - 2.5) < 1e-9, "остров 1: лишнее теряется")
 check(A:GetAttribute("JarFill") == 1, "JarFill = 1")
 check(lastMsg("Notify", A, function(a)
-	return string.find(a[1], "Банка полна", 1, true) ~= nil
+	return string.find(R(a[1]), "Банка полна", 1, true) ~= nil
 end) ~= nil, "напоминание «Банка полна»")
+check(lastMsg("Notify", A, function(a)
+	return E(a[1]) == "Jar full! Go sell your charge ⚡"
+end) ~= nil, "напоминание «Банка полна» по-английски")
 -- на подстанцию
 local pad = Zones.Geo[1].SellPad
 local voltsBefore = DataService.get(A).Volts
@@ -778,13 +797,15 @@ DataService.update(A, function(dd)
 	dd.Volts = 0
 end)
 local ok, err = request(A, "BuyUpgrade", "Boots")
-check(ok == false and err == "Не хватает Вольт", "нет денег: " .. tostring(err))
+check(ok == false and R(err) == "Не хватает Вольт", "нет денег: " .. tostring(err))
+check(E(err) == "Not enough Volts", "нет денег по-английски: " .. E(err))
 ok, err = request(A, "BuyUpgrade", "Nope")
-check(ok == false and type(err) == "string", "неизвестное улучшение")
+check(ok == false and R(err) == "Неизвестное улучшение" and E(err) == "Unknown upgrade", "неизвестное улучшение: " .. R(err))
 ok, err = request(A, "BuyUpgrade", { 1 })
 check(ok == false, "мусорный payload")
 ok, err = request(A, "Hack", nil)
-check(ok == false and err == "Неизвестное действие", "неизвестное действие")
+check(ok == false and R(err) == "Неизвестное действие", "неизвестное действие")
+check(not string.find(E(err), "[\208\209]"), "неизвестное действие по-английски: " .. E(err))
 ok, err = request(A, 123, nil)
 check(ok == false, "действие не строка")
 EconomyService.grantVolts(A, 1e9, "test")
@@ -830,7 +851,7 @@ task.wait(1.3)
 local tooFast = 0
 for _ = 1, 25 do
 	local okR, e = request(A, "Teleport", 99)
-	if not okR and e == "Слишком быстро! Подожди секунду" then
+	if not okR and R(e) == "Слишком быстро! Подожди секунду" then
 		tooFast += 1
 	end
 end
@@ -852,7 +873,7 @@ check(waitUntil(function()
 end, 1), "отброшен назад от барьера")
 check(lastMsg("Notify", A, function(a)
 	-- у барьера следующего острова — цена (или «Хватает ⚡!» и магазин), у дальнего — «сначала открой …»
-	return string.find(a[1], "Остров закрыт", 1, true) == 1 or string.find(a[1], "Хватает", 1, true) == 1
+	return string.find(R(a[1]), "Остров закрыт", 1, true) == 1 or string.find(R(a[1]), "Хватает", 1, true) == 1
 end) ~= nil, "Notify «Остров закрыт»")
 moveTo(A, g3.Center)
 check(waitUntil(function()
@@ -860,7 +881,7 @@ check(waitUntil(function()
 end, 1), "с закрытого острова тоже выкидывает")
 check(A:GetAttribute("Zone") ~= 3, "закрытый остров не становится зоной")
 ok, err = request(A, "Teleport", 3)
-check(ok == false and err == "Остров закрыт — открой его в магазине", "телепорт на закрытый остров")
+check(ok == false and R(err) == "Остров закрыт — открой его в магазине", "телепорт на закрытый остров")
 local zc = {}
 PlayerService.ZoneChanged:Connect(function(p, new, old)
 	table.insert(zc, { p = p, new = new, old = old })
@@ -880,12 +901,14 @@ for _, m in strikeMsgs(A) do
 end
 check(hubRings == 0, "в хабе колец нет")
 ok, err = request(A, "Teleport", 0)
-check(ok == false and err == "Ты уже в городе", "телепорт туда, где стоишь, — нельзя: " .. tostring(err))
+check(ok == false and R(err) == "Ты уже в городе", "телепорт туда, где стоишь, — нельзя: " .. tostring(err))
+check(E(err) == "You're already in the Hub", "уже в городе по-английски: " .. E(err))
 ok, err = request(A, "Teleport", 2)
 check(ok == true and A:GetAttribute("Zone") == 2, "телепорт обратно на остров 2: " .. tostring(err))
 Config.Server.TeleportCooldown = 5
 ok, err = request(A, "Teleport", 0)
-check(ok == false and typeof(err) == "string" and string.find(err, "заряжается", 1, true) ~= nil, "пауза между телепортами: " .. tostring(err))
+check(ok == false and string.find(R(err), "заряжается", 1, true) ~= nil, "пауза между телепортами: " .. tostring(err))
+check(string.match(E(err), "^Teleport recharging: %d+s left$") ~= nil, "пауза телепорта по-английски: " .. E(err))
 check(A:GetAttribute("Zone") == 2, "без телепорта остался на острове 2")
 Config.Server.TeleportCooldown = 0
 -- падение
@@ -1204,8 +1227,11 @@ check(dr.Rebirths == 1 and dr.Shards == 77 and #dr.Pets == petsBefore and dr.Ind
 check(A:GetAttribute("Rebirths") == 1 and A:GetAttribute("Zone") == 1, "атрибуты после перезапуска")
 check(A.Character.Humanoid.WalkSpeed == Economy.walkSpeed(0), "скорость сброшена")
 check(lastMsg("Banner", "all", function(a)
-	return a[1] == "♻ Генератор перезапущен! Аня теперь ×1.5"
+	return R(a[1]) == "♻ Генератор перезапущен! Аня теперь ×1.5"
 end) ~= nil, "баннер перезапуска")
+check(lastMsg("Banner", "all", function(a)
+	return E(a[1]) == "♻ Rebirth! Аня is now ×1.5"
+end) ~= nil, "баннер перезапуска по-английски")
 
 ----------------------------------------------------------------------
 -- 12. Особые кольца, хуки, модификаторы, крайние случаи
@@ -1515,8 +1541,11 @@ do
 	end
 	check(equippedKept, "надетые не разбиваются")
 	check(lastMsg("Notify", A, function(a)
-		return string.find(a[1], "Коллекция полна", 1, true) ~= nil and string.find(a[1], "разбит", 1, true) ~= nil
+		return string.find(R(a[1]), "Коллекция полна", 1, true) ~= nil and string.find(R(a[1]), "разбит", 1, true) ~= nil
 	end) ~= nil, "игроку сказали, какой разбит")
+	check(lastMsg("Notify", A, function(a)
+		return string.match(E(a[1]), "^Collection full: .+ Fulgurite #%d+ shattered, %+%d+ 💎") ~= nil
+	end) ~= nil, "какой разбит — по-английски")
 	DataService.update(A, function(d2)
 		d2.Fulgs = {}
 		d2.EquippedFulgs = {}
@@ -1545,11 +1574,70 @@ do
 	clearLog()
 	local voltsBefore = DataService.get(A).Volts
 	local okQ, errQ = request(A, "ClaimQuest", 1)
-	check(okQ == false and errQ == "Наступил новый день — задания обновились", "после смены дня — новые задания: " .. tostring(errQ))
+	check(okQ == false and R(errQ) == "Наступил новый день — задания обновились", "после смены дня — новые задания: " .. tostring(errQ))
+	check(not string.find(E(errQ), "[\208\209]"), "новый день по-английски: " .. E(errQ))
 	check(DataService.get(A).Quests.Day == yesterday + 1 and DataService.get(A).Volts > voltsBefore, "вчерашняя награда зачислена")
 	check(lastMsg("Notify", A, function(a)
-		return string.find(a[1], "прошлое задание", 1, true) ~= nil
+		return string.find(R(a[1]), "прошлое задание", 1, true) ~= nil
 	end) ~= nil, "тост о вчерашней награде")
+end
+
+----------------------------------------------------------------------
+-- Локализация: всё, что сервер показал игрокам, переводится на английский; по-русски — как было
+----------------------------------------------------------------------
+print("   локализация текстов сервера")
+do
+	-- имена игроков и пометки, которые не переводятся
+	local function cyrillicLeft(text)
+		text = string.gsub(text, "Аня", "")
+		text = string.gsub(text, "Боря", "")
+		return string.match(text, "[\208\209][\128-\191]+") -- noloc
+	end
+	local bad, plainRu, count = {}, {}, 0
+	for _, it in shownTexts do
+		count += 1
+		local en, ru = E(it.text), R(it.text)
+		if ru == "" then
+			table.insert(bad, it.src .. ": пустой текст")
+		elseif cyrillicLeft(en) then
+			table.insert(bad, it.src .. ": «" .. en .. "»")
+		end
+		if typeof(it.text) == "string" and string.find(it.text, "[\208\209]") and not LocM.has(it.text) then
+			table.insert(plainRu, it.src .. ": «" .. it.text .. "»")
+		end
+	end
+	check(count > 30, "тексты сервера собраны: " .. count)
+	check(#bad == 0, "тексты сервера переведены на английский: " .. table.concat(bad, " | "))
+	check(#plainRu == 0, "сервер не шлёт готовый русский текст: " .. table.concat(plainRu, " | "))
+	-- надписи в мире (табло, подписи над головой, галерея, киоски): свойство — английское, атрибут — исходник
+	local world, badWorld = 0, {}
+	for _, inst in Workspace:GetDescendants() do
+		for _, prop in { "Text", "ActionText", "ObjectText" } do
+			local raw = inst:GetAttribute("Loc_" .. prop)
+			if typeof(raw) == "string" then
+				world += 1
+				local en = inst[prop]
+				local ru = LocM.worldText(inst, prop, "ru")
+				if typeof(en) ~= "string" or cyrillicLeft(en) then
+					table.insert(badWorld, prop .. " «" .. tostring(en) .. "»")
+				end
+				if ru == nil or (raw ~= "" and ru == "") then
+					table.insert(badWorld, prop .. ": нет русского для «" .. tostring(en) .. "»")
+				end
+			end
+		end
+	end
+	-- (карты в этом прогоне нет: табличка над головой и галерея)
+	check(world >= 3, "надписи в мире с исходником: " .. world)
+	check(#badWorld == 0, "надписи в мире: " .. table.concat(badWorld, " | "))
+	-- столбцы leaderstats: по-английски, исходник в Loc_Name
+	local ls = A:FindFirstChild("leaderstats")
+	local names = {}
+	for _, v in (if ls then ls:GetChildren() else {}) do
+		table.insert(names, v.Name .. "/" .. tostring(LocM.worldText(v, "Name", "ru")))
+	end
+	table.sort(names)
+	check(table.concat(names, ",") == "Rebirths/Перезапуски,Volts/Вольты", "leaderstats: " .. table.concat(names, ","))
 end
 
 ----------------------------------------------------------------------

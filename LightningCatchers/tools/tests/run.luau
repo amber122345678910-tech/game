@@ -19,8 +19,19 @@ local PlayerData = Loader.load("src/shared/PlayerData")
 local Quests = Loader.load("src/shared/Quests")
 local Format = Loader.load("src/shared/Format")
 local Geom = Loader.load("src/shared/Geom")
+local Loc = Loader.load("src/shared/Loc")
 
 local test, eq, near, truthy, falsy = T.test, T.eq, T.near, T.truthy, T.falsy
+
+-- Выполнить fn на языке lang (тексты на языке игрока: Fulgurite.title, Quests.text, …), потом вернуть английский
+local function inLang(lang: string, fn: () -> ())
+	Loc.setLang(lang :: any)
+	local ok, err = pcall(fn)
+	Loc.setLang("en")
+	if not ok then
+		error(err, 0)
+	end
+end
 
 ----------------------------------------------------------------------
 -- Тайминг
@@ -318,7 +329,12 @@ test("фульгурит: детерминирован, редкость и бо
 	truthy(Fulgurite.rollDrop("rainbow", 0.999), "rainbow always drops")
 	falsy(Fulgurite.rollDrop("blue", 0.5), "blue rarely drops")
 	-- названия без порчи кириллицы
-	eq(Fulgurite.title(a, "golden"), "Золотой фульгурит «" .. a.ShapeName .. "»")
+	inLang("ru", function()
+		eq(Fulgurite.title(a, "golden"), "Золотой фульгурит «" .. a.ShapeName .. "»")
+	end)
+	eq(Fulgurite.title(a, "golden"), "Golden " .. Loc.tl("en", a.ShapeName) .. " Fulgurite")
+	eq(Loc.renderIn("en", Fulgurite.titleMsg({ ShapeName = "Звезда" } :: any, nil)), "Star Fulgurite")
+	eq(Loc.renderIn("ru", Fulgurite.titleMsg({ ShapeName = "Звезда" } :: any, "perun")), "Перунов фульгурит «Звезда»")
 end)
 
 test("фульгуриты: распределение редкости по цветам разумное", function()
@@ -408,7 +424,11 @@ test("бонусы питомцев складываются", function()
 	near(b.volts, 0.28, 1e-9)
 	near(b.luck, 0.1, 1e-9)
 	near(b.window, 15, 1e-9)
-	eq(Pets.bonusText("sosulka"), "🎯 Окно ИДЕАЛЬНО +15 мс")
+	inLang("ru", function()
+		eq(Pets.bonusText("sosulka"), "🎯 Окно ИДЕАЛЬНО +15 мс")
+	end)
+	eq(Pets.bonusText("sosulka"), "🎯 PERFECT Window +15 ms")
+	eq(Loc.renderIn("ru", Pets.bonusMsg("sosulka")), "🎯 Окно ИДЕАЛЬНО +15 мс")
 end)
 
 ----------------------------------------------------------------------
@@ -486,21 +506,35 @@ test("задания дня: 3 разных, детерминированы", fu
 end)
 
 test("тексты заданий: число и слово согласованы", function()
-	for _, def in Quests.Pool do
-		for _, n in { 1, 2, 5, 11, 21, 22, def.Target } do
-			local text = Quests.text(def, n)
-			falsy(string.find(text, "%", 1, true), "нет незаполненных %: " .. text)
-			truthy(string.find(text, tostring(n), 1, true) ~= nil, "есть число: " .. text)
-		end
+	for _, lang in { "ru", "en" } do
+		inLang(lang, function()
+			for _, def in Quests.Pool do
+				for _, n in { 1, 2, 5, 11, 21, 22, def.Target } do
+					local text = Quests.text(def, n)
+					falsy(string.find(text, "%", 1, true), "нет незаполненных %: " .. text)
+					truthy(string.find(text, tostring(n), 1, true) ~= nil, "есть число: " .. text)
+					eq(Loc.renderIn(lang :: any, Quests.msg(def, n)), text, "Quests.msg = Quests.text")
+					if lang == "en" then
+						falsy(string.find(text, "[\208\209]"), "без кириллицы: " .. text)
+					end
+				end
+			end
+		end)
 	end
 	local catch = Quests.def("catch") :: any
-	eq(Quests.text(catch, 1), "Поймай 1 молнию")
-	eq(Quests.text(catch, 3), "Поймай 3 молнии")
-	eq(Quests.text(catch, 60), "Поймай 60 молний")
-	eq(Quests.text(Quests.def("rare") :: any, 8), "Поймай 8 редких молний (◆ и выше)")
-	eq(Quests.text(Quests.def("sell") :: any, 2), "Сдай банку 2 раза")
-	eq(Quests.text(Quests.def("shards") :: any, 21), "Собери 21 осколок с земли")
-	eq(Quests.text(Quests.def("combo") :: any, 12), "Набери комбо 12")
+	inLang("ru", function()
+		eq(Quests.text(catch, 1), "Поймай 1 молнию")
+		eq(Quests.text(catch, 3), "Поймай 3 молнии")
+		eq(Quests.text(catch, 60), "Поймай 60 молний")
+		eq(Quests.text(Quests.def("rare") :: any, 8), "Поймай 8 редких молний (◆ и выше)")
+		eq(Quests.text(Quests.def("sell") :: any, 2), "Сдай банку 2 раза")
+		eq(Quests.text(Quests.def("shards") :: any, 21), "Собери 21 осколок с земли")
+		eq(Quests.text(Quests.def("combo") :: any, 12), "Набери комбо 12")
+	end)
+	eq(Quests.text(catch, 1), "Catch 1 bolt")
+	eq(Quests.text(catch, 3), "Catch 3 bolts")
+	eq(Quests.text(Quests.def("sell") :: any, 1), "Sell your Jar 1 time")
+	eq(Quests.text(Quests.def("shards") :: any, 21), "Pick up 21 Shards")
 end)
 
 test("осколки за разбитый фульгурит: редкость × ценность острова", function()
@@ -511,7 +545,10 @@ test("осколки за разбитый фульгурит: редкость 
 end)
 
 test("текст улучшения банки без несогласованного слова", function()
-	eq(Economy.effectText("Jar", 0), "вместимость 25")
+	inLang("ru", function()
+		eq(Economy.effectText("Jar", 0), "вместимость 25")
+	end)
+	eq(Economy.effectText("Jar", 0), "capacity 25")
 	truthy(string.find(Economy.effectText("Jar", 20), "K", 1, true) ~= nil or string.find(Economy.effectText("Jar", 20), "M", 1, true) ~= nil, "крупные числа коротко")
 end)
 
@@ -532,6 +569,195 @@ test("форматирование чисел", function()
 	eq(Format.mult(1.5), "x1.5")
 	eq(Format.percent(0.25), "25%")
 	eq(Format.percent(0.0001), "1/10K")
+end)
+
+----------------------------------------------------------------------
+-- Локализация (src/shared/Loc.luau)
+----------------------------------------------------------------------
+test("Loc: словарь без конфликтов, язык по умолчанию — английский", function()
+	eq(#Loc.Conflicts, 0, "конфликты ключей")
+	eq(Loc.lang(), "en")
+	eq(Loc.t("Вольты"), "Volts")
+	eq(Loc.tl("ru", "Вольты"), "Вольты")
+	eq(Loc.tl("en", "Ловцы Молний"), "Lightning Catchers")
+	truthy(Loc.has("Вольты"), "has")
+	falsy(Loc.has("Такой строки нет в словаре"), "has: нет")
+	-- нет перевода — показывается исходник
+	eq(Loc.tl("en", "Такой строки нет в словаре"), "Такой строки нет в словаре")
+	inLang("ru", function()
+		eq(Loc.lang(), "ru")
+		eq(Loc.t("Вольты"), "Вольты")
+		eq(Loc.t("Банка"), "Банка")
+	end)
+end)
+
+test("Loc: ключи с контекстом ctx::", function()
+	eq(Loc.tl("en", "kind::Обычный"), "Normal")
+	eq(Loc.tl("en", "Обычный"), "Common")
+	eq(Loc.tl("ru", "kind::Обычный"), "Обычный")
+	eq(Loc.tl("ru", "Обычный"), "Обычный")
+	-- у ключа с контекстом нет своего перевода — берётся перевод без контекста
+	eq(Loc.tl("en", "nothere::Вольты"), "Volts")
+	eq(Loc.tl("ru", "nothere::Вольты"), "Вольты")
+	-- с аргументами
+	eq(Loc.tl("en", "kind::Обычный"), Loc.renderIn("en", "kind::Обычный"))
+end)
+
+test("Loc: множественное число", function()
+	local forms = "минуту|минуты|минут"
+	local ru = {
+		[1] = "минуту",
+		[2] = "минуты",
+		[5] = "минут",
+		[11] = "минут",
+		[12] = "минут",
+		[14] = "минут",
+		[21] = "минуту",
+		[22] = "минуты",
+		[25] = "минут",
+		[101] = "минуту",
+		[111] = "минут",
+		[0] = "минут",
+	}
+	inLang("ru", function()
+		for n, want in ru do
+			eq(Loc.plural(n, forms), want, "ru " .. n)
+		end
+	end)
+	for n, want in ru do
+		eq(Loc.renderIn("ru", Loc.pmsg(n, forms)), want, "ru pmsg " .. n)
+	end
+	eq(Loc.plural(1, forms), "minute", "en 1")
+	eq(Loc.plural(2, forms), "minutes", "en 2")
+	eq(Loc.plural(0, forms), "minutes", "en 0")
+	eq(Loc.renderIn("en", Loc.pmsg(21, forms)), "minutes", "en 21")
+	eq(Loc.renderIn("en", Loc.pmsg(1, forms)), "minute", "en pmsg 1")
+	-- с контекстом: по-русски формы без префикса
+	eq(Loc.renderIn("ru", Loc.pmsg(5, "perfect::молнию|молнии|молний")), "молний")
+	eq(Loc.renderIn("en", Loc.pmsg(5, "perfect::молнию|молнии|молний")), "PERFECT catches")
+end)
+
+test("Loc: сообщения с вложенными сообщениями и pmsg", function()
+	local m = Loc.msg("🏙 ЭЛЕКТРОГРАД СИЯЕТ! %s Вольт на %d %s", "×2", 5, Loc.pmsg(5, "минуту|минуты|минут"))
+	eq(Loc.renderIn("ru", m), "🏙 ЭЛЕКТРОГРАД СИЯЕТ! ×2 Вольт на 5 минут")
+	eq(Loc.renderIn("en", m), "🏙 VOLTVILLE IS SHINING! ×2 Volts for 5 minutes")
+	local spec = { ShapeName = "Звезда" } :: any
+	local full = Loc.msg("Коллекция полна: %s %s разбит, +%d 💎 — место для нового!", Fulgurite.titleMsg(spec, "golden"), Loc.msg("№%06d", 12), 30)
+	eq(Loc.renderIn("ru", full), "Коллекция полна: Золотой фульгурит «Звезда» №000012 разбит, +30 💎 — место для нового!")
+	eq(Loc.renderIn("en", full), "Collection full: Golden Star Fulgurite #000012 shattered, +30 💎 — room for a new one!")
+	-- render: строка-исходник, nil, число
+	eq(Loc.renderIn("en", "Не хватает Вольт"), "Not enough Volts")
+	eq(Loc.renderIn("en", nil), "")
+	eq(Loc.renderIn("en", 42), "42")
+	eq(Loc.render(Loc.msg("Не хватает Вольт")), "Not enough Volts")
+	-- мусор вместо сообщения не роняет клиент
+	eq(Loc.renderIn("en", { 5, 6 }), "")
+end)
+
+test("Loc: строковые аргументы-исходники переводятся сами", function()
+	eq(Loc.tl("en", "🎁 %s!", "Искорка"), "🎁 Sparky!")
+	eq(Loc.tl("ru", "🎁 %s!", "Искорка"), "🎁 Искорка!")
+	eq(Loc.tl("en", "Сначала открой остров «%s»", "Медные Холмы"), "Unlock Copper Hills first")
+	eq(Loc.renderIn("en", Loc.msg("🎁 Подарок: %s!", "Луговой кокон")), "🎁 Gift: Meadow Cocoon!")
+	-- имя игрока (нет в словаре) — как есть
+	eq(Loc.tl("en", "🌈 Радужную молнию поймали: %s!", "Аня"), "🌈 Rainbow Lightning caught by Аня!")
+	-- числа — как есть
+	eq(Loc.tl("en", "Телепорт заряжается: ещё %d с", 7), "Teleport recharging: 7s left")
+end)
+
+test("Loc: encode/decode и надписи в мире", function()
+	local m = Loc.msg("Телепорт заряжается: ещё %d с", 7)
+	local back = Loc.decode(Loc.encode(m))
+	eq(#back, 2)
+	eq(back[1], m[1])
+	eq(back[2], 7)
+	eq(Loc.renderIn("ru", back), "Телепорт заряжается: ещё 7 с")
+	local m2 = Loc.msg("%s · %s", "Редкий", Loc.msg("№%06d", 5))
+	local back2 = Loc.decode(Loc.encode(m2))
+	eq(back2[2], "Редкий")
+	eq(back2[3], "№000005", "вложенное сообщение — русским текстом")
+	eq(Loc.renderIn("ru", back2), "Редкий · №000005")
+	eq(Loc.renderIn("en", back2), "Rare · №000005")
+	-- строка с числом в виде текста остаётся строкой
+	local back3 = Loc.decode(Loc.encode(Loc.msg("%s и ещё %d", "12", 3)))
+	eq(back3[2], "12")
+	eq(back3[3], 3)
+	-- строка-исходник без аргументов
+	eq(Loc.encode("Магазин"), "Магазин")
+	eq(Loc.decode("Магазин")[1], "Магазин")
+	eq(#Loc.decode("Магазин"), 1)
+	-- поддельная надпись: свойство — английский, атрибут — исходник
+	local attrs = {}
+	local label: any = {
+		Text = "",
+		GetAttribute = function(_, k)
+			return attrs[k]
+		end,
+		SetAttribute = function(_, k, v)
+			attrs[k] = v
+		end,
+	}
+	Loc.setWorldText(label, "Text", "Телепорт заряжается: ещё %d с", 3)
+	eq(label.Text, "Teleport recharging: 3s left")
+	eq(Loc.worldText(label, "Text", "ru"), "Телепорт заряжается: ещё 3 с")
+	eq(Loc.worldText(label, "Text", "en"), "Teleport recharging: 3s left")
+	eq(Loc.worldText(label, "ActionText", "ru"), nil, "нет атрибута — nil")
+	attrs.LocUpper = true
+	Loc.setWorldText(label, "Text", "Магазин")
+	eq(label.Text, "SHOP")
+	eq(Loc.worldText(label, "Text", "ru"), "МАГАЗИН")
+end)
+
+test("Loc.pick: настройка важнее локали, ru* — русский, остальное — английский", function()
+	eq(Loc.pick("ru", "en-us"), "ru")
+	eq(Loc.pick("en", "ru-ru"), "en")
+	eq(Loc.pick("", "ru-ru"), "ru")
+	eq(Loc.pick(nil, "ru-RU"), "ru")
+	eq(Loc.pick(nil, "ru"), "ru")
+	eq(Loc.pick("", "en-us"), "en")
+	eq(Loc.pick("", "pt-br"), "en")
+	eq(Loc.pick("", "uk-ua"), "en")
+	eq(Loc.pick("", ""), "en")
+	eq(Loc.pick(nil, nil), "en")
+	eq(Loc.pick("de", "ru-ru"), "ru", "неизвестная настройка — по локали")
+end)
+
+test("Loc: сломанный перевод — показывается исходник", function()
+	local key = "Тестовая строка %d из %d"
+	Loc.EN[key] = "Broken %s %s %s" -- не хватает аргумента
+	local ok, err = pcall(function()
+		eq(Loc.tl("en", key, 1, 2), "Тестовая строка 1 из 2")
+		eq(Loc.renderIn("en", Loc.msg(key, 1, 2)), "Тестовая строка 1 из 2")
+		Loc.EN[key] = "Broken %d" -- лишний аргумент string.format не роняет
+		eq(Loc.tl("en", key, 1, 2), "Broken 1")
+		Loc.EN[key] = "Broken %d of %d"
+		-- в исходнике тоже не те аргументы — хотя бы исходник
+		eq(Loc.tl("en", key, "x", "y"), key)
+	end)
+	Loc.EN[key] = nil
+	if not ok then
+		error(err, 0)
+	end
+end)
+
+test("Loc.upper: кириллица и латиница", function()
+	eq(Loc.upper("ловцы молний ёж"), "ЛОВЦЫ МОЛНИЙ ЁЖ")
+	eq(Loc.upper("Lightning catchers 123 ×"), "LIGHTNING CATCHERS 123 ×")
+end)
+
+test("Loc: в английских переводах нет кириллицы, плейсхолдеры как у исходника", function()
+	local function ph(s: string): string
+		local out = {}
+		for p in string.gmatch(s, "%%[-+ #0]*%d*%.?%d*[sdifgxXqc%%]") do
+			table.insert(out, p)
+		end
+		return table.concat(out, ",")
+	end
+	for k, v in Loc.EN do
+		falsy(string.find(v, "[\208\209][\128-\191]"), "кириллица в переводе: " .. v)
+		local plain = string.match(k, "::(.*)$") or k
+		eq(ph(v), ph(plain), "плейсхолдеры: " .. k)
+	end
 end)
 
 local ok = T.summary()

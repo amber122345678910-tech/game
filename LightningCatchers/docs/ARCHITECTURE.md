@@ -1,7 +1,8 @@
 # Ловцы Молний — архитектура кода
 
-Roblox-проект собирается Rojo из `LightningCatchers/`. Код — Luau, везде `--!strict`, комментарии по-русски,
-весь текст для игрока — по-русски. Дизайн игры: `docs/DESIGN.md`. Все числа — только в `src/shared/Config.luau`.
+Roblox-проект собирается Rojo из `LightningCatchers/`. Код — Luau, везде `--!strict`, комментарии по-русски.
+Игра двуязычная: английский — по умолчанию, русский — по локали Roblox или в настройках (раздел «Локализация» ниже);
+текст для игрока пишется в коде по-русски (исходник и ключ словаря). Дизайн игры: `docs/DESIGN.md`. Все числа — только в `src/shared/Config.luau`.
 
 ```
 LightningCatchers/
@@ -23,6 +24,7 @@ tools/analyze.sh                         # строгий анализ типо�
 .tools/lune run tools/tests/balance.luau # симуляция баланса
 .tools/lune run tools/gen_map.luau       # пересобрать src/map/Map.rbxmx
 python3 tools/check_ui_props.py          # ключи таблиц UIKit.new/label/panel — настоящие свойства классов
+python3 tools/check_loc.py               # локализация: переводы, плейсхолдеры, необёрнутые русские строки (0 ошибок)
 .tools/rojo build default.project.json -o LightningCatchers.rbxl
 .tools/lune run tools/verify_place.luau LightningCatchers.rbxl
 # превью карты: tools/preview (dump_scene.luau -> render.mjs, см. README в папке)
@@ -49,6 +51,8 @@ Lune-тесты подключают модули через `tools/lib/loader.l
 | `SoundIds` | проверенные ID: `Sfx`, `Ambient`, `Music` |
 | `Format` | `short(n)` (1.2K), `full`, `time`, `plural`, `mult`, `percent` |
 | `Signal` | простой сигнал |
+| `Loc` | локализация: `t`, `tl`, `plural`, `msg`, `pmsg`, `render`, `renderIn`, `setWorldText`, `worldText`, `encode`/`decode`, `pick`, `lang`/`setLang`, `upper` (см. «Локализация») |
+| `Strings/*` | английские словари `{ ["русский исходник"] = "English" }`; `Strings/Shared.luau` — глоссарий |
 
 ## Сеть
 
@@ -63,11 +67,14 @@ RemoteEvent (в `ReplicatedStorage.Remotes`): `DataSync`, `StrikeSpawn`, `Strike
 | Catch | C→S | `(strikeId: number, hit: number, tapTime: number)` — tapTime = `workspace:GetServerTimeNow()` в момент нажатия **уже с** поправкой задержки из настроек; сервер сам оценивает ближайший к tapTime неоценённый удар кольца (`hit` — только проверка), tapTime принимается в окне `[now − (2 × пинг + TapLateSlack), now + TapAheadSlack]` (± поправка) |
 | ShardSpawn | S→C | `(msg: Net.ShardMsg)` |
 | ShardCollect | C→S | `(shardId: number)` |
-| Notify | S→C | `(text: string, kind: "info"|"good"|"bad"|"rare")` — короткий тост |
-| Banner | S→all | `(text: string, kind: string, color: Color3?)` — баннер на весь сервер (редкая поимка, событие) |
+| Notify | S→C | `(text: Net.Text, kind: "info"|"good"|"bad"|"rare")` — короткий тост |
+| Banner | S→all | `(text: Net.Text, kind: string, color: Color3?)` — баннер на весь сервер (редкая поимка, событие) |
 | Effect | S→C/all | `(msg: Net.EffectMsg)` |
 | BoltFX | S→C (ненадёжно) | `(msg: Net.BoltMsg)` — чужие молнии в той же зоне, только для красоты |
-| Request | C→S RemoteFunction | `(action: string, payload: any) -> (ok: boolean, result: any)`; при `ok=false` result — текст ошибки по-русски |
+| Request | C→S RemoteFunction | `(action: string, payload: any) -> (ok: boolean, result: any)`; при `ok=false` result — текст ошибки (`Net.Text`) |
+
+`Net.Text = string | Loc.Msg` — текст для игрока от сервера: строка-исходник или `Loc.msg(...)`; клиент рисует его через
+`Loc.render` на своём языке (сервер языка игрока не знает и сам не переводит).
 
 `Net.gameState()` — папка `ReplicatedStorage.GameState`, сервер создаёт её при старте и пишет атрибуты:
 `CityPoints, CityTarget, CityLit (0..6), CityBoostUntil, Event ("", "supercell", "ball", "rainbow"), EventEnds,
@@ -110,7 +117,7 @@ Event → City → Daily → Leaderboard → Tutorial → Request (роутер)
 | `EventService` | расписание по серверному времени: Суперячейка (модификаторы `rateMult()`, `chargeMult()`, `goldBoost()`), Шаровая молния (остров с макс. игроков, путь по `Zones.clampToPlay`, общие кольца каждые `HitInterval`, HP = игроки × HpPerPlayer, награда по вкладу), Радужная молния (`Effect rainbowWarn` за `Announce` с, затем огромное общее кольцо на каждом острове с игроками (все в хабе — на острове 1); награда — `RewardMinutes` дохода + гарантированный радужный фульгурит каждому поймавшему), Перун (баннер «бьёт рядом с …», `Effect perun` всем; поймали — баннер с ловцом и «Я видел!» тем, кто в радиусе; не поймали — «ушла»). Атрибуты GameState. API: `rateMult()`, `chargeMult()`, `goldBoost()`, `current(): string` |
 | `CityService` | на `EconomyService.Sold`: очки = заполнение банки (≤1.5); цель `PointsBase + PointsPerPlayer × игроки`; `CityLit` = доля × 6; при заполнении — `CityBoostUntil = now + CityBoostDuration`, баннер, `Effect cityLit`; после буста — сброс с плавным гашением. API: `boostActive(): boolean` |
 | `DailyService` | календарь (`Config.DailyRewards`, серия, прощённый 1 день), задания (`Quests.forDay`, прогресс от `StrikeService.CatchResolved`, `EconomyService.Sold`, вылуплений, осколков), коды (`Config.Codes`, регистр не важен), офлайн-доход (`Welcome`, Request ClaimWelcome), бусты ×2 (`data.Boosts.Volts2x`) |
-| `LeaderboardService` | leaderstats (NumberValue `Вольты` и IntValue `Перезапуски`), глобальная таблица `OrderedDataStore` по `TotalVolts` (обновление раз в 3 мин, в pcall), заполнение `Board_Leaders`, `Board_Hall` (радужные ловцы сервера), `FriendCount` (друзья на сервере, `Player:IsFriendsWith` в pcall с кэшем) |
+| `LeaderboardService` | leaderstats (NumberValue `Volts` и IntValue `Rebirths`, исходник имени — атрибут `Loc_Name`, значения ищутся по классу), глобальная таблица `OrderedDataStore` по `TotalVolts` (обновление раз в 3 мин, в pcall), заполнение `Board_Leaders`, `Board_Hall` (радужные ловцы сервера), `FriendCount` (друзья на сервере, `Player:IsFriendsWith` в pcall с кэшем) |
 | `TutorialService` | Request TutorialStep (флаги в `data.Tutorial`: "catch", "sell", "shop", "pet", "zone2", "overcharge"); выдача стартового питомца |
 
 Правила сервера: сервер — единственный источник правды (Вольты, заряд, оценки, награды). Клиенту никогда не доверяем
@@ -119,8 +126,8 @@ Event → City → Daily → Leaderboard → Tutorial → Request (роутер)
 
 ## Клиент (src/client)
 
-`Main.client.luau` запускает: ClientState → Sounds → Juice → WorldFX → StrikeController → CatchController → CharacterFX → PetsFX →
-UI (HUD, Notifications, окна) → Tutorial.
+`Main.client.luau` запускает: ClientState → выбор языка (`Loc.setLang`, до запуска модулей) → Sounds → Juice → WorldFX → WorldText →
+StrikeController → CatchController → CharacterFX → PetsFX → UI (HUD, Notifications, окна) → Tutorial.
 
 | Модуль | Ответственность |
 |---|---|
@@ -132,11 +139,71 @@ UI (HUD, Notifications, окна) → Tutorial.
 | `Controllers/CharacterFX` | банка на спине каждого игрока: ядро по `JarFill`, краснеет и трещит при перегрузке; свечение громоотвода по `Combo`; «Шарахнуло» по `ZappedUntil` (сажа через Highlight, искры над головой); дуги цепной молнии |
 | `Controllers/PetsFX` | питомцы всех игроков по атрибуту `Pets`: модели из `Models.pet(kind)`, парят и кружат (BulkMoveTo), у чужих — упрощённо |
 | `Controllers/WorldFX` | освещение по зоне (`Config.Zones[i].Sky` / `Config.Hub.Sky`, плавный твин Atmosphere/ColorCorrection/Ambient), дождь у камеры, далёкие вспышки в тучах, дрейф туч, дуги Тесла-башни, барьеры открытых островов прячутся, кварталы города (`CityLit`) зажигаются волной от центра, настроение событий (Суперячейка — зелёное небо), вспышка Перуна, музыка и фон по зоне/событию |
+| `Controllers/WorldText` | надписи в мире на русском клиенте: таблички, табло, подписи над головой, ProximityPrompt и столбцы leaderstats — подменяет свойство локально по атрибуту `Loc_<свойство>` (на английском клиенте ничего не делает) |
 | `Controllers/Tutorial` | стрелка-луч к цели и короткая подсказка: встань в круг → жми ⚡ → сдай банку → купи улучшение → питомец → мост на остров 2; шаги по флагам `data.Tutorial` и событиям |
 | `Fonts` (src/shared/Fonts.luau) | шрифты игры (docs/STYLE.md §8.3), один источник для UI и серверных табличек: `Display` (Montserrat Black Italic), `DisplayFlat`, `Number` (Oswald Bold), `Body` / `BodyHeavy` (Nunito 700/800), `All` для прогрева в Main.client. У всех полная кириллица; BuilderSans кириллицы не имеет |
 | `Models` (src/shared/Models.luau) | строители моделей из примитивов (для сервера, клиента и Lune-превью): `rod(tier)`, `jar()`, `pet(kind)`, `cocoon(id)`, `fulgurite(spec, glassColor)`, `station()`, `ballLightning()` (детали якорные, без сварки — их крутит EventFX), рецепты пулов StrikeController `strikeCloudRecipe()` и `shardRecipe()`. Возвращают Model/Tool, не родительствуют |
-| `UI/*` | `HUD` (Вольты/осколки, полоса банки с перегрузкой и риском, кнопка ЛОВИ, комбо, таймер события, шкала города, кнопки меню слева выше джойстика, надписи оценки, тосты), `Notifications` (тосты + баннеры), `ShopUI`, `PetsUI` (+ анимация вылупления), `CollectionUI` (фульгуриты с ViewportFrame + Молниедекс), `TeleportUI`, `RebirthUI`, `DailyUI` (календарь, задания, коды), `SettingsUI` (музыка, звуки, мягкие вспышки, тряска, задержка), `WelcomeUI` |
+| `UI/*` | `HUD` (Вольты/осколки, полоса банки с перегрузкой и риском, кнопка ЛОВИ, комбо, таймер события, шкала города, кнопки меню слева выше джойстика, надписи оценки, тосты), `Notifications` (тосты + баннеры), `ShopUI`, `PetsUI` (+ анимация вылупления), `CollectionUI` (фульгуриты с ViewportFrame + Молниедекс), `TeleportUI`, `RebirthUI`, `DailyUI` (календарь, задания, коды), `SettingsUI` (язык, музыка, звуки, мягкие вспышки, тряска, задержка), `WelcomeUI` |
 
 Правила клиента: всё визуальное — только на клиенте; сервер не создаёт эффектов. Пулы деталей, лимиты частиц, `CastShadow=false`
 у мелочи, `CanQuery/CanTouch=false` у эффектов. Не перекрывать левые 40% нижних 2/3 экрана (джойстик) и кнопку прыжка.
 Кнопки ≥ 56 px. Тексты короткие. Числа — `Format.short`.
+
+## Локализация
+
+Игра для всего мира: **английский — язык по умолчанию**, русский — у игроков с русской локалью Roblox или выбравших его
+в настройках. Ядро — `src/shared/Loc.luau` (правила — в его шапке), словари — `src/shared/Strings/*.luau`.
+
+**Исходник — русский.** Строка для игрока пишется в коде по-русски и сразу оборачивается в `Loc.*`; эта русская строка —
+и текст для русского игрока (ровно как раньше), и ключ словаря. Английский перевод лежит в словаре:
+`["Банка: %d / %d"] = "Jar: %d / %d",` (одна запись на строку, `"` экранируется `\"`).
+
+**Язык игрока.** `Loc.pick(Settings.Lang, локаль)`: настройка `"en"`/`"ru"` важнее локали; пустая настройка — по локали Roblox
+(`LocalizationService.RobloxLocaleId`, иначе `Player.LocaleId`): `ru*` → русский, всё остальное (`en-us`, `pt-br`, пусто) → английский.
+`Main.client` выбирает язык до запуска контроллеров и окон (ждёт данные до 6 с), поэтому тексты можно строить один раз при старте
+модуля. Смена языка в настройках (`SettingsUI`, `Settings.Lang`) применяется после перезахода.
+
+**Клиент** рисует текст сам:
+- `Loc.t("Банка полна!")`, с аргументами `Loc.t("Банка: %d / %d", a, b)` — плейсхолдеры и их порядок в переводе те же;
+- строковые аргументы, которые сами есть в словаре (имена питомцев, островов, цветов, редкостей), переводятся автоматически:
+  `Loc.t("Вылупился %s!", def.Name)`; данные показываются через `Loc.t(def.Name)`;
+- множественное число — одной строкой: `Loc.plural(n, "минута|минуты|минут")` ↔ `"minute|minutes"` (3 формы → 2);
+- одна русская строка с двумя разными переводами — ключ с контекстом `"ctx::Исходник"`
+  (`"kind::Обычный"` = Normal, а редкость `"Обычный"` = Common); по-русски показывается часть после `::`.
+
+**Сервер** языка игрока не знает и `Loc.t` не вызывает. Текст для клиента (Notify, Banner, ответы и ошибки Request, любые
+показываемые поля сообщений) — `Loc.msg("Исходник %s", аргументы...)` (таблица `{ fmt, ... }`) или простая строка-исходник;
+клиент рисует его через `Loc.render(x)`. Множественное число внутри — аргумент `Loc.pmsg(n, "минуту|минуты|минут")`,
+вложенные `Loc.msg` тоже можно. В общих модулях есть пары «клиент/сервер»: `Quests.text`/`Quests.msg`,
+`Pets.bonusText`/`Pets.bonusMsg`, `Fulgurite.title`/`Fulgurite.titleMsg`.
+
+**Надписи в мире** видят игроки на разных языках сразу. Сервер ставит их через `Loc.setWorldText(inst, "Text", "Исходник %s", ...)`:
+в свойство (`Text`, `ActionText`, `ObjectText`, у leaderstats — `Name`) пишется английский, в атрибут `Loc_<свойство>` —
+исходник (`Loc.encode`). Русский клиент подменяет свойство локально (`Controllers/WorldText`, следит и за атрибутом, и за
+свойством). Заглавные — атрибут `LocUpper = true` до вызова. Таблички карты делает `B.text` (`tools/lib/builder.luau`):
+в `tools/map/*` поле `Text` — русский исходник (или `Loc.msg(...)`), переводы — в `Strings/Map.luau`.
+
+**Правила** (их проверяет `python3 tools/check_loc.py`, он же входит в `tools/build.sh`):
+1. `Loc.t / msg / plural / pmsg / setWorldText` — всегда прямой вызов со строковым литералом-исходником (без псевдонимов
+   `local L = Loc.t` и без склейки ключа); динамический ключ — только для имён из данных (`Loc.t(def.Name)`, `Loc.t("kind::" .. name)`).
+2. Склейку `"Ловец: " .. name` заменять форматом `Loc.t("Ловец: %s", name)`.
+3. Не переводятся: логи (`warn/print/error`), имена объектов для поиска, атрибуты, имена действий и окон, ключи DataStore, id
+   данных, строки для сравнения в логике (сравнивать id, не текст). Строку не для игрока можно пометить `-- noloc` в конце строки кода.
+4. Чекер падает, если: у ключа нет перевода; плейсхолдеры перевода не совпадают с исходником; у множественного числа не 2 формы;
+   один ключ в двух словарях переведён по-разному (общий ключ — тот же перевод или `ctx::`); в переводе кириллица; русская строка
+   в коде не обёрнута в `Loc.*` и не помечена `-- noloc`; имя/описание в данных `src/shared` или табличка карты без перевода.
+
+**Словари** (`src/shared/Strings/`, все подключает `Loc.luau`): `Shared` — глоссарий и данные (Config, Pets, Quests, Fulgurite,
+Economy), `Server`/`Server2` — тексты сервисов, `HUD`, `ShopPets`, `Windows`, `Windows2`, `Controllers` — клиент, `Map` — таблички.
+Английские термины игры — только из глоссария (Volts, Shards, Jar, Charge, Combo, Overcharge, Substation, Sparklings, Boltdex,
+Rebirth, острова и события).
+
+**Как добавить строку:** написать в коде `Loc.t("Новая строка %d", n)` (на сервере — `Loc.msg(...)`), добавить
+`["Новая строка %d"] = "New line %d",` в словарь своей области, запустить `python3 tools/check_loc.py` (должно быть 0 ошибок).
+Английский — короткий и живой (аудитория 9–16 лет), не длиннее русского: окна рассчитаны на русский текст.
+
+**Проверки:** юнит-тесты `Loc` в `tools/tests/run.luau` (поиск, `ctx::`, множественное число, вложенные сообщения,
+`encode/decode`, `pick`, сломанный перевод); `tools/tests/server_sim.luau` сверяет тексты сервера по-русски
+(`Loc.renderIn("ru", x)`) и по-английски, проверяет, что всё показанное игрокам переводится; эмулятор (`tools/sim`, сценарий `core`):
+BotTwo — с локалью `ru-ru` (русский интерфейс и надписи в мире), остальные — `en-us`; у английских ботов в интерфейсе не должно
+появиться ни одной кириллической строки, BotTwo переключает язык в настройках и после перезахода играет по-английски.

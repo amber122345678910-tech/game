@@ -14,6 +14,7 @@ local Format = require(Shared:WaitForChild("Format"))
 local PlayerData = require(Shared:WaitForChild("PlayerData"))
 local Net = require(Shared:WaitForChild("Net"))
 local Models = require(Shared:WaitForChild("Models"))
+local Loc = require(Shared:WaitForChild("Loc"))
 
 local ClientState = require(script.Parent.Parent.ClientState)
 local Sounds = require(script.Parent.Parent.Controllers.Sounds)
@@ -96,12 +97,12 @@ local function rewardLines(r: { Kind: string, Amount: number?, Shards: number?, 
 		return "💎 " .. Format.short(r.Amount or 0), ""
 	elseif r.Kind == "cocoon" then
 		local c = r.Cocoon and Pets.Cocoons[r.Cocoon]
-		return "🥚", if c then c.Name else "Кокон"
+		return "🥚", if c then Loc.t(c.Name) else Loc.t("Кокон")
 	elseif r.Kind == "boost" then
-		return "×2 ⚡", string.format("%d мин", r.Amount or 0)
+		return "×2 ⚡", Loc.t("%d мин", r.Amount or 0)
 	elseif r.Kind == "pet" then
 		local p = r.Pet and Pets.Kinds[r.Pet]
-		return "🐾", if p then p.Name else "Питомец"
+		return "🐾", if p then Loc.t(p.Name) else Loc.t("Питомец")
 	end
 	return "🎁", ""
 end
@@ -121,7 +122,7 @@ local function makeTile(parent: Instance, day: number, size: Vector2, pos: UDim2
 	local scale = UIKit.new("UIScale", { Scale = 1, Parent = frame }) :: UIScale
 	local dayLabel = UIKit.label({
 		Name = "Day",
-		Text = "ДЕНЬ " .. day,
+		Text = Loc.t("ДЕНЬ %d", day),
 		FontFace = Theme.FontBodyHeavy,
 		Size = UDim2.new(1, -40, 0, 22),
 		Position = UDim2.fromOffset(10, if big then 10 else 6),
@@ -189,7 +190,7 @@ local function fillBigTile(t: DayTile)
 		end
 		UIKit.label({
 			Name = "Name",
-			Text = def.Name,
+			Text = Loc.t(def.Name),
 			FontFace = Theme.FontDisplayFlat,
 			Size = UDim2.new(1, -10, 0, 28),
 			Position = UDim2.fromOffset(5, 160),
@@ -205,7 +206,7 @@ local function fillBigTile(t: DayTile)
 			Rotation = -2,
 			BackgroundColor3 = rar.Color,
 			Parent = t.frame,
-		}, rar.Name, 13)
+		}, Loc.t(rar.Name), 13)
 		tag.ZIndex = 1
 		tagText.TextColor3 = Theme.Ink
 		UIKit.label({
@@ -280,26 +281,26 @@ local function refreshCalendar(d: PlayerData.Data)
 		local highlight = t.day == current
 		setTileGlow(t, highlight and claimable)
 		if highlight and claimable then
-			t.dayLabel.Text = "СЕГОДНЯ!"
+			t.dayLabel.Text = Loc.t("СЕГОДНЯ!")
 			t.dayLabel.TextColor3 = Theme.Volt
 		elseif highlight and claimed then
-			t.dayLabel.Text = "СЕГОДНЯ"
+			t.dayLabel.Text = Loc.t("СЕГОДНЯ")
 			t.dayLabel.TextColor3 = Theme.GoHi
 		else
-			t.dayLabel.Text = "ДЕНЬ " .. t.day
+			t.dayLabel.Text = Loc.t("ДЕНЬ %d", t.day)
 			t.dayLabel.TextColor3 = if t.day == #Config.DailyRewards then Theme.Volt else Theme.TextDim
 		end
 	end
 	local streak = math.max(done, if claimable then 0 else d.Daily.Streak)
-	streakLabel.Text = string.format("Серия: %d %s", streak, Format.plural(streak, "день", "дня", "дней"))
+	streakLabel.Text = Loc.t("Серия: %d %s", streak, Loc.plural(streak, "день|дня|дней"))
 	if claimable then
 		UIKit.setButtonStyle(claimButton, "verb")
-		UIKit.setButtonText(claimButton, "Забрать")
+		UIKit.setButtonText(claimButton, Loc.t("Забрать"))
 		UIKit.setButtonVariant(claimButton, "Go")
 	else
 		local left = 86400 - (serverNow() % 86400)
 		UIKit.setButtonStyle(claimButton, "plain")
-		UIKit.setButtonText(claimButton, "Ещё через " .. Format.time(left))
+		UIKit.setButtonText(claimButton, Loc.t("Ещё через %s", Format.time(left)))
 		UIKit.setButtonVariant(claimButton, "Disabled")
 	end
 end
@@ -307,7 +308,7 @@ end
 local function buildCalendar(body: Frame)
 	UIKit.label({
 		Name = "CalTitle",
-		Text = "Заходи каждый день — подарок!",
+		Text = Loc.t("Заходи каждый день — подарок!"),
 		FontFace = Theme.FontBodyHeavy,
 		Size = UDim2.fromOffset(LEFT_W, 32),
 		Position = UDim2.fromOffset(0, 0),
@@ -336,7 +337,7 @@ local function buildCalendar(body: Frame)
 
 	claimButton = UIKit.button({
 		Name = "Claim",
-		Text = "Забрать",
+		Text = Loc.t("Забрать"),
 		Color = Theme.Go,
 		Size = UDim2.fromOffset(300, 72),
 		Position = UDim2.fromOffset(0, 40 + BIG_TILE.Y + 14),
@@ -350,7 +351,7 @@ local function buildCalendar(body: Frame)
 		local claimable, current = dailyState(d)
 		if not claimable then
 			Sounds.play("Error")
-			ClientState.Toast:Fire("Сегодняшний подарок уже получен — приходи завтра!", "info")
+			ClientState.Toast:Fire(Loc.t("Сегодняшний подарок уже получен — приходи завтра!"), "info")
 			return
 		end
 		busy = true
@@ -364,8 +365,10 @@ local function buildCalendar(body: Frame)
 			if t then
 				UIKit.bump(t.scale, 0.2)
 			end
-			if typeof(result) == "string" and result ~= "" then
-				ClientState.Toast:Fire(result, "good")
+			-- сервер отвечает сообщением (Loc.Msg) или строкой-исходником
+			local text = if typeof(result) == "string" or typeof(result) == "table" then Loc.render(result) else ""
+			if text ~= "" then
+				ClientState.Toast:Fire(text, "good")
 			end
 		else
 			Sounds.play("Error")
@@ -384,7 +387,7 @@ local function buildCalendar(body: Frame)
 	})
 	UIKit.label({
 		Name = "Freeze",
-		Text = "Пропущен один день? Серия не сгорит!",
+		Text = Loc.t("Пропущен один день? Серия не сгорит!"),
 		Size = UDim2.fromOffset(LEFT_W, 24),
 		Position = UDim2.fromOffset(0, 40 + BIG_TILE.Y + 92),
 		TextXAlignment = Enum.TextXAlignment.Left,
@@ -403,7 +406,7 @@ local function questText(q: { Id: string, Target: number }): string
 		return q.Id
 	end
 	local ok, text = pcall(Quests.text, def, q.Target)
-	return if ok then text else def.Text
+	return if ok then text else Loc.t(def.Text)
 end
 
 local function refreshQuests(d: PlayerData.Data)
@@ -433,7 +436,7 @@ local function refreshQuests(d: PlayerData.Data)
 			row.done.Visible = false
 			row.button.Visible = true
 			UIKit.setButtonVariant(row.button, if complete then "Go" else "Disabled")
-			UIKit.setButtonText(row.button, "Забрать")
+			UIKit.setButtonText(row.button, Loc.t("Забрать"))
 		end
 	end
 end
@@ -442,7 +445,7 @@ local function buildQuests(body: Frame)
 	local w = 848 - RIGHT_X
 	UIKit.label({
 		Name = "QuestTitle",
-		Text = "Задания дня",
+		Text = Loc.t("Задания дня"),
 		FontFace = Theme.FontBodyHeavy,
 		Size = UDim2.fromOffset(w, 32),
 		Position = UDim2.fromOffset(RIGHT_X, 0),
@@ -487,7 +490,7 @@ local function buildQuests(body: Frame)
 		})
 		local button = UIKit.button({
 			Name = "Claim",
-			Text = "Забрать",
+			Text = Loc.t("Забрать"),
 			Color = Theme.Go,
 			Size = UDim2.fromOffset(100, 64),
 			AnchorPoint = Vector2.new(1, 0.5),
@@ -505,7 +508,7 @@ local function buildQuests(body: Frame)
 			end
 			if q.Progress < q.Target then
 				Sounds.play("Error")
-				ClientState.Toast:Fire(string.format("Ещё не выполнено: осталось %d", math.max(0, q.Target - q.Progress)), "info")
+				ClientState.Toast:Fire(Loc.t("Ещё не выполнено: осталось %d", math.max(0, q.Target - q.Progress)), "info")
 				return
 			end
 			busy = true
@@ -514,9 +517,10 @@ local function buildQuests(body: Frame)
 			if ok then
 				Sounds.play("Coins")
 				Sounds.play("PowerUp")
-				-- сервер отвечает текстом награды («+1.2K ⚡ и +50 💎»)
-				local reward = if typeof(result) == "string" and result ~= "" and result ~= "✅" then result else nil
-				ClientState.Toast:Fire(if reward then "Награда: " .. reward else "Награда получена!", "good")
+				-- сервер отвечает текстом награды («+1.2K ⚡ и +50 💎»): строкой или сообщением (Loc.Msg)
+				local text = if typeof(result) == "string" or typeof(result) == "table" then Loc.render(result) else ""
+				local reward = if text ~= "" and text ~= "✅" then text else nil
+				ClientState.Toast:Fire(if reward then Loc.t("Награда: %s", reward) else Loc.t("Награда получена!"), "good")
 				local scale = frame:FindFirstChildOfClass("UIScale") or UIKit.new("UIScale", { Parent = frame }) :: UIScale
 				UIKit.bump(scale, 0.06)
 			else
@@ -539,7 +543,7 @@ local function redeem()
 	local text = string.gsub(codeBox.Text, "^%s*(.-)%s*$", "%1")
 	if text == "" then
 		Sounds.play("Error")
-		ClientState.Toast:Fire("Введи код", "info")
+		ClientState.Toast:Fire(Loc.t("Введи код"), "info")
 		return
 	end
 	if busy then
@@ -551,7 +555,8 @@ local function redeem()
 	if ok then
 		Sounds.play("PowerUp")
 		codeBox.Text = ""
-		ClientState.Toast:Fire(if typeof(result) == "string" and result ~= "" then result else "Код сработал!", "good")
+		local msg = if typeof(result) == "string" or typeof(result) == "table" then Loc.render(result) else ""
+		ClientState.Toast:Fire(if msg ~= "" then msg else Loc.t("Код сработал!"), "good")
 	else
 		Sounds.play("Error")
 	end
@@ -574,7 +579,7 @@ local function buildCode(body: Frame)
 		AnchorPoint = Vector2.new(0, 0.5),
 		BackgroundColor3 = Theme.Well,
 		Text = "",
-		PlaceholderText = "Ввести код",
+		PlaceholderText = Loc.t("Ввести код"),
 		PlaceholderColor3 = Theme.TextDim,
 		TextColor3 = Theme.Cream,
 		FontFace = Theme.FontBody,
@@ -593,7 +598,7 @@ local function buildCode(body: Frame)
 	end)
 	UIKit.button({
 		Name = "Redeem",
-		Text = "ОК",
+		Text = Loc.t("ОК"),
 		Color = Theme.Violet,
 		Size = UDim2.fromOffset(100, 64),
 		AnchorPoint = Vector2.new(1, 0.5),
@@ -621,7 +626,7 @@ function DailyUI.start()
 	end
 	win = UIKit.window({
 		Name = "Daily",
-		Title = "Награды",
+		Title = Loc.t("Награды"),
 		Icon = "🎁",
 		Width = 880,
 		Height = 560,
