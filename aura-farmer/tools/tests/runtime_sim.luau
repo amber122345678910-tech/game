@@ -126,6 +126,14 @@ wrap = function(inst)
 			end)
 			if not ok then
 				-- свойство без значения в Lune: вернуть разумное значение по умолчанию
+				-- вычисляемые свойства, которых нет в Lune
+				if key == "Position" and inst:IsA("BasePart") then
+					return inst.CFrame.Position
+				elseif key == "WorldPosition" and inst:IsA("Attachment") then
+					return (inst.Parent.CFrame * inst.CFrame).Position
+				elseif key == "WorldCFrame" and inst:IsA("Attachment") then
+					return inst.Parent.CFrame * inst.CFrame
+				end
 				local defaults = { Enabled = true, SoundId = "", IsLoaded = false, IsPlaying = false, TimePosition = 0 }
 				if defaults[key] ~= nil then
 					return defaults[key]
@@ -284,7 +292,7 @@ extraMethods.Workspace = {
 		_G.SIM_MOVES = (_G.SIM_MOVES or 0) + #parts
 	end,
 }
-extraMethods.Folder = {
+extraMethods.Terrain = {
 	FillBlock = function()
 		fills += 1
 	end,
@@ -298,6 +306,7 @@ extraMethods.Folder = {
 		fills += 1
 	end,
 }
+extraMethods.Folder = extraMethods.Terrain
 setOverride(camera, "ViewportSize", Vector2.new(1920, 1080))
 setOverride(camera, "CameraType", Enum.CameraType.Custom)
 local wsW = wrap(ws)

@@ -76,37 +76,30 @@ function Easing.tween(style: string, direction: string, t: number): number
 	end
 end
 
--- Направление в Pose у Roblox исторически перевёрнуто относительно TweenService:
--- PoseEasingDirection.In ведёт себя как EasingDirection.Out (быстрый старт, плавная остановка).
-Easing.POSE_DIRECTION_FLIPPED = true
-
-local POSE_STYLE: { [string]: string } = {
-	Linear = "Linear",
-	Constant = "Constant",
-	Cubic = "Cubic",
-	CubicV2 = "Cubic",
-	Elastic = "Elastic",
-	Bounce = "Bounce",
-}
-
+-- Как движок Roblox интерполирует Pose (сглаживание берётся у РАННЕГО ключа сегмента):
+-- CubicV2/Elastic/Bounce — как TweenService с тем же направлением; устаревший Cubic — направление
+-- перевёрнуто; Constant — держит значение раннего ключа; Bounce InOut в движке — два «In»-отскока.
 -- styleName/directionName: имена EnumItem (PoseEasingStyle/PoseEasingDirection).
 function Easing.pose(styleName: string, directionName: string, t: number): number
-	local style = POSE_STYLE[styleName] or "Linear"
-	if style == "Constant" then
-		return if t >= 1 then 1 else 0
-	end
-	if style == "Linear" then
-		return math.clamp(t, 0, 1)
-	end
-	local dir = directionName
-	if Easing.POSE_DIRECTION_FLIPPED then
-		if dir == "In" then
-			dir = "Out"
-		elseif dir == "Out" then
-			dir = "In"
+	t = math.clamp(t, 0, 1)
+	if styleName == "Constant" then
+		return 0
+	elseif styleName == "Linear" then
+		return t
+	elseif styleName == "CubicV2" then
+		return Easing.tween("Cubic", directionName, t)
+	elseif styleName == "Cubic" then
+		local dir = if directionName == "In" then "Out" elseif directionName == "Out" then "In" else directionName
+		return Easing.tween("Cubic", dir, t)
+	elseif styleName == "Bounce" and directionName == "InOut" then
+		if t < 0.5 then
+			return 0.5 * Easing.tween("Bounce", "In", t * 2)
 		end
+		return 0.5 + 0.5 * Easing.tween("Bounce", "In", t * 2 - 1)
+	elseif styleName == "Elastic" or styleName == "Bounce" then
+		return Easing.tween(styleName, directionName, t)
 	end
-	return Easing.tween(style, dir, t)
+	return t
 end
 
 -- Имена сглаживания в DSL ключей камеры/эффектов: "linear", "in", "out", "inout", "hold", "smooth",

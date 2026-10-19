@@ -168,7 +168,7 @@ local blur = ensure(Lighting, "BlurEffect", "AF_Blur")
 local clouds = workspace.Terrain:FindFirstChildOfClass("Clouds") or ensure(workspace.Terrain, "Clouds", "Clouds")
 for _, e in Lighting:GetChildren() do
 	-- чужие эффекты из места не должны мешать пресетам
-	if e:IsA("PostEffect") and string.sub(e.Name, 1, 3) ~= "AF_" then
+	if e:IsA("PostEffect") and not e:IsA("ColorGradingEffect") and string.sub(e.Name, 1, 3) ~= "AF_" then
 		e.Enabled = false
 	end
 end
@@ -484,6 +484,8 @@ local function step(dt: number)
 	camera.CameraType = Enum.CameraType.Scriptable
 	camera.CFrame = track.cframe
 	camera.FieldOfView = track.fov
+	-- Focus в Scriptable-режиме нужно ставить самим: от него зависит отрисовка локальных источников света
+	camera.Focus = CFrame.new(track.look)
 	local fd = focusDistance(shot, track.cframe, track)
 	if fd and currentPreset and currentPreset.dof and currentPreset.dof.Enabled ~= false then
 		dof.FocusDistance = fd

@@ -1,0 +1,139 @@
+{
+ "shot": "S01_man_glasses",
+ "start": 0,
+ "end": 1.433,
+ "summary": "The shot is a handheld close-up on a sunny beach. A young dark-haired man in a white ribbed tank top wears gold aviator sunglasses. His head is turned about 58 deg toward frame-right (his own left) and his chin is raised. At t=0 his left hand is already moving up toward the glasses. His fingers pinch the outer rim and hinge of the left lens on beat 0 (0.163s). From beat 1 (0.651s) he pulls the glasses about 3-4 cm (about 0.12 studs) down his nose and tucks his chin. By beat 2 (1.139s) his eyes peer over the top rim. His brows are knitted and his mouth holds an intrigued 'ooh' O-shape the whole time. This is the 'checking someone out over the shades' gag. The camera slowly pushes in, so the subject grows about 15%. It also tilts up about 3 deg and pans about 1.5 deg right. A reclining friend in yellow sunglasses lies out of focus behind him at frame-right. The subtitle 'DO DO DO DO DO DO DO DO' is shown for the whole shot. A hard cut at 1.433s leads to S02 (the 'A' belt buckle).",
+ "camera": {
+  "framing": "Close-up / tight medium close-up in 16:9. At t=0, headroom is about 7% of frame height (hair top at y=0.07). The head runs from hair top to beard bottom (y 0.07 to 0.59), about 52% of frame height. The frame bottom cuts at mid-chest (the tank-top neckline is visible). Frame-left: his near (right) shoulder is cut by the left edge from about t=0.8 onward. Frame-right third: his raised left hand and forearm, which leave through the bottom-right. Behind them at lower-right is the blurred reclining friend. Background: sky fills the top 55-60% and the sandy beach fills the bottom. The face centre sits at about x=0.47, y=0.33 at t=0. By t=1.433 the head fills about 62% of frame height (hair top y=0.09, beard bottom y=0.75), the near eye is at about (0.46, 0.43), and the glasses' near lens is at about (0.49, 0.52). Rule of thirds: the eye line starts on the upper third and drifts toward the centre.",
+  "position": "In front of the subject, about 25 deg toward the subject's right of his chest-forward direction. His torso is turned about 25 deg to his left away from the lens, and his head about 58 deg to his left. Distance from the face is about 2.2 studs at t=0, closing to about 1.95 studs at t=1.433 (about 0.25 stud push-in). This assumes the 5.5-stud adult scale, where the real distance is about 0.7 m. The subject is most likely seated on the sand. The camera is about 2.4 studs above the sand, which is roughly the subject's mouth/chin height and 0.2-0.3 studs below his eyes. The horizon sits at his chin/neck line, confirming the camera height is about chin level.",
+  "angle": "Slight low angle. Camera pitch is about +3 deg (looking up) at t=0, reaching about +6 deg by t=1.0 and holding to the end. The horizon sits 42 px below centre (y=0.59) at t=0 and 82 px below centre (y=0.67) at the end. Yaw is level (pan) at the start and about 1.5 deg to the right by the end. Roll: a slight dutch of about 1-1.5 deg clockwise, so the horizon rises slightly toward frame-right.",
+  "fovVerticalDeg": 34,
+  "lensNotes": "About 35 mm full-frame equivalent, vertical FOV about 34 deg. There is mild close-range perspective: the near shoulder looks large relative to the head, but there is no visible barrel distortion. Focus is on the face and glasses at about 2.2 studs, following the push-in. Depth of field is moderate-shallow. The friend about 6 studs behind is clearly soft. Distant buildings and the pier (200+ studs) are soft but readable, not creamy bokeh. There is slight motion blur on the hand during the fast reach (0.00-0.13s). No lens flare. Highlights clip slightly on the forehead.",
+  "movement": [
+   {
+    "t": 0,
+    "description": "Start of shot. Pitch +3 deg, pan 0, distance 2.2 studs. The camera is already drifting slowly; there is no start-from-rest feel."
+   },
+   {
+    "t": 0.4,
+    "description": "Pitch +4.2 deg, pan +0.4 deg right, pushed in 0.07 studs. The background has moved down about 17 px and left about 10 px."
+   },
+   {
+    "t": 0.8,
+    "description": "Pitch +5.5 deg, pan +1.0 deg, pushed in 0.16 studs. Motion is close to linear from 0 to 0.8s."
+   },
+   {
+    "t": 1.1,
+    "description": "Pitch +5.9 deg, pan +1.3 deg, pushed in 0.22 studs. Easing out."
+   },
+   {
+    "t": 1.433,
+    "description": "Pitch +6.0 deg, pan +1.5 deg, pushed in 0.25 studs, almost settled. Hard cut. Net result: the background moves 44 px down and 20-36 px left. The subject drifts down and toward frame-left and grows about 12-20% (the head grows more because the chin also lowers)."
+   }
+  ],
+  "shake": "Light organic handheld or loose-gimbal float. Rotation noise is about 0.15-0.3 deg at 1-3 Hz, with about 0.01-0.02 stud positional jitter. No whip pans, no zooms, no impact shakes. Use smooth noise such as Perlin, not random per-frame jitter."
+ },
+ "subjects": [
+  {
+   "who": "Main man ('aura farmer' beach guy), on the left 2/3 of frame",
+   "appearance": "Young man, about 25-30, slim-athletic build, fair skin with sun-pink shoulders. Skin colours: highlight #E0D4CC (forehead nearly clipped #DDD6CE); shoulder lit #C4B2AE; mid-tone #C39C8D / #A38175; shadow #6A4A3E; deep shadow (under jaw, around ear) #4A2A20. Ear: #B07A6C. Hair: near-black #0A0D10 with brown highlight #3A2F2A, slicked-back pompadour/quiff with volume on top, short tapered sides and a side part, swept back off the forehead. Facial hair: short dark full stubble beard on jaw, chin and cheeks (#2B201E over skin) plus a slightly thicker moustache. Eyebrows: thick and dark (#32211B). Eyes: dark hazel/grey-green. Lips: #B0706A, open mouth interior #381415. Sunglasses: aviators with a thin gold metal frame (highlight #C9A54E, mid #8C6A2C, dark #3C261A), double bridge with a dark brown/tortoise brow bar (#3A2418), and thin gold temples to the ears. Lenses are dark green G-15 (#0C1210 base, #1E3A30 green reflections), teardrop shape, each about 0.17 studs wide in head scale. Clothing: white ribbed cotton tank top (A-shirt) with scoop neck, wide armholes and fine vertical ribbing. Lit #E6E3DD / #DBDAD5; mid #D2CCC6; cool shadow #8D8D9A / #787D8F; deep fold shadow #5B5B66. Possibly a thin dark-red cord necklace running down the chest from the frame-right side of the neck (barely visible). No other accessories. Legs are not visible; he is assumed to be seated on the sand.",
+   "placement": "Head and chest in the left 2/3 of frame. Face centre at about x=0.47, y=0.33 at t=0, drifting to about x=0.45, y=0.45 by the end. His raised LEFT hand is at frame-right (x 0.58-0.78, y 0.38-0.60) and the forearm leaves through the bottom-right corner. The body broadly faces the camera, with the chest turned about 25 deg to his own left (toward frame-right). The head is turned about 58 deg to his left, so the camera sees a 3/4 profile with his right ear and right cheek visible. He is not looking at the camera; he looks off frame-right at something interesting. Angle conventions: head yaw + = toward his own left (frame-right), pitch + = chin up, roll + = top of head toward his own right shoulder (frame-left).",
+   "poseKeys": [
+    {
+     "t": 0,
+     "body": "Root: seated on the sand (hips out of frame), chest yawed 25 deg to his left of the camera axis, torso leaning back about 5 deg (pitch). Head relative to camera: yaw +58 deg (to his left), pitch +15 deg (chin up, looking up and out), roll +5 deg. Neck carries about 33 deg yaw relative to the chest. RIGHT arm (frame-left): hangs down relaxed and out of frame; shoulder slightly dropped (-5 deg elevation), about 10 deg abduction, elbow about 15 deg flexed. LEFT arm (frame-right), mid-reach: upper arm about 50 deg forward flexion and 35 deg abduction (elbow out to the side and forward, below frame bottom-right). Elbow flexed about 130 deg, forearm nearly vertical and leaning about 20 deg toward the face. Wrist at about (0.75, 0.62) in frame, slightly extended about 10 deg, with about 15 deg radial deviation so the fingertips aim at the glasses. Hand: open 'claw' about 0.25 studs out to his left of and 0.08 studs above the left lens hinge. Back of hand faces the camera / frame-right, fingertips point toward frame-left at (0.67, 0.38). Fingers: index and middle flexed MCP 30 / PIP 40 / DIP 20 deg; ring and pinky curled more (MCP 50 / PIP 60); thumb hidden behind, abducted about 40 deg. Slight motion blur on the hand.",
+     "face": "Mouth open 0.35 in a rounded, pushed-forward 'O' (pucker/funnel about 0.6, no teeth visible), as if mouthing 'doo'/'ooh'. No smile. The sunglasses cover the eyes; the brows just above the brow bar look relaxed to slightly lowered. Glasses seated normally on the bridge of the nose."
+    },
+    {
+     "t": 0.133,
+     "body": "The left hand has travelled about 80 px (about 0.26 studs) toward the face in 0.13s with an ease-out. The index and middle fingertips touch the top outer rim and hinge of the LEFT lens (far lens, frame-right) at about (0.58, 0.35). Elbow flexion about 140 deg, shoulder flexion about 55 deg. Wrist at about (0.70, 0.60). Head pitch +14 deg, yaw +58 deg, otherwise unchanged.",
+     "face": "Mouth 0.45 open (a little wider) in an 'O' shape. Brows neutral."
+    },
+    {
+     "t": 0.163,
+     "body": "ON BEAT 0: grip locks. Pinch grip on the left lens: index and middle fingers lie across the top of the rim and brow bar near the hinge (pads pressing down; MCP 45 / PIP 60 / DIP 30 deg). The thumb is opposed under the lower outer edge of the lens (hidden). Ring and pinky curl loosely below (MCP 70 / PIP 80). The palm faces his temple and slightly down, the back of the hand faces the camera / frame-right. Forearm mid-pronated (thumb toward the face). Torso lean back 4 deg. Head pitch +13 deg.",
+     "face": "Mouth 0.35 'O'. Brows still neutral; glasses still fully covering the eyes."
+    },
+    {
+     "t": 0.3,
+     "body": "Hold with a slight settle: hand and glasses move together with the head. The glasses slide maybe 0.01 studs (barely visible). The head starts lowering: pitch +11 deg, yaw +58 deg, roll +5 deg. Torso lean back 3 deg. Left elbow 142 deg, shoulder flexion 55 deg, abduction 35 deg.",
+     "face": "Mouth 0.35 'O', lips rounded. Brows begin to knit (0.3): inner brows slightly lowered, a faint crease appears above the bridge of the nose."
+    },
+    {
+     "t": 0.651,
+     "body": "ON BEAT 1: the glasses-lowering move starts. Head pitch +8 deg, yaw +57 deg. Glasses still cover the eyes (their top bar is at brow level). Left wrist at about (0.70, 0.64), grip at about (0.585, 0.43) in frame. Torso upright (0 deg).",
+     "face": "Mouth 0.30 'O'. Brows knit 0.4."
+    },
+    {
+     "t": 0.8,
+     "body": "Fastest part of the drop. The glasses have slid about 0.08 studs down the nose, pivoting at the hinge in the fingers: the frame pitches about 8 deg so the lens tops tilt away from the face. Achieve this with a small elbow extension (to about 137 deg), shoulder flexion down to about 52 deg, and about 8 deg of wrist flexion. The hand moves down about 0.1 studs relative to the head. The head tucks the chin down and slightly forward to peer over the rim: pitch +4 deg, slight forward neck translation of about 0.03 studs. Torso leans forward 2 deg toward frame-right/camera.",
+     "face": "Eyebrows fully revealed above the rim and knitted (0.5): inner brows down and together. The top of the near (right) eye and iris peek over the brow bar. Gaze is directed toward frame-right: eyes yaw about +12 deg further left than the head, pitch 0. Mouth opens a little more, to 0.45 ('ooh')."
+    },
+    {
+     "t": 1,
+     "body": "The glasses are almost at their lowest point: about 0.12 studs below their start, resting lower on the nose. The brow bar is now at lower-eyelid level, so both eyes are visible over the top rim (the far eye is small, beside the nose bridge). Glasses pitched forward about 12-15 deg. Head pitch about +1 deg, yaw +55 deg, roll +5 deg. Left elbow about 135 deg, shoulder flexion about 50 deg, wrist flexion about 10 deg. Grip at about (0.59, 0.47), wrist at about (0.70, 0.67) in frame. Torso forward lean 3 deg.",
+     "face": "Brows knitted 0.6, with a slight horizontal forehead crease and a crease above the nose. Eyes open normally (upper lid touching the top of the iris), lower lids raised 0.2-0.25 (sun squint). Gaze locked toward frame-right at eye level: an intrigued 'well, hello' look. Mouth 0.35-0.4 'O'."
+    },
+    {
+     "t": 1.139,
+     "body": "ON BEAT 2: the glasses settle at their lowest point (final settle about 0.01 studs). The pose freezes with only micro drift: head pitch 0 deg, yaw +55 deg. The hand holds its grip; there is no release.",
+     "face": "Mouth 0.4 'oh'. Brows knitted 0.6. Eyes peering over the rim toward frame-right."
+    },
+    {
+     "t": 1.433,
+     "body": "End hold (cut). Same as 1.139 with tiny drift: head yaw +55 deg, pitch 0 to -1 deg, roll +5 deg. Torso forward lean 3 deg. Left elbow about 135 deg, glasses still pinched at the hinge, about 0.12-0.13 studs down the nose, pitched about 15 deg.",
+     "face": "Mouth 0.4 'O' (rounded, lower lip relaxed down). Brows knit 0.6, squint 0.25, gaze toward frame-right."
+    }
+   ],
+   "motionNotes": "Three beat-locked phases. (1) 0.000-0.163: a fast ease-out reach, with the hand already moving at frame 1 and no anticipation visible. Contact lands on beat 0 (0.163s) with a tiny 1-2 frame squash as the fingers press the rim. (2) 0.163-0.651: grip hold. The head slowly drops its chin (pitch +15 to +8 deg) and the brows start to knit, so it never fully freezes. (3) 0.651-1.139: the glasses slide down the nose in sync with a chin tuck and slight forward lean, so the eyes 'rise' over the rim. Use ease-in-out; peak velocity is around 0.75-0.85s. Settle on beat 2 (1.139s) with a tiny about 0.01-stud overshoot or settle. 1.139-1.433: held 'look' with micro head drift of about 1 deg and breathing. Secondary motion: the shoulder of the raised arm lifts slightly (about 3 deg elevation) during the grip. The mouth keeps a constant 'O', with small jaw pulses from 0.3 to 0.45 roughly on eighth notes (0.1, 0.8, 1.1s are the more-open moments). The relative speed between the hand and the glasses is zero after 0.163s; they must stay locked. The glasses pivot (pitch about 12-15 deg) because they are pulled down from one hinge only."
+  },
+  {
+   "who": "Background friend reclining on the sand (out of focus)",
+   "appearance": "Dark brown curly/messy hair (#2A1A14), yellow/gold-tinted sunglasses (#E0A020), white crew T-shirt (#E8E8EA, softened by blur), and blue/pink patterned swim shorts (#3B5BB0 with #C8508A pattern) visible only in the extreme bottom-right corner. Skin similar to the main man's but in shadow (#A07C6C).",
+   "placement": "Behind the main man and to his left (frame-right), lying diagonally on the sand. The head is the farthest point, at about 8 studs from the camera (about 6 studs behind the main man), and sits propped up (reclining on elbows) at frame (0.66, 0.64) at t=0, partly hidden by the main man's raised forearm. The body extends toward the camera and frame-right, with the shirt filling x 0.7-1.0, y 0.78-1.0. The hips and shorts are at the bottom-right corner, about 4-5 studs from the camera. Face roughly toward the camera/main man. Their screen motion comes only from the camera move: the head moves to about (0.62, 0.73) by the end.",
+   "poseKeys": [
+    {
+     "t": 0,
+     "body": "Static recline: torso about 25-30 deg up from the sand, propped on the elbows. Head upright with yaw toward the camera. Legs extend away (out of frame right).",
+     "face": "Unreadable (blurred, sunglasses on). Neutral."
+    },
+    {
+     "t": 1.433,
+     "body": "Unchanged; no visible motion.",
+     "face": "Neutral."
+    }
+   ],
+   "motionNotes": "Static background extra. At most add subtle idle breathing (chest about 0.02 studs at about 0.3 Hz). All visible movement comes from the camera move and the depth-of-field blur."
+  }
+ ],
+ "set": "The setting is a wide, flat, sunny North Sea city beach; it looks like Scheveningen, The Hague. Ground: dry beige sand (in-frame graded colour #948679 near / #8A7E70 far; real albedo about #C2B29A) with tire tracks and footprint furrows running horizontally through the mid-ground about 15-40 studs away. The sand plane is flat to the horizon. Background objects, left to right: (1) A distant low white pier pavilion with a wavy, wing-like white roof (#B6B2AF, hazed) on the horizon at frame x 0.15-0.34, y 0.53-0.58 at t=0. It is about 300 studs away, about 60 studs long and 10-15 studs tall. Small poles and flags and a few tiny beach structures sit on the far left horizon. (2) A cluster of small teal-blue and white beach cabins or lifeguard huts (#2A90A8 / #E0E6EA). They sit directly behind the man's face and nose at frame x 0.55-0.68, y 0.50-0.55, about 60-100 studs away, each about 4x3x3 studs. (3) Seafront apartment towers on the right third (frame x 0.70-1.0, y 0.38-0.55): a teal/blue-green glass tower (#1D4A4F / #174248) with a white vertical edge band, a light grey-beige tower (#8A8A80), and a grey-green block (#3E4A47). They are about 200-350 studs away and 40-90 studs tall, and partly behind the raised hand. A pink/red flag or umbrella sits at their base. Sky: clear deep blue gradient, #2F7294 at the top, #4F829F at mid-height, hazy pale #7B8D99 at the horizon. There are faint wispy cirrus streaks (#8CA1AF) at the upper right (x 0.7-1.0, y 0.2-0.38) and a thin streak at the left (x 0.23-0.30, y 0.34). There is no sun in frame. Props: the aviator sunglasses only. The reclining friend is about 6 studs behind the main man.",
+ "lighting": "Hard, bright midday summer sun with no cloud cover. Key (sun): high, about 55-65 deg elevation, from camera-left and slightly behind the camera, so it comes from the upper frame-left. It brightly lights the forehead, the top of the hair, the top of his near (right) shoulder, the front of the tank top, the back of the raised hand and the outer forearm. Shadows are crisp: under the brow bar onto the cheeks, under the nose, under the jaw onto the neck, and the chin shadow falls on the chest toward frame-right. The cheek and temple under the lens are dark. Fill: strong warm bounce from the sand plus cool blue skylight. Shadows stay readable (skin shadows #6A4A3E, not black), but white fabric in shadow turns cool blue-grey (#787D8F to #5B5B66). No dedicated rim light; sky edge-light makes his outline read against the blue. Colour temperature: neutral-warm daylight on skin (about 5600K), cool shadows. Exposure: bright, with the forehead and shoulders near clipping (#DDD6CE to #E0D4CC). Contrast: high, with crushed blacks in the hair (#050A0E) and lenses (#0C0F10). Saturation: medium-high in the sky (teal-blue), muted beige in the sand; slight teal-and-orange grade. No lens flare. Slight bloom on the brightest skin. The distance has visible atmospheric haze (lower-contrast horizon, bluish buildings).",
+ "effects": [
+  {
+   "t": 0,
+   "description": "Hard cut in (first frame of the video). The subtitle overlay is already on screen."
+  },
+  {
+   "t": 0,
+   "description": "The raised hand shows mild motion blur while it travels quickly to the glasses (0.00-0.13s)."
+  },
+  {
+   "t": 0.163,
+   "description": "Beat 0: fingers grab the glasses (no VFX). This is a natural sync point for a subtle beat accent."
+  },
+  {
+   "t": 0.651,
+   "description": "Beat 1: the glasses start sliding down."
+  },
+  {
+   "t": 1.139,
+   "description": "Beat 2: the glasses settle and the eyes are fully revealed over the rim. A good place for a tiny camera settle."
+  },
+  {
+   "t": 1.433,
+   "description": "Hard cut to S02 (close-up of the gold 'A' belt buckle). The subtitle continues unchanged into the next shot. No transition effect. Throughout the shot there is light film grain/compression and a slight sharpening look; no vignette, no letterbox."
+  }
+ ],
+ "subtitle": "'DO DO DO DO DO DO DO DO' (8 x 'DO', separated by single spaces). Static and centred for the whole shot, 0.000-1.433s, and it carries over into S02 unchanged; no animation, pop or karaoke wipe. Position: horizontally centred, spanning x 0.28-0.72 of frame width (about 44% of the width). Letter cap height runs from y 0.898 to 0.954 of frame height (about 5.6% of the height); vertical centre about y 0.925. Style: chunky, heavy, rounded cartoon display font (like Lilita One / Luckiest Guy / Fredoka One Bold). Fill is a vertical gradient: bright yellow #FFD02E at the top, through orange #F59A2C, to red-orange #E8452C at the bottom. A thin dark crimson outline (#7A0A14) plus a hard drop/extrusion shadow (#6A0010) offset about 2 px right and 2-3 px down at 480p (about 0.5% of the height). No background box.",
+ "recreateInRoblox": "CHARACTER: Use an R15 rig with a Dynamic Head (FACS) so you can key the mouth and brows: JawDrop 0.35-0.45, Funneler/Pucker 0.6 for the 'O', BrowLowerer + InnerBrowRaiser off (knit 0.3 to 0.6 from 0.3s to 1.0s), LowerLidRaiser 0.25, plus gaze through the EyesLookLeft/Right controls toward frame-right after 0.8s. For maximum quality, use a custom skinned MeshPart rig with finger bones (made in Blender, imported with Bones) so the pinch grip reads. If you stay on plain R15, model separate finger parts on the LeftHand with Motor6Ds. Body: white tank top as a layered-clothing shirt or Shirt texture (#E6E3DD with ribbing normal map). Black slick-back hair accessory; stubble beard as a Dynamic Head texture or decal (#2B201E). Pose him seated on the sand with legs out of frame. Rotate the HumanoidRootPart so the chest faces 25 deg to his left of the camera axis, and key the neck and head yaw to reach 58 deg total.\n\nSUNGLASSES: Build them as their own model. Make two teardrop lenses (MeshPart, or a squashed cylinder with a SpecialMesh): Glass material, Color #10201A, Transparency 0.05, Reflectance 0.25. Add a gold frame of thin parts or a ring mesh (Metal, #C9A54E) and a brow bar (#3A2418). Attach the glasses to the Head with a Motor6D (not a Weld) so you can keyframe them: C1 offset 0 until 0.651s, then ease-in-out down to about -0.12 studs Y (in head space; scale to your head size, which is about 15% of head height) plus about -12 to -15 deg pitch by 1.0-1.139s. Key the LeftHand IK target to follow the left lens hinge exactly. Moon Animator 2 or the Animation Editor with IK on the left arm works; make sure the fingertips stay locked to the hinge from 0.163s on.\n\nTIMING: Arm reach 0.0 to 0.163s (ease-out, last 0.25 studs of travel, with grip contact on beat 0). Hold 0.163-0.651s. Glasses drop and chin tuck 0.651-1.139s (ease-in-out, fastest around 0.8s). Hold with micro-drift to 1.433s. Add subtle overshoot: the glasses dip 0.01 studs past their lowest point at about 1.05s and settle back by 1.139s. Optionally pulse the jaw 0.3 to 0.45 on eighth notes (every 0.244s) for 'do do' lip-sync life.\n\nCAMERA: Workspace.CurrentCamera.CameraType = Scriptable, FieldOfView = 34. Keyframe the CFrame from a ModuleScript using RunService.RenderStepped and a smooth spline (or TweenService with Sine/Quad easing). Start about 2.2 studs from the face, 25 deg to the subject's right of his chest axis, at his chin height (about 0.25 studs below eye level), pitch +3 deg, roll about 1.5 deg clockwise. Push in linearly to 1.95 studs while pitching up to +6 deg and panning 1.5 deg right; ease out after 0.9s. Add handheld noise: math.noise on pitch, yaw and roll at about 1.5 Hz with about 0.2 deg amplitude, plus 0.015 stud positional noise. Frame-check: hair top at 7% from the top of frame, face centre at x 0.47; head height 52% of frame at the start and about 62% at the end.\n\nSET: Flat Terrain sand (MaterialColors Sand about #C2B29A) or large SmoothPlastic/Sand parts. Add darker tire-track decals 15-40 studs away. Place teal/white cabin boxes (4x3x3 studs) 60-100 studs behind his face. Put a white wavy pavilion (curved MeshParts or CornerWedges) on a pier about 300 studs away at frame-left. Apartment towers on the right are Parts (Glass material #1D4A4F, Concrete #8A8A80, #3E4A47) 200-350 studs away and 40-90 studs tall; use StreamingEnabled-friendly low-poly shapes. Reclining friend NPC about 8 studs from the camera behind his left side: white tee, blue/pink shorts, yellow sunglasses, dark curly hair, posed propped on elbows.\n\nLIGHTING: Lighting.Technology = Future. ClockTime about 13 with GeographicLatitude/rotation tuned so the sun is about 60 deg high and comes from camera-left, slightly behind the camera. Brightness 3.5, ExposureCompensation +0.2, ShadowSoftness 0.05 (hard shadows), Ambient #5E6470, OutdoorAmbient #8A8F99, EnvironmentDiffuseScale 1, EnvironmentSpecularScale 1. Sky: clear blue skybox (or default with Clouds Cover 0.15, Density 0.1 for faint cirrus). Atmosphere: Density 0.3, Offset 0.15, Color #C7D6E0, Decay #7F9DB3, Haze 1.5, Glare 0. Post effects: ColorCorrection Contrast 0.2, Saturation 0.08, Brightness 0.02, TintColor #FFF5EC. Bloom Intensity 0.3, Size 28, Threshold 1.1. DepthOfField FocusDistance 2.2 (animate down to 1.95 with the push-in), InFocusRadius 0.6, FarIntensity 0.4, NearIntensity 0. SunRays Intensity 0.01. Add a white SurfaceLight or invisible reflector part below frame for warm sand bounce (#FFE8CC, Brightness 0.5) if the face shadows go too dark.\n\nSUBTITLE: ScreenGui > TextLabel, Text 'DO DO DO DO DO DO DO DO', AnchorPoint (0.5, 0.5), Position UDim2(0.5, 0, 0.925, 0), Size UDim2(0.46, 0, 0.065, 0), TextScaled, Font LuckiestGuy or FredokaOne, BackgroundTransparency 1. Add a UIGradient (Rotation 90, ColorSequence #FFD02E to #F59A2C to #E8452C) and a UIStroke (#7A0A14, Thickness 2). Duplicate the label behind it, offset +2/+3 px, coloured #6A0010, for the extrusion shadow. Keep it on screen through the cut into S02.\n\nRENDER: Record at 60 fps or higher (or capture with a frame-stepping script) at 1920x1080, with graphics quality 10, then conform to 30 fps for the edit."
+}

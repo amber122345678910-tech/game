@@ -1,0 +1,126 @@
+{
+ "shot": "S06_mouth",
+ "start": 5.9,
+ "end": 6.6,
+ "summary": "Locked-off, low-angle extreme close-up of the anthropomorphic horse's muzzle, with the sun in the sky at upper-left of frame behind the horse. The shot opens on a hard cut at 5.900 (frame 178) with the lips closed in a smug smile. The jaw snaps open over two frames (5.933-5.967), revealing huge human-like white veneer teeth, a pink tongue and glossy pink lips. At 6.033-6.067 the jaw opens to its widest in a laughing head-toss: the head lunges toward the lens and slides screen-left. This peak lands on beat 12 (6.017s). At 6.100-6.133 the head swings back and the jaw half-closes, then settles over 6.200-6.300 into a wide, frozen, toothy grin. The grin holds almost motionless until the hard cut at 6.600 (frame 199 is the next shot: two girls on a beach, subtitle \"HE'S SUCH A CHARMER\"). The camera never moves; all motion is the horse's head and jaw. The subtitle \"DO DO DO DO DO DO DO DO\" stays on screen for the whole shot.",
+ "camera": {
+  "framing": "Extreme close-up (ECU) of the horse's mouth in a 16:9 frame. The horse fills the right ~55% of frame (x from ~45% to the right edge); the left ~45% is open sky. The top edge crops through the bottom of the horse's sunglasses: the left-lens rim shows at x~50-54%, y 0-8%, and the right-lens rim at x~87-100%, y 0-5%. The bottom edge crops through the fuzzy chin. At the HOLD (6.2-6.6), positions as fractions of frame width/height: upper-lip top y~21%. Upper-teeth row x 51%-81%, y 38%-52%; the big central incisors are at x~58-68%. Lower teeth y~60-67%. Lower-lip bottom y~76%. Mouth corner (horse's left, screen-right) x~82%, y~38%. Tongue center x~63%, y~58%. Sun disc center x~35%, y~18%. The blurred horizon with a low building and a pole sits at the very bottom-left, y~94-100%, x 0-20%. At 5.9 (lips closed): the lip seam runs from (x49%, y40%) to (x80%, y37%), and the fuzzy chin/beard fills x 35-100%, y 40-100%.",
+  "position": "About 2.1 studs from the front of the mouth (lens to lip). Camera height is ~0.7 studs below the mouth center, about chin level of the horse character (~4.3 studs above ground if the character is 5.5 studs tall with the head ~4.8-5.3 studs up). Horizontally the camera is ~20-25 deg off the horse's facing axis toward the horse's own right side. As a result the muzzle points toward camera/screen-left, and we see more of the horse's LEFT cheek and jaw (on screen-right). The aim point is ~0.45 studs to screen-left of the mouth center, so the mouth lands at x~65% of frame and the sky/sun fills the left.",
+  "angle": "Low angle looking up: pitch about +18 deg, derived from the horizon sitting at the bottom ~3% of frame with a 38 deg vertical FOV. Yaw is set so the subject sits right of center. Roll 0 deg (horizon level). No dutch.",
+  "fovVerticalDeg": 38,
+  "lensNotes": "Moderate-wide lens (~35mm full-frame equivalent; vertical FOV ~38 deg, horizontal ~63 deg), very close focus on the front teeth/lips. Mild wide-angle bulge makes the teeth and lips look oversized, pushed toward the lens. Shallow depth of field: the focal plane is at the front incisors and lips (~2.1 studs). The far cheek/jaw fur on the right softens slightly; the background (horizon building, pole) is heavily blurred (bokeh, ~8-12 px blur at 854 px width). The sun produces a big soft bloom halo (~23% of frame height in radius) with a slight veiling glare over the left third that lowers contrast there. No visible chromatic aberration or vignette beyond a slight darkening at the bottom-right corner.",
+  "movement": [
+   {
+    "t": 5.9,
+    "description": "Hard cut in. Camera locked off (tripod). The sun stays at exactly the same pixel position (x35%, y18%) in every frame, which confirms zero camera movement."
+   },
+   {
+    "t": 6.033,
+    "description": "Camera still static. The apparent 'push' is the horse's head lunging ~0.2 studs toward the lens; the camera does not move."
+   },
+   {
+    "t": 6.6,
+    "description": "Hard cut out to the next shot (beach girls). Camera never moved during the shot."
+   }
+  ],
+  "shake": "None. Fully locked-off, no handheld, no whip, no zoom. Frame differencing over the hold (6.27-6.57) shows only sub-pixel residual changes from the subject's settle and fur."
+ },
+ "subjects": [
+  {
+   "who": "Horse (anthropomorphic 'aura farmer' horse character; only the muzzle/mouth/chin and the bottom of his sunglasses are visible)",
+   "appearance": "Realistic CG horse muzzle with dense short fur. Main coat is near-black charcoal (#0E0E15 in shadow, #14161A mid, #3E3D37 where lit) with grey-brown short fur on the upper muzzle (#63615D lit, #414242). A long, fuzzy, beard-like tuft of fur hangs under the chin and lower lip. Backlit fur fringe along the screen-left silhouette glows warm white (#D9D7CF to #EAE9E4) where the sun rims it. LIPS: large, rubbery, very human-like and glossy. Upper lip is pink-mauve (lit #B49583, mid #7E463B, shadow #5A2F24 to #683D2F) with fine vertical wrinkles and a wet specular sheen; lower lip is similar, highlight #C9AAA3, mid #7E463B, rolled outward. Lip corners and inner lip edge are deep red-brown (#442423); the inner lip line along the screen-right corner is a saturated orange-red (#C04A2A). TEETH: comically huge, perfect human veneer teeth, bright white (lit #E6E2E1, mid #D0CDC8, shaded #B5B0AF, side-shadow #8E7D73), smooth and slightly glossy. About 7 large upper teeth are visible: the two central incisors are the biggest (~0.16 studs wide x 0.19 tall if the mouth is ~0.9 studs wide), flanked by laterals and canines that get smaller toward the corner. About 6-7 smaller lower teeth (#B6A39C in shade) are partly hidden by the tongue. A thin pink gum line shows above the upper teeth when the lip is retracted. Tongue is salmon-pink (#B77661) and fills the lower mouth. Mouth interior/throat is dark red-brown (#511A10 to #2C1B1B). SUNGLASSES (only the bottoms visible): thin round wire frames in rose-gold/copper (#B0907F; brighter highlight #C8A070). The left lens (screen-left) reads bright cream from sky/sun reflection (#E8E5D9); the right lens is dark brown tint (#120B0D to #2A1A14). The glasses sit low on the nasal bridge just above the nostrils. Character context from adjacent shots, all out of frame here: royal-blue suit jacket, red-orange shirt collar with purple polka dots, chunky gold Cuban-link chain.",
+   "placement": "Occupies the right ~55% of frame, mouth centered at ~x65%, y45%. The horse roughly faces the camera, with the head yawed ~20-25 deg to his own RIGHT, so the muzzle tip points toward screen-left/camera-left and the visible open mouth corner is his LEFT corner (screen-right, x~82%). The camera looks up at him from below the chin. His eyes are out of frame above; only the glasses bottoms show.",
+   "poseKeys": [
+    {
+     "t": 5.9,
+     "body": "Root/torso/arms/legs out of frame (hold a neutral standing idle). Head: yaw +22 deg to his own right (muzzle toward screen-left), pitch +3 deg (chin slightly raised), roll 0 deg. Jaw joint (hinge just behind the mouth corners) at 0 deg, closed. Head position is the 'home' position: lip seam at x49-80%, y~38%.",
+     "face": "Mouth open 0.0. Lips closed and pressed together in a smug closed-mouth smile: the upper lip overhangs and bulges forward, the seam curves slightly up toward the screen-right corner, and the corner is pulled back (smile 0.5). A faint sliver of glossy pink lip shows; the lower lip is hidden under the fuzzy chin tuft. Eyes and brows not visible; glasses sit on the top edge of frame (bottom of lens rims only)."
+    },
+    {
+     "t": 5.933,
+     "body": "Head unchanged (yaw +22, pitch +4, roll 0). Jaw snapping open fast: about 12-14 deg, with heavy vertical motion blur on the lower jaw and chin (smear of ~60 px downward). The upper lip begins lifting straight up.",
+     "face": "Mouth open ~0.35. The upper lip retracts ~0.06 studs, exposing the bottom ~2/3 of the upper teeth (row at y~42-52%). The lower teeth and lip are a vertical smear down to y~65%. Corners start pulling back into a grin (smile 0.7)."
+    },
+    {
+     "t": 5.967,
+     "body": "Head pitch +6 deg, yaw +22, roll +2 deg (tilts slightly so the screen-right side rises). Jaw ~28 deg open. Head nudged ~0.03 studs toward screen-left. Same pose duplicated at 6.000 (held frame).",
+     "face": "Mouth open ~0.7. Big open grin. Upper lip fully retracted and curled up, showing the full upper-teeth row (y 42-55%) and a thin pink gum strip. Lower jaw down: lower teeth at y~77-82% and lower lip at ~85%. The tongue is visible as a pink mound in the middle (y~60%). Corners pulled far back (smile 1.0). Some residual vertical motion blur on the lower lip and teeth."
+    },
+    {
+     "t": 6.033,
+     "body": "PEAK laugh toss (on beat 12 at 6.017). Jaw ~40 deg, widest; the lower jaw and lower teeth exit the bottom of frame. Head pitched back to +10 deg (laughing 'ha!' toss), yaw +18 deg (turns ~4 deg more toward camera), roll -3 deg. Whole head translated ~0.12 studs toward screen-left and ~0.15 studs toward the camera, so the muzzle looks ~7% larger. Lower lip/jaw heavily motion-blurred.",
+     "face": "Mouth open 1.0 (maximum). Huge cavernous open-mouth laugh. Upper-teeth row at y~45-57%, slightly arched. The tongue is a long pink slab running down out of frame. The dark throat (#511A10) is visible on the screen-right side. Upper lip curled up and back under the nostrils. Nostrils and dark upper muzzle now fill the top 40% of frame."
+    },
+    {
+     "t": 6.067,
+     "body": "Continuation of the toss: head now ~0.25 studs screen-left of home (the right lens of the glasses moved from x~87% to x~77%) and ~0.2 studs closer to the camera. Head pitch +8 deg, yaw +16 deg, roll -4 deg. Jaw still ~38-40 deg. The lower jaw sweeps out the bottom-left of frame with motion blur.",
+     "face": "Mouth open ~0.95. Still laughing wide: upper-teeth row at x~46-73%, y~45-58%. The upper lip forms a tall arch. The screen-right lip corner (horse's left) is stretched long and deep red. Smile 1.0."
+    },
+    {
+     "t": 6.1,
+     "body": "Head swinging back toward home: ~0.08 studs screen-left of home, ~0.07 studs closer than home. Pitch +5 deg, yaw +20 deg, roll -1 deg. Jaw closing quickly to ~22 deg, with strong vertical/diagonal motion blur on the lower lip and chin (the chin fur smears down-left). A ghosted second set of lower teeth is visible at y~75%.",
+     "face": "Mouth open ~0.55. Upper teeth at x~49-77%, y~40-54%. The lower lip arcs as a big U from x~42% to x~78%, bottom at ~85%. Tongue visible. Corners still pulled back (smile 1.0)."
+    },
+    {
+     "t": 6.133,
+     "body": "Nearly home: ~0.02 studs screen-left, back at home depth. Pitch +3, yaw +22, roll 0. Jaw ~17 deg (slightly more open than the final hold). Light residual motion blur on the lower-lip edge. Same pose duplicated at 6.167.",
+     "face": "Mouth open ~0.45. Upper teeth at x~51-80%, y~40-52%. Lower teeth tips visible at the left of the mouth (y~62-68%). Lower lip bottom at y~78%. Big grin, smile 1.0."
+    },
+    {
+     "t": 6.2,
+     "body": "Settled at the home position: head yaw +22, pitch +3, roll 0. Jaw ~14 deg (tiny overshoot past the final value, closing ~1 deg too far). Small settle continues over 6.233-6.3 (jaw creeps back to ~14.5 deg, head drifts <0.01 studs).",
+     "face": "Final grin. Mouth open ~0.4. Upper lip retracted up into a thick glossy roll above the teeth (lip top y~21%, lip bottom y~37%), showing the full row of ~7 big white upper teeth (bottom edges at y~50-52%, center incisors largest). Lower teeth (6-7 smaller, rounded) peek along y~60-67% and are partly covered by the tongue. Tongue is a pink mound centered (x63%, y58%). The lower lip forms a big glossy U, bottom at y~76%. The screen-right corner (horse's left) is pulled far back to x~82% and shows a red inner-lip edge. Expression: smug, cheesy, frozen 'say cheese' grin. Smile 1.0."
+    },
+    {
+     "t": 6.3,
+     "body": "HOLD. Head at home (yaw +22, pitch +3, roll 0), jaw ~14.5 deg. Only micro motion until the cut: <0.5 deg jaw drift, plus a fur/whisker shimmer from 6.33 to 6.57. No movement on beat 13 (6.505).",
+     "face": "Same frozen big-teeth grin as at 6.2. Mouth open 0.4, smile 1.0."
+    },
+    {
+     "t": 6.567,
+     "body": "Last frame before the cut. Identical to the hold pose (yaw +22, pitch +3, roll 0, jaw ~14.5 deg).",
+     "face": "Same frozen grin, mouth open 0.4."
+    }
+   ],
+   "motionNotes": "A single snappy accent: the jaw snaps open in 2 frames (5.900 to 5.967, an extremely fast ease-out, almost a pop) just before beat 12 (6.017). The laughing head-toss peak (jaw 40 deg, head lunging ~0.15-0.2 studs toward the lens and ~0.25 studs screen-left) sits at 6.033-6.067, right on the beat. Recovery runs from 6.1 to 6.2 with an ease-in-out swing back. A small overshoot/settle follows (jaw closes ~1 deg past the final value at 6.2-6.23, then eases back by 6.3), giving a rubbery 'boing' feel. After 6.3 everything holds still for ~0.3s (a comedic freeze-frame grin) through beat 13 at 6.505, until the cut at 6.6. The source animation appears stepped (on 2s in places): 6.000 duplicates 5.967, 6.167 duplicates 6.133, and 6.333 duplicates 6.300. Heavy motion blur on the jaw during 5.933-6.133. Fur under the chin trails the jaw slightly as secondary motion (it lags ~1 frame and smears downward on the open, upward on the close)."
+  }
+ ],
+ "set": "Exterior on a sunny beach/boardwalk; the next shot reveals sand, sea-side apartment towers and a pier. Nearly the whole background is clear sky. The sky has a vertical gradient: deep steel blue at the top (#3B6686 to #4B6F8F), mid blue (#5E84A3), pale desaturated blue (#9BAEBF) lower, and almost white haze near the horizon (#CDD3D3 to #D3D3D1). At the very bottom-left (y 94-100%, x 6-20%) a distant low flat-roofed grey building (#565454) sits very out of focus, roughly 150-300 studs away and ~10-15 studs tall. A thin utility pole/lamp post shows at the far-left edge (x~0.5%, y~90-100%). No clouds. There are no props other than the horse's glasses at the top edge. The ground is not visible because the camera is so low and pitched up.",
+ "lighting": "Hard midday-to-afternoon sun used as a BACKLIGHT. The sun is in frame at ~x35%, y18%, behind and to the horse's right-rear. That puts it roughly 10 deg left of the camera axis and ~30-31 deg elevation (camera pitch 18 deg + ~12.5 deg above frame center). The sun disc is blown out (#EAE9E4 to #FFFFFF) with a large soft circular bloom (radius ~23% of frame height) fading into the sky (#A9AFBD at the halo edge); there are no streak flares or ghosts. The sun gives a strong warm-white rim (~5500K, #FFF4E0) on the fuzzy fur silhouette along screen-left (chin tuft and upper-muzzle edge) and a specular kick on the upper lip. FILL/KEY on the face: a large soft frontal fill from slightly below and camera-left (simulated sand bounce, neutral-warm ~5000K, about 1.5 stops under the sun). It keeps the teeth bright white and the lips glossy, while the dark fur on the cheek, jaw and nostrils falls to near-black (#080D11 to #14161A). The glossy lips and teeth have sharp specular highlights facing camera-left. Contrast is high (deep blacks in the fur, near-clipped teeth highlights and sun). Saturation is moderate: the sky is slightly desaturated teal-blue and the lips/tongue/mouth are warm pinks and reds. Exposure is set for the teeth. Slight veiling glare/haze lifts the blacks on the left third, near the sun.",
+ "effects": [
+  {
+   "t": 5.9,
+   "description": "Hard cut in from S05 (gold chain close-up). No transition effect."
+  },
+  {
+   "t": 5.933,
+   "description": "Strong vertical motion blur/smear on the lower jaw, lower lip, chin fur and lower teeth (smear length ~10-15% of frame height) as the jaw snaps open. The upper teeth are only lightly blurred."
+  },
+  {
+   "t": 5.967,
+   "description": "Residual vertical motion blur on the lower teeth/lip (ghosted double lower-teeth row). Held for 2 frames (to 6.000)."
+  },
+  {
+   "t": 6.033,
+   "description": "Whole-head motion blur, mostly horizontal/diagonal to screen-left, plus vertical blur on the jaw during the laugh toss (6.033-6.067). The left edge of the muzzle and the chin fur smear."
+  },
+  {
+   "t": 6.1,
+   "description": "Strong downward-left motion blur on the closing jaw, chin and lower lip (whole-frame difference is highest here). Ghost lower teeth visible."
+  },
+  {
+   "t": 6.133,
+   "description": "Light residual blur on the lower-lip edge; clean from 6.2 onward."
+  },
+  {
+   "t": 6.2,
+   "description": "Clean, sharp hold frames. Constant throughout the shot: sun bloom halo, mild veiling glare on the left third, shallow-DOF background blur, slight fur shimmer."
+  },
+  {
+   "t": 6.6,
+   "description": "Hard cut out to the next shot (two girls laughing on the beach; the subtitle changes)."
+  }
+ ],
+ "subtitle": "\"DO DO DO DO DO DO DO DO\" (eight DOs) is on screen for the entire shot, 5.900-6.600. It is carried over unchanged from the previous shot (already visible at 5.867) and replaced by \"HE'S SUCH A CHARMER\" at the 6.600 cut. Placement: bottom center, text center at x~50% (x 238-617 px of 854, ~44% of frame width), baseline at y~95%, cap-height ~4.6% of frame height (~22 px of 480), vertical center y~92.3%. Style: heavy bold italic rounded sans (Fredoka One / Luckiest Guy / Gotham Black Italic look), all caps. Fill is a vertical gradient: yellow #F2D345 at the top, #EFC21F, orange #ED9D20 in the middle, #F07D2C, red-orange #D43F1E at the bottom. A thick dark-red 3D extrusion/drop shadow (#A8000B to #8E0021, darkest #53001D) is offset ~2 px down and slightly right, with a thin dark-red outline. No animation on the text during this shot: it is static, no pop or bounce.",
+ "recreateInRoblox": "MODEL: Build (or import) a horse-head MeshPart with a separate Jaw part rigged by a Motor6D (Head -> Jaw). Put the C0 hinge just behind and slightly above the mouth corners so rotating the jaw about its local X axis drops the lower lip, lower teeth and chin together. Keep the Upper Lip as its own part on a Motor6D so it can translate up ~0.06 studs (retract) and pull the corners back. Approximate in studs, assuming the mouth is ~0.9 studs wide:\n- Upper lip: a squashed torus/capsule MeshPart ~0.95 x 0.18 x 0.25. SmoothPlastic, Color #B49583 (shadow areas #7E463B). Use a SurfaceAppearance with a roughness map ~0.25 for a wet sheen, or Reflectance 0.05.\n- Upper teeth: 7 rounded blocks (MeshPart or Part + SpecialMesh 'Brick' with bevels), SmoothPlastic #F2EEEA. Central two are 0.16 W x 0.19 H x 0.06 D; the others shrink to 0.11 W toward the corner. Lay them on a gentle arc.\n- Lower teeth: 6 smaller blocks, 0.10 x 0.08, color #E6E2E1, on the Jaw.\n- Tongue: a flattened ellipsoid 0.45 x 0.12 x 0.4, #B77661, on the Jaw.\n- Mouth-interior back wall: a dark part #511A10 (Neon off, SmoothPlastic) so the open mouth reads deep.\n- Lower lip: a U-shaped torus segment, #C9AAA3 highlight / #7E463B, on the Jaw.\n- Fur: the muzzle, cheeks and a big chin tuft in near-black #14161A with a grey-brown upper muzzle #63615D. For the fuzzy look, use a fur SurfaceAppearance plus 2-3 slightly larger shells with transparent fur-strand decals/textures (Transparency 0.4-0.7) and a light-cream fringe texture on the silhouette edges, so the backlight reads as a glowing rim.\n- Sunglasses: two round torus rims (0.6 diameter), rose-gold #B0907F, Metal material. Lenses: transparent glass #2A1A14, Transparency 0.3, Reflectance 0.3. Place them just above the nostrils so only their bottoms show in frame.\n\nCAMERA: Workspace.CurrentCamera.CameraType = Scriptable, FieldOfView = 38 (vertical, locked for the whole shot, no movement). Position the camera ~2.1 studs from the front of the lips, ~0.7 studs below the mouth center, and ~22 deg around toward the horse's right side. Set CFrame.lookAt to a point ~0.45 studs to screen-left of the mouth center so the mouth sits at ~x65% of frame and the sun lands at ~x35%, y18%. Check the pitch is ~+18 deg up so the horizon sits at the very bottom edge. Roll 0.\n\nANIMATION (Animation Editor or TweenService at 30 fps, times relative to shot start t0=5.9). Jaw X-rotation keys:\n- 0.000: 0 deg\n- 0.033: 13 deg\n- 0.067: 28 deg (Out-Expo)\n- 0.100: 28 deg\n- 0.133: 40 deg\n- 0.167: 39 deg\n- 0.200: 22 deg (InOut-Quad)\n- 0.233: 17 deg\n- 0.300: 14 deg (overshoot)\n- 0.333: 14.5 deg, then hold to 0.700.\nHead keys (relative to home; X = screen-left offset, Z = toward camera):\n- 0.000: home, pitch +3, yaw +22, roll 0\n- 0.067: pitch +6, roll +2, X 0.03\n- 0.133: pitch +10, yaw +18, roll -3, X 0.12, Z 0.15\n- 0.167: pitch +8, yaw +16, roll -4, X 0.25, Z 0.20\n- 0.200: pitch +5, yaw +20, roll -1, X 0.08, Z 0.07\n- 0.233: pitch +3, yaw +22, X 0.02, Z 0\n- 0.300: home, then hold.\nUpper lip: 0.000 closed; 0.033 up 0.04 studs; 0.067 up 0.06 studs plus corners back 0.05 studs; hold. Optionally step the keys on 2s (duplicate 0.067 to 0.100 and 0.233 to 0.267) to match the stepped feel of the source. The 0.133-0.167 peak lands on beat 12 (absolute 6.017).\n\nLIGHTING:\n- Lighting.Technology = Future.\n- Set ClockTime / GeographicLatitude so the sun sits ~31 deg above the horizon in the camera's view direction, ~10 deg left of the camera axis, behind the horse. Alternatively use a far-away Neon sphere 'sun' plus a BillboardGui radial-glow image if you need exact framing.\n- Brightness 3, EnvironmentDiffuseScale 1, EnvironmentSpecularScale 1, OutdoorAmbient #808080, Ambient #303030.\n- Add a SurfaceLight or large PointLight (Brightness 1.5, Range 4, Color #FFF1E0) ~1.5 studs in front of and below-left of the mouth as the sand-bounce fill on the teeth and lips; avoid lighting the dark fur too much.\n- Optional SpotLight rim from behind-left on the chin tuft.\n- Sky: a clean clear-sky Skybox (or Atmosphere-only sky) graded deep blue at the top to pale haze at the horizon.\n- Atmosphere: Density 0.3, Offset 0.1, Color #CDD3D3, Decay #9BAEBF, Glare 0.6, Haze 1.6.\n\nPOST:\n- BloomEffect: Intensity 1.2, Size 48, Threshold 0.9.\n- SunRaysEffect: Intensity 0.12, Spread 0.7.\n- DepthOfFieldEffect: FocusDistance 2.1, InFocusRadius 0.8, FarIntensity 0.7, NearIntensity 0.\n- ColorCorrectionEffect: Brightness 0.02, Contrast 0.18, Saturation -0.05, TintColor (255,250,242).\n- Motion blur: Roblox has none natively. Fake it by tweening a BlurEffect Size 0 -> 6 -> 0 over 5.93-6.13 (peak at 6.1), and/or add 2-3 ghost copies of the jaw at 0.6-0.8 transparency trailing the previous frame's pose during the fast frames.\n\nBACKGROUND: A blurred low grey block building (#565454, ~40 x 12 x 20 studs) ~200 studs away near the bottom-left of frame, and a thin pole at the far-left edge. Both will melt into DOF and atmosphere haze.\n\nSUBTITLE: ScreenGui > TextLabel \"DO DO DO DO DO DO DO DO\".\n- AnchorPoint (0.5,0.5), Position UDim2(0.5,0,0.923,0), Size UDim2(0.46,0,0.06,0), TextScaled.\n- FontFace: Fredoka One or Luckiest Guy (or Montserrat/GothamBlack, Bold + Italic), TextColor3 white.\n- Gradient: UIGradient Rotation 90, ColorSequence #F2D345 at 0, #ED9D20 at 0.55, #D43F1E at 1.\n- Outline: UIStroke Color #8E0021, Thickness 1.5.\n- Extrusion: a duplicate TextLabel behind it, offset (+2px, +3px), TextColor3 #A8000B (gradient down to #53001D).\n- Show for the whole shot with no animation; swap to \"HE'S SUCH A CHARMER\" at the 6.6 cut."
+}

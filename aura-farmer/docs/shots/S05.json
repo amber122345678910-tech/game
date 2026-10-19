@@ -1,0 +1,185 @@
+{
+ "shot": "S05_chain",
+ "start": 4.967,
+ "end": 5.9,
+ "summary": "Hard cut in at 4.967s, just before beat 10 at 5.041s, from the wide 'thumb/shaka' shot of the horse to a near-static frontal insert close-up of its chest. A polished yellow-gold Cuban curb chain sits at the base of the neck as a smile-shaped arc across the upper third of the frame. It glints with 4-point star sparkles, and a large soft bloom sits on its frame-left end. Below it is very dark chest fur with silvery backlit stray hairs. A coral-red twill disco shirt with purple/teal polka dots is spread open, and its huge pointed collars run from the bottom center up to both top corners. They lie over a royal-indigo satin jacket at the outer edges. The head is out of frame above. The only motion is a subtle beat-synced body groove: a tiny rise on beat 10 (5.033), then a dip down and away of about 2.3% zoom-out at 5.10-5.17 and an ease back. Then a quick pop-up with the chain hopping about 20 px (about 0.055 studs) on the 16th note before beat 11 (5.40). The dip lands on beat 11 (5.533-5.567), then everything eases out. Hard cut out at 5.9s, the 16th note before beat 12 at 6.017, to an ECU of the horse's lips and teeth against the sun. The subtitle 'DO DO DO DO DO DO DO DO' stays on screen throughout. The source animation is 24 fps (every 5th 30-fps frame is a duplicate: 5.000, 5.167, 5.333, 5.500, 5.667, 5.833).",
+ "camera": {
+  "framing": "Insert / extreme close-up of the chest, frontal and centered. Edge to edge it covers roughly shoulder to shoulder: about 2.4 studs wide by 1.35 studs tall (16:9; reference is 854x480 px, so 1 px is about 0.0028 studs at the subject). Top edge sits just under the jaw. Lower neck fur fills the top center (x 0.30-0.69, y 0-0.08), with hair-thin slivers of blue sky in the extreme top-left (x 0.05-0.27, y 0-0.02) and top-right (x 0.70-0.94, y 0-0.02) above the jacket shoulders. The bottom edge cuts mid-chest; the V of the open shirt continues past it. The chain band occupies x 0.29-0.69, y 0.08-0.37, with its lowest point at x 0.52, y 0.35. The frame-left red collar runs from the top-left corner (tip about x 0.02-0.10, y 0.08-0.16) diagonally down to the bottom center (inner edge reaches x 0.37 at the bottom). The frame-right red collar runs from the top-right corner (tip about x 0.97, y 0.15) down to x 0.60 at the bottom. Blue satin jacket fills x 0-0.18 on the left and x 0.82-1.0 on the right below the collars. The dark fur V fills the center between the collars (x 0.33-0.65). Composition is nearly perfectly symmetric about the vertical center line.",
+  "position": "Directly in front of the chest on the character's centerline, facing the horse (the horse faces the camera). Distance is about 2.5 studs from the chest surface (about 0.45 character heights) at vFOV 30. Lens height is about at the chain line, roughly 0.15 studs below the top of the frame-filling area, at about 4.2 studs above the ground for a 5.5-stud character whose chest is at 3.8-4.3 studs. Horizontal angle is 0 degrees (dead-on frontal).",
+  "angle": "Pitch about -3 degrees (very slightly looking down, so the necklace reads as a hanging U/smile curve). Yaw 0, roll 0; measured roll stays within +/-0.07 degrees, so there is no dutch angle.",
+  "fovVerticalDeg": 30,
+  "lensNotes": "Medium focal length, about 45 mm full-frame equivalent (vFOV about 30 degrees). No visible barrel distortion. Shallow depth of field: the focus plane is on the chain and the inner collar edges at about 2.5 studs. The top neck fur and a few collar dots on the frame-right collar near its inner fold (x 0.68-0.84, y 0.43-0.50) are noticeably soft (2-4 px blur), so parts of the collar roll toward the lens out of the focus plane. Slight motion blur on the frame-right collar dots at 5.400 during the pop. Mild film grain/compression texture; no vignette beyond the naturally dark navy corners.",
+  "movement": [
+   {
+    "t": 4.967,
+    "description": "Hard cut in. Locked-off frame; this is the reference framing (scale 1.000)."
+   },
+   {
+    "t": 5.033,
+    "description": "Beat 10 (5.041): tiny push/rise. Content scale 1.006 and up 0.6 px. The chain lifts about 3-4 px. Read it as the body rising about 0.01 stud toward the lens."
+   },
+   {
+    "t": 5.1,
+    "description": "Dip: the image contracts to scale 0.977 and content shifts down 2.6 px, i.e. the subject moves about 0.055 studs away from the camera and about 0.008 studs down. The chain sits about 5 px below rest. Fast ease-out, roughly 2 frames from the rise."
+   },
+   {
+    "t": 5.167,
+    "description": "Holds the dip (scale 0.980, down 2.3 px)."
+   },
+   {
+    "t": 5.2,
+    "description": "Slow ease back up: scale 0.985."
+   },
+   {
+    "t": 5.333,
+    "description": "Scale 0.989, still 2 px low. A slow linear-ish recovery from 5.2 to 5.333."
+   },
+   {
+    "t": 5.367,
+    "description": "Snaps back to rest (scale 0.999, down 0.7 px)."
+   },
+   {
+    "t": 5.4,
+    "description": "Pop: scale 1.0095 (about 0.025 studs toward the lens), content up 0.4 px, plus the large chain hop (see subject). Slight motion blur. Lands on the 16th note before beat 11 (5.407)."
+   },
+   {
+    "t": 5.433,
+    "description": "Falling back: scale 1.002."
+   },
+   {
+    "t": 5.467,
+    "description": "Already below rest: scale 0.990, down 1.8 px."
+   },
+   {
+    "t": 5.533,
+    "description": "Beat 11 (5.529): deepest dip of the shot, scale 0.981 and down 3.3 px (about 0.05 studs away, 0.009 studs down)."
+   },
+   {
+    "t": 5.567,
+    "description": "Holds near the bottom: scale 0.983, down 2.9 px."
+   },
+   {
+    "t": 5.6,
+    "description": "Easing out: scale 0.988."
+   },
+   {
+    "t": 5.633,
+    "description": "Scale 0.992, down 2.2 px. Nearly settled from here."
+   },
+   {
+    "t": 5.867,
+    "description": "Settled at scale 0.994, down 2.2 px (a tiny net drift down and away of about 0.015 studs)."
+   },
+   {
+    "t": 5.9,
+    "description": "Hard cut out (16th note before beat 12 at 6.017) to an ECU of the lips/teeth with the sun flare."
+   }
+  ],
+  "shake": "No handheld shake and no whip or zoom moves. The only motion is the rhythmic 1-2.3% push/pull with a 2-3 px vertical bob described above (subject groove, or an equivalent tiny camera dolly), synced to the beat: rise on the beat or on the 16th note before it, dip about 0.06-0.1 s after the beat. Rotation is under 0.1 degrees."
+ },
+ "subjects": [
+  {
+   "who": "Aura Farmer horse (chest/neck only; head out of frame above)",
+   "appearance": "Anthropomorphic horse torso, upright, chest facing the camera. FUR: chest fur is very dark umber-black (base #0A0605, mid #1A1512, deepest #070604), dense and soft. Over it are long, sparse, wispy silver-white guard hairs (#9C9C98 to #D8D8D0 at the tips, each about 0.08-0.2 studs long). They point mostly downward and slightly outward and catch the backlight like fiber-optic strands. Most are concentrated just under the chain and along the collar inner edges. The lower neck fur at the top of the frame is warmer and lit: warm taupe-brown #836D60 with #5A4034 mids and a darker central crease stripe #2A1E18 running vertically at x 0.45-0.49. SHIRT: open-necked 1970s disco shirt, unbuttoned to below the frame, in a coral/brick-red diagonal twill weave with a clearly visible fine diagonal rib texture. Colors: lit #C8665A, mid #A0443A, highlight edge #D77F75, shade #520C10 / #5C0C06. It has enormous pointed spread 'dagger' collars, about 1.1 studs long, that lie flat over the jacket and reach the top corners. The frame-left collar tip has a small folded notch at the top-left (x 0.05-0.10, y 0.12-0.16). Polka dots are vertical ovals about 0.07 x 0.09 studs (25x35 px) in a staggered grid with about 0.25-stud spacing (6-8 visible per collar). Each dot is two-tone iridescent: violet/purple body #7A3E9E (lit #8E6974 to #A963C0, shaded #4E1939 / #4C1E5C) with a dark teal-green crescent on its upper edge #2E5A58. JACKET: royal-indigo satin suit jacket with a soft liquid sheen. Mid #1E266E; lit sheen #414994; lavender specular glints #8D7AA9 at the top-right shoulder; deep shadows #050E37 / #0A1241. Soft broad wrinkles, visible only at the outer left and right edges and at the shoulder tops. CHAIN: a thick Cuban curb chain in polished yellow gold. Link band is about 0.13 studs tall; each link is about 0.1 studs wide; 9 links face the camera, plus 3-4 links turned edge-on on the frame-right side as the chain wraps around the neck. Colors: specular #F2E6C8 / #E7DDCC, gold mid #C9A55A / #8B764E, shadow #6B4E1E, crevices #2A1805. Very glossy (metalness 1, roughness about 0.15). It reflects warm sun on the frame-left end and pale sky (near-white silver #E0E0D8) on the edge-on links at frame right. The chain arc is a smile/U shape about 0.97 studs across. The frame-left end is high (y 0.09) and blown out by bloom. The lowest point is at x 0.52, y 0.35. The frame-right end climbs steeply to y 0.11 at x 0.68.",
+   "placement": "Centered, filling the frame. The body faces the camera directly (torso yaw 0). The shirt V opening is on the vertical center line; the chain is in the upper third. The character's right side (collar and jacket) is frame-left, and the character's left side is frame-right. The head and arms are not visible.",
+   "poseKeys": [
+    {
+     "t": 4.967,
+     "body": "Rest pose. Root/UpperTorso upright, pitch 0, yaw 0 (square to camera), roll 0. Chest at reference distance (2.5 studs from the lens). Shoulders level and relaxed; arms out of frame (the previous shot ended with the character's left hand up in a thumb gesture, but nothing is visible here). Neck vertical; head above the frame. Chain resting on the chest at its rest offset. Legs not visible.",
+     "face": "Not visible (head out of frame). Nothing to animate."
+    },
+    {
+     "t": 5.033,
+     "body": "On beat 10 (5.041): small lift. UpperTorso +0.01 stud up and +0.015 stud toward the camera. Chain +0.01 stud up (about 3-4 px) with the torso. No rotation.",
+     "face": "Not visible."
+    },
+    {
+     "t": 5.1,
+     "body": "Groove dip. UpperTorso -0.008 stud down and -0.055 stud back (away from the camera), with a slight hip/knee bend implied (about 3 degrees knee flex, not visible). Torso pitch about +1 degree (chest drops back slightly). Chain lags and settles about 0.014 stud (5 px) below rest. Ease: fast, about 2 frames.",
+     "face": "Not visible."
+    },
+    {
+     "t": 5.167,
+     "body": "Hold the dip (UpperTorso -0.007 down, -0.05 back). Chain at -0.014.",
+     "face": "Not visible."
+    },
+    {
+     "t": 5.333,
+     "body": "Slow recovery: UpperTorso -0.006 down, -0.03 back. Chain at rest -0.01 (about 4 px low).",
+     "face": "Not visible."
+    },
+    {
+     "t": 5.367,
+     "body": "Back to the rest position (0, 0, 0). Chain at -0.005.",
+     "face": "Not visible."
+    },
+    {
+     "t": 5.4,
+     "body": "Pop-up on the 16th note before beat 11 (5.407). UpperTorso +0.001 up and +0.025 toward the camera; a quick chest pump with pitch about -1 degree (chest pushed forward). Chain secondary motion: the whole chain jumps up +0.04 stud (about 14 px) at its frame-left/center links. The frame-right end (character's left side) jumps more, +0.06 to +0.07 stud (about 22-25 px), so the chain rolls about +4 degrees, raised on the character's left. The edge-on links on the character's left flip toward the lens and flash silver-white. Motion blur on this frame.",
+     "face": "Not visible."
+    },
+    {
+     "t": 5.433,
+     "body": "Torso near rest (+0.005 toward camera). Chain falling: still +0.02 stud at center and +0.004 at the character's-left end. The roll mostly resolves.",
+     "face": "Not visible."
+    },
+    {
+     "t": 5.467,
+     "body": "Torso already dropping: -0.005 down, -0.025 back. Chain at rest; the character's-left end overshoots slightly low (-0.006).",
+     "face": "Not visible."
+    },
+    {
+     "t": 5.533,
+     "body": "On beat 11 (5.529): deepest dip of the shot. UpperTorso -0.009 down, -0.05 back, pitch +1 degree. Chain lands and overshoots: -0.009 stud at center and -0.02 stud (about 6-10 px) at the character's-left end.",
+     "face": "Not visible."
+    },
+    {
+     "t": 5.567,
+     "body": "Hold the dip (-0.008 down, -0.045 back). Chain at -0.008 to -0.017.",
+     "face": "Not visible."
+    },
+    {
+     "t": 5.633,
+     "body": "Ease out: UpperTorso -0.006 down, -0.02 back. Chain settles at about -0.003 (center) and -0.012 (character's-left end).",
+     "face": "Not visible."
+    },
+    {
+     "t": 5.867,
+     "body": "Settled: UpperTorso -0.006 down, -0.015 back. Chain at about -0.003 and -0.01 (character's-left end). Cut at 5.9.",
+     "face": "Not visible."
+    }
+   ],
+   "motionNotes": "Almost a still frame: all motion is a small dance groove of the torso plus chain secondary motion. Rhythm: rise slightly on the beat (5.033) or on the 16th note before the beat (5.40), then sink down and back right after the beat (5.10-5.17 after beat 10; 5.533-5.567 exactly on beat 11). The dips are fast-in (about 2 frames) and slow-out (about 0.2 s ease back). Amplitude is tiny for the body: about 0.05 studs toward/away from the lens and about 0.01 stud vertical, which reads on screen as a 1-2.3% zoom pulse. The chain is the visible secondary motion. It lags the torso, hops up about 0.04-0.065 studs at 5.40 with an asymmetric roll (the character's-left end flies higher), then lands with a small overshoot below rest at 5.533 and settles by 5.63. The edge-on links flash as they rotate. No fabric flutter on the collars or jacket, and no breathing beyond the groove. Every motion change produces extra sparkle glints on the chain (beat 10 burst)."
+  }
+ ],
+ "set": "Essentially no environment is visible: the character's chest fills the frame. The only background is hair-thin slivers of sky at the very top corners, above the jacket shoulders: soft steel blue #6287A4 at top-left and #4B7490 at top-right, with a hint of #9092B5 haze. The surrounding scene, known from the adjacent shots, is a sunny seaside beach with a pier at frame right, a sandy beach, and a hazy clear-blue sky with the sun high behind the horse at upper frame-left. For Roblox, place a simple sky (Atmosphere plus a skybox or a large blue backdrop part) behind the character so those corner slivers read as blue sky. Everything else is wardrobe: the satin jacket, the red polka-dot collars, the fur, and the gold chain.",
+ "lighting": "Low-key, high-contrast, saturated 'music-video glam' look. Mean frame luminance is only about 54/255; most of the frame is dark navy, deep red and black fur, punctuated by very bright gold. KEY (sun): warm white, about 5200-5600K (#FFF1DC), from upper frame-left and behind the subject, about 120-135 degrees around from the camera and about 40 degrees elevation. It back-rims the neck fur (warm #836D60 glow at the top), lights the silvery stray chest hairs from behind, and blows out the frame-left end of the chain into a white-gold hotspot (#F0E8D0+). It also lights the frame-left collar (#B25E58 highlights) more than the frame-right one. The frame-right collar is mostly in shade (#520C10), except a bright raking strip along its inner edge near the fur (#D77F75 at x 0.66-0.70, y 0.62-0.85), which suggests a second rim/kicker from behind frame-right. FILL: cool sky bounce from the front/above, about 8000K blue (#4A5A80). It gives the satin jacket its blue-violet sheen (#414994 lit, lavender #8D7AA9 speculars at the top-right shoulder) while its shadows fall to #050E37. Fill-to-key ratio is about 1:6. RIM: strong on the hair strands and chain edges. Lens flare/bloom: a large soft bloom (radius about 50 px, about 0.14 studs) on the frame-left chain end, plus many small 4-point star glints on the link edges. Brightness in the bloom region holds steady at about 162-164/255, peaking at 168 at 5.400-5.433 when the chain lifts into the light. Color grade: punchy contrast, saturation +20-25%, deep blacks crushed in the fur, warm highlights and cool shadows (teal-blue / gold-orange split).",
+ "effects": [
+  {
+   "t": 4.967,
+   "description": "Hard cut in (no flash or transition). The subtitle continues from the previous shot without re-animating."
+  },
+  {
+   "t": 4.967,
+   "description": "Persistent effects for the whole shot: (1) A large soft bloom hotspot on the frame-left end of the chain, centered about x 0.32, y 0.17 with a radius of about 0.06 of frame width, warm white #FFF4DC fading to gold. It stays roughly constant. (2) 12-20 small 4-point star sparkles (cross-shaped glints, each 8-20 px or about 0.02-0.06 studs long; thin horizontal plus vertical rays, white-gold #FFF6D8, additive) sitting on the top edges and corners of the links. Several are on the edge-on links at frame right. They twinkle independently: each lives about 0.1-0.25 s, fading in and out, and the positions shift between frames. (3) Mild bloom on all gold specular highlights."
+  },
+  {
+   "t": 5.033,
+   "description": "Sparkle burst on beat 10: the number of glint pixels jumps about 40% (83 to 122 by 5.067), then decays back to baseline by 5.2. So spawn extra star glints on the beat."
+  },
+  {
+   "t": 5.4,
+   "description": "Chain hop catches the light: the bloom brightens about 4% (to its peak at 5.433). The edge-on links at frame right flash silver-white (sky reflection). Slight motion blur across the frame for 1 frame."
+  },
+  {
+   "t": 5.433,
+   "description": "Sparkle count dips (58-69 glint px) at 5.433-5.533 while the chain is moving and repositioning, then rebuilds to the baseline of about 85-93 by 5.6-5.8."
+  },
+  {
+   "t": 5.9,
+   "description": "Hard cut out to the lips/teeth ECU (the next shot has a big sun flare at frame left)."
+  }
+ ],
+ "subtitle": "'DO DO DO DO DO DO DO DO' (8 x 'DO', uppercase) is on screen for the entire shot, 4.967-5.9, unchanged. It was already visible in the previous shot and continues into the next one, with no pop or animation at the cuts. Position: bottom center, text block spanning x 0.28-0.72 of frame width (238-615 px of 854), vertical center at y 0.925 (about 444/480 px), cap height about 0.046 of frame height (about 22 px). Style: heavy rounded bold sans with a slight forward italic slant (similar to Fredoka One / Luckiest Guy). Fill is a vertical gradient: bright yellow #FFD552 / #F9CB41 at the top, orange #E09040 / #E07A30 in the middle, red-orange #E8402E / #EB6741 at the bottom. A thin dark-red outline (#7A0008 / #5A0010, about 1.5 px at 480p) and a short 3D extrusion / drop shadow offset about 2 px down (dark crimson #8A0001 to #550006) give a raised sticker look. Letter spacing is normal; there is one space between each 'DO'.",
+ "recreateInRoblox": "SETUP: Use a dedicated close-up rig, or the real horse character, with an UpperTorso about 2.4 studs wide. The camera is Scriptable (workspace.CurrentCamera.CameraType = Enum.CameraType.Scriptable) with FieldOfView = 30. Place the camera on the chest centerline 2.5 studs in front of the chest surface, at chain height, aimed at a point 0.1 studs below the chain with a pitch of about -3 degrees. No roll. Snap to it at t=4.967 with no blend; it is a hard cut.\n\nFUR: The base chest is a MeshPart or Part in Material Fabric (or a SurfaceAppearance with a fur ColorMap and NormalMap), Color #120E0C, roughness 0.9. For the backlit stray hairs (essential to the look), parent 150-300 very thin parts (0.006 x 0.006 x 0.08-0.2 studs, Material SmoothPlastic, Color #BDBDB8) or Beams with a hair-strand texture. Angle them 10-40 degrees off vertical, pointing down and outward, concentrated just under the chain and along the collar edges. Under the backlight they read as silver strands. The neck fur at the top is the same but Color #5A4034, with a darker vertical stripe of #2A1E18.\n\nSHIRT COLLARS: Two big pointed collar flaps, MeshParts or thin WedgeParts about 1.1 x 0.45 x 0.03 studs. Run each from the bottom center up to its top corner, lying flat and slightly curled over the jacket. Material Fabric, Color #A0443A. Polka dots: a tiled Texture or SurfaceAppearance ColorMap with violet ovals #7A3E9E with a teal top crescent #2E5A58, about 0.07 x 0.09 studs, staggered on a 0.25-stud grid. A diagonal twill NormalMap sells the fabric. Add a small fold/notch near the frame-left collar tip.\n\nJACKET: Shoulder and side panels in SmoothPlastic or a SurfaceAppearance with roughness 0.3 for the satin sheen, metalness 0, Color #1E266E.\n\nCHAIN: Build a Cuban chain of 13 links along a U-shaped arc about 0.97 studs wide, sagging about 0.3 studs at the center and wrapping back around the neck on the character's left (frame-right). Each link is a MeshPart torus flattened to about 0.10 x 0.13 x 0.04 studs, twisted 45 degrees, alternating orientation so neighbors interlock. Material Metal or Foil with Color #D4AF37, or a SurfaceAppearance with metalness 1, roughness 0.12, Color #E0B85A. Weld all links to a hidden 'ChainRoot' part attached to the UpperTorso by a Motor6D, so the hop and lag can be animated separately.\n\nSPARKLES: Put an Attachment on every link with a ParticleEmitter using a 4-point star texture. Settings: LightEmission 1, LightInfluence 0, Color #FFF6D8, Size NumberSequence 0 to 0.06 to 0 over the lifetime, Lifetime 0.1-0.25, Rate 3-5 per link, Speed 0, Rotation 0 or 45, ZOffset 0.2. Call :Emit(2) on several links at 5.041 (beat 10) for the glint burst. For the bloom hotspot, add a Neon sphere (size 0.08) or a soft-glow ParticleEmitter (Size 0.25, Transparency 0.3, LightEmission 1, Color #FFF1D0) at the frame-left end of the chain, plus a PointLight there (Color #FFE2A8, Brightness 2, Range 1.5).\n\nLIGHTING: Lighting.Technology = Future. Set Lighting.ClockTime and GeographicLatitude so the sun is behind the horse at upper frame-left, about 130 degrees from the camera axis and 40 degrees elevation. Brightness 3.5. Ambient #141A33, OutdoorAmbient #3E4C78. EnvironmentDiffuseScale 1, EnvironmentSpecularScale 1 (the chain needs sky reflections). Add a SpotLight kicker behind frame-right aimed at the right collar's inner edge: Color #FFD9C0, Brightness 3, Angle 30. Add an Atmosphere (Density 0.3, Haze 1.5, Color #B8CCE0).\n\nPOST: BloomEffect Intensity 1.2, Size 36, Threshold 0.9. ColorCorrectionEffect Contrast 0.3, Saturation 0.25, Brightness -0.05, TintColor #FFF6EE. DepthOfFieldEffect FocusDistance 2.5, InFocusRadius 0.5, NearIntensity 0.6, FarIntensity 0.4. SunRaysEffect Intensity 0.03.\n\nANIMATION: The rest of the frame is static, so animate only these. (a) UpperTorso root offset keyframes, in studs (+Z = toward camera): 4.967 (0,0,0); 5.033 (0,+0.01,+0.015); 5.10 (0,-0.008,-0.055); 5.167 hold; 5.333 (0,-0.006,-0.03); 5.367 (0,0,0); 5.40 (0,+0.001,+0.025) with chest pitch -1 degree; 5.467 (0,-0.005,-0.025); 5.533 (0,-0.009,-0.05) with pitch +1 degree; 5.633 (0,-0.006,-0.02); 5.867 (0,-0.006,-0.015). Use Cubic easing, Quad-out into the dips. (b) ChainRoot Motor6D offset, relative to the torso: 5.033 +0.01 Y; 5.10 -0.014; 5.333 -0.01; 5.367 -0.005; 5.40 +0.04 Y with roll +4 degrees (raising the character's-left end by about +0.065); 5.433 +0.02, roll +1; 5.467 0, roll -1; 5.533 -0.012, roll -2; 5.633 -0.006; 5.867 -0.005. Use Back/Elastic out for the landing overshoot. Alternatively, put the push/pull on the camera instead: CFrame dolly of -0.055 studs at 5.10 and -0.05 at 5.533, +0.025 at 5.40.\n\nTo mimic the 24 fps source cadence, you can step the animation at 24 fps.\n\nSUBTITLE: A ScreenGui TextLabel, AnchorPoint (0.5,0.5), Position UDim2.fromScale(0.5,0.925), Size UDim2.fromScale(0.46,0.06), TextScaled, Text 'DO DO DO DO DO DO DO DO'. Font: FontFace with Fredoka One or Luckiest Guy, Bold, Italic style. Add a UIGradient with Rotation 90 and Color sequence #FFD552 to #E8902E to #E8402E, and a UIStroke with Color #7A0008, Thickness 2. Behind it, a duplicate label offset (0,2) px with TextColor #8A0001 for the extrusion. Keep it visible across the cut without re-animating."
+}

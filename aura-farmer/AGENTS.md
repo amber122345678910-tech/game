@@ -94,3 +94,14 @@ return {
 * Трон стоит на подиуме (верх подиума Y=0.8, подиум выступает вперёд до z≈-3.5, по ширине x±4) — стопы сидящего коня стоят на подиуме.
 * Трон в (0,0,0), лицом в −Z: **верх сиденья Y=2.2**, сиденье z∈[-1.3,0.6], ширина 3.2; спинка z≈0.6…1.1 до Y≈8.5, корона сверху до Y≈10.5; подлокотники x=±1.9, верх Y≈3.4. Золотая резная рама, красный бархат.
 * Прожектор сверху (≈ (0,30,-2)) вниз на трон + видимый конус света (Beam), пылинки, золотые искры.
+
+## Проверенные факты Roblox (исследование, октябрь 2026)
+
+* Лучший свет: `Lighting.LightingStyle = Realistic` + `PrioritizeLightingQuality = true` (уже в файле). `Technology` устарел.
+* Дальность локальных источников (Point/Spot/SurfaceLight) — максимум **120 студов**; Angle до 180. Тени от локальных источников только в Realistic.
+* `ShadowSoftness` работает только в Realistic. `EnvironmentSpecularScale = 1` важен для золота/металла.
+* Только один BlurEffect рисуется (самый большой Size). Постэффекты: Bloom, Blur, ColorCorrection, ColorGrading, DepthOfField, SunRays. Своих шейдеров нет (рыбий глаз — только широким FOV).
+* `Terrain.Decoration` (анимированная трава на материале Grass) не меняется скриптами — задана в файле.
+* Частицы: встроенные текстуры `rbxasset://textures/particles/sparkles_main.dds`, `fire_main.dds`, `smoke_main.dds`, `forcefield_glow_main.dds`, `explosion01_core_main.dds`, а также `rbxasset://textures/sparkle.png`, `glow.png`, `whiteCircle.png`. `ParticleEmitter.LightInfluence` у созданного кодом = 0 (светится сам), `LightEmission = 1` — аддитивно.
+* Beam для светового столба: `FaceCamera = true`, `LightEmission = 1`, `LightInfluence = 0`, прозрачность через NumberSequence; Attachment0/1 должны быть в Workspace.
+* KeyframeSequence: сглаживание позы действует на сегмент ОТ этого ключа к следующему; Weight=0 — контейнер; CubicV2 In/Out — как TweenService.

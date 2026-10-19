@@ -1,0 +1,310 @@
+{
+ "shot": "S03_trio",
+ "start": 2.7,
+ "end": 3.867,
+ "summary": "Hard cut in at 2.700s (30fps frame all_0082) from the gold \"A\" belt-buckle close-up. Hard cut out after frame all_0116 (3.833s), to the horse shot at 3.867s. This is a frontal, near-static medium shot on a sunny wide beach. The man (center, foreground) holds silver sunglasses horizontally in front of his chest and lip-syncs \"THE AURA FARMER\" straight into the lens. Two women stand ~4 studs behind him and ~4 studs to each side, forming a triangle with him at the front point. At the start they wear red sunglasses. Between 2.77s and 3.07s each grips her glasses at the temples, pulls them down past her face and makes an awed open-mouth \"O\". She then holds the glasses horizontally at waist or lower-chest height for the rest of the shot. The right woman leads the pull by about 1 frame. The glasses-down move centers on the off-beat at 2.846s and lands in the hold on beat 3.090s. The man's lip-sync goes: \"THE\" at 2.70, \"AU\" (huge open mouth, eyes squeezed) at 2.80-3.00, \"ra\" at 3.03-3.17, a pursed-lip \"F\" frown at 3.23-3.30, \"AR\" at 3.37-3.50, \"M\" lips together at 3.567 (on beat 3.578) and \"ER\" from 3.60 to 3.83. Over the last 0.25s he leans toward the lens. A static yellow-to-orange italic subtitle \"THE AURA FARMER\" stays on screen for the whole shot.",
+ "camera": {
+  "framing": "Medium shot (waist-up) of the man, centered. The frame top cuts ~0.3 studs above his hair (hair top at ~9% from frame top). The frame bottom cuts across his hips/belt line. His head spans y=9%..43% of frame height (head incl. hair ~1/3 of the frame height). His elbows nearly reach x=29% and x=69% of frame width. The left woman is at x~16% of frame width, visible from head (top at y~32%) to mid-thigh, which is cut by the frame bottom. The right woman is at x~85%, visible from head (top at y~27%) to upper thighs. The horizon/boulevard line sits at y~40% of frame (190/480 px) and crosses the man's chin and the women's eyes. Sky fills the top ~38% of the frame and sand the bottom 60%. Aspect ratio 16:9.",
+  "position": "Camera on the subjects' front axis, square to the man. Distance from the man's face ~3.8 studs (about 0.7 man-heights; real world ~1.25 m). Distance to the two women ~7.8 studs (they appear at half the man's head size). Camera height ~4.75 studs above the sand, which is the man's chin height: the horizon crosses his chin. Horizontal angle 0 deg: dead-on frontal, no yaw offset. Suggested Roblox placement: camera at (0, 4.75, 0) looking at (0, 4.4, -3.8). Man's root at (0, 0, -3.8). Left woman at (-4.2, 0, -7.8). Right woman at (+4.3, 0, -7.8).",
+  "angle": "Pitch about -5 deg (looking slightly down: the horizon sits about 50 px above frame center). Yaw 0. Roll 0 (horizon level; the buildings' verticals are straight). Not a low or high angle in feel: it is eye-level with the man's chin.",
+  "fovVerticalDeg": 48,
+  "lensNotes": "Moderately wide lens, ~24-28 mm full-frame equivalent (vertical FOV ~46-50 deg). The camera is close to the man, so his head and hands look slightly enlarged relative to the women behind him (mild near-field wide-angle exaggeration). Straight lines show no visible barrel distortion. Depth of field is deep, like a phone or small sensor: the man, the women and the far buildings are all acceptably sharp, with no background blur, no bokeh and no focus pull. There is slight video-compression softness and mild sharpening.",
+  "movement": [
+   {
+    "t": 2.7,
+    "description": "Cut in. The camera is effectively locked off (gimbal/steady handheld). Framing as described."
+   },
+   {
+    "t": 2.9,
+    "description": "A very slow push-in begins. The background expands outward from center by ~1 px per 0.1 s: the right-side buildings drift right and the left sand drifts left. This is equivalent to ~0.5% scale by 3.0s."
+   },
+   {
+    "t": 3.2,
+    "description": "Push-in reaches ~1% scale (background edges moved ~2 px outward on an 854 px frame). There is a tiny horizontal drift of ~1 px toward frame-right (camera yaw <0.1 deg left)."
+   },
+   {
+    "t": 3.833,
+    "description": "Push-in ends at ~1.5% total scale (an FOV change of 48 -> ~47.3 deg, or a 0.06-stud dolly forward). Over the last 0.25 s the man also leans toward the lens, so he grows ~4% in frame (head top rises from y=47 px to y=40 px). Cut at 3.867s."
+   }
+  ],
+  "shake": "Minimal. Sub-pixel to 1 px micro-drift, with no visible handheld jitter, no whip pans and no zoom snaps. In Roblox, add only a very subtle Perlin noise: rotation amplitude ~0.05 deg at ~1-1.5 Hz, translation <0.01 studs."
+ },
+ "subjects": [
+  {
+   "who": "Man (lead singer), center foreground",
+   "appearance": "Adult male, slim/lean build with defined but not bulky arms, ~5.5 studs tall. Fair, pinkish-beige skin: lit #DDBFB2, mid #C19488, shadow side #8A5E52, deep shadow (his right forearm) #3A2A26. Hair is dark brown, nearly black (#2A2022, highlights #4A3A34): short sides with a voluminous swept-up and back quiff on top (~0.35 studs tall above the forehead), slightly messy. Thick dark eyebrows (#2A1E1C). He has a full short boxed beard plus mustache, dark brown #3A2826, trimmed close on the cheeks and fuller on the chin and upper lip. Eyes are dark. Clothing: a plain white ribbed tank top / A-shirt (#E8E4EA lit, #C8C0CA shaded) with deep armholes, a scooped neckline ~0.4 studs below the collarbones, and thin straps. The lower body is not visible (cropped at the hips). Prop: silver metal sunglasses with oval/rounded-aviator lenses, a chrome frame (#C8CCD0) and dark smoked mirror lenses (#3A3B3E with reflections #9EA2A8), about 0.9 studs wide in Roblox scale. He holds them unfolded and horizontal by the temple ends. No visible jewelry.",
+   "placement": "Frame center, x~49% (face center at 420/854 px), with the glasses centered slightly left at x~48%. He stands ~3.8 studs from the camera, fully facing the camera (body yaw 0) and looking straight into the lens. Feet are not visible; assume he stands hip-width apart on the sand.",
+   "poseKeys": [
+    {
+     "t": 2.7,
+     "body": "Root at (0,0,-3.8), standing upright, torso facing the camera, spine flexed ~5 deg forward, shoulders slightly rounded forward. Head: yaw 0, pitch +3 deg (chin slightly up), roll -3 deg (tilted toward his own right = screen left). His RIGHT arm (screen left): upper arm hangs close to the ribs with shoulder flexion ~20 deg, abduction ~15 deg and internal rotation ~30 deg. Elbow flexed ~105 deg, so the forearm angles up and inward. The right hand sits in front of his right pec, ~0.6 studs in front of the chest at sternum height (~3.8 studs above the ground). Wrist extended ~10 deg. Hand shape: thumb and index finger pinch the end of the glasses' temple arm near the hinge, and the middle, ring and pinky fingers curl loosely toward the palm. His LEFT arm (screen right) mirrors this: shoulder flexion ~20 deg, abduction ~20 deg, elbow ~110 deg, hand ~0.05 studs higher than the right, same pinch grip. The glasses span between the hands horizontally, lenses facing up/forward, with the bar tilted ~8 deg (his right end lower). Legs straight, knees soft ~5 deg.",
+     "face": "Eyelids heavy and half closed (openness 0.45): a smug, cool look. Brows raised high with forehead wrinkles. Mouth open 0.25 for 'THE', lips slightly parted with a hint of the upper teeth."
+    },
+    {
+     "t": 2.767,
+     "body": "Same pose. The head comes back to roll -2 deg. The hands are steady.",
+     "face": "Eyes snap open wide (1.0). Brows stay raised. Mouth opens to 0.4 in an 'o' shape."
+    },
+    {
+     "t": 2.833,
+     "body": "Head pitch +5 deg (chin lifts with the vowel). Arms unchanged.",
+     "face": "Mouth 0.85, a tall vertical oval for 'AU'. Upper teeth visible, tongue low. Eyes wide, brows high."
+    },
+    {
+     "t": 2.9,
+     "body": "Head pitch +6 deg, roll +2 deg (slight tilt toward his left). Shoulders rise ~0.03 studs (effortful singing). Hands steady.",
+     "face": "Peak mouth opening 1.0: a big round 'AU' oval about 1.4x taller than wide. Eyes squeezed nearly shut (0.15), brows still raised: an ecstatic belting face."
+    },
+    {
+     "t": 2.967,
+     "body": "Head pitch +4 deg.",
+     "face": "Mouth 0.9, eyes 0.3 (still squinting)."
+    },
+    {
+     "t": 3.033,
+     "body": "Head returns to pitch 0, roll 0.",
+     "face": "Mouth 0.6, rounding into an 'o' / 'ra'. Eyes open 0.85, brows raised."
+    },
+    {
+     "t": 3.1,
+     "body": "He rotates the glasses ~8 deg in the opposite direction (his left end lower, right end higher), a fidget with both wrists. The hands stay at sternum height.",
+     "face": "Mouth 0.3, closing with lips pushed slightly forward. Eyes open."
+    },
+    {
+     "t": 3.167,
+     "body": "Same.",
+     "face": "Mouth 0.5 'a'. Brows raised, eyes open and wide."
+    },
+    {
+     "t": 3.233,
+     "body": "Head pitch -2 deg (chin slightly tucked) and roll +2 deg. Arms unchanged.",
+     "face": "Mouth fully closed (0). Lips pursed and pushed out, corners turned down: a mock-impressed 'hmm' frown, doubling as the 'F' of 'FAR'. Chin muscle bunched. Brows raised, eyes open and looking into the lens."
+    },
+    {
+     "t": 3.3,
+     "body": "Hold.",
+     "face": "Same closed, pursed, down-turned mouth. One brow (his left, screen right) slightly higher than the other."
+    },
+    {
+     "t": 3.367,
+     "body": "Head pitch +1 deg.",
+     "face": "Mouth 0.45, opening for 'AR'."
+    },
+    {
+     "t": 3.467,
+     "body": "Head pitch +2 deg. Glasses tilt back to level.",
+     "face": "Mouth 0.65, open with upper teeth visible: 'AR'. Brows raised, eyes wide."
+    },
+    {
+     "t": 3.567,
+     "body": "Hold. This lands on the beat at 3.578.",
+     "face": "Lips almost closed (0.15) for the 'M' of 'FARMER'."
+    },
+    {
+     "t": 3.633,
+     "body": "He starts leaning toward the camera: spine flexion builds from 5 to 8 deg. The elbows start spreading outward (abduction 20 to 25 deg).",
+     "face": "Mouth 0.55 'ER'. Brows raised, eyes open."
+    },
+    {
+     "t": 3.733,
+     "body": "The lean continues: root/chest move ~0.1 studs toward the camera, head ~0.15 studs closer and ~0.05 studs lower. Shoulders hunch forward.",
+     "face": "Mouth 0.6, both teeth rows partly visible. Brows lift in the middle (intense, earnest)."
+    },
+    {
+     "t": 3.833,
+     "body": "End pose. Spine flexion ~10 deg forward, head ~0.2 studs closer to the lens than at the start. Head pitch -4 deg (chin slightly down, looking up into the lens through his brows), roll -5 deg (toward his right/screen left), yaw +3 deg. Arms: shoulder abduction ~28 deg on both sides, elbows ~100 deg, both pointing out wider. The hands, still pinching the glasses, have dropped ~0.1 studs to lower-sternum height. Glasses level.",
+     "face": "Mouth 0.6 sustaining 'ER', upper and lower teeth visible. Brows raised and slightly knitted. Eyes wide, locked on the lens."
+    }
+   ],
+   "motionNotes": "The body stays almost stationary. Most of the life is in the lip-sync, eyes and brows, with a slow lean in at the end (3.63-3.83) that builds energy into the cut. Head nods follow the vowel shapes: the chin lifts on big open vowels ('AU' 2.83-2.97) and tucks on the closed 'F' (3.23). The biggest mouth opening falls on the off-beat at 2.846-2.9. The 'M' closure lands on beat 3.578. The hands fidget the glasses ~8 deg in roll around 3.1 and return to level by 3.47. There is no bounce in the knees. Use smooth ease-in-out on the head, with no overshoot."
+  },
+  {
+   "who": "Left woman (screen left, background)",
+   "appearance": "Young adult woman, slim, ~5.2 studs tall (her eye level matches the man's chin). Fair skin with warm pink undertone: lit #E2BFB0, mid #C9A799, shaded #8A6A60. Hair is chestnut / medium-dark brown (#4A362C, sunlit strands #7A5A44): a shoulder-length shaggy wolf/shag cut with curtain bangs parted in the middle and wispy pieces framing the face, a little messy. Top: white ribbed high-neck racerback crop tank (#E6E2E8, shaded #C6BCC4), cropped ~0.4 studs above the navel, so a bare midriff shows. Bottom: very dark navy/black baggy low-rise wide-leg jeans or cargos (#0A1018) with white contrast stitching (#D8D8D8) along the seams and pockets, and a red rose/flower embroidery (#C8202A) near the lower outer thigh of her own left leg (screen right). Jewelry: a long cord necklace with a round silver coin pendant (#B0B0B0) hanging at mid-chest, plus a short dark choker cord with a small charm. A silver bangle on her right wrist (screen left). A dark beaded/leather bracelet and a thin silver bracelet on her left wrist (screen right). Prop: small sunglasses with round/heart-ish rimless lenses in saturated red (#E0182A, semi-transparent) and a thin silver wire frame, ~0.75 studs wide in Roblox scale.",
+   "placement": "Screen left at x~16%, standing ~7.8 studs from the camera, ~4.2 studs left of and ~4 studs behind the man. Her torso faces the camera, turned ~8 deg toward the center (toward the man and her left). Her face looks straight at the camera. Visible from her head to mid-thigh. The man's right elbow nearly overlaps her left hip region in frame but does not occlude her.",
+   "poseKeys": [
+    {
+     "t": 2.7,
+     "body": "Standing upright, weight slightly on her left leg (hip shifted ~0.05 studs toward screen right). Both hands are up at her temples holding the red glasses on her eyes. Right arm (screen left): shoulder flexion ~30 deg, abduction ~25 deg, elbow flexed ~145 deg. The forearm is nearly vertical with the elbow low, about at her bra line and slightly out from the ribs. The hand is beside her right temple. Wrist extended ~15 deg. Hand shape: thumb and index pinch the temple arm of the glasses just behind the hinge, while the middle, ring and pinky are extended and spread in a fan (splayed 'jazz' fingers). Left arm (screen right) mirrors this: flexion ~30 deg, abduction ~25 deg, elbow ~145 deg, hand at her left temple, same splayed pinch. Head: yaw 0, pitch 0, roll +4 deg (tilted toward her left / screen right).",
+     "face": "Eyes hidden behind the red lenses. Cool, neutral expression with lips slightly parted (mouth 0.2). Brows mostly hidden."
+    },
+    {
+     "t": 2.8,
+     "body": "Same. The glasses start to slide a hair down (0.02 studs).",
+     "face": "Mouth 0.3."
+    },
+    {
+     "t": 2.833,
+     "body": "The pull begins: the elbows drop ~0.05 studs and the glasses reach the bridge or tip of the nose. The fingers stay splayed.",
+     "face": "Eyes become visible over the rims, wide. Brows rising. Mouth 0.45 'o'."
+    },
+    {
+     "t": 2.867,
+     "body": "The glasses are now over her mouth and upper lip (dropped ~0.25 studs). Elbow flexion ~140 deg, shoulder flexion ~25 deg. The hands are at cheek level, palms facing each other, fingers fanned.",
+     "face": "Eyes wide open (1.0), brows raised high, mouth 0.55 'O' (awe)."
+    },
+    {
+     "t": 2.9,
+     "body": "Glasses at chin level (dropped ~0.4 studs). The hands pass the jaw, slightly forward of the face (~0.15 studs). Elbow flexion ~130 deg, elbows moving out (abduction 30 deg).",
+     "face": "Mouth 0.7, a round 'O' of awe. Brows high. Head pitch +3 deg."
+    },
+    {
+     "t": 2.933,
+     "body": "Glasses at collarbone/neckline (dropped ~0.6). Hands in front of the upper chest, fingers splayed upward. Elbow flexion ~125 deg. Head pitch +5 deg (chin up), roll -3 deg (toward her right / screen left).",
+     "face": "Mouth 0.8, wide 'O', jaw dropped. Eyes wide, brows highest: peak awe face."
+    },
+    {
+     "t": 2.967,
+     "body": "Glasses at mid-chest (dropped ~0.75). Elbow flexion ~120 deg, hands ~0.2 studs in front of the chest.",
+     "face": "Mouth 0.8 'O'."
+    },
+    {
+     "t": 3.033,
+     "body": "Glasses at the lower chest (dropped ~1.0). Elbow flexion ~105 deg. Head comes back to pitch 0.",
+     "face": "Mouth 0.6 'o', eyes wide."
+    },
+    {
+     "t": 3.1,
+     "body": "Lands in the hold on beat 3.090. The glasses are held horizontally across the hem of her crop top / lower ribs (~2.9 studs above the ground, dropped ~1.15 from the start), ~0.25 studs in front of her body. Upper arms hang by her sides, slightly forward: flexion ~10 deg, abduction ~15 deg. Elbows flexed ~95 deg, forearms roughly horizontal pointing forward and inward. Wrists extended ~30 deg so the splayed fingers point up and out. Pinch grip on the temple ends: thumb and index pinch, middle/ring/pinky fanned upward like an 'OK' sign or jazz hand. There is a tiny overshoot: the hands dip ~0.03 studs below the hold and settle back up by 3.133.",
+     "face": "Mouth 0.3. Brows still raised."
+    },
+    {
+     "t": 3.167,
+     "body": "Hold. Head roll -5 deg (toward her right / screen left).",
+     "face": "Mouth 0.35 'o'."
+    },
+    {
+     "t": 3.3,
+     "body": "Hold. Head roll -6 deg, slight chin tuck -2 deg.",
+     "face": "Lips barely parted (0.15). Neutral, slightly stunned face. Brows slightly raised."
+    },
+    {
+     "t": 3.433,
+     "body": "Hold. The hands rock the glasses a few degrees.",
+     "face": "Mouth 0.5 'o' (singing along / awe)."
+    },
+    {
+     "t": 3.567,
+     "body": "Hold.",
+     "face": "Mouth 0.35."
+    },
+    {
+     "t": 3.7,
+     "body": "Head roll -7 deg. Her upper body sways ~0.05 studs toward screen left.",
+     "face": "Mouth 0.5 'o', brows raised, eyes on the lens."
+    },
+    {
+     "t": 3.833,
+     "body": "End: same waist-level hold, fingers splayed, head roll -7 deg, body facing the camera.",
+     "face": "Mouth 0.45 'o', eyes wide, brows raised."
+    }
+   ],
+   "motionNotes": "The glasses-down pull takes ~0.27 s (2.83 -> 3.10) with an ease-in-out cubic curve, fastest at ~2.90-2.97 (about 0.5 studs per frame-pair). She follows the right woman by ~1-2 frames. The splayed fingers stay fanned the whole time: a stylized 'wow' hand. The jaw drop into a big 'O' peaks at 2.93-2.97, just after the off-beat at 2.846. The hands settle on beat 3.090 with a small overshoot. After that, only head tilts and mouth shapes move. There is no knee bounce."
+  },
+  {
+   "who": "Right woman (screen right, background)",
+   "appearance": "Young adult woman with an athletic, broader-shouldered build and toned arms, ~5.2 studs tall. Tan/olive-brown skin: lit #B07A62, mid #8F6A5C, shadow #604A42. Hair: short, voluminous, tight black curls (#141012, highlight #2E2622), ear-length, sitting high on top. Thick dark brows. Top: classic white ribbed tank top / A-shirt (#E6E4EC, shaded #9F9CB5), fitted, tucked at the waistband. Bottom: black track pants or shorts (#0A0C12) with white side stripes (#E8E8E8, 2-3 thin stripes) down the outer seams and a dark waistband. Jewelry: a thin gold chain necklace (#C9A24A) with a small pendant at the sternum and a silver bracelet on her left wrist (screen right). Prop: slim narrow rectangular 'Matrix'-style sunglasses with bright red frames and lenses (#E8202E), very narrow (lens height ~0.12 studs), ~0.8 studs wide.",
+   "placement": "Screen right at x~85%, standing ~7.8 studs from the camera, ~4.3 studs right of and ~4 studs behind the man. Body square to the camera, feet ~shoulder-width apart. Face looks at the camera. Visible from her hair to her upper thighs.",
+   "poseKeys": [
+    {
+     "t": 2.7,
+     "body": "Upright stance. Both hands at her temples holding the red slim glasses on her eyes, with her ELBOWS HIGH AND WIDE. Right arm (screen left): shoulder abduction ~80 deg (elbow almost at shoulder height, pointing out to the side), flexion ~20 deg forward, elbow flexed ~120 deg, forearm angled up and inward to the temple. Left arm (screen right) mirrors this (abduction ~80, elbow ~120). Hands: thumb and index pinch the glasses' arms near the hinges, the other fingers loosely curled. Head pitch -5 deg (slightly down), yaw 0, roll 0. Her forearms partly frame and occlude the sides of her face.",
+     "face": "Eyes hidden behind the red bar. Mouth closed and neutral, cool."
+    },
+    {
+     "t": 2.767,
+     "body": "The pull begins: the glasses drop from her eyes to the bridge of the nose (-0.08 studs). Elbows still high (abduction ~78).",
+     "face": "Eyes start to show, brows rising."
+    },
+    {
+     "t": 2.8,
+     "body": "Glasses at the nose tip / upper lip (-0.2 studs). Abduction ~75 deg, elbow ~118 deg.",
+     "face": "Eyes wide (0.9), brows raised, mouth 0.2."
+    },
+    {
+     "t": 2.833,
+     "body": "Glasses over the mouth (-0.25 studs).",
+     "face": "Mouth opening behind the glasses (0.4)."
+    },
+    {
+     "t": 2.867,
+     "body": "Glasses at chin / upper neck (-0.45 studs). Shoulder abduction ~60 deg, elbow ~110 deg. The hands move ~0.1 studs forward of her face.",
+     "face": "Mouth 0.6, 'O' of awe. Brows high, eyes wide."
+    },
+    {
+     "t": 2.9,
+     "body": "Glasses at the collarbone / top of the tank neckline (-0.75 studs), stretched taut between the hands. Abduction ~45 deg, elbows still out wide. Head pitch 0.",
+     "face": "Mouth 0.8 'O', jaw dropped, brows highest, eyes wide."
+    },
+    {
+     "t": 2.933,
+     "body": "Hands at the sides of her chest, in front of the pecs (-1.0 studs). Abduction ~35 deg, elbow ~100 deg. Fingers loosely open.",
+     "face": "Mouth 0.7."
+    },
+    {
+     "t": 2.967,
+     "body": "Hands at lower-rib level (-1.2 studs).",
+     "face": "Mouth 0.6 'O'."
+    },
+    {
+     "t": 3.033,
+     "body": "Settles into the hold at her waist / tank-top tuck line, ~2.8 studs above the ground (-1.35 studs from the start). The glasses are held horizontally and stretched between her hands, ~0.3 studs in front of her stomach. Upper arms abducted ~20 deg and flexed ~10 deg, elbows bent ~95 deg and pointing slightly out and back. Forearms horizontal, angled inward. Pinch grip at both temple tips, other fingers loosely curled. A slight overshoot dip of ~0.03 studs settles by 3.1 (beat 3.090).",
+     "face": "Mouth 0.55, brows raised."
+    },
+    {
+     "t": 3.167,
+     "body": "Hold. Head yaw -5 deg (glancing slightly toward screen left / the man), pitch -2 deg.",
+     "face": "Mouth closed (0.05), neutral and serious, brows slightly raised."
+    },
+    {
+     "t": 3.3,
+     "body": "Hold. Head yaw back to 0.",
+     "face": "Mouth 0.15, slight part. Eyes on the lens."
+    },
+    {
+     "t": 3.433,
+     "body": "Hold.",
+     "face": "Mouth 0.45, round 'o' (awe / singing along). Brows raised."
+    },
+    {
+     "t": 3.567,
+     "body": "Hold. Head roll +3 deg (toward her left / screen right).",
+     "face": "Mouth 0.45 'o'."
+    },
+    {
+     "t": 3.7,
+     "body": "Hold. Head roll +4 deg, and her upper torso leans ~3 deg toward the camera.",
+     "face": "Mouth 0.3."
+    },
+    {
+     "t": 3.833,
+     "body": "End: glasses still at the waist, elbows out ~20 deg, head roll +4 deg, facing the camera.",
+     "face": "Mouth 0.4 'o', brows raised, wide-eyed awe."
+    }
+   ],
+   "motionNotes": "She starts the pull ~1-2 frames before the left woman (2.767 vs 2.833). Her movement reads bigger because her elbows begin high and wide and sweep down and in, a 'wing-closing' arc. The descent runs ~2.77 -> 3.03 with ease-in-out, fastest around 2.87-2.93, and settles with a tiny overshoot on beat 3.090. After that she stays nearly frozen (holding the glasses like a bar) with only mouth and head-tilt changes. There is no bounce."
+  }
+ ],
+ "set": "A wide, flat, dry sandy beach on a sunny day (a North-Sea city-beach look, like Scheveningen). The sea is not visible; it would be behind the camera. Ground: flat tan sand (#B5A18B where lit in the midground, #A89685 far, #7E6E5B for the nearer slightly shaded sand at the frame bottom). On the left half, long parallel tractor/tire ruts (darker grooves #6E604F, ~0.3 studs wide, in pairs ~1 stud apart) run diagonally from the bottom-left foreground toward the center-right distance. On the right half the sand is churned with many footprints and lumps, each with a small dark shadow (#5A4C3E) on its far side, about 0.5-1 stud scale. Background along the horizon (all at real-world 100-400 m, Roblox ~300-1200 studs): far left, a few tiny distant people (silhouettes ~0.1 of frame height or smaller) and a lamppost/flagpole with a small round sign. Left-center (x 20-32% of frame): a large white beach pavilion with a wavy, tent-like scalloped white roof (#E8E8EC), ~60x12 studs, at ~500 studs. Center: a long low row of beach-club pavilions with turquoise/blue awnings and parasols (#3F7C96, #2E6A88) and white walls, spanning x 33-75% of frame, plus a tall thin white flagpole/antenna directly behind the man's left shoulder (x~41%). A small group of people sits on the sand in the midground just left of the man (x~38%, y~43%; ~40 studs away), and a lone person stands behind the man's right side (x~54%). Right (x 70-100% of frame): a skyline of mid-rise seafront buildings at ~700-900 studs. A dark teal-green glass tower (#2E5A5E, ~8 floors, ~110 studs tall), a white slab building (#D8D8D4) beside it, then beige/gray 10-12 floor apartment blocks with horizontal balcony bands (#8E8C80 and #B4AE9E) at ~120-130 studs tall, plus a few low white/gray buildings at their base. Sky: clear blue, deep at the top (#4F7D9C) fading lighter toward the horizon (#8FA6B8, slightly hazy). Thin wispy cirrus streaks run diagonally from the upper-left toward the center at ~25% height, plus a faint streak at the upper right. No sun in frame.",
+ "lighting": "Bright, clear-sky midday or early-afternoon sunlight. Key: hard direct sun from behind the camera and to camera-right (sun azimuth ~30-40 deg right of the camera's view axis, behind the camera), elevation ~45-50 deg. It front-lights all three subjects with crisp shadows. The man's screen-right side (his left cheek and left arm) is brightly lit (#DFCDCC); his screen-left forearm and the side of his nose fall into shade (#3A2A26 to #8A5E52). The underside of his chin and his eye sockets get soft shadow from the high sun. The white tank tops are near clipping (#E6E4EA) with soft gray-violet shading in the folds (#C0B7C0). Fill: strong blue sky ambient plus bounce from the bright sand (warm), so shadows are open, not black, with a slightly cool cast. There is no distinct rim light. Color temperature is daylight ~5600K. Skin reads warm/pinkish and the sky slightly teal-blue (graded), with the sand a neutral-warm tan. Exposure is bright, with highlights on whites and skin near the top of the range. Contrast is medium-high and the blacks are crushed (the black pants and shorts read #05080E with no detail). Saturation is moderate and slightly muted/filmic; the only strong saturated accents are the red sunglasses (#E0182A) and the subtitle. No lens flare and no visible bloom beyond a slight glow on the white tank tops.",
+ "effects": [
+  {
+   "t": 2.7,
+   "description": "Hard cut in from the previous shot (gold 'A' belt-buckle close-up on a purple suit, subtitle 'DO DO DO...'). No transition, flash or blur. The subtitle switches to 'THE AURA FARMER' on the same frame."
+  },
+  {
+   "t": 2.7,
+   "description": "The subtitle overlay 'THE AURA FARMER' is visible for the whole shot, fully static (no pop, scale or shake)."
+  },
+  {
+   "t": 2.9,
+   "description": "A subtle digital/optical push-in starts (~1.5% scale by 3.83). It is almost imperceptible and optional."
+  },
+  {
+   "t": 3.867,
+   "description": "Hard cut out to the next shot (cartoon horse in a purple suit and sunglasses, subtitle back to 'DO DO DO DO DO DO DO DO DO')."
+  }
+ ],
+ "subtitle": "\"THE AURA FARMER\" is shown for the whole shot, from 2.700s (first frame) to 3.833s (last frame). It disappears at the cut at 3.867s, when the next shot's subtitle 'DO DO DO DO DO DO DO DO DO' appears. Style: all caps in a heavy condensed italic sans, similar to Impact Italic or 'Bangers'. Fill is a vertical gradient from bright yellow (#FFE23A) at the top through orange (#FFA010) to orange-red (#FF5A00) at the bottom. A dark crimson (#9A0F12) 3D extrusion / drop shadow sits offset ~2 px right and ~3 px down (on a 480p frame), with a thin dark-red outline. Placement: bottom center, horizontally centered at ~50.5% of frame width, spanning ~30% of the frame width (x 35.5%-66%). Cap height ~4.6% of frame height; baseline at ~94% of frame height (cap tops at ~89.5%). It overlaps the man's lower tank top. There is no background box.",
+ "recreateInRoblox": "WORLD: Use a large flat Terrain or Part floor with Material=Sand, Color #B5A18B. Add a slight darker variation near the camera (#8A7A66) using a second large Part or Terrain paint. Make tire ruts from long thin Parts (0.3 x 0.05 x 60 studs, Sand, Color #6E604F), sunk slightly, in pairs 1 stud apart, rotated ~25 deg so they run from the lower-left foreground toward the center-right distance. Scatter 40-80 small squashed spheres/wedges (0.4-1 stud, Sand #A08C76) on the right half for footprint lumps. Background, placed far away so the camera sees no parallax: at ~500 studs left-center, a white pavilion built from several half-cylinders/wedges with a scalloped roof (white SmoothPlastic). From x -150..+250 at ~600 studs, a row of low white boxes with turquoise awnings (#3F7C96 wedge parts) and some parasols. A thin tall white cylinder flagpole about 30 studs behind the man's left shoulder line. At ~800 studs to the right, boxes for buildings: a teal glass tower (Glass material, #2E5A5E, 40x110x40 studs), a white slab (#D8D8D4) and beige apartment blocks (#B4AE9E, 120-130 studs tall) with a window/balcony SurfaceAppearance or decal. Add a few tiny R15 dummies far away as beachgoers. LIGHTING (Lighting service): Technology=Future. ClockTime ~13.5. Adjust GeographicLatitude/rotation so the sun sits behind the camera and ~35 deg to its right at ~45-50 deg elevation. Brightness 3-3.5, Ambient #6E7480, OutdoorAmbient #8C96A6, EnvironmentDiffuseScale 1, EnvironmentSpecularScale 0.6, GlobalShadows on, ShadowSoftness 0.1 for crisp sun shadows. Atmosphere: Density 0.28, Offset 0.1, Color #C7D3DC, Decay #8FA6B8, Glare 0, Haze 1.2. Sky: a clear blue skybox with faint cirrus, CelestialBodiesShown off, or keep the sun out of view. POST: ColorCorrectionEffect with Brightness 0.03, Contrast 0.18, Saturation -0.08, TintColor #FFF5EE (warm skin, slightly muted). BloomEffect Intensity 0.35, Size 24, Threshold 0.92 (a slight glow on the white tank tops). SunRaysEffect off or Intensity 0.02. Add no DepthOfField: the shot has deep focus. CHARACTERS (R15, scale to ~5.5 studs for the man and ~5.2 for the women, so the women's eyes line up with the man's chin): Man: fair skin #DDBFB2, a dark brown quiff hair accessory #2A2022, a dark short beard/mustache accessory #3A2826, and a white ribbed tank top as a Classic Shirt or layered clothing #E8E4EA. Prop: silver oval sunglasses (thin cylinder rims with Metal material #C8CCD0, Reflectance 0.3; lenses as thin discs, Glass/SmoothPlastic #3A3B3E, Reflectance 0.35, ~0.9 studs wide), welded/Motor6D'd to his RightHand with the other end aligned to the LeftHand. Left woman: fair skin #E2BFB0, a brown shag hair accessory with curtain bangs #4A362C, a white crop racerback tank, dark navy baggy jeans #0A1018 with white stitch lines and a red rose decal, a coin-pendant necklace, bracelets. Right woman: tan skin #B07A62, a short black curly hair accessory #141012, a white A-shirt, black track pants with white side stripes, a gold chain #C9A24A. Women's props: left woman, small round red-lens glasses (lenses Transparency 0.3, Color #E0182A); right woman, slim red rectangular bar glasses #E8202E. Attach each pair to the head (Motor6D) for 2.70-2.80, then switch to RightHand from 2.80 onward. Do this with two welds and toggle Enabled, or animate a Motor6D on the RightHand. POSITIONS: man root at (0,0,-3.8) facing +Z (toward the camera); left woman at (-4.2,0,-7.8), yawed 8 deg toward center; right woman at (4.3,0,-7.8), facing the camera. CAMERA: Workspace.CurrentCamera, CameraType=Scriptable, FieldOfView=48 (vertical), CFrame = CFrame.lookAt(Vector3.new(0,4.75,0), Vector3.new(0,4.4,-3.8)) for a ~5 deg down pitch. Over 2.70-3.83, tween FieldOfView 48 -> 47.3 (Sine InOut) for the 1.5% push-in. Optionally add Perlin micro-noise (0.05 deg, 1.2 Hz). ANIMATION: use the Animation Editor or Moon Animator at 30 fps, one KeyframeSequence per character, all starting at the shot start. Key the women's glasses-down pull with Cubic InOut (right woman frames 2.767-3.033, left woman 2.833-3.100), with a 1-frame 0.03-stud dip/overshoot settling on beat 3.090. Lip-sync the man with a dynamic head or FACS face controls (JawDrop, LipsTogether, LipPucker, LipCornerDepressor, BrowRaiser, EyesClosed): JawDrop 0.25@2.70, 0.4@2.77, 0.85@2.83, 1.0@2.90 (EyesClosed 0.85), 0.9@2.97, 0.6@3.03, 0.3@3.10, 0.5@3.17, 0@3.23-3.30 (LipPucker 0.6 + LipCornerDepressor 0.6), 0.45@3.37, 0.65@3.47, 0.15@3.57 (LipsTogether), 0.55@3.63, 0.6@3.73-3.83. Keep BrowRaiser ~0.8 throughout. The women's JawDrop peaks at 0.8 around 2.93-2.97. Add the man's forward lean (UpperTorso pitch +5 deg, root 0.1 studs toward the camera) over 3.63-3.83. Finger poses need a rig with finger bones (a custom R15 with finger joints or a MeshPart rig). Otherwise approximate the splayed left-woman hands with a custom hand mesh posed open. SUBTITLE: ScreenGui > TextLabel with Text='THE AURA FARMER', Font=Enum.Font.Bangers (italic, condensed), TextScaled inside a frame of Size UDim2.fromScale(0.31,0.065), AnchorPoint (0.5,0.5), Position UDim2.fromScale(0.505,0.92). Add a UIGradient (Rotation 90, ColorSequence #FFE23A -> #FFA010 -> #FF5A00) and a UIStroke (Thickness 1.5, Color #7A0A0E). Duplicate the label behind it, offset +2px/+3px, TextColor3 #9A0F12, for the 3D drop. Show it only from 2.700 to 3.867. RENDER: record at 1080p/60fps or higher with Graphics Quality 10 and export, or use a high-res capture tool. Cut hard at 3.867 to the horse shot."
+}

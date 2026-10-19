@@ -19,6 +19,25 @@ if old then
 end
 world.animSaves.Parent = ss
 
+-- Terrain со свойствами (Decoration не меняется скриптами — только в файле/Properties)
+local Loader = require("./lib/loader")
+local Config = Loader.load("src/shared/Config")
+local ws = game:GetService("Workspace")
+local terrain = ws:FindFirstChildOfClass("Terrain")
+if not terrain then
+	terrain = roblox.Instance.new("Terrain")
+	terrain.Parent = ws
+end
+for k, v in Config.Terrain do
+	terrain[k] = v
+end
+if not terrain:FindFirstChildOfClass("Clouds") then
+	local clouds = roblox.Instance.new("Clouds")
+	clouds.Cover = 0.45
+	clouds.Density = 0.55
+	clouds.Parent = terrain
+end
+
 fs.writeFile(output, roblox.serializePlace(game))
 local parts = 0
 for _, d in world.root:GetDescendants() do

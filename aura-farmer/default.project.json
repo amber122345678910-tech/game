@@ -36,20 +36,38 @@
         "ClockTime": 15.5,
         "GeographicLatitude": 30,
         "Brightness": 3.2,
-        "Ambient": [0.27, 0.29, 0.34],
-        "OutdoorAmbient": [0.59, 0.63, 0.7],
+        "Ambient": [
+          0.27,
+          0.29,
+          0.34
+        ],
+        "OutdoorAmbient": [
+          0.59,
+          0.63,
+          0.7
+        ],
         "EnvironmentDiffuseScale": 1,
         "EnvironmentSpecularScale": 1,
         "GlobalShadows": true,
-        "ShadowSoftness": 0.12
+        "ShadowSoftness": 0.12,
+        "LightingStyle": "Realistic",
+        "PrioritizeLightingQuality": true
       },
       "Atmosphere": {
         "$className": "Atmosphere",
         "$properties": {
           "Density": 0.28,
           "Offset": 0.25,
-          "Color": [0.78, 0.84, 0.91],
-          "Decay": [0.43, 0.51, 0.63],
+          "Color": [
+            0.78,
+            0.84,
+            0.91
+          ],
+          "Decay": [
+            0.43,
+            0.51,
+            0.63
+          ],
           "Glare": 0.35,
           "Haze": 1.4
         }
@@ -60,6 +78,12 @@
           "SunAngularSize": 16,
           "MoonAngularSize": 9,
           "StarCount": 3000
+        }
+      },
+      "ColorGrading": {
+        "$className": "ColorGradingEffect",
+        "$properties": {
+          "TonemapperPreset": "Default"
         }
       }
     },

@@ -1,0 +1,207 @@
+{
+ "shot": "S09_lying_grass",
+ "start": 9.533,
+ "end": 11.133,
+ "summary": "The horse lies on its belly on a sunny park lawn and faces the camera. Its chest is propped up nearly vertical. Its knees are spread wide and its lower legs are bent up, so the black boots (soles up) sit at shoulder height on both sides. Its arms reach out and back to hold its own ankles, like a wide-kneed yoga bow pose. The camera sits on the grass (about 0.7 studs high), 6 studs in front, tilted up about 8.5°. The shot opens with a whip zoom-out and heavy radial blur: at 9.533 it is an extreme close-up of the face (FOV about 15°, 2.7x tighter). By 9.633 it has snapped out to the settled full shot (FOV 40°). This is a match zoom-through from the selfie close-up in S08, which ends zooming into the face. After that the camera is locked off, with a barely visible linear zoom-out (FOV 40° to 41.3°). The body holds the pose completely still. All the motion is the lip-sync to 'I'M FEELING NO STRESS' plus small head nods. The head dips (-5° to -6.5° pitch) between beats and comes back to neutral or chin-up on beats 9.919 and 10.895. The big chin-up with a wide-open mouth on 'STRESS' is the accent. Subtitle 'I'M FEELING NO STRESS' is on screen for the whole shot. Hard cut to the gym (S10) at 11.133.",
+ "camera": {
+  "framing": "Settled (9.633-11.133): a low, front-on full shot of the horse in its lying pose. The ear tips are ~12% below the top edge (y=60/480) and the sky shows above. The gold glasses are at 26-34% frame height. The nose is at x=51%, y=37%, just above center, so the subject is centered horizontally. The jacket shoulders are at ~40% height. The two boots sit at ~38-45% height, at 25-33% (frame-left boot) and 67-74% of width (frame-right boot). The gold chain is at ~71% height. The torso disappears into the grass at ~87% height. The bottom 10% is foreground grass blades with the subtitle over them. The background is a trimmed hedge across the frame at 60-76% height, with trees above it and bright white sky. The subject's visible height from grass to ear tips is ~75% of frame height. Start of shot (9.533): extreme close-up. Glasses span 34-69% of frame width (y 6-31%), nostrils sit at ~36% height and the open mouth at 50-85%. The blue jacket shoulders and sleeves fill the left and right edges. A sliver of light-blue jeans shows at the bottom-right corner and grass at the bottom-left. 9.567: medium shot, 1.48x tighter than settled. Head from the top edge down to the chain; boots and hands at the left and right edges.",
+  "position": "World convention: horse chest center at origin. The horse faces the camera along -Z, +X = frame-right = the horse's LEFT, +Y up. Camera at (0, 0.7, -6), about 6 studs in front of the chest, almost at grass level (0.7 studs is about knee-height of the grass blades in Roblox scale). It is dead center horizontally, square to the subject, so the camera's horizontal angle is 0°. The settled look-at point is about (0, 1.6, 0). Measured subject heights from the frame: ground 0, chain ~0.7, shoulders ~2.0, glasses ~2.5, ear tips ~3.25 studs. Hedge ~40 studs behind the horse (z~+40), trees 35-60 studs, building ~70-80 studs.",
+  "angle": "Low angle, worm's-eye-lite. Pitch up ~+8.5° (the horizon sits at ~71% frame height, y~340/480). Yaw 0°, square to the subject. Roll 0° (±0.5°). During the whip zoom (9.533) the aim is ~3° higher, centered on the nose. It eases down to the settled +8.5° pitch by 9.600.",
+  "fovVerticalDeg": 40,
+  "lensNotes": "Settled lens is about 40° vertical (~33 mm full-frame equivalent), with no visible barrel distortion; the hedge line is straight. The zoom is an optical-style FOV change: subject and background scale by the same amount, so there is no dolly parallax. FOV keys: 9.533 = 15.3°, 9.567 = 27.6°, 9.600 = 38.9°, 9.633 = 40.0°, then a linear creep to 41.3° at 11.133 (a 3.5% scale-out, measured from tracked background points). Focus is on the horse at ~6 studs and the subject is crisp. Depth of field is moderate: the hedge at 40 studs is slightly soft, the trees are a bit softer but still readable. The foreground grass blades in the bottom 10% are slightly soft (near blur). Mild bloom and haze around the blown-out sky behind the head.",
+  "movement": [
+   {
+    "t": 9.533,
+    "description": "Hard cut from S08, which ended zooming into the face with radial blur at 9.467-9.5. Frame starts 2.7x tight on the face (vFOV ~15.3°), aimed ~3° above the settled pitch, centered on the nose. Strong radial zoom blur. Whip zoom-out begins immediately."
+   },
+   {
+    "t": 9.567,
+    "description": "Mid-whip: 1.48x tight (vFOV ~27.6°). Peak radial blur. Head, shoulders, arms and boot tips are visible."
+   },
+   {
+    "t": 9.6,
+    "description": "Nearly settled: 1.03x (vFOV ~38.9°). Residual radial blur at the edges only. Pitch back to the settled +8.5°."
+   },
+   {
+    "t": 9.633,
+    "description": "Settled full shot, vFOV 40°, no blur. Lock-off. The whip zoom is a strong ease-out (Quad/Expo Out) over 0.1 s. In zoom-scale terms: 2.7 -> 1.48 -> 1.03 -> 1.0."
+   },
+   {
+    "t": 9.7,
+    "description": "Small leftover settle: frame edges contract ~2 px. From here a constant, near-invisible zoom-out runs at ~0.9°/s of FOV. No pan, tilt or roll."
+   },
+   {
+    "t": 10.4,
+    "description": "vFOV ~40.7° (linear creep continues)."
+   },
+   {
+    "t": 11.1,
+    "description": "vFOV ~41.3°. Total scale-out since 9.633 is ~3.5%."
+   },
+   {
+    "t": 11.133,
+    "description": "Hard cut to S10 (gym), no transition effect."
+   }
+  ],
+  "shake": "None: tripod lock-off. The only motion is the whip zoom-out (9.533-9.633) and the slow linear zoom creep afterwards. Tracked background points show no jitter (<1 px)."
+ },
+ "subjects": [
+  {
+   "who": "Aura Farmer horse: anthropomorphic dark horse in a 70s blue disco suit (main character)",
+   "appearance": "HEAD: large, long anthropomorphic horse head, roughly 1.3 studs from jaw to poll plus 0.35-stud ears. Read like an elongated human face toward camera: ears on top, glasses, then a big dark nose pad, then a wide human-like mouth. Coat is velvety, near-black charcoal on the muzzle, jaw and neck (#1c1c1a, sheen highlights #5e584a to #8a8478 on the cheek and muzzle sides). Forehead and the band above the glasses are warm brown (#6b4a3d). Nose pad is dark gray-black (#2e2e30) with two large nostrils. Ears are upright and pointed, splayed ~10° outward each, brown (#7c5c49) with darker inner ear (#4a3a2e) and bright rim-light edges. MANE: black Elvis-style pompadour quiff (#1e1e1c, highlights #45443f) rising between the ears and swept back. EYES (behind the lenses): yellow-green irises (#b8b040) with dark pupils, heavy-lidded and cool, looking straight into the lens. MOUTH: wide human-style mouth with full rows of big square off-white teeth (#e6dcc0, shaded #cabfa0). Lips and gums are mauve-pink (#b08a84 / #99817c), dark interior (#2d1b19), tongue orange-pink (#c07850, shaded #936535). GLASSES: gold aviators with double bridge and thin gold frame (#d4b04a, highlight #f0dc8a). Yellow-amber gradient lenses (#e8bf4a at the rims, see-through amber #5a4630 over the eyes), sitting at the top of the muzzle, ~0.9 studs wide. JACKET: 70s disco/Elvis suit jacket in saturated royal periwinkle blue (mid #4a55c4, lit #8a90e8, sheen up to #d8d8f2, shadow #2b3a8c). Satin/velvet sheen, big padded shoulders, wide sleeves. It is worn open to the sternum over bare dark fur. COLLAR/LAPELS: huge spread shirt collar and lapels in brick red (#a8453f, shadow #7c3531), covered in a grid of small dark studs/dots (#3a2f40, ~0.06 studs, ~0.15 apart). NECKLACE: thick gold Cuban-link chain (#d4b84a, highlight #f0e08a, shadow #6a5a1a), ~0.12 studs thick, lying across the upper chest at y~0.7 studs. PANTS: light washed denim jeans, flared (lit #7f9bb5, mid #55708a, shadow #44616a). SHOES: black glossy leather Cuban-heel boots (#1e2124, gray sole edge #5a6062, specular #9aa0a0) with a block heel. HANDS: brown fur hands (#6a5232) with fingers. A gold wristwatch (gold band #c9a640, dark face) is on the horse's LEFT wrist (frame-right). PROPORTIONS: big head (~1/3.5 of standing height), broad shoulders (~1.9 studs across the jacket), long torso. Scale the rig to the 5.5-stud adult standard.",
+   "placement": "Centered horizontally (nose at x=51%), lying in the middle of the lawn ~6 studs from camera, facing the camera directly with the body square (yaw 0). Eyes look straight into the lens. Chest plane at z=0. The lower body is behind the chest and hidden by it (belly and hips on the grass, z 0 to +0.6). The horse's RIGHT boot and hand are on frame-LEFT and its LEFT boot and hand (with the watch) are on frame-RIGHT. Both boots sit ~1.2-1.3 studs behind the chest plane, ~1.9-2.0 studs out to each side, ~1.8 studs above the grass.",
+   "poseKeys": [
+    {
+     "t": 9.533,
+     "body": "BASE POSE, held unchanged for the whole shot. Prone 'bow' pose with knees spread wide, viewed from the front. ROOT/LowerTorso: belly and pelvis on the grass. LowerTorso pitched forward ~80° (lying, pelvis going away from camera), LowerTorso center at about (0, 0.3, 0.35). WAIST (UpperTorso vs LowerTorso): back-bent ~80° so the UpperTorso stands almost vertical. It leans back only ~8° (top away from camera), chest square to the camera, no twist or side-bend. Bottom of the jacket and chest buried at the grass line, shoulders ~2.0 studs high. Shoulders slightly shrugged/raised (+0.05 studs) by the arm position, jacket shoulder pads bunched upward. NECK: neutral, head upright. HEAD: yaw 0, pitch +1 (chin very slightly up, aimed into the lens), roll 0. RIGHT ARM (frame-left): shoulder abducted ~80° (arm ~8-10° below horizontal), swept back ~50° behind the shoulder line (horizontal extension), internally rotated so the palm faces back and in. Elbow flexed ~15-20°, pointing down and back. Forearm pronated. Wrist ~10° flexed. Hand closed in a fist grip around the right ankle just above the boot, fingers curled ~90° at each joint, thumb wrapped on the opposite side. Mostly hidden under the sleeve cuff; only brown knuckles show. Wrist target ~(-1.85, 1.75, 1.25). LEFT ARM (frame-right): mirror of the right. Shoulder abducted ~80°, swept back ~50°, elbow ~15°. Fist grip around the left ankle with the gold watch facing the camera and knuckles pointing outward. Wrist target ~(+1.9, 1.8, 1.25). HIPS: thighs run back and out from the pelvis, each abducted ~40-45° and slightly lifted (~10-15° hip extension), knees ~0.45-0.65 studs above the grass at ~(±1.4, 0.55, 1.45). The thighs are hidden behind the torso from this camera. KNEES: flexed ~100-110° so the shins rise nearly vertical, tipped ~15-20° outward at the top. The shins are the jeans visible beside the torso, from grass level near x=±1.3 up to the hands. ANKLES: right ankle ~(-1.95, 1.8, 1.3), left ~(+2.0, 1.85, 1.3). RIGHT FOOT (frame-left): dorsiflexed ~85-90° and externally rotated so the toe points horizontally outward (frame-left), sole and block heel facing the sky. LEFT FOOT (frame-right): toe points up and out ~35° above horizontal, sole facing up and inward toward the head.",
+     "face": "Mouth 0.75 open on the 'I' of 'I'M'. Jaw dropped, upper and lower teeth fully visible, tongue visible. Corners pulled wide in a big grin. Eyes on the lens, lids ~60% open, cool and confident. Glasses seated on the upper muzzle. Brows hidden behind the glasses bar."
+    },
+    {
+     "t": 9.567,
+     "body": "Base pose held. Head yaw 0, pitch +1, roll 0.",
+     "face": "Mouth 0.55 open, both teeth rows and tongue visible, wide grin corners."
+    },
+    {
+     "t": 9.6,
+     "body": "Base pose held. Head pitch 0.",
+     "face": "Mouth 0.35 open, teeth showing, closing."
+    },
+    {
+     "t": 9.633,
+     "body": "Base pose held. Head yaw 0, pitch 0, roll -1 (barely tilted to its own right).",
+     "face": "Mouth 0 (closed) for the 'M' of 'I'M'. Lips pressed with a slight pout: the pink lower-lip edge shows as a thin line. Corners slightly up in a smug smirk. No teeth."
+    },
+    {
+     "t": 9.733,
+     "body": "Base pose held. Head nods down: pitch -5° (chin toward chest), head drops ~0.03 studs. Yaw 0, roll 0.",
+     "face": "Mouth still closed (0.03), smirk."
+    },
+    {
+     "t": 9.767,
+     "body": "Head pitch -4°, starting to come back up.",
+     "face": "Mouth 0.08: lips part, upper teeth on the lower lip ('F' of FEELING)."
+    },
+    {
+     "t": 9.833,
+     "body": "Head pitch -2°.",
+     "face": "Mouth 0.33: toothy grin, both rows visible, lips pulled back wide."
+    },
+    {
+     "t": 9.9,
+     "body": "Head back to neutral: pitch 0, height back to rest. ON BEAT 9.919.",
+     "face": "Mouth 1.0 (max) on 'FEE-'. Jaw fully dropped, tall oval opening, tongue visible, lips stretched, all teeth showing."
+    },
+    {
+     "t": 9.967,
+     "body": "Head pitch 0.",
+     "face": "Mouth 0.5."
+    },
+    {
+     "t": 10.033,
+     "body": "Head pitch 0 to -0.5°.",
+     "face": "Mouth 0.22: near-closed toothy grin, teeth almost touching ('-L-' / '-NG')."
+    },
+    {
+     "t": 10.133,
+     "body": "Head pitch -1°, head 0.01 studs lower.",
+     "face": "Mouth 0.93, wide open."
+    },
+    {
+     "t": 10.2,
+     "body": "Head pitch -1.5°.",
+     "face": "Mouth 0.65."
+    },
+    {
+     "t": 10.233,
+     "body": "Head pitch -2.5°, dropping ~0.03 studs.",
+     "face": "Mouth 0.2 ('N' of NO), teeth nearly together."
+    },
+    {
+     "t": 10.333,
+     "body": "Head pitch -4°.",
+     "face": "Mouth 0.75 on 'O' of NO. Slightly rounder and narrower opening than the 'EE' shape; corners pulled in ~10%."
+    },
+    {
+     "t": 10.4,
+     "body": "Head pitch -4°. ON BEAT 10.407, in the middle of the dip.",
+     "face": "Mouth 0.78."
+    },
+    {
+     "t": 10.467,
+     "body": "Head pitch -4.5°.",
+     "face": "Mouth 0.25, closing."
+    },
+    {
+     "t": 10.6,
+     "body": "Lowest point of the nod: pitch -6.5°, head ~0.02-0.03 studs lower than rest. This is the anticipation before the accent.",
+     "face": "Mouth 0.03: teeth clenched in a huge grin for 'ST-' of STRESS. Lips pulled far back, both teeth rows touching and fully visible. Held 10.533-10.667."
+    },
+    {
+     "t": 10.7,
+     "body": "Head pitch -5°, starting to rise.",
+     "face": "Mouth 0.3."
+    },
+    {
+     "t": 10.767,
+     "body": "Head snaps up: pitch 0 to +0.5° in ~2 frames.",
+     "face": "Mouth 0.95 on 'RE-'."
+    },
+    {
+     "t": 10.833,
+     "body": "Head pitch +2°.",
+     "face": "Mouth 0.88."
+    },
+    {
+     "t": 10.9,
+     "body": "Head pitch +3° (chin up). ON BEAT 10.895: the accent.",
+     "face": "Mouth 0.7."
+    },
+    {
+     "t": 11,
+     "body": "Head pitch +5°, head ~0.03 studs higher than rest.",
+     "face": "Mouth 0.65, 'E' held."
+    },
+    {
+     "t": 11.1,
+     "body": "Head pitch +6° (chin up, a proud 'aura' look), yaw 0, roll 0. Body still in the base pose. Cut at 11.133.",
+     "face": "Mouth 0.75 on '-ESS', held open with a toothy grin, tongue visible. Eyes still on the lens."
+    }
+   ],
+   "motionNotes": "The whole body (torso, arms, hands, legs, boots) is locked in the pose. Once you correct for the camera zoom, tracked shoes, hands, shoulders and chain move less than 1 px, so do not add bounce. All the performance is in the head and mouth. 1) A slow head nod at half-tempo groove. Dips: -5° around 9.73, -4° through 10.3-10.5, deepest -6.5° at 10.6. Recoveries: back to 0 on beat 9.919, then up to +6° chin-up through beat 10.895 into the cut. Use smooth sine easing; vertical head travel is tiny (±0.03 studs). The rise at 10.73-10.77 is fast (2 frames) and reads as the accent on 'STRESS'. The clenched-teeth dip just before it (10.53-10.67) is the anticipation. 2) Lip-sync to 'I'M FEELING NO STRESS': I 9.533-9.6, M closed 9.633-9.733, F 9.767, EE 9.87-9.93, L/NG 10.033, open 10.1-10.2, N 10.233, O 10.3-10.43, ST clenched grin 10.53-10.67, RE-ESS open 10.73-11.1. The jaw opens and closes fast (1-2 frames at 30 fps) and the mouth keeps a wide grin shape throughout. 3) No blinks, no ear flicks, no yaw or roll (stays within ±1°). Glasses are rigid to the head. 4) Optional, for CG life: an almost invisible breath (0.5° chest rise, 2 s cycle) and very slight mane and grass wind."
+  }
+ ],
+ "set": "Sunny city park or campus lawn in spring. GROUND: flat, well-kept bright lawn running ~40 studs back to a hedge. Grass is lit yellow-green (#a2be45), mid green (#7c9e3f) and darker in shadow (#4f6a2a). Individual blades show in the foreground because the camera is at grass level; they are slightly taller and softer right at the lens. On the right, a pale gray paved path strip (#9a9e98) runs along the hedge base (z~+37, x +12 to +30). HEDGE: continuous trimmed dark-green hedge across the full frame width, ~4 studs tall, ~3 deep, at z~+40 (#353e22, lit tops #4a5a2c). LEFT: big dense dark-green tree (#1c2d23 to #2a4430) at about (-20, 0, +35). Crown spans x -26 to -13 and fills the left edge from the top of frame down to the hedge, ~22+ studs tall. CENTER-BACK, directly behind the horse's head: a tall, sparse deciduous tree with thin dark branches (#6b5e50) and light yellowish spring foliage (#c8c890 / #d8d0a0) against the white sky, at ~(0, 0, +55). Crown spans x -13 to +8 and runs off the top of frame. RIGHT: a rounded, bright, backlit yellow-green tree (#8b9b4a to #b8c860) at ~(+20, 0, +42). Crown from ~19 studs high down to ~5, with a visible trunk (#4a3b2c) to the hedge. Behind it, a dark modern building (#1e2a22, black-green with horizontal window bands #2a3a35) at ~(+45, 0, +75), ~26 studs tall, filling the right edge above the hedge, plus a dark fence or ground-floor band just above the hedge. A thin black lamp post at ~(+15, 0, +38), ~9 studs tall (frame x~80%). SKY: bright, hazy, nearly blown-out white (#e5efee, behind the head #efeeee) with a very faint blue tint top-right. No visible clouds or sun disk. No props apart from the character.",
+ "lighting": "Bright midday sunlight, backlit. The sun is high (elevation ~55°) behind the horse and slightly to frame-left, not in frame. Evidence: the sky behind the head is blown out, the left tree is dark, the right tree's leaves glow translucent, there is a darker grass zone in front of the horse toward the camera, and the tops of the jacket shoulders and frame-left sleeve carry strong highlights (#d8d8f2 sheen). RIM: bright rim on the ear edges, mane and shoulder tops. FILL: strong, soft, slightly warm frontal fill (CG sky fill), so the face, jacket and lapels are evenly readable with no deep shadows. The dark fur keeps detail. Color temperature ~5800-6000 K, slightly warm and yellow in the highlights, neutral-cool in the sky. Exposure is bright: sky clipped to near white, subject correctly exposed. Contrast medium-high, saturation high (vivid greens #a2be45, very saturated jacket blue #4a55c4, red lapels #a8453f, gold #d4b84a). Soft bloom and halation around the bright sky edges near the head and branches. No lens flare streaks. Shadows are soft.",
+ "effects": [
+  {
+   "t": 9.467,
+   "description": "(Previous shot S08) Radial zoom-in blur builds on the S08 face close-up. This sets up a zoom-through match cut on the horse's face; the cut lands ~0.03-0.1 s after beat 9.431."
+  },
+  {
+   "t": 9.533,
+   "description": "Cut in. Strong radial/zoom blur centered on the horse's nose (≈51% x, 36% y). The center ~20% radius stays fairly sharp. Streaks at the frame edges are ~40-60 px on an 854-wide frame (5-7% of width), smearing jacket, foliage and grass outward. Paired with the whip zoom-out from 2.7x."
+  },
+  {
+   "t": 9.567,
+   "description": "Peak blur: streaks ~70-90 px (8-10% of frame width). Even the face, ears and chain are smeared radially (the chain shows radial spikes). Zoom 1.48x."
+  },
+  {
+   "t": 9.6,
+   "description": "Blur decays: ~25-35 px streaks only in the outer third of the frame, center sharp. Zoom 1.03x."
+  },
+  {
+   "t": 9.633,
+   "description": "Clean image, no blur, from here to the end of the shot."
+  },
+  {
+   "t": 9.533,
+   "description": "Throughout: subtitle overlay (see subtitle). Gentle bloom and haze on the bright sky. Warm, saturated grade. Slight near-focus softness on the bottom grass blades and slight far softness on the hedge and trees."
+  },
+  {
+   "t": 11.133,
+   "description": "Hard cut to S10 (gym). The subtitle carries over unchanged into the next shot."
+  }
+ ],
+ "subtitle": "'I'M FEELING NO STRESS' appears at 9.533, replacing 'WAKE UP IN THE MORNING' exactly on the cut. It stays unchanged through the whole shot and carries on into S10 (still on screen at 11.133+). Style: all caps, heavy bold italic sans (Helvetica/Arial Black Oblique look), slanted ~12°. Vertical gradient fill from golden yellow at the top (#f5c430, very top #ffd84a) through orange (#e8862a) to red-orange at the bottom (#e04a3a). Dark maroon 3D extrusion / drop shadow offset ~2 px down-right at 480p (#8a1010), plus a thin dark-red outline (#5a0a0a). Centered horizontally. Text bbox on the 854x480 frame is x 266-589, y 432-454: center at (50%, 92.3%), width ~38% of frame, cap height ~22 px = 4.6% of frame height (≈50 px cap height at 1080p). No animation: it is static, with no pop or fade.",
+ "recreateInRoblox": "TIMING: shot-local time = t - 9.533; duration 1.6 s (96 frames @60 fps). Beats in shot: 9.919 and 10.407 (beats 20-21) and 10.895 (beat 22); beat 9.431 (19) is just before the cut.\n\nSET (horse chest at origin, facing -Z toward camera):\n- Terrain: flat Grass 300x300 with Terrain.Decoration = true for real 3D blades at the low lens. Terrain:SetMaterialColor(Grass, #6f9b38). workspace.GlobalWind = (3,0,1.5) for gentle sway.\n- Path: Concrete Part #9a9e98 at (+21, 0.05, +37), size 18x0.1x3.\n- Hedge: Part 140x4x3 at (0,2,40), Material LeafyGrass, #34452a. Split into 4-5 slightly uneven segments.\n- Left tree: trunk Cylinder 2.5x12 at (-20,6,34), #3b3026. Crown: 6 overlapping LeafyGrass Balls (r 7-9) #1d3a26 up to y~26.\n- Center tree at (0,0,58): trunk 1.5x18 #6b5e50, 10-15 thin branch cylinders, 10 small Balls #c9c88e at Transparency 0.35 for sparse spring leaves.\n- Right tree at (20,0,42): trunk 1.5x8 #4a3b2c, crown Balls #9db44a / #b6c95a up to y~20.\n- Building: block 60x26x20 at (48,13,78) #1e2a22 SmoothPlastic, with horizontal Glass window strips #2a3a35 (Reflectance 0.15).\n- Black fence 40x2.5x0.3 at z=36 on the right. Lamp post: Cylinder 0.3x9 #111 at (15,4.5,38).\n\nLIGHTING: Lighting.Technology = Future. Brightness 3.2, ExposureCompensation 0.35. Ambient #5c6460, OutdoorAmbient #a9b0b0, ColorShift_Top #fff0d8. EnvironmentDiffuseScale 1, EnvironmentSpecularScale 0.6, ShadowSoftness 0.3. Set ClockTime ~13 and GeographicLatitude so Lighting:GetSunDirection() points from behind the horse toward the camera (elevation ~55°, slightly frame-left); rotate the whole set if that is easier.\n- Atmosphere: Density 0.32, Offset 0.1, Color #e3ebee, Decay #c7d3a8, Glare 0.4, Haze 1.8 (for the blown hazy sky).\n- Post: Bloom (Intensity 0.7, Size 32, Threshold 1.4). ColorCorrection (Brightness 0.04, Contrast 0.15, Saturation 0.22, TintColor #fff6e6). SunRays (Intensity 0.04, Spread 0.8). DepthOfField (FocusDistance 6, InFocusRadius 2.5, FarIntensity 0.25, NearIntensity 0.4).\n- Fill: invisible anchored Part at (0,2.6,-3.5) with a SpotLight aimed at the horse: Brightness 1.5, Range 9, Angle 70, #fff1df, Shadows off.\n- Rim: SpotLight at (1.5,5.5,2.5) aimed at the head: Brightness 3, Range 8, #fffbea.\n\nCHARACTER: R15 horse rig scaled to 5.5 studs.\n- Jacket: SurfaceAppearance satin (roughness ~0.35), #4a55c4.\n- Red collar #a8453f with a stud-dot texture.\n- Chain: Metal #d4b84a, Reflectance 0.3.\n- Glasses: Metal #d4b04a frames, Glass lenses #e8bf4a at Transparency 0.35.\n- Jeans #7f9bb5 (Fabric material). Boots #1e2124 SmoothPlastic, Reflectance 0.1. Gold watch on the LEFT wrist.\n\nPOSE (Animation Editor or Moon Animator, one held keyframe for the body, IK on):\n- HumanoidRootPart/LowerTorso: lowered so the belly touches the grass, LowerTorso pitched forward ~80° (lying, legs going away from camera).\n- Waist: back-bend ~80° so the UpperTorso is vertical with an 8° lean back.\n- Shoulders: abduct ~80° and sweep back ~50°. Elbows 15-20°. Fists gripping the ankles.\n- Hips: abduct ~40-45°, slight extension. Knees: flex ~100-110° (shins vertical, tipped 15-20° out).\n- Feet: dorsiflexed with toes turned out, soles up.\n- World targets: shoulders (±0.9, 2.0, 0.05). Wrists (-1.85,1.75,1.25) / (+1.9,1.8,1.25). Ankles (-1.95,1.8,1.3) / (+2.0,1.85,1.3). Knees (±1.4,0.55,1.45).\n- Check through the shot camera: boots at ~25-33% and 67-74% of frame width and ~40% height, chain at 71% height, ear tips at 12% height.\n\nHEAD/MOUTH ANIMATION: key only the Neck pitch and the jaw.\n- Neck pitch keys (deg, negative = chin down): 9.533 +1, 9.633 0, 9.733 -5, 9.767 -4, 9.833 -2, 9.9 0, 10.033 -0.5, 10.133 -1, 10.233 -2.5, 10.333 -4, 10.467 -4.5, 10.6 -6.5, 10.7 -5, 10.767 0.5, 10.833 2, 10.9 3, 11.0 5, 11.1 6. Sine easing, except 10.7 -> 10.767, which is fast (Quad Out).\n- Jaw open (0-1, 1 = jaw Motor6D down ~25-30°, or swap mouth decals): 9.533 .75, 9.567 .55, 9.6 .35, 9.633 0, 9.733 .03, 9.767 .08, 9.833 .33, 9.9 1.0, 9.967 .5, 10.033 .22, 10.133 .93, 10.2 .65, 10.233 .2, 10.333 .75, 10.4 .78, 10.467 .25, 10.533-10.667 .03 (clenched grin), 10.7 .3, 10.767 .95, 10.833 .88, 10.9 .7, 11.0 .65, 11.1 .75.\n- Keep a wide grin (mouth corners pulled back) the whole time. No blinks.\n\nCAMERA (LocalScript, CameraType Scriptable, driven on RenderStepped by shot time):\n- cam.CFrame = CFrame.lookAt(Vector3.new(0,0.7,-6), Vector3.new(0,1.6,0)) * CFrame.Angles(math.rad(extraPitch),0,0). extraPitch = +3° at 9.533, easing to 0 by 9.6.\n- FieldOfView keys: 9.533 15.3, 9.567 27.6, 9.6 38.9, 9.633 40 (Quad/Expo Out), then linear to 41.3 at 11.133.\n- No shake.\n\nWHIP-ZOOM RADIAL BLUR: Roblox has no radial blur, so the best quality comes from doing it in the video editor. In CapCut use 'Zoom blur'; in Premiere/AE use 'CC Radial Fast Blur' in Zoom mode. Center at 51% / 37%, amount keyed 60% at 9.533, 85% at 9.567, 35% at 9.6, 0 at 9.633. Match it with an equal zoom-in blur at the end of S08 (9.467-9.5).\nIn-engine fallback:\n- BlurEffect.Size 14 -> 18 -> 6 -> 0 on the same keys.\n- Plus a full-screen ImageLabel with a radial speed-lines texture (transparent center), ImageTransparency 0.35 -> 0.2 -> 0.6 -> 1, scaled 1.0 -> 1.25.\n\nSUBTITLE: ScreenGui TextLabel 'I'M FEELING NO STRESS'.\n- FontFace: Font.new('rbxasset://fonts/families/GothamSSm.json', Enum.FontWeight.Heavy, Enum.FontStyle.Italic).\n- AnchorPoint (0.5,0.5), Position (0.5,0,0.923,0), TextSize ≈ 4.6% cap height (~66 px at 1080p).\n- UIGradient Rotation 90: #ffd84a -> #f5c430 -> #e8862a -> #e04a3a.\n- UIStroke 1.5 px #5a0a0a. A duplicate label behind it, offset (+3,+3) px in #8a1010, for the extrusion.\n- Visible from 9.533 and kept into S10.\n\nRECORDING: Studio rendering quality at max, Future lighting, 1920x1080 or 4K, 60 fps capture (OBS), UI hidden except the subtitle, wind on so the grass moves slightly."
+}

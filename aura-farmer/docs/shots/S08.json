@@ -1,0 +1,154 @@
+{
+ "shot": "S08_horse_selfie",
+ "start": 7.867,
+ "end": 9.533,
+ "summary": "Hard cut (from S07, the beach selfie of two women) to an extreme close-up of the anthropomorphic horse ('aura farmer'). He wears big gold aviators with yellow lenses, a royal-blue velvet jacket with huge shoulders and lapels, and a coral-red dotted disco shirt collar. He looks straight into the lens and sings 'WAKE UP IN THE MORNING' in a sunny park.\n\nThe camera is locked off: the background moves 0 px for the whole shot and there is no shake. All motion comes from the horse:\n- The head lifts (chin up) on each beat and settles on the off-beats.\n- The lips close for the 'p' of 'up' (8.27-8.33s) and the 'm' (8.63-8.67s).\n- The jaw drops hugely on 'MOR-' (peak 8.87-9.03s, on beat 8.944) while the head rises and tips back about 12 degrees.\n- A wide toothy grin is held on '-NING' to the end of the shot.\n\nAt 9.467s a radial zoom blur starts on the background only; the face stays sharp. This launches the crash pull-back of S09 at 9.533s, where the subtitle changes to \"I'M FEELING NO STRESS\".\n\nThe wide view in S09 shows his real pose: lying prone on the grass with the chest lifted, arms spread wide to the sides and hands gripping his raised ankles (a wide-knee bow pose). In this close-up his 'outstretched arms' read only as huge blue shoulder and sleeve masses running off both frame edges.\n\nThe source animation is 24 fps in a 30 fps container, so every 5th frame is a duplicate (240=241, 245=246, 250=251 and so on, up to 285=286).",
+ "camera": {
+  "framing": "Extreme close-up (ECU / big close-up 'selfie') of the horse's face, 16:9.\n- Top edge: cuts through the forehead and mane. The ear bases just peek in at the top edge around 8.57-8.67s and after 9.17s, at about x=0.38 and x=0.64 of frame width.\n- Bottom edge: cuts the chin and upper neck. When the mouth is fully open, the lower jaw and lower teeth run off the bottom behind the subtitle.\n- Glasses: span about x=0.33-0.75 of frame width (about 360 of 854 px, roughly 42% of width) and y=0.15-0.42 at the start.\n- Nose pad centre: about (0.55, 0.58) at the start.\n- Shoulders: blue jacket shoulders fill both sides from frame mid-height down to the bottom corners.\n  - Frame-right (character's LEFT) shoulder/upper arm: rises higher, its top at about y=0.37, and exits the right edge at y=0.42-0.92.\n  - Frame-left (character's RIGHT) shoulder: its top at about y=0.52, exits the left edge at y=0.55-1.0.\n- Shirt collars: red pointed collar flaps lie over the lapels at the bottom-left (x 0.17-0.33) and bottom-right (x 0.67-0.85), flanking the dark neck.\n- Background: visible only in the top 55% and in a small grass patch in the bottom-right corner.",
+  "position": "Directly in front of the face, dead-on frontal (horizontal angle 0 degrees); the subject faces the camera and looks into the lens.\n- Distance: about 1.65 studs from the glasses plane, about 1.1 studs from the nose tip. This assumes the glasses are about 0.95 studs wide on a horse head about 0.8 studs wide at the eyes, for an adult-scale character of 5.5 studs.\n- Height: horse eye level, about 2.1-2.3 studs above the grass, because the horse is prone with its chest raised.\n- Within the frame, the face sits slightly right of centre at the start (glasses centre x=0.545) and ends about centred (x=0.50) after drifting.",
+  "angle": "Pitch: about +3 degrees, tilted slightly up. Background hedge line sits at frame y=0.52-0.69; horizon a little below centre.\nYaw: 0 degrees.\nRoll/Dutch: 0 degrees, horizon level.\nThis is essentially an eye-level, very slightly low frontal angle.",
+  "fovVerticalDeg": 42,
+  "lensNotes": "- Lens: wide-normal, about 28 mm full-frame equivalent (horizontal FOV about 66 degrees, vertical about 42 degrees), focused very close.\n- Perspective: strong close-range exaggeration. The muzzle, nostrils and lips look big compared with the eyes, and the head narrows toward the ears.\n- Distortion: no visible barrel/fisheye curvature, since there are no straight lines near the edges.\n- Focus: on the glasses/nose plane at about 1.6 studs; face crisp from the glasses to the lips.\n- Depth of field: shallow. The shoulders are slightly soft. The background (hedge at about 25-35 studs, trees at 30-60, building at 80-100) is heavily defocused, with a blur radius of about 6-10 px at 854 px width, soft creamy bokeh, and bright sky patches glowing through the leaves.\n- Image texture: mild sharpening, faint grain and compression.",
+  "movement": [
+   {
+    "t": 7.867,
+    "description": "Hard cut in. Camera static and locked off. Background phase-correlation shift is exactly 0 px for every frame until 9.433."
+   },
+   {
+    "t": 8.944,
+    "description": "Still static during the big 'MOR-' head rise. Only the subject moves; there is no camera follow and no reframing."
+   },
+   {
+    "t": 9.467,
+    "description": "Camera still physically static, but a radial zoom-blur streak effect appears on the background only, centred near the nose. The face stays sharp. This anticipates the pull-back and lands just after beat 19 (9.432)."
+   },
+   {
+    "t": 9.533,
+    "description": "Shot ends. The next frame (S09) is the same take: a crash dolly-out/zoom-out with full-frame radial blur. Within about 0.1s it reveals the full horse lying on the grass, with the camera dropping to near grass level."
+   }
+  ],
+  "shake": "None. The camera is locked off, with zero measurable background drift, jitter or handheld noise. There are no whip moves or zooms within the shot apart from the radial blur onset in the last 2 frames (9.467-9.5)."
+ },
+ "subjects": [
+  {
+   "who": "Aura-farmer horse: an anthropomorphic stallion singer, the main character, the same as in S04 and S09",
+   "appearance": "HEAD: realistic CG horse head, slightly humanised.\n- Fur:\n  - Forehead and top of head: dark chocolate brown, #3A2A22 to #574233.\n  - Around the eyes and the bridge of the nose: warm reddish-brown, #7F5648, with a sparse lighter tan stripe down the centre of the bridge.\n  - Muzzle sides and cheeks: shaggy frosted grey-brown, #7B7972, with backlit tips up to #CECCC3, strongest on frame-left.\n- Mane: short dark brown-black pompadour/mohawk tuft, #2C1E1D, on top (mostly out of frame).\n- Ears: brown, upright (only the bases are visible at the top edge).\n- Nose/muzzle front: dark charcoal velvety skin, #29282A, with two big flared crescent nostrils, #1D1D1E, and a soft specular sheen.\n- Chin, lower jaw and neck: almost black-charcoal, #151515 to #232321.\n\nEYES: yellow-olive irises, #8C8030 with highlights about #C8B848, as seen through the yellow lenses; dark pupils. Heavy, half-closed upper lids (about 50%) give a cool, smug look. The eyes are deep-set under brown brow fur.\n\nMOUTH: human-like, fleshy, cartoonishly big lips, pink-tan: #B07A68 lit, #6C4130 in shadow, upper lip highlight #9C6A55. Big square human teeth, ivory #D7CAB8 to #E8E2D2. Mouth interior is dark red-brown, #42241A. Tongue is salmon, #C88A6A lit, #9C5C42 base.\n\nGLASSES: oversized gold-metal aviators.\n- Frame: thin wire rims about 0.012 studs thick; gold #D4B24A with highlights #F2E08A and shadow #8A6A2A. Double bridge: a straight top brow bar plus a curved lower bridge. Small hinge studs at the temples. Total width about 0.95 studs.\n- Lenses: teardrop pilot shape, each about 0.42 x 0.36 studs, wider at the top-outer corner. Semi-transparent amber-yellow tint: bright #DBD170 where the sky reflects (outer upper area), and #6C5228 to #816D32 where the fur and eyes show through. The eyes are visible behind them.\n\nCOSTUME (visible part):\n- Jacket: royal / violet-blue, velvety-suede fabric, base #3A47C0, highlights #7077CE, deep shadow #1E2B7F. Huge rounded padded shoulders and wide pointed lapels.\n- Shirt: coral-red / salmon disco shirt, base #A14F50, lit #B77368, shade #88413C. The big pointed spread collar lies over the jacket lapels and is printed with small round dots: about 0.04 studs across, spaced about 0.15 studs apart, slate-teal #3E4A55 with light grey-violet centres #86818D. They read as studs or rivets in the wide shot.\n- Off-frame but part of the character (seen in S09/S04): thick gold Cuban-link chain on the chest, gold watch on the LEFT wrist, light-blue denim trousers #8AA6CC, black loafers.\n\nPROPORTIONS: head about 1.6 studs long (poll to lips) and 0.8 wide at the eyes; neck thick; broad shoulders about 3.2-3.5 studs across with the padding.",
+   "placement": "Centre frame. At the start the face centre (nose) is at x=0.55, y=0.58 and the eye line at y=0.28. The head then drifts to frame-left, toward the character's RIGHT, by about 40 px (0.11 studs) and up by as much as 54 px (0.14 studs) at the 'MOR-' peak, ending about centred (x=0.51, eye line y=0.24).\n\nHe faces the camera directly (yaw about 0) and looks straight into the lens the whole time.\n\nBody: prone on the lawn about 2 studs below the camera, chest lifted toward the camera; only the neck, collars and shoulders are visible. The background is behind him and the sun is behind him (backlit).",
+   "poseKeys": [
+    {
+     "t": 7.867,
+     "body": "Root/hips: lying prone on the grass, pelvis on the ground, unchanged for the whole shot.\nTorso: upper torso arched up about 45 degrees from the ground, chest square to the camera.\nNeck: extended up and forward so the face is vertical.\nHead: pitch 0 (reference), yaw 0, roll +2 (tilted toward the character's LEFT shoulder; the left temple hinge sits 12 px lower than the right).\nCharacter's RIGHT arm (frame-left): shoulder abducted about 80 degrees and extended back about 20 degrees, elbow bent about 15 degrees, wrist neutral, hand a closed fist gripping the right ankle (all beyond the frame edge). Only the upper sleeve and shoulder pad are visible.\nCharacter's LEFT arm (frame-right): shoulder abducted about 95 degrees (sits higher) and extended back about 20 degrees, elbow about 15 degrees, hand a fist gripping the left ankle; gold watch on this wrist (out of frame).\nLegs: knees bent about 110 degrees and spread wide, shins raised, feet up near the hands (out of frame).",
+     "face": "Mouth open 0.45, an oval vowel ('WA-'): jaw about 14 degrees, lips rounded, a hint of the upper teeth. No smile.\nEyes: half-lidded (upper lids about 50% down), gaze into the lens.\nBrows: low and relaxed.\nGlasses: level on the nose bridge."
+    },
+    {
+     "t": 7.967,
+     "body": "BEAT 16 (7.968): head lifts 22 px (0.06 studs) and drifts left 3 px. Head pitch -3 (chin up/back), yaw 0, roll +2.\nNeck extends slightly.\nCharacter's LEFT shoulder (frame-right) bounces up 8 px and in 10 px (a small shrug).\nCharacter's RIGHT shoulder still.\nNothing else changes.",
+     "face": "Mouth open 0.6 ('WAKE' vowel peak), jaw about 19 degrees, tall oval, lower lip dropped, teeth barely visible. Eyes half-lidded, on the lens."
+    },
+    {
+     "t": 8.067,
+     "body": "Head up 21 px and left 11 px (0.03 studs toward the character's right). Pitch -4, roll +2.\nCharacter's LEFT shoulder at its first peak: up 12 px, in 16 px (shrug follow-through about 0.1s after the beat).\nCharacter's RIGHT shoulder unchanged.",
+     "face": "Mouth 0.55 with the upper teeth edge showing ('-AKE'). The eyes are clearly visible through the lenses: yellow irises, heavy lids about 50%, looking straight at the camera."
+    },
+    {
+     "t": 8.167,
+     "body": "Head sways to frame-left (character's right): left 18-19 px, up 16-17 px. Pitch -3, yaw 0, roll +2.\nCharacter's LEFT shoulder settles slightly (up 6 px, in 10 px).",
+     "face": "Mouth 0.45, slightly lopsided (wider on frame-left). At 8.2 it begins to close and shows the upper and lower teeth at 0.35."
+    },
+    {
+     "t": 8.267,
+     "body": "Off-beat dip: head comes back right and down to left 8 px, up 11 px. Pitch -2 (a small nod forward relative to the previous key), roll +2.\nShoulders down near neutral, with the character's LEFT shoulder dipping 7 px lower than its peak.",
+     "face": "Mouth CLOSED (0.0) for the 'P' of 'UP', held through 8.333. Lips pressed together with the lower lip pushed out in a pout. Corners neutral. Eyes half-lidded on the lens."
+    },
+    {
+     "t": 8.367,
+     "body": "Head starts the next lift: left 10 px, up 16 px. Pitch -3.\nCharacter's LEFT shoulder rising (up 13 px, in 18 px).",
+     "face": "Mouth opens to 0.45 ('IN'), oval, 2-frame snap from closed (8.333 to 8.367)."
+    },
+    {
+     "t": 8.467,
+     "body": "BEAT 17 (8.456): head up 17 px, left 16 px. Pitch -5, roll +2.\nCharacter's LEFT shoulder at its second peak: up 16 px, in 24 px (the biggest shrug).\nCharacter's RIGHT shoulder still.",
+     "face": "Mouth 0.35, lips spread horizontally with the upper and lower teeth bared (grimace-like 'IN / THE'). Corners slightly back. Eyes half-lidded."
+    },
+    {
+     "t": 8.567,
+     "body": "Head left 11 px, up 15 px. Pitch -4.\nShoulder easing down (up 13 px, in 18 px).",
+     "face": "Mouth 0.5, rounder ('THE'), jaw about 16 degrees."
+    },
+    {
+     "t": 8.667,
+     "body": "Off-beat settle: head left 12 px, up 10 px. Pitch -3, roll +1.\nCharacter's LEFT shoulder back to about neutral (up 3 px, in 8 px).",
+     "face": "Mouth CLOSED (0.05) for the 'M' of 'MORNING', lips pressed with a pout, from 8.633 to 8.667. At 8.7 it opens to 0.35 with the upper teeth row exposed (anticipation)."
+    },
+    {
+     "t": 8.767,
+     "body": "Big accent starts: head jumps up and left FAST (2 frames from 8.70): left 34 px (0.09 studs), up 31 px (0.08 studs). Pitch -9 (chin up/back), roll -1 (now tilting slightly toward the character's RIGHT).\nCharacter's RIGHT shoulder (frame-left) dips 6 px; the character's LEFT shoulder holds.",
+     "face": "Jaw drops fast to 0.9 ('MOR-'), jaw about 32 degrees. Tall vertical oval with the full upper teeth row (4-6 big square teeth) visible at the top of the mouth. The dark throat and the tongue tip show; the lower teeth sit near the bottom frame edge. Eyes half-lidded on the lens."
+    },
+    {
+     "t": 8.867,
+     "body": "Head left 40 px, up 30 px. Pitch -11, roll -1.\nBoth shoulders begin rising (character's RIGHT shoulder up 4 px; character's LEFT shoulder up 11 px, in 13 px). The collar rises 5 px.",
+     "face": "Mouth at MAX 1.0, jaw about 35-38 degrees. The open mouth spans from just under the nostrils (frame y about 0.53) to below the bottom edge. Upper teeth bright, interior dark red-brown, lips stretched into a long vertical O."
+    },
+    {
+     "t": 8.967,
+     "body": "BEAT 18 (8.944): PEAK of the head rise. Left 41 px, up 40-49 px (0.13 studs); glasses top at frame y=0.04. Pitch -12 (strongest tip-back; eye-to-nostril distance shrinks from 142 to about 100 px), yaw 0, roll -1.5.\nChest/shoulders lifted: character's RIGHT shoulder up 9 px, character's LEFT shoulder up 15 px, collar up 8 px.",
+     "face": "Mouth 1.0 held, the 'MOR' belted out. Eyes stay half-lidded and locked on the lens; no blink."
+    },
+    {
+     "t": 9.033,
+     "body": "Head at its highest: left 41 px, up 54 px (0.14 studs). Pitch -12, roll -1.5.\nShoulders hold up (character's RIGHT shoulder up 12 px, in 6 px).",
+     "face": "Mouth 0.95, starting to widen horizontally as it moves into '-NING'."
+    },
+    {
+     "t": 9.067,
+     "body": "Head starts down: left 38 px, up 50 px. Pitch -12.",
+     "face": "Mouth 0.75, now a WIDE GRIN: lip corners pulled back hard (smile 0.8), upper and lower rows of big white teeth both showing, square open shape."
+    },
+    {
+     "t": 9.167,
+     "body": "Head lowers: left 31 px, up 33 px. Pitch -9, roll -1.\nShoulders easing down (character's RIGHT shoulder up 9 px, character's LEFT shoulder up 10 px).",
+     "face": "Grin open 0.9 with the salmon tongue visible on the lower jaw (9.10-9.23). Smile 0.8. Eyes half-lidded."
+    },
+    {
+     "t": 9.267,
+     "body": "Off-beat low point: head left 31-34 px, up only 4-10 px (dropped about 45 px in 0.23s). Pitch -7, roll -1.\nShoulders back to about neutral.",
+     "face": "Grin 0.75, both teeth rows, smile 0.8 ('-NING' held). The tongue is hidden behind the lower teeth again."
+    },
+    {
+     "t": 9.367,
+     "body": "Head left 32 px, up 15-21 px (small rebound). Pitch -6.",
+     "face": "Grin 0.75 held, smile 0.8."
+    },
+    {
+     "t": 9.467,
+     "body": "BEAT 19 (9.432): small lift. Head left 33 px, up 15 px. Pitch -7, roll -1.\nCharacter's RIGHT shoulder (frame-left) up 8 px, in 8 px; character's LEFT shoulder up 12 px, in 14 px (shoulders brace).\nThe background starts radial-blurring. Hold this pose through 9.5.",
+     "face": "Grin 0.8, smile 0.8, teeth fully shown, tongue just visible at the bottom. Eyes half-lidded on the lens."
+    }
+   ],
+   "motionNotes": "RHYTHM:\n- The head lifts (chin up, moving frame-up) on every downbeat: 7.968, 8.456, 8.944, 9.432.\n- It settles down on the off-beats (about 8.27, 8.65, 9.27). Lip closures land on the off-beats: 'p' at 8.27-8.33, 'm' at 8.63-8.67.\n- Amplitudes: about 0.06 studs on beats 16-17, then a big accent on beat 18 ('MOR-'): +0.14 studs up, -12 degrees pitch back, and a 0.11-stud shift toward the character's right that persists to the end.\n\nTIMING:\n- Up-moves have a fast attack: 2-3 frames, ease-out.\n- Settles are slower: 4-7 frames, ease-in-out.\n- No visible overshoot.\n\nSECONDARY MOTION: the character's LEFT shoulder (frame-right) does a little shrug (up and inward, 0.03-0.06 studs) on each beat, lagging the head by about 0.05-0.1s. The character's RIGHT shoulder is almost still until 'MOR', when both shoulders, the chest and the collar rise together.\n\nFACE:\n- No blinks; the eyes stay locked on the lens and half-lidded throughout.\n- No visible fur jiggle.\n- The jaw is the main lip-sync driver.\n\nMOUTH-OPEN CURVE (30 fps frames): 7.867 0.45 | 7.9 0.5 | 7.93-8.07 0.55 | 8.1 0.5 | 8.13-8.17 0.45 | 8.2 0.35 | 8.23 0.15 | 8.27-8.33 0.0 | 8.37 0.4 | 8.4 0.45 | 8.43-8.5 0.35 (teeth bared) | 8.53 0.45 | 8.57 0.5 | 8.6 0.3 | 8.63-8.67 0.05 | 8.7 0.35 | 8.73 0.8 | 8.77 0.9 | 8.8-8.83 0.95 | 8.87-9.0 1.0 | 9.03 0.95 | 9.07 0.75 (grin) | 9.1-9.17 0.9 (tongue) | 9.2 0.85 | 9.23 0.8 | 9.27-9.43 0.75 | 9.47-9.5 0.8.\n\nCADENCE: the animation is 24 fps (stepped); every 5th 30 fps frame repeats."
+  }
+ ],
+ "set": "Sunny city park lawn (the same location as S09). In this close-up everything behind the head is heavily blurred.\n\n- Upper-left quadrant: tall deciduous trees with light lime / yellow-green sunlit leaves (#A8C070, shade #6A8353). Bright overexposed sky patches (#DEE0DF) show between the leaves; about 30-50 studs away.\n- Left, mid-height (frame y about 0.52-0.69): a dark green trimmed hedge band (#2F4A22), about 4-5 studs tall and 25-35 studs away, running horizontally behind the subject.\n- Right of the head: dark tree trunks and denser green foliage (#4C6C22). Through it, a pale modern building facade (white / grey-blue glass, #D9D9ED to #6C7B79, faint horizontal mullion lines) at frame x 0.68-0.89, y 0.2-0.52, about 80-100 studs away. In S09 it reads as a dark glass office block behind the hedge on the right.\n- Bottom-right corner: a small patch of bright green mown grass (#77A726) close behind the shoulder.\n\nFrom the S09 reveal:\n- Large dark green tree on the left about 20 studs away.\n- Thin birch-like trees in the centre background.\n- A lime tree on the right.\n- A dark green lamp post on the right.\n- The hedge spans the whole background.\n- The horse lies on the lawn, with his feet / black loafers raised level with his hands.\n\nThere are no foreground props in the close-up apart from the character's own shoulders and collars.",
+ "lighting": "Bright midday sun, backlit.\n- Sun: behind the subject, high (elevation about 55-60 degrees) and slightly frame-left. In S09 the bright sky and backlit trees are behind him and his shadow falls toward the camera.\n- Key on the face: soft and fairly flat. It comes from sky fill and grass bounce in front, so the face is a little darker than the background.\n- Rim: bright frosty rim and backlight on the outer fur of the muzzle and cheeks (strongest on the frame-left edge, #CECCC3 tips) and on the top surfaces of the blue shoulder pads (highlight #7077CE).\n- Shadows: under the glasses' top bar and inside the nostrils and mouth; the neck below the jaw falls to near-black (#151515).\n- Exposure: set for the face. Background highlights clip toward white (#DEE0DF to #E8EAE6), with soft bloom and glow where sky shows through the leaves.\n- Colour temperature: daylight, about 5600-6000K, slightly warm in the highlights; greens push lime / yellow.\n- Saturation: high, especially the royal-blue jacket (#3A47C0), coral shirt (#A14F50), gold glasses (#D4B24A) and yellow lenses (#DBD170).\n- Contrast: medium-high. Mild teal-green in the deep shadows.\n- No lens flare in this shot. Specular sheen on the dark nose leather, the lenses and the gold rims.",
+ "effects": [
+  {
+   "t": 7.867,
+   "description": "Hard cut in from S07 (beach selfie): no transition, no flash. The subtitle swaps instantly from 'HE'S SUCH A CHARMER' to 'WAKE UP IN THE MORNING' on the same frame."
+  },
+  {
+   "t": 7.867,
+   "description": "Throughout: shallow depth-of-field background blur, mild bloom on the bright sky patches, slight sharpening and grain. The animation runs at 24 fps, so every 5th frame is a duplicate."
+  },
+  {
+   "t": 9.467,
+   "description": "Radial (zoom) blur with streaks radiating from about the centre of the face (frame x 0.5, y 0.45), applied to the BACKGROUND ONLY. The streaks are strong at the edges and trees, with a strength of about 30-40 px at the frame corners. The face, glasses and most of the jacket stay sharp. Held for 2 frames (9.467-9.5)."
+  },
+  {
+   "t": 9.533,
+   "description": "Shot boundary. S09 begins with a full-frame radial blur and a crash pull-back/zoom-out, and the subtitle changes to 'I'M FEELING NO STRESS'. Treat 9.467-9.533 as a whoosh transition that lands right after beat 19 (9.432)."
+  }
+ ],
+ "subtitle": "The text 'WAKE UP IN THE MORNING' (all caps) stays on screen for the whole shot, 7.867-9.533.\n- Change points: it appears on the cut frame 7.867, replacing 'HE'S SUCH A CHARMER', and is replaced at 9.533 by 'I'M FEELING NO STRESS'.\n- Style: heavy bold italic condensed sans (Impact-italic / Bangers-like).\n- Fill: vertical gradient, yellow #F2C82C (top) to orange #EA9B2F (middle) to red-orange #E04B40 (bottom).\n- Outline and shadow: thin dark red outline plus a hard dark red / maroon (#7A1010) extruded drop shadow offset about 2 px down-right.\n- Placement: centred horizontally, spanning about x 0.29-0.71 (about 360 of 854 px), cap height about 25 px (5.2% of frame height), baseline at frame y about 0.95, text centre at y about 0.92.",
+ "recreateInRoblox": "CHARACTER\nReuse the S04/S09 horse rig: an R15 body with a custom horse-head MeshPart, or a part-built head welded to Head.\n- Head build:\n  - Elongated head block, about 0.8 W x 1.0 H x 1.6 D studs, reddish-brown #7F5648.\n  - Dark charcoal muzzle front, #29282A (a sphere or cylinder 0.75 wide), with two black nostril wedges, #1D1D1E.\n  - Grey fur cheek blocks, #7B7972, using Fabric material for a fuzzy look. Dark brown top and forehead, #3A2A22, with a dark mane tuft (wedges).\n  - Two brown wedge ears.\n- Mouth:\n  - Make the LOWER JAW a separate part on a Motor6D hinged just under the nostrils, so it can open 0-38 degrees.\n  - Big pink-tan lips, #B07A68 (curved cylinders or a torus mesh), split between the upper and lower jaw.\n  - 5-6 ivory square teeth, #E2DACA, on each jaw.\n  - Dark interior box, #42241A, and a salmon tongue part, #C88A6A.\n  - For the '-NING' grin, scale the lip-corner parts outward about 15% or rotate the corner wedges back.\n- Eyes: yellow spheres, #B8A840, with black pupils. Brown half-sphere upper lids cover the top 50%.\n- Aviators (Metal material, #D4B24A, Reflectance 0.25):\n  - Rims: thin, about 0.012 studs. Build from rotated thin cylinders or a Union shaped like a teardrop.\n  - Bridge: a straight top bar plus a curved lower bridge.\n  - Lenses: Glass or SmoothPlastic, #D9C760, Transparency 0.35-0.45. Each about 0.42 x 0.36 studs; total width about 0.95 studs.\n- Body:\n  - Jacket: Fabric material, #3A47C0 royal blue. Add big rounded shoulder pads (balls/cylinders scaled 1.6x) and wide pointed lapel wedges.\n  - Shirt collar: two big pointed wedges, #A14F50, laid over the lapels, with a dot Texture (dots #3E4A55 with #86818D centres, StudsPerTile about 0.15) or tiny cylinder dots.\n  - Neck: near-black, #151515.\n\nPOSE\nLie the horse prone on the grass.\n- Torso pitched up about 45 degrees; neck bent so the face is vertical.\n- Arms out to the sides: UpperArm abducted 80 degrees (right) and 95 degrees (left), extended back 20 degrees, elbows bent 15 degrees, fists on the ankles.\n- Knees bent 110 degrees and spread, feet raised.\nOnly the head, collars and shoulders need to look perfect for this shot.\n\nANIMATION\nAnimate in the Animation Editor (or with CFrame / Motor6D tweens) on the Neck, Jaw, Waist and LeftShoulder joints, using the pose keys.\n- Head offsets: use Neck.C0 translation plus pitch. 0.0026 studs per reference pixel at the glasses depth, so 41 px is about 0.11 studs toward the character's right and 54 px is about 0.14 studs up. Pitch tip-back goes to -12 degrees at 8.97-9.03.\n- Easing: Cubic/Quad Out for the lifts (2-3 frames), Sine InOut for the settles.\n- Jaw keys follow the mouth-open curve, with 1.0 = 37 degrees.\n- For the authentic look, sample keys at 24 fps (step every 1/24 s), or use Constant easing between frames.\n\nCAMERA\nUse a Scriptable workspace.CurrentCamera, static.\n- Placement: CFrame.lookAt(eyeMid + faceForward*1.65 + Vector3.new(0,-0.05,0), eyeMid + Vector3.new(0,0.08,0)). That is 1.65 studs from the glasses, at eye height, pitched about +3 degrees up.\n- FieldOfView = 42 (vertical).\n- Hold the camera completely still for 7.867-9.467.\n\nDEPTH OF FIELD\nAdd a DepthOfFieldEffect: FocusDistance 1.6, InFocusRadius 0.7, NearIntensity 0, FarIntensity 0.7.\n\nLIGHTING\n- Lighting.Technology = Future. ClockTime about 13.\n- Sun direction: rotate the scene (or set GeographicLatitude / ClockTime) so the sun is BEHIND the horse, high and slightly to the frame-left.\n- Brightness 3.5, ExposureCompensation +0.4, Ambient #5C5C5C, OutdoorAmbient #A0A6A6, EnvironmentDiffuseScale 1, EnvironmentSpecularScale 1, ShadowSoftness 0.4.\n- Soft frontal fill: an invisible part 1.2 studs in front of the face holding a PointLight (Brightness 0.8, Range 4, Color #FFF3E2, Shadows off).\n- Rim: a SpotLight behind and above-left of the head (Brightness 2-3, Range 6, Color #FFF6E0) to light the fur edges and the tops of the shoulders.\n- Atmosphere: Density 0.25, Haze 1.5, Glare 0.3, Color #C9D1CF, Decay #A3B47E.\n- Bloom: Intensity 0.6, Size 28, Threshold 0.9.\n- ColorCorrection: Contrast 0.15, Saturation 0.25, Brightness 0.02, TintColor #FFF8EC.\n- SunRays: Intensity 0.04, Spread 0.6.\n\nSET\nPrimitives are enough because everything is blurred.\n- Ground: Grass Terrain or a part (#77A726).\n- Hedge: box 60 x 4.5 x 3 studs at about 28 studs behind the horse, Grass material #2F4A22.\n- Trees: brown cylinder trunks with ball-part canopies in lime #8DB04A and dark green #3E5E22. Place them 30-50 studs back on the left and right, with some gaps so the bright sky shows through.\n- Building: a pale glass block at about 90 studs, right of frame (#D9D9ED panels with thin grey mullion strips).\n- Sky: a bright, slightly hazy Sky/Atmosphere.\n\nSUBTITLE\nScreenGui with a TextLabel:\n- Text 'WAKE UP IN THE MORNING'.\n- AnchorPoint (0.5, 0.5), Position UDim2.new(0.5, 0, 0.92, 0), Size UDim2.new(0.45, 0, 0.065, 0), TextScaled on.\n- FontFace = Font.new('rbxasset://fonts/families/Bangers.json'), or GothamSSm with FontWeight Heavy and FontStyle Italic.\n- TextColor white with a UIGradient (rotation 90): #F2C82C at 0, #EA9B2F at 0.5, #E04B40 at 1.\n- UIStroke: Thickness 1.5, #6A0A0A.\n- Drop shadow: duplicate the label behind it, offset (+2, +3) px, colour #7A1010.\n- Show it from 7.867 and switch the text at 9.533.\n\nTRANSITION\nRoblox has no radial blur. At 9.467:\n- Tween a BlurEffect.Size from 0 to 6 over 2 frames.\n- Optionally overlay a semi-transparent radial speed-lines ImageLabel (transparent centre) to fake the zoom streaks on the background.\nThen, at 9.533, start S09's crash pull-back:\n- Tween the camera back about 8 studs and down to about 0.6 studs above the grass over about 0.15s.\n- Kick the FOV from 42 to 60 and back to 50 (Quint Out).\n- Hold BlurEffect.Size at about 10, then fade it to 0.\n\nRECORDING\nRender or record at 1920x1080 with graphics quality at 10. Play back from a script driven by tick() or RenderStepped with the absolute timeline, so it stays in sync with the music the user will add (123 BPM, beats at 0.163 + n*0.4878 s)."
+}

@@ -68,6 +68,11 @@ function World.build(opts)
 					holder.Value = rig.model
 					holder.Parent = animSaves
 					kfs.Parent = holder
+					-- ссылка, по которой Animation Editor находит сохранения этого рига
+					local link = Instance.new("ObjectValue")
+					link.Name = "AnimSaves"
+					link.Value = holder
+					link.Parent = rig.model
 				end
 				entry.actors[actorName] = { rig = rig, model = rig.model, kfs = kfs, name = rigName }
 				table.insert(result.stats, string.format("%s: %d деталей, %s", rigName, #rig.visuals, if kfs then (kfs:GetAttribute("Keyframes") .. " ключевых кадров") else "без анимации"))

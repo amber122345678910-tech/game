@@ -1,0 +1,229 @@
+{
+ "shot": "S07_selfie_women",
+ "start": 6.6,
+ "end": 7.867,
+ "summary": "Hard cut in at 6.600s (first frame all_0199) from the horse-mouth \"DO DO DO\" close-up, hard cut out after 7.833s (last frame all_0236) to the horse in gold aviators (\"WAKE UP IN THE MORNING\"). The shot is 38 frames at 30fps. The source is 25fps upsampled, so every 5th frame repeats (205=206, 210=211, 215=216, 220=221, 225=226, 230=231, 235=236). It is a sunny-beach, low-angle, wide-lens, selfie-style two-shot against a deep blue sky with a fixed Dutch tilt of about 13 deg. Woman A (left, light-brown/blonde shag bob, cream tank) laughs with her head thrown back. Over 6.9-7.1 her head drops forward, and by the end she leans toward the lens with a huge toothy grin; her right hand, holding red-lens sunglasses, goes out of the bottom of frame and comes back into the lower-left corner at the end. Her left arm is around Woman B. Woman B (right, black curly short hair, white tank) sings \"he's such a charmer\" looking up and off to frame-right. She does a sassy two-hand gesture. Her left hand goes from a claw to a wide-open spread palm (\"jazz hand\") at shoulder/head height; the open hand lands about 6.75s, on the half-beat. Her right hand rises to her throat with index and middle fingers pointing up while it pinches red sunglasses. Both hold these poses with small sways while both mouths open wide on \"CHAR\" (about 7.24-7.4s), close on \"m\" (about 7.48s, a beat) and open wide again on \"MER\" (about 7.55-7.65s). The gimbal camera is nearly locked. Over 6.6-7.0 it pushes in and rises fast with ease-out (subjects get about 35% bigger and drop in frame). After that it creeps forward and tilts up about 2 deg linearly until the cut.",
+ "camera": {
+  "framing": "Low-angle medium close-up two-shot, from chest/shoulders up. At 6.6 frame-left holds Woman A (x 14%-55% of width): her bare right shoulder fills the lower-left corner, her face center is at about (39% x, 30% y) and her head (hair top to chin) is about 29% of frame height. Frame-right holds Woman B (x 52%-94%): face center about (66%, 35%), head about 25% of frame height. Her raised left hand is at about (85%, 45%). Sky fills the top 45-55% of frame; tan sand with tire tracks and footprints fills the lower right; low-rise beach buildings and apartment blocks sit on a tilted horizon at the right. By 7.0: A's face is at (42%, 42%) with head 40% of frame height; B's face is at (70%, 41%) with head 33%. At 7.833: A's face is at (31%, 51%), head 39%; B's face at (66%, 43%), head 32%. A's right hand and red sunglasses enter the lower-left corner (0-20% x, 77-100% y). The subtitle sits at the bottom center over their chests.",
+  "position": "World layout (ground y=0, Roblox studs, adult = 5.5). Woman A's HumanoidRootPart is at (0, 2.75, 0) facing +Z (toward the camera). Woman B is at (1.5, 2.75, -0.7), standing at A's left side, shoulder to shoulder and about 0.6-0.7 stud farther from the camera. The camera is in front of A, slightly to her left (toward B), at roughly chest height of the subjects. Camera keys (Position -> LookAt target): 6.600 pos (0.30, 3.50, 1.90) -> look (0.60, 4.10, -0.30). 6.800 pos (0.32, 3.75, 1.70) -> look (0.61, 4.32, -0.45). 7.000 pos (0.36, 3.92, 1.68) -> look (0.64, 4.45, -0.55). 7.400 pos (0.43, 3.98, 1.66) -> look (0.70, 4.55, -0.60). 7.833 pos (0.50, 4.05, 1.65) -> look (0.76, 4.66, -0.65). Distance from lens to A's face goes from about 2.4 studs (6.6) to about 1.5 studs (7.83), partly because A leans toward the lens. Distance to B's face goes from about 3.2 to about 2.5 studs. The camera is about 1.3-1.4 studs below A's face at the start and about 0.5-0.6 below it at the end.",
+  "angle": "Pitch about +15 deg up at 6.6, rising linearly to about +17.5 deg at 7.833 (far background slides down 14 px over the shot). Yaw: the optical axis is aimed between the two women, slightly right of A's face (A sits about 16-25 deg left of center, B about 20 deg right). Roll is a constant Dutch tilt of about 13 deg clockwise from the operator's view, so the horizon rises toward frame-right. At 6.6 the sand horizon is at y≈452/480 at the left edge and y≈227/480 at the right edge, running straight through about (50%, 70%). In Roblox apply it as camCF = CFrame.lookAt(pos, target) * CFrame.Angles(0, 0, math.rad(-13)); if the horizon tilts the wrong way, flip the sign so the horizon goes from lower-left to upper-right.",
+  "fovVerticalDeg": 72,
+  "lensNotes": "Ultra-wide action-cam/16-18mm full-frame look, about 100-105 deg horizontal, with moderate barrel distortion. Straight lines bow (the horizon is a slight ∩: about 16 deg slope at the left edge, about 11 deg at the right), and faces near the edges look stretched and swollen because they are so close to the lens. Deep focus (about f/8): everything is sharp from about 1 stud (A's hand at the end) to the buildings 300+ studs away, with no bokeh. About 180-deg shutter: visible motion blur on B's left hand and right hand during the quick flick at 6.67-6.77, plus small blur on swinging hair. Mild corner vignette, strongest top-left (sky goes to #0A3755 in the corner).",
+  "movement": [
+   {
+    "t": 6.6,
+    "description": "Cut in. Camera at pos (0.30,3.50,1.90), pitch +15, roll -13 (CW). The push-in/crane-up starts immediately (ease-out, Sine Out)."
+   },
+   {
+    "t": 6.8,
+    "description": "Mid-move: about 0.2 stud forward and about 0.25 stud up since the start. Subjects visibly bigger and lower in frame. Far background still fixed (no pan)."
+   },
+   {
+    "t": 7,
+    "description": "The fast part of the move ends (lands on the 6.992 beat): about 0.22 forward and 0.42 up in total. A's head is now 40% of frame height. From here on, only a slow linear creep."
+   },
+   {
+    "t": 7.4,
+    "description": "Slow drift: about 0.07 stud right (truck right), slight rise, pitch about +16.5. Near subjects slide slightly left in frame while the far buildings stay put (parallax only)."
+   },
+   {
+    "t": 7.833,
+    "description": "Last frame: pos (0.50,4.05,1.65), pitch about +17.5, roll unchanged. Hard cut at 7.867."
+   }
+  ],
+  "shake": "Practically none. It is a stabilized gimbal/selfie-stick move: the far background moves only vertically (0 px horizontal, 14 px down, linear from about 6.8 to 7.83), with no high-frequency jitter, no whip and no zoom. For realism add at most 0.005-stud / 0.1-deg Perlin noise at about 1.5 Hz."
+ },
+ "subjects": [
+  {
+   "who": "Woman A (left of frame, nearest the lens), shag-bob, laughing",
+   "appearance": "Slim young woman, fair warm skin (lit #EBC9BA, mid #D2A493, shadow #9C6A5A, chin-underside shadow #8D5F51). Hair: shoulder-length layered shag/mullet bob with heavy curtain bangs to the eyebrows and flipped-out wispy ends at jaw and shoulder level. Dark ash-brown base/underlayer #3B2C22 to #5A4434, chunky platinum-honey blonde face-framing streaks and bang highlights #D9C2A5 / #C9A983, wind-blown strands. Eyes hazel-brown, possibly a faint pale-gold eyeshadow. Natural rosy lips #C26A5E, very white teeth. Clothing: cream/ivory fine-ribbed sleeveless racer-cut tank top with high round neck (lit #EDE6DF, shade #D0C1BA). Jewelry: layered necklaces: a short beaded chain choker in copper/gold tones #9C6B45 with tiny dark beads, a thin dark cord, and a long thin silver chain #B8B4AA with a round coin/medallion pendant at the sternum. Thin large silver hoop earrings (about 0.12 stud diameter). Chunky silver ring with a blue-grey stone on her right index/middle finger; silver rings on two fingers of her left hand. Prop: rimless sunglasses with thin red-gold metal temples and red-orange tinted lenses (#C8302A to translucent #E8806A).",
+   "placement": "Frame-left; her right shoulder fills the lower-left corner. Body faces the camera, torso yawed about 20 deg toward her own left (toward B / frame-right) at the start, about 10 deg at the end. Face is three-quarters toward frame-right early and nearly frontal to the lens by the end. Her left arm is around B's back and her left hand rests on the top/front of B's right shoulder and upper arm (fingers with rings visible between the women at about (53-56% x, 58-80% y) at 6.6, and at the front of B's right upper arm (50-57% x, 75-92% y) from 7.1 on).",
+   "poseKeys": [
+    {
+     "t": 6.6,
+     "body": "Torso upright and leaning back about 12 deg (laughing back), yawed 20 deg to her left. Head (world): pitch +40 deg (thrown back, chin up, underside of jaw visible), yaw 25 deg to her left, roll 7 deg toward her right shoulder. Right arm: shoulder flexion 25 deg, abduction 15 deg; elbow flexion about 120 deg; forearm pronated 45 deg; hand about 0.35 stud in front of her right chest at tank-neckline height, knuckles toward the lens. Pinch grip: thumb over index and middle, holding the end of one sunglasses temple; ring and pinky curled. The glasses dangle below and to the right of the hand across her chest. Left arm: shoulder abduction 70 deg, horizontally extended about 20 deg behind her (around B), elbow 80 deg, hand cupped over B's right shoulder, fingers pointing up. Legs out of frame (standing, weight even).",
+     "face": "Mouth open 0.5, a full laugh with upper and lower teeth visible. Lip corners pulled up hard (smile 1.0), cheeks raised. Eyes squeezed almost shut (0.15). Brows relaxed and slightly raised. Looking up at the sky."
+    },
+    {
+     "t": 6.7,
+     "body": "Head pitch +38, yaw 25 left, roll 5 right. Right hand lifts about 0.05 stud and drifts slightly toward the lens and to frame-left, wrist cocked up 15 deg; glasses swing. Torso unchanged.",
+     "face": "Mouth 0.35, a grin with teeth nearly together (say 'he's'). Smile 1.0, eyes 0.15."
+    },
+    {
+     "t": 6.8,
+     "body": "Head pitch +35, yaw 22 left, roll 5 right; head translates 0.05 stud to her left (the face drifts frame-right). Right hand about 0.1 stud closer to the lens, moving to frame-left (hand around (27%, 79%)).",
+     "face": "Mouth 0.5 open laugh, eyes 0.15, cheeks high."
+    },
+    {
+     "t": 6.9,
+     "body": "Head starts to come forward: pitch +28, yaw 20 left, roll 5 right. The blonde side strands on her right (frame-left) flick outward. Right elbow opens to about 100 deg and the hand starts dropping toward the bottom edge (about (34%, 88%)).",
+     "face": "Mouth 0.4, eyes 0.2, still laughing."
+    },
+    {
+     "t": 7,
+     "body": "Beat 6.992: the head nods down and forward. Pitch +18 (drops about 10 deg in 0.1 s), yaw 20 left, roll 6 right. Torso comes upright (0 deg lean) and the chest moves about 0.1 stud toward the lens. Right hand has left frame (lowered to waist: shoulder flexion 10, elbow 60, glasses hanging by her hip). Left hand still on B's shoulder.",
+     "face": "Grin, mouth 0.35, upper teeth showing, lips spread wide. Eyes half open (0.35), gaze up and to frame-right (about 30 deg right, 20 deg up from the lens)."
+    },
+    {
+     "t": 7.1,
+     "body": "Head pitch +15, yaw 18 left, roll 0. Hair settles. Shoulders relaxed. The left hand moves down to the front of B's right upper arm, fingers wrapped around it.",
+     "face": "Mouth 0.35 grin, eyes 0.45, gaze up-right, brows lifted 0.3."
+    },
+    {
+     "t": 7.2,
+     "body": "Head pitch +12, yaw 15 left, roll 5 toward her LEFT shoulder (toward B); head translating down and toward the lens.",
+     "face": "Mouth 0.35 toothy grin, eyes 0.5."
+    },
+    {
+     "t": 7.3,
+     "body": "Torso leans about 8 deg toward the lens. Head pitch +15, yaw 12 left, roll 8 left. Small upward head bob as she laughs.",
+     "face": "Mouth 0.7, wide-open laugh/singing 'CHAR' (opens from about 7.23, the half-beat 7.236). Eyes squint 0.3, cheeks max."
+    },
+    {
+     "t": 7.4,
+     "body": "Head pitch +15, yaw 15 left, roll 8 left. Steady.",
+     "face": "Mouth 0.3, lips almost together in a closed-ish smile. Eyes 0.4, gaze up-right."
+    },
+    {
+     "t": 7.5,
+     "body": "Beat about 7.48. Head pitch +12, yaw 15 left, roll 8 left; head begins sliding toward her right (frame-left) and closer to the lens.",
+     "face": "Mouth 0.35 grin, eyes 0.35."
+    },
+    {
+     "t": 7.6,
+     "body": "Head pitch +10, yaw 10 left, roll 10 left; head about 0.15 stud to her right and 0.1 closer than at 7.4. Torso lean toward the lens about 10 deg (bending into the selfie). Right shoulder starts to lift as the right arm rises.",
+     "face": "Mouth 0.7 wide laugh ('MER'). Eyes squint 0.3."
+    },
+    {
+     "t": 7.7,
+     "body": "Head pitch +8, yaw 10 left, roll 10 left. Right hand comes back up into the lower-left of frame: shoulder flexion 55, abduction 20, elbow 110, hand about 0.9-1.0 stud from the lens, still pinching the sunglasses temple. A thin metal temple rises from the hand toward her ear and the red lens hangs below.",
+     "face": "Mouth 0.55, eyes 0.35, gaze now near the lens (just above it)."
+    },
+    {
+     "t": 7.833,
+     "body": "Final frame. Head pitch +6, yaw 8 left, roll 10 toward her left shoulder; face at frame center height. Right hand fills the lower-left corner (0-20% x, 77-100% y): back of the hand to the lens, fingers curled, ring visible on index/middle. The red lens of the glasses sits at the bottom edge (about (18-27%, 93-98%)).",
+     "face": "Big open toothy grin, mouth 0.5, smile 1.0, eyes 0.35, crinkled and looking almost into the lens. Brows slightly raised."
+    }
+   ],
+   "motionNotes": "The main beats of her performance: the head is thrown back laughing (6.6-6.9). It drops and nods forward on the 6.992 beat with a whip of hair: blonde strands fly out on frame-left and settle by 7.1. Then she leans gradually toward the lens (+0.25 stud) with continuous laugh bobs (small 2-3 deg head pitch oscillations at about 4 Hz). The mouth matches B's lyric rhythm: wide on 'CHAR' (7.27-7.37), almost closed at 7.4-7.5, wide on 'MER' (7.57-7.63). Hair secondary motion: wind blows loose strands toward frame-right throughout, and the bangs lift slightly. The right hand drops out of frame at about 6.93-7.0 and comes back up about 7.6-7.83 (ease-in rise). The left hand on B's shoulder rides along with B's sway."
+  },
+  {
+   "who": "Woman B (right of frame), curly black hair, singing with hand gestures",
+   "appearance": "Young woman with olive/tan skin (lit #CF9A80, mid #A86E58, shadow #6E4436). Thick dark brows #2A1E18. Hair: very voluminous short-to-medium dark curly/shaggy hair, blue-black #141012 with cool sheen #2A3438, tight curls spilling onto the forehead and over the ears, with a mullet-ish nape. Small silver hoop earring in her right ear (about 0.04 stud). Clothing: plain bright white ribbed scoop-neck tank top with deep, wide armholes (lit #F4F4F2, shaded areas take a cool lavender cast #B9B3BF). A thin black strap/cord over her right shoulder (the sunglasses' black temple/retainer). Jewelry: thin silver chain necklace with a tiny pendant; chunky silver curb-chain bracelet #A8A6A0 plus a thin black cord bracelet on her left wrist. Prop: sunglasses with saturated red lenses/front #C0201C and thin black temples, held in her right hand. Lips medium rose-brown #A85A4A.",
+   "placement": "Frame-right, just to A's left and about 0.6-0.7 stud farther from the lens. Torso faces the camera, yawed about 15 deg toward her own left (frame-right). Head is turned 30-45 deg to her own left and pitched up, so she looks up and off to frame-right (NOT at the camera) for the whole shot. The face is in three-quarter profile with the nose pointing to frame-right.",
+   "poseKeys": [
+    {
+     "t": 6.6,
+     "body": "Torso upright, slight lean back 5 deg, yaw 15 left. Head (world) yaw 30 left, pitch +28 up, roll 0. RIGHT arm: upper arm close to her side/front ribs (shoulder flexion 20, adduction 10), elbow flexion 145, forearm vertical in front of her right chest. Hand at chin level about 0.25 stud in front of the chin, palm facing medially (toward her face/neck). Thumb and index pinch the sunglasses: the red lens/front hangs straight down along her sternum (about 0.35 stud long) and the black temple sticks out horizontally toward frame-left about 0.35 stud. Middle, ring and pinky curled. LEFT arm: shoulder abduction 50, flexion 25, elbow flexion 100, forearm angled up and out (40 deg from vertical toward frame-right), hand at shoulder-top height about 0.75 stud lateral of the shoulder. Palm toward the lens, tilted 30 deg down. Fingers in a loose claw (MCP 30, PIP 60, DIP 30), thumb abducted, wrist extended 10.",
+     "face": "Mouth 0.5, open and singing 'He's'. Lips spread, upper teeth visible. Brows raised 0.6, eyes open 0.7, looking up and to frame-right."
+    },
+    {
+     "t": 6.667,
+     "body": "Left hand claw tightens (PIP 80, like scratching the air / 'come on'), wrist extends 20. Right index finger begins lifting off the glasses. Slight upward lift of the left forearm (0.05 stud).",
+     "face": "Mouth 0.4 smile-open, brows 0.6."
+    },
+    {
+     "t": 6.7,
+     "body": "Head yaw 35 left, pitch +25. Left hand still clawed and rising. Right hand: fingers start extending upward, and the black temple swings down from horizontal to about 30 deg below horizontal (pointing frame-left/down).",
+     "face": "Mouth 0.45, eyes 0.7."
+    },
+    {
+     "t": 6.733,
+     "body": "The FLICK (motion-blurred frame). The left hand snaps open from claw to spread: fingers extend fast and the hand rises about 0.1 stud. The right hand rises: index and middle shoot up into a vertical 'blade' beside her chin. Upper body sways 4 deg to her left (frame-right) and the head moves 0.08 stud frame-right.",
+     "face": "Mouth 0.4, smiling."
+    },
+    {
+     "t": 6.767,
+     "body": "Lands on half-beat 6.748. LEFT hand is a full jazz hand: all fingers straight and splayed 15-20 deg apart, thumb out 45 deg, palm square to the lens, fingertips at about crown height. Elbow 95, shoulder abduction 55, flexion 30, wrist neutral. RIGHT hand: forearm vertical, hand at throat/chin level, index and middle extended up with a slight curl at the tips. Ring finger and thumb pinch the red glasses against the palm, which faces medially toward her neck; the red lens sits at her collarbone. Head yaw 42 left, pitch +23.",
+     "face": "Mouth 0.45 open smile with teeth, brows high 0.7."
+    },
+    {
+     "t": 6.8,
+     "body": "Hold. Head at its farthest frame-right position (face about (70%, 36%)), yaw 45 left (near profile), pitch +22. Body sway 5 deg left. Left hand center at about (85%, 58%) of frame.",
+     "face": "Mouth 0.45, eyes 0.7 looking up-right."
+    },
+    {
+     "t": 6.9,
+     "body": "Hold the gesture. The black temple of the glasses has dropped over the front of her right shoulder. Head yaw 42 left, pitch +20. Left hand about (86%, 58%).",
+     "face": "Mouth 0.35, lips rounding forward ('such')."
+    },
+    {
+     "t": 7,
+     "body": "Beat 6.992: a small head dip of 3 deg pitch down and a 0.03-stud body bob down. Head yaw 40 left, pitch +18. Hands hold.",
+     "face": "Mouth 0.35, lips rounded/funnelled for 'such', upper teeth just visible. Brows 0.6."
+    },
+    {
+     "t": 7.1,
+     "body": "Head yaw 38 left, pitch +18; the whole upper body starts a slow sway back toward A (frame-left), about 0.15 stud by 7.8. The left hand drifts very slowly down and inward (about 0.12 stud by 7.6) with a ±5 deg wrist rock.",
+     "face": "Mouth 0.3 ('such' to 'a'), eyes 0.65."
+    },
+    {
+     "t": 7.2,
+     "body": "Head yaw 38 left, pitch +18. Hands hold, with small finger flutter on the right hand (index/middle tips bend about 10 deg).",
+     "face": "Mouth 0.25 ('a'), lips spread slightly."
+    },
+    {
+     "t": 7.3,
+     "body": "Chin lifts for the big note: head yaw 35 left, pitch +25.",
+     "face": "Mouth wide open 0.7, an 'AH'/O shape for 'CHAR' (opening from 7.233). Inner and outer brows raised high (0.8), eyes 0.6, slightly squinting in the sun."
+    },
+    {
+     "t": 7.4,
+     "body": "Head yaw 35 left, pitch +28 (most tilted back).",
+     "face": "Mouth 0.6, still an O, closing (0.45 by 7.433)."
+    },
+    {
+     "t": 7.5,
+     "body": "Beat about 7.48: head comes down slightly, pitch +22, yaw 38 left.",
+     "face": "Lips closed/pressed for the 'm' (mouth 0.15 at 7.467-7.5)."
+    },
+    {
+     "t": 7.6,
+     "body": "Head yaw 35 left, pitch +27. Left hand settled at about (82%, 62%).",
+     "face": "Mouth 0.7, wide O for 'MER' (open again from 7.533, widest 7.567-7.6). Brows 0.8."
+    },
+    {
+     "t": 7.7,
+     "body": "Head yaw 35 left, pitch +25. Hands hold.",
+     "face": "Mouth 0.45, relaxing."
+    },
+    {
+     "t": 7.833,
+     "body": "Last frame: head yaw 35 left, pitch +22, face at about (66%, 43%). Left jazz hand at about (82%, 61%), palm still to the lens, fingers spread. Right hand index and middle still up at her throat with the red glasses.",
+     "face": "Mouth 0.35, singing the tail 'er' with a smile. Brows 0.6, eyes 0.65 looking up-right."
+    }
+   ],
+   "motionNotes": "The key action is the left-hand flick from claw to spread palm at 6.70-6.77, with motion blur and a slight overshoot upward by about 0.03 stud, settling at 6.8. It lands on the half-beat 6.748. Both hands then hold the 'ooh, he's such a charmer' presenting pose to the end. There is no real waving: only the slow downward-inward drift of the left hand plus ±5 deg wrist rocks. The head swings toward frame-right with the flick, then sways slowly back toward A. Vertical bobs on 6.992 (dip) and 7.48 (dip with lip closure). Curls bounce with each head move (secondary jiggle, about 2 frames of lag). A red light reflection from the sunglasses lens stays on the front of her right upper arm the whole shot."
+  }
+ ],
+ "set": "Wide, flat, sunny sand beach (North Sea / Dutch-style boulevard beach). The sea is not visible. Ground: fine pale tan sand (sunlit #B8A58E, grade-darkened average #7A6E60, footprint/tire-rut shadows #6E6055), covered in footprints and parallel vehicle tire tracks running toward the right background. Horizon: the sand meets the hazy sky in a straight line, tilted 13 deg by the camera roll. Far left on the horizon (about 250-400 studs) a tiny white flagpole/lifeguard flag and low, hazy dunes/pavilions. Middle background (visible between and behind the women from 6.9 on), about 120-180 studs away: a row of low white beach pavilions/beach clubs (1-2 storeys, white #E9ECEE with teal-blue bases and trim #2E6A8E), plus one taller white block (about 4 storeys) that becomes visible next to A's head near the end. Right background, about 200-350 studs: a row of 8-12-storey mid-century apartment blocks with balconies (beige/grey concrete #B9A58A, dark window bands #464F4E). One taller tower is cut off at the far right edge (about 400 studs). A low teal-roofed beach building at the right, dark parked vehicles/beach equipment as small dark blocks on the sand near the buildings, and a thin orange-red vertical banner/pole near the left end of the apartment row. Sky: cloudless, very saturated deep blue. Corner/top #0A3755, upper #1D5774, mid #326E92, lower #6F93AE, with milky haze near the horizon #9FB2C0-#BFCAD2. Faint wisps of cloud near the right horizon #C5CED5. No props other than the two pairs of sunglasses.",
+ "lighting": "Hard midday sunlight. The sun is out of frame, behind the camera and to its left: about 40-50 deg left of the lens axis, elevation about 55-60 deg. Faces and upper bodies are fully, brightly lit almost frontally from upper camera-left. Shadows fall to frame-right and down: under the chins and jaws (strong, since the camera sees the jaw underside), down the right side of B's neck, and on the camera-facing side of B's left forearm (#6E4436). A's right shoulder and B's right upper arm get specular hot spots. No artificial fill: the sand bounce gives a warm low fill (#C9B79C) on the undersides of the chins. Rim/top light catches A's blonde crown and the flyaway hairs, and gives B's curls a cool blue-white sheen. Color temperature about 5800-6200K: neutral-warm skin against a cool teal-blue sky. Bright exposure, white tank tops near clipping (#F4F4F2) with soft halation/bloom. Contrast high, blacks slightly crushed toward teal (#0A1A22 in the hair). Saturation boosted (sky and red lenses very saturated). Signature colors: sky #1D5774 / #326E92, red lenses #C0201C, skin #D2A493 / #A86E58. A red caustic reflection from B's red sunglasses lens sits as a soft blob (about 0.2 x 0.15 stud, #D8573A at about 50% strength) on the front of B's right upper arm. Mild vignette in the corners. No lens flare in frame.",
+ "effects": [
+  {
+   "t": 6.6,
+   "description": "Hard cut in (no transition) from the horse-mouth close-up. The subtitle 'HE'S SUCH A CHARMER' replaces 'DO DO DO DO DO DO DO DO' at the same moment."
+  },
+  {
+   "t": 6.6,
+   "description": "Persistent look for the whole shot: barrel/wide-angle distortion, corner vignette (strongest top-left), filmic teal-sky/warm-skin grade, soft bloom on the white tank tops, light film grain/compression softness. Red light reflection on B's right upper arm."
+  },
+  {
+   "t": 6.7,
+   "description": "Motion blur on B's left hand and right hand during the claw-to-spread flick (6.70-6.77)."
+  },
+  {
+   "t": 6.9,
+   "description": "A's hair whip: blonde strands flick out on frame-left and toward frame-right as she drops her head (6.9-7.1). Wind blows loose strands of both women toward frame-right throughout."
+  },
+  {
+   "t": 7.6,
+   "description": "A's right hand and the red sunglasses rise into the lower-left foreground, very close to the lens (slightly soft and enlarged by the wide lens)."
+  },
+  {
+   "t": 7.867,
+   "description": "Hard cut out to the horse in gold aviators; the subtitle changes to 'WAKE UP IN THE MORNING'."
+  }
+ ],
+ "subtitle": "\"HE'S SUCH A CHARMER\" shows unchanged from 6.600 to 7.867, with no animation, for the whole shot. It replaces \"DO DO DO DO DO DO DO DO\" at the cut in and gives way to \"WAKE UP IN THE MORNING\" at the cut out. The words are sung roughly as: \"He's\" 6.60-6.75, \"such\" 6.90-7.10, \"a\" 7.15-7.22, \"CHAR\" 7.24-7.43, \"m\" closure 7.47-7.50, \"MER\" 7.53-7.80. Style: heavy italic sans in all caps (like Futura Extra Bold Oblique / Montserrat Black Italic) with tight letter spacing. Vertical gradient fill: yellow #F5C82A at the top, through orange #F0A020 / #E07020, to red-orange #D9402E at the bottom. Dark red #8E1A14 outline (about 1.5 px at 480p) plus a dark red/maroon extruded drop shadow offset about 2 px down-right. Placement: centered horizontally (center at about 50% x), vertical center at about 92.7% of frame height (y≈445/480). Cap height is about 4.6% of frame height, and the line spans about 37% of frame width (x≈265-585 of 854).",
+ "recreateInRoblox": "CHARACTERS: Use two R15 rigs at realistic proportions (about 5.5 studs, Rthro Normal/Slender) with Dynamic Heads (FACS) so the jaw, lips, eyes and brows can be keyed. Woman A: shag-bob hair accessory recolored (base #4A3628 with a blonde #D9C2A5 bangs/streaks texture), cream ribbed tank as layered clothing (#EDE6DF), skin #E2B9A6. Add small parts or meshes for the layered necklaces (copper choker #9C6B45 plus a long silver chain with a 0.06-stud disc pendant #B8B4AA), thin hoop earrings (torus mesh, 0.12 stud), and a ring. Woman B: big curly black hair accessory (#141012), white scoop tank (#F4F4F2), skin #B47A60, silver chain bracelet on her left wrist, tiny hoop on her right ear. Props: two sunglasses models welded to the hands with Motor6D/RigidConstraint so they can swing. A's pair: thin red-gold frame with Neon-free translucent red-orange lenses (Glass material, Transparency 0.35, #D0402E). B's pair: red front #C0201C with black temples, one temple left dangling.\n\nANIMATION: Build it in the Animation Editor (or Moon Animator 2) at 30 fps over 38 frames (6.600-7.833), using the pose keys above. Use Sine/Cubic ease-out for B's flick (6.700-6.767) with a 1-frame overshoot, and ease-in-out for A's head drop (6.900-7.050). Key the FACS curves: JawDrop = the mouth 0..1 values above; LipCornerPuller and CheekRaiser about 0.9-1.0 for A all the way through; LeftEyeClosed/RightEyeClosed 0.85 for A until 6.93, then about 0.55-0.65; UpperLipRaiser 0.4 to show teeth; Funneler 0.5 for B's 'such' (6.9-7.1) and 'CHAR' (7.3-7.4); LipsTogether 1 for B at 7.467-7.500; InnerBrowRaiser/OuterBrowRaiser 0.6-0.8 for B. Add secondary jiggle to the hair (bones or a spring script) and a ±2 deg laugh bob on A's Neck at about 4 Hz.\n\nCAMERA: Workspace.CurrentCamera.CameraType = Scriptable, FieldOfView = 72. Each RenderStepped, interpolate the camera keys (pos/lookAt at 6.6, 6.8, 7.0, 7.4, 7.833 from the camera section) with Sine Out over 6.6-7.0 and linear after that. Set cam.CFrame = CFrame.lookAt(pos, target) * CFrame.Angles(0, 0, math.rad(-13)) (the horizon must rise toward the right). Optionally add 0.005-stud noise. Roblox has no lens distortion, so keep the camera very close (1.5-2.4 studs) to get the wide-lens face exaggeration.\n\nSET: Terrain Sand floor, with Terrain:SetMaterialColor(Enum.Material.Sand, Color3.fromRGB(190,170,142)). Overlay large Texture/Decal strips of footprints and tire tracks on transparent flat parts. Background: apartment blocks as Parts or meshes (30x40x20 to 30x60x20 studs, #BCA98E with window-band Textures #464F4E) at 200-350 studs to the right; a white 40x15x15 pavilion row (#E9ECEE with #2E6A8E trim) at 120-180 studs behind the gap between the women; a tall tower at about 400 studs at the far right; a few dark 4x2x2 blocks as vehicles.\n\nLIGHTING: Technology = Future. ClockTime ≈ 13.5; set GeographicLatitude/rotation so the sun sits behind the camera's left shoulder at about 55-60 deg elevation (check that the shadows of the chins fall down and to frame-right). Brightness 3.5, ExposureCompensation +0.3, Ambient #3E4A55, OutdoorAmbient #9AA6B0, EnvironmentDiffuseScale 1, EnvironmentSpecularScale 1, ShadowSoftness 0.05. Atmosphere: Density 0.28, Offset 0.15, Color #C6D3DC, Decay #6E8AA0, Glare 0, Haze 1.2, which gives deep blue overhead and milky haze at the horizon. Use a clear-sky Sky (no clouds) and darken it toward the zenith. ColorCorrectionEffect: Contrast 0.22, Saturation 0.25, TintColor #F6F8FF. BloomEffect: Intensity 0.5, Size 24, Threshold 0.92. DepthOfField off (deep focus). Vignette: a ScreenGui ImageLabel with a radial vignette PNG (black #06223A, about 0.55 opacity at the corners), or 4 UIGradient-faded frames. Red caustic: a SpotLight in B's red lens (Color #FF4A30, Brightness 3, Range 0.8, Angle 30) aimed at her right upper arm, or a soft red Decal on the arm with Transparency 0.5.\n\nSUBTITLE: ScreenGui > TextLabel with Text = \"HE'S SUCH A CHARMER\", AnchorPoint (0.5, 0.5), Position UDim2.fromScale(0.5, 0.927), TextScaled inside a frame of Size UDim2.fromScale(0.37, 0.06). FontFace = Font.new(\"rbxasset://fonts/families/Montserrat.json\", Enum.FontWeight.Heavy, Enum.FontStyle.Italic). TextColor3 white with a UIGradient (Rotation 90, ColorSequence #F5C82A at 0, #F0A020 at 0.45, #D9402E at 1). UIStroke color #8E1A14, Thickness 2. Duplicate the label behind it, offset +2,+3 px, colored #6A120E, for the extruded shadow. Show it from 6.600 to 7.867 with no fade. Cut the camera hard at 6.600 and 7.867, with no transitions."
+}
