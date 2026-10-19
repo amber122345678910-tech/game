@@ -262,7 +262,8 @@ type PendingShard = {
 	restored: boolean,
 }
 
-type Arrow = { frame: Frame, pointer: TextLabel, dot: TextLabel }
+-- Стрелка к кольцу за краем экрана: треугольник-указатель и нарисованный значок цвета (как на кольце)
+type Arrow = { frame: Frame, pointer: TextLabel, dots: { [string]: IconGlyph }, dot: IconGlyph? }
 
 ----------------------------------------------------------------------
 -- Папка эффектов и общие помощники
@@ -2005,17 +2006,42 @@ local function makeArrow(parent: Frame): Arrow
 		NoStroke = false,
 		Parent = frame,
 	})
-	local dot = UIKit.label({
-		Name = "Dot",
-		Text = "●",
-		Size = UDim2.fromOffset(30, 30),
-		AnchorPoint = Vector2.new(0.5, 0.5),
-		Position = UDim2.fromScale(0.5, 0.5),
-		MaxTextSize = 30,
-		NoStroke = false,
-		Parent = frame,
-	})
-	return { frame = frame, pointer = pointer, dot = dot }
+	return { frame = frame, pointer = pointer, dots = {}, dot = nil }
+end
+
+-- Значок цвета в стрелке: строится один раз на вид и остаётся в стрелке
+local function setArrowDot(a: Arrow, colorId: string, color: Color3)
+	local kind = iconKind(colorId)
+	local g = a.dots[kind]
+	if not g then
+		local isPerun = kind == "perun"
+		local holder = UIKit.glyph(a.frame, kind, {
+			Name = "Dot_" .. kind,
+			Color = if isPerun then BLACK_CORE else color,
+			StrokeColor = if isPerun then BLACK_LINE else Theme.Ink,
+			Stroke = 2,
+			Size = UDim2.fromOffset(30, 30),
+		})
+		g = { holder = holder, items = {}, base = {}, strokes = {}, labels = {}, fills = {} }
+		for _, d in holder:GetDescendants() do
+			if d:IsA("Frame") and string.sub(d.Name, 1, 1) == "F" and not isPerun then
+				table.insert(g.fills, d)
+			elseif d:IsA("TextLabel") then
+				table.insert(g.labels, d)
+			end
+		end
+		a.dots[kind] = g
+	end
+	if a.dot ~= g then
+		if a.dot then
+			a.dot.holder.Visible = false
+		end
+		g.holder.Visible = true
+		a.dot = g
+	end
+	if colorId ~= "black" then
+		setIconColor(g, color)
+	end
 end
 
 local function updateArrows(now: number, clock: number)
@@ -2066,8 +2092,7 @@ local function updateArrows(now: number, clock: number)
 				a.pointer.Rotation = math.deg(math.atan2(dy, dx)) + 90
 				a.pointer.Position = UDim2.new(0.5, dx * 20, 0.5, dy * 20)
 				a.pointer.TextColor3 = color
-				a.dot.Text = colorDef(r.colorId).Icon
-				a.dot.TextColor3 = color
+				setArrowDot(a, r.colorId, color)
 				-- пульс перед ударом
 				local remaining = r.hits[idx] - now
 				local pulse = if remaining < 0.8 then 0.5 + 0.5 * math.sin(clock * 18) else 0

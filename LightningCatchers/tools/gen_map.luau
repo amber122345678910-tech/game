@@ -98,6 +98,6 @@ print("Деталей по разделам:")
 for _, line in counts do
 	print(line)
 end
-print(string.format("Всего деталей: %d, из них шаров: %d (бюджет STYLE §11: ≤ 6900 и ≤ 300)", B.count, B.balls))
+print(string.format("Всего деталей: %d, из них шаров: %d (бюджет STYLE §11: ≤ 7600 и ≤ 300)", B.count, B.balls))
 fs.writeFile("src/map/Map.rbxmx", roblox.serializeModel({ root }, true))
 print("src/map/Map.rbxmx записан")

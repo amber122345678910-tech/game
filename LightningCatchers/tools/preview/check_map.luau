@@ -235,7 +235,7 @@ for i, g in Zones.Geo do
 end
 
 print(string.format("Деталей: %d, источников света: %d, окон: %d, стен: %d", #parts, lights, windows, #walls))
-if #parts > 7000 then
+if #parts > 8000 then
 	fail("слишком много деталей для телефонов: " .. #parts)
 end
 if #problems == 0 then

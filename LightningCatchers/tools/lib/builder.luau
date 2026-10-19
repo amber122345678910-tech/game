@@ -423,13 +423,15 @@ function B.pyramid4(parent, base, w: number, h: number, yaw: number, color, opts
 	return parts
 end
 
--- Lobe: купол с плоским дном (облака). Цилиндр-«барабан» тёмный, шар-«купол» светлый:
--- на экваторе получается мультяшный терминатор. base — центр плоского дна. 2 детали
+-- Lobe: гранёный купол с плоским дном (облака моря). Шестигранный «барабан» тёмный, крышка — GemCube
+-- (куб на вершине, три грани вверх) светлая и чуть уже барабана: по кромке виден мультяшный уступ-терминатор.
+-- Шаров нет. base — центр плоского дна; поворот выводится из позиции (соседние купола не одинаковые). 4 детали
 function B.lobe(parent, base, D: number, h: number, sideColor, topColor, opts)
 	local hh = math.max(h, D / 2 + 0.1)
-	local drum = B.cylY(parent, base + Vector3.new(0, hh / 2, 0), hh, D, sideColor, copy(opts))
-	local dome = B.ball(parent, base + Vector3.new(0, hh, 0), D, topColor, copy(opts))
-	return drum, dome
+	local yaw = (base.X * 0.37 + base.Z * 0.11) % (math.pi * 2)
+	local drum = B.hexPrism(parent, base + Vector3.new(0, hh / 2, 0), D / 2, hh, yaw, sideColor, opts)
+	local cap = B.gem(parent, base + Vector3.new(0, hh, 0), D * 0.66, yaw + math.rad(30), topColor, copy(opts))
+	return drum[1], cap
 end
 
 -- SkewPlate: параллелограмм (брусок и два клина на торцах) — вывески и таблички цены.

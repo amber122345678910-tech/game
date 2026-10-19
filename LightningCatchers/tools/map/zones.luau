@@ -649,18 +649,19 @@ function ZonesMap.build(ctx, i, parent)
 	pathStones(C + g.ToHub * (R - 1), g.Spawn - Vector3.new(0, 3, 0) - g.ToHub * 4, 8, th.path)
 	pathStones(g.Spawn - Vector3.new(0, 3, 0), g.SellPad - stationOut * 1 + g.ToHub * 5, 5, th.path)
 
-	-- 4) пятна другого оттенка на земле (оживляют плоскую игровую зону): 2 перекрывающихся диска,
-	-- каждый на своей высоте (+0.012 / +0.027), без коллизий — кольца рисуются выше (+0.05 и больше)
+	-- 4) пятна другого оттенка на земле (оживляют плоскую игровую зону): 2 гранёные плиты-шестигранника
+	-- с рваным краем внахлёст (не диски), каждая на своей высоте (+0.012 / +0.027), без коллизий —
+	-- кольца рисуются выше (+0.05 и больше)
 	local function groundPatch(pos, size)
 		local col = rng:pick(th.patches)
 		for k = 1, 2 do
 			local off = if k == 1 then Vector3.zero else rng:disc(size * 0.4) + W * size * 0.25
 			local d = size * rng:range(0.55, 1)
 			local top = if k == 1 then 0.012 else 0.027
-			B.cylY(flora, ground(pos + off) + Vector3.new(0, top - 0.05, 0), 0.1, d, B.vary(col, rng, 0.012), B.deco({ Material = th.patchMaterial or th.groundMat, Shadow = false, Name = "Patch" }))
+			B.hexPlate(flora, ground(pos + off) + Vector3.new(0, top - 0.05, 0), d / 2, 0.1, rng:range(0, TAU), 1, rng, B.vary(col, rng, 0.012), B.deco({ Material = th.patchMaterial or th.groundMat, Shadow = false, Name = "Patch" }))
 		end
 	end
-	for _ = 1, 7 do
+	for _ = 1, 9 do
 		local p = C + rng:disc(PR - 6)
 		if flatDist(p, g.SellPad) > 10 then
 			groundPatch(p, rng:range(10, 20))
@@ -706,6 +707,17 @@ function ZonesMap.build(ctx, i, parent)
 		end
 	end
 
+	-- ровный пояс по всей кромке: n точек через равные углы (±40% шага), чтобы рощи не оставляли голых дуг
+	local function evenRim(n, minR, maxR, r, fn)
+		local a0 = rng:range(0, TAU)
+		for k = 1, n do
+			local p = S.ring(minR, maxR, r, 30, { a0 + k / n * TAU, TAU / n * 0.4 })
+			if p then
+				fn(ground(p))
+			end
+		end
+	end
+
 	local landmarkFacing = -g.Dir -- ориентир «смотрит» к центру острова
 
 	if i == 1 then
@@ -744,12 +756,20 @@ function ZonesMap.build(ctx, i, parent)
 				P.windyTree(decor, ground(p), rng, pal)
 			end
 		end
-		for k = 1, math.min(#treeAt, 8) do
+		evenRim(12, rimMin + 2, R + 3, 4.5, function(p)
+			if rng:chance(0.3) then
+				P.poplar(decor, p, rng, pal)
+			else
+				P.tree(decor, p, rng, pal, rng:range(0.85, 1.1))
+			end
+			table.insert(treeAt, p)
+		end)
+		for k = 1, math.min(#treeAt, 14) do
 			anchorBush(treeAt[k], pal)
 		end
 		local rockAt = {}
 		for _ = 1, 5 do
-			local p = S.ring(rimMin, R + 4, 2.8)
+			local p = S.ring(rimMin + 2.5, R + 4, 2.8) -- крупный валун по диагонали до ~4.4: центр дальше от игровой зоны
 			if p then
 				P.rock(decor, ground(p), rng, pal)
 				table.insert(rockAt, p)
@@ -822,13 +842,13 @@ function ZonesMap.build(ctx, i, parent)
 			end
 		end
 		-- цветы полосами вдоль ветра и травинки внутри
-		for _ = 1, 6 do
+		for _ = 1, 14 do
 			local p = insideSpot(4)
 			if p then
 				P.flowerStrip(flora, p, rng, th.flowers, rng:int(5, 6), isHero(p))
 			end
 		end
-		for _ = 1, 18 do
+		for _ = 1, 40 do
 			local p = insideSpot(3)
 			if p then
 				P.tuft(flora, p, rng, th.ground, nil, isHero(p))
@@ -874,7 +894,7 @@ function ZonesMap.build(ctx, i, parent)
 			anchorBush(rockAt[k], pal, rng:range(0.6, 0.9))
 		end
 		for _ = 1, 5 do
-			local p = S.ring(rimMin, R + 4, 2.8)
+			local p = S.ring(rimMin + 2.5, R + 4, 2.8) -- крупный валун по диагонали до ~4.4: центр дальше от игровой зоны
 			if p then
 				P.rock(decor, ground(p), rng, pal)
 			end
@@ -895,14 +915,21 @@ function ZonesMap.build(ctx, i, parent)
 				P.crate(decor, ground(p + Vector3.new(rng:range(1.8, 2.4), 0, rng:range(-1, 1))), rng)
 			end
 		end
-		for _ = 1, 22 do
+		evenRim(8, rimMin + 1, R + 3, 3.5, function(p)
+			if rng:chance(0.5) then
+				P.deadTree(decor, p, rng, pal)
+			else
+				P.veinRock(decor, p, rng, pal)
+			end
+		end)
+		for _ = 1, 36 do
 			local p = insideSpot(3)
 			if p then
 				P.tuft(flora, p, rng, B.tint(th.ground, 0.3), nil, isHero(p))
 			end
 		end
 		-- рыжие цветы-«медянки» полосами по ветру
-		for _ = 1, 5 do
+		for _ = 1, 10 do
 			local p = insideSpot(5)
 			if p then
 				P.flowerStrip(flora, p, rng, { rgb(255, 196, 90), rgb(255, 130, 70), rgb(240, 230, 200) }, 4, isHero(p))
@@ -957,7 +984,7 @@ function ZonesMap.build(ctx, i, parent)
 			end
 		end
 		for _ = 1, 5 do
-			local p = S.ring(rimMin, R + 4, 2.8)
+			local p = S.ring(rimMin + 2.5, R + 4, 2.8) -- крупный валун по диагонали до ~4.4: центр дальше от игровой зоны
 			if p then
 				if rng:chance(0.5) then
 					P.rock(decor, ground(p), rng, pal)
@@ -974,7 +1001,14 @@ function ZonesMap.build(ctx, i, parent)
 				B.block(flora, cf, Vector3.new(0.35, rng:range(0.6, 1.2), 0.35), th.glass, B.deco({ Material = M.Glass, Transparency = 0.2, Shadow = false, Name = "Shard" }))
 			end
 		end
-		for _ = 1, 20 do
+		evenRim(8, rimMin + 2.5, R + 3, 3, function(p)
+			if rng:chance(0.6) then
+				P.cactus(decor, p, rng, pal)
+			else
+				P.rock(decor, p, rng, pal)
+			end
+		end)
+		for _ = 1, 32 do
 			local p = insideSpot(3)
 			if p then
 				P.tuft(flora, p, rng, rgb(176, 160, 98), 0.8, isHero(p))
@@ -1009,7 +1043,7 @@ function ZonesMap.build(ctx, i, parent)
 			end
 		end
 		for _ = 1, 5 do
-			local p = S.ring(rimMin, R + 4, 2.8)
+			local p = S.ring(rimMin + 2.5, R + 4, 2.8) -- крупный валун по диагонали до ~4.4: центр дальше от игровой зоны
 			if p then
 				local r = P.rock(decor, ground(p), rng, pal)
 				-- снежная шапка: плоская плита сверху
@@ -1029,7 +1063,10 @@ function ZonesMap.build(ctx, i, parent)
 				P.snowman(decor, ground(p), C - p, rng)
 			end
 		end
-		for _ = 1, 20 do
+		evenRim(9, rimMin + 2, R + 3, 4.5, function(p)
+			P.pine(decor, p, rng, pal, rng:range(0.8, 1.05))
+		end)
+		for _ = 1, 32 do
 			local p = insideSpot(3)
 			if p then
 				P.tuft(flora, p, rng, rgb(196, 214, 240), 0.9, isHero(p))
@@ -1102,7 +1139,10 @@ function ZonesMap.build(ctx, i, parent)
 				B.block(flora, CFrame.new(p + Vector3.new(0, -0.02, 0)) * CFrame.Angles(0, rng:range(0, 3), 0), Vector3.new(rng:range(0.6, 1.2), 0.1, rng:range(0.5, 1)), rgb(74, 62, 96), B.deco({ Shadow = false }))
 			end
 		end
-		for _ = 1, 10 do
+		evenRim(6, rimMin, R + 3, 2.8, function(p)
+			P.crystals(decor, p, rng, rgb(130, 80, 220), rng:range(0.9, 1.3), nil, th.rock)
+		end)
+		for _ = 1, 18 do
 			local p = insideSpot(3)
 			if p then
 				P.tuft(flora, p, rng, rgb(120, 90, 170), 0.7, isHero(p))

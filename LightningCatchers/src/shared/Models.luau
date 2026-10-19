@@ -429,7 +429,7 @@ end
 ----------------------------------------------------------------------
 -- Питомцы-искрята (STYLE §7). Пять силуэтов по Pets.Shape:
 --   ball — «мочи-искра»: шар на плоском донышке, ушки-молнии с огоньками, хвост-зигзаг;
---   cloud — «тучка»: три купола разного размера на плоском тёмном брюхе, под брюхом дождик-молния;
+--   cloud — «тучка»: гранёный шестигранник с лицом и три клуба-шестигранника за ним, плоское тёмное брюхо, дождик-молния;
 --   star — «звезда-печенька»: толстая сердцевина с плоским лицом, пять лучей из двух клиньев (светлая и тёмная грань);
 --   drop — «капелька»: шар и гранёный кончик, загнутый назад, блик-наклейка;
 --   crystal — «самоцвет»: бипирамида, глаза-бруски.
@@ -729,30 +729,47 @@ local function buildBall(ctx: Ctx, def: Pets.PetDef, look: Look): (BasePart, Anc
 	}
 end
 
--- «Тучка»
+-- Шестигранник «печенькой» (ось по Z, к зрителю): три бруска, повёрнутые на 60° вокруг Z. R — описанный радиус,
+-- depth — толщина; при roll = 0 верхняя и нижняя грани плоские. Возвращает первый брусок.
+local function hexCookie(ctx: Ctx, name: string, pos: Vector3, R: number, depth: number, roll: number, color: Color3): BasePart
+	local first: BasePart? = nil
+	for q = 0, 2 do
+		local p = add(ctx, "Block", name, CFrame.new(pos) * CFrame.Angles(0, 0, roll + q * math.pi / 3), Vector3.new(R, R * SQRT3, depth), color)
+		first = first or p
+	end
+	return first :: BasePart
+end
+
+-- «Тучка»: гранёная, как грозовые тучи мира (STYLE §6.3) — большой шестигранник с лицом спереди,
+-- три клуба-шестигранника поменьше за ним (повёрнуты, разной высоты), плоское тёмное брюхо и дождик-молния
 local function buildCloud(ctx: Ctx, def: Pets.PetDef, look: Look): (BasePart, Anchors)
 	local col, acc = def.Color, def.Accent
-	local c = Vector3.new(0.06, 0.1, -0.12)
-	local r = 0.825
-	local body = ball(ctx, "Body", c, 2 * r, col)
-	-- купола разного размера (1.65 / 1.1 / 0.8), низы утоплены в брюхо
-	ball(ctx, "Puff", Vector3.new(-0.78, -0.06, 0.24), 1.1, tint(col, 0.14))
-	ball(ctx, "Puff", Vector3.new(0.88, -0.2, 0.2), 0.8, tint(col, 0.07))
-	cylY(ctx, "Belly", Vector3.new(-0.1, -0.55, 0.1), 0.3, 1.42, shade(col, 0.28))
+	local c = Vector3.new(0.04, 0.12, -0.1)
+	local R, depth = 0.96, 0.9
+	local apo = R * SQRT3 / 2 -- половина высоты шестигранника (до плоской грани)
+	local body = hexCookie(ctx, "Body", c, R, depth, 0, col) -- без крена: первый брусок — PrimaryPart (по нему ставится модель)
+	-- клубы: левый крупнее и выше, правый ниже; повёрнуты, чтобы край тучи был рваным
+	hexCookie(ctx, "Puff", c + Vector3.new(-0.86, -0.2, 0.26), 0.64, 0.74, RAD(17), tint(col, 0.14))
+	hexCookie(ctx, "Puff", c + Vector3.new(0.86, -0.33, 0.24), 0.52, 0.7, RAD(-12), tint(col, 0.07))
+	-- малый клуб выглядывает из-за макушки справа: верх тучи не плоский
+	hexCookie(ctx, "Puff", c + Vector3.new(0.42, 0.66, 0.32), 0.46, 0.6, RAD(9), tint(col, 0.2))
+	-- плоское брюхо: туча «стоит» на ровном тёмном основании
+	local bellyY = c.Y - apo + 0.06
+	add(ctx, "Block", "Belly", CFrame.new(c.X - 0.04, bellyY, c.Z + 0.2), Vector3.new(2.3, 0.22, 0.78), shade(col, 0.3))
 	-- дождик-молния под брюхом
 	local mat = glow(ctx, 2)
-	local z0 = Vector3.new(0.14, -0.64, 0.06)
+	local z0 = Vector3.new(0.14, bellyY - 0.1, c.Z + 0.12)
 	chain(ctx, "Rain", { z0, z0 + Vector3.new(-0.24, -0.28, 0), z0 + Vector3.new(0.02, -0.56, 0) }, 0.11, acc, mat, Vector3.new(0, 0, -1))
-	faceKit(ctx, sphereSurface(c, r), r, faceOpts(def, look))
-	local rc = 0.32
+	local s = 0.78
+	faceKit(ctx, planeSurface(c + Vector3.new(0, -0.04, 0), s, c.Z - depth / 2), s, faceOpts(def, look))
 	return body, {
 		head = c,
-		headR = r,
-		crown = c + Vector3.new(0, math.sqrt(r * r - rc * rc) - 0.04, 0),
-		crownR = rc,
-		ear = Vector3.new(0.95, 0.62, 0.05),
-		orbit = c + Vector3.new(0, 0.15, 0.1),
-		orbitR = 1.4,
+		headR = apo + 0.06,
+		crown = c + Vector3.new(0, apo, 0),
+		crownR = 0.32,
+		ear = c + Vector3.new(0.82, apo + 0.05, 0.05),
+		orbit = c + Vector3.new(0, 0.1, 0.12),
+		orbitR = 1.5,
 	}
 end
 
