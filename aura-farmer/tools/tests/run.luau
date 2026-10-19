@@ -116,6 +116,24 @@ end)
 test("all shots build and bake", function()
 	local World = require("../lib/World")
 	local w = World.build({ allSets = true })
+	-- Линт: материал на SpecialMesh в Roblox не отображается (металл/стекло/неон превращаются в пластик)
+	local bad = {}
+	for _, d in w.root:GetDescendants() do
+		if d:IsA("BasePart") and d:FindFirstChildOfClass("SpecialMesh") then
+			local m = d.Material.Name
+			if m == "Metal" or m == "Foil" or m == "Glass" or m == "Neon" or m == "DiamondPlate" or m == "CorrodedMetal" then
+				local top = d
+				while top.Parent and top.Parent ~= w.root and top.Parent.Parent ~= w.root and top.Parent.Parent.Parent ~= w.root do
+					top = top.Parent
+				end
+				local key = top:GetFullName()
+				bad[key] = (bad[key] or 0) + 1
+			end
+		end
+	end
+	for k, n in bad do
+		print(string.format("WARNING: %s — %d деталей со SpecialMesh и материалом Metal/Foil/Glass/Neon (в Roblox материал не виден; нужна форма Part Ball/Cylinder/Block)", k, n))
+	end
 	for id, e in w.shots do
 		for name, a in e.actors do
 			truthy(a.model:FindFirstChild("HumanoidRootPart"), id .. "/" .. name .. " no HRP")

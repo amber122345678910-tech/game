@@ -1,24 +1,49 @@
 --!nocheck
--- Девушка слева (S03, S07): светло-русое каре с чёлкой, белый кроп-топ, тёмные штаны.
+-- Девушка слева (S03, S07, S10): светло-русая «рваная» стрижка (шэг) с шторкой-чёлкой и осветлёнными прядями у лица,
+-- белый кроп-топ в рубчик с высоким вырезом, чёрные широкие шорты до колена с контрастной строчкой и красными розами,
+-- босиком; серебряные кольца-серьги, чёрный шнурок-чокер + серебряная цепочка с монеткой, браслеты, кольца;
+-- красные «шестиугольные» очки с красными стёклами.
 local roblox = require("@lune/roblox")
 local Color3 = roblox.Color3
 local Human = require("./Human")
 
+local function rgb(r, g, b)
+	return Color3.fromRGB(r, g, b)
+end
+
 return function(opts)
 	local o = {
-		skin = Color3.fromRGB(238, 200, 172),
-		hair = Color3.fromRGB(150, 116, 82),
-		hairStyle = "bob",
-		top = Color3.fromRGB(248, 248, 246),
-		topStyle = "crop",
-		bottom = Color3.fromRGB(26, 26, 30),
-		bottomLong = true,
-		bottomStripe = Color3.fromRGB(200, 40, 40),
-		glasses = "round",
-		glassesFrame = Color3.fromRGB(200, 40, 40),
-		glassesLens = Color3.fromRGB(150, 30, 30),
 		female = true,
-		build = 0.9,
+		skin = rgb(228, 176, 152),
+		eyes = rgb(112, 104, 72),
+		lips = rgb(196, 112, 106),
+		lashes = true,
+		browThick = 0.75,
+		brows = rgb(104, 76, 56),
+		nose = 0.88,
+		hair = rgb(132, 96, 66),
+		hairHighlight = rgb(198, 164, 116),
+		hairStyle = "shag",
+		top = rgb(244, 242, 238),
+		topStyle = "crop",
+		bottom = rgb(22, 22, 28),
+		bottomStyle = "baggy",
+		stitch = rgb(214, 212, 206),
+		roses = rgb(176, 26, 32),
+		shoes = "barefoot",
+		earrings = "hoop",
+		earringColor = rgb(214, 214, 220),
+		necklaces = {
+			{ kind = "cord", color = rgb(26, 24, 24), choker = true, pendant = true, pendantColor = rgb(200, 200, 206) },
+			{ kind = "chain", color = rgb(206, 206, 212), len = 0.62, pendant = "coin" },
+		},
+		bracelets = { right = { rgb(210, 210, 216), rgb(196, 196, 204) }, left = { rgb(40, 32, 30) } },
+		rings = rgb(210, 210, 216),
+		glasses = "hex",
+		glassesFrame = rgb(214, 36, 40),
+		glassesLens = rgb(228, 40, 44),
+		glassesLensTransparency = 0.35,
+		build = 0.94,
 		height = 0.97,
 	}
 	for k, v in opts or {} do

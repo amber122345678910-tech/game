@@ -23,13 +23,16 @@ function Limbs.build(g, opts)
 		local sx = s * S.shoulderX
 		local UA, LA, HD = side .. "UpperArm", side .. "LowerArm", side .. "Hand"
 
-		-- ===== Рукав =====
-		g:ball(UA, V(sx, S.shoulderY - 0.02, 0), 0.66, P.suit, "SmoothPlastic")
-		g:ellSeg(UA, V(sx, S.shoulderY + 0.12, 0), V(sx, elbowY - 0.12, 0.01), 0.6, 0.62, P.suit, "SmoothPlastic", V(0, 0, -1))
-		g:ball(UA, V(sx, elbowY, 0.01), 0.53, P.suit, "SmoothPlastic")
-		g:ellSeg(LA, V(sx, elbowY + 0.12, 0.01), V(sx, wristY + 0.14, 0), 0.54, 0.56, P.suit, "SmoothPlastic", V(0, 0, -1))
+		-- ===== Рукав (гладкие «капсулы») =====
+		local shoulder = V(sx, S.shoulderY, 0)
+		local elbow = V(sx, elbowY, 0.01)
+		g:tube(UA, { shoulder + V(0, 0.02, 0), elbow + V(0, 0.08, 0) }, function(i)
+			return if i == 1 then 0.6 else 0.54
+		end, P.suit, "SmoothPlastic")
+		g:ball(UA, elbow, 0.53, P.suit, "SmoothPlastic")
+		g:tube(LA, { elbow + V(0, -0.02, 0), V(sx, wristY + 0.32, 0) }, 0.5, P.suit, "SmoothPlastic", nil, false)
 		-- манжета: чёткий срез + тёмная «глубина» рукава
-		g:cylSeg(LA, V(sx, wristY + 0.36, 0), V(sx, wristY + 0.13, 0), 0.52, P.suit, "SmoothPlastic")
+		g:cylSeg(LA, V(sx, wristY + 0.4, 0), V(sx, wristY + 0.13, 0), 0.52, P.suit, "SmoothPlastic")
 		g:cylSeg(LA, V(sx, wristY + 0.14, 0), V(sx, wristY + 0.125, 0), 0.44, P.suitDark, "SmoothPlastic")
 		-- мех предплечья, торчащий из манжеты
 		g:ellSeg(LA, V(sx, wristY + 0.4, 0), V(sx, wristY - 0.04, 0), 0.36, 0.42, P.furHand, "Carpet", V(0, 0, -1))
@@ -95,23 +98,27 @@ function Limbs.build(g, opts)
 		local s = if side == "Right" then 1 else -1
 		local hx = s * S.hipX
 		local UL, LL, FT = side .. "UpperLeg", side .. "LowerLeg", side .. "Foot"
-		g:ball(UL, V(hx, S.hipY, 0.02), 0.84, P.jeans, "Fabric")
-		g:ellSeg(UL, V(hx, S.hipY + 0.15, 0.02), V(hx, S.kneeY - 0.12, 0.0), 0.8, 0.82, P.jeans, "Fabric", V(0, 0, -1))
-		g:ball(UL, V(hx, S.kneeY, 0.0), 0.64, P.jeans, "Fabric")
-		g:ellSeg(LL, V(hx, S.kneeY + 0.14, 0.0), V(hx, 0.5, 0.0), 0.62, 0.64, P.jeans, "Fabric", V(0, 0, -1))
-		-- клёш
-		g:ell(LL, V(hx, 0.62, -0.02), V(0.8, 0.9, 0.84), P.jeans, "Fabric")
-		g:cylSeg(LL, V(hx, 0.42, -0.03), V(hx, 0.13, -0.03), 0.9, P.jeans, "Fabric")
-		g:cylSeg(LL, V(hx, 0.135, -0.03), V(hx, 0.12, -0.03), 0.8, P.jeansDark, "Fabric")
+		local hip = V(hx, S.hipY, 0.02)
+		local knee = V(hx, S.kneeY, 0)
+		g:tube(UL, { hip, knee + V(0, 0.06, 0) }, function(i)
+			return if i == 1 then 0.84 else 0.66
+		end, P.jeans, "Fabric")
+		g:ball(UL, knee, 0.64, P.jeans, "Fabric")
+		g:tube(LL, { knee + V(0, 0.02, 0), V(hx, 0.8, -0.01) }, 0.6, P.jeans, "Fabric", nil, false)
+		-- клёш: плавное расширение книзу
+		g:ell(LL, V(hx, 0.74, -0.01), V(0.66, 0.9, 0.68), P.jeans, "Fabric")
+		g:ell(LL, V(hx, 0.4, -0.02), V(0.82, 0.62, 0.84), P.jeans, "Fabric")
+		g:cylSeg(LL, V(hx, 0.36, -0.03), V(hx, 0.12, -0.03), 0.88, P.jeans, "Fabric")
+		g:cylSeg(LL, V(hx, 0.125, -0.03), V(hx, 0.11, -0.03), 0.78, P.jeansDark, "Fabric")
 		-- боковой шов
-		g:ellSeg(LL, V(hx + s * 0.3, 1.2, 0.0), V(hx + s * 0.44, 0.15, -0.03), 0.03, 0.03, P.jeansDark, "Fabric")
+		g:ellSeg(LL, V(hx + s * 0.3, 1.2, 0.0), V(hx + s * 0.44, 0.14, -0.03), 0.025, 0.025, P.jeansDark, "Fabric")
 
-		-- ===== Обувь (чёрные кожаные, каблук) =====
-		g:rbox(FT, V(hx, 0.035, -0.2), V(0.5, 0.07, 1.2), P.sole, "Rubber")
-		g:box(FT, V(hx, 0.09, 0.28), V(0.4, 0.18, 0.26), P.sole, "Rubber")
-		g:ell(FT, V(hx, 0.22, -0.08), V(0.48, 0.38, 0.92), P.shoe, "Leather", nil, { reflectance = 0.08 })
-		g:ell(FT, V(hx, 0.15, -0.52), V(0.44, 0.24, 0.6), P.shoe, "Leather", nil, { reflectance = 0.08 })
-		g:ellSeg(FT, V(hx, 0.15, 0.1), V(hx, 0.6, 0.05), 0.44, 0.48, P.shoe, "Leather", V(0, 0, -1))
+		-- ===== Обувь (чёрные кожаные, заострённый нос, каблук) =====
+		g:rbox(FT, V(hx, 0.035, -0.18), V(0.46, 0.07, 1.16), P.sole, "Rubber")
+		g:box(FT, V(hx, 0.09, 0.27), V(0.38, 0.17, 0.26), P.sole, "Rubber")
+		g:ell(FT, V(hx, 0.2, -0.05), V(0.46, 0.36, 0.86), P.shoe, "Leather", nil, { reflectance = 0.06 })
+		g:ellSeg(FT, V(hx, 0.15, -0.3), V(hx, 0.1, -0.79), 0.4, 0.2, P.shoe, "Leather", nil, { reflectance = 0.06 })
+		g:ellSeg(FT, V(hx, 0.12, 0.1), V(hx, 0.62, 0.05), 0.42, 0.46, P.shoe, "Leather", V(0, 0, -1))
 	end
 end
 

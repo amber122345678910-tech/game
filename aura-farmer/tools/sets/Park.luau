@@ -1,14 +1,16 @@
 --!nocheck
 -- Декорация PARK (S08, S09): лужайка в городском парке, весна, яркое солнце.
 -- Камера обычно в -Z и смотрит на +Z, поэтому +X — СЛЕВА в кадре, -X — справа.
---   * Terrain Grass 800x800 (верх Y=0), дорожка (Terrain Pavement) z∈[20,24] вдоль изгороди.
---   * Стриженая живая изгородь z∈[24.6,28.2], высота ≈2.8, x∈[-130,130].
---   * Деревья: слева в кадре (+X) тёмная большая липа и светлое молодое деревце, в центре редкие
---     светлые ранневесенние кроны, справа (-X) жёлто-зелёное деревце и фонарь; дальше ряды деревьев.
---   * Справа за деревьями (-X, z 140…186) — современный офис: тёмное стекло, светлые пояса, импосты,
---     нависающая чёрная кровля; слева вдали — белое здание с ленточными окнами.
---   * Фонари вдоль дорожки, скамейка и урна у изгороди (x≈+24).
--- Зона постановки вокруг (0,0,0) свободна (ближе z=+20 нет ничего, кроме травы).
+--   * Terrain Grass x∈[-400,400], z∈[-300,500] (верх Y=0), дорожка (Terrain Pavement) z∈[20,24] вдоль изгороди.
+--   * Стриженая живая изгородь z∈[24.4,28.0], высота ≈3.0, x∈[-130,130] (под ней полоса LeafyGrass).
+--   * Деревья: слева в кадре (+X) тёмная большая липа (31,37) и светлое воздушное деревце (17,47), в центре
+--     редкие светлые ранневесенние кроны (6,58) и (-12,76), справа (-X) жёлто-зелёное деревце (-27,40)
+--     и фонарь (-17.5,23.2); второй ряд, кусты, дальние ряды деревьев в дымке по кругу.
+--   * Справа за деревьями (-X: x -236…-36, z 140…186, высота 44) — офис: тёмное стекло, светлые пояса,
+--     импосты, свет потолков за стеклом, чёрная кровля-козырёк; слева вдали — белое здание с ленточными окнами.
+--   * Фонари вдоль дорожки (x = -17.5, 44, -78, 104; z = 23.2), скамейка (центр сиденья (24, 1.45, 22.9),
+--     лицом в -Z) и урна; эмиттер пыльцы "ParkPollen" (включён) в объёме над лужайкой.
+-- Зона постановки вокруг (0,0,0) свободна (ближе z=+20 нет ничего, кроме травы; невидимый объём пыльцы z∈[3,23]).
 
 local roblox = require("@lune/roblox")
 local Vector3 = roblox.Vector3
@@ -97,7 +99,7 @@ return function(B)
 	-- Полоса под изгородью (тёмная, без травинок).
 	B:terrain("Block", V(0, -3.98, 26), V(272, 8.04, 4), "LeafyGrass")
 	-- Боковая дорожка влево-назад к белому зданию.
-	B:terrain("Block", V(140, -3.99, 90), V(4, 8.02, 132), "Pavement")
+	B:terrain("Block", V(142, -3.99, 90), V(4, 8.02, 132), "Pavement")
 	-- Рекомендуемые цвета материалов Terrain (Terrain:SetMaterialColor) — сочная весенняя трава как в клипе.
 	root:SetAttribute("TerrainColor_Grass", hex("7da83c"))
 	root:SetAttribute("TerrainColor_LeafyGrass", hex("4f6a2a"))
@@ -114,10 +116,10 @@ return function(B)
 		fresh = { hex("384c26"), hex("536a32"), hex("738946"), hex("94a468") }, -- молодая весенняя листва
 		lime = { hex("434d24"), hex("5f6a34"), hex("7e8846"), hex("9fa466") }, -- жёлто-зелёное деревце
 		mid = { hex("223620"), hex("33502a"), hex("4b6a38"), hex("6a874f") }, -- обычная зелень
-		pale = { hex("737c48"), hex("959a60"), hex("b2b27e"), hex("cac79c") }, -- ранневесенняя (ясень/берёза)
+		pale = { hex("6e7744"), hex("8d9259"), hex("a6a670"), hex("bbb888") }, -- ранневесенняя (ясень/берёза)
 	}
 
-	local HAZE = hex("b4c2c0") -- цвет воздушной дымки для дальнего плана
+	local HAZE = hex("aebca8") -- цвет воздушной дымки для дальнего плана
 	local BARK = {
 		dark = hex("3a342f"),
 		brown = hex("564a3f"),
@@ -172,7 +174,7 @@ return function(B)
 			end
 			leafFx.name = name
 			if rnd() < 0.55 then
-				B:ellipsoid(p, V(d * rr(1.05, 1.3), d * rr(0.72, 0.9), d * rr(1.0, 1.2)), c, leafMat, V(rr(-12, 12), rr(0, 180), rr(-12, 12)), leafFx)
+				B:ellipsoid(p, V(d * rr(1.05, 1.25), d * rr(0.82, 0.98), d * rr(1.0, 1.2)), c, leafMat, V(rr(-12, 12), rr(0, 180), rr(-12, 12)), leafFx)
 			else
 				B:ball(p, d, c, leafMat, leafFx)
 			end
@@ -184,11 +186,11 @@ return function(B)
 		local k1 = V(o.x + lean[1] * 0.3 + rr(-0.2, 0.2), o.fork * 0.42, o.z + lean[2] * 0.3 + rr(-0.2, 0.2))
 		local k2 = V(o.x + lean[1] * 0.7 + rr(-0.25, 0.25), o.fork * 0.76, o.z + lean[2] * 0.7 + rr(-0.25, 0.25))
 		cylAB(p0, k1, td, barkC, barkMat, f, { name = "Trunk" })
-		B:ball(k1, td * 0.97, barkC, barkMat, { parent = f, name = "TrunkJoint" })
+		B:ball(k1, td * 1.02, barkC, barkMat, { parent = f, name = "TrunkJoint" })
 		cylAB(k1, k2, td * 0.9, barkC, barkMat, f, { name = "Trunk" })
-		B:ball(k2, td * 0.88, barkC, barkMat, { parent = f, name = "TrunkJoint" })
+		B:ball(k2, td * 0.92, barkC, barkMat, { parent = f, name = "TrunkJoint" })
 		cylAB(k2, F, td * 0.8, barkC, barkMat, f, { name = "Trunk" })
-		B:ball(F, td * 0.82, barkC, barkMat, { parent = f, name = "Fork" })
+		B:ball(F, td * 0.84, barkC, barkMat, { parent = f, name = "Fork" })
 
 		if not o.sparse then
 			-- центры масс по спирали Фибоначчи на оболочке
@@ -222,8 +224,16 @@ return function(B)
 				-- сначала вверх (внутри кроны), потом наружу к массе — снизу видны только ствол и развилка
 				local M = V(F.X, 0, F.Z):Lerp(V(T.X, 0, T.Z), rr(0.12, 0.25)) + V(0, F.Y + (C.Y - F.Y) * rr(0.55, 0.8), 0)
 				cylAB(F, M, td * 0.58, bark(), barkMat, f, { name = "Limb" })
-				B:ball(M, td * 0.56, barkC, barkMat, { parent = f, name = "LimbJoint" })
+				B:ball(M, td * 0.6, barkC, barkMat, { parent = f, name = "LimbJoint" })
 				cylAB(M, T, td * 0.42, bark(), barkMat, f, { name = "Limb" })
+				-- открытая крона: от середины ветви тонкие веточки к соседним массам (видны в просветах)
+				for _ = 1, (o.branchy or 0) do
+					local other = centers[math.floor(rnd() * #centers) + 1]
+					if other[2].Y > -0.3 and (other[1] - T).Magnitude < (rx + ry) * 0.9 then
+						local P = M:Lerp(T, rr(0.3, 0.7))
+						cylAB(P, P:Lerp(other[1], 0.85), td * 0.2, bark(), barkMat, f, { name = "Branch" })
+					end
+				end
 			end
 			cylAB(F, crownPt(V(0, 1, 0), 0.45), td * 0.5, barkC, barkMat, f, { name = "Leader" })
 			-- тёмные ядра
@@ -269,7 +279,7 @@ return function(B)
 			end
 			cylAB(p, e, d, bark(), barkMat, f, { name = if depth == 0 then "Limb" elseif depth < depthMax then "Branch" else "Twig" })
 			if d > 0.4 then
-				B:ball(e, d * 0.96, barkC, barkMat, { parent = f, name = "BranchJoint" })
+				B:ball(e, d * 1.04, barkC, barkMat, { parent = f, name = "BranchJoint" })
 			end
 			if depth >= depthMax then
 				table.insert(tips, e)
@@ -281,28 +291,38 @@ return function(B)
 			local ph = rr(0, math.pi * 2)
 			for c = 1, k do
 				local ang = ph + (c - 1) / k * math.pi * 2 + rr(-0.4, 0.4)
-				local th = math.rad(rr(18, 34))
+				local th = math.rad(rr(o.spreadMin or 16, o.spreadMax or 30))
 				local side = p1 * math.cos(ang) + p2 * math.sin(ang)
 				local nd = (dir * math.cos(th) + side * math.sin(th) + V(0, 0.1, 0)).Unit
-				grow(e, nd, len * rr(0.66, 0.8), math.max(d * 0.66, o.minD or 0.1), depth + 1)
+				grow(e, nd, len * rr(0.66, 0.8), math.max(d * 0.62, o.minD or 0.1), depth + 1)
 			end
 			if o.nodeTufts then
 				table.insert(tips, e)
 			end
 		end
+		-- ствол продолжается лидером, скелетные ветви отходят на разной высоте (не «взрыв» из одной точки)
+		local LT = F:Lerp(C, 0.7) + V(rr(-0.5, 0.5), 0, rr(-0.5, 0.5))
+		cylAB(F, LT, td * 0.62, barkC, barkMat, f, { name = "Leader" })
 		local n = o.limbs
 		local phase = rr(0, math.pi * 2)
 		for i = 1, n do
-			local a = phase + (i - 1) / n * math.pi * 2 + rr(-0.3, 0.3)
+			local a = phase + (i - 1) * 2.4 + rr(-0.3, 0.3) -- золотой угол
 			local phi = math.rad(rr(o.limbMin or 22, o.limbMax or 45))
 			local dir = V(math.cos(a) * math.sin(phi), math.cos(phi), math.sin(a) * math.sin(phi))
-			grow(F, dir, (o.limbLen or 0.5) * (rx + ry) * 0.5 * rr(0.85, 1.1), td * 0.5, 0)
+			local start = F:Lerp(LT, (i - 1) / n * 0.85)
+			grow(start, dir, (o.limbLen or 0.5) * (rx + ry) * 0.5 * rr(0.85, 1.1) * (1 - 0.25 * (i - 1) / n), td * 0.46 * (1 - 0.3 * (i - 1) / n), 0)
 		end
-		grow(F, V(rr(-0.1, 0.1), 1, rr(-0.1, 0.1)).Unit, (C.Y - F.Y) * 0.8, td * 0.45, 1)
+		grow(LT, V(rr(-0.15, 0.15), 1, rr(-0.15, 0.15)).Unit, (C.Y - LT.Y) + ry * 0.35, td * 0.4, 1)
 		-- пучки листвы на концах и узлах ветвей + редкие пучки по оболочке
 		local tuft = o.tuft or 2.4
 		for _, e in tips do
-			blob(e + randUnit() * tuft * 0.2, tuft * rr(0.7, 1.2), jitter(palColor(math.clamp(shade(e) + rr(-0.1, 0.1), 0, 1)), 0.5), "Leaves")
+			-- пучок: 1 шар (редкая крона) или «клумпа» из нескольких (молодое деревце с открытой кроной)
+			local base = shade(e) + rr(-0.1, 0.1)
+			for j = 1, (o.clump or 1) do
+				local q = if j == 1 then e + randUnit() * tuft * 0.2 else e + (randUnit() + V(0, 0.35, 0)).Unit * tuft * rr(0.4, 0.65)
+				local up = math.clamp((q - e).Y / tuft, -1, 1)
+				blob(q, tuft * rr(0.7, 1.15) * (if j == 1 then 1 else 0.85), jitter(palColor(math.clamp(base + up * 0.15, 0, 1)), 0.5), "Leaves")
+			end
 		end
 		for _ = 1, (o.extra or 0) do
 			local sg = segs[math.floor(rnd() * #segs) + 1]
@@ -314,15 +334,17 @@ return function(B)
 	-- Дальнее дерево (фон): короткий ствол + крупные массы почти до земли (сливаются в сплошную полосу), без теней.
 	local farFolder = B:folder("FarTrees", treesFolder)
 	local function farTree(x: number, z: number, h: number, r: number, pal, n: number?)
-		cylAB(V(x, -0.3, z), V(x, h * 0.35, z), r * 0.16, BARK.dark, "Wood", farFolder, { name = "FarTrunk", castShadow = false })
-		local haze = math.clamp((z - 120) / 600, 0.08, 0.35)
-		local base = lerpC(jitter(lerpC(pal[2], pal[3], rr(0.1, 0.5)), 0.8), HAZE, haze)
-		B:ellipsoid(V(x, h * 0.55, z), V(r * 2.1, h * 0.72, r * 1.9), base, "LeafyGrass", V(0, rr(0, 180), 0), { parent = farFolder, name = "FarLeaves", castShadow = false })
-		for _ = 1, (n or 3) - 1 do
-			local u = randUnit()
-			local p = V(x + u.X * r * 0.6, h * 0.62 + math.abs(u.Y) * h * 0.18, z + u.Z * r * 0.5)
-			local c = lerpC(jitter(lerpC(pal[2], pal[4], rr(0.2, 0.6)), 0.6), HAZE, haze)
-			B:ellipsoid(p, V(r * 1.3, r * rr(1.1, 1.5), r * 1.2), c, "LeafyGrass", V(0, rr(0, 180), 0), { parent = farFolder, name = "FarLeaves", castShadow = false })
+		cylAB(V(x, -0.3, z), V(x, h * 0.4, z), r * 0.15, BARK.dark, "Wood", farFolder, { name = "FarTrunk", castShadow = false })
+		local haze = math.clamp((math.sqrt(x * x + z * z) - 100) / 700, 0.06, 0.26)
+		local k = n or 3
+		local tone = rr(0.0, 0.35)
+		for i = 1, k do
+			-- массы кроны: нижняя широкая, верхние меньше и светлее; вместе — неровный округлый силуэт
+			local t = (i - 1) / math.max(1, k - 1)
+			local p = V(x + rr(-0.45, 0.45) * r, h * (0.5 + 0.28 * t) + rr(-0.05, 0.05) * h, z + rr(-0.3, 0.3) * r)
+			local sz = V(r * rr(1.7, 2.1) * (1 - 0.3 * t), h * rr(0.42, 0.55) * (1 - 0.25 * t), r * rr(1.5, 1.9) * (1 - 0.3 * t))
+			local c = lerpC(jitter(lerpC(pal[1], pal[3], math.clamp(tone + 0.35 * t + rr(-0.05, 0.05), 0, 1)), 0.5), HAZE, haze)
+			B:ellipsoid(p, sz, c, "LeafyGrass", V(rr(-8, 8), rr(0, 180), rr(-8, 8)), { parent = farFolder, name = "FarLeaves", castShadow = false })
 		end
 	end
 
@@ -342,12 +364,12 @@ return function(B)
 
 	-- Слева в кадре (+X): тёмная большая липа (низкая плотная крона до изгороди) и светлое деревце перед ней.
 	tree({ name = "DarkLime", x = 31, z = 37, crown = { 15, 21, 13 }, cy = 28, fork = 12, trunkD = 2.3, bark = BARK.dark, pal = PAL.dark, flat = 0.95, masses = 30, massR = 5.2, balls = { 4, 5 }, limbs = 6, core = 4, sparkle = 8 })
-	tree({ name = "FreshAiry", x = 17, z = 47, crown = { 10, 11, 9 }, cy = 21, fork = 9, trunkD = 1.1, bark = BARK.grey, pal = PAL.fresh, sparse = true, limbs = 5, depth = 3, fork3 = 0, limbLen = 0.55, minD = 0.1, tuft = 2.6, extra = 40, leafTr = 0.1 })
+	tree({ name = "FreshAiry", x = 17, z = 47, crown = { 10, 11, 9 }, cy = 21, fork = 9, trunkD = 1.1, bark = BARK.grey, pal = PAL.fresh, sparse = true, limbs = 5, depth = 3, fork3 = 0, limbLen = 0.55, minD = 0.1, tuft = 2.8, extra = 48, leafTr = 0.1 })
 	-- Центр (за конём): крупные светлые ранневесенние кроны со сквозными ветвями.
-	tree({ name = "PaleAsh1", x = 6, z = 58, crown = { 15, 18, 12 }, cy = 32, fork = 12, trunkD = 1.6, bark = BARK.light, pal = PAL.pale, sparse = true, limbs = 5, depth = 3, fork3 = 0, limbLen = 0.55, minD = 0.1, tuft = 2.3, extra = 36, leafTr = 0.15 })
-	tree({ name = "PaleAsh2", x = -12, z = 76, crown = { 14, 17, 12 }, cy = 31, fork = 12, trunkD = 1.5, bark = BARK.grey, pal = PAL.pale, sparse = true, limbs = 5, depth = 2, fork3 = 0.4, limbLen = 0.7, minD = 0.12, tuft = 2.5, extra = 32, leafTr = 0.15 })
+	tree({ name = "PaleAsh1", x = 6, z = 58, crown = { 15, 18, 12 }, cy = 32, fork = 12, trunkD = 1.6, bark = BARK.light, pal = PAL.pale, sparse = true, limbs = 5, depth = 3, fork3 = 0, limbLen = 0.58, limbMin = 14, limbMax = 36, minD = 0.1, tuft = 2.6, extra = 46, leafTr = 0.15 })
+	tree({ name = "PaleAsh2", x = -12, z = 76, crown = { 14, 17, 12 }, cy = 31, fork = 12, trunkD = 1.5, bark = BARK.grey, pal = PAL.pale, sparse = true, limbs = 5, depth = 2, fork3 = 0.4, limbLen = 0.7, minD = 0.12, tuft = 2.7, extra = 40, leafTr = 0.15 })
 	-- Справа в кадре (-X): жёлто-зелёное деревце (рядом фонарь), за ним офис.
-	tree({ name = "LimeYoung", x = -27, z = 40, crown = { 11, 13, 10 }, cy = 22, fork = 12, trunkD = 1.3, bark = BARK.grey, pal = PAL.lime, flat = 0.7, masses = 24, massR = 3.8, balls = { 4, 5 }, limbs = 6, core = 2, sparkle = 8 })
+	tree({ name = "LimeYoung", x = -27, z = 40, crown = { 11, 14, 10 }, cy = 22, fork = 10, trunkD = 1.3, bark = BARK.grey, pal = PAL.lime, flat = 0.7, masses = 28, massR = 3.5, balls = { 3, 4 }, limbs = 6, branchy = 3, core = 1, sparkle = 10 })
 	-- второй ряд
 	tree({ name = "Dark2", x = 56, z = 60, crown = { 14, 16, 12 }, cy = 28, fork = 15, flat = 0.85, trunkD = 2.1, bark = BARK.dark, pal = PAL.dark, masses = 16, massR = 6, balls = { 2, 3 }, limbs = 4, core = 3 })
 	tree({ name = "Mid3", x = 80, z = 32, crown = { 13, 14, 11 }, cy = 25, fork = 14, flat = 0.85, trunkD = 1.9, bark = BARK.brown, pal = PAL.mid, masses = 14, massR = 6, balls = { 2, 3 }, limbs = 4, core = 3 })
@@ -359,22 +381,28 @@ return function(B)
 	tree({ name = "SideL", x = 100, z = 4, crown = { 14, 15, 12 }, cy = 28, fork = 16, flat = 0.85, trunkD = 2.0, bark = BARK.dark, pal = PAL.dark, masses = 12, massR = 7, balls = { 2, 2 }, limbs = 3, core = 3 })
 	tree({ name = "SideR", x = -100, z = 10, crown = { 13, 14, 12 }, cy = 26, fork = 15, flat = 0.85, trunkD = 1.8, bark = BARK.brown, pal = PAL.fresh, masses = 12, massR = 7, balls = { 2, 2 }, limbs = 3, core = 3 })
 
-	-- дальний фон: деревья закрывают горизонт (кроме места, где стоит офис)
-	for i = 0, 11 do
-		local x = 250 - i * 24 + rr(-6, 6)
-		if x > -30 then
-			farTree(x, rr(150, 200), rr(34, 46), rr(9, 12), if rnd() < 0.5 then PAL.dark else PAL.mid)
-		end
+	-- дальний фон: слева — ряд деревьев (в центре за конём оставлено небо, как в клипе; справа офис),
+	-- совсем далеко — сплошная подёрнутая дымкой полоса леса
+	for i = 0, 8 do
+		farTree(250 - i * 24 + rr(-6, 6), rr(150, 200), rr(34, 46), rr(9, 12), if rnd() < 0.5 then PAL.dark else PAL.mid)
 	end
 	for i = 0, 16 do
-		farTree(-330 + i * 40 + rr(-8, 8), rr(275, 320), rr(40, 54), rr(13, 17), if rnd() < 0.5 then PAL.dark else PAL.mid, 2)
+		farTree(-330 + i * 40 + rr(-8, 8), rr(275, 320), rr(40, 54), rr(13, 17), if rnd() < 0.5 then PAL.dark else PAL.mid, 3)
 	end
 	for i = 0, 4 do
 		farTree(rr(130, 200), 30 + i * 26 + rr(-5, 5), rr(36, 46), rr(9, 12), PAL.mid, 3)
 		farTree(rr(-200, -130), 0 + i * 24 + rr(-5, 5), rr(36, 46), rr(9, 12), PAL.fresh, 3)
 	end
+	-- кольцо деревьев за спиной камеры и по бокам: горизонт закрыт при любом повороте камеры
+	for i = 0, 10 do
+		farTree(-240 + i * 48 + rr(-8, 8), rr(-200, -160), rr(38, 50), rr(12, 16), if rnd() < 0.5 then PAL.dark else PAL.mid, 2)
+	end
+	for i = 0, 4 do
+		farTree(rr(250, 290), -140 + i * 70 + rr(-10, 10), rr(38, 50), rr(11, 15), PAL.mid, 3)
+		farTree(rr(-290, -250), -140 + i * 70 + rr(-10, 10), rr(38, 50), rr(11, 15), PAL.dark, 3)
+	end
 	-- кусты за изгородью
-	for _, b in { { 40, 46, 3.2, PAL.dark }, { 22, 52, 2.6, PAL.mid }, { 64, 44, 3.4, PAL.dark }, { 92, 50, 3.0, PAL.mid }, { -8, 46, 2.4, PAL.fresh }, { -40, 50, 2.8, PAL.fresh }, { -62, 46, 3.2, PAL.mid }, { -90, 52, 3.0, PAL.fresh }, { 8, 96, 3.6, PAL.mid }, { 48, 92, 3.4, PAL.dark }, { -20, 120, 3.4, PAL.mid }, { 74, 78, 3.6, PAL.mid } } do
+	for _, b in { { 42, 46, 3.2, PAL.dark }, { 64, 44, 3.4, PAL.dark }, { 92, 50, 3.0, PAL.mid }, { -40, 50, 2.8, PAL.mid }, { -62, 46, 3.2, PAL.mid }, { -90, 52, 3.0, PAL.fresh }, { 48, 92, 3.4, PAL.dark }, { 74, 78, 3.6, PAL.mid } } do
 		bush(b[1] + rr(-2, 2), b[2] + rr(-2, 2), b[3], b[4])
 	end
 
@@ -382,7 +410,7 @@ return function(B)
 	-- ЖИВАЯ ИЗГОРОДЬ
 	---------------------------------------------------------------------------
 	local hedgeFolder = group("Hedge")
-	local HZ0, HZ1, HH = 24.6, 28.2, 2.8
+	local HZ0, HZ1, HH = 24.4, 28.0, 3.0
 	local hedgeBody = hex("2d3a19")
 	local hedgeTop = hex("435222")
 	local hedgeDark = hex("1a2312")
@@ -392,13 +420,16 @@ return function(B)
 		segI += 1
 		local len = rr(5.0, 6.8)
 		local cx = hx + len / 2
-		local h = HH + (if segI % 2 == 0 then 0.05 else -0.05) + rr(-0.08, 0.08)
-		local dz = (if segI % 2 == 0 then 0.03 else -0.03) + rr(-0.05, 0.05)
+		-- соседние сегменты всегда различаются высотой (≥0.1) и выносом (≥0.05) — нет совпадающих граней
+		local h = HH + (if segI % 2 == 0 then 0.07 else -0.07) + rr(-0.02, 0.02)
+		local dz = (if segI % 2 == 0 then 0.04 else -0.04) + rr(-0.012, 0.012)
 		local yaw = rr(-0.4, 0.4)
 		local zc = (HZ0 + HZ1) / 2 + dz
 		-- тело (низ утоплен и темнее — «стебли» в тени), скруглённый верх-«подушка»
-		B:box(V(cx, 0.4 + (h - 0.4) / 2, zc), V(len, h - 0.4, HZ1 - HZ0), jitter(hedgeBody, 0.5), "LeafyGrass", V(0, yaw, 0), { parent = hedgeFolder, name = "HedgeBody" })
-		B:box(V(cx, 0.25, zc + 0.12), V(len, 0.5, HZ1 - HZ0 - 0.5), jitter(hedgeDark, 0.6), "LeafyGrass", V(0, yaw, 0), { parent = hedgeFolder, name = "HedgeBase", castShadow = false })
+		local y0 = 0.4 + (segI % 2) * 0.03 -- низ тела у соседей на разной высоте (нет общих граней в нахлёсте)
+		local bh = 0.5 + (segI % 2) * 0.04
+		B:box(V(cx, y0 + (h - y0) / 2, zc), V(len + 0.12, h - y0, HZ1 - HZ0), jitter(hedgeBody, 0.5), "LeafyGrass", V(0, yaw, 0), { parent = hedgeFolder, name = "HedgeBody" })
+		B:box(V(cx, bh / 2 - 0.02 - (segI % 2) * 0.03, zc + 0.15), V(len + 0.04, bh, HZ1 - HZ0 - 0.6), jitter(hedgeDark, 0.6), "LeafyGrass", V(0, yaw, 0), { parent = hedgeFolder, name = "HedgeBase", castShadow = false })
 		B:ellipsoid(V(cx, h, zc), V(len * 1.14, 0.7, HZ1 - HZ0 + 0.12), jitter(hedgeTop, 0.5), "LeafyGrass", V(0, yaw, 0), { parent = hedgeFolder, name = "HedgeTop" })
 		-- пологие «подушки» листвы на лицевой стороне и на верху (неровность стрижки)
 		local nb = if rnd() < 0.5 then 1 else 2
@@ -411,7 +442,7 @@ return function(B)
 		end
 		if rnd() < 0.6 then
 			local w = rr(1.6, 2.8)
-			B:ellipsoid(V(cx + rr(-1.5, 1.5), h + 0.18, zc + rr(-0.6, 0.6)), V(w, 0.55, w * 0.8), jitter(hedgeTop, 0.4), "LeafyGrass", V(0, rr(0, 180), 0), { parent = hedgeFolder, name = "HedgeLump" })
+			B:ellipsoid(V(cx + rr(-1.5, 1.5), h + 0.18, zc + rr(-0.6, 0.6)), V(w, 0.55, w * 0.8), jitter(lerpC(hedgeTop, hex("7f8f3a"), rr(0.2, 0.6)), 0.4), "LeafyGrass", V(0, rr(0, 180), 0), { parent = hedgeFolder, name = "HedgeLump" })
 		end
 		hx += len
 	end
@@ -434,10 +465,10 @@ return function(B)
 		local bulb = B:ball(V(lx, 13.9, lz), 0.5, hex("fff6dc"), "SmoothPlastic", { parent = f, name = "LampBulb", castShadow = false })
 		B:light(bulb, "PointLight", { Brightness = 0.6, Range = 10, Color = hex("ffe8c0"), Enabled = false, Shadows = false })
 	end
-	lamp(-17.5, 24.25)
-	lamp(44, 24.25)
-	lamp(-78, 24.25)
-	lamp(104, 24.25)
+	lamp(-17.5, 23.2)
+	lamp(44, 23.2)
+	lamp(-78, 23.2)
+	lamp(104, 23.2)
 
 	-- Скамейка спинкой к изгороди, лицом в -Z. Центр сиденья (24, 1.45, 22.9).
 	do
@@ -462,6 +493,32 @@ return function(B)
 		B:cyl(V(bx - 4.3, 2.25, bz + 0.2), 0.1, 1.2, hex("1e2620"), "Metal", "Y", nil, { parent = f, name = "BinRim" })
 	end
 
+	-- Пыльца/пух в солнечном воздухе над лужайкой (едва заметные искорки). Эмиттер "ParkPollen" включён
+	-- всегда; его можно выключить/«выбросить» эффектами плана (kind = "enable"/"emit").
+	do
+		-- объём начинается за зоной постановки (z ≥ 3), чтобы искорки не пролетали у самого объектива
+		local holder = B:part({ name = "PollenVolume", pos = V(0, 5.5, 13), size = V(50, 9, 20), transparency = 1, castShadow = false, canQuery = false, parent = props })
+		local e = roblox.Instance.new("ParticleEmitter")
+		e.Name = "ParkPollen"
+		e.Texture = "rbxasset://textures/particles/sparkles_main.dds"
+		e.Shape = roblox.Enum.ParticleEmitterShape.Box
+		e.ShapeStyle = roblox.Enum.ParticleEmitterShapeStyle.Volume
+		e.Rate = 7
+		e.Lifetime = roblox.NumberRange.new(7, 10)
+		e.Speed = roblox.NumberRange.new(0.15, 0.5)
+		e.SpreadAngle = roblox.Vector2.new(180, 180)
+		e.Acceleration = V(0.06, 0.015, 0.03)
+		e.Drag = 0.4
+		e.RotSpeed = roblox.NumberRange.new(-40, 40)
+		e.Rotation = roblox.NumberRange.new(0, 360)
+		e.Size = roblox.NumberSequence.new({ roblox.NumberSequenceKeypoint.new(0, 0), roblox.NumberSequenceKeypoint.new(0.15, 0.11), roblox.NumberSequenceKeypoint.new(0.85, 0.09), roblox.NumberSequenceKeypoint.new(1, 0) })
+		e.Transparency = roblox.NumberSequence.new({ roblox.NumberSequenceKeypoint.new(0, 1), roblox.NumberSequenceKeypoint.new(0.2, 0.3), roblox.NumberSequenceKeypoint.new(0.8, 0.45), roblox.NumberSequenceKeypoint.new(1, 1) })
+		e.Color = roblox.ColorSequence.new(hex("fff6dc"))
+		e.LightEmission = 0.7
+		e.LightInfluence = 0.4
+		e.Parent = holder
+	end
+
 	---------------------------------------------------------------------------
 	-- ОФИС (справа в кадре): тёмное стекло, светлые междуэтажные пояса, импосты, чёрная кровля-козырёк
 	---------------------------------------------------------------------------
@@ -476,7 +533,8 @@ return function(B)
 		local lightC = hex("dfe6e6")
 		local cx, cz = (X0 + X1) / 2, (Z0 + Z1) / 2
 		local glassFx = { transparency = 0.3, reflectance = 0.28 }
-		B:box(V(cx, H / 2, cz), V(X1 - X0 - 2.4, H - 0.4, Z1 - Z0 - 2.4), hex("161b1d"), "SmoothPlastic", nil, { parent = office, name = "Interior" })
+		-- тёмный внутренний объём отступает от стекла на 3.2: в зазоре видны перекрытия и потолочные светильники
+		B:box(V((X0 + 1.2 + X1 - 3.2) / 2, H / 2, (Z0 + 3.2 + Z1 - 1.2) / 2), V(X1 - X0 - 4.4, H - 0.4, Z1 - Z0 - 4.4), hex("161b1d"), "SmoothPlastic", nil, { parent = office, name = "Interior" })
 		B:box(V(cx, H / 2, Z0), V(X1 - X0, H, 0.2), glassC, "Glass", nil, { parent = office, name = "GlassFront", transparency = glassFx.transparency, reflectance = glassFx.reflectance })
 		B:box(V(X1, H / 2, cz), V(0.2, H, Z1 - Z0 - 0.4), glassC, "Glass", nil, { parent = office, name = "GlassEnd", transparency = glassFx.transparency, reflectance = glassFx.reflectance })
 		B:box(V(X0, H / 2, cz), V(0.2, H, Z1 - Z0 - 0.4), glassC, "Glass", nil, { parent = office, name = "GlassEnd", transparency = glassFx.transparency, reflectance = glassFx.reflectance })
@@ -492,23 +550,26 @@ return function(B)
 				B:box(V(X1 - 1.8, y - 0.8, Z0 + 6 + i * 8), V(0.9, 0.12, 2.6), lightC, "Neon", nil, { parent = office, name = "CeilingLight", castShadow = false })
 			end
 			if k < FLOORS then
-				B:box(V(cx, y, Z0 - 0.05), V(X1 - X0 + 0.9, 1.1, 0.8), bandC, "Concrete", nil, { parent = office, name = "Band" })
+				-- перекрытие (видно сквозь стекло) и светлый пояс снаружи
+				B:box(V(cx - 1.6, y, Z0 + 1.75), V(X1 - X0 - 3.6, 0.7, 3.3), hex("3a3e40"), "Concrete", nil, { parent = office, name = "Slab" })
+				B:box(V(X1 - 1.75, y + 0.01, cz + 1.6), V(3.3, 0.7, Z1 - Z0 - 3.6), hex("3a3e40"), "Concrete", nil, { parent = office, name = "Slab" })
+				B:box(V(cx, y, Z0 - 0.05), V(X1 - X0 + 0.8, 1.1, 0.8), bandC, "Concrete", nil, { parent = office, name = "Band" })
 				B:box(V(X1 + 0.05, y + 0.02, cz), V(0.8, 1.1, Z1 - Z0 + 0.6), bandC, "Concrete", nil, { parent = office, name = "Band" })
 				B:box(V(X0 - 0.05, y + 0.02, cz), V(0.8, 1.1, Z1 - Z0 + 0.6), bandC, "Concrete", nil, { parent = office, name = "Band" })
 			end
 		end
-		B:box(V(cx, 0.4, Z0 - 0.1), V(X1 - X0 + 0.6, 0.8, 0.8), hex("8d8f8b"), "Concrete", nil, { parent = office, name = "Plinth" })
+		B:box(V(cx, 0.38, Z0 - 0.1), V(X1 - X0 + 0.6, 0.8, 0.8), hex("8d8f8b"), "Concrete", nil, { parent = office, name = "Plinth" })
 		-- импосты: фасад (шаг ≈4) и торец к камере
 		local nm = math.floor((X1 - X0) / 4)
 		for i = 1, nm - 1 do
-			B:box(V(X0 + i * (X1 - X0) / nm, H / 2, Z0 - 0.2), V(0.28, H, 0.3), mullC, "Metal", nil, { parent = office, name = "Mullion" })
+			B:box(V(X0 + i * (X1 - X0) / nm, H / 2, Z0 - 0.2), V(0.28, H - 0.04, 0.3), mullC, "Metal", nil, { parent = office, name = "Mullion" })
 		end
 		local ns = math.floor((Z1 - Z0) / 4)
 		for i = 1, ns - 1 do
-			B:box(V(X1 + 0.2, H / 2, Z0 + i * (Z1 - Z0) / ns), V(0.3, H, 0.28), mullC, "Metal", nil, { parent = office, name = "Mullion" })
+			B:box(V(X1 + 0.2, H / 2, Z0 + i * (Z1 - Z0) / ns), V(0.3, H - 0.04, 0.28), mullC, "Metal", nil, { parent = office, name = "Mullion" })
 		end
-		B:box(V(X1 + 0.1, H / 2, Z0 - 0.1), V(0.9, H, 0.9), hex("2c3033"), "Metal", nil, { parent = office, name = "Corner" })
-		B:box(V(X0 - 0.1, H / 2, Z0 - 0.1), V(0.9, H, 0.9), hex("2c3033"), "Metal", nil, { parent = office, name = "Corner" })
+		B:box(V(X1 + 0.1, H / 2, Z0 - 0.1), V(0.96, H - 0.06, 0.96), hex("2c3033"), "Metal", nil, { parent = office, name = "Corner" })
+		B:box(V(X0 - 0.1, H / 2, Z0 - 0.1), V(0.96, H - 0.06, 0.96), hex("2c3033"), "Metal", nil, { parent = office, name = "Corner" })
 		-- плоская кровля с козырьком
 		B:box(V(cx, H + 0.75, cz - 1.5), V(X1 - X0 + 6, 1.5, Z1 - Z0 + 3), hex("17191b"), "SmoothPlastic", nil, { parent = office, name = "Roof" })
 		B:box(V(cx, H + 1.7, cz - 1.5), V(X1 - X0 + 5.4, 0.4, Z1 - Z0 + 2.4), hex("2b2e30"), "Concrete", nil, { parent = office, name = "Parapet" })

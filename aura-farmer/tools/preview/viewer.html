@@ -66,6 +66,9 @@ function geometry(def) {
 }
 
 function material(def, envIntensity) {
+  // В Roblox материал НЕ отображается на SpecialMesh: такая деталь рисуется как гладкий пластик цвета Color
+  // (без металла/неона/стекла). Превью повторяет это, чтобы не обманывать.
+  if (def.mesh) def = Object.assign({}, def, { mat: 'SmoothPlastic', rf: Math.min(def.rf || 0, 0.1) });
   const [rough, metal] = MAT[def.mat] || [0.6, 0];
   const color = new THREE.Color().setRGB(def.color[0], def.color[1], def.color[2], THREE.SRGBColorSpace);
   if (def.mat === 'Neon') {

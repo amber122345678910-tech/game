@@ -4,7 +4,7 @@
 --
 -- Контракт (AGENTS.md): трон в (0,0,0) лицом в −Z; верх подиума Y=0.8 (вперёд до z≈−3.5, x±4);
 -- верх сиденья Y=2.2, сиденье z∈[−1.3,0.6], ширина 3.2; спинка от z≈0.6, до Y≈8.5; корона до Y≈10.5;
--- подлокотники x=±1.9, верх Y≈3.4. Прожектор ≈ (0,30,−2).
+-- подлокотники x=±1.9, верх Y≈3.4. Прожектор (0,30,−4) — чуть впереди, чтобы золото ловило свет фасадами.
 --
 -- Имена для эффектов планов (shot.effects):
 --   ParticleEmitter: "ThroneSparkles" (золотые искры), "Dust" (пылинки), "ThroneGlints" / "ThroneGlintsL" / "ThroneGlintsR" (блики на золоте)
@@ -30,10 +30,10 @@ local rad = math.rad
 
 -- ===== Палитра =====
 local C = {
-	gold = rgb(212, 168, 88), -- основное золото (Metal)
-	goldHi = rgb(240, 206, 128), -- рельеф/орнамент (Foil)
-	goldDeep = rgb(132, 94, 38), -- фон резьбы, торцы
-	velvet = rgb(152, 14, 28), -- бархат спинки
+	gold = rgb(220, 188, 126), -- основное золото, бледное «шампанское» как в клипе (Metal)
+	goldHi = rgb(242, 222, 172), -- рельеф/орнамент (Foil)
+	goldDeep = rgb(138, 104, 52), -- фон резьбы, торцы
+	velvet = rgb(150, 12, 34), -- бархат спинки (малиновый: под тёплым светом даёт коралловый, как в клипе)
 	velvetSeat = rgb(138, 6, 20), -- бархат сиденья
 	velvetDark = rgb(72, 2, 10), -- пуговицы, складки
 	ruby = rgb(226, 18, 52),
@@ -205,11 +205,11 @@ return function(B)
 	local function wall(name, pos, size)
 		part({ parent = room, name = name, pos = pos, size = size, color = C.void, material = "SmoothPlastic", castShadow = false })
 	end
-	wall("WallN", V(0, 25, -70.5), V(142, 52, 1))
-	wall("WallS", V(0, 25, 70.5), V(142, 52, 1))
+	wall("WallN", V(0, 25, -70.5), V(139.9, 51.9, 1))
+	wall("WallS", V(0, 25, 70.5), V(139.9, 51.9, 1))
 	wall("WallW", V(-70.5, 25, 0), V(1, 52, 142))
 	wall("WallE", V(70.5, 25, 0), V(1, 52, 142))
-	wall("Ceiling", V(0, 51.5, 0), V(142, 1, 142))
+	wall("Ceiling", V(0, 51.52, 0), V(142.2, 1, 142.2))
 
 	-- ===================================================================
 	-- ПОДИУМ: две круглые ступени чёрного мрамора с золотыми кантами
@@ -235,14 +235,14 @@ return function(B)
 
 	---------------------------------------------------------------- ножки-кабриоли с лапами
 	local legs = B:folder("Legs", throne)
-	local function cabriole(top, out, s)
+	local function cabriole(top, out, s, plain)
 		local side = out:Cross(Vector3.yAxis).Unit
 		local h = top.Y - FLOOR_Y
 		local function at(o, y)
 			return top + out * (o * s) + V(0, y * h - h, 0)
 		end
 		-- профиль: {вынос наружу, доля высоты, толщина}
-		local prof = { { 0.0, 1.0, 0.36 }, { 0.1, 0.86, 0.37 }, { 0.13, 0.72, 0.31 }, { 0.07, 0.57, 0.23 }, { 0.0, 0.45, 0.17 }, { -0.02, 0.35, 0.15 } }
+		local prof = { { 0.0, 1.0, 0.36 }, { 0.12, 0.87, 0.37 }, { 0.16, 0.74, 0.31 }, { 0.09, 0.6, 0.22 }, { -0.01, 0.47, 0.16 }, { -0.03, 0.36, 0.14 } }
 		local raw, ds = {}, {}
 		for _, q in prof do
 			table.insert(raw, at(q[1], q[2]))
@@ -257,6 +257,13 @@ return function(B)
 			table.insert(pts, { p, ds[a] + (ds[b] - ds[a]) * (t - a) })
 		end
 		tube(legs, pts, C.gold, M.gold)
+		if plain then
+			-- задние ножки почти не видны: только лапа
+			local ballC = V(top.X, FLOOR_Y + 0.13, top.Z) + out * (0.03 * s)
+			ball(legs, ballC, 0.24, C.goldHi, M.foil)
+			ell(legs, CFrame.new(ballC + V(0, 0.1, 0) + out * 0.04), V(0.2, 0.16, 0.2), C.gold, M.gold)
+			return
+		end
 		-- завиток-«колено» снаружи
 		local kc = at(0.24, 0.86)
 		local vol = {}
@@ -285,21 +292,21 @@ return function(B)
 		end
 		rod(legs, ankle, ballC - out * 0.13 + V(0, -0.02, 0), 0.07, C.gold, M.gold) -- задний коготь
 	end
-	local FRONT_LEG = V(1.92, 1.52, -1.12)
-	local BACK_LEG = V(1.62, 1.52, 0.86)
+	local FRONT_LEG = V(1.92, 1.62, -1.12)
+	local BACK_LEG = V(1.62, 1.62, 0.86)
 	cabriole(FRONT_LEG, V(0.75, 0, -0.66).Unit, 1)
 	cabriole(V(-FRONT_LEG.X, FRONT_LEG.Y, FRONT_LEG.Z), V(-0.75, 0, -0.66).Unit, 1)
-	cabriole(BACK_LEG, V(0.6, 0, 0.8).Unit, 0.85)
-	cabriole(V(-BACK_LEG.X, BACK_LEG.Y, BACK_LEG.Z), V(-0.6, 0, 0.8).Unit, 0.85)
+	cabriole(BACK_LEG, V(0.6, 0, 0.8).Unit, 0.85, true)
+	cabriole(V(-BACK_LEG.X, BACK_LEG.Y, BACK_LEG.Z), V(-0.6, 0, 0.8).Unit, 0.85, true)
 
 	---------------------------------------------------------------- царга сиденья
 	local seat = B:folder("Seat", throne)
-	local R0, R1 = 1.5, 1.95
+	local R0, R1 = 1.6, 1.95
 	local RY = (R0 + R1) / 2
 	box(seat, CFrame.new(0, RY, -1.3), V(3.5, R1 - R0, 0.24), C.gold, M.gold)
-	box(seat, CFrame.new(1.75, RY, -0.22), V(0.24, R1 - R0, 2.3), C.gold, M.gold)
-	box(seat, CFrame.new(-1.75, RY, -0.22), V(0.24, R1 - R0, 2.3), C.gold, M.gold)
-	box(seat, CFrame.new(0, (R0 + 2.15) / 2, 0.82), V(3.5, 2.15 - R0, 0.3), C.goldDeep, M.gold)
+	box(seat, CFrame.new(1.75, RY, -0.22), V(0.24, R1 - R0 - 0.012, 2.3), C.gold, M.gold)
+	box(seat, CFrame.new(-1.75, RY, -0.22), V(0.24, R1 - R0 - 0.012, 2.3), C.gold, M.gold)
+	box(seat, CFrame.new(0, (R0 - 0.01 + 2.15) / 2, 0.82), V(3.5, 2.16 - R0, 0.3), C.goldDeep, M.gold)
 	box(seat, CFrame.new(0, RY, -1.425), V(2.9, 0.26, 0.02), C.goldDeep, M.gold) -- филёнка
 	rod(seat, V(-1.66, R1, -1.43), V(1.66, R1, -1.43), 0.12, C.goldHi, M.foil)
 	rod(seat, V(1.88, R1, -1.2), V(1.88, R1, 0.75), 0.12, C.goldHi, M.foil)
@@ -367,57 +374,72 @@ return function(B)
 		local zf = -1.12
 		local fz = zf - 0.36 -- лицо тумбы
 		-- резная тумба с угловыми колонками
-		box(arms, CFrame.new(x, 2.02, zf), V(0.58, 1.04, 0.72), C.gold, M.gold)
-		for _, cx in { -0.29, 0.29 } do
+		box(arms, CFrame.new(x, 2.065, zf), V(0.6, 0.95, 0.72), C.gold, M.gold)
+		for _, cx in { -0.3, 0.3 } do
 			for _, cz in { -0.36, 0.36 } do
-				rod(arms, V(x + cx, 1.52, zf + cz), V(x + cx, 2.52, zf + cz), 0.12, C.goldHi, M.foil)
+				rod(arms, V(x + cx, 1.62, zf + cz), V(x + cx, 2.52, zf + cz), 0.12, C.goldHi, M.foil)
 			end
 		end
-		box(arms, CFrame.new(x, 2.04, fz - 0.005), V(0.44, 0.86, 0.02), C.goldDeep, M.gold)
-		-- рельеф: стебель, листья, два завитка, розетка
-		ell(arms, CFrame.new(x, 2.1, fz - 0.03), V(0.12, 0.6, 0.07), C.goldHi, M.foil)
+		box(arms, CFrame.new(x, 2.08, fz - 0.005), V(0.44, 0.78, 0.02), C.goldDeep, M.gold)
+		-- рельеф: веер листьев сверху, камень в бусинной оправе, пара завитков-волют внизу
+		for k = -2, 2 do
+			ell(arms, CFrame.new(x, 2.24, fz - 0.03) * CFrame.Angles(0, 0, rad(k * 24)) * CFrame.new(0, 0.12, 0), V(0.07, 0.26, 0.05), if k % 2 == 0 then C.goldHi else C.gold, M.foil)
+		end
+		for k = 0, 9 do
+			local a = k / 10 * math.pi * 2
+			ball(arms, V(x + math.cos(a) * 0.1, 2.02 + math.sin(a) * 0.12, fz - 0.04), 0.045, C.goldHi, M.foil)
+		end
 		for _, k in { -1, 1 } do
-			ell(arms, CFrame.new(x + k * 0.07, 2.26, fz - 0.03) * CFrame.Angles(0, 0, rad(-k * 38)), V(0.08, 0.34, 0.06), C.goldHi, M.foil)
 			local vol = {}
-			for i = 0, 9 do
-				local a = i / 9 * math.pi * 1.55 + (if k > 0 then 0 else math.pi)
-				local r = 0.11 * (1 - i / 14)
-				table.insert(vol, { V(x + k * 0.12 + math.cos(a) * r * k, 1.74 + math.sin(a) * r, fz - 0.035), 0.06 })
+			for i = 0, 11 do
+				local a = math.pi * 0.5 + k * (i / 11 * math.pi * 1.6)
+				local r = 0.1 * (1 - i / 16)
+				table.insert(vol, { V(x + k * 0.1 + math.cos(a) * r, 1.79 + math.sin(a) * r, fz - 0.035), 0.06 * (1 - i / 24) })
 			end
 			tube(arms, vol, C.goldHi, M.foil)
 		end
-		ball(arms, V(x, 1.72, fz - 0.04), 0.1, C.goldHi, M.foil)
+		rod(arms, V(x - 0.1, 1.89, fz - 0.035), V(x + 0.1, 1.89, fz - 0.035), 0.06, C.goldHi, M.foil)
 		-- карниз, шейка с бусинами, карниз
 		box(arms, CFrame.new(x, 2.57, zf), V(0.7, 0.1, 0.84), C.goldHi, M.foil)
 		box(arms, CFrame.new(x, 2.69, zf), V(0.5, 0.16, 0.62), C.goldDeep, M.gold)
 		beads(arms, { V(x - 0.2, 2.69, fz + 0.04), V(x + 0.2, 2.69, fz + 0.04) }, 0.07, 0.1, C.goldHi, M.foil)
 		box(arms, CFrame.new(x, 2.8, zf), V(0.64, 0.07, 0.78), C.goldHi, M.foil)
-		-- шапка-подушка
-		box(arms, CFrame.new(x, 2.98, zf), V(0.62, 0.34, 0.76), C.gold, M.gold)
-		rod(arms, V(x, 3.11, zf - 0.38), V(x, 3.11, zf + 0.38), 0.62, C.gold, M.gold)
-		rod(arms, V(x, 3.11, zf - 0.4), V(x, 3.11, zf - 0.36), 0.66, C.goldHi, M.foil)
-		-- волюты по бокам шапки (свиток в профиль)
+		-- шапка: «свиток» — брусок со скруглёнными передним и задним верхними рёбрами
+		local CAP0, CAP1, RR = 2.83, 3.43, 0.2
+		box(arms, CFrame.new(x, (CAP0 + CAP1 - RR) / 2, zf), V(0.64, CAP1 - CAP0 - RR, 0.8), C.gold, M.gold)
+		box(arms, CFrame.new(x, CAP1 - RR / 2, zf), V(0.64, RR, 0.8 - 2 * RR), C.gold, M.gold)
+		rod(arms, V(x - 0.31, CAP1 - RR, zf - 0.4 + RR), V(x + 0.31, CAP1 - RR, zf - 0.4 + RR), RR * 2, C.gold, M.gold)
+		rod(arms, V(x - 0.31, CAP1 - RR, zf + 0.4 - RR), V(x + 0.31, CAP1 - RR, zf + 0.4 - RR), RR * 2, C.gold, M.gold)
+		-- торцы свитка: спирали на боковых гранях у переднего края
 		for _, k in { -1, 1 } do
 			local vol = {}
-			for i = 0, 12 do
-				local a = i / 12 * math.pi * 1.75 - math.pi * 0.5
-				local r = 0.2 * (1 - i / 17)
-				table.insert(vol, { V(x + k * 0.31, 3.08 + math.sin(a) * r, zf - 0.22 - math.cos(a) * r), 0.1 * (1 - i / 22) })
+			for i = 0, 16 do
+				local a = i / 16 * math.pi * 2.2 + math.pi * 0.5
+				local r = 0.2 * (1 - i / 20)
+				table.insert(vol, { V(x + k * 0.335, CAP1 - 0.23 + math.sin(a) * r, zf - 0.18 + math.cos(a) * r), 0.075 * (1 - i / 30) })
 			end
 			tube(arms, vol, C.goldHi, M.foil)
+			ball(arms, V(x + k * 0.335, CAP1 - 0.23, zf - 0.18), 0.09, C.goldHi, M.foil)
 		end
-		for _, q in { { -0.17, 3.26 }, { 0.17, 3.26 } } do
-			ball(arms, V(x + q[1], q[2], fz), 0.075, C.goldHi, M.foil)
+		-- лицо шапки: розетка и заклёпки по верхнему ребру
+		for k = 0, 5 do
+			local a = k / 6 * math.pi * 2
+			ell(arms, CFrame.new(x + math.cos(a) * 0.08, 3.08 + math.sin(a) * 0.08, fz - 0.06) * CFrame.Angles(0, 0, a), V(0.12, 0.07, 0.05), C.goldHi, M.foil)
 		end
-		gem(arms, CFrame.new(x, 3.06, fz - 0.03), V(0.15, 0.18, 0.08), C.ruby, C.rubyCore)
+		ball(arms, V(x, 3.08, fz - 0.07), 0.09, C.goldHi, M.foil)
+		for _, dx in { -0.2, 0, 0.2 } do
+			ball(arms, V(x + dx, CAP1 - 0.06, zf - 0.32), 0.065, C.goldHi, M.foil)
+		end
+		gem(arms, CFrame.new(x, 2.05, fz - 0.06), V(0.13, 0.16, 0.07), C.ruby, C.rubyCore)
 		-- подлокотник: золотой брус + бархатный валик
-		box(arms, CFrame.new(x, 3.08, -0.1), V(0.38, 0.2, 1.36), C.gold, M.gold)
-		rod(arms, V(x + s * 0.19, 2.99, -0.76), V(x + s * 0.19, 2.99, 0.58), 0.08, C.goldHi, M.foil)
-		rod(arms, V(x - s * 0.19, 2.99, -0.76), V(x - s * 0.19, 2.99, 0.58), 0.08, C.goldHi, M.foil)
-		ell(arms, CFrame.new(x, 3.22, -0.06), V(0.42, 0.32, 1.3), C.velvet, M.velvet)
-		-- бархатная боковина под подлокотником и стойка
-		box(arms, CFrame.new(x, 2.47, -0.1), V(0.16, 1.04, 1.36), C.velvet, M.velvet)
-		rod(arms, V(x, 1.95, 0.52), V(x, 3.0, 0.52), 0.15, C.gold, M.gold)
+		-- (брус и боковина заходят в раму спинки — без щели между подлокотником и спинкой)
+		box(arms, CFrame.new(x, 3.08, 0.09), V(0.38, 0.2, 1.74), C.gold, M.gold)
+		rod(arms, V(x + s * 0.19, 2.99, -0.76), V(x + s * 0.19, 2.99, 0.92), 0.08, C.goldHi, M.foil)
+		rod(arms, V(x - s * 0.19, 2.99, -0.76), V(x - s * 0.19, 2.99, 0.92), 0.08, C.goldHi, M.foil)
+		ell(arms, CFrame.new(x, 3.22, 0.0), V(0.42, 0.32, 1.46), C.velvet, M.velvet)
+		-- бархатная боковина под подлокотником и стойка у спинки
+		box(arms, CFrame.new(x, 2.47, 0.09), V(0.16, 1.04, 1.74), C.velvet, M.velvet)
+		rod(arms, V(x, 1.9, 0.8), V(x, 3.0, 0.8), 0.17, C.gold, M.gold)
 	end
 	armSide(1)
 	armSide(-1)
@@ -425,7 +447,7 @@ return function(B)
 	---------------------------------------------------------------- спинка
 	local back = B:folder("Back", throne)
 	local TILT = 5 -- спинка чуть откинута назад: лучше ловит верхний свет
-	local BACK = CFrame.new(0, SEAT_Y, 0.62) * CFrame.Angles(rad(TILT), 0, 0)
+	local BACK = CFrame.new(0, SEAT_Y, 0.7) * CFrame.Angles(rad(TILT), 0, 0)
 	local function bp(x, v, w)
 		return BACK:PointToWorldSpace(V(x, v, w))
 	end
@@ -441,13 +463,13 @@ return function(B)
 		{ 1.60, 2.3 },
 		{ 1.70, 3.1 },
 		{ 1.78, 3.9 },
-		{ 1.82, 4.6 },
-		{ 1.80, 5.05 },
-		{ 1.70, 5.42 },
-		{ 1.50, 5.70 },
-		{ 1.18, 5.88 },
-		{ 0.78, 5.98 },
-		{ 0.38, 6.04 },
+		{ 1.83, 4.6 },
+		{ 1.84, 5.08 },
+		{ 1.79, 5.44 },
+		{ 1.66, 5.69 },
+		{ 1.42, 5.86 },
+		{ 1.02, 5.96 },
+		{ 0.52, 6.03 },
 		{ 0.0, 6.06 },
 	}
 	local function halfWidth(v)
@@ -478,7 +500,7 @@ return function(B)
 	end
 
 	-- панель: горизонтальные полосы по контуру
-	local PANEL_D = 0.36
+	local PANEL_D = 0.46
 	do
 		local v = -0.1
 		while v < 6.06 do
@@ -522,26 +544,32 @@ return function(B)
 	-- рама: внешний валик, наружный тонкий валик, торец, бусины изнутри, задний валик
 	do
 		local front, outer = {}, {}
-		for i, p in outline do
-			local nrm = outNormal(i, outline)
+		local function nAt(sv)
+			return outNormal(math.clamp(math.floor(sv * (#outline - 1) + 0.5) + 1, 1, #outline), outline)
+		end
+		for _, it in resample(outline, 0.24) do
+			local p, nrm = it[1], nAt(it[2])
 			table.insert(front, { bp(p.X + nrm.X * 0.04, p.Y + nrm.Y * 0.04, -0.05), 0.3 })
+		end
+		for _, it in resample(outline, 0.3) do
+			local p, nrm = it[1], nAt(it[2])
 			table.insert(outer, { bp(p.X + nrm.X * 0.24, p.Y + nrm.Y * 0.24, 0.02), 0.12 })
 		end
 		tube(back, front, C.gold, M.gold)
 		tube(back, outer, C.goldHi, M.foil)
 		-- торец рамы
-		local edge = resample(outline, 0.32)
+		local edge = resample(outline, 0.4)
 		for i = 1, #edge - 1 do
 			local a, b = edge[i][1], edge[i + 1][1]
 			local na = outNormal(math.max(1, math.floor(edge[i][2] * (#outline - 1)) + 1), outline)
 			local nb = outNormal(math.max(1, math.floor(edge[i + 1][2] * (#outline - 1)) + 1), outline)
 			local pa, pb = a + na * 0.14, b + nb * 0.14
 			local cf, len = along(bp(pa.X, pa.Y, PANEL_D / 2 + 0.02), bp(pb.X, pb.Y, PANEL_D / 2 + 0.02))
-			box(back, cf, V(len + 0.06, 0.2, PANEL_D + 0.08), C.goldDeep, M.gold)
+			box(back, cf, V(len + 0.06, 0.2 + (i % 2) * 0.012, PANEL_D + 0.08 + (i % 2) * 0.012), C.goldDeep, M.gold)
 		end
 		-- задний валик
 		local backT = {}
-		for _, it in resample(outline, 0.3) do
+		for _, it in resample(outline, 0.55) do
 			local p = it[1]
 			table.insert(backT, { bp(p.X, p.Y, PANEL_D + 0.04), 0.16 })
 		end
@@ -552,7 +580,7 @@ return function(B)
 			local nrm = outNormal(i, outline)
 			table.insert(inner, bp(p.X - nrm.X * 0.24, p.Y - nrm.Y * 0.24, -0.06))
 		end
-		beads(back, inner, 0.09, 0.115, C.goldHi, M.foil)
+		beads(back, inner, 0.09, 0.125, C.goldHi, M.foil)
 	end
 
 	-- Волюта (спираль-трубка) в плоскости спинки
@@ -629,7 +657,7 @@ return function(B)
 		end
 		local bt = {}
 		for _, p in spline(base, 2) do
-			table.insert(bt, { bp(p.X, p.Y, p.Z), 0.3 })
+			table.insert(bt, { bp(p.X, p.Y + 0.02, p.Z - 0.02), 0.34 })
 		end
 		tube(crest, bt, C.gold, M.gold)
 		-- сплошной задник гребня (тёмное золото)
@@ -639,7 +667,7 @@ return function(B)
 			local t = (v1 - 5.85) / 1.3
 			local w = 1.9 * math.sqrt(math.max(0, 1 - t ^ 1.6)) * (1 - 0.25 * t)
 			if w > 0.08 then
-				box(crest, BACK * CFrame.new(0, (v + v1) / 2, 0.1), V(w * 2, 0.112, 0.16), C.goldDeep, M.gold)
+				box(crest, BACK * CFrame.new(0, (v + v1) / 2, 0.12), V(w * 2, 0.112, 0.16), C.goldDeep, M.gold)
 			end
 			v = v1
 		end
@@ -662,6 +690,14 @@ return function(B)
 		leaf(crest, 2.08 * s, 6.55, CW - 0.04, -80 * s, 0.4)
 		leaf(crest, 0.6 * s, 5.95, CW - 0.1, -95 * s, 0.38)
 		ball(crest, bp(2.12 * s, 5.78, CW - 0.04), 0.12, C.goldHi, M.foil)
+		-- листья аканта по внешней кромке большого завитка
+		for _, q in { { 0.62, 6.83, 40 }, { 1.1, 7.12, 10 }, { 1.62, 7.0, -30 }, { 1.98, 6.6, -60 } } do
+			leaf(crest, q[1] * s, q[2], CW - 0.02, q[3] * s * -1 + (if s < 0 then 0 else 0), 0.3)
+		end
+	end
+	-- раковина-веер позади короны
+	for k = -3, 3 do
+		ell(crest, bcf(0, 7.0, 0.2, k * 22) * CFrame.new(0, 0.32, 0), V(0.16, 0.62, 0.1), if k % 2 == 0 then C.goldHi else C.gold, M.foil)
 	end
 	-- картуш: овальный медальон с большим рубином
 	do
@@ -709,7 +745,7 @@ return function(B)
 			local cf = CFrame.new(p) * CFrame.Angles(0, -a, 0)
 			if k % 2 == 0 then
 				box(crown, cf * CFrame.new(0, 0.02, 0), V(0.09, 0.28, 0.05), C.goldHi, M.foil)
-				box(crown, cf * CFrame.new(0, 0.06, 0), V(0.24, 0.08, 0.05), C.goldHi, M.foil)
+				box(crown, cf * CFrame.new(0, 0.06, 0), V(0.24, 0.08, 0.035), C.goldHi, M.foil)
 				ell(crown, cf * CFrame.new(0, 0.06, -0.03), V(0.07, 0.07, 0.04), C.ruby, M.glass, { transparency = 0.1 })
 				ball(crown, p + V(0, 0.2, 0), 0.07, C.pearl, "SmoothPlastic")
 			else
@@ -733,7 +769,7 @@ return function(B)
 		ball(crown, V(0, cy + 0.86, cz), 0.22, C.goldHi, M.foil)
 		rod(crown, V(-0.12, cy + 0.86, cz), V(0.12, cy + 0.86, cz), 0.035, C.gold, M.gold)
 		box(crown, CFrame.new(0, cy + 1.06, cz), V(0.055, 0.24, 0.055), C.goldHi, M.foil)
-		box(crown, CFrame.new(0, cy + 1.09, cz), V(0.17, 0.055, 0.055), C.goldHi, M.foil)
+		box(crown, CFrame.new(0, cy + 1.09, cz), V(0.17, 0.055, 0.04), C.goldHi, M.foil)
 		gem(crown, CFrame.new(0, cy + 1.09, cz - 0.03), V(0.06, 0.06, 0.03), C.ruby, C.rubyCore)
 	end
 
@@ -741,15 +777,16 @@ return function(B)
 	-- СВЕТ
 	-- ===================================================================
 	local lights = B:folder("Lights")
-	local LAMP = V(0, 30, -2)
+	local LAMP = V(0, 30, -4)
 	local TARGET = V(0, 3.6, 0.35)
 	local lampCf = aim(LAMP, TARGET)
 	local lamp = part({ parent = lights, name = "SpotLamp", cf = lampCf, size = V(1.6, 1.6, 1.2), color = C.void, castShadow = false, canQuery = false })
 	lamp.Transparency = 1
 	part({ parent = lights, name = "LampHousing", cf = lampCf * CFrame.new(0, 0, 0.9) * CFrame.Angles(0, math.pi / 2, 0), size = V(1.8, 1.5, 1.5), shape = "Cylinder", color = rgb(10, 10, 12), material = "Metal", castShadow = false })
 	part({ parent = lights, name = "LampLens", cf = lampCf * CFrame.new(0, 0, 0.02) * CFrame.Angles(0, math.pi / 2, 0), size = V(0.06, 1.3, 1.3), shape = "Cylinder", color = C.light, material = M.neon, castShadow = false })
-	B:light(lamp, "SpotLight", { Name = "KeyLight", Brightness = 14, Range = 60, Angle = 20, Face = "Front", Shadows = true, Color = C.light })
-	B:light(lamp, "SpotLight", { Name = "KeySoft", Brightness = 2.5, Range = 60, Angle = 32, Face = "Front", Shadows = false, Color = C.light })
+	-- Range 42 (а не максимум): свет затухает к полу — корона и спинка ярче ножек и подиума, как в клипе
+	B:light(lamp, "SpotLight", { Name = "KeyLight", Brightness = 12, Range = 42, Angle = 20, Face = "Front", Shadows = true, Color = C.light })
+	B:light(lamp, "SpotLight", { Name = "KeySoft", Brightness = 2, Range = 42, Angle = 32, Face = "Front", Shadows = false, Color = C.light })
 
 	local function spot(name, pos, target, kind, props)
 		local p = part({ parent = lights, name = name, cf = aim(pos, target), size = V(0.4, 0.4, 0.4), color = C.void, castShadow = false, canQuery = false })
@@ -758,7 +795,7 @@ return function(B)
 		l.Name = name .. "Light"
 		return p
 	end
-	spot("FillFront", V(0, 6.5, -12), V(0, 5, 0.5), "SpotLight", { Brightness = 0.45, Range = 24, Angle = 40, Face = "Front", Shadows = false, Color = rgb(255, 214, 160) })
+	spot("FillFront", V(0, 5, -11), V(0, 3.5, 0), "SpotLight", { Brightness = 0.6, Range = 24, Angle = 46, Face = "Front", Shadows = false, Color = rgb(255, 214, 160) })
 	spot("RimBack", V(0, 17, 7.5), V(0, 7.5, 0.8), "SpotLight", { Brightness = 1.2, Range = 22, Angle = 38, Face = "Front", Shadows = false, Color = rgb(255, 220, 170) })
 
 	-- ===================================================================
@@ -782,7 +819,7 @@ return function(B)
 		end
 		return NumberSequence.new(kps)
 	end
-	local function beam(name, a0, a1, w0, w1, alphaTop, alphaMid, color)
+	local function beam(name, a0, a1, w0, w1, alphaTop, color)
 		local bm = Instance.new("Beam")
 		bm.Name = name
 		bm.Attachment0 = a0
@@ -794,7 +831,8 @@ return function(B)
 		bm.LightInfluence = 0
 		bm.Segments = 24
 		bm.Color = ColorSequence.new(color)
-		bm.Transparency = ns({ { 0, 1 - alphaTop }, { 0.35, 1 - alphaMid }, { 0.75, 1 - alphaMid * 0.35 }, { 1, 1 } })
+		-- почти линейный спад к полу (превью интерполирует только крайние точки — так они совпадают)
+		bm.Transparency = ns({ { 0, 1 - alphaTop }, { 0.5, 1 - alphaTop * 0.5 }, { 0.8, 1 - alphaTop * 0.16 }, { 1, 1 } })
 		bm.Parent = a0.Parent
 		return bm
 	end
@@ -804,26 +842,33 @@ return function(B)
 	local top = anchor("ShaftTop", TOP_P)
 	local backEnd = anchor("ShaftBackEnd", BACK_P)
 	local frontEnd = anchor("ShaftFrontEnd", FRONT_P)
-	local coneTan = math.tan(rad(10))
+	local coneTan = math.tan(rad(8.5))
 	local Lb = (BACK_P - TOP_P).Magnitude
 	local Lf = (FRONT_P - TOP_P).Magnitude
-	local warm = rgb(255, 234, 200)
+	-- Ленты стоят не на оси конуса: из камеры плана (0,4,−14) задняя кажется меньше, передняя — больше.
+	-- Поправка ширины у пола, чтобы обе проецировались на настоящий силуэт конуса.
+	local CAM_Z = -14
+	local axisZ0 = LAMP.Z + (TARGET.Z - LAMP.Z) * (LAMP.Y / (LAMP.Y - TARGET.Y)) -- ось конуса на высоте пола
+	local kBack = (BACK_P.Z - CAM_Z) / (axisZ0 - CAM_Z)
+	local kFront = (FRONT_P.Z - CAM_Z) / (axisZ0 - CAM_Z)
+	local Lc = (V(0, 0, axisZ0) - TOP_P).Magnitude
+	local warm = rgb(246, 238, 224)
 	-- Профиль яркости поперёк конуса P(r) (r — доля радиуса): плотная середина, мягкое плечо к краю.
 	-- Ленты шириной f_i, непрозрачность каждой = P(f_{i−1}) − P(f_i): сумма лент даёт P без ступенек.
 	local function profile(r)
-		local e = math.clamp((r - 0.62) / (1.22 - 0.62), 0, 1)
+		local e = math.clamp((r - 0.55) / (1.12 - 0.55), 0, 1)
 		return (1 - e * e * (3 - 2 * e)) * (0.8 + 0.2 * (1 - math.min(1, r * r)))
 	end
 	local N = 14
 	local prev = profile(0)
 	for i = 1, N do
-		local f = 0.1 + (1.22 - 0.1) * (i - 1) / (N - 1)
+		local f = 0.1 + (1.12 - 0.1) * (i - 1) / (N - 1)
 		local p = profile(f)
 		local a = prev - p
 		prev = p
-		beam(string.format("LightShaftBack%02d", i), top, backEnd, 0.35 + f * 0.5, 2 * Lb * coneTan * f, a * 0.42, a * 0.2, warm)
+		beam(string.format("LightShaftBack%02d", i), top, backEnd, 0.35 + f * 0.5, 2 * Lc * coneTan * f * kBack, math.min(1, a * 0.45), warm)
 		if f > 0.3 then
-			beam(string.format("LightShaftFront%02d", i), top, frontEnd, 0.35 + f * 0.5, 2 * Lf * coneTan * f, a * 0.22, a * 0.1, warm)
+			beam(string.format("LightShaftFront%02d", i), top, frontEnd, 0.35 + f * 0.5, 2 * Lc * coneTan * f * kFront, math.min(1, a * 0.18), warm)
 		end
 	end
 

@@ -9,10 +9,10 @@ return {
 	furWarm = C("6B4A37"), -- тёплый: лоб, переносица
 	furDark = C("2F2623"), -- кисти, тень
 	furHand = C("4A382E"), -- кисти в солнце
-	furGrey = C("4B4542"), -- седоватые щёки/скулы
-	chestFur = C("2A2524"),
-	muzzle = C("2E2A29"),
-	nose = C("1C1A1A"),
+	furGrey = C("4A403B"), -- седоватые щёки/скулы
+	chestFur = C("2C2624"),
+	muzzle = C("2F2B2A"),
+	nose = C("232020"),
 	nostril = C("070606"),
 	mane = C("151212"),
 	earIn = C("2B2321"),
@@ -28,23 +28,23 @@ return {
 	iris = C("3E2510"),
 	pupil = C("060505"),
 	-- костюм
-	suit = C("4C40B8"), -- индиго-фиолетовый пиджак
-	suitLight = C("5A4DC8"),
-	suitDark = C("2E2575"),
-	shirt = C("B4432F"), -- ржаво-красная рубашка
-	shirtDark = C("8E2F22"),
+	suit = C("3F37A8"), -- индиго-фиолетовый пиджак
+	suitLight = C("463EB4"),
+	suitDark = C("1E1850"),
+	shirt = C("A83A2A"), -- ржаво-красная рубашка
+	shirtDark = C("7E2A1F"),
 	dot = C("33296A"), -- тёмно-синие точки
 	dotLight = C("5B4C9A"),
-	jeans = C("7086BC"),
-	jeansDark = C("566BA0"),
+	jeans = C("5A6FA6"),
+	jeansDark = C("4A5E92"),
 	seam = C("C99A4A"),
 	belt = C("151414"),
 	croc = C("23211F"),
 	shoe = C("161617"),
 	sole = C("0C0C0C"),
 	-- золото
-	gold = C("F2C14E"), -- цепь (полированное)
-	goldDeep = C("C99A2E"),
+	gold = C("E8AE34"), -- цепь (полированное)
+	goldDeep = C("B9831E"),
 	champagne = C("E3D5AE"), -- лицевая сторона «A»
 	buckleSide = C("E8BF58"),
 	frame = C("E2BE5C"), -- оправа очков

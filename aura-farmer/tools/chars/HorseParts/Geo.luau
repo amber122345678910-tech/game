@@ -187,49 +187,73 @@ function Geo:trap(bone, frame, v0, v1, L0, L1, R0, R1, thick, color, mat, zoff, 
 	end
 end
 
--- Выпуклый многоугольник pts = { {u, v}, ... } (любой порядок обхода) -> горизонтальные трапеции.
+-- Прямоугольный треугольник в 3D: прямой угол в R, катеты к A и B. Клин толщиной thick.
+function Geo:rtri3(bone, R, A, B, thick, color, mat, extra)
+	local ya, zb = A - R, B - R
+	local h, w = ya.Magnitude, zb.Magnitude
+	if h < 1e-4 or w < 1e-4 then
+		return nil
+	end
+	local Y = ya / h
+	local Z = -(zb / w)
+	local X = Y:Cross(Z).Unit
+	Z = X:Cross(Y).Unit
+	local cf = CFrame.fromMatrix((A + B) / 2, X, Y, Z)
+	return self:put(bone, merge({ cf = cf, size = V(thick, h, w), color = color, material = mat or "SmoothPlastic", shape = "Wedge" }, extra))
+end
+
+-- Произвольный треугольник в 3D -> 2 клина (высота к самой длинной стороне).
+function Geo:tri3(bone, a, b, c, thick, color, mat, extra)
+	local pts = { a, b, c }
+	local best, bi = -1, 1
+	for i = 1, 3 do
+		local p, q = pts[i], pts[i % 3 + 1]
+		local l = (q - p).Magnitude
+		if l > best then
+			best, bi = l, i
+		end
+	end
+	local p, q, r = pts[bi], pts[bi % 3 + 1], pts[(bi + 1) % 3 + 1]
+	local e = (q - p).Unit
+	local f = p + e * (r - p):Dot(e)
+	self:rtri3(bone, f, r, p, thick, color, mat, extra)
+	self:rtri3(bone, f, r, q, thick, color, mat, extra)
+end
+
+-- Выпуклый многоугольник pts = { {u, v}, ... } в плоскости frame -> веер треугольников.
 function Geo:poly(bone, frame, pts, thick, color, mat, zoff, extra)
-	local n = #pts
-	local levels = {}
+	local p3 = {}
 	for _, p in pts do
-		table.insert(levels, p[2])
+		table.insert(p3, frame * V(p[1], p[2], zoff or 0))
 	end
-	table.sort(levels)
-	-- границы на высоте v: пересечения рёбер
-	local function span(v)
-		local lo, hi = math.huge, -math.huge
-		for i = 1, n do
-			local a, b = pts[i], pts[i % n + 1]
-			local va, vb = a[2], b[2]
-			if (v >= math.min(va, vb) - 1e-6) and (v <= math.max(va, vb) + 1e-6) then
-				if math.abs(vb - va) < 1e-6 then
-					lo = math.min(lo, a[1], b[1])
-					hi = math.max(hi, a[1], b[1])
-				else
-					local t = (v - va) / (vb - va)
-					local u = a[1] + (b[1] - a[1]) * t
-					lo = math.min(lo, u)
-					hi = math.max(hi, u)
-				end
-			end
-		end
-		return lo, hi
+	for i = 2, #p3 - 1 do
+		self:tri3(bone, p3[1], p3[i], p3[i + 1], thick, color, mat, extra)
 	end
-	-- для каждого слоя берём границы чуть внутри, чтобы не цеплять соседние рёбра в вершинах
-	for i = 1, #levels - 1 do
-		local v0, v1 = levels[i], levels[i + 1]
-		if v1 - v0 > 1e-4 then
-			local e = (v1 - v0) * 1e-3
-			local l0, r0 = span(v0 + e)
-			local l1, r1 = span(v1 - e)
-			-- экстраполяция к точным уровням
-			local k = (v1 - v0) / (v1 - v0 - 2 * e)
-			local lm, rm = (l0 + l1) / 2, (r0 + r1) / 2
-			l0, l1 = lm + (l0 - lm) * k, lm + (l1 - lm) * k
-			r0, r1 = rm + (r0 - rm) * k, rm + (r1 - rm) * k
-			self:trap(bone, frame, v0, v1, l0, l1, r0, r1, thick, color, mat, zoff, extra)
-		end
+end
+
+-- Плоская панель по 3D-точкам (выпуклый многоугольник; точки проецируются на плоскость первых трёх).
+function Geo:panel(bone, pts3, thick, color, mat, extra)
+	local a, b, c = pts3[1], pts3[2], pts3[3]
+	local n = (b - a):Cross(c - a).Unit
+	local o = Vector3.zero
+	for _, p in pts3 do
+		o += p
 	end
+	o /= #pts3
+	local up = V(0, 1, 0) - n * n.Y
+	if up.Magnitude < 1e-3 then
+		up = V(0, 0, -1)
+	end
+	up = up.Unit
+	local x = up:Cross(n).Unit
+	local frame = CFrame.fromMatrix(o, x, up, n)
+	local pts = {}
+	for _, p in pts3 do
+		local d = p - o
+		table.insert(pts, { d:Dot(x), d:Dot(up) })
+	end
+	self:poly(bone, frame, pts, thick, color, mat, 0, extra)
+	return frame, pts
 end
 
 -- Обводка многоугольника цилиндрами (замкнутая), d — диаметр.

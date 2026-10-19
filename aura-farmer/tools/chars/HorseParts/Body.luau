@@ -10,6 +10,7 @@ local V = roblox.Vector3.new
 local rad = math.rad
 
 local Geo = require("./Geo")
+local Drape = require("./Drape")
 local P = require("./Palette")
 
 local Body = {}
@@ -97,112 +98,125 @@ Body.seq = seq
 function Body.build(g, opts)
 	local rig = g.rig
 
-	-- ===== Пиджак: спина, бока, грудь (UpperTorso) =====
-	g:ell("UpperTorso", V(0, 4.0, 0.12), V(2.3, 2.0, 1.18), P.suit, "SmoothPlastic")
+	-- ===== Корпус (UpperTorso): пиджак, рубашка, мех =====
+	local E = {
+		chest = { c = V(0, 3.98, 0.1), r = V(1.12, 1.3, 0.58) },
+		waist = { c = V(0, 3.32, 0.1), r = V(1.01, 0.65, 0.54) },
+		shirt = { c = V(0, 3.8, -0.2), r = V(0.525, 1.0, 0.38) },
+		fur = { c = V(0, 4.48, -0.3), r = V(0.36, 0.58, 0.255) },
+		fur2 = { c = V(0, 4.86, -0.2), r = V(0.4, 0.26, 0.31) },
+		shoulder = { c = V(0, 4.6, 0.06), r = V(1.42, 0.29, 0.29) },
+	}
+	g:ell("UpperTorso", E.chest.c, E.chest.r * 2, P.suit, "SmoothPlastic")
+	g:ell("UpperTorso", E.waist.c, E.waist.r * 2, P.suit, "SmoothPlastic")
+	g:tube("UpperTorso", { V(-1.12, 4.6, 0.06), V(1.12, 4.6, 0.06) }, 0.58, P.suit, "SmoothPlastic") -- линия плеч
 	for _, s in { 1, -1 } do
-		g:ell("UpperTorso", V(s * 0.5, 3.98, -0.02), V(1.36, 2.2, 1.2), P.suit, "SmoothPlastic")
-		-- плечевые накладки (мост к рукаву)
-		g:ell("UpperTorso", V(s * 1.0, 4.58, 0.03), V(1.0, 0.56, 1.08), P.suit, "SmoothPlastic", V(0, 0, s * -12))
-		-- трапеция (скат к шее)
-		g:ell("UpperTorso", V(s * 0.55, 4.72, 0.12), V(0.9, 0.5, 0.9), P.suit, "SmoothPlastic", V(0, 0, s * -18))
+		g:tube("UpperTorso", { V(s * 0.36, 4.88, 0.14), V(s * 1.08, 4.66, 0.08) }, 0.5, P.suit, "SmoothPlastic") -- скат плеч
 	end
-	g:ell("UpperTorso", V(0, 3.3, 0.12), V(2.1, 1.2, 1.12), P.suit, "SmoothPlastic")
-
-	-- ===== Рубашка (основа) и мех в вырезе =====
-	g:ell("UpperTorso", V(0, 3.82, -0.18), V(1.4, 2.2, 1.0), P.shirt, "Fabric")
-	g:ell("UpperTorso", V(0, 4.5, -0.42), V(0.66, 1.05, 0.62), P.chestFur, "Carpet")
-	g:ell("UpperTorso", V(0, 4.78, -0.25), V(0.8, 0.5, 0.7), P.chestFur, "Carpet")
-	for _, s in { 1, -1 } do
-		-- края планки рубашки образуют V
-		g:ell("UpperTorso", V(s * 0.36, 4.25, -0.5), V(0.46, 1.5, 0.36), P.shirt, "Fabric", V(0, s * 10, s * 16))
+	g:ell("UpperTorso", E.shirt.c, E.shirt.r * 2, P.shirt, "Fabric")
+	g:ell("UpperTorso", E.fur.c, E.fur.r * 2, P.chestFur, "Carpet")
+	g:ell("UpperTorso", E.fur2.c, E.fur2.r * 2, P.chestFur, "Carpet")
+	-- пучки шерсти на груди (ломают ровную поверхность)
+	for _, t in { { 0.0, 4.66, 0.16 }, { 0.1, 4.32, 0.12 }, { -0.1, 4.4, 0.13 }, { 0.04, 4.05, 0.1 } } do
+		local dr = Drape.new(g, { E.fur, E.fur2 })
+		g:ell("UpperTorso", dr:cf(t[1], t[2], -0.015, 0), V(t[3], t[3] * 1.6, 0.06), P.chestFur:Lerp(P.furGrey, 0.35), "Carpet")
 	end
 
-	-- ===== Лацканы пиджака (плоские панели) =====
+	local D = Drape.new(g, { E.chest, E.waist, E.shirt, E.fur, E.fur2, E.shoulder })
+
+	-- ===== Планки рубашки: внутренние края образуют глубокий V =====
 	for _, s in { 1, -1 } do
-		local frame = planeFrame(V(s * 0.56, 4.1, -0.66), V(s * 0.28, 0.14, -1))
-		local pts = { { -0.2, 0.75 }, { 0.1, 0.72 }, { 0.44, 0.52 }, { 0.32, 0.18 }, { -0.33, -0.72 } }
-		for _, p in pts do
-			p[1] *= s
+		local inner = { { s * 0.37, 4.98 }, { s * 0.25, 4.5 }, { s * 0.12, 4.02 }, { 0.0, 3.54 } }
+		local outer = { { s * 0.5, 4.98 }, { s * 0.5, 4.5 }, { s * 0.5, 4.02 }, { s * 0.5, 3.54 } }
+		D:strip("UpperTorso", inner, outer, 0.012, 0.012, P.shirt, "Fabric")
+		D:tube("UpperTorso", { { s * 0.012, 3.56 }, { s * 0.37, 4.96 } }, 0.02, 0.03, P.shirtDark, "Fabric", 0.4)
+	end
+	-- горошек на рубашке (видимая часть)
+	for _, d in { { 0.2, 4.42 }, { 0.3, 4.75 }, { 0.12, 3.95 }, { -0.2, 4.42 }, { -0.3, 4.75 }, { -0.12, 3.95 }, { 0.0, 3.4 }, { 0.22, 3.62 }, { -0.22, 3.62 }, { 0.12, 3.2 }, { -0.12, 3.2 }, { 0.3, 3.3 }, { -0.3, 3.3 }, { 0.25, 4.1 }, { -0.25, 4.1 } } do
+		local x, y = d[1], d[2]
+		local vEdge = 3.55 + math.abs(x) / 0.37 * 1.43 -- над этой высотой — вырез (мех)
+		if y < vEdge - 0.06 then
+			g:ell("UpperTorso", D:cf(x, y, 0.024, if x > 0 then 25 else -25), V(0.05, 0.072, 0.014), P.dot, "SmoothPlastic")
 		end
-		g:poly("UpperTorso", frame, pts, 0.05, P.suitLight, "SmoothPlastic", 0)
+	end
+
+	-- ===== Лацканы пиджака =====
+	for _, s in { 1, -1 } do
+		local function m(t)
+			for _, p in t do
+				p[1] *= s
+			end
+			return t
+		end
+		local inner = m({ { 0.34, 4.9 }, { 0.31, 4.45 }, { 0.28, 3.95 }, { 0.25, 3.42 } })
+		local outer = m({ { 0.66, 4.86 }, { 0.88, 4.5 }, { 0.6, 3.92 }, { 0.25, 3.42 } })
+		D:strip("UpperTorso", inner, outer, 0.04, 0.014, P.suitLight, "SmoothPlastic")
+		-- верхняя кромка до пика лацкана
+		D:strip("UpperTorso", m({ { 0.62, 4.88 }, { 0.66, 4.86 } }), m({ { 0.9, 4.66 }, { 0.88, 4.5 } }), 0.04, 0.014, P.suitLight, "SmoothPlastic")
 		-- закатанная кромка лацкана
-		local edge = { pts[3], pts[4], pts[5] }
-		for i = 1, #edge - 1 do
-			local a = frame * V(edge[i][1], edge[i][2], -0.01)
-			local b = frame * V(edge[i + 1][1], edge[i + 1][2], -0.01)
-			g:ellSeg("UpperTorso", a, b, 0.07, 0.07, P.suitLight, "SmoothPlastic")
-		end
+		D:tube("UpperTorso", m({ { 0.62, 4.88 }, { 0.9, 4.66 }, { 0.88, 4.5 }, { 0.75, 4.2 }, { 0.6, 3.92 }, { 0.42, 3.66 }, { 0.25, 3.42 }, { 0.28, 3.95 }, { 0.31, 4.45 }, { 0.34, 4.9 } }), 0.045, 0.055, P.suitLight, "SmoothPlastic", 0.3)
 	end
 
 	-- ===== Огромный воротник рубашки (поверх лацканов) =====
 	for _, s in { 1, -1 } do
-		local frame = planeFrame(V(s * 0.55, 4.45, -0.71), V(s * 0.3, 0.2, -1))
-		local pts = { { -0.34, 0.5 }, { -0.05, 0.6 }, { 0.3, 0.25 }, { 0.54, -0.4 }, { 0.15, -0.15 }, { -0.3, 0.3 } }
-		for _, p in pts do
-			p[1] *= s
+		local function m(t)
+			for _, p in t do
+				p[1] *= s
+			end
+			return t
 		end
-		g:poly("UpperTorso", frame, pts, 0.04, P.shirt, "Fabric", 0)
-		-- кромка воротника
-		for i = 1, #pts do
-			local a, b = pts[i], pts[i % #pts + 1]
-			g:ellSeg("UpperTorso", frame * V(a[1], a[2], 0), frame * V(b[1], b[2], 0), 0.045, 0.045, P.shirtDark, "Fabric")
+		local top = m({ { 0.13, 4.9 }, { 0.38, 5.02 }, { 0.6, 4.8 }, { 0.76, 4.42 }, { 0.84, 4.12 } })
+		local bot = m({ { 0.13, 4.9 }, { 0.2, 4.68 }, { 0.38, 4.52 }, { 0.58, 4.34 }, { 0.84, 4.12 } })
+		D:strip("UpperTorso", top, bot, 0.08, 0.014, P.shirt, "Fabric")
+		local rim = {}
+		for i = 1, #top do
+			table.insert(rim, top[i])
 		end
-		-- горошек на воротнике
-		local dots = { { 0.0, 0.42 }, { 0.12, 0.2 }, { -0.14, 0.32 }, { 0.3, 0.02 }, { 0.15, -0.02 }, { 0.42, -0.25 }, { -0.03, 0.12 }, { 0.26, 0.2 } }
-		for _, d in dots do
-			local p = frame * CFrame.new(s * d[1], d[2], -0.024) * CFrame.Angles(0, 0, rad(s * 25))
-			g:ell("UpperTorso", p, V(0.055, 0.075, 0.012), P.dot, "SmoothPlastic")
+		for i = #bot - 1, 2, -1 do
+			table.insert(rim, bot[i])
+		end
+		D:tube("UpperTorso", rim, 0.082, 0.034, P.shirtDark, "Fabric", 0.3, true)
+		for _, d in { { 0.3, 4.86 }, { 0.48, 4.78 }, { 0.36, 4.66 }, { 0.58, 4.6 }, { 0.5, 4.46 }, { 0.7, 4.38 }, { 0.24, 4.78 }, { 0.74, 4.22 }, { 0.42, 4.62 }, { 0.62, 4.5 } } do
+			g:ell("UpperTorso", D:cf(s * d[1], d[2], 0.092, s * 25), V(0.05, 0.072, 0.012), P.dot, "SmoothPlastic")
 		end
 	end
-	-- стойка воротника вокруг шеи сзади
+	-- стойка воротника вокруг шеи сзади + воротник пиджака
 	local back = {}
 	for i = 0, 8 do
-		local a = rad(-100 + i * 25)
-		table.insert(back, V(0.5 * math.sin(a), 4.98, 0.1 + 0.52 * math.cos(a)))
+		local a = rad(-112 + i * 28)
+		table.insert(back, V(0.48 * math.sin(a), 5.0, 0.1 + 0.5 * math.cos(a)))
 	end
-	for i = 1, #back - 1 do
-		g:ellSeg("UpperTorso", back[i], back[i + 1], 0.12, 0.26, P.shirt, "Fabric")
+	g:tube("UpperTorso", back, 0.2, P.shirt, "Fabric")
+	local jback = {}
+	for i = 0, 8 do
+		local a = rad(-118 + i * 29.5)
+		table.insert(jback, V(0.58 * math.sin(a), 4.9, 0.12 + 0.58 * math.cos(a)))
 	end
+	g:tube("UpperTorso", jback, 0.2, P.suit, "SmoothPlastic")
 
-	-- горошек на видимой части рубашки
-	for _, d in { { 0.18, 3.75 }, { -0.2, 3.62 }, { 0.05, 3.45 }, { -0.08, 3.85 }, { 0.25, 3.35 }, { -0.25, 3.3 }, { 0.12, 3.2 }, { -0.1, 3.18 }, { 0.3, 3.95 }, { -0.32, 4.02 } } do
-		local x, y = d[1], d[2]
-		-- точка на поверхности эллипсоида рубашки
-		local cx, cy, cz, rx, ry, rz = 0, 3.82, -0.18, 0.7, 1.1, 0.5
-		local t = 1 - ((x - cx) / rx) ^ 2 - ((y - cy) / ry) ^ 2
-		if t > 0 then
-			local z = cz - rz * math.sqrt(t)
-			local n = V((x - cx) / rx ^ 2, (y - cy) / ry ^ 2, (z - cz) / rz ^ 2).Unit
-			g:ell("UpperTorso", CFrame.lookAt(V(x, y, z), V(x, y, z) + n) * CFrame.Angles(0, 0, rad(30)), V(0.05, 0.07, 0.03), P.dot, "SmoothPlastic")
-		end
-	end
-
-	-- ===== Кубинская цепь =====
-	local N = 40
-	local function chainPt(th)
-		local c = math.cos(th)
-		local front = math.max(0, c)
-		local x = 0.6 * math.sin(th)
-		local z = 0.12 - (0.6 + 0.18 * front) * c
-		local y = 4.9 - 0.42 * front ^ 1.6
-		return V(x, y, z)
+	-- ===== Кубинская цепь (передняя дуга лежит на мехе, концы уходят под воротник) =====
+	local N = 22
+	local Df = Drape.new(g, { E.fur, E.fur2, E.shirt, E.chest })
+	local function chainXY(th)
+		return 0.43 * math.sin(th), 5.0 - 0.6 * math.cos(th) ^ 1.25
 	end
 	for i = 0, N - 1 do
-		local th = (i + 0.5) / N * 2 * math.pi
-		local p = chainPt(th)
-		local tng = (chainPt(th + 0.01) - chainPt(th - 0.01)).Unit
-		local out = V(p.X, 0, p.Z - 0.12).Unit
-		if math.cos(th) > 0.3 then
-			out = (out + V(0, 0.45, -0.3)).Unit -- спереди цепь лежит на груди
-		end
-		local bin = tng:Cross(out).Unit
+		local th = rad(-84 + 168 * (i + 0.5) / N)
+		local x, y = chainXY(th)
+		local x2, y2 = chainXY(th + 0.01)
+		local x1, y1 = chainXY(th - 0.01)
+		local p, n = Df:at(x, y, 0.035)
+		local pa = Df:at(x1, y1, 0.035)
+		local pb = Df:at(x2, y2, 0.035)
+		local tng = (pb - pa).Unit
+		local bin = tng:Cross(-n).Unit
 		local nrm = bin:Cross(tng).Unit
-		local base = CFrame.fromMatrix(p, tng, bin, -nrm)
-		g:rbox("UpperTorso", base * CFrame.Angles(0, 0, rad(38)), V(0.19, 0.085, 0.05), P.gold, "Foil")
-		g:rbox("UpperTorso", base * CFrame.new(0.045, 0, 0.014) * CFrame.Angles(0, 0, rad(-38)), V(0.15, 0.065, 0.04), P.goldDeep, "Foil")
+		local base = CFrame.fromMatrix(p, tng, bin, nrm)
+		g:rbox("UpperTorso", base * CFrame.Angles(0, 0, rad(36)), V(0.17, 0.078, 0.05), P.gold, "Foil")
+		g:rbox("UpperTorso", base * CFrame.new(0.048, 0, 0.018) * CFrame.Angles(0, 0, rad(-36)), V(0.13, 0.06, 0.035), P.goldDeep, "Foil")
 	end
 	-- эмиттер блеска цепи
-	local chainHost = g:box("UpperTorso", V(0, 4.55, -0.72), V(1.1, 0.35, 0.3), Color3.new(1, 1, 1), "SmoothPlastic", nil, { transparency = 1, castShadow = false, name = "ChainSparkleHost" })
+	local chainHost = g:box("UpperTorso", V(0, 4.55, -0.6), V(0.9, 0.4, 0.3), Color3.new(1, 1, 1), "SmoothPlastic", nil, { transparency = 1, castShadow = false, name = "ChainSparkleHost" })
 	chainHost.CanQuery = false
 	emitter(chainHost, "ChainSparkles", {
 		Rate = 14,
@@ -214,16 +228,17 @@ function Body.build(g, opts)
 	})
 
 	-- ===== Таз в джинсах (LowerTorso) =====
-	g:ell("LowerTorso", V(0, 2.72, 0.04), V(2.0, 1.25, 1.24), P.jeans, "Fabric")
-	g:ell("LowerTorso", V(0, 2.32, 0.0), V(0.9, 0.6, 0.9), P.jeans, "Fabric")
-	-- ширинка: шов
-	g:ellSeg("LowerTorso", V(0.05, 2.86, -0.6), V(0.03, 2.4, -0.52), 0.035, 0.02, P.jeansDark, "Fabric")
+	g:ell("LowerTorso", V(0, 2.74, 0.06), V(1.96, 1.2, 1.1), P.jeans, "Fabric")
+	g:ell("LowerTorso", V(0, 2.95, 0.04), V(1.94, 0.5, 1.2), P.jeans, "Fabric") -- пояс
+	g:ellSeg("LowerTorso", V(0.05, 2.82, -0.6), V(0.03, 2.4, -0.5), 0.03, 0.02, P.jeansDark, "Fabric") -- шов ширинки
 
-	-- пиджак ниже талии: спина, бока, полы
-	g:ell("LowerTorso", V(0, 2.75, 0.16), V(2.18, 1.3, 1.16), P.suit, "SmoothPlastic")
+	-- пиджак ниже талии: два вертикальных цилиндра (прямые бока, ровный подол); спереди между ними
+	-- «долина» — там видны ремень и джинсы (полы распахнуты)
 	for _, s in { 1, -1 } do
-		g:ell("LowerTorso", V(s * 0.86, 2.78, -0.12), V(0.72, 1.32, 1.0), P.suit, "SmoothPlastic", V(0, 0, s * 4))
+		g:cylSeg("LowerTorso", V(s * 0.5, 3.16, 0.08), V(s * 0.5, 2.12, 0.08), 1.2, P.suit, "SmoothPlastic")
+		g:cylSeg("LowerTorso", V(s * 0.5, 2.135, 0.08), V(s * 0.5, 2.11, 0.08), 1.12, P.suitDark, "SmoothPlastic")
 	end
+	g:ell("LowerTorso", V(0, 2.72, 0.3), V(1.6, 1.2, 0.9), P.suit, "SmoothPlastic")
 
 	-- ===== Ремень (крокодил) =====
 	local belt = {}
@@ -250,11 +265,11 @@ function Body.build(g, opts)
 			local y = by + (if row == 0 then 0.055 else -0.055)
 			local cf = CFrame.lookAt(V(x, y, z), V(x, y, z) + nrm)
 			local shade = if (i + row) % 3 == 0 then P.croc else P.belt:Lerp(P.croc, 0.6)
-			g:rbox("LowerTorso", cf, V(0.1, 0.085, 0.02), shade, "Leather")
+			g:rbox("LowerTorso", cf, V(0.085, 0.07, 0.012), shade, "Leather", nil, { reflectance = 0.04 })
 		end
 	end
 	-- шлёвки
-	for _, x in { -0.62, 0.62 } do
+	for _, x in { -0.4, 0.4 } do
 		local a = math.asin(x / 1.04)
 		local z = 0.04 - 0.69 * math.cos(a)
 		local nrm = V(math.sin(a), 0, -math.cos(a)).Unit

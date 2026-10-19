@@ -9,7 +9,7 @@
 --     диагональные неоновые трубки фиолет/маджента/оранж под потолком + трековые споты;
 --   * скамья под конём: центр (0,0,0.4), длинная ось по Z, длина 3.6, ширина 1.1, верх сиденья Y=1.55
 --     (модель "HorseBench", деталь "SeatTop" — верхняя плоскость сиденья);
---   * стойки с гантелями у задней стены (z≈10.5…13.6), зеркала на стене;
+--   * две стойки с гантелями у задней стены: x∈[7.7,19.5] и x∈[−19.5,−7.7], z≈9.5…13.2 (верх ≈3.6), зеркала на стене +X;
 --   * места статистов x≈−6…−3 и x≈+3…+7, z≈+3…+8 — свободны (на полу ничего нет).
 --   Дополнительно: в задней стене проём x∈[−7,7] в глубокую нишу до z=36 (силовая рама, кроссовер,
 --   стойка блинов) — даёт перспективу «коридора», как в клипе. Ниша не мешает постановке.
@@ -33,9 +33,9 @@ local C = {
 	wallShade = hex("ddd6e4"),
 	skirting = hex("1a181e"),
 	floor = hex("0e0d11"),
-	floorSeam = hex("060608"),
+	floorSeam = hex("09080b"),
 	ceilingBack = hex("0c0a0c"),
-	woods = { hex("6c4a36"), hex("76523c"), hex("643f2f"), hex("7e5a41"), hex("6f4d38"), hex("5e3f2e"), hex("845f45") },
+	woods = { hex("7c5a46"), hex("87644f"), hex("72523f"), hex("8f6c55"), hex("7a5845"), hex("6a4c3a"), hex("96735a") },
 	steel = hex("1e1e23"),
 	steelDark = hex("141418"),
 	chrome = hex("c4c8d0"),
@@ -134,8 +134,6 @@ return function(B)
 		local len = (b - a).Magnitude
 		return boxCF(look((a + b) / 2, b), V(w, h, len), color, material, extra)
 	end
-	local NOSHADOW = { castShadow = false }
-	local GLOW = { castShadow = false, canQuery = false }
 
 	-- Невидимый излучатель света в точке pos, направленный на target (Face = Front).
 	local function emitter(pos, target, kind, props)
@@ -183,10 +181,10 @@ return function(B)
 	box(V(0, -0.5, zMid), V(2 * W + 2, 1, zLen + 2), C.floor, "Rubber", nil, { name = "Floor" })
 	-- швы резиновых плит 4×4 (тонкие тёмные полосы поверх пола)
 	for z = Z_FRONT + 4, Z_BACK - 1, 4 do
-		box(V(0, 0.006, z), V(2 * W - 0.2, 0.012, 0.05), C.floorSeam, "Rubber", nil, { name = "FloorSeam", castShadow = false })
+		box(V(0, 0.006, z), V(2 * W - 0.2, 0.012, 0.08), C.floorSeam, "Rubber", nil, { name = "FloorSeam", castShadow = false })
 	end
 	for x = -W + 4, W - 4, 4 do
-		box(V(x, 0.005, (Z_FRONT + Z_BACK) / 2), V(0.05, 0.01, Z_BACK - Z_FRONT - 0.2), C.floorSeam, "Rubber", nil, { name = "FloorSeam", castShadow = false })
+		box(V(x, 0.005, (Z_FRONT + Z_BACK) / 2), V(0.08, 0.01, Z_BACK - Z_FRONT - 0.2), C.floorSeam, "Rubber", nil, { name = "FloorSeam", castShadow = false })
 	end
 	-- стены зала
 	local wallH = CEIL + 0.3
@@ -342,12 +340,19 @@ return function(B)
 	end
 	-- линия трека в нишу (уходит вдаль «вправо» в кадре)
 	do
-		local a, b = V(-4.6, TRACK_Y, 15.0), V(-4.6, TRACK_Y, 34.5)
+		-- от угла рамы по диагонали в глубину ниши
+		local a, b = V(-5.2, TRACK_Y, 13.57), V(-6.1, TRACK_Y, 34.8)
 		trackRail(a, b, CEIL)
 		local yb = TRACK_Y - 0.045
-		spot(V(-4.6, yb, 19), V(-2, 0.5, 23), { Brightness = 1.4, Range = 22, Angle = 60, Color = LIGHT_AMBER })
-		spot(V(-4.6, yb, 25), V(2.5, 3.5, 29), { Brightness = 1.5, Range = 22, Angle = 60, Color = LIGHT_AMBER })
-		spot(V(-4.6, yb, 31), V(0, 4.5, ANNEX_Z), { Brightness = 1.6, Range = 22, Angle = 70, Color = LIGHT_AMBER })
+		local function on(t)
+			local p = a:Lerp(b, t)
+			return V(p.X, yb, p.Z)
+		end
+		spot(on(0.12), V(-5.5, 2.5, 13.6), nil)
+		spot(on(0.26), V(-2, 0.5, 23), { Brightness = 1.4, Range = 22, Angle = 60, Color = LIGHT_AMBER })
+		spot(on(0.42), V(-3, 2, 26), nil)
+		spot(on(0.56), V(2.5, 3.5, 29), { Brightness = 1.5, Range = 22, Angle = 60, Color = LIGHT_AMBER })
+		spot(on(0.82), V(0, 4.5, ANNEX_Z), { Brightness = 1.6, Range = 22, Angle = 70, Color = LIGHT_AMBER })
 	end
 	-- передний трек (поперёк зала над камерой): ключевой и заполняющий на коня
 	do
@@ -377,7 +382,7 @@ return function(B)
 			emitter(V(x, CEIL - 0.25, z), V(x, 0, z), "SpotLight", p)
 		end
 	end
-	downlight(-1.0, 3.2, { Brightness = 1.6, Range = 18, Angle = 70 })
+	downlight(-1.0, 3.2, { Brightness = 1.5, Range = 18, Angle = 70, Shadows = true })
 	downlight(12, -2, { Brightness = 0.9, Range = 18, Angle = 80 })
 	downlight(-12, -2, { Brightness = 0.9, Range = 18, Angle = 80 })
 	downlight(12, -14, nil)
@@ -398,7 +403,7 @@ return function(B)
 	emitter(V(0, 9, -2), nil, "PointLight", { Brightness = 0.6, Range = 26, Color = LIGHT_PURPLE })
 	-- «отражённый» тёплый свет под потолком (в Roblox нет переотражений — без него дерево чёрное)
 	for _, p in { V(-10, 10.4, -1), V(10, 10.4, -1), V(-10, 10.4, 9), V(10, 10.4, 9), V(0, 10.4, -13), V(0, 10.4, 21), V(0, 10.6, -4) } do
-		emitter(p, nil, "PointLight", { Brightness = 0.7, Range = 10, Color = Color3.fromRGB(255, 196, 160) })
+		emitter(p, nil, "PointLight", { Brightness = 0.7, Range = 10, Color = Color3.fromRGB(245, 196, 196) })
 	end
 
 	---------------------------------------------------------------- 5. Скамьи
@@ -500,9 +505,10 @@ return function(B)
 	local function dumbbell(cf, kg)
 		local d, w = dbSize(kg)
 		local grip = 0.9
-		local zh = grip / 2 + w / 2
+		local bev = 0.05 -- наружная «фаска»: ступенька меньшего диаметра на торце
 		for s = -1, 1, 2 do
-			cylX(cf * CFrame.new(0, 0, s * zh) * ROT_Z, w, d, C.rubber, "Rubber", { name = "DumbbellHead" })
+			cylX(cf * CFrame.new(0, 0, s * (grip / 2 + (w - bev) / 2)) * ROT_Z, w - bev, d, C.rubber, "Rubber", { name = "DumbbellHead" })
+			cylX(cf * CFrame.new(0, 0, s * (grip / 2 + w - bev / 2)) * ROT_Z, bev, d - 0.09, C.rubber, "Rubber", { name = "DumbbellHeadBevel" })
 			cylX(cf * CFrame.new(0, 0, s * (grip / 2 - 0.035)) * ROT_Z, 0.07, 0.25, C.chrome, "Metal", { name = "DumbbellCollar" })
 		end
 		cylX(cf * ROT_Z, grip + 0.06, 0.15, C.chrome, "Metal", { name = "DumbbellHandle" })
@@ -585,7 +591,7 @@ return function(B)
 	local function mirror(x0, x1, y0, y1, z)
 		local w, h = x1 - x0, y1 - y0
 		local cx, cy = (x0 + x1) / 2, (y0 + y1) / 2
-		box(V(cx, cy, z - 0.03), V(w, h, 0.06), C.mirror, "Glass", nil, { name = "Mirror", reflectance = 0.22 })
+		box(V(cx, cy, z - 0.03), V(w, h, 0.06), C.mirror, "Glass", nil, { name = "Mirror", reflectance = 0.07 })
 		local ft, fd = 0.07, 0.1
 		box(V(cx, y1 + ft / 2, z - fd / 2), V(w + 2 * ft, ft, fd), C.chrome, "Metal", nil, { name = "MirrorFrame" })
 		box(V(cx, y0 - ft / 2, z - fd / 2), V(w + 2 * ft, ft, fd), C.chrome, "Metal", nil, { name = "MirrorFrame" })
@@ -599,7 +605,7 @@ return function(B)
 	-- зеркало на боковой стене +X (длинное)
 	do
 		local x = W
-		box(V(x - 0.03, 5.2, -2), V(0.06, 6.6, 16), C.mirror, "Glass", nil, { name = "Mirror", reflectance = 0.22 })
+		box(V(x - 0.03, 5.2, -2), V(0.06, 6.6, 16), C.mirror, "Glass", nil, { name = "Mirror", reflectance = 0.07 })
 		for _, zz in { -10.04, 6.04 } do
 			box(V(x - 0.05, 5.2, zz), V(0.1, 6.74, 0.07), C.chrome, "Metal", nil, { name = "MirrorFrame" })
 		end
@@ -609,6 +615,11 @@ return function(B)
 	end
 	-- колонна справа в кадре (−X) у задней стены
 	box(V(-17.3, wallH / 2, Z_BACK - 0.3), V(1.3, wallH, 0.6), C.wallShade, "Plaster", nil, { name = "Column" })
+	-- вертикальная труба-кабель-канал у колонны (как в клипе)
+	rod(V(-16.45, 0.02, Z_BACK - 0.14), V(-16.45, CEIL, Z_BACK - 0.14), 0.16, C.wall, "SmoothPlastic", { name = "Conduit" })
+	for _, y in { 2.5, 6.5, 10.5 } do
+		box(V(-16.45, y, Z_BACK - 0.1), V(0.26, 0.08, 0.2), C.wallShade, "Metal", nil, { name = "ConduitClamp" })
+	end
 	-- рамы с принтами
 	local function frame(cx, cy, w, h, z, art, artMat)
 		local ft = 0.08

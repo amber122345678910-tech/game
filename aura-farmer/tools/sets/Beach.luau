@@ -1,8 +1,18 @@
 --!nocheck
--- Декорация «Beach»: пляж Схевенинген (Нидерланды).
--- Локальные координаты декорации: Y=0 — верх песка, +Z — юг (бульвар и город), -Z — море, пирс у x≈+160.
--- Зона постановки вокруг (0,0,0) свободна (только плоские следы шин/вмятины на песке высотой < 0.1).
+-- Декорация «Beach»: пляж Схевенинген (Нидерланды). Координаты — локальные (Y=0 — верх песка).
 -- Если камера смотрит на город (+Z), то +X — СЛЕВА в кадре; если на море (-Z) — +X справа.
+--
+-- Что где (для постановки планов):
+--   * Зона постановки: в радиусе ~25 студов от (0,0,0) только плоские следы шин, вмятины и ракушки
+--     (высота < 0.08); под стопами актёров (|x|<4.8, |z|<1.6) рельефа нет.
+--   * Песок (Terrain Sand) y=0 при z -160 … +270, x ±3000; к z=+300 подъём до y=4.5; бульвар (Pavement) y=6, z +300 … +760.
+--   * Море (Terrain Water) при z < -160, уровень -0.6, до z=-3600; мокрая полоса z -160 … ~-120; пена у кромки.
+--   * Город: z +330 … +740 (высотки справа в кадре на город, x -60 … -900, высота до ~100); «Курхаус» (232, 432);
+--     белый павильон с крышей-волной (100, 246), пляжные клубы z≈237…244, зонты/шезлонги z≈200…210.
+--   * Пирс: ось x=160, от z=-40 (вход на пляже) до z=-600 + голова до z≈-640; пол галереи y≈10.5, верхняя палуба y≈16.5;
+--     колесо обозрения: ось (185, 46, -230), R=26; смотровая башня на конце (180, ~17…62, -662).
+--   * Слева при взгляде на море: спасательная вышка (-70, 0, -112), молы гавани с маяками x≈-420…-540 до z≈-650.
+--   * Цвет Terrain-песка задаёт скрипт BeachTerrainColors (атрибуты TerrainColor_* модели) — детали-песок подобраны под него.
 
 local roblox = require("@lune/roblox")
 local Vector3 = roblox.Vector3
@@ -34,12 +44,12 @@ end
 
 -- ===== Палитра (по кадрам клипа) =====
 local C = {
-	sand = hex(0xC8B48E),
-	sandPacked = hex(0xBCA885),
-	tread = hex(0x9A8466),
-	dent = hex(0xAE9A78),
-	wet = hex(0xA08D6E),
-	wetter = hex(0x8A7A62),
+	sand = hex(0xC9B28A),
+	sandPacked = hex(0xBDA580),
+	tread = hex(0x998062),
+	dent = hex(0xAD9673),
+	wet = hex(0x9E896A),
+	wetter = hex(0x89775F),
 	foam = hex(0xF2F4F3),
 	white = hex(0xE8E5DE),
 	offWhite = hex(0xD9D4C9),
@@ -47,10 +57,8 @@ local C = {
 	sandstone = hex(0xC9B08C),
 	concrete = hex(0xA9A7A0),
 	grey = hex(0x8E918F),
-	darkGrey = hex(0x4A4F4E),
 	glassGreen = hex(0x3C5552),
 	glassTeal = hex(0x4E6D70),
-	glassBlue = hex(0x5D7C8E),
 	glassDark = hex(0x2C3A3C),
 	pierTeal = hex(0x2E4643),
 	pierLeg = hex(0xC2C0BB),
@@ -122,15 +130,32 @@ return function(B)
 	-- =====================================================================
 	-- 1) Terrain: море, дно, пляж, дюны, бульвар
 	-- =====================================================================
-	-- Порядок важен: позже залитое перекрывает раньше залитое.
-	B:terrain("Block", V(0, -3.3, -1950), V(7000, 5.4, 3620), "Water") -- y -6 … -0.6, z -3760 … -140
-	B:terrain("Block", V(0, -8, -1980), V(7000, 4, 3560), "Sand") -- дно y -10 … -6, z -3760 … -200
-	B:terrain("Wedge", V(0, -3, -215), V(5600, 6, 130), "Sand") -- откос под воду: y=0 при z=-150 … y=-6 при z=-280
-	B:terrain("Block", V(0, -5, 75), V(5600, 10, 450), "Sand") -- пляж: верх y=0, z -150 … +300
+	-- Порядок важен: позже залитое перекрывает раньше залитое. Воксели Terrain — 4 студа, поэтому
+	-- граница вода/песок выровнена по сетке: в воксель не попадают два материала (иначе вода пропадает).
+	-- Объём terrain по границам; режется на куски ≤ 2000 студов (у Part максимум 2048 по оси);
+	-- границы кусков кратны 4 (сетка вокселей), иначе на стыках остаются бороздки.
+	local function tblock(x0, x1, y0, y1, z0, z1, material)
+		local nx = math.ceil((x1 - x0) / 2000)
+		local nz = math.ceil((z1 - z0) / 2000)
+		for i = 0, nx - 1 do
+			local a0, a1 = x0 + (x1 - x0) * i / nx, x0 + (x1 - x0) * (i + 1) / nx
+			for j = 0, nz - 1 do
+				local b0, b1 = z0 + (z1 - z0) * j / nz, z0 + (z1 - z0) * (j + 1) / nz
+				B:terrain("Block", V((a0 + a1) / 2, (y0 + y1) / 2, (b0 + b1) / 2), V(a1 - a0, y1 - y0, b1 - b0), material)
+			end
+		end
+	end
+	tblock(-3000, 3000, -12, -0.6, -3600, -160, "Water") -- море до горизонта, уровень -0.6
+	tblock(-3000, 3000, -12, -4, -240, -160, "Sand") -- мелководье: дно y=-4
+	tblock(-3000, 3000, -12, -8, -400, -240, "Sand") -- дно y=-8
+	tblock(-3000, 3000, -16, -12, -3600, -400, "Sand") -- дно y=-12
+	tblock(-3000, 3000, -8, 0, -160, 300, "Sand") -- пляж: верх y=0, z -160 … +300
 	-- насыпь к бульвару: от y=0 (z=+270) до y=+4.5 (z=+300); всё на пляже стоит при z < 268 на ровном песке y=0
-	B:terrain("Wedge", V(0, 2.25, 285), V(5600, 4.5, 30), "Sand")
+	for i = 0, 2 do
+		B:terrain("Wedge", V(-2000 + i * 2000, 2.25, 285), V(2000, 4.5, 30), "Sand")
+	end
 	-- бульвар (набережная) y=+6, z +300 … +760
-	B:terrain("Block", V(0, 1, 530), V(5600, 10, 460), "Pavement")
+	tblock(-3000, 3000, -4, 6, 300, 760, "Pavement")
 	-- дюны далеко на востоке и западе (вне города)
 	for i = 0, 9 do
 		local x = 1000 + i * 170 + rr(-40, 40)
@@ -146,30 +171,25 @@ return function(B)
 	-- =====================================================================
 	local shore = folder("Shoreline")
 	do
-		-- мокрая полоса (несколько неровных кусков на разной высоте, чтобы не было z-fighting)
-		local x = -1800
-		local k = 0
-		while x < 1800 do
-			local w = rr(140, 260)
-			local depth = rr(26, 44)
-			k += 1
-			local top = 0.02 + (k % 3) * 0.012
-			box(shore, V(x + w / 2, top - 0.1, -150 + depth / 2), V(w + 30, 0.2, depth), mix(C.wet, C.sand, rr(0.1, 0.35)), "Sand", nil, NOSH)
-			x += w
-		end
-		-- влажный откос до воды (наклон как у клина terrain: 6 на 130)
-		local slope = math.deg(math.atan(6 / 130))
+		-- у самой воды — очень мокрый блестящий песок (z -160 … -150)
 		for i = 0, 5 do
 			local w = 600
-			local cx = -1500 + i * w + w / 2
-			box(shore, V(cx, -0.485, -159), V(w, 0.2, 19), C.wetter, "Sand", V(-slope, 0, 0), { castShadow = false, reflectance = 0.12 })
+			box(shore, V(-1800 + i * w + w / 2, 0.02 - 0.1, -154.25), V(w, 0.2, 8.5), C.wetter, "Sand", nil, { castShadow = false, reflectance = 0.1 })
+		end
+		-- мокрая полоса неровной ширины (куски стыкуются без перекрытий)
+		local x = -1800
+		while x < 1800 do
+			local w = rr(120, 240)
+			local depth = rr(14, 36)
+			box(shore, V(x + w / 2, 0.035 - 0.1, -150 + depth / 2), V(w, 0.2, depth), mix(C.wet, C.sand, rr(0.05, 0.3)), "Sand", nil, NOSH)
+			x += w
 		end
 		-- пена у кромки: рваная полоса из коротких изогнутых кусков
 		for line = 1, 2 do
 			local xx = -1400
 			while xx < 1400 do
-				local len = rr(18, 70)
-				local zc = (if line == 1 then -163.2 else -167.5) + math.sin(xx * 0.013) * 1.4 + rr(-0.8, 0.8)
+				local len = rr(30, 95)
+				local zc = (if line == 1 then -161.3 else -165.5) + math.sin(xx * 0.013) * 0.6 + rr(-0.3, 0.3)
 				if line == 1 or rnd() > 0.45 then
 					box(shore, V(xx + len / 2, -0.5 + line * 0.015, zc), V(len, 0.06, rr(0.7, 1.9) / line), C.foam, "SmoothPlastic", V(0, rr(-3, 3), 0), { castShadow = false, transparency = if line == 1 then rr(0.1, 0.3) else rr(0.45, 0.65) })
 				end
@@ -177,7 +197,7 @@ return function(B)
 			end
 		end
 		-- барашки дальше в море (короткие, редкие)
-		for _ = 1, 70 do
+		for _ = 1, 36 do
 			local z = rr(-330, -178)
 			local x = rr(-900, 900)
 			box(shore, V(x, -0.47, z), V(rr(5, 26), 0.06, rr(0.5, 1.3)), C.foam, "SmoothPlastic", V(0, rr(-6, 6), 0), { castShadow = false, transparency = rr(0.5, 0.75) })
@@ -227,11 +247,13 @@ return function(B)
 			{ ctrl = { V2(-160, 130), V2(-60, 118), V2(60, 140), V2(170, 124) }, gauge = 4.6, tyre = 1.4, lug = 0.85 },
 			{ ctrl = { V2(-40, -80), V2(-30, -40), V2(-48, 10), V2(-90, 60) }, gauge = 4.6, tyre = 1.4, lug = 0.85 },
 			{ ctrl = { V2(-170, -50), V2(-60, -40), V2(60, -52), V2(170, -38) }, gauge = 4.6, tyre = 1.4, lug = 0.85 },
+			{ ctrl = { V2(-6, -60), V2(-10, -15), V2(-22, 25), V2(-75, 95) }, gauge = 4.6, tyre = 1.5, lug = 0.85 },
+			{ ctrl = { V2(30, -90), V2(20, -35), V2(14, 30), V2(60, 110) }, gauge = 4.8, tyre = 1.5, lug = 0.9 },
 			-- старые следы на среднем плане (только колея)
 			{ ctrl = { V2(-220, 175), V2(-80, 160), V2(80, 185), V2(230, 165) }, gauge = 4.6, tyre = 1.3, lug = 0.85 },
 			{ ctrl = { V2(-200, 105), V2(-90, 112), V2(70, 98), V2(210, 112) }, gauge = 4.6, tyre = 1.3, lug = 0.85 },
 			{ ctrl = { V2(-90, 190), V2(-70, 120), V2(-110, 70), V2(-150, 20) }, gauge = 4.8, tyre = 1.4, lug = 0.85 },
-			{ ctrl = { V2(-200, -95), V2(-80, -110), V2(70, -90), V2(220, -105) }, gauge = 4.6, tyre = 1.3, lug = 0.85 },
+			{ ctrl = { V2(-200, -118), V2(-80, -132), V2(70, -124), V2(220, -130) }, gauge = 4.6, tyre = 1.3, lug = 0.85 },
 		}
 		local function clearZone(p)
 			-- не класть рельеф прямо под стопы актёров (x -3..3, z≈0)
@@ -240,24 +262,24 @@ return function(B)
 		local function lugZone(p)
 			-- видимая камерами у центра полоса: |z| < 34, по x — расширяющийся клин
 			local az = math.abs(p.Z)
-			return az < 34 and math.abs(p.X) < 10 + az * 0.95
+			return az < 31 and math.abs(p.X) < 8 + az * 0.9
 		end
 		for ti, tr in list do
 			local pts = samplePath(tr.ctrl, 0.25)
-			local top = 0.012 + ((ti - 1) % 3) * 0.012
+			-- у каждого трека своя высота (см. ниже), чтобы пересечения колей не мерцали (z-fighting)
 			for side = -1, 1, 2 do
 				-- колея: стыкующиеся отрезки (без перекрытий), короче вблизи
 				-- вблизи колея почти вровень с песком (иначе торцы светятся), вдали чуть выше (против z-fighting)
 				local i = 1
 				while i < #pts do
 					local near = pts[i].Magnitude < 45
-					local j = math.min(#pts, i + (if near then 32 else 88))
+					local j = math.min(#pts, i + (if near then 40 else 120))
 					local a, b = pts[i], pts[j]
 					local dir = (b - a).Unit
 					local n = V(-dir.Z, 0, dir.X)
 					local mid = (a + b) / 2 + n * (side * tr.gauge / 2)
 					local yaw = math.deg(math.atan2(-dir.X, -dir.Z))
-					local t = if near then top * 0.5 else top + 0.02
+					local t = if near then 0.01 + (ti - 1) * 0.003 else 0.04 + (ti - 1) * 0.006
 					box(tracks, V(mid.X, t - 0.05, mid.Z), V(tr.tyre, 0.1, (b - a).Magnitude), mix(C.sandPacked, C.sand, if near then 0 else 0.35), "Sand", V(0, yaw, 0), NOSH)
 					i = j
 				end
@@ -271,13 +293,14 @@ return function(B)
 					local c = p + n * (side * tr.gauge / 2)
 					if lugZone(c) and not clearZone(c) then
 						local yaw = math.deg(math.atan2(-dir.X, -dir.Z))
-						box(tracks, V(c.X, top * 0.5 + 0.012, c.Z), V(tr.tyre * 0.92, 0.06, 0.26), C.tread, "Sand", V(0, yaw + side * 18, 0), NOSH)
+						local j = dir * rr(-0.06, 0.06)
+						box(tracks, V(c.X + j.X, 0.01 + (ti - 1) * 0.003 + 0.012, c.Z + j.Z), V(tr.tyre * rr(0.8, 0.95), 0.06, rr(0.22, 0.3)), mix(C.tread, C.sandPacked, rr(0, 0.35)), "Sand", V(0, yaw + side * rr(14, 22), 0), NOSH)
 					end
 				end
 			end
 		end
 		-- вмятины/следы ног: пары тёмных овалов (по видимым зонам)
-		for _ = 1, 90 do
+		for _ = 1, 62 do
 			local z = rr(-30, 34)
 			local x = rr(-1, 1) * (8 + math.abs(z) * 0.9)
 			local c = V(x, 0, z)
@@ -290,17 +313,17 @@ return function(B)
 					local y2 = yaw + rr(-10, 10)
 					ell(tracks, V(p.X, 0.01, p.Z), V(0.5, 0.045, 0.98), mix(C.sand, C.dent, rr(0.35, 0.75)), "Sand", V(0, y2, 0), NOSH)
 					if close then
-						-- освещённый дальний бортик вмятины (солнце со стороны -Z)
-						ell(tracks, V(p.X, 0.02, p.Z + 0.2), V(0.42, 0.045, 0.62), mix(C.sand, Color3.new(1, 1, 1), 0.07), "Sand", V(0, y2, 0), NOSH)
+						-- освещённый дальний бортик вмятины (солнце со стороны -Z): тонкий светлый серп
+						ell(tracks, V(p.X, 0.016, p.Z + 0.44), V(0.42, 0.05, 0.2), mix(C.sand, Color3.new(1, 1, 1), 0.05), "Sand", V(0, y2, 0), NOSH)
 					end
 				end
 			end
 		end
 		-- истоптанные пятна подальше (средний план)
-		for _ = 1, 30 do
-			local z = if rnd() < 0.7 then rr(36, 160) else rr(-140, -36)
+		for _ = 1, 24 do
+			local z = if rnd() < 0.7 then rr(60, 170) else rr(-140, -60)
 			local x = rr(-1, 1) * (20 + math.abs(z) * 0.9)
-			ell(tracks, V(x, 0.006, z), V(rr(3, 9), 0.03, rr(3, 9)), mix(C.sand, C.dent, rr(0.15, 0.4)), "Sand", V(0, rr(0, 180), 0), NOSH)
+			ell(tracks, V(x, 0.006, z), V(rr(3, 8), 0.03, rr(3, 8)), mix(C.sand, C.dent, rr(0.12, 0.3)), "Sand", V(0, rr(0, 180), 0), NOSH)
 		end
 		-- ракушки и камешки у зоны постановки
 		for _ = 1, 22 do
@@ -440,11 +463,11 @@ return function(B)
 	-- Справа в кадре при взгляде на город (x < 0): высокие жилые блоки
 	glassBox(-64, 392, 40, 26, 68, { glass = hex(0x3D5A55), mullion = hex(0xD8D6CE) })
 	tower(-99, 396, 27, 22, 94, { cols = 6 })
-	slabBlock(-150, 412, 62, 28, 46, { core = hex(0x3A4D4B), band = hex(0xD9D5CA), bays = 4 })
-	slabBlock(-245, 424, 104, 30, 70, { core = hex(0x3B514D), band = hex(0xE0DCD2), bays = 7, step = { 40, 44, 26, -1 }, antenna = true })
-	slabBlock(-372, 446, 104, 30, 60, { core = hex(0x44575A), band = hex(0xD6D0C3), bays = 7 })
+	slabBlock(-150, 412, 62, 28, 46, { core = hex(0x33464A), band = hex(0xC8C4BA), bays = 4 })
+	slabBlock(-245, 424, 104, 30, 70, { core = hex(0x34494A), band = hex(0xCFCBC1), bays = 7, step = { 40, 44, 26, -1 }, antenna = true })
+	slabBlock(-372, 446, 104, 30, 60, { core = hex(0x3C4F52), band = hex(0xC9C3B6), bays = 7 })
 	tower(-462, 432, 28, 24, 86, { cols = 6, color = hex(0xE2DDD3) })
-	slabBlock(-560, 456, 118, 30, 54, { core = hex(0x47595B), band = hex(0xE3DED4), bays = 8, step = { 36, 34, 26, -1 } })
+	slabBlock(-560, 456, 118, 30, 54, { core = hex(0x405254), band = hex(0xD2CDC3), bays = 8, step = { 36, 34, 26, -1 } })
 	slabBlock(-740, 470, 130, 30, 46, { core = hex(0x4F6061), band = hex(0xDAD4C8), bays = 8 })
 	slabBlock(-900, 482, 140, 30, 40, { core = hex(0x56676A), band = hex(0xDDD7CB), bays = 8 })
 	-- центр: тёмный корпус с белым карнизом, зелёный стеклянный корпус, белая мачта
@@ -467,9 +490,9 @@ return function(B)
 		for f = 1, 3 do
 			box(g, V(kx, 6 + f * 6.2 - 2, kz - 0.15), V(116, 2.4, 0.4), hex(0x4F5B60), "Glass", nil, NOSH)
 		end
-		wedge(g, V(kx, 6 + 24.5, kz + 7.5), V(120, 5, 15), hex(0x5B6466), "Slate", V(0, 180, 0), NOSH)
-		wedge(g, V(kx, 6 + 24.5, kz + 22.5), V(120, 5, 15), hex(0x5B6466), "Slate", nil, NOSH)
-		B:cyl(V(kx, 6 + 28, kz + 15), 10, 22, hex(0xD9C9AC), "Concrete", "Y", nil, { parent = g, castShadow = false })
+		wedge(g, V(kx, 6 + 24.5, kz + 7.5), V(120, 5, 15), hex(0x5B6466), "Slate", nil, NOSH)
+		wedge(g, V(kx, 6 + 24.5, kz + 22.5), V(120, 5, 15), hex(0x5B6466), "Slate", V(0, 180, 0), NOSH)
+		B:cyl(V(kx, 6 + 28.5, kz + 15), 9, 22, hex(0xD9C9AC), "Concrete", "Y", nil, { parent = g, castShadow = false })
 		ell(g, V(kx, 6 + 33, kz + 15), V(24, 20, 24), hex(0x55625F), "Slate", nil, NOSH)
 		post(g, kx, 6 + 42, kz + 15, 8, 1.2, hex(0x55625F), "Slate", NOSH)
 		for s = -1, 1, 2 do
@@ -511,45 +534,62 @@ return function(B)
 	-- =====================================================================
 	local pav = folder("Pavilion")
 	do
+		-- Павильон с белой крышей-«волной» (как в S01/S03): низко у +X, гребень ближе к -X, крутой спуск на конце.
 		local cx, cz = 100, 246
-		local W, D = 74, 40
-		-- настил на сваях
-		box(pav, V(cx, 1.4, cz), V(W + 6, 1.0, D + 4), C.offWhite, "Concrete")
+		local D = 40
+		local deckTop = 1.9
+		box(pav, V(cx, 1.4, cz), V(90, 1.0, D + 6), C.offWhite, "Concrete")
 		for i = -3, 3 do
-			post(pav, cx + i * 11.5, -1, cz - D / 2 - 1, 2.4, 0.8, C.grey, "Concrete", NOSH)
+			post(pav, cx + i * 12.5, -1, cz - D / 2 - 2, 2.4, 0.8, C.grey, "Concrete", NOSH)
 		end
-		-- остеклённый первый этаж
-		box(pav, V(cx, 4.7, cz + 2), V(W - 6, 5.6, D - 8), hex(0x5E7A86), "Glass", nil, { reflectance = 0.25 })
-		-- белые колонны по фасаду
-		for i = 0, 9 do
-			post(pav, cx - W / 2 + 2 + i * (W - 4) / 9, 1.9, cz - D / 2 + 2.5, 6.2, 0.5, C.white, "SmoothPlastic", NOSH)
+		-- профиль крыши (x относительно центра, высота над настилом)
+		local prof = { { 44, 4.8 }, { 32, 6.6 }, { 20, 8.9 }, { 8, 11.4 }, { -4, 13.6 }, { -14, 15.1 }, { -22, 15.7 }, { -29, 15.0 }, { -35, 12.8 }, { -40, 9.4 }, { -43, 6.2 } }
+		local function roofY(x)
+			for i = 1, #prof - 1 do
+				local a, b = prof[i], prof[i + 1]
+				if x <= a[1] and x >= b[1] then
+					local t = (a[1] - x) / (a[1] - b[1])
+					return a[2] + (b[2] - a[2]) * t
+				end
+			end
+			return prof[#prof][2]
 		end
-		-- плоский свес крыши
-		box(pav, V(cx, 8.4, cz), V(W + 2, 0.7, D + 2), C.white, "SmoothPlastic")
-		-- мембранная кровля: ряд белых «шатров» (пики растут к -X, как в кадре S03)
-		local peaks = { { 30, 3.6 }, { 15, 5.2 }, { 0, 6.6 }, { -15, 8.4 }, { -30, 10.2 } }
-		for _, pk in peaks do
-			local x0, h = cx + pk[1], pk[2]
-			local hw = 7.4
-			-- левая и правая половины: клинья, сходящиеся к гребню вдоль Z
-			wedge(pav, V(x0 - hw / 2, 8.75 + h / 2, cz), V(D - 2, h, hw), hex(0xF5F4F0), "Fabric", V(0, 90, 0))
-			wedge(pav, V(x0 + hw / 2, 8.75 + h / 2, cz), V(D - 2, h, hw), hex(0xEDEBE6), "Fabric", V(0, -90, 0))
-			-- мачта над пиком
-			post(pav, x0, 8.75 + h - 0.5, cz, 5, 0.3, C.white, "Metal", NOSH)
+		for i = 1, #prof - 1 do
+			local a, b = prof[i], prof[i + 1]
+			local mx, my = cx + (a[1] + b[1]) / 2, deckTop + (a[2] + b[2]) / 2
+			local dx, dy = b[1] - a[1], b[2] - a[2]
+			local len = math.sqrt(dx * dx + dy * dy) + 0.7
+			local ang = math.deg(math.atan2(dy, dx))
+			local base = CFrame.new(mx, my, cz) * CFrame.Angles(0, 0, math.rad(ang))
+			-- оболочка крыши
+			B:part({ cf = base, size = V(len, 0.8, D), color = hex(0xF4F3EF), material = "SmoothPlastic", parent = pav })
+			-- скруглённый передний край (наклонённая полоса)
+			B:part({ cf = base * CFrame.new(0, -0.1, -D / 2) * CFrame.Angles(math.rad(-38), 0, 0) * CFrame.new(0, 0, -2.4), size = V(len, 0.7, 5), color = hex(0xECEAE5), material = "SmoothPlastic", parent = pav })
+			-- задний край
+			B:part({ cf = base * CFrame.new(0, -0.1, D / 2) * CFrame.Angles(math.rad(38), 0, 0) * CFrame.new(0, 0, 2.4), size = V(len, 0.7, 5), color = hex(0xE4E2DC), material = "SmoothPlastic", parent = pav, castShadow = false })
 		end
-		-- флажки на крайних мачтах
-		box(pav, V(cx - 30 + 1.4, 8.75 + 10.2 + 3.7, cz), V(2.6, 1.5, 0.06), C.clubBlue, "Fabric", nil, NOSH)
-		box(pav, V(cx + 1.4, 8.75 + 6.6 + 3.7, cz), V(2.6, 1.5, 0.06), C.yellow, "Fabric", nil, NOSH)
-		-- круглый навес-«тарелка» на западном краю
-		B:cyl(V(cx - W / 2 - 9, 7.6, cz - 4), 0.8, 20, C.white, "SmoothPlastic", "Y", nil, { parent = pav })
-		post(pav, cx - W / 2 - 9, 1.9, cz - 4, 5.4, 0.7, C.white, "SmoothPlastic", NOSH)
+		-- первый этаж: стекло и белые колонны (всё строго под оболочкой)
+		box(pav, V(cx - 5, deckTop + 2.9, cz + 1), V(70, 5.8, D - 10), hex(0x557380), "Glass", nil, { reflectance = 0.25 })
+		box(pav, V(cx + 36, deckTop + 1.8, cz + 1), V(12, 3.6, D - 10), hex(0x557380), "Glass", nil, { reflectance = 0.25 })
+		for i = 0, 12 do
+			local x = cx - 41 + i * (82 / 12)
+			local h = roofY(x - cx) - 0.45
+			post(pav, x, deckTop, cz - D / 2 + 3.5, h, 0.55, C.white, "SmoothPlastic", NOSH)
+		end
+		-- второй ярус под высокой частью крыши: белая плита-терраса, стеклянный парапет и тёмное остекление
+		box(pav, V(cx - 15, deckTop + 6.2, cz - 1), V(42, 0.7, D - 4), C.white, "SmoothPlastic")
+		box(pav, V(cx - 15, deckTop + 7.2, cz - D / 2 + 3.1), V(42, 1.3, 0.12), hex(0xB8CCD4), "Glass", nil, { transparency = 0.45, castShadow = false })
+		box(pav, V(cx - 18, deckTop + 9.42, cz + 2), V(30, 5.75, D - 14), hex(0x3E5560), "Glass", nil, { reflectance = 0.2 })
+		-- мачта с флагом на гребне
+		post(pav, cx - 22, deckTop + 15.6, cz, 6, 0.3, C.white, "Metal", NOSH)
+		box(pav, V(cx - 20.6, deckTop + 20.6, cz), V(2.6, 1.6, 0.06), C.clubBlue, "Fabric", nil, NOSH)
 	end
 
 	-- =====================================================================
 	-- 7) Пляжные клубы (сине-бирюзовые павильоны на деревянных помостах), зонты, ветрозащиты
 	-- =====================================================================
 	local clubs = folder("BeachClubs")
-	local function club(x, z, w, wallColor, accent, flags)
+	local function club(x, z, w, wallColor, accent, flags, name)
 		local g = B:folder("Club", clubs)
 		local d = 22
 		box(g, V(x, 1.5, z), V(w + 8, 0.8, d + 8), C.wood, "WoodPlanks")
@@ -565,6 +605,10 @@ return function(B)
 		wedge(g, V(x, 7.6, z - d / 2 - 0.5), V(w, 1.6, 4), accent, "Fabric", V(0, 0, 0), NOSH)
 		-- ветрозащитные стёкла по краю помоста
 		box(g, V(x, 2.8, z - d / 2 - 3.6), V(w + 7, 1.8, 0.2), hex(0xB8CCD4), "Glass", nil, { transparency = 0.5 })
+		if name then
+			local sg = box(g, V(x, 10.6, z - d / 2 + 0.9), V(math.min(w - 4, 16), 2.0, 0.25), accent, "SmoothPlastic", nil, NOSH)
+			B:text(sg, "Front", name, { color = if accent == C.white then C.clubNavy else C.white })
+		end
 		-- флагштоки
 		for k = 1, flags do
 			local fx = x - w / 2 + k * w / (flags + 1)
@@ -573,12 +617,12 @@ return function(B)
 		end
 		return g
 	end
-	club(-30, 240, 34, C.clubBlue, C.white, 2)
-	club(18, 237, 26, C.white, C.clubTeal, 1)
-	club(-78, 242, 30, C.clubTeal, C.white, 2)
+	club(-30, 240, 34, C.clubBlue, C.white, 2, "ZEEZICHT")
+	club(18, 237, 26, C.white, C.clubTeal, 1, "STRAND 7")
+	club(-78, 242, 30, C.clubTeal, C.white, 2, "BEACHCLUB")
 	club(-125, 238, 28, C.white, C.clubBlue, 1)
 	club(-175, 243, 32, C.clubNavy, C.white, 2)
-	club(170, 238, 30, C.clubBlue, C.white, 1)
+	club(170, 238, 30, C.clubBlue, C.white, 1, "DE ZON")
 	club(225, 243, 26, C.white, C.clubBlue, 2)
 	club(-235, 241, 30, C.clubBlue, C.white, 1)
 	club(-290, 244, 26, C.white, C.clubTeal, 1)
@@ -603,10 +647,15 @@ return function(B)
 		umbrella(x, 206 + rr(-5, 5), pick({ C.white, C.white, C.clubBlue, hex(0xF0EEE8), C.yellow }))
 	end
 	-- шезлонги
-	for i = 0, 13 do
-		local x = -190 + i * 24 + rr(-4, 4)
+	for i = 0, 9 do
+		local x = -190 + i * 34 + rr(-4, 4)
 		local z = 199 + rr(-4, 4)
-		wedge(props, V(x, 0.7, z), V(1.8, 1.4, 4.5), pick({ C.white, C.clubBlue, hex(0xD9D2C0) }), "Fabric", V(0, 180, 0), NOSH)
+		local col = pick({ C.white, C.clubBlue, hex(0xE6E0D2) })
+		for k = -1, 1, 2 do
+			local bx = x + k * 1.6
+			box(props, V(bx, 0.55, z + 0.4), V(1.9, 0.35, 4.2), col, "Fabric", nil, NOSH)
+			box(props, V(bx, 1.25, z - 2.0), V(1.9, 1.5, 0.3), col, "Fabric", V(-35, 0, 0), NOSH)
+		end
 	end
 
 	-- =====================================================================
@@ -618,7 +667,7 @@ return function(B)
 		local z0, z1 = -40, -600 -- основной настил
 		local L = z0 - z1
 		local zc = (z0 + z1) / 2
-		local gy0, gy1 = 7, 11.5 -- закрытая нижняя галерея
+		local gy0, gy1 = 10.5, 15.5 -- закрытая нижняя галерея (пол ≈10.5), верхняя палуба ≈16.5
 		local half = 6.5
 		-- галерея: низ, верхний настил, остекление по бокам, тёмно-бирюзовые фасции
 		box(pier, V(px, gy0 + 0.4, zc), V(2 * half, 0.8, L), C.pierTeal, "Metal")
@@ -635,7 +684,7 @@ return function(B)
 		local zz = z0 - 6
 		while zz > z1 - 70 do
 			for s = -1, 1, 2 do
-				post(pier, px + s * (half - 1), -7, zz, gy0 + 7, 1.2, C.pierLeg, "Metal")
+				post(pier, px + s * (half - 1), -13, zz, gy0 + 13, 1.4, C.pierLeg, "Metal")
 				-- стойки остекления галереи над опорой
 				box(pier, V(px + s * (half - 0.05), (gy0 + gy1) / 2 + 0.4, zz), V(0.45, gy1 - gy0, 0.5), C.pierTeal, "Metal", nil, NOSH)
 			end
@@ -658,14 +707,23 @@ return function(B)
 			box(pier, V(px, gy1 + 5.7, kz), V(8.4, 0.6, 11.4), C.pierTeal, "Metal", nil, NOSH)
 		end
 		-- вход на пляже: лестничная башня и пандус
-		box(pier, V(px, 6.5, z0 + 6), V(16, 13, 12), C.pierTeal, "Metal")
-		box(pier, V(px, 13.2, z0 + 6), V(17, 0.6, 13), C.white, "Metal")
-		box(pier, V(px - 8.2, 6.5, z0 + 6), V(0.3, 10, 9), hex(0x88A2A8), "Glass", nil, { reflectance = 0.3 })
+		box(pier, V(px, (gy1 + 1) / 2, z0 + 6), V(16, gy1 + 1, 12), C.pierTeal, "Metal")
+		box(pier, V(px, gy1 + 1.3, z0 + 6), V(17, 0.6, 13), C.white, "Metal")
+		box(pier, V(px - 8.2, gy1 / 2, z0 + 6), V(0.3, gy1 - 3, 9), hex(0x88A2A8), "Glass", nil, { reflectance = 0.3 })
+		local sign = box(pier, V(px, gy1 - 1.4, z0 + 12.1), V(10, 2, 0.2), C.pierTeal, "Metal", nil, NOSH)
+		B:text(sign, "Back", "DE PIER", { color = C.white })
+		local sign2 = box(pier, V(px - 8.3, gy1 - 1.4, z0 + 6), V(0.2, 2, 9), C.pierTeal, "Metal", nil, NOSH)
+		B:text(sign2, "Left", "DE PIER", { color = C.white })
+		-- флаг Нидерландов у входа
+		post(pier, px - 10, 0, z0 + 14, 22, 0.25, C.white, "Metal", NOSH)
+		for k, col in { C.nlRed, C.white, C.nlBlue } do
+			box(pier, V(px - 8.2, 21.4 - k * 0.6, z0 + 14), V(3.4, 0.6, 0.05), col, "Fabric", nil, NOSH)
+		end
 		-- первый «остров» с колесом обозрения
 		local iz = -230
 		box(pier, V(px + 14, gy1 + 0.5, iz), V(30, 1.0, 40), C.pierTeal, "Metal")
 		for _, o in { { 8, -16 }, { 26, -16 }, { 8, 16 }, { 26, 16 } } do
-			post(pier, px + o[1], -7, iz + o[2], gy1 + 7, 1.4, C.pierLeg, "Metal")
+			post(pier, px + o[1], -13, iz + o[2], gy1 + 13, 1.4, C.pierLeg, "Metal")
 		end
 		-- голова пирса: платформа и павильоны
 		local hz = z1 - 40
@@ -673,7 +731,7 @@ return function(B)
 		box(pier, V(px, gy0 + 0.4, hz), V(60, 0.8, 76), C.pierTeal, "Metal", nil, NOSH)
 		for ox = -26, 26, 13 do
 			for oz = -34, 34, 17 do
-				post(pier, px + ox, -7, hz + oz, gy0 + 7, 1.3, C.pierLeg, "Metal")
+				post(pier, px + ox, -13, hz + oz, gy0 + 13, 1.3, C.pierLeg, "Metal")
 			end
 		end
 		box(pier, V(px - 6, gy1 + 5, hz - 4), V(40, 8, 34), hex(0x5D7A84), "Glass", nil, { reflectance = 0.3 })
@@ -689,9 +747,9 @@ return function(B)
 	-- Колесо обозрения на первом острове пирса (ось вдоль X — видно «кругом» с пляжа)
 	local wheel = folder("FerrisWheel")
 	do
-		local hub = V(185, 40, -230)
+		local hub = V(185, 46, -230)
 		local R = 26
-		local nSeg = 28
+		local nSeg = 22
 		for s = -1, 1, 2 do
 			local x = hub.X + s * 1.2
 			for i = 0, nSeg - 1 do
@@ -699,23 +757,23 @@ return function(B)
 				local a1 = ((i + 1) / nSeg) * math.pi * 2
 				local p0 = V(x, hub.Y + R * math.cos(a0), hub.Z + R * math.sin(a0))
 				local p1 = V(x, hub.Y + R * math.cos(a1), hub.Z + R * math.sin(a1))
-				beam(wheel, p0, p1, 0.5, 0.5, C.white, "Metal", NOSH)
+				beam(wheel, p0, p1, 0.7, 0.7, C.white, "Metal", NOSH)
 			end
 		end
-		for i = 0, 13 do
-			local a = (i / 14) * math.pi * 2
+		for i = 0, 10 do
+			local a = (i / 11) * math.pi * 2
 			local p = V(hub.X, hub.Y + R * math.cos(a), hub.Z + R * math.sin(a))
-			beam(wheel, V(hub.X, hub.Y, hub.Z), p, 0.22, 0.22, C.white, "Metal", NOSH)
+			beam(wheel, V(hub.X, hub.Y, hub.Z), p, 0.3, 0.3, C.white, "Metal", NOSH)
 		end
 		B:cyl(hub, 3.4, 2.2, C.grey, "Metal", "X", nil, { parent = wheel })
 		-- опорные ноги (А-образные)
 		for s = -1, 1, 2 do
-			beam(wheel, V(hub.X + s * 2, 12, hub.Z - 16), V(hub.X + s * 1.5, hub.Y, hub.Z), 1.0, 1.0, C.white, "Metal")
-			beam(wheel, V(hub.X + s * 2, 12, hub.Z + 16), V(hub.X + s * 1.5, hub.Y, hub.Z), 1.0, 1.0, C.white, "Metal")
+			beam(wheel, V(hub.X + s * 2, 16.5, hub.Z - 16), V(hub.X + s * 1.5, hub.Y, hub.Z), 1.0, 1.0, C.white, "Metal")
+			beam(wheel, V(hub.X + s * 2, 16.5, hub.Z + 16), V(hub.X + s * 1.5, hub.Y, hub.Z), 1.0, 1.0, C.white, "Metal")
 		end
 		-- кабинки
-		for i = 0, 13 do
-			local a = (i / 14) * math.pi * 2 + 0.11
+		for i = 0, 10 do
+			local a = (i / 11) * math.pi * 2 + 0.11
 			local p = V(hub.X, hub.Y + R * math.cos(a) - 1.8, hub.Z + R * math.sin(a))
 			box(wheel, p, V(2.6, 2.8, 2.6), pick({ hex(0xD8E4EA), hex(0xB8CCD8) }), "Glass", nil, { reflectance = 0.2, castShadow = false })
 		end
@@ -729,18 +787,18 @@ return function(B)
 		-- два мола гавани с маяками (видны слева при взгляде на море)
 		local moles = { { x0 = -420, z0 = -150, x1 = -440, z1 = -650, light = C.nlRed }, { x0 = -540, z0 = -150, x1 = -505, z1 = -610, light = hex(0x2F8A46) } }
 		for _, m in moles do
-			local a, b = V(m.x0, -1.75, m.z0), V(m.x1, -1.75, m.z1)
-			beam(harbor, a, b, 13, 8.5, hex(0x5F5E58), "Rock", { castShadow = false })
-			beam(harbor, a + V(0, 4.6, 0), b + V(0, 4.6, 0), 7, 0.7, hex(0xA9A59C), "Concrete", { castShadow = false })
+			local a, b = V(m.x0, -4.75, m.z0), V(m.x1, -4.75, m.z1)
+			beam(harbor, a, b, 13, 14.5, hex(0x5F5E58), "Rock", { castShadow = false })
+			beam(harbor, a + V(0, 7.6, 0), b + V(0, 7.6, 0), 7, 0.7, hex(0xA9A59C), "Concrete", { castShadow = false })
 			-- навал камней вдоль мола
 			for k = 1, 9 do
 				local t = k / 10
 				local p = a:Lerp(b, t)
 				local sgn = if k % 2 == 0 then 1 else -1
-				box(harbor, p + V(sgn * rr(5, 7), rr(-0.5, 1.2), rr(-6, 6)), V(rr(4, 7), rr(3, 5), rr(5, 9)), pick({ hex(0x55544E), hex(0x6A6862), hex(0x4A4A46) }), "Rock", V(rr(-15, 15), rr(0, 90), rr(-15, 15)), NOSH)
+				box(harbor, p + V(sgn * rr(5, 7), rr(2.5, 4.2), rr(-6, 6)), V(rr(4, 7), rr(3, 5), rr(5, 9)), pick({ hex(0x55544E), hex(0x6A6862), hex(0x4A4A46) }), "Rock", V(rr(-15, 15), rr(0, 90), rr(-15, 15)), NOSH)
 			end
 			-- маяк на конце
-			local e = b + V(0, 3.2, 0)
+			local e = b + V(0, 7.95, 0)
 			post(harbor, e.X, e.Y, e.Z, 15, 3.4, m.light, "SmoothPlastic", NOSH)
 			post(harbor, e.X, e.Y + 15, e.Z, 2.6, 2.2, hex(0xE8E8E2), "Glass", NOSH)
 			post(harbor, e.X, e.Y + 17.6, e.Z, 0.8, 3.6, m.light, "SmoothPlastic", NOSH)
@@ -835,9 +893,42 @@ return function(B)
 	person(46, 62.6, "sit", 200)
 	person(48.4, 62.9, "sit", 165)
 	-- у кромки воды (вид на море)
-	for _ = 1, 16 do
+	for _ = 1, 11 do
 		local x, z = rr(-260, 300), rr(-149, -100)
 		person(x, z, pick({ "stand", "stand", "sit" }), rr(0, 360))
+	end
+
+	-- синие ветрозащитные полотна перед клубами (синяя полоса в кадрах S01/S03)
+	do
+		local g = folder("Windscreens")
+		local x = -310
+		while x < 60 do
+			local len = rr(18, 34)
+			if rnd() > 0.25 then
+				local col = pick({ C.clubBlue, C.clubBlue, C.clubTeal, hex(0x2A6FA0) })
+				box(g, V(x + len / 2, 1.0, 221 + rr(-1.5, 1.5)), V(len, 2.0, 0.1), col, "Fabric", V(0, rr(-3, 3), 0), NOSH)
+			end
+			x += len + rr(2, 10)
+		end
+	end
+
+	-- пляжный трактор-уборщик (источник следов шин)
+	do
+		local g = folder("Tractor")
+		local cf = CFrame.new(-118, 0, 150) * CFrame.Angles(0, math.rad(64), 0)
+		local function at(dx, dy, dz)
+			return cf * CFrame.new(dx, dy, dz)
+		end
+		local col = hex(0x2F7A3E)
+		B:part({ cf = at(0, 2.6, 0.6), size = V(3.2, 2.0, 6.6), color = col, material = "Metal", parent = g })
+		B:part({ cf = at(0, 5.0, 1.6), size = V(3.0, 2.8, 3.0), color = hex(0x7E98A2), material = "Glass", parent = g, reflectance = 0.25 })
+		B:part({ cf = at(0, 6.55, 1.6), size = V(3.4, 0.3, 3.4), color = C.white, material = "Metal", parent = g })
+		B:part({ cf = at(0.9, 4.6, -2.0), size = V(0.25, 2.6, 0.25), color = hex(0x222222), material = "Metal", parent = g, castShadow = false })
+		for _, w in { { -2.0, 1.6, 2.4, 3.2 }, { 2.0, 1.6, 2.4, 3.2 }, { -2.0, -1.8, 1.6, 2.2 }, { 2.0, -1.8, 1.6, 2.2 } } do
+			B:part({ cf = at(w[1], w[4] / 2, w[2]) * CFrame.Angles(0, 0, 0), size = V(w[3] * 0.55, w[4], w[4]), color = hex(0x1E1E1E), material = "Rubber", shape = "Cylinder", parent = g })
+		end
+		-- прицепная борона-уборщик
+		B:part({ cf = at(0, 0.8, 6.4), size = V(5.6, 1.2, 2.6), color = hex(0xC9A43A), material = "Metal", parent = g })
 	end
 
 	-- спасательная вышка у воды и волейбольная сетка
@@ -851,6 +942,8 @@ return function(B)
 		box(g, V(lx, 11.2, lz + 0.4), V(3.8, 3.4, 3.6), hex(0xE9E7E1), "SmoothPlastic")
 		box(g, V(lx, 11.6, lz - 1.42), V(3.2, 1.4, 0.12), hex(0x6F8C98), "Glass", nil, NOSH)
 		box(g, V(lx, 13.1, lz + 0.2), V(4.6, 0.4, 4.8), C.red, "SmoothPlastic")
+		local lsign = box(g, V(lx, 9.95, lz - 2.35), V(4.4, 0.7, 0.1), C.red, "SmoothPlastic", nil, NOSH)
+		B:text(lsign, "Front", "REDDINGSBRIGADE", { color = C.white })
 		beam(g, V(lx + 1.2, 0, lz - 5.5), V(lx + 1.2, 9.4, lz - 2.2), 1.0, 0.2, C.wood, "WoodPlanks")
 		post(g, lx - 2.2, 13.3, lz - 2.2, 5, 0.18, C.white, "Metal", NOSH)
 		box(g, V(lx - 1.3, 17.6, lz - 2.2), V(1.8, 1.1, 0.05), C.red, "Fabric", nil, NOSH)
@@ -868,8 +961,17 @@ return function(B)
 	-- воздушные змеи над пляжем
 	do
 		local g = folder("Kites")
-		for _, k in { { -90, 52, 150, C.red, C.yellow }, { 120, 40, -60, C.clubBlue, C.white } } do
+		for _, k in { { -210, 58, 120, C.red, C.yellow, -196, 92 }, { 120, 40, -60, C.clubBlue, C.white, 104, -34 } } do
 			local p = V(k[1], k[2], k[3])
+			-- запускающий змея человек и леер (с лёгким провисом)
+			local fx, fz = k[6], k[7]
+			local yaw = math.deg(math.atan2(-(k[1] - fx), -(k[3] - fz)))
+			person(fx, fz, "stand", yaw)
+			local hand = V(fx, 4.6, fz) + V(k[1] - fx, 0, k[3] - fz).Unit * 0.9
+			local tip = p - V(0, 2.1, 0)
+			local mid = hand:Lerp(tip, 0.5) - V(0, 2.5, 0)
+			beam(g, hand, mid, 0.07, 0.07, hex(0xF2F2F2), "SmoothPlastic", NOSH)
+			beam(g, mid, tip, 0.07, 0.07, hex(0xF2F2F2), "SmoothPlastic", NOSH)
 			local cf = CFrame.new(p) * CFrame.Angles(0, math.rad(rr(-30, 30)), 0) * CFrame.Angles(0, 0, math.rad(45))
 			B:part({ cf = cf, size = V(3.2, 3.2, 0.08), color = k[4], material = "Fabric", parent = g, castShadow = false })
 			B:part({ cf = cf * CFrame.new(0, 0, -0.05), size = V(3.2, 0.3, 0.06), color = k[5], material = "Fabric", parent = g, castShadow = false })
@@ -896,7 +998,24 @@ return function(B)
 		end
 	end
 
-	-- Пожелание цвета материалов Terrain (Terrain:SetMaterialColor) для координатора.
+	-- Цвет материалов Terrain: детали-песок (следы, мокрая полоса) подобраны под этот цвет песка,
+	-- а у Terrain по умолчанию песок темнее (143,126,95). Скрипт ставит цвет при запуске (Terrain общий,
+	-- Sand/Pavement используются только на пляже).
 	root:SetAttribute("TerrainColor_Sand", C.sand)
 	root:SetAttribute("TerrainColor_Pavement", hex(0xB9B5AC))
+	local scr = roblox.Instance.new("Script")
+	scr.Name = "BeachTerrainColors"
+	scr.Source = [[
+-- Цвета материалов Terrain для пляжа: атрибуты TerrainColor_<Material> модели Beach.
+local model = script.Parent
+for name, value in model:GetAttributes() do
+	local m = string.match(name, "^TerrainColor_(%w+)$")
+	if m and typeof(value) == "Color3" then
+		pcall(function()
+			workspace.Terrain:SetMaterialColor((Enum.Material :: any)[m], value)
+		end)
+	end
+end
+]]
+	scr.Parent = root
 end
