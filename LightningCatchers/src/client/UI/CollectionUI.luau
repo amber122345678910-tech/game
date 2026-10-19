@@ -873,7 +873,7 @@ function CollectionUI.start()
 	win = UIKit.window({
 		Name = "Collection",
 		Title = "Коллекция",
-		Icon = "💎",
+		Icon = "🔮",
 		Width = 880,
 		Height = 560,
 		Accent = Theme.ElectricDark,

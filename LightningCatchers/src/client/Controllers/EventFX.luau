@@ -662,7 +662,8 @@ end
 -- Молния оставила фульгурит (подробности — в тосте от сервера)
 local function onFulgurite(msg: Net.StrikeResultMsg)
 	Sounds.play("Fulgurite")
-	Juice.popup(msg.Pos + Vector3.new(0, 2, 0), "💎 Фульгурит!", Theme.Shard, true)
+	-- 🔮 и сиреневый — не путать с 💎 осколком
+	Juice.popup(msg.Pos + Vector3.new(0, 2, 0), "🔮 Фульгурит!", Theme.Purple:Lerp(Color3.new(1, 1, 1), 0.35), true)
 end
 
 ----------------------------------------------------------------------

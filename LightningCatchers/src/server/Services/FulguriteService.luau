@@ -421,12 +421,12 @@ function FulguriteService.grant(player: Player, color: Config.ColorId, zone: num
 	end
 	local rarity = Pets.Rarities[spec.Rarity]
 	local title = Fulgurite.title(spec, mut)
-	notify(player, string.format("💎 %s %s — %s!", title, serialText(serial), rarity.Name), if rarity.Rank >= NOTIFY_RARE_RANK then "rare" else "good")
+	notify(player, string.format("🔮 %s %s — %s!", title, serialText(serial), rarity.Name), if rarity.Rank >= NOTIFY_RARE_RANK then "rare" else "good")
 	-- у Радужной и Перуна свои баннеры (EventService) — второй не нужен
 	local banner = bannerRemote
 	local eventDrop = tag == "rainbow" or tag == "perun"
 	if banner and rarity.Rank >= BANNER_RANK and not eventDrop then
-		banner:FireAllClients(string.format("💎 %s нашёл: %s %s!", player.DisplayName, title, serialText(serial)), spec.Rarity, rarity.Color)
+		banner:FireAllClients(string.format("🔮 %s нашёл: %s %s!", player.DisplayName, title, serialText(serial)), spec.Rarity, rarity.Color)
 	end
 	return rec
 end

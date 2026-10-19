@@ -191,15 +191,35 @@ local function showToast(text: string, kind: string)
 	end)
 end
 
--- Тосты висят под верхним блоком HUD (Вольты и банка)
-local function placeToasts()
-	local anchor = HUD.toastAnchor()
-	if not anchor then
-		toastRoot.Position = UDim2.new(0.5, 0, 0, 150)
+-- Подсказка обучения висит там же, под верхним блоком HUD: пока она есть, тосты встают под неё
+local hintLaneBottom: number? = nil -- нижний край полосы подсказки (экранные точки) или nil
+local placeTween: Tween? = nil
+
+-- Тосты висят под верхним блоком HUD (Вольты и банка) и под подсказкой обучения
+local function placeToasts(smooth: boolean?)
+	if not toastRoot then
 		return
 	end
-	local bottom = anchor.AbsolutePosition.Y + anchor.AbsoluteSize.Y - gui.AbsolutePosition.Y
-	toastRoot.Position = UDim2.new(0.5, 0, 0, math.floor(bottom + 4))
+	local y = 150
+	local anchor = HUD.toastAnchor()
+	if anchor then
+		y = anchor.AbsolutePosition.Y + anchor.AbsoluteSize.Y - gui.AbsolutePosition.Y + 4
+	end
+	local lane = hintLaneBottom
+	if lane then
+		y = math.max(y, lane - gui.AbsolutePosition.Y + 4)
+	end
+	local pos = UDim2.new(0.5, 0, 0, math.floor(y))
+	local tw = placeTween
+	if tw then
+		tw:Cancel()
+		placeTween = nil
+	end
+	if smooth then
+		placeTween = UIKit.tween(toastRoot, 0.2, { Position = pos })
+	else
+		toastRoot.Position = pos
+	end
 end
 
 ----------------------------------------------------------------------
@@ -592,6 +612,16 @@ function Notifications.start()
 			end
 		end)
 	end)
+end
+
+-- Обучение: подсказка заняла полосу под верхним блоком HUD до экранной высоты bottom (nil — освободила)
+function Notifications.setHintLane(bottom: number?)
+	local b = if bottom then math.floor(bottom) else nil
+	if b == hintLaneBottom then
+		return
+	end
+	hintLaneBottom = b
+	placeToasts(true)
 end
 
 -- Показать баннер локально (например, своё событие); sound — вместо обычного звука баннера

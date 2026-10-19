@@ -43,16 +43,19 @@ local RIGHT_W = 300
 local CATCH_PX_PHONE = 100 -- реальный размер кнопки ЛОВИ на экране
 local CATCH_PX_PC = 120
 local MENU_GAP = 10
-local MENU_MIN_TILE = 48 -- сенсорный экран: плитка меню не мельче (реальные точки), иначе часть уходит в «Ещё»
+local MENU_MIN_TILE = 56 -- сенсорный экран: плитка меню не мельче (реальные точки, кнопки ≥ 56), иначе часть уходит в «Ещё»
 local MORE_AUTO_CLOSE = 6 -- раскрытое «Ещё» само закрывается через столько секунд
+local CATCH_EST_N = 5 -- риск перегрузки: заряд следующей поимки = медиана стольких последних своих поимок
 
+-- Порядок = важность: на маленьком экране последние кнопки уходят в «Ещё»
+-- (награды дня нужны с первой минуты, перезапуск — только через час-полтора, настройки — редко)
 local MENU = {
 	{ Name = "ShopButton", Window = "Shop", Icon = "🛒", Text = "Магазин", Color = Theme.Green },
 	{ Name = "PetsButton", Window = "Pets", Icon = "🐾", Text = "Питомцы", Color = Theme.Pink },
-	{ Name = "CollectionButton", Window = "Collection", Icon = "💎", Text = "Коллекция", Color = Theme.Electric },
-	{ Name = "TeleportButton", Window = "Teleport", Icon = "🌀", Text = "Острова", Color = Theme.Purple },
-	{ Name = "RebirthButton", Window = "Rebirth", Icon = "♻", Text = "Перезапуск", Color = Theme.Orange },
 	{ Name = "DailyButton", Window = "Daily", Icon = "🎁", Text = "Награды", Color = Theme.Gold },
+	{ Name = "TeleportButton", Window = "Teleport", Icon = "🌀", Text = "Острова", Color = Theme.Purple },
+	{ Name = "CollectionButton", Window = "Collection", Icon = "🔮", Text = "Коллекция", Color = Theme.Electric },
+	{ Name = "RebirthButton", Window = "Rebirth", Icon = "♻", Text = "Перезапуск", Color = Theme.Orange },
 	{ Name = "SettingsButton", Window = "Settings", Icon = "⚙", Text = "Настройки", Color = Theme.Gray },
 }
 
@@ -114,6 +117,9 @@ local jarFillGrad: UIGradient
 local statusLabel: TextLabel
 local statusScale: UIScale
 local statusPulse: Tween? = nil
+-- заряд последних своих поимок на острове recentZone (для оценки следующей)
+local recentCatches: { number } = {}
+local recentZone = -1
 
 local eventPill: Frame
 local eventLabel: TextLabel
@@ -393,6 +399,44 @@ local function setPulse(on: boolean)
 	end
 end
 
+-- Сколько заряда, скорее всего, даст следующая поимка: медиана своих последних поимок на этом острове
+-- (редкая золотая не раздувает оценку), а пока их нет — голубая «ХОРОШО» при текущем комбо
+local function nextCatchCharge(zone: number, d: PlayerData.Data?): number
+	if zone == recentZone and #recentCatches > 0 then
+		local sorted = table.clone(recentCatches)
+		table.sort(sorted)
+		return sorted[(#sorted + 1) // 2]
+	end
+	if not Config.Zones[zone] then
+		return 0
+	end
+	return Economy.catchCharge(zone, "blue", "good", playerNumber(Net.PlayerAttrs.Combo), if d then d.Upgrades.Rod else 0)
+end
+
+-- Своя поимка: уточнить оценку следующей
+local function noteCatch(msg: Net.StrikeResultMsg)
+	local charge, cap, jar = msg.Charge, msg.Capacity, msg.Jar
+	if msg.Grade ~= "perfect" and msg.Grade ~= "good" then
+		return
+	end
+	if typeof(charge) ~= "number" or typeof(cap) ~= "number" or typeof(jar) ~= "number" or charge <= 0 or cap <= 0 then
+		return
+	end
+	-- банка упёрлась в предел — заряд обрезан и не показывает, сколько дала бы поимка
+	if jar >= cap * Config.Overcharge.MaxFill * (1 - 1e-6) or math.abs(jar - cap) <= cap * 1e-6 then
+		return
+	end
+	local zone = ClientState.zone()
+	if zone ~= recentZone then
+		recentZone = zone
+		table.clear(recentCatches)
+	end
+	table.insert(recentCatches, charge)
+	if #recentCatches > CATCH_EST_N then
+		table.remove(recentCatches, 1)
+	end
+end
+
 local lastJarKey = ""
 local function updateJar()
 	local fill = playerNumber(Net.PlayerAttrs.JarFill)
@@ -439,6 +483,14 @@ local function updateJar()
 	-- строка состояния: риск перегрузки или "сдай заряд" (или Тесла-дрон везёт заряд)
 	local full = (fill >= 0.999 and not overAllowed) or fill >= Config.Overcharge.MaxFill - 0.001
 	local droneAway = droneOn and ClientState.droneAway()
+	-- риск следующей поимки: сервер бросает его по заполнению ПОСЛЕ неё (как только банка переливается за 100%)
+	local risk = 0
+	if overAllowed and not full then
+		local ins = if d then d.Upgrades.Insulation else 0
+		local nextFill = math.min(fill + nextCatchCharge(zone, d) / math.max(1, cap), Config.Overcharge.MaxFill)
+		risk = Strikes.overchargeRisk(math.max(nextFill, if fill >= 0.999 then 1.0001 else 0), ins)
+	end
+	local riskPct = math.max(1, math.floor(risk * 100 + 0.5))
 	if full and zone ~= 0 then
 		statusLabel.Visible = true
 		statusLabel.Text = if droneAway then "Банка полна — дрон скоро вернётся" else "Банка полна — сдай заряд!"
@@ -450,11 +502,21 @@ local function updateJar()
 		statusLabel.TextColor3 = Theme.Volt
 		setPulse(true)
 	elseif fill > 1.001 then
-		local ins = if d then d.Upgrades.Insulation else 0
-		local risk = Strikes.overchargeRisk(fill, ins)
 		statusLabel.Visible = true
-		statusLabel.Text = string.format("⚠ Перегрузка! Риск %d%%", math.floor(risk * 100 + 0.5))
+		statusLabel.Text = string.format("⚠ Перегрузка! Риск лопнуть ~%d%%", riskPct)
 		statusLabel.TextColor3 = Theme.Miss
+		setPulse(false)
+	elseif overAllowed and fill >= 0.999 then
+		-- ровно полна: можно сдать или рискнуть
+		statusLabel.Visible = true
+		statusLabel.Text = string.format("Банка полна! Дальше риск ~%d%%", riskPct)
+		statusLabel.TextColor3 = Theme.Volt
+		setPulse(true)
+	elseif risk > 0 then
+		-- следующая поимка, скорее всего, перельётся за 100%
+		statusLabel.Visible = true
+		statusLabel.Text = string.format("⚠ Почти полна: риск лопнуть ~%d%%", riskPct)
+		statusLabel.TextColor3 = Theme.Orange
 		setPulse(false)
 	elseif droneAway then
 		statusLabel.Visible = true
@@ -1257,7 +1319,6 @@ local function layout()
 	-- (левые 40% нижних 2/3 — зона джойстика); что не помещается крупно — в «Ещё». На ПК — два столбца слева
 	if touch then
 		local guiW = if gui.AbsoluteSize.X > 0 then gui.AbsoluteSize.X else vp.X
-		local guiH = if gui.AbsoluteSize.Y > 0 then gui.AbsoluteSize.Y else vp.Y - inset
 		local top = 6
 		local gapReal = if phone then 8 else 10
 		local maxTile = if phone then 64 else 80
@@ -1288,21 +1349,27 @@ local function layout()
 		menuRoot.Size = UDim2.fromOffset(cols * t + (cols - 1) * gap, rows * t + (rows - 1) * gap)
 		menuRoot.AnchorPoint = Vector2.new(0, 0)
 		menuRoot.Position = UDim2.new(0, 10, 0, top)
-		-- блок «Ещё» — под своей плиткой: столбцом, а если не влезает по высоте — в несколько
+		-- блок «Ещё» — строкой справа от своей плитки, в её ряду (не столбцом вниз: левые 40% ниже
+		-- верхней трети — зона джойстика); не влезает по ширине — в несколько рядов, но, пока блок
+		-- левее 40% ширины, не ниже верхней трети
 		local hidden = #MENU - shown
 		if hidden > 0 then
-			local x = 10 + (shown % cols) * (tile + gapReal)
-			local y = top + (shown // cols + 1) * (tile + gapReal)
 			local pad = morePad * sMenu
-			local fitRows = math.max(1, math.floor((guiH - y - 2 * pad - 6 + gapReal) / (tile + gapReal)))
-			local mCols = math.ceil(hidden / fitRows)
+			local x = 10 + (shown % cols + 1) * (tile + gapReal)
+			local y = top + (shown // cols) * (tile + gapReal) - pad
+			local fitCols = math.max(1, math.floor((guiW - 6 - x - 2 * pad + gapReal) / (tile + gapReal)))
+			local mCols = math.min(hidden, fitCols)
 			local mRows = math.ceil(hidden / mCols)
 			local w = mCols * t + (mCols - 1) * gap + 2 * morePad
 			local h = mRows * t + (mRows - 1) * gap + 2 * morePad
+			local mx = math.max(4, math.min(x, guiW - w * sMenu - 6))
+			if mx < guiW * 0.4 then
+				y = math.min(y, vp.Y / 3 - inset - h * sMenu)
+			end
 			moreGrid.CellSize = UDim2.fromOffset(t, t)
 			moreGrid.CellPadding = UDim2.fromOffset(gap, gap)
 			moreRoot.Size = UDim2.fromOffset(w, h)
-			moreRoot.Position = UDim2.fromOffset(math.max(4, math.min(x - pad, guiW - w * sMenu - 6)), y)
+			moreRoot.Position = UDim2.fromOffset(math.floor(mx), math.floor(math.max(0, y)))
 		end
 		-- узкий экран: верхний блок сдвигается правее меню, чтобы не наезжать на кнопки
 		local menuRight = 10 + cols * tile + (cols - 1) * gapReal + 10
@@ -1445,6 +1512,8 @@ function HUD.start()
 		end
 	end)
 	ClientState.StrikeResolved:Connect(function(msg: Net.StrikeResultMsg)
+		noteCatch(msg)
+		updateJar()
 		if msg.Grade == "zap" then
 			-- уже показано прогнозом клиента — ответ сервера только подтверждает
 			if ClientState.predictedGrade(msg.Id, msg.Hit) ~= "zap" then

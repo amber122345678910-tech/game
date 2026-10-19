@@ -22,6 +22,7 @@ local ClientState = require(script.Parent.Parent.ClientState)
 local StrikeController = require(script.Parent.StrikeController)
 local UIKit = require(script.Parent.Parent.UI.UIKit)
 local Theme = require(script.Parent.Parent.UI.Theme)
+local Notifications = require(script.Parent.Parent.UI.Notifications)
 
 local Tutorial = {}
 
@@ -174,6 +175,16 @@ local function findButton(name: string): GuiObject?
 		return found
 	end
 	return nil
+end
+
+-- Кнопка меню спрятана в закрытом «Ещё» (маленький экран) — подсвечиваем «Ещё»
+local function visibleButton(name: string): GuiObject?
+	local b = findButton(name)
+	local holder = if b then b.Parent else nil
+	if holder and holder:IsA("GuiObject") and holder.Name == "MenuMore" and not holder.Visible then
+		return findButton("MoreButton") or b
+	end
+	return b
 end
 
 ----------------------------------------------------------------------
@@ -597,8 +608,18 @@ local function show(h: Hint?, clock: number)
 
 	-- пульс кнопки
 	local buttonName = if hidden or not h then nil else h.button
-	setPulse(if buttonName then findButton(buttonName) else nil)
+	setPulse(if buttonName then visibleButton(buttonName) else nil)
 	current = if hidden then nil else h
+
+	-- полоса подсказки: тосты встают под неё (и в паузу на надпись оценки — чтобы не прыгали)
+	local laneBottom: number? = nil
+	local ng, lp, ls = gui, panel, panelScale
+	if not hidden and ng and lp and ls then
+		local base = ls:GetAttribute("BaseScale")
+		local k = if typeof(base) == "number" then base else ls.Scale
+		laneBottom = ng.AbsolutePosition.Y + lp.Position.Y.Offset + HINT_H * k
+	end
+	Notifications.setHintLane(laneBottom)
 end
 
 local function animate(clock: number)
