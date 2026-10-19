@@ -16,10 +16,13 @@ return {
 	},
 	camera = {
 		keys = {
-			{ t = 5.9, pos = Config.at("Beach", -1.596, 5.227, 3.216), look = Config.at("Beach", -0.642, 5.828, 0.235), fov = 24 },
-			{ t = 6.0, pos = Config.at("Beach", -1.779, 5.212, 2.48), look = Config.at("Beach", -0.742, 5.828, 0.205), fov = 30 },
-			{ t = 6.1, pos = Config.at("Beach", -0.132, 5.2, 2.751), look = Config.at("Beach", -0.487, 5.719, 1.18), fov = 38 },
+			{ t = 5.9, pos = Config.at("Beach", -0.227, 5.2, 2.608), look = Config.at("Beach", -0.506, 5.719, 1.02), fov = 38 },
+			{ t = 6.0, pos = Config.at("Beach", -0.23, 5.199, 2.473), look = Config.at("Beach", -0.538, 5.719, 0.886), fov = 38 },
+			{ t = 6.1, pos = Config.at("Beach", 0.042, 5.202, 2.64), look = Config.at("Beach", -0.49, 5.719, 1.128), fov = 38 },
+			{ t = 6.2, pos = Config.at("Beach", 0.317, 5.205, 2.643), look = Config.at("Beach", -0.44, 5.719, 1.242), fov = 38 },
 		},
+
+
 
 
 		focus = { actor = "Horse", part = "Head" },

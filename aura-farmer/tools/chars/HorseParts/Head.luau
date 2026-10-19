@@ -91,13 +91,6 @@ function Head.build(g, opts)
 		-- ноздри: тёмные «запятые» на переднем торце, верх сходится к центру
 		local c = V(s * 0.155, 6.09, -1.735)
 		g:ell("Head", CFrame.new(c) * CFrame.Angles(rad(-12), rad(s * 18), rad(s * -22)), V(0.12, 0.2, 0.07), P.nostril, "SmoothPlastic")
-		-- крыло ноздри (валик снаружи)
-		local pts = {}
-		for i = 0, 4 do
-			local a = rad(-70 + i * 45)
-			table.insert(pts, c + V(s * 0.085 * math.cos(a), 0.11 * math.sin(a), 0.012 + 0.02 * math.cos(a)))
-		end
-		g:tube("Head", pts, 0.05, P.nose, "Carpet")
 	end
 
 	-- ===== Рот: верхняя часть (Head) =====
@@ -108,7 +101,7 @@ function Head.build(g, opts)
 		local x, z = arch(0.305, 0.485, Z0, phi)
 		table.insert(gum, V(x, biteY(phi) + 0.14, z))
 	end
-	g:tube("Head", gum, 0.08, P.gum, "SmoothPlastic")
+	g:caps("Head", gum, 0.08, P.gum, "SmoothPlastic")
 	-- верхние зубы (крупные, «человеческие»)
 	local upper = {
 		{ 6.2, 0.12, 0.16 },
@@ -144,7 +137,7 @@ function Head.build(g, opts)
 		local x, z = arch(0.282, 0.452, Z0, phi)
 		table.insert(lgum, V(x, biteY(phi) - 0.125, z))
 	end
-	g:tube("Jaw", lgum, 0.075, P.gum, "SmoothPlastic")
+	g:caps("Jaw", lgum, 0.075, P.gum, "SmoothPlastic")
 	-- нижние зубы
 	local lower = {
 		{ 5.6, 0.1, 0.12 },
@@ -170,7 +163,7 @@ function Head.build(g, opts)
 		local k = math.abs(phi) / 100
 		table.insert(llip, V(x, biteY(phi) - 0.15 + 0.07 * k * k, z))
 	end
-	g:tube("Jaw", llip, function(i)
+	g:caps("Jaw", llip, function(i)
 		local k = math.abs(i - (#llip + 1) / 2) / ((#llip - 1) / 2)
 		return 0.11 - 0.03 * k
 	end, P.lip, "SmoothPlastic")
@@ -182,7 +175,7 @@ function Head.build(g, opts)
 		local k = math.abs(phi) / 100
 		table.insert(ulip, V(x, biteY(phi) + 0.165 - 0.075 * k * k, z))
 	end
-	g:tube("UpperLip", ulip, function(i)
+	g:caps("UpperLip", ulip, function(i)
 		local k = math.abs(i - (#ulip + 1) / 2) / ((#ulip - 1) / 2)
 		return 0.1 - 0.025 * k
 	end, P.lip, "SmoothPlastic")
@@ -193,7 +186,7 @@ function Head.build(g, opts)
 		local k = math.abs(phi) / 100
 		table.insert(uf, V(x, biteY(phi) + 0.24 - 0.06 * k * k, z + 0.015))
 	end
-	g:tube("UpperLip", uf, 0.12, P.muzzle, "Carpet")
+	g:caps("UpperLip", uf, 0.12, P.muzzle, "Carpet")
 
 	-- ===== Глаза =====
 	for _, s in { 1, -1 } do

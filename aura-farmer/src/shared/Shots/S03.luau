@@ -19,6 +19,17 @@ return {
 	finish = 3.8667,
 	set = "Beach",
 	preset = "Beach",
+	-- солнце сзади-справа от камеры (≈35° от оси, высота ≈46°): фронтальный жёсткий свет, правая щека парня в свету;
+	-- глубокая резкость (как на телефоне), без бликов в кадре; контраст выше, насыщенность сдержанная
+	lighting = {
+		sunDir = Vector3.new(-0.4, 0.72, -0.57),
+		lighting = { ExposureCompensation = -0.15, ShadowSoftness = 0.1 },
+		atmosphere = { Glare = 0, Haze = 1.2 },
+		bloom = { Intensity = 0.45, Size = 24, Threshold = 1.0 },
+		sunRays = { Intensity = 0.02 },
+		cc = { Brightness = 0, Contrast = 0.2, Saturation = 0.08, TintColor = Color3.fromRGB(255, 247, 240) },
+		dof = { FarIntensity = 0.06, InFocusRadius = 40 },
+	},
 	actors = {
 		-- девушка слева в кадре (+X мира)
 		WomanA = { char = "WomanA", place = Config.place("Beach", 5.15, 3.5, 22) },

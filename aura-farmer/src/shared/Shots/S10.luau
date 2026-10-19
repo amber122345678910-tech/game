@@ -2,7 +2,7 @@
 -- S10 (11.133–13.133 с): Спортзал с фиолетовым неоном: конь качает гантель 500 кг.
 local Config = require(script.Parent.Parent:WaitForChild("Config"))
 
-local HZ = -0.7 -- таз коня на переднем конце скамьи (сиденье z∈[-1.4,-0.18], верх Y=1.55)
+local HZ = -1.0 -- таз коня на переднем конце скамьи (сиденье z∈[-1.4,-0.18], верх Y=1.55)
 
 return {
 	id = "S10",
@@ -14,7 +14,7 @@ return {
 		Horse = { char = "Horse", place = Config.place("Gym", 0, HZ, 0), opts = { props = { "dumbbell" } } },
 		Ginger = {
 			char = "Human",
-			place = Config.place("Gym", 3.8, 1.6, 90),
+			place = Config.place("Gym", 4.6, 0.6, 90),
 			opts = {
 				female = true,
 				height = 0.98,
@@ -34,7 +34,7 @@ return {
 		},
 		Curly = {
 			char = "Human",
-			place = Config.place("Gym", -4.8, 1.8, -55),
+			place = Config.place("Gym", -5.0, 0.8, -55),
 			opts = {
 				height = 1.0,
 				build = 0.95,
@@ -72,8 +72,8 @@ return {
 	},
 	camera = {
 		keys = {
-			{ t = 11.1333, pos = Config.at("Gym", 0.25, 2.5, -8.6), look = Config.at("Gym", 0.53, 3.06, -0.6), fov = 58, ease = "linear" },
-			{ t = 13.1333, pos = Config.at("Gym", 0.25, 2.5, -8.6), look = Config.at("Gym", 0.53, 3.06, -0.6), fov = 56.6 },
+			{ t = 11.1333, pos = Config.at("Gym", 0.42, 2.5, -8.9), look = Config.at("Gym", 0.62, 3.06, -0.9), fov = 58, ease = "linear" },
+			{ t = 13.1333, pos = Config.at("Gym", 0.42, 2.5, -8.9), look = Config.at("Gym", 0.62, 3.06, -0.9), fov = 56.6 },
 		},
 		path = "linear",
 		focus = { actor = "Horse", part = "Head" },

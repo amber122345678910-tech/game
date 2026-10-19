@@ -101,7 +101,7 @@ function Body.build(g, opts)
 	-- ===== Корпус (UpperTorso): пиджак, рубашка, мех =====
 	local E = {
 		chest = { c = V(0, 3.98, 0.1), r = V(1.12, 1.3, 0.58) },
-		waist = { c = V(0, 3.32, 0.1), r = V(1.01, 0.65, 0.54) },
+		waist = { c = V(0, 3.3, 0.08), r = V(1.1, 0.75, 0.6) },
 		shirt = { c = V(0, 3.8, -0.2), r = V(0.525, 1.0, 0.38) },
 		fur = { c = V(0, 4.48, -0.3), r = V(0.36, 0.58, 0.255) },
 		fur2 = { c = V(0, 4.86, -0.2), r = V(0.4, 0.26, 0.31) },
@@ -109,7 +109,7 @@ function Body.build(g, opts)
 	}
 	g:ell("UpperTorso", E.chest.c, E.chest.r * 2, P.suit, "SmoothPlastic")
 	g:ell("UpperTorso", E.waist.c, E.waist.r * 2, P.suit, "SmoothPlastic")
-	g:tube("UpperTorso", { V(-1.12, 4.6, 0.06), V(1.12, 4.6, 0.06) }, 0.58, P.suit, "SmoothPlastic") -- линия плеч
+	g:tube("UpperTorso", { V(-1.12, 4.63, 0.06), V(1.12, 4.63, 0.06) }, 0.6, P.suit, "SmoothPlastic") -- линия плеч
 	for _, s in { 1, -1 } do
 		g:tube("UpperTorso", { V(s * 0.36, 4.88, 0.14), V(s * 1.08, 4.66, 0.08) }, 0.5, P.suit, "SmoothPlastic") -- скат плеч
 	end
@@ -235,28 +235,28 @@ function Body.build(g, opts)
 	-- пиджак ниже талии: два вертикальных цилиндра (прямые бока, ровный подол); спереди между ними
 	-- «долина» — там видны ремень и джинсы (полы распахнуты)
 	for _, s in { 1, -1 } do
-		g:cylSeg("LowerTorso", V(s * 0.5, 3.16, 0.08), V(s * 0.5, 2.12, 0.08), 1.2, P.suit, "SmoothPlastic")
-		g:cylSeg("LowerTorso", V(s * 0.5, 2.135, 0.08), V(s * 0.5, 2.11, 0.08), 1.12, P.suitDark, "SmoothPlastic")
+		g:cylSeg("LowerTorso", V(s * 0.5, 3.0, 0.08), V(s * 0.5, 2.12, 0.08), 1.12, P.suit, "SmoothPlastic")
+		g:ell("LowerTorso", V(s * 0.5, 3.0, 0.08), V(1.12, 0.36, 1.12), P.suit, "SmoothPlastic")
+		g:cylSeg("LowerTorso", V(s * 0.5, 2.135, 0.08), V(s * 0.5, 2.11, 0.08), 1.04, P.suitDark, "SmoothPlastic")
 	end
 	g:ell("LowerTorso", V(0, 2.72, 0.3), V(1.6, 1.2, 0.9), P.suit, "SmoothPlastic")
 
 	-- ===== Ремень (крокодил) =====
 	local belt = {}
-	local NB = 28
 	local by = 2.96
-	for i = 0, NB do
-		local a = i / NB * 2 * math.pi
+	for _, deg in { -180, -130, -95, -70, -52, -38, -26, -15, -5, 5, 15, 26, 38, 52, 70, 95, 130, 180 } do
+		local a = rad(deg)
 		table.insert(belt, V(1.02 * math.sin(a), by, 0.04 - 0.655 * math.cos(a)))
 	end
-	for i = 1, NB do
+	for i = 1, #belt - 1 do
 		local a, b = belt[i], belt[i + 1]
 		local mid = (a + b) / 2
 		local d = b - a
 		local cf = Geo.axisX(mid, d)
-		g:box("LowerTorso", cf, V(d.Magnitude + 0.02, 0.24, 0.05), P.belt, "Leather")
+		g:box("LowerTorso", cf, V(d.Magnitude + 0.02, 0.24, 0.05), P.belt, "Leather", nil, { reflectance = 0.03 })
 	end
 	-- чешуя крокодила спереди (2 ряда скруглённых плиток)
-	for i = -6, 6 do
+	for i = -5, 4 do
 		for row = 0, 1 do
 			local a = (i + (row * 0.5)) * 0.11
 			local x = 1.04 * math.sin(a)
@@ -273,7 +273,7 @@ function Body.build(g, opts)
 		local a = math.asin(x / 1.04)
 		local z = 0.04 - 0.69 * math.cos(a)
 		local nrm = V(math.sin(a), 0, -math.cos(a)).Unit
-		g:box("LowerTorso", CFrame.lookAt(V(x, by, z), V(x, by, z) + nrm), V(0.07, 0.32, 0.03), P.jeansDark, "Fabric")
+		g:box("LowerTorso", CFrame.lookAt(V(x, by, z), V(x, by, z) + nrm), V(0.06, 0.3, 0.025), P.jeansDark, "Fabric")
 	end
 
 	-- ===== Пряжка «A» =====

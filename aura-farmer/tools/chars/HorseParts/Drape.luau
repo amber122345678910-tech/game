@@ -117,7 +117,7 @@ function Drape:tube(bone, pts, off, d, color, mat, maxLen, closed, extra)
 	if closed then
 		table.insert(p3, p3[1])
 	end
-	self.g:tube(bone, p3, d, color, mat, extra)
+	self.g:caps(bone, p3, d, color, mat, extra)
 end
 
 -- CFrame детали, лежащей на поверхности в (x, y): -Z смотрит наружу по нормали, поворот rot (град) вокруг нормали.

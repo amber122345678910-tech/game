@@ -194,78 +194,105 @@ return function(opts)
 	end
 
 	-- ===== Туловище =====
+	-- Корпус — кожа (скруглённые блоки груди и талии); одежда — оболочка чуть больше корпуса
+	-- (низ майки) + тонкие пластины спереди/сзади (центральная панель под вырезом, бретели, проймы-клинья).
 	local yW, yN, yH = P.waistY, P.neckY, P.hipY
 	local topC = o.top
 	local topStyle = o.topStyle
-	local chestBot = yW + (yN - yW) * (if fem then 0.5 else 0.38) -- низ грудной клетки (у девушек — талия уже)
+	local chestBot = yW + (yN - yW) * (if fem then 0.5 else 0.38) -- низ грудной клетки (у девушек талия уже)
 	local waistW = if fem then tw * 0.88 else tw * 0.97
 	local hipW = if fem then tw * 0.98 else tw * 0.97
 	local cropped = topStyle == "crop"
 	local shirtPad = 0.03
-	-- грудь
-	local chestColor = if topStyle then topC else skin
-	local chestTop = yN + (if topStyle then 0.0 else 0.0)
-	rboxY("UpperTorso", 0, chestBot, chestTop, 0, tw + (if topStyle then shirtPad else 0), td + (if topStyle then shirtPad else 0), 0.2 * bw, chestColor, if topStyle then "Fabric" else "SmoothPlastic", "Chest")
-	-- талия/живот
-	local waistBottom = yW - 0.18
+	local waistTop = yW + (if cropped then 0.16 else 0.24) * h -- верх пояса низа
+	local halfW = tw / 2
+	rboxY("UpperTorso", 0, chestBot, yN, 0, tw, td, 0.2 * bw, skin, "SmoothPlastic", "Chest")
+	rboxY("UpperTorso", 0, yW - 0.18, chestBot + 0.04, 0.0, waistW, td * 0.94, 0.2 * bw, skin, "SmoothPlastic", "Belly")
 	if cropped or not topStyle then
-		rboxY("UpperTorso", 0, waistBottom, chestBot + 0.04, 0.0, waistW, td * 0.94, 0.2 * bw, skin, "SmoothPlastic", "Belly")
-		-- пупок
 		ell("UpperTorso", at(0, yW + 0.42 * h, -td * 0.47 - 0.012), v(0.07, 0.09, 0.04), skinShade:Lerp(BLACK, 0.25), "SmoothPlastic", "Navel")
-	else
+	end
+	local neckHole = 0.43 * bw -- полуширина «кожи» у шеи сверху
+	local scoopF = 0
+	if topStyle == "tee" then
+		-- футболка: оболочка до плеч, круглый вырез, рукава (см. руки)
 		local hem = yW - 0.1
-		rboxY("UpperTorso", 0, hem, chestBot + 0.04, 0.0, math.max(waistW + shirtPad, hipW + 0.075), math.max(td * 0.96 + shirtPad, td * 0.98 + 0.075), 0.2 * bw, topC, "Fabric", "ShirtWaist")
+		rboxY("UpperTorso", 0, chestBot - 0.02, yN + 0.015, 0, tw + shirtPad, td + shirtPad, 0.21 * bw, topC, "Fabric", "Shirt")
+		rboxY("UpperTorso", 0, hem, chestBot + 0.04, 0, math.max(waistW + shirtPad, hipW + 0.06), math.max(td * 0.94 + shirtPad, td * 0.98 + 0.06), 0.21 * bw, topC, "Fabric", "ShirtWaist")
+		neckHole = 0.29 * bw
+		local frontZ = -(td + shirtPad) / 2
+		part("UpperTorso", at(0, yN + 0.024, 0), v(neckHole * 2, 0.02, td * 0.6), skin, "SmoothPlastic", "NeckTop")
+		ell("UpperTorso", at(0, yN, frontZ + 0.012), v(neckHole * 2, 0.24, 0.03), skin, "SmoothPlastic", "NecklineF")
+		ell("UpperTorso", at(0, yN + 0.012, frontZ + 0.006), v(neckHole * 2 + 0.08, 0.3, 0.03), topC:Lerp(BLACK, 0.15), "Fabric", "Collar")
+	elseif topStyle == "tank" or topStyle == "crop" then
+		local so, si, ya, scoopB
+		if cropped then
+			so, si, ya, scoopF, scoopB = 0.42 * bw, 0.25 * bw, yN - 0.64 * h, 0.07, 0.1
+		elseif fem then
+			so, si, ya, scoopF, scoopB = 0.56 * bw, 0.33 * bw, yN - 0.72 * h, o.scoop * 0.9 * h, 0.26 * h
+		else
+			so, si, ya, scoopF, scoopB = 0.62 * bw, 0.36 * bw, yN - 0.9 * h, o.scoop * h, 0.28 * h
+		end
+		neckHole = si
+		-- низ майки (оболочка)
+		local hem
+		if cropped then
+			hem = chestBot
+		elseif fem then
+			hem = waistTop - 0.03 -- заправлена в пояс
+		else
+			hem = yW - 0.1 -- навыпуск поверх шорт
+		end
+		rboxY("UpperTorso", 0, math.max(hem, chestBot - 0.02), ya, 0, tw + shirtPad, td + shirtPad, 0.21 * bw, topC, "Fabric", "Shirt")
+		if hem < chestBot - 0.02 then
+			local ww = if fem then waistW + shirtPad else math.max(waistW + shirtPad, hipW + 0.06)
+			local wd = if fem then td * 0.94 + shirtPad else math.max(td * 0.94 + shirtPad, td * 0.98 + 0.06)
+			rboxY("UpperTorso", 0, hem, chestBot + 0.04, 0, ww, wd, 0.21 * bw, topC, "Fabric", "ShirtWaist")
+		end
+		-- пластины спереди (zs=-1) и сзади (zs=1)
+		local pt2 = 0.02
+		local edge = halfW - 0.21 * bw * 0.45 -- до начала скругления угла корпуса
+		for _, zs in { -1, 1 } do
+			local zc = zs * (td / 2 + 0.005)
+			local yS = yN - (if zs < 0 then scoopF else scoopB)
+			local nm = if zs < 0 then "ShirtFront" else "ShirtBack"
+			part("UpperTorso", at(0, (ya + yS) / 2, zc), v(2 * so, yS - ya, pt2), topC, "Fabric", nm)
+			for _, s in { 1, -1 } do
+				-- бретель
+				part("UpperTorso", at(s * (si + so) / 2, (yS + yN) / 2 + 0.005, zc), v(so - si, yN - yS + 0.01, pt2), topC, "Fabric", "Strap")
+				-- пройма: клин с прямым углом в (so, ya), гипотенуза от (edge, ya) к (so, yN)
+				local ww = edge - so
+				local cf = CFrame.fromMatrix(v(s * (so + ww / 2), (ya + yN) / 2, zc), v(0, 0, s), v(0, 1, 0))
+				part("UpperTorso", cf, v(pt2, yN - ya, ww), topC, "Fabric", "Armhole", { shape = "Wedge" })
+				-- скругление угла выреза (фаска)
+				local c = math.min(0.09, (si * 0.5))
+				local fcf = CFrame.fromMatrix(v(s * (si - c / 2), yS + c / 2, zc), v(0, 0, -s), v(0, 1, 0))
+				part("UpperTorso", fcf, v(pt2, c, c), topC, "Fabric", "Fillet", { shape = "Wedge" })
+			end
+		end
+		-- бретели поверх плеч
+		for _, s in { 1, -1 } do
+			part("UpperTorso", at(s * (si + so) / 2, yN + 0.006, 0), v(so - si, 0.02, td + 0.03), topC, "Fabric", "StrapTop")
+		end
 	end
 	if fem then
-		-- грудь под майкой
-		local bustY = chestBot + (yN - chestBot) * 0.36
-		ell("UpperTorso", at(0, bustY, -td / 2 + 0.04), v(tw * 0.8, 0.5 * h, 0.3), chestColor, if topStyle then "Fabric" else "SmoothPlastic", "Bust")
-	end
-
-	-- кожа поверх майки: плечи (проймы), основание шеи, вырез
-	if topStyle == "tank" or topStyle == "crop" then
-		local so = if topStyle == "crop" then 0.4 * bw else (if fem then 0.62 else 0.74) * bw -- внешний край бретели у шеи
-		local si = if topStyle == "crop" then 0.26 * bw else (if fem then 0.4 else 0.46) * bw -- внутренний край бретели
-		local ya = yN - (if topStyle == "crop" then 0.82 else (if fem then 0.74 else 0.88)) * h -- низ проймы
-		local halfW = (tw + shirtPad) / 2
-		local depth = td + shirtPad + 0.025
+		-- грудь: под майкой — цвет майки; верх не выше выреза
+		local covered = topStyle ~= nil
+		local semi = 0.19 * h
+		local top = if covered then math.min(yN - scoopF - 0.03, chestBot + (yN - chestBot) * 0.62) else chestBot + (yN - chestBot) * 0.62
+		local bustY = math.max(top - semi, chestBot + semi * 0.8)
+		local bc = if covered then topC else skin
+		local bm = if covered then "Fabric" else "SmoothPlastic"
 		for _, s in { 1, -1 } do
-			-- клин проймы: прямой угол сверху-снаружи, гипотенуза от (so, yN) к (halfW, ya)
-			local wx = halfW + 0.012 - so
-			local wy = yN - ya
-			-- Wedge: профиль в YZ (высокая сторона +Z); поворот по Y ставит профиль в плоскость XY
-			-- Для s=1 нужен прямой угол в (+X,+Y): локальный Z -> +X, локальный Y -> -Y (переворот).
-			local cf = CFrame.fromMatrix(v(s * (so + wx / 2), (yN + ya) / 2 + 0.006, 0), v(0, 0, s), v(0, -1, 0))
-			part("UpperTorso", cf, v(depth, wy + 0.012, wx), skin, "SmoothPlastic", "Armhole", { shape = "Wedge" })
+			ell("UpperTorso", at(s * tw * 0.16, bustY, -td / 2 + 0.035) * ang(0, s * 10, 0), v(tw * 0.38, semi * 2, 0.19), bc, bm, "Bust")
 		end
-		-- кожа сверху между бретелями
-		part("UpperTorso", at(0, yN + 0.011, 0), v(si * 2, 0.02, depth), skin, "SmoothPlastic", "NeckTop")
-		-- вырез спереди и сзади: прямоугольник от верхнего ребра + эллипс внизу (тонкие пластины кожи)
-		local frontZ = -(td + shirtPad) / 2
-		local function neckline(scoop, zSign, name)
-			local b = math.min(si * 0.95, scoop * 0.7)
-			local y0 = yN - scoop + b
-			part("UpperTorso", at(0, (y0 + yN) / 2, zSign * (-frontZ + 0.006)), v(si * 2, yN - y0, 0.012), skin, "SmoothPlastic", name)
-			ell("UpperTorso", at(0, y0, zSign * (-frontZ + 0.012)), v(si * 2, b * 2, 0.012), skin, "SmoothPlastic", name)
-		end
-		neckline(if topStyle == "crop" then 0.1 else o.scoop * h, -1, "NecklineF")
-		neckline((if topStyle == "crop" then 0.12 else 0.3) * h, 1, "NecklineB")
-	end
-	if topStyle == "tee" then
-		-- футболка: круглый вырез
-		local si = 0.3 * bw
-		local frontZ = -(td + shirtPad) / 2
-		part("UpperTorso", at(0, yN + 0.011, 0), v(si * 2, 0.02, td * 0.6), skin, "SmoothPlastic", "NeckTop")
-		ell("UpperTorso", at(0, yN, frontZ + 0.012), v(si * 2, 0.26, 0.03), skin, "SmoothPlastic", "NecklineF")
-		ell("UpperTorso", at(0, yN + 0.01, frontZ + 0.006), v(si * 2 + 0.07, 0.32, 0.03), topC:Lerp(BLACK, 0.12), "Fabric", "Collar")
+		ell("UpperTorso", at(0, bustY + semi * 0.3, -td / 2 + 0.03), v(tw * 0.62, semi * 1.5, 0.12), bc, bm, "Bust")
 	end
 	-- основание шеи (трапеция)
-	ell("UpperTorso", at(0, yN + 0.02, 0.04), v(0.86 * bw, 0.2, 0.62 * bw), skin, "SmoothPlastic", "NeckBase")
+	ell("UpperTorso", at(0, yN + 0.01, 0.03), v(neckHole * 2 - 0.02, 0.16, td * 0.62), skin, "SmoothPlastic", "NeckBase")
 
 	-- ===== Таз и низ =====
 	local botC = o.bottom
 	local bstyle = o.bottomStyle
-	local waistTop = yW + (if cropped then 0.16 else 0.24) * h
 	rboxY("LowerTorso", 0, yH - 0.22, waistTop, 0, hipW, td * 0.98, 0.2 * bw, botC, "Fabric", "Pelvis")
 	-- пояс
 	local bandC = if bstyle == "track" then botC:Lerp(BLACK, 0.25) else botC:Lerp(BLACK, 0.12)
@@ -445,7 +472,7 @@ return function(opts)
 		return CFrame.new(x, hc + y, z)
 	end
 	-- шея
-	cylY("Head", Hc(0, -0.62, 0.05), 0.72, (if fem then 0.46 else 0.56) * bw, skin, "SmoothPlastic", "Neck")
+	cylY("Head", Hc(0, -0.62, 0.05), 0.72, (if fem then 0.42 else 0.5) * bw, skin, "SmoothPlastic", "Neck")
 	-- череп: цилиндр + купол + низ (по мотивам классической головы Roblox)
 	local lowFace = o.beard or skin
 	local beardTop = -0.21
@@ -568,8 +595,8 @@ return function(opts)
 	-- щетина: бакенбарды и скулы — «линзы» на поверхности головы
 	if o.beard then
 		for _, s in { 1, -1 } do
-			patch("Head", s * 52, -0.19, 0.52, 0.2, 0.22, 0.008, o.beard, "SmoothPlastic", "BeardCheek", s * 16)
-			patch("Head", s * 70, -0.08, 0.24, 0.36, 0.2, 0.01, o.beard, "SmoothPlastic", "BeardSide", s * 6)
+			patch("Head", s * 54, -0.22, 0.46, 0.14, 0.22, 0.008, o.beard, "SmoothPlastic", "BeardCheek", s * 18)
+			patch("Head", s * 71, -0.1, 0.2, 0.32, 0.2, 0.01, o.beard, "SmoothPlastic", "BeardSide", s * 6)
 		end
 	end
 

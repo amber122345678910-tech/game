@@ -11,7 +11,8 @@
 --     белый павильон с крышей-волной (100, 246), пляжные клубы z≈237…244, зонты/шезлонги z≈200…210.
 --   * Пирс: ось x=160, от z=-40 (вход на пляже) до z=-600 + голова до z≈-640; пол галереи y≈10.5, верхняя палуба y≈16.5;
 --     колесо обозрения: ось (185, 46, -230), R=26; смотровая башня на конце (180, ~17…62, -662).
---   * Слева при взгляде на море: спасательная вышка (-70, 0, -112), молы гавани с маяками x≈-420…-540 до z≈-650.
+--   * Слева при взгляде на море: тёмный пляжный павильон (-60, 0, -116), спасательная вышка (-165, 0, -116),
+--     молы гавани с маяками x≈-420…-540 до z≈-650.
 --   * Цвет Terrain-песка задаёт скрипт BeachTerrainColors (атрибуты TerrainColor_* модели) — детали-песок подобраны под него.
 
 local roblox = require("@lune/roblox")
@@ -299,31 +300,34 @@ return function(B)
 				end
 			end
 		end
-		-- вмятины/следы ног: пары тёмных овалов (по видимым зонам)
-		for _ = 1, 62 do
+		-- Следы ног: каждый отпечаток — два плоских диска (носок и пятка). Диски — Part Cylinder,
+		-- а не SpecialMesh: у SpecialMesh в Roblox не видна текстура материала Sand.
+		local function disc(pos, d, color, y)
+			return B:cyl(V(pos.X, y, pos.Z), 0.04, d, color, "Sand", "Y", nil, { parent = tracks, castShadow = false })
+		end
+		local k = 0
+		for _ = 1, 52 do
 			local z = rr(-30, 34)
 			local x = rr(-1, 1) * (8 + math.abs(z) * 0.9)
 			local c = V(x, 0, z)
 			if not clearZone(c) and c.Magnitude > 2.5 then
 				local yaw = rr(0, 360)
 				local cf = CFrame.new(x, 0, z) * CFrame.Angles(0, math.rad(yaw), 0)
-				local close = c.Magnitude < 14
 				for s = -1, 1, 2 do
-					local p = (cf * CFrame.new(s * 0.32, 0, s * rr(0.3, 0.7))).Position
-					local y2 = yaw + rr(-10, 10)
-					ell(tracks, V(p.X, 0.01, p.Z), V(0.5, 0.045, 0.98), mix(C.sand, C.dent, rr(0.35, 0.75)), "Sand", V(0, y2, 0), NOSH)
-					if close then
-						-- освещённый дальний бортик вмятины (солнце со стороны -Z): тонкий светлый серп
-						ell(tracks, V(p.X, 0.016, p.Z + 0.44), V(0.42, 0.05, 0.2), mix(C.sand, Color3.new(1, 1, 1), 0.05), "Sand", V(0, y2, 0), NOSH)
-					end
+					k += 1
+					local foot = cf * CFrame.new(s * 0.34, 0, s * rr(0.3, 0.8)) * CFrame.Angles(0, math.rad(rr(-10, 10)), 0)
+					local col = mix(C.sand, C.dent, rr(0.4, 0.85))
+					local y = 0.004 + (k % 4) * 0.004
+					disc((foot * CFrame.new(0, 0, -0.24)).Position, 0.52, col, y)
+					disc((foot * CFrame.new(0, 0, 0.3)).Position, 0.42, col, y)
 				end
 			end
 		end
 		-- истоптанные пятна подальше (средний план)
-		for _ = 1, 24 do
+		for i = 1, 24 do
 			local z = if rnd() < 0.7 then rr(60, 170) else rr(-140, -60)
 			local x = rr(-1, 1) * (20 + math.abs(z) * 0.9)
-			ell(tracks, V(x, 0.006, z), V(rr(3, 8), 0.03, rr(3, 8)), mix(C.sand, C.dent, rr(0.12, 0.3)), "Sand", V(0, rr(0, 180), 0), NOSH)
+			disc(V(x, 0, z), rr(3, 8), mix(C.sand, C.dent, rr(0.12, 0.3)), 0.002 + (i % 3) * 0.005)
 		end
 		-- ракушки и камешки у зоны постановки
 		for _ = 1, 22 do
@@ -893,9 +897,9 @@ return function(B)
 	person(46, 62.6, "sit", 200)
 	person(48.4, 62.9, "sit", 165)
 	-- у кромки воды (вид на море)
-	for _ = 1, 11 do
-		local x, z = rr(-260, 300), rr(-149, -100)
-		person(x, z, pick({ "stand", "stand", "sit" }), rr(0, 360))
+	-- (по центру вида на море никого: там солнце и горизонт в S02/S04/S06)
+	for _, x in { -250, -215, -128, 236, 290 } do
+		person(x + rr(-6, 6), rr(-146, -104), pick({ "stand", "stand", "sit" }), rr(0, 360))
 	end
 
 	-- синие ветрозащитные полотна перед клубами (синяя полоса в кадрах S01/S03)
@@ -931,10 +935,26 @@ return function(B)
 		B:part({ cf = at(0, 0.8, 6.4), size = V(5.6, 1.2, 2.6), color = hex(0xC9A43A), material = "Metal", parent = g })
 	end
 
+	-- тёмный пляжный павильон у воды (в S04/S06 слева на горизонте — низкое тёмное здание)
+	do
+		local g = folder("ShorePavilion")
+		local sx, sz = -60, -116
+		for _, o in { { -12, -6 }, { 12, -6 }, { -12, 6 }, { 12, 6 }, { 0, -6 }, { 0, 6 } } do
+			post(g, sx + o[1], -0.5, sz + o[2], 2.6, 0.7, C.woodDark, "Wood", NOSH)
+		end
+		box(g, V(sx, 2.4, sz), V(30, 0.6, 16), C.wood, "WoodPlanks")
+		box(g, V(sx + 2, 6.2, sz + 1.5), V(24, 7, 11), hex(0x34444A), "WoodPlanks")
+		box(g, V(sx + 2, 5.6, sz - 4.1), V(21, 3.6, 0.2), hex(0x5C7480), "Glass", nil, { reflectance = 0.25 })
+		box(g, V(sx + 2, 10.0, sz + 0.5), V(27, 0.7, 15), C.offWhite, "SmoothPlastic")
+		box(g, V(sx - 1, 3.4, sz - 7.8), V(28, 1.4, 0.15), hex(0xB8CCD4), "Glass", nil, { transparency = 0.5, castShadow = false })
+		post(g, sx - 12, 2.7, sz - 7, 9, 0.22, C.white, "Metal", NOSH)
+		box(g, V(sx - 10.6, 10.8, sz - 7), V(2.6, 1.6, 0.06), C.nlBlue, "Fabric", nil, NOSH)
+	end
+
 	-- спасательная вышка у воды и волейбольная сетка
 	do
 		local g = folder("Lifeguard")
-		local lx, lz = -70, -112
+		local lx, lz = -165, -116
 		for _, o in { { -1.6, -1.6 }, { 1.6, -1.6 }, { -1.6, 1.6 }, { 1.6, 1.6 } } do
 			post(g, lx + o[1], -0.5, lz + o[2], 9.5, 0.45, hex(0xE8E6E0), "Wood")
 		end

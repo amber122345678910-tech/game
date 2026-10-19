@@ -8,28 +8,32 @@
 -- Кулаки — IK в пространстве таза (едут вместе с ремнём), на провалах — дожим (кисть чуть вниз/назад,
 -- пальцы плотнее), в 1.933 — короткий рывок кистями «под солнце» (мотивирует блик пряжки).
 
+-- Хват: тыл кисти смотрит в камеру, кисть лежит горизонтально и указывает внутрь (к пряжке),
+-- пальцы перехватывают ремень сверху и загибаются вниз по его лицу, большой палец — за ремнём.
+local GRIP = {
+	wrist = { 1.0, 2.98, 0.7 }, -- запястье (поза покоя, пространство таза; для левой x зеркально)
+	palm = { 0, 0.2, -1 }, -- ладонь к животу, чуть вверх (тыл кисти смотрит в камеру, слегка вниз)
+	fingers = { -1, -0.35, 0.3 }, -- к пряжке и чуть вниз
+	pole = { 1, 0.1, 0.2 }, -- локти в стороны
+	curl = 0.82,
+}
+
 -- Кисти на ремне. p — дожим на провале (0..1), snap — рывок кистями (0..1).
 local function arms(t, p, snap, ease)
 	snap = snap or 0
 	local k = p + snap * 1.4
-	local fy, ff = -0.7 - 0.1 * k, 0.38 - 0.12 * k
+	local w, fg, pl, po = GRIP.wrist, GRIP.fingers, GRIP.palm, GRIP.pole
+	local wy, wf = w[2] - 0.02 * p, w[3] - 0.012 * p
+	-- дожим/рывок: кисть сгибается к ладони (пальцы вниз и к животу)
+	local fy, ff = fg[2] - 0.12 * k, fg[3] - 0.06 * k
+	local curl = GRIP.curl + 0.08 * p
 	return {
 		t = t,
 		ease = ease,
-		rArm = {
-			ik = { 0.86, 3.21 - 0.02 * p, 0.74 - 0.012 * p },
-			space = "hips",
-			pole = { 1, 0.1, 0.2 },
-			wrist = { palm = { 0, -0.5, -1 }, fingers = { -0.6, fy, ff } },
-		},
-		lArm = {
-			ik = { -0.86, 3.21 - 0.02 * p, 0.74 - 0.012 * p },
-			space = "hips",
-			pole = { -1, 0.1, 0.2 },
-			wrist = { palm = { 0, -0.5, -1 }, fingers = { 0.6, fy, ff } },
-		},
-		rHand = { curl = 0.9 + 0.07 * p, thumb = 0.9, thumbOut = 0.1 },
-		lHand = { curl = 0.9 + 0.07 * p, thumb = 0.9, thumbOut = 0.1 },
+		rArm = { ik = { w[1], wy, wf }, space = "hips", pole = po, wrist = { palm = pl, fingers = { fg[1], fy, ff } } },
+		lArm = { ik = { -w[1], wy, wf }, space = "hips", pole = { -po[1], po[2], po[3] }, wrist = { palm = { -pl[1], pl[2], pl[3] }, fingers = { -fg[1], fy, ff } } },
+		rHand = { curl = curl, thumb = 0.9, thumbOut = 0.1 },
+		lHand = { curl = curl, thumb = 0.9, thumbOut = 0.1 },
 	}
 end
 

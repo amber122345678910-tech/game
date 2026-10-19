@@ -140,10 +140,24 @@ return function(B)
 	local function box(parent, cf, size, color, mat, extra)
 		return with({ parent = parent, cf = cf, size = size, color = color, material = mat }, extra)
 	end
-	-- Драгоценный камень: стеклянная огранка + светящееся ядро
-	local function gem(parent, cf, size, color, core)
-		ell(parent, cf, size, color, M.glass, { transparency = 0.18 })
-		ell(parent, cf * CFrame.new(0, 0, size.Z * 0.12), size * 0.62, core, M.neon, { castShadow = false })
+	-- ВАЖНО: на SpecialMesh Roblox не показывает Material, поэтому всё золото/стекло/неон — настоящие Part
+	-- (Ball, Cylinder, Block); эллипсоиды (SpecialMesh) — только для бархата, где важен цвет.
+
+	-- Камень-кабошон: стеклянный шар + неоновое ядро
+	local function gem(parent, pos, d, color, core)
+		ball(parent, pos, d, color, M.glass, { transparency = 0.2 })
+		ball(parent, pos, d * 0.58, core, M.neon, { castShadow = false })
+	end
+	-- Огранённый камень: стеклянный куб, повёрнутый вершиной к зрителю (грани ловят блики) + неоновое ядро.
+	-- cf — центр, −Z cf — «наружу».
+	local function cutGem(parent, cf, edge, color, core)
+		box(parent, cf * CFrame.Angles(0, 0, rad(45)) * CFrame.Angles(rad(35.26), 0, 0) * CFrame.Angles(0, rad(45), 0), V(edge, edge, edge), color, M.glass, { transparency = 0.2 })
+		ball(parent, cf.Position, edge * 0.9, core, M.neon, { castShadow = false })
+	end
+	-- Лепесток/лист «капсулой»: цилиндр от a к b + шарик на кончике
+	local function petal(parent, a, b, d, color, mat)
+		rod(parent, a, b, d, color, mat)
+		ball(parent, b, d * 1.03, color, mat)
 	end
 
 	-- Гладкая трубка: pts = { {pos, d}, ... }. Шарики только на концах и на заметных изгибах,
@@ -261,7 +275,7 @@ return function(B)
 			-- задние ножки почти не видны: только лапа
 			local ballC = V(top.X, FLOOR_Y + 0.13, top.Z) + out * (0.03 * s)
 			ball(legs, ballC, 0.24, C.goldHi, M.foil)
-			ell(legs, CFrame.new(ballC + V(0, 0.1, 0) + out * 0.04), V(0.2, 0.16, 0.2), C.gold, M.gold)
+			ball(legs, ballC + V(0, 0.12, 0) + out * 0.03, 0.17, C.gold, M.gold)
 			return
 		end
 		-- завиток-«колено» снаружи
@@ -274,8 +288,7 @@ return function(B)
 		end
 		tube(legs, vol, C.goldHi, M.foil)
 		-- листок аканта вниз по колену
-		local lcf = CFrame.fromMatrix(at(0.17, 0.66), side, Vector3.yAxis, side:Cross(Vector3.yAxis))
-		ell(legs, lcf * CFrame.Angles(rad(-12), 0, 0), V(0.13 * s, 0.34 * s, 0.1 * s), C.goldHi, M.foil)
+		petal(legs, at(0.2, 0.8), at(0.17, 0.58), 0.09 * s, C.goldHi, M.foil)
 		-- лапа, сжимающая шар
 		local ballC = V(top.X, FLOOR_Y + 0.13, top.Z) + out * (0.03 * s)
 		ball(legs, ballC, 0.26, C.goldHi, M.foil)
@@ -326,11 +339,12 @@ return function(B)
 		end
 		tube(seat, sm, C.gold, M.gold)
 		for k = -3, 3 do
-			local cf = CFrame.new(0, R0 - 0.06, -1.41) * CFrame.Angles(0, 0, rad(k * 22)) * CFrame.new(0, -0.11, 0)
-			ell(seat, cf, V(0.1, 0.28, 0.08), if k % 2 == 0 then C.goldHi else C.gold, if k % 2 == 0 then M.foil else M.gold)
+			local a = rad(k * 22)
+			local o = V(0, R0 - 0.04, -1.41)
+			petal(seat, o, o + V(math.sin(a) * 0.22, -math.cos(a) * 0.22, -0.01), 0.075, if k % 2 == 0 then C.goldHi else C.gold, if k % 2 == 0 then M.foil else M.gold)
 		end
 		ball(seat, V(0, R0, -1.46), 0.12, C.goldHi, M.foil)
-		gem(seat, CFrame.new(0, RY + 0.02, -1.45), V(0.22, 0.16, 0.09), C.ruby, C.rubyCore)
+		cutGem(seat, CFrame.new(0, RY + 0.02, -1.42), 0.12, C.ruby, C.rubyCore)
 		for _, sx in { 1, -1 } do
 			local vol = {}
 			for i = 0, 12 do
@@ -340,7 +354,7 @@ return function(B)
 			end
 			tube(seat, vol, C.goldHi, M.foil)
 			rod(seat, V(sx * 0.5, RY - 0.03, -1.445), V(sx * 1.35, RY - 0.03, -1.445), 0.05, C.goldHi, M.foil)
-			ell(seat, CFrame.new(sx * 1.38, RY - 0.03, -1.445), V(0.18, 0.1, 0.06), C.goldHi, M.foil)
+			ball(seat, V(sx * 1.38, RY - 0.03, -1.445), 0.1, C.goldHi, M.foil)
 		end
 	end
 
@@ -383,7 +397,9 @@ return function(B)
 		box(arms, CFrame.new(x, 2.08, fz - 0.005), V(0.44, 0.78, 0.02), C.goldDeep, M.gold)
 		-- рельеф: веер листьев сверху, камень в бусинной оправе, пара завитков-волют внизу
 		for k = -2, 2 do
-			ell(arms, CFrame.new(x, 2.24, fz - 0.03) * CFrame.Angles(0, 0, rad(k * 24)) * CFrame.new(0, 0.12, 0), V(0.07, 0.26, 0.05), if k % 2 == 0 then C.goldHi else C.gold, M.foil)
+			local a = rad(k * 24)
+			local o = V(x, 2.2, fz - 0.03)
+			petal(arms, o, o + V(math.sin(a) * 0.2, math.cos(a) * 0.2, 0), 0.06, if k % 2 == 0 then C.goldHi else C.gold, M.foil)
 		end
 		for k = 0, 9 do
 			local a = k / 10 * math.pi * 2
@@ -424,13 +440,13 @@ return function(B)
 		-- лицо шапки: розетка и заклёпки по верхнему ребру
 		for k = 0, 5 do
 			local a = k / 6 * math.pi * 2
-			ell(arms, CFrame.new(x + math.cos(a) * 0.08, 3.08 + math.sin(a) * 0.08, fz - 0.06) * CFrame.Angles(0, 0, a), V(0.12, 0.07, 0.05), C.goldHi, M.foil)
+			ball(arms, V(x + math.cos(a) * 0.075, 3.08 + math.sin(a) * 0.075, fz - 0.02), 0.07, C.goldHi, M.foil)
 		end
 		ball(arms, V(x, 3.08, fz - 0.07), 0.09, C.goldHi, M.foil)
 		for _, dx in { -0.2, 0, 0.2 } do
 			ball(arms, V(x + dx, CAP1 - 0.06, zf - 0.32), 0.065, C.goldHi, M.foil)
 		end
-		gem(arms, CFrame.new(x, 2.05, fz - 0.06), V(0.13, 0.16, 0.07), C.ruby, C.rubyCore)
+		gem(arms, V(x, 2.02, fz - 0.03), 0.14, C.ruby, C.rubyCore)
 		-- подлокотник: золотой брус + бархатный валик
 		-- (брус и боковина заходят в раму спинки — без щели между подлокотником и спинкой)
 		box(arms, CFrame.new(x, 3.08, 0.09), V(0.38, 0.2, 1.74), C.gold, M.gold)
@@ -558,7 +574,7 @@ return function(B)
 		tube(back, front, C.gold, M.gold)
 		tube(back, outer, C.goldHi, M.foil)
 		-- торец рамы
-		local edge = resample(outline, 0.4)
+		local edge = resample(outline, 0.5)
 		for i = 1, #edge - 1 do
 			local a, b = edge[i][1], edge[i + 1][1]
 			local na = outNormal(math.max(1, math.floor(edge[i][2] * (#outline - 1)) + 1), outline)
@@ -580,7 +596,7 @@ return function(B)
 			local nrm = outNormal(i, outline)
 			table.insert(inner, bp(p.X - nrm.X * 0.24, p.Y - nrm.Y * 0.24, -0.06))
 		end
-		beads(back, inner, 0.09, 0.125, C.goldHi, M.foil)
+		beads(back, inner, 0.09, 0.135, C.goldHi, M.foil)
 	end
 
 	-- Волюта (спираль-трубка) в плоскости спинки
@@ -612,19 +628,28 @@ return function(B)
 	local function rosette(parent, cx, cv, w, r, petals, jewel)
 		for k = 0, petals - 1 do
 			local a = k / petals * math.pi * 2
-			ell(parent, BACK * CFrame.new(cx + math.cos(a) * r * 0.62, cv + math.sin(a) * r * 0.62, w) * CFrame.Angles(0, 0, a), V(r * 0.95, r * 0.6, r * 0.42), C.gold, M.gold)
+			ball(parent, bp(cx + math.cos(a) * r * 0.62, cv + math.sin(a) * r * 0.62, w), r * 0.62, C.gold, M.gold)
 		end
 		if jewel then
 			ball(parent, bp(cx, cv, w - 0.02), r * 0.85, C.goldHi, M.foil)
-			gem(parent, BACK * CFrame.new(cx, cv, w - r * 0.36), V(r * 0.55, r * 0.55, r * 0.3), jewel[1], jewel[2])
+			gem(parent, bp(cx, cv, w - r * 0.3), r * 0.6, jewel[1], jewel[2])
 		else
 			ball(parent, bp(cx, cv, w - r * 0.12), r * 0.8, C.goldHi, M.foil)
 		end
 	end
-	-- Лист аканта: веер из трёх эллипсоидов
-	local function leaf(parent, cx, cv, w, ang, len)
+	-- Лист аканта: веер из капсул от общей «почки» (single — одна капсула)
+	local function leaf(parent, cx, cv, w, ang, len, single)
+		local o = bp(cx, cv, w)
 		for k = -1, 1 do
-			ell(parent, bcf(cx, cv, w, ang + k * 30) * CFrame.new(0, len * (if k == 0 then 0.5 else 0.38), 0), V(len * 0.3, len * (if k == 0 then 1 else 0.75), 0.09), if k == 0 then C.goldHi else C.gold, if k == 0 then M.foil else M.gold)
+			if not single or k == 0 then
+				local a = rad(ang + k * 30)
+				local L = len * (if k == 0 then 0.85 else 0.62)
+				local tip = bp(cx - math.sin(a) * L, cv + math.cos(a) * L, w - 0.02)
+				petal(parent, o, tip, len * (if k == 0 then 0.32 else 0.25), if k == 0 then C.goldHi else C.gold, if k == 0 then M.foil else M.gold)
+			end
+		end
+		if not single then
+			ball(parent, o, len * 0.4, C.goldHi, M.foil)
 		end
 	end
 
@@ -692,12 +717,13 @@ return function(B)
 		ball(crest, bp(2.12 * s, 5.78, CW - 0.04), 0.12, C.goldHi, M.foil)
 		-- листья аканта по внешней кромке большого завитка
 		for _, q in { { 0.62, 6.83, 40 }, { 1.1, 7.12, 10 }, { 1.62, 7.0, -30 }, { 1.98, 6.6, -60 } } do
-			leaf(crest, q[1] * s, q[2], CW - 0.02, q[3] * s * -1 + (if s < 0 then 0 else 0), 0.3)
+			leaf(crest, q[1] * s, q[2], CW - 0.02, -q[3] * s, 0.3, true)
 		end
 	end
 	-- раковина-веер позади короны
 	for k = -3, 3 do
-		ell(crest, bcf(0, 7.0, 0.2, k * 22) * CFrame.new(0, 0.32, 0), V(0.16, 0.62, 0.1), if k % 2 == 0 then C.goldHi else C.gold, M.foil)
+		local a = rad(k * 22)
+		petal(crest, bp(0, 7.0, 0.2), bp(-math.sin(a) * 0.6, 7.0 + math.cos(a) * 0.6, 0.2), 0.13, if k % 2 == 0 then C.goldHi else C.gold, M.foil)
 	end
 	-- картуш: овальный медальон с большим рубином
 	do
@@ -708,8 +734,8 @@ return function(B)
 			table.insert(ring, bp(cx + math.cos(a) * 0.34, cv + math.sin(a) * 0.44, CW - 0.16))
 		end
 		beads(crest, ring, 0.09, 0.08, C.goldHi, M.foil)
-		ell(crest, BACK * CFrame.new(cx, cv, CW - 0.08), V(0.72, 0.92, 0.2), C.gold, M.gold)
-		gem(crest, BACK * CFrame.new(cx, cv, CW - 0.17), V(0.36, 0.48, 0.18), C.ruby, C.rubyCore)
+		part({ parent = crest, cf = BACK * CFrame.new(cx, cv, CW - 0.06) * CFrame.Angles(0, math.pi / 2, 0), size = V(0.14, 0.74, 0.74), shape = "Cylinder", color = C.gold, material = M.gold })
+		cutGem(crest, BACK * CFrame.new(cx, cv, CW - 0.14), 0.24, C.ruby, C.rubyCore)
 		leaf(crest, 0, 6.02, CW - 0.14, 180, 0.42)
 		ball(crest, bp(0, 6.06, CW - 0.18), 0.13, C.goldHi, M.foil)
 	end
@@ -735,7 +761,7 @@ return function(B)
 		for k = 0, 7 do
 			local a = k / 8 * math.pi * 2
 			local g = gems[k % 4 + 1]
-			gem(crown, CFrame.new(cp(a, R + 0.015, cy + 0.19)) * CFrame.Angles(0, -a, 0), V(0.15, 0.16, 0.08), g[1], g[2])
+			gem(crown, cp(a, R + 0.0, cy + 0.19), 0.15, g[1], g[2])
 			ball(crown, cp(a + math.pi / 8, R + 0.01, cy + 0.19), 0.07, C.pearl, "SmoothPlastic")
 		end
 		-- зубцы: кресты и лилии по кругу
@@ -746,12 +772,13 @@ return function(B)
 			if k % 2 == 0 then
 				box(crown, cf * CFrame.new(0, 0.02, 0), V(0.09, 0.28, 0.05), C.goldHi, M.foil)
 				box(crown, cf * CFrame.new(0, 0.06, 0), V(0.24, 0.08, 0.035), C.goldHi, M.foil)
-				ell(crown, cf * CFrame.new(0, 0.06, -0.03), V(0.07, 0.07, 0.04), C.ruby, M.glass, { transparency = 0.1 })
+				ball(crown, (cf * CFrame.new(0, 0.06, -0.02)).Position, 0.07, C.ruby, M.glass, { transparency = 0.1 })
 				ball(crown, p + V(0, 0.2, 0), 0.07, C.pearl, "SmoothPlastic")
 			else
-				ell(crown, cf, V(0.09, 0.3, 0.06), C.goldHi, M.foil)
-				ell(crown, cf * CFrame.new(0.07, -0.03, 0) * CFrame.Angles(0, 0, rad(-38)), V(0.06, 0.2, 0.05), C.goldHi, M.foil)
-				ell(crown, cf * CFrame.new(-0.07, -0.03, 0) * CFrame.Angles(0, 0, rad(38)), V(0.06, 0.2, 0.05), C.goldHi, M.foil)
+				local o = (cf * CFrame.new(0, -0.1, 0)).Position
+				petal(crown, o, (cf * CFrame.new(0, 0.13, 0)).Position, 0.075, C.goldHi, M.foil)
+				petal(crown, o, (cf * CFrame.new(0.11, 0.04, 0)).Position, 0.055, C.goldHi, M.foil)
+				petal(crown, o, (cf * CFrame.new(-0.11, 0.04, 0)).Position, 0.055, C.goldHi, M.foil)
 				ball(crown, p + V(0, 0.18, 0), 0.07, C.pearl, "SmoothPlastic")
 			end
 		end
@@ -770,7 +797,7 @@ return function(B)
 		rod(crown, V(-0.12, cy + 0.86, cz), V(0.12, cy + 0.86, cz), 0.035, C.gold, M.gold)
 		box(crown, CFrame.new(0, cy + 1.06, cz), V(0.055, 0.24, 0.055), C.goldHi, M.foil)
 		box(crown, CFrame.new(0, cy + 1.09, cz), V(0.17, 0.055, 0.04), C.goldHi, M.foil)
-		gem(crown, CFrame.new(0, cy + 1.09, cz - 0.03), V(0.06, 0.06, 0.03), C.ruby, C.rubyCore)
+		gem(crown, V(0, cy + 1.09, cz - 0.03), 0.06, C.ruby, C.rubyCore)
 	end
 
 	-- ===================================================================

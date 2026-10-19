@@ -196,7 +196,7 @@ local function manHands(spread, drop)
 end
 local function manG(t, y, f, roll, spread, ease)
 	local h = manHands(spread)
-	return { t = t, cf = G(0, y, f, roll, -78), R = h.R, L = h.L, ease = ease }
+	return { t = t, cf = G(0, y, f, roll, 80), R = h.R, L = h.L, ease = ease }
 end
 local MAN_GLASSES = {
 	manG(2.633, 3.720, 0.94, -8, 0),
@@ -285,22 +285,22 @@ local A_GLASSES = {
 	onFace(2.8, -0.03, 0.01, 0, A_FACE),
 	onFace(2.833, -0.12, 0.04, 4, mix(A_FACE, A_HOLD, 0.05)),
 	inHands(2.867, 0, 4.3, 0.85, 0, -10, mix(A_FACE, A_HOLD, 0.15)),
-	inHands(2.9, 0, 4.0, 0.95, 0, -30, mix(A_FACE, A_HOLD, 0.35)),
-	inHands(2.933, 0, 3.72, 1.0, 0, -55, mix(A_FACE, A_HOLD, 0.6)),
-	inHands(2.967, 0, 3.48, 1.0, 0, -70, mix(A_FACE, A_HOLD, 0.8)),
-	inHands(3.033, 0, 3.22, 0.98, 0, -78, mix(A_FACE, A_HOLD, 0.95)),
-	inHands(3.1, 0, 3.08, 0.95, 0, -80, A_HOLD),
-	inHands(3.167, 0, 3.12, 0.95, 0, -80, A_HOLD),
-	inHands(3.3, 0, 3.12, 0.95, 2, -80, A_HOLD),
-	inHands(3.433, 0, 3.12, 0.95, -3, -80, A_HOLD),
-	inHands(3.567, 0, 3.12, 0.95, 2, -80, A_HOLD),
-	inHands(3.7, 0.02, 3.11, 0.95, 0, -80, A_HOLD),
-	inHands(3.833, 0.03, 3.11, 0.95, -1, -80, A_HOLD),
-	inHands(3.9, 0.03, 3.11, 0.95, -1, -80, A_HOLD),
+	inHands(2.9, 0, 4.0, 0.95, 0, -35, mix(A_FACE, A_HOLD, 0.35)),
+	inHands(2.933, 0, 3.72, 1.0, 0, -70, mix(A_FACE, A_HOLD, 0.6)),
+	inHands(2.967, 0, 3.48, 1.0, 0, -100, mix(A_FACE, A_HOLD, 0.8)),
+	inHands(3.033, 0, 3.22, 0.98, 0, -150, mix(A_FACE, A_HOLD, 0.95)),
+	inHands(3.1, 0, 3.08, 0.95, 0, -165, A_HOLD),
+	inHands(3.167, 0, 3.12, 0.95, 0, -165, A_HOLD),
+	inHands(3.3, 0, 3.12, 0.95, 2, -165, A_HOLD),
+	inHands(3.433, 0, 3.12, 0.95, -3, -165, A_HOLD),
+	inHands(3.567, 0, 3.12, 0.95, 2, -165, A_HOLD),
+	inHands(3.7, 0.02, 3.11, 0.95, 0, -165, A_HOLD),
+	inHands(3.833, 0.03, 3.11, 0.95, -1, -165, A_HOLD),
+	inHands(3.9, 0.03, 3.11, 0.95, -1, -165, A_HOLD),
 }
 local womanA = derive("WomanA", aBase, {
 	parent = "Head",
-	pinch = { R = V(0.46, 0.05, 0.12), L = V(-0.46, 0.05, 0.12) },
+	pinch = { R = V(0.5, 0.05, 0.22), L = V(-0.5, 0.05, 0.22) },
 }, A_GLASSES)
 
 -- ===================================================================================
@@ -352,21 +352,21 @@ local B_GLASSES = {
 	onFace(2.767, -0.08, 0.02, 2, B_FACE),
 	onFace(2.8, -0.2, 0.06, 4, mix(B_FACE, B_HOLD, 0.05)),
 	onFace(2.833, -0.3, 0.12, 2, mix(B_FACE, B_HOLD, 0.12)),
-	inHands(2.867, 0, 4.1, 0.95, 0, -15, mix(B_FACE, B_HOLD, 0.3)),
-	inHands(2.9, 0, 3.75, 1.0, 0, -45, mix(B_FACE, B_HOLD, 0.55)),
-	inHands(2.933, 0, 3.4, 1.0, 0, -65, mix(B_FACE, B_HOLD, 0.75)),
-	inHands(2.967, 0, 3.1, 0.98, 0, -75, mix(B_FACE, B_HOLD, 0.9)),
-	inHands(3.033, 0, 2.86, 0.95, 0, -80, B_HOLD),
-	inHands(3.067, 0, 2.84, 0.95, 0, -80, B_HOLD),
-	inHands(3.1, 0, 2.87, 0.95, 0, -80, B_HOLD),
-	inHands(3.3, 0, 2.87, 0.95, 0, -80, B_HOLD),
-	inHands(3.567, 0, 2.87, 0.95, -2, -80, B_HOLD),
-	inHands(3.833, -0.02, 2.86, 0.97, -3, -80, B_HOLD),
-	inHands(3.9, -0.02, 2.86, 0.97, -3, -80, B_HOLD),
+	inHands(2.867, 0, 4.1, 0.95, 0, -20, mix(B_FACE, B_HOLD, 0.3)),
+	inHands(2.9, 0, 3.75, 1.0, 0, -60, mix(B_FACE, B_HOLD, 0.55)),
+	inHands(2.933, 0, 3.4, 1.0, 0, -95, mix(B_FACE, B_HOLD, 0.75)),
+	inHands(2.967, 0, 3.1, 0.98, 0, -140, mix(B_FACE, B_HOLD, 0.9)),
+	inHands(3.033, 0, 2.86, 0.95, 0, -165, B_HOLD),
+	inHands(3.067, 0, 2.84, 0.95, 0, -165, B_HOLD),
+	inHands(3.1, 0, 2.87, 0.95, 0, -165, B_HOLD),
+	inHands(3.3, 0, 2.87, 0.95, 0, -165, B_HOLD),
+	inHands(3.567, 0, 2.87, 0.95, -2, -165, B_HOLD),
+	inHands(3.833, -0.02, 2.86, 0.97, -3, -165, B_HOLD),
+	inHands(3.9, -0.02, 2.86, 0.97, -3, -165, B_HOLD),
 }
 local womanB = derive("WomanB", bBase, {
 	parent = "Head",
-	pinch = { R = V(0.46, 0.05, 0.12), L = V(-0.46, 0.05, 0.12) },
+	pinch = { R = V(0.5, 0.05, 0.22), L = V(-0.5, 0.05, 0.22) },
 }, B_GLASSES)
 
 return {

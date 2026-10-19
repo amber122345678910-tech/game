@@ -26,7 +26,7 @@ function Limbs.build(g, opts)
 		-- ===== Рукав (гладкие «капсулы») =====
 		local shoulder = V(sx, S.shoulderY, 0)
 		local elbow = V(sx, elbowY, 0.01)
-		g:tube(UA, { shoulder + V(0, 0.02, 0), elbow + V(0, 0.08, 0) }, function(i)
+		g:tube(UA, { shoulder + V(0, -0.06, 0), elbow + V(0, 0.08, 0) }, function(i)
 			return if i == 1 then 0.6 else 0.54
 		end, P.suit, "SmoothPlastic")
 		g:ball(UA, elbow, 0.53, P.suit, "SmoothPlastic")

@@ -14,7 +14,8 @@ local function fist(x, y, f)
 	return { ik = { x, y, f }, space = "chest", pole = POLE, wrist = { palm = PALM, fingers = UP } }
 end
 
-local NOD = 0
+local NOD = 35
+local LEAN = -12
 
 -- t, root.turn, waist.turn, waist.bend, neck.turn, neck.nod, neck.tilt, ease, root.x, root.y, root.f
 local body = {
@@ -85,7 +86,7 @@ for _, b in body do
 	local k = key(b[1])
 	k.ease = b[8]
 	k.root = { turn = b[2], x = b[9], y = b[10], f = b[11] }
-	k.waist = { turn = b[3], bend = b[4] }
+	k.waist = { turn = b[3], bend = b[4] + (if b[1] >= 3.95 then LEAN else 0) }
 	k.neck = { turn = b[5], nod = b[6] + NOD, tilt = b[7] }
 end
 for _, f in faceKeys do
