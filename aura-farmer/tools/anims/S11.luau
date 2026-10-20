@@ -29,10 +29,10 @@ local function rest(side, lift)
 	lift = lift or 0
 	if side == "r" then
 		-- правая: кулак на переднем завитке, костяшки вперёд-вверх
-		return arm("r", 1.84, 3.74 + lift, 1.0 + lift * 0.4, ELBOW_BACK, { -0.25, -0.95 + lift * 0.6, 0.15 }, { 0, -0.55 + lift, 0.85 })
+		return arm("r", 1.84, 3.67 + lift, 1.0 + lift * 0.4, ELBOW_BACK, { -0.25, -0.95 + lift * 0.6, 0.15 }, { 0, -0.55 + lift, 0.85 })
 	end
 	-- левая: кисть свисает через передний край, пальцы вниз
-	return arm("l", 1.86, 3.74, 1.1, ELBOW_BACK, { -0.1, -0.75, -0.6 }, { 0, -0.75, 0.66 })
+	return arm("l", 1.86, 3.8, 1.22, ELBOW_BACK, { -0.1, -0.75, -0.6 }, { 0, -0.78, 0.62 })
 end
 -- кулак (костяшки вверх-наружу, ладонь к телу)
 local function fist(side, x, y, f, pole)
@@ -47,11 +47,14 @@ local function open(side, x, y, f, o, pole)
 end
 -- поза «я лучший»: x — вынос кистей в стороны (камера облетает трон, кисти медленно раскрываются шире,
 -- чтобы в кадре держаться у краёв трона, как в клипе), dy — дыхание/дрейф; левая чуть выше правой
-local function spreadR(x, dy)
-	return open("r", x, 3.8 + (dy or 0), 0.85, 1, { 0.15, -1, 0.05 })
+local ELBOW_OUT = { 0.5, -1, -0.4 }
+local ELBOW_FWD = { 0.45, -0.6, 0.6 }
+local ELBOW_MID = { 0.48, -0.8, 0.1 }
+local function spreadR(x, dy, pole)
+	return open("r", x + 0.15, 3.95 + (dy or 0), 1.15, 0.82, pole or ELBOW_OUT)
 end
 local function spreadL(x, dy, f)
-	return open("l", x + 0.05, 4.37 + (dy or 0), f or 0.95, 1, { 0.15, -1, 0.05 })
+	return open("l", x + 0.05, 4.37 + (dy or 0), f or 0.95, 0.82, { 0.15, -1, 0.05 })
 end
 
 local SPREAD_HAND = { curl = 0.18, thumb = 0.1, thumbOut = 0.65, spread = 0.65 }
@@ -84,7 +87,7 @@ local keys = {
 		t = 13.1,
 		root = ROOT,
 		waist = W(-2, 3),
-		neck = N(36, 12, 16),
+		neck = N(36, 18, 24),
 		rArm = rest("r"),
 		lArm = rest("l"),
 		rLeg = R_LEG,
@@ -93,73 +96,73 @@ local keys = {
 		lHand = DRAPE_HAND,
 		face = F(0.5, -0.9, -0.1),
 	},
-	{ t = 13.1333, neck = N(36, 12, 16), face = F(0.5, -0.9, -0.1) },
-	{ t = 13.2, waist = W(-2, 3), neck = N(33, 10, 16), rArm = rest("r"), lArm = rest("l"), rHand = "grip", lHand = DRAPE_HAND, face = F(0.42, -0.85, -0.1) },
+	{ t = 13.1333, neck = N(36, 18, 24), face = F(0.5, -0.9, -0.1) },
+	{ t = 13.2, waist = W(-2, 3), neck = N(33, 16, 24), rArm = rest("r"), lArm = rest("l"), rHand = "grip", lHand = DRAPE_HAND, face = F(0.42, -0.85, -0.1) },
 	-- 13.267 предвкушение: голова поднимается к камере, правая кисть отрывается от подлокотника, пальцы сжимаются
-	{ t = 13.267, neck = N(22, 6, 15), rArm = rest("r", 0.3), rHand = { curl = 0.85, thumb = 0.65, thumbOut = 0.2 }, face = F(0.18, -0.4) },
+	{ t = 13.267, neck = N(24, 10, 20), rArm = rest("r", 0.22), lArm = rest("l"), rHand = { curl = 0.85, thumb = 0.65, thumbOut = 0.2 }, face = F(0.18, -0.4) },
 	-- 13.30 сжатый зубастый оскал прямо в камеру
-	{ t = 13.3, neck = N(15, 5, 15), face = F(0.12, -0.1) },
+	{ t = 13.3, neck = N(18, 8, 18), rArm = rest("r", 0.36), lArm = rest("l"), face = F(0.12, -0.1) },
 	-- 13.334 ДОЛЯ: обе руки пошли вверх (ускорение), голова начинает откидываться
-	{ t = 13.334, ease = "in", waist = W(-3, 3), neck = N(8, 6, 14), rArm = fist("r", 1.95, 3.85, 1.45), lArm = fist("l", 1.95, 3.95, 1.4), rHand = { curl = 0.92, thumb = 0.75, thumbOut = 0.1 }, lHand = { curl = 0.8, thumb = 0.6, thumbOut = 0.15 }, face = F(0.25, 0.2) },
-	{ t = 13.367, rArm = fist("r", 2.05, 3.85, 1.6), lArm = fist("l", 2.15, 4.05, 1.45), rHand = "fist", lHand = "fist", face = F(0.35, 0.4, 0.1) },
+	{ t = 13.334, waist = W(-3, 3), neck = N(12, 8, 16), rArm = fist("r", 1.92, 3.92, 1.35), lArm = fist("l", 1.9, 3.98, 1.32), rHand = { curl = 0.92, thumb = 0.75, thumbOut = 0.1 }, lHand = { curl = 0.8, thumb = 0.6, thumbOut = 0.15 }, face = F(0.25, 0.2) },
+	{ t = 13.367, rArm = fist("r", 2.0, 3.88, 1.55), lArm = fist("l", 2.1, 4.12, 1.42), rHand = "fist", lHand = "fist", face = F(0.35, 0.4, 0.1) },
 	-- 13.40 двойной «флекс»: кулаки на уровне груди/плеча (левый выше), голова запрокинута
-	{ t = 13.4, waist = W(-7, 2), neck = N(-4, 8, 14), rArm = fist("r", 2.0, 3.85, 1.75), lArm = fist("l", 2.3, 4.25, 1.4), face = F(0.5, 0.6, 0.2, 0.1) },
+	{ t = 13.4, waist = W(-6, 2), neck = N(4, 12, 16), rArm = fist("r", 2.0, 3.85, 1.75), lArm = fist("l", 2.3, 4.25, 1.4), face = F(0.5, 0.6, 0.2, 0.1) },
 	{ t = 13.433, rArm = fist("r", 2.12, 3.88, 1.75), lArm = fist("l", 2.42, 4.3, 1.4), rHand = "fist", lHand = "fist", face = F(0.85, 0.8, 0.3, 0.2) },
 	-- 13.467 бросок: кисти раскрываются, ладони поворачиваются вверх
-	{ t = 13.467, neck = N(-10, 10, 12), rArm = open("r", 2.55, 4.1, 1.5, 0.6, { 0.3, -1, -0.4 }), lArm = open("l", 2.6, 4.45, 1.4, 0.6), rHand = OPEN_HAND, lHand = OPEN_HAND, face = F(1.3, 0.9, 0.35, 0.3) },
+	{ t = 13.467, neck = N(0, 16, 14), rArm = open("r", 2.55, 4.1, 1.5, 0.35, { 0.3, -1, -0.4 }), lArm = open("l", 2.6, 4.45, 1.4, 0.35), rHand = OPEN_HAND, lHand = OPEN_HAND, face = F(1.3, 0.9, 0.35, 0.3) },
 	-- 13.50 пик хохота: голова запрокинута (морда вверх-вправо), рот настежь; руки на максимуме (перелёт)
-	{ t = 13.5, waist = W(-10, 1), neck = N(-14, 12, 10), rArm = open("r", 2.64, 4.1, 1.45, 1, { 0.2, -1, -0.4 }), lArm = open("l", 2.7, 4.44, 1.36), rHand = FLING_HAND, lHand = FLING_HAND, face = F(1.6, 1, 0.4, 0.45) },
-	{ t = 13.533, rArm = open("r", 2.56, 4.07, 1.4, 1, { 0.2, -1, -0.38 }), lArm = open("l", 2.62, 4.4, 1.34), face = F(1.55, 1, 0.4, 0.4) },
+	{ t = 13.5, waist = W(-8, 1), neck = N(-2, 20, 12), rArm = open("r", 2.64, 4.1, 1.45, 0.55, { 0.2, -1, -0.4 }), lArm = open("l", 2.7, 4.44, 1.36, 0.55), rHand = FLING_HAND, lHand = FLING_HAND, face = F(1.6, 1, 0.4, 0.45) },
+	{ t = 13.533, rArm = open("r", 2.58, 4.12, 1.38, 0.7, { 0.3, -1, -0.38 }), lArm = open("l", 2.62, 4.4, 1.34, 0.7), face = F(1.55, 1, 0.4, 0.4) },
 	{ t = 13.567, face = F(1.3, 0.95, 0.4, 0.35) },
 	{ t = 13.6, face = F(0.8, 0.9, 0.35, 0.3) },
 	-- 13.633 руки встали в позу, рот прикрылся в зубастую улыбку (голова ещё запрокинута)
-	{ t = 13.633, waist = W(-9, 1), neck = N(-10, 12, 8), rArm = spreadR(2.5), lArm = spreadL(2.75), rHand = SPREAD_HAND, lHand = SPREAD_HAND, face = F(0.4, 0.8, 0.3, 0.3) },
+	{ t = 13.633, waist = W(-7, 1), neck = N(0, 20, 10), rArm = spreadR(2.5), lArm = spreadL(2.75), rHand = SPREAD_HAND, lHand = SPREAD_HAND, face = F(0.4, 0.8, 0.3, 0.3) },
 	{ t = 13.667, face = F(0.6, 0.8, 0.3, 0.25) },
 	-- второй импульс смеха (язык виден), голова возвращается с ease-out
 	{ t = 13.7, face = F(1.2, 0.8, 0.3, 0.2) },
-	{ t = 13.733, ease = "out", waist = W(-7, 0), neck = N(-2, 10, 5), face = F(1.35, 0.75, 0.25, 0.15) },
+	{ t = 13.733, ease = "out", waist = W(-6, 0), neck = N(12, 18, 8), face = F(1.35, 0.75, 0.25, 0.15) },
 	{ t = 13.767, face = F(1.3, 0.7, 0.2, 0.1) },
 	{ t = 13.8, face = F(1.1, 0.65, 0.15, 0.05) },
-	{ t = 13.833, waist = W(-5, 0), neck = N(10, 8, 2), rArm = spreadR(2.55, -0.06), lArm = spreadL(2.85, -0.06), face = F(0.9, 0.6, 0.1, 0) },
+	{ t = 13.833, waist = W(-4, 0), neck = N(24, 12, 5), rArm = spreadR(2.55, -0.06), lArm = spreadL(2.85, -0.06), face = F(0.9, 0.6, 0.1, 0) },
 	{ t = 13.867, face = F(0.65, 0.5, 0.05, 0) },
 	{ t = 13.9, face = F(0.4, 0.45) },
 	-- 13.967 голова ровно (лицо в камеру), широкая улыбка, зубы сомкнуты
-	{ t = 13.967, waist = W(-2, 0), neck = N(35, 5, 3), face = F(0.22, 0.4) },
+	{ t = 13.967, waist = W(-2, 0), neck = N(33, 8, 3), face = F(0.22, 0.4) },
 	{ t = 14.0, face = F(0.2, 0.4) },
-	{ t = 14.033, face = F(0.38, 0.45) },
+	{ t = 14.033, face = F(0.45, 0.45) },
 	-- «I'M THE BEST»: липсинк, голова поворачивается влево, подбородок чуть вверх
-	{ t = 14.067, face = F(0.6, 0.5) },
-	{ t = 14.133, neck = N(30, 6, 3), rArm = spreadR(2.68, -0.05), lArm = spreadL(2.97, -0.04), rHand = SPREAD_HAND2, lHand = SPREAD_HAND2, face = F(0.68, 0.5) },
-	{ t = 14.167, face = F(0.66, 0.5) },
-	{ t = 14.2, face = F(0.72, 0.55) },
-	{ t = 14.233, neck = N(28, 7, 3), face = F(0.7, 0.6) },
-	{ t = 14.267, face = F(0.62, 0.55) },
-	{ t = 14.3, face = F(0.52, 0.5) },
+	{ t = 14.067, face = F(0.8, 0.5) },
+	{ t = 14.133, neck = N(28, 16, 0), rArm = spreadR(2.68, -0.05), lArm = spreadL(2.97, -0.04), rHand = SPREAD_HAND2, lHand = SPREAD_HAND2, face = F(0.95, 0.5) },
+	{ t = 14.167, face = F(0.9, 0.5) },
+	{ t = 14.2, face = F(1.0, 0.55) },
+	{ t = 14.233, neck = N(26, 17, 0), face = F(0.95, 0.6) },
+	{ t = 14.267, face = F(0.85, 0.55) },
+	{ t = 14.3, face = F(0.7, 0.5) },
 	-- доля 14.309: лёгкий кивок
-	{ t = 14.333, neck = N(31, 7, 3), rHand = SPREAD_HAND, lHand = SPREAD_HAND, face = F(0.48, 0.45) },
-	{ t = 14.367, face = F(0.4, 0.4) },
-	{ t = 14.4, face = F(0.32, 0.35) },
+	{ t = 14.333, neck = N(29, 16, 0), rHand = SPREAD_HAND, lHand = SPREAD_HAND, face = F(0.6, 0.45) },
+	{ t = 14.367, face = F(0.48, 0.4) },
+	{ t = 14.4, face = F(0.36, 0.35) },
 	{ t = 14.433, face = F(0.26, 0.3) },
 	-- 14.467 самодовольная зубастая ухмылка
-	{ t = 14.467, neck = N(34, 6, 3), face = F(0.24, 0.25) },
-	{ t = 14.533, face = F(0.25, 0.25) },
+	{ t = 14.467, waist = W(-3.2, 0.5), neck = N(33, 13, 1), face = F(0.2, 0.25) },
+	{ t = 14.533, face = F(0.2, 0.25) },
 	-- дыхание: грудь чуть поднимается, кисти дрейфуют вверх
-	{ t = 14.667, waist = W(-3, 0), rArm = spreadR(2.78, -0.08), lArm = spreadL(3.1, 0.03), face = F(0.34, 0.3) },
-	{ t = 14.733, face = F(0.44, 0.35) },
+	{ t = 14.667, rArm = spreadR(2.8, 0.02, ELBOW_MID), lArm = spreadL(3.1, 0.03), face = F(0.36, 0.3) },
+	{ t = 14.733, face = F(0.5, 0.35) },
 	-- доля 14.797: смех, обе челюсти видны
-	{ t = 14.8, neck = N(32, 6, 3), face = F(0.52, 0.45) },
-	{ t = 14.867, face = F(0.5, 0.45) },
-	{ t = 14.933, face = F(0.56, 0.5) },
+	{ t = 14.8, neck = N(31, 11, 2), face = F(0.62, 0.45) },
+	{ t = 14.867, face = F(0.58, 0.45) },
+	{ t = 14.933, face = F(0.66, 0.5) },
 	{ t = 14.967, waist = W(-2, 0) },
-	{ t = 15.0, face = F(0.5, 0.45) },
-	{ t = 15.067, neck = N(31, 6, 3), rArm = spreadR(2.72, -0.12), lArm = spreadL(3.2, 0, 1.1), face = F(0.56, 0.5) },
-	{ t = 15.133, face = F(0.5, 0.5) },
-	{ t = 15.2, neck = N(32, 6, 3), face = F(0.52, 0.5) },
-	{ t = 15.267, face = F(0.45, 0.45) },
+	{ t = 15.0, face = F(0.58, 0.45) },
+	{ t = 15.067, neck = N(30, 10, 2), rArm = spreadR(2.76, -0.04, ELBOW_FWD), lArm = spreadL(3.2, 0.05, 1.1), face = F(0.66, 0.5) },
+	{ t = 15.133, face = F(0.6, 0.5) },
+	{ t = 15.2, neck = N(31, 10, 2), face = F(0.64, 0.5) },
+	{ t = 15.267, face = F(0.52, 0.45) },
 	-- доля 15.285: подбородок опускается, рот смыкается в широкую ухмылку
-	{ t = 15.333, waist = W(-2.5, 0), neck = N(37, 6, 3), rHand = SPREAD_HAND2, lHand = SPREAD_HAND2, face = F(0.34, 0.35) },
-	{ t = 15.4, face = F(0.3, 0.3) },
-	{ t = 15.65, waist = W(-2, 0), neck = N(37, 6, 3), rArm = spreadR(2.66, -0.04), lArm = spreadL(3.3, 0.02, 1.3), rHand = SPREAD_HAND2, lHand = SPREAD_HAND2, face = F(0.3, 0.3) },
+	{ t = 15.333, neck = N(34, 10, 2), rHand = SPREAD_HAND2, lHand = SPREAD_HAND2, face = F(0.36, 0.35) },
+	{ t = 15.4, waist = W(-3, 0.5), face = F(0.3, 0.3) },
+	{ t = 15.65, waist = W(-2.6, 0.3), neck = N(33, 10, 2), rArm = spreadR(2.88, 0.12, ELBOW_FWD), lArm = spreadL(3.3, 0.12, 1.3), rHand = SPREAD_HAND2, lHand = SPREAD_HAND2, face = F(0.3, 0.3) },
 }
 
 return {

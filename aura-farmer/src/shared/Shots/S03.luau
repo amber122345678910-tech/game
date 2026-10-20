@@ -3,8 +3,8 @@
 local Config = require(script.Parent.Parent:WaitForChild("Config"))
 
 -- Камера смотрит на город (+Z): +X мира — СЛЕВА в кадре.
-local CAM_Z = -6.1
-local CAM_Y = 4.38
+local CAM_Z = -5.95
+local CAM_Y = 5.12
 local PITCH = math.rad(-5)
 
 local function camKey(t: number, dz: number, fov: number, ease: string?): any
@@ -32,7 +32,7 @@ return {
 	},
 	actors = {
 		-- девушка слева в кадре (+X мира)
-		WomanA = { char = "WomanA", place = Config.place("Beach", 5.15, 3.5, 22) },
+		WomanA = { char = "WomanA", place = Config.place("Beach", 4.25, 1.8, 34, -0.3) },
 		Man = { char = "Man", place = Config.place("Beach", 0, 0, 0), opts = {
 				-- в этом плане очки в руках: серебряные, тёмные дымчатые стёкла
 				glassesOn = "RightHand",
@@ -41,7 +41,7 @@ return {
 				glassesLensTransparency = 0.05,
 			} },
 		-- девушка справа в кадре (-X мира)
-		WomanB = { char = "WomanB", place = Config.place("Beach", -5.3, 3.5, -24) },
+		WomanB = { char = "WomanB", place = Config.place("Beach", -4.35, 1.8, -29, -0.1) },
 	},
 	camera = {
 		keys = {

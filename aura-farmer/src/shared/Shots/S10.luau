@@ -10,16 +10,27 @@ return {
 	finish = 13.1333,
 	set = "Gym",
 	preset = "Gym",
+	-- зал в клипе светлый (стены почти «в белое»), конь читается тёплым мех-коричневым: чуть больше
+	-- заполняющего света (сиреневый «отскок» от стен) и экспозиции
+	lighting = {
+		lighting = {
+			Ambient = Color3.fromRGB(62, 50, 78),
+			OutdoorAmbient = Color3.fromRGB(54, 44, 70),
+			ExposureCompensation = 0.4,
+		},
+		-- грейд клипа: фиолетово-маджентовый оттенок в светах и полутонах
+		cc = { Brightness = 0.02, Contrast = 0.14, Saturation = 0.18, TintColor = Color3.fromRGB(244, 228, 255) },
+	},
 	actors = {
 		Horse = { char = "Horse", place = Config.place("Gym", 0, HZ, 0), opts = { props = { "dumbbell" } } },
 		-- рыжая (слева в кадре): у стойки +X, в профиль лицом к центру (−X), махи правой (ближней) ногой влево в кадре
-		Ginger = { char = "GymWoman", place = Config.place("Gym", 6.3, 1.5, 92) },
-		-- кудрявая (справа в кадре): у стойки −X, вполоборота к коню и к камере, махи правой ногой вправо в кадре
-		Curly = { char = "GymGuy", place = Config.place("Gym", -6.0, 1.4, -65) },
+		Ginger = { char = "GymWoman", place = Config.place("Gym", 4.9, 0.6, 92) },
+		-- кудрявая (справа в кадре): у стойки −X, почти в профиль лицом к коню, махи левой (ближней) ногой вправо в кадре
+		Curly = { char = "GymGuy", place = Config.place("Gym", -5.6, 0.8, -80) },
 		-- тёмноволосая за +X стойкой (видна между рыжей и конём, пояс скрыт стойкой)
 		Rack = {
 			char = "Human",
-			place = Config.place("Gym", 5.0, 6.8, 160),
+			place = Config.place("Gym", 5.6, 6.8, 160),
 			opts = {
 				female = true,
 				height = 0.97,
@@ -38,8 +49,8 @@ return {
 	},
 	camera = {
 		keys = {
-			{ t = 11.1333, pos = Config.at("Gym", 0.53, 2.1, -9.0), look = Config.at("Gym", 0.53, 3.43, -1.11), fov = 58, ease = "linear" },
-			{ t = 13.1333, pos = Config.at("Gym", 0.53, 2.1, -9.0), look = Config.at("Gym", 0.53, 3.43, -1.11), fov = 56.6 },
+			{ t = 11.1333, pos = Config.at("Gym", 0.75, 2.1, -9.0), look = Config.at("Gym", 0.75, 3.45, -1.11), fov = 58, ease = "linear" },
+			{ t = 13.1333, pos = Config.at("Gym", 0.75, 2.1, -9.0), look = Config.at("Gym", 0.75, 3.45, -1.11), fov = 56.6 },
 		},
 		path = "linear",
 		focus = { actor = "Horse", part = "Head" },

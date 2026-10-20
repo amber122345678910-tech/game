@@ -74,32 +74,48 @@ end
 -- таз: сидит на сиденье, наклонён вперёд
 local ROOT = { y = -0.72, f = 0, bend = 12, turn = 0, tilt = 0 }
 -- верх корпуса: внизу — наклон к коленям, крен и поворот к правому плечу; вверху — выпрямляется
-local W_DN = { bend = 27, turn = -10, tilt = 2 }
-local W_UP = { bend = 9, turn = 4, tilt = 5 }
+local W_DN = { bend = 27, turn = -22, tilt = 6 }
+local W_UP = { bend = 10, turn = -6, tilt = 5 }
 local function waistK(k)
 	return lerpT(W_DN, W_UP, k)
 end
 
 local LEGS = {
 	root = ROOT,
-	rLeg = { ik = { 1.42, 0.62, 0.95 }, pole = { 0.7, 0.2, 1 } },
-	lLeg = { ik = { -1.42, 0.62, 0.95 }, pole = { -0.7, 0.2, 1 } },
+	rLeg = { ik = { 1.3, 0.3, 0.92 }, pole = { 0.7, 0.2, 1 } },
+	lLeg = { ik = { -1.3, 0.3, 0.92 }, pole = { -0.7, 0.2, 1 } },
 }
 -- левая ладонь на левом колене
 local LARM = {
-	lArm = { ik = { -1.36, 2.25, 0.85 }, pole = { -1, 0.1, -0.3 }, wrist = { palm = { 0, -1, 0 }, fingers = { 0.2, -0.5, 1 } } },
+	lArm = { ik = { -1.27, 1.92, 0.66 }, pole = { -1, 0.15, -0.3 }, wrist = { palm = { 0, -1, 0 }, fingers = { 0.2, -0.5, 1 } } },
 	lHand = { curl = 0.4, thumb = 0.2, thumbOut = 0.5, spread = 0.1 },
 }
 
 -- правая рука: низ (гантель у правого колена), середина, верх (у морды)
-local A_DN = { ik = { 2.9, 1.68, 1.8 }, pole = { 1, 0.1, -0.5 }, palm = { -0.45, 0, -0.9 }, fingers = { 0, -1, 0 } }
-local A_MID = { ik = { 2.8, 2.3, 1.95 }, pole = { 1, -0.5, -0.4 }, palm = { -0.18, 0.79, -0.57 }, fingers = { 0.25, 0.6, 0.75 } }
-local A_UP = { ik = { 2.65, 3.72, 2.3 }, pole = { 1, -0.8, -0.2 }, palm = { -0.82, 0, -0.55 }, fingers = { -0.1, 1, 0.15 } }
+local A_DN = { ik = { 2.95, 2.02, 1.75 }, pole = { 1, 0.1, -0.5 }, palm = { -0.45, 0, -0.9 }, fingers = { 0, -1, 0 } }
+local A_MID = { ik = { 2.95, 2.75, 2.0 }, pole = { 1, -0.5, -0.4 }, palm = { 0.18, -0.79, 0.57 }, fingers = { 0.25, 0.6, 0.75 } }
+local A_UP = { ik = { 2.55, 3.66, 2.3 }, pole = { 1, -0.8, -0.2 }, palm = { 0.8, 0, 0.6 }, fingers = { -0.1, 1, 0.7 } }
 local function armOf(a, dy)
 	return { ik = { a.ik[1], a.ik[2] + (dy or 0), a.ik[3] }, pole = a.pole, wrist = { palm = a.palm, fingers = a.fingers } }
 end
+-- ориентация кисти интерполируется поворотом (slerp), а не покомпонентно: иначе на полпути ладонь и пальцы
+-- становятся почти параллельны и кисть «переворачивается»
+local RB = require("@lune/roblox")
+local function handCF(palm, fingers)
+	local f = RB.Vector3.new(fingers[1], fingers[2], fingers[3]).Unit
+	local p = RB.Vector3.new(palm[1], palm[2], palm[3])
+	p = (p - f * p:Dot(f)).Unit
+	return RB.CFrame.fromMatrix(RB.Vector3.zero, p, f, p:Cross(f))
+end
 local function lerpArm(a, b, k)
-	return { ik = lerpV(a.ik, b.ik, k), pole = lerpV(a.pole, b.pole, k), palm = lerpV(a.palm, b.palm, k), fingers = lerpV(a.fingers, b.fingers, k) }
+	local cf = handCF(a.palm, a.fingers):Lerp(handCF(b.palm, b.fingers), k)
+	local px, fy = cf.XVector, cf.YVector
+	return {
+		ik = lerpV(a.ik, b.ik, k),
+		pole = lerpV(a.pole, b.pole, k),
+		palm = { px.X, px.Y, px.Z },
+		fingers = { fy.X, fy.Y, fy.Z },
+	}
 end
 local K_MID = 0.6
 local function armK(k)
@@ -113,7 +129,7 @@ local function armK(k)
 	return armOf(A_UP, (k - 1) * 1.4)
 end
 local function dbK(k)
-	return { Dumbbell = { rz = 88 * math.clamp(k, 0, 1.03) } }
+	return { Dumbbell = { rz = -88 * math.clamp(k, 0, 1.03) } }
 end
 
 local horse = {}
@@ -138,27 +154,27 @@ local rad, deg = math.rad, math.deg
 local function euler(turn, bend, tilt)
 	return CFrame.Angles(0, rad(turn), 0) * CFrame.Angles(rad(-bend), 0, 0) * CFrame.Angles(0, 0, rad(-tilt))
 end
-local CAM_PITCH = 24
+local CAM_PITCH = 15
 local HEAD = {
-	{ 11.0, -10, 19, 24 },
-	{ 11.1333, -10, 19, 24 },
-	{ 11.3, -10, 19, 24 },
-	{ B23 + 0.1, -8, 22, 22 },
-	{ B23 + 0.25, -3, 18, 21 },
-	{ 11.75, -5, 18, 21 }, -- лёгкий кивок в верхней стоп-позе
-	{ B24, -3, 18, 21 },
-	{ 12.0, 3, 20, 21 }, -- AIN'T: голова вверх
-	{ 12.133, -2, 22, 20 },
-	{ 12.25, 0, 22, 19 },
-	{ 12.333, 6, 22, 17 }, -- GOT: запрокинута
-	{ 12.43, 4, 20, 17 },
-	{ 12.533, 8, 18, 17 }, -- NO
-	{ 12.633, 3, 17, 19 },
-	{ 12.767, 5, 17, 19 }, -- WOR-
-	{ B26 + 0.02, 4, 18, 19 },
-	{ 12.967, -1, 20, 20 }, -- -RIES
-	{ 13.1, 1, 22, 20 },
-	{ 13.25, 1, 22, 20 },
+	{ 11.0, -13, 22, 17 },
+	{ 11.1333, -13, 22, 17 },
+	{ 11.3, -13, 22, 17 },
+	{ B23 + 0.12, -8, 21, 18 },
+	{ B23 + 0.25, -3, 23, 20 },
+	{ 11.75, -5, 23, 20 }, -- лёгкий кивок в верхней стоп-позе
+	{ B24, -3, 23, 20 },
+	{ 12.0, 3, 25, 20 }, -- AIN'T: голова вверх
+	{ 12.133, -2, 27, 20 },
+	{ 12.25, 0, 28, 19 },
+	{ 12.333, 6, 27, 17 }, -- GOT: запрокинута
+	{ 12.43, 4, 26, 17 },
+	{ 12.533, 8, 25, 17 }, -- NO
+	{ 12.633, 3, 23, 19 },
+	{ 12.767, 5, 23, 19 }, -- WOR-
+	{ B26 + 0.02, 4, 24, 19 },
+	{ 12.967, -1, 26, 20 }, -- -RIES
+	{ 13.1, 1, 27, 20 },
+	{ 13.25, 1, 27, 20 },
 }
 for _, h in HEAD do
 	local w = waistK(curlAt(h[1]))
@@ -169,24 +185,32 @@ for _, h in HEAD do
 end
 
 -- лицо: челюсть (0 — зубы сомкнуты), оскал, брови, уши
+-- (открытие рта снято по кадрам клипа, 30 к/с; jaw ≈ 1.15 × «раскрытие» из разбора)
 local FACE = {
 	-- t, jaw, grin, brows, ears
 	{ 11.0, 0.04, 1, 0, 0 },
-	{ 11.1333, 0.04, 1, 0, 0 },
-	{ 11.5, 0.1, 1, 0.1, 0 },
-	{ 11.633, 0.16, 1, 0.2, -0.1 },
-	{ 11.867, 0.2, 1, 0.2, -0.1 },
-	{ 11.93, 0.3, 1, 0.3, 0 },
-	{ 12.0, 0.45, 1, 0.5, 0.1 }, -- AIN'T
-	{ 12.133, 0.33, 1, 0.4, 0.1 },
-	{ 12.25, 0.4, 1, 0.4, 0.1 },
-	{ 12.333, 0.75, 1, 0.7, 0.2 }, -- GOT
-	{ 12.4, 0.48, 1, 0.5, 0.1 },
-	{ 12.533, 0.8, 1, 0.8, 0.2 }, -- NO
-	{ 12.633, 0.58, 1, 0.6, 0.1 },
-	{ 12.767, 0.8, 0.6, 0.7, 0.2 }, -- WOR- (округлый рот, губы вперёд)
-	{ 12.867, 0.7, 0.7, 0.6, 0.1 },
-	{ 12.967, 0.3, 1, 0.5, 0 }, -- -RIES (широкий оскал)
+	{ 11.1333, 0.04, 1, 0, 0 }, -- «…stress»: сомкнутые зубы, самодовольный оскал
+	{ 11.5, 0.06, 1, 0.1, 0 },
+	{ 11.633, 0.12, 1, 0.2, -0.1 },
+	{ 11.833, 0.08, 1, 0.2, -0.1 },
+	{ 11.9, 0.17, 1, 0.25, 0 },
+	{ 11.967, 0.5, 1, 0.45, 0.1 }, -- AIN'T: смеющийся раскрытый оскал
+	{ 12.033, 0.62, 1, 0.55, 0.1 },
+	{ 12.1, 0.4, 1, 0.45, 0.1 },
+	{ 12.2, 0.22, 1, 0.35, 0.05 },
+	{ 12.233, 0.24, 1, 0.35, 0.05 },
+	{ 12.3, 0.86, 0.95, 0.75, 0.2 }, -- GOT: высокий раскрытый рот
+	{ 12.367, 0.46, 1, 0.55, 0.1 },
+	{ 12.4, 0.4, 1, 0.5, 0.1 },
+	{ 12.467, 0.62, 1, 0.65, 0.15 },
+	{ 12.533, 0.98, 0.9, 0.85, 0.25 }, -- NO: шире всего
+	{ 12.6, 0.7, 0.9, 0.7, 0.15 },
+	{ 12.65, 0.63, 0.85, 0.65, 0.1 },
+	{ 12.733, 0.92, 0.55, 0.8, 0.2 }, -- WOR-: округлый рот, губы вперёд
+	{ 12.8, 0.86, 0.5, 0.75, 0.2 },
+	{ 12.867, 0.92, 0.55, 0.75, 0.2 },
+	{ 12.933, 0.38, 1, 0.55, 0.05 }, -- -RIES: широкий оскал, зубы почти сомкнуты
+	{ 13.033, 0.34, 1, 0.5, 0 },
 	{ 13.1, 0.55, 1, 0.6, 0.1 },
 	{ 13.25, 0.55, 1, 0.6, 0.1 },
 }
@@ -221,18 +245,19 @@ local function kicker(o)
 		lHand = "relaxed",
 	}
 	local function pose(t, k, drift, ease)
-		-- k = 0 стоит, 1 — нога назад; drift — покачивание ноги в стоп-позе (градусы)
-		local bend = o.hinge * k
+		-- k = 0 стоит, 1 — нога назад; drift — покачивание ноги в стоп-позе (градусы).
+		-- корпус «запаздывает» на подъёме и выпрямляется раньше ноги на опускании (k^2.5)
+		local bend = o.hinge * math.max(k, 0) ^ 2.5
 		local rb = bend * 0.75
 		local key = merge(arms, {
 			t = t,
 			ease = ease,
-			root = { y = -0.05 * k, f = -o.shift * k, bend = rb },
+			root = { y = -0.13 * k, f = -o.shift * k, bend = rb },
 			waist = { bend = bend * 0.25 + (o.lean or 0) * (1 - k), turn = 0, tilt = 0 },
 		})
 		key[stand] = { ik = { sx * hx, P.ankleY, 0.03 }, pole = { 0, 0, 1 } }
 		local back = o.legBack * k + (drift or 0)
-		key[kick] = { fwd = -(back - rb) + 2 * (1 - k), out = 4, knee = 6 + 10 * (1 - k), ankle = { bend = -35 * k } }
+		key[kick] = { fwd = -(back - rb), out = 4 * k, knee = 6 * k, ankle = { bend = -35 * k } }
 		return key
 	end
 	-- фаза — та же кривая, что у гантели (полная синхронность); в верхней стоп-позе нога слегка «пружинит»
@@ -249,6 +274,17 @@ local function kicker(o)
 	for _, h in o.head do
 		table.insert(keys, { t = h[1], neck = { nod = h[2], turn = h[3], tilt = h[4] or 0 }, face = h[5] })
 	end
+	-- моргание (живые люди в кадре): закрыть за 2 кадра, открыть за 3
+	for _, b in o.blinks or {} do
+		local f = table.clone(b[2])
+		table.insert(keys, { t = b[1] - 0.067, face = table.clone(f) })
+		f.blink = 1
+		table.insert(keys, { t = b[1], face = f })
+		table.insert(keys, { t = b[1] + 0.1, face = table.clone(b[2]) })
+	end
+	table.sort(keys, function(a, b)
+		return a.t < b.t
+	end)
 	return { keys = keys }
 end
 
@@ -260,6 +296,7 @@ local ginger = kicker({
 	legBack = 88,
 	shift = 0.3,
 	lean = 5,
+	blinks = { { 12.2, { smile = 0.4 } } },
 	head = {
 		{ 11.0, -20, -6, 0, { smile = 0.35 } },
 		{ 11.1333, -20, -6, 0, { smile = 0.35 } },
@@ -275,40 +312,45 @@ local ginger = kicker({
 	},
 })
 
--- кудрявая: наклон ~35°, нога почти горизонтально; стоя смотрит на коня, в верхней позе — в камеру с ухмылкой
+-- кудрявая: наклон ~35°, ближняя к камере левая нога почти горизонтально вправо в кадре; стоя смотрит на коня,
+-- в верхней позе поворачивает голову в камеру с ухмылкой (камера у неё слева: поворот влево+)
 local curly = kicker({
 	P = rigOf("GymGuy").P,
-	side = "r",
+	side = "l",
 	hinge = 36,
-	legBack = 78,
+	legBack = 84,
 	shift = 0.2,
 	lean = 9,
+	blinks = { { 11.25, { smile = 0.4 } }, { 12.24, { smile = 0.55 } } },
 	head = {
-		{ 11.0, -4, 18, 0, { smile = 0.4 } },
-		{ 11.1333, -4, 18, 0, { smile = 0.4 } },
-		{ B23 + 0.05, -2, 12, 0, { smile = 0.45 } },
-		{ B23 + 0.25, 6, -30, -6, { smile = 0.75, squint = 0.25, lookX = 0.3 } },
-		{ B24, 7, -30, -6, { smile = 0.75, squint = 0.25, lookX = 0.3 } },
-		{ B24 + 0.26, -4, 16, 0, { smile = 0.55 } },
-		{ B25 + 0.02, -4, 16, 0, { smile = 0.55 } },
-		{ B25 + 0.25, 6, -30, -6, { smile = 1, jaw = 0.12, squint = 0.3, lookX = 0.3 } },
-		{ B26, 7, -30, -6, { smile = 1, jaw = 0.12, squint = 0.3, lookX = 0.3 } },
-		{ B26 + 0.26, -4, 18, 0, { smile = 0.55 } },
-		{ 13.25, -4, 18, 0, { smile = 0.55 } },
+		{ 11.0, -4, 12, 0, { smile = 0.4 } },
+		{ 11.1333, -4, 12, 0, { smile = 0.4 } },
+		{ B23 + 0.05, -4, 16, 0, { smile = 0.45 } },
+		{ B23 + 0.25, -22, 42, -8, { smile = 0.75, squint = 0.25, lookX = -0.35 } },
+		{ B24, -22, 44, -8, { smile = 0.8, squint = 0.25, lookX = -0.35 } },
+		{ B24 + 0.26, -4, 14, 0, { smile = 0.55 } },
+		{ B25 + 0.02, -4, 14, 0, { smile = 0.55 } },
+		{ B25 + 0.25, -22, 42, -8, { smile = 1, jaw = 0.12, squint = 0.3, lookX = -0.35 } },
+		{ B26, -22, 44, -8, { smile = 1, jaw = 0.12, squint = 0.3, lookX = -0.35 } },
+		{ B26 + 0.26, -4, 12, 0, { smile = 0.55 } },
+		{ 13.25, -4, 12, 0, { smile = 0.55 } },
 	},
 })
 
 -- тёмноволосая за стойкой (почти статична: смотрит вниз на гантели, руки опущены вперёд, лёгкое покачивание)
+local rackP = rigOf("Human", { female = true, height = 0.97, build = 0.9 }).P
 local rack = { keys = {} }
 for i, t in { 11.0, 11.6, 12.2, 12.8, 13.25 } do
 	local sway = if i % 2 == 0 then 1.5 else -1
 	table.insert(rack.keys, {
 		t = t,
-		root = { bend = 8 + sway * 0.5 },
+		root = { y = -0.04, bend = 8 + sway * 0.5 },
 		waist = { bend = 12, tilt = sway },
 		neck = { nod = 26, turn = -4 },
 		rArm = { fwd = 26, out = 6, elbow = 14 },
 		lArm = { fwd = 26, out = 6, elbow = 14 },
+		rLeg = { ik = { rackP.hipX, rackP.ankleY, 0 } },
+		lLeg = { ik = { -rackP.hipX, rackP.ankleY, 0.1 } },
 		rHand = "relaxed",
 		lHand = "relaxed",
 		face = { blink = 0.35 },

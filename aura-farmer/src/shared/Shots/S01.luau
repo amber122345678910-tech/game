@@ -6,6 +6,7 @@ local Config = require(script.Parent.Parent:WaitForChild("Config"))
 -- pitch > 0 — вверх, roll < 0 — «по часовой» (горизонт поднимается к правому краю кадра).
 -- Ключ: позиция камеры (локально в декорации, x/y/z) + ориентация pan/pitch/roll. Позиции решены по кадрам клипа
 -- (ближний глаз, макушка, низ бороды; pitch — по высоте горизонта) и сглажены в ровный наезд.
+-- Сегменты "linear": сплайн Эрмита по ключам сам даёт плавность (Cubic InOut на сегмент останавливал бы камеру в каждом ключе).
 local SX, SZ = 0, 0
 local function camKey(t: number, x: number, y: number, z: number, pan: number, pitch: number, roll: number, fov: number, ease: string?): any
 	local p, w = math.rad(pitch), math.rad(pan)
@@ -25,29 +26,30 @@ return {
 	lighting = {
 		sunDir = Vector3.new(0.42, 0.85, -0.32),
 		lighting = {
-			Brightness = 2.3,
-			ExposureCompensation = -0.7,
+			Brightness = 2.6,
+			ExposureCompensation = -0.5,
 			ShadowSoftness = 0.05,
 			-- тёплое солнце на коже (в клипе ≈5600K, без «бледности»), тёплый отсвет песка снизу, холодное небо
-			ColorShift_Top = Color3.fromRGB(255, 226, 196),
+			ColorShift_Top = Color3.fromRGB(255, 222, 190),
 			ColorShift_Bottom = Color3.fromRGB(96, 72, 52),
 			OutdoorAmbient = Color3.fromRGB(120, 126, 140),
 			Ambient = Color3.fromRGB(112, 94, 80),
 		},
-		atmosphere = { Density = 0.26, Offset = 0.12, Haze = 0.9, Glare = 0, Color = Color3.fromRGB(118, 156, 184), Decay = Color3.fromRGB(64, 108, 150) },
+		atmosphere = { Density = 0.24, Offset = 0.12, Haze = 0.8, Glare = 0, Color = Color3.fromRGB(128, 162, 190), Decay = Color3.fromRGB(58, 104, 148) },
 		bloom = { Intensity = 0.45, Size = 28, Threshold = 1.1 },
 		sunRays = { Intensity = 0.01, Spread = 0.5 },
-		cc = { Brightness = 0, Contrast = 0.24, Saturation = 0.2, TintColor = Color3.fromRGB(255, 240, 228) },
+		cc = { Brightness = 0, Contrast = 0.28, Saturation = 0.24, TintColor = Color3.fromRGB(255, 240, 228) },
 		dof = { Enabled = true, FarIntensity = 0.42, NearIntensity = 0, InFocusRadius = 1.8, FocusDistance = 4.6 },
 		clouds = { Cover = 0.22, Density = 0.12 },
 	},
 	actors = {
 		-- сидит на песке, грудь развёрнута на 25° влево от оси камеры
 		Man = { char = "Man", place = Config.place("Beach", SX, SZ, 25) },
-		-- друг полулёжа на локтях позади-справа по кадру (не в фокусе), ноги к камере и вправо
+		-- друг полулёжа на локтях позади-справа по кадру (не в фокусе): голова выглядывает у предплечья парня,
+		-- белая футболка справа, шорты уходят за нижний край кадра
 		Friend = {
 			char = "Human",
-			place = Config.place("Beach", SX - 4.8, SZ + 10.6, 40),
+			place = Config.place("Beach", SX - 3.3, SZ + 7.19, 20),
 			opts = {
 				skin = Color3.fromRGB(214, 162, 140),
 				hair = Color3.fromRGB(42, 26, 20),
@@ -67,13 +69,13 @@ return {
 	},
 	camera = {
 		keys = {
-			-- наезд ~0.3 студа с подъёмом взгляда (горизонт 0.55 -> 0.65 кадра) и панорамой вправо 1.5°
-			camKey(0, -0.227, 3.10, -4.945, 0, 1.75, -1, 34),
-			camKey(0.3, -0.27, 3.17, -4.91, 0.35, 2.45, -1.1, 34),
-			camKey(0.633, -0.33, 3.22, -4.81, 0.85, 3.15, -1.2, 34),
-			camKey(0.8, -0.39, 3.20, -4.74, 1.0, 4.2, -1.25, 34),
-			camKey(1.0, -0.44, 3.17, -4.66, 1.3, 4.54, -1.3, 34),
-			camKey(1.4333, -0.455, 3.13, -4.59, 1.5, 5.07, -1.3, 34),
+			-- наезд ~0.36 студа с подъёмом взгляда (горизонт 0.55 -> 0.64 кадра) и панорамой вправо 1.5°
+			camKey(0, -0.22, 3.09, -4.93, 0, 1.75, -1, 34, "linear"),
+			camKey(0.3, -0.20, 3.14, -4.89, 0.35, 2.8, -1.1, 34, "linear"),
+			camKey(0.633, -0.25, 3.21, -4.79, 0.85, 3.81, -1.2, 34, "linear"),
+			camKey(0.8, -0.31, 3.21, -4.74, 1.0, 4.16, -1.25, 34, "linear"),
+			camKey(1.0, -0.38, 3.19, -4.66, 1.3, 4.44, -1.3, 34, "linear"),
+			camKey(1.4333, -0.385, 3.17, -4.57, 1.5, 4.93, -1.3, 34, "linear"),
 		},
 		shake = { rot = 0.2, pos = 0.012, freq = 1.6, seed = 11 },
 		focus = { actor = "Man", part = "Head" },

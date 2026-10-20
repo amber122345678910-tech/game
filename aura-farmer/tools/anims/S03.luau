@@ -194,9 +194,11 @@ local function manHands(spread, drop)
 		L = { fingers = C(0.35, 0.25, 1), palm = V(1, 0, 0), pole = C(-1 - spread, -1.2, -0.3) },
 	}
 end
+-- новые пропорции людей: грудь/талия выше на ≈0.58
+local DY = 0.58
 local function manG(t, y, f, roll, spread, ease)
 	local h = manHands(spread)
-	return { t = t, cf = G(0, y, f, roll, 80), R = h.R, L = h.L, ease = ease }
+	return { t = t, cf = G(0, y + DY, f, roll, 80), R = h.R, L = h.L, ease = ease }
 end
 local MAN_GLASSES = {
 	manG(2.633, 3.5, 0.94, -8, 0),
@@ -223,7 +225,7 @@ local man = derive("Man", manBase, {
 local function womanKey(t, neck, face, waist, root)
 	return { t = t, neck = neck, face = face, waist = waist or { bend = 0 }, root = root or { x = 0 } }
 end
-local A_TURN = 8 -- голова дополнительно к корпусу смотрит в объектив
+local A_TURN = -5 -- голова дополнительно к корпусу смотрит в объектив
 local aBase = {
 	womanKey(2.633, { nod = 0, tilt = -4, turn = A_TURN }, { jaw = 0.18, brows = 0.3 }, nil, { x = -0.05, tilt = -1 }),
 	womanKey(2.7, { nod = 0, tilt = -4, turn = A_TURN }, { jaw = 0.2, brows = 0.3 }, nil, { x = -0.05, tilt = -1 }),
@@ -276,7 +278,7 @@ local function onFace(t, dy, df, rx, hands, ease)
 	return { t = t, head = CFrame.new(V(0, dy, -df)) * CFrame.Angles(rad(rx or 0), 0, 0), R = hands.R, L = hands.L, ease = ease }
 end
 local function inHands(t, x, y, f, roll, pitch, hands, ease)
-	return { t = t, cf = G(x, y, f, roll, pitch), R = hands.R, L = hands.L, ease = ease }
+	return { t = t, cf = G(x, y + DY, f, roll, pitch), R = hands.R, L = hands.L, ease = ease }
 end
 -- y — высота очков (char space): на носу ≈ 4.65, подол топа ≈ 3.1
 local A_GLASSES = {
@@ -306,7 +308,7 @@ local womanA = derive("WomanA", aBase, {
 -- ===================================================================================
 -- ДЕВУШКА B (справа в кадре, −X мира): узкие красные очки, локти высоко и широко, ведёт рывок.
 -- ===================================================================================
-local B_TURN = -6
+local B_TURN = 0
 local bBase = {
 	womanKey(2.633, { nod = 5, tilt = 0, turn = B_TURN }, { jaw = 0, brows = 0.1 }),
 	womanKey(2.7, { nod = 5, tilt = 0, turn = B_TURN }, { jaw = 0, brows = 0.1 }),
