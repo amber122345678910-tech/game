@@ -32,7 +32,7 @@ return {
 	},
 	actors = {
 		-- девушка слева в кадре (+X мира)
-		WomanA = { char = "WomanA", place = Config.place("Beach", 4.25, 1.8, 34, -0.3) },
+		WomanA = { char = "WomanA", place = Config.place("Beach", 4.25, 1.8, 34, -0.5) },
 		Man = { char = "Man", place = Config.place("Beach", 0, 0, 0), opts = {
 				-- в этом плане очки в руках: серебряные, тёмные дымчатые стёкла
 				glassesOn = "RightHand",
@@ -41,7 +41,7 @@ return {
 				glassesLensTransparency = 0.05,
 			} },
 		-- девушка справа в кадре (-X мира)
-		WomanB = { char = "WomanB", place = Config.place("Beach", -4.35, 1.8, -29, -0.1) },
+		WomanB = { char = "WomanB", place = Config.place("Beach", -4.35, 1.8, -29, -0.4) },
 	},
 	camera = {
 		keys = {
