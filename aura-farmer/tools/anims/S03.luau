@@ -196,36 +196,36 @@ table.insert(manBase, {
 local function manHands(spread)
 	spread = spread or 0
 	return {
-		R = { fingers = C(-0.2, 1, 0.3), palm = C(-1, 0, 0.25), pole = C(1 + spread, -1, 0.3) },
-		L = { fingers = C(0.2, 1, 0.3), palm = C(1, 0, 0.25), pole = C(-1 - spread, -1, 0.3) },
+		R = { fingers = C(-0.2, 1, 0.3), palm = C(-1, 0, 0.25), pole = C(0.3 + spread, -1, 0.15) },
+		L = { fingers = C(0.2, 1, 0.3), palm = C(1, 0, 0.25), pole = C(-0.3 - spread, -1, 0.15) },
 	}
 end
 -- очки парня: стёкла почти горизонтально, дужки торчат вверх из кулаков (как в клипе)
-local MAN_PITCH = -65
+local MAN_PITCH = -50
 local function manG(t, y, f, roll, spread, ease)
 	local h = manHands(spread)
 	return { t = t, cf = G(0, y, f, roll, MAN_PITCH), R = h.R, L = h.L, ease = ease }
 end
 -- y — высота центра очков (char space, новые пропорции: плечи 4.6, низ груди ≈ 3.9)
 local MAN_GLASSES = {
-	manG(2.633, 3.9, 0.95, -8, 0),
-	manG(2.7, 3.9, 0.95, -8, 0),
-	manG(2.9, 3.91, 0.95, -7, 0),
-	manG(3.033, 3.9, 0.95, -2, 0),
-	manG(3.133, 3.89, 0.96, 8, 0),
-	manG(3.3, 3.895, 0.96, 5, 0),
-	manG(3.467, 3.9, 0.95, 0, 0),
-	manG(3.633, 3.89, 0.97, 0, 0.1),
-	manG(3.733, 3.85, 1.03, 0, 0.3),
-	manG(3.833, 3.8, 1.07, 0, 0.45),
-	manG(3.9, 3.79, 1.08, 0, 0.5),
+	manG(2.633, 4, 0.95, -8, 0),
+	manG(2.7, 4, 0.95, -8, 0),
+	manG(2.9, 4.01, 0.95, -7, 0),
+	manG(3.033, 4, 0.95, -2, 0),
+	manG(3.133, 3.99, 0.96, 8, 0),
+	manG(3.3, 3.995, 0.96, 5, 0),
+	manG(3.467, 4, 0.95, 0, 0),
+	manG(3.633, 3.99, 0.97, 0, 0.1),
+	manG(3.733, 3.95, 1.03, 0, 0.3),
+	manG(3.833, 3.9, 1.07, 0, 0.45),
+	manG(3.9, 3.89, 1.08, 0, 0.5),
 }
 
 local man = derive("Man", manBase, {
 	parent = "RightHand",
-	pinch = { R = V(0.45, 0.06, 0.04), L = V(-0.45, 0.06, 0.04) },
+	pinch = { R = V(0.5, 0.06, 0.06), L = V(-0.5, 0.06, 0.06) },
 	-- щипок у середины кисти, с внутренней (ладонной) стороны: пальцы обхватывают шарнир
-	off = { palm = 0.17, along = 0.3, thumb = 0.06 },
+	off = { palm = 0.12, along = 0.3, thumb = 0.06 },
 }, MAN_GLASSES)
 
 -- ===================================================================================
@@ -295,23 +295,25 @@ local A_GLASSES = {
 	onFace(2.7, 0, 0, 0, A_FACE),
 	onFace(2.8, -0.03, 0.01, 0, A_FACE),
 	onFace(2.833, -0.12, 0.04, 4, mix(A_FACE, A_HOLD, 0.05)),
-	inHands(2.867, 0, 4.88, 0.85, 0, -8, mix(A_FACE, A_HOLD, 0.15)),
-	inHands(2.9, 0, 4.58, 0.95, 0, -25, mix(A_FACE, A_HOLD, 0.35)),
-	inHands(2.933, 0, 4.3, 1.0, 0, -45, mix(A_FACE, A_HOLD, 0.6)),
-	inHands(2.967, 0, 4.06, 1.0, 0, -60, mix(A_FACE, A_HOLD, 0.8)),
-	inHands(3.033, 0, 3.8, 0.98, 0, -72, mix(A_FACE, A_HOLD, 0.95)),
-	inHands(3.1, 0, 3.66, 0.95, 0, -77, A_HOLD),
-	inHands(3.167, 0, 3.7, 0.95, 0, -77, A_HOLD),
-	inHands(3.3, 0, 3.7, 0.95, 2, -77, A_HOLD),
-	inHands(3.433, 0, 3.7, 0.95, -3, -77, A_HOLD),
-	inHands(3.567, 0, 3.7, 0.95, 2, -77, A_HOLD),
-	inHands(3.7, 0.02, 3.69, 0.95, 0, -77, A_HOLD),
-	inHands(3.833, 0.03, 3.69, 0.95, -1, -77, A_HOLD),
-	inHands(3.9, 0.03, 3.69, 0.95, -1, -77, A_HOLD),
+	inHands(2.867, 0, 5.05, 0.85, 0, 12, mix(A_FACE, A_HOLD, 0.15)),
+	inHands(2.9, 0, 4.86, 0.95, 0, 35, mix(A_FACE, A_HOLD, 0.35)),
+	inHands(2.933, 0, 4.58, 1.0, 0, 60, mix(A_FACE, A_HOLD, 0.6)),
+	inHands(2.967, 0, 4.28, 1.0, 0, 80, mix(A_FACE, A_HOLD, 0.8)),
+	inHands(3.033, 0, 3.94, 0.98, 0, 96, mix(A_FACE, A_HOLD, 0.95)),
+	inHands(3.1, 0, 3.66, 0.95, 0, 103, A_HOLD),
+	inHands(3.167, 0, 3.7, 0.95, 0, 103, A_HOLD),
+	inHands(3.3, 0, 3.7, 0.95, 2, 103, A_HOLD),
+	inHands(3.433, 0, 3.7, 0.95, -3, 103, A_HOLD),
+	inHands(3.567, 0, 3.7, 0.95, 2, 103, A_HOLD),
+	inHands(3.7, 0.02, 3.69, 0.95, 0, 103, A_HOLD),
+	inHands(3.833, 0.03, 3.69, 0.95, -1, 103, A_HOLD),
+	inHands(3.9, 0.03, 3.69, 0.95, -1, 103, A_HOLD),
 }
 local womanA = derive("WomanA", aBase, {
 	parent = "Head",
-	pinch = { R = V(0.5, 0.05, 0.22), L = V(-0.5, 0.05, 0.22) },
+	pinch = { R = V(0.47, 0.02, 0.06), L = V(-0.47, 0.02, 0.06) },
+	-- «О-кей»: щипок большим и указательным у середины кисти, остальные пальцы веером вверх
+	off = { palm = 0.06, along = 0.28, thumb = 0.12 },
 }, A_GLASSES)
 
 -- ===================================================================================
@@ -363,17 +365,17 @@ local B_GLASSES = {
 	onFace(2.767, -0.08, 0.02, 2, B_FACE),
 	onFace(2.8, -0.2, 0.06, 4, mix(B_FACE, B_HOLD, 0.05)),
 	onFace(2.833, -0.3, 0.12, 2, mix(B_FACE, B_HOLD, 0.12)),
-	inHands(2.867, 0, 4.68, 0.95, 0, -5, mix(B_FACE, B_HOLD, 0.3)),
-	inHands(2.9, 0, 4.33, 1.0, 0, -8, mix(B_FACE, B_HOLD, 0.55)),
-	inHands(2.933, 0, 3.98, 1.0, 0, -5, mix(B_FACE, B_HOLD, 0.75)),
-	inHands(2.967, 0, 3.68, 0.98, 0, 0, mix(B_FACE, B_HOLD, 0.9)),
-	inHands(3.033, 0, 3.44, 0.95, 0, 8, B_HOLD),
-	inHands(3.067, 0, 3.42, 0.95, 0, 8, B_HOLD),
-	inHands(3.1, 0, 3.45, 0.95, 0, 8, B_HOLD),
-	inHands(3.3, 0, 3.45, 0.95, 0, 8, B_HOLD),
-	inHands(3.567, 0, 3.45, 0.95, -2, 8, B_HOLD),
-	inHands(3.833, -0.02, 3.44, 0.97, -3, 8, B_HOLD),
-	inHands(3.9, -0.02, 3.44, 0.97, -3, 8, B_HOLD),
+	inHands(2.867, 0, 4.68, 0.95, 0, 8, mix(B_FACE, B_HOLD, 0.3)),
+	inHands(2.9, 0, 4.33, 1.0, 0, 18, mix(B_FACE, B_HOLD, 0.55)),
+	inHands(2.933, 0, 3.98, 1.0, 0, 28, mix(B_FACE, B_HOLD, 0.75)),
+	inHands(2.967, 0, 3.68, 0.98, 0, 38, mix(B_FACE, B_HOLD, 0.9)),
+	inHands(3.033, 0, 3.44, 0.95, 0, 45, B_HOLD),
+	inHands(3.067, 0, 3.42, 0.95, 0, 45, B_HOLD),
+	inHands(3.1, 0, 3.45, 0.95, 0, 45, B_HOLD),
+	inHands(3.3, 0, 3.45, 0.95, 0, 45, B_HOLD),
+	inHands(3.567, 0, 3.45, 0.95, -2, 45, B_HOLD),
+	inHands(3.833, -0.02, 3.44, 0.97, -3, 45, B_HOLD),
+	inHands(3.9, -0.02, 3.44, 0.97, -3, 45, B_HOLD),
 }
 local womanB = derive("WomanB", bBase, {
 	parent = "Head",

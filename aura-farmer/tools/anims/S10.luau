@@ -347,8 +347,9 @@ for i, t in { 11.0, 11.6, 12.2, 12.8, 13.25 } do
 		root = { y = -0.04, bend = 8 + sway * 0.5 },
 		waist = { bend = 12, tilt = sway },
 		neck = { nod = 26, turn = -4 },
-		rArm = { fwd = 26, out = 6, elbow = 14 },
-		lArm = { fwd = 26, out = 6, elbow = 14 },
+		-- ладони лежат на гантелях верхнего яруса стойки (за ней)
+		rArm = { ik = { 0.42, 3.1 + sway * 0.01, 1.2 }, pole = { 0.6, -0.3, -1 }, wrist = { palm = { 0, -1, 0.1 }, fingers = { 0, -0.3, 1 } } },
+		lArm = { ik = { -0.42, 3.1 - sway * 0.01, 1.2 }, pole = { -0.6, -0.3, -1 }, wrist = { palm = { 0, -1, 0.1 }, fingers = { 0, -0.3, 1 } } },
 		rLeg = { ik = { rackP.hipX, rackP.ankleY, 0 } },
 		lLeg = { ik = { -rackP.hipX, rackP.ankleY, 0.1 } },
 		rHand = "relaxed",

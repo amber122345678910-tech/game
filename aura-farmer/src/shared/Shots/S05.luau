@@ -3,14 +3,15 @@
 local Config = require(script.Parent.Parent:WaitForChild("Config"))
 
 -- Камера неподвижна (locked-off), фронтально по оси груди. Кадр — «инсерт» по клипу: цепь дугой в верхней трети
--- (x 0.32–0.67, верх 0.06, низ дуги ≈0.42; в клипе x 0.29–0.69, 0.08–0.37), острые воротники из верхних углов
--- к центру низа, «V» меха по центру, атлас пиджака по краям. У нашей цепи дуга глубже и звенья крупнее, чем в клипе,
--- поэтому камера чуть ниже цепи и смотрит вверх (~12°): дальние концы дуги опускаются (дуга площе), цепь поднимается
--- относительно кончиков воротников. Расстояние до цепи ≈2.0, vFOV 26.5 (кадр ≈0.94 × 1.67 студа на цепи).
+-- (x 0.28–0.71, верх 0.06, низ дуги ≈0.44; в клипе x 0.28–0.69, 0.08–0.36), острые воротники из верхних углов
+-- к центру, «V» меха по центру почти до низа кадра, атлас пиджака по краям. У нашей цепи дуга глубже, звенья крупнее,
+-- а вырез рубашки короче, чем в клипе, поэтому камера ниже груди и смотрит вверх (~22°): дальние концы дуги
+-- опускаются (дуга площе), цепь поднимается к кончикам воротников, а «V» меха вытягивается к низу кадра
+-- (подбор по совпадению цветовых зон с кадром клипа). Расстояние до цепи ≈2.0, vFOV 22.
 -- «Грув» (наезд/отъезд 1–2.3 %) делает сам конь (tools/anims/S05.luau).
-local CAM = Config.at("Beach", 0, 3.58, -2.55)
-local LOOK = Config.at("Beach", 0, 4.06, 0)
-local FOV = 26.5
+local CAM = Config.at("Beach", 0, 3.25, -2.4)
+local LOOK = Config.at("Beach", 0, 4.2, 0)
+local FOV = 22
 local FOCUS = 2.0 -- дистанция до цепи (плоскость фокуса — цепь и внутренние края воротника)
 
 return {
@@ -37,18 +38,18 @@ return {
 	-- правая половина груди в тени. Заполнение — холодное небо спереди (OutdoorAmbient) даёт атласу королевскую
 	-- синеву; насыщенность +, контраст давит черноту меха, тёплый «грейд» светов.
 	lighting = {
-		sunDir = Vector3.new(0.7, 0.5, 0.45),
+		sunDir = Vector3.new(0.72, 0.55, 0.2),
 		lighting = {
 			Brightness = 5,
-			ExposureCompensation = -0.25,
-			EnvironmentDiffuseScale = 0.5,
-			EnvironmentSpecularScale = 1,
-			Ambient = Color3.fromRGB(40, 44, 76),
-			OutdoorAmbient = Color3.fromRGB(110, 120, 178),
+			ExposureCompensation = -0.2,
+			EnvironmentDiffuseScale = 0.35,
+			EnvironmentSpecularScale = 0.6,
+			Ambient = Color3.fromRGB(30, 32, 56),
+			OutdoorAmbient = Color3.fromRGB(80, 88, 130),
 		},
 		bloom = { Intensity = 1.2, Size = 36, Threshold = 0.9 },
 		sunRays = { Intensity = 0.03, Spread = 0.5 },
-		cc = { Brightness = -0.02, Contrast = 0.3, Saturation = 0.15, TintColor = Color3.fromRGB(255, 246, 238) },
+		cc = { Brightness = -0.02, Contrast = 0.3, Saturation = -0.2, TintColor = Color3.fromRGB(255, 246, 238) },
 		dof = { Enabled = true, FocusDistance = FOCUS, InFocusRadius = 0.6, NearIntensity = 0.5, FarIntensity = 0.25 },
 	},
 	-- Блеск цепи: постоянные мелкие «звёздочки» (эмиттер ChainSparkles на груди коня), всплеск на долю 10,

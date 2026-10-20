@@ -19,16 +19,26 @@ return {
 	finish = 3.8667,
 	set = "Beach",
 	preset = "Beach",
-	-- солнце сзади-справа от камеры (≈35° от оси, высота ≈46°): фронтальный жёсткий свет, правая щека парня в свету;
-	-- глубокая резкость (как на телефоне), без бликов в кадре; контраст выше, насыщенность сдержанная
+	-- солнце сзади-справа от камеры (≈35° от оси, высота ≈47°): фронтальный жёсткий свет, левая щека парня
+	-- (справа в кадре) в свету. Как в S01 (тот же пляж): тёплое солнце на коже, тёплый отсвет песка, холодное небо;
+	-- глубокая резкость (телефон), без бликов; контраст выше, «киношная» насыщенность, чёрные штаны «в ноль»
 	lighting = {
 		sunDir = Vector3.new(-0.4, 0.72, -0.57),
-		lighting = { ExposureCompensation = -0.15, ShadowSoftness = 0.1 },
-		atmosphere = { Glare = 0, Haze = 1.2 },
-		bloom = { Intensity = 0.45, Size = 24, Threshold = 1.0 },
-		sunRays = { Intensity = 0.02 },
-		cc = { Brightness = 0, Contrast = 0.2, Saturation = 0.08, TintColor = Color3.fromRGB(255, 247, 240) },
-		dof = { FarIntensity = 0.06, InFocusRadius = 40 },
+		lighting = {
+			Brightness = 3,
+			ExposureCompensation = -0.4,
+			ShadowSoftness = 0.08,
+			ColorShift_Top = Color3.fromRGB(255, 226, 196),
+			ColorShift_Bottom = Color3.fromRGB(96, 72, 52),
+			OutdoorAmbient = Color3.fromRGB(122, 128, 142),
+			Ambient = Color3.fromRGB(104, 90, 80),
+		},
+		atmosphere = { Density = 0.26, Offset = 0.12, Haze = 0.9, Glare = 0, Color = Color3.fromRGB(140, 170, 196), Decay = Color3.fromRGB(64, 108, 150) },
+		bloom = { Intensity = 0.4, Size = 24, Threshold = 1.1 },
+		sunRays = { Intensity = 0.01, Spread = 0.5 },
+		cc = { Brightness = 0, Contrast = 0.26, Saturation = 0.22, TintColor = Color3.fromRGB(255, 242, 230) },
+		dof = { FarIntensity = 0.04, InFocusRadius = 40 },
+		clouds = { Cover = 0.2, Density = 0.1 },
 	},
 	actors = {
 		-- девушка слева в кадре (+X мира)

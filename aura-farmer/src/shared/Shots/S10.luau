@@ -20,6 +20,8 @@ return {
 		},
 		-- грейд клипа: фиолетово-маджентовый оттенок в светах и полутонах
 		cc = { Brightness = 0.02, Contrast = 0.14, Saturation = 0.18, TintColor = Color3.fromRGB(244, 228, 255) },
+		-- глубокая резкость: статисты в 8–15 студах лишь чуть мягче коня
+		dof = { FarIntensity = 0.12, InFocusRadius = 10 },
 	},
 	actors = {
 		Horse = { char = "Horse", place = Config.place("Gym", 0, HZ, 0), opts = { props = { "dumbbell" } } },
@@ -30,7 +32,7 @@ return {
 		-- тёмноволосая за +X стойкой (видна между рыжей и конём, пояс скрыт стойкой)
 		Rack = {
 			char = "Human",
-			place = Config.place("Gym", 5.6, 6.8, 160),
+			place = Config.place("Gym", 6.6, 7.2, 30),
 			opts = {
 				female = true,
 				height = 0.97,
@@ -55,5 +57,16 @@ return {
 		path = "linear",
 		focus = { actor = "Horse", part = "Head" },
 	},
-	effects = {},
+	-- В клипе нет вспышек/тряски/переходов; размытие движения только на гантели и ногах (полноэкранный Blur
+	-- размыл бы и морду — не используем). Золото ловит блики ключевого света, когда корпус выпрямляется
+	-- на верх подъёма: короткие искры на цепи в верхних стоп-позах (доли 23 и 25).
+	-- (одиночные emit, а не enable: два enable-события одного эмиттера перебивают друг друга)
+	effects = {
+		{ t = 11.64, kind = "emit", name = "ChainSparkles", count = 1 },
+		{ t = 11.71, kind = "emit", name = "ChainSparkles", count = 1 },
+		{ t = 11.78, kind = "emit", name = "ChainSparkles", count = 1 },
+		{ t = 12.62, kind = "emit", name = "ChainSparkles", count = 1 },
+		{ t = 12.69, kind = "emit", name = "ChainSparkles", count = 1 },
+		{ t = 12.76, kind = "emit", name = "ChainSparkles", count = 1 },
+	},
 }
