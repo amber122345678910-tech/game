@@ -27,9 +27,7 @@ function Limbs.build(g, opts)
 		-- ===== Рукав: атласный, «головка» рукава с валиком у подплечника, сужение к манжете =====
 		local SAT = { reflectance = 0.04 }
 		-- корень рукава (шар вокруг плечевого сустава — без щелей при подъёме руки)
-		g:ell(UA, V(sx, S.shoulderY - 0.17, 0.06), V(0.6, 0.6, 0.78), P.suit, "SmoothPlastic")
-		-- головка рукава: «валик» под краем подплечника
-		g:ell(UA, V(sx + s * 0.02, S.shoulderY - 0.16, 0.06), V(0.66, 0.44, 0.84), P.suit:Lerp(P.suitLight, 0.12), "SmoothPlastic")
+		g:ell(UA, V(sx, S.shoulderY - 0.15, 0.06), V(0.62, 0.62, 0.68), P.suit, "SmoothPlastic")
 		-- верхний рукав: прямой цилиндр (крой рукава, без «надутого шара»)
 		g:cylSeg(UA, V(sx, S.shoulderY - 0.06, 0.06), V(sx, elbowY, 0.05), 0.6, P.suit, "SmoothPlastic", { reflectance = 0.04, name = "Sleeve" })
 		-- локоть: шар чуть меньше рукава (без перетяжки при сгибе)
@@ -81,7 +79,7 @@ function Limbs.build(g, opts)
 			local tone = if fi % 2 == 0 then fur else fur:Lerp(light, 0.25)
 			-- основание пальца и костяшка (выпуклость на тыльной стороне)
 			g:ell(HD, V(sx, baseY + 0.02, z), V(t * 0.95, w * 1.1, w * 1.02), tone, "SmoothPlastic")
-			g:ell(HD, V(sx + s * 0.07, baseY + 0.035, z), V(0.11, 0.13, w * 0.8), fur:Lerp(light, 0.4), "SmoothPlastic", nil, { name = "Knuckle" })
+			g:ell(HD, V(sx + s * 0.06, baseY + 0.03, z), V(0.1, 0.15, w * 0.9), fur:Lerp(light, 0.25), "SmoothPlastic", nil, { name = "Knuckle" })
 			-- основная фаланга (концы заходят за суставы — без «перетяжек»)
 			g:ellSeg(b1, V(sx, baseY + 0.09, z), V(sx, baseY - l1 - 0.09, z), t, w, tone, "SmoothPlastic", V(0, 0, -1))
 			-- средний сустав: шар чуть тоньше пальца (виден только на сгибе)
@@ -154,11 +152,12 @@ function Limbs.build(g, opts)
 		g:ball(UL, hip + V(0, 0.02, 0), 0.74, J, "Fabric")
 		g:cylSeg(UL, hip + V(0, 0.02, 0.01), knee, 0.7, J, "Fabric", { name = "Thigh" })
 		g:ball(UL, knee, 0.66, J, "Fabric")
-		-- голень: прямая труба, затем клёш — ступенчатые цилиндры, расширяются к подолу
-		g:cylSeg(LL, knee, V(hx, 0.75, -0.01), 0.64, J, "Fabric")
-		g:cylSeg(LL, V(hx, 0.77, -0.012), V(hx, 0.55, -0.016), 0.68, J, "Fabric")
-		g:cylSeg(LL, V(hx, 0.57, -0.016), V(hx, 0.4, -0.02), 0.73, J, "Fabric")
-		g:cylSeg(LL, V(hx, 0.42, -0.02), V(hx, 0.25, -0.025), 0.79, J, "Fabric")
+		-- голень: прямая труба, затем клёш — частые ступени цилиндров (уступы ~0.012, читаются как плавный конус)
+		g:cylSeg(LL, knee, V(hx, 0.86, -0.01), 0.64, J, "Fabric")
+		local steps = { { 0.88, 0.7, 0.665 }, { 0.72, 0.58, 0.69 }, { 0.6, 0.48, 0.715 }, { 0.5, 0.39, 0.74 }, { 0.41, 0.32, 0.765 }, { 0.34, 0.25, 0.79 } }
+		for _, st in steps do
+			g:cylSeg(LL, V(hx, st[1], -0.012), V(hx, st[2], -0.025), st[3], J, "Fabric")
+		end
 		-- подол: подшивка (чуть темнее) и тёмная внутренность штанины
 		g:cylSeg(LL, V(hx, 0.27, -0.025), V(hx, 0.24, -0.025), 0.81, P.jeansDark, "Fabric")
 		g:cylSeg(LL, V(hx, 0.255, -0.025), V(hx, 0.235, -0.025), 0.7, P.jeansDark:Lerp(P.shoe, 0.6), "Fabric")

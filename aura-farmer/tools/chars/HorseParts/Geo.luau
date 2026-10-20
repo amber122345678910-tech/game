@@ -236,11 +236,29 @@ function Geo:trap(bone, frame, v0, v1, L0, L1, R0, R1, thick, color, mat, zoff, 
 end
 
 -- Прямоугольный треугольник в 3D: прямой угол в R, катеты к A и B. Клин толщиной thick.
+-- self.triGrow > 0: треугольник раздувается наружу на эту величину (соседние клинья одной плоскости
+-- перекрываются — без светлых «швов» по общим рёбрам; только для непрозрачных деталей одного цвета).
 function Geo:rtri3(bone, R, A, B, thick, color, mat, extra)
 	local ya, zb = A - R, B - R
 	local h, w = ya.Magnitude, zb.Magnitude
 	if h < 1e-4 or w < 1e-4 then
 		return nil
+	end
+	local e = self.triGrow
+	if e and e > 0 then
+		local c = (A - B).Magnitude
+		local r = (h + w - c) / 2
+		if r > 1e-5 then
+			local I = R + ya / h * r + zb / w * r
+			-- смещение вершин не больше 2e (острые углы не вытягиваются в «иглы»)
+			local far = math.max((R - I).Magnitude, (A - I).Magnitude, (B - I).Magnitude)
+			local k = 1 + math.min(e / r, 2 * e / far)
+			R = I + (R - I) * k
+			A = I + (A - I) * k
+			B = I + (B - I) * k
+			ya, zb = A - R, B - R
+			h, w = ya.Magnitude, zb.Magnitude
+		end
 	end
 	local Y = ya / h
 	local Z = -(zb / w)

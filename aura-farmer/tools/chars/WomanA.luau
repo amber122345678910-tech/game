@@ -24,6 +24,7 @@ return function(opts)
 		nose = 0.88,
 		hair = rgb(108, 72, 50),
 		hairHighlight = rgb(214, 180, 130),
+		hairCrown = rgb(188, 160, 124), -- пепельно-светлые макушка и чёлка (S07)
 		hairStyle = "shag",
 		top = rgb(244, 242, 238),
 		topStyle = "crop",

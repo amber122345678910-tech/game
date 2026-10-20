@@ -85,7 +85,7 @@ Head.MOUTH_TILT = 14 -- (при TILT0) передние зубы смотрят 
 Head.MF = RM * CFrame.new(V(0, 5.2, -1.52)) * CFrame.Angles(rad(-Head.MOUTH_TILT), 0, 0)
 Head.LOWER_LIP_PIVOT = RM * V(0, 5.08, -1.46)
 -- канал grin для нижней губы (при grin = 1, char space): вниз и наружу, кромка выворачивается
-Head.LOWER_LIP_GRIN = { pos = V(0, -0.06, -0.012), rot = V(-8, 0, 0) }
+Head.LOWER_LIP_GRIN = { pos = V(0, -0.03, -0.01), rot = V(-8, 0, 0) }
 -- зубная дуга (верхняя): полуширина, глубина, центр (в MF)
 Head.AX, Head.AZ, Head.Z0 = 0.31, 0.44, 0.44
 
@@ -166,6 +166,7 @@ end
 -- Губа — лента из сплющенных эллипсоидов вдоль дуги: высота hf(k) (вертикально в системе рта), толщина wf(k);
 -- k = 0 в центре, 1 — в уголке. Концы сегментов перекрываются.
 local function lipBand(g, bone, pts, hf, wf, color)
+	-- губа: частые сплющенные эллипсоиды вдоль дуги с большим перекрытием (провал на стыках ~2%, без «бусин»)
 	local n = #pts
 	local up = (Head.MF - Head.MF.Position) * V(0, 1, 0)
 	for i = 1, n - 1 do
@@ -175,9 +176,14 @@ local function lipBand(g, bone, pts, hf, wf, color)
 		if l > 1e-4 then
 			local u = d / l
 			local km = math.abs((i + 0.5) - (n + 1) / 2) / ((n - 1) / 2)
-			local h, w = hf(km), wf(km)
-			local ext = l * 1.0
-			g:ellSeg(bone, a - u * ext, b + u * ext, w, h, color, "SmoothPlastic", up, { name = "Lip" })
+			local ext = l * 1.8
+			if i == 1 then
+				a += u * l * 0.9
+			end
+			if i == n - 1 then
+				b -= u * l * 0.9
+			end
+			g:ellSeg(bone, a - u * ext, b + u * ext, wf(km), hf(km), color, "SmoothPlastic", up, { name = "Lip" })
 		end
 	end
 end
@@ -222,8 +228,8 @@ function Head.build(g, opts)
 	Head.setMap(g)
 	-- Форма морды — несколько длинных базовых объёмов вдоль линии морды (гладкие поверхности),
 	-- цветовые зоны — «оболочки»: копия объёма, сдвинутая назад/вбок, выглядывает только по краям.
-	g:ell("Head", V(0, 7.0, 0.0), V(1.16, 0.82, 1.04), P.forehead, "SmoothPlastic", nil, { name = "Skull" })
-	g:ell("Head", V(0, 6.8, 0.18), V(0.96, 0.92, 0.8), P.neck, "SmoothPlastic") -- затылок
+	g:ell("Head", V(0, 6.95, 0.0), V(1.12, 0.78, 1.0), P.forehead, "SmoothPlastic", nil, { name = "Skull" })
+	g:ell("Head", V(0, 6.74, 0.16), V(0.92, 0.86, 0.78), P.neck, "SmoothPlastic") -- затылок
 	g:ell("Head", flCF(-0.5, -0.34), V(1.28, 1.02, 0.72), P.forehead, "SmoothPlastic", nil, { name = "Forehead" })
 	-- B1: верх морды (глаза, скулы) — тёплый рыже-коричневый
 	g:ell("Head", flCF(0.08, -0.46), V(1.36, 1.2, 0.9), P.warm, "SmoothPlastic", nil, { name = "Face" })
@@ -238,7 +244,7 @@ function Head.build(g, opts)
 	g:ell("Head", flCF(0.88, -0.64), V(0.88, 0.74, 0.7), P.cheek:Lerp(P.jowl, 0.35), "SmoothPlastic", nil, { castShadow = false })
 	-- скулы под глазами: тёплые, переходят в седину
 	for _, s in { 1, -1 } do
-		g:ell("Head", flCF(0.3, -0.5, s * 0.36, 0, s * -18, 0), V(0.5, 0.74, 0.62), P.warm:Lerp(P.cheek, 0.45), "SmoothPlastic")
+		g:ell("Head", flCF(0.26, -0.52, s * 0.36, 0, s * -18, 0), V(0.44, 0.62, 0.56), P.warm:Lerp(P.cheek, 0.45), "SmoothPlastic")
 		-- пряди по краю щеки: лежат по поверхности, торчат только кончики (вниз-назад)
 		for i, t in { 0.4, 0.62, 0.84 } do
 			local base = fl(t, -0.56, s * (0.45 - t * 0.09))
@@ -248,7 +254,7 @@ function Head.build(g, opts)
 	end
 	-- боковые плоскости головы: от глаза вниз-назад к углу челюсти (переход морда -> ганаши)
 	for _, s in { 1, -1 } do
-		g:ell("Head", flCF(0.5, -0.86, s * 0.3, 0, s * -6, 0), V(0.5, 1.44, 1.14), P.jowl:Lerp(P.warm, 0.3), "SmoothPlastic", nil, { name = "SidePlane" })
+		g:ell("Head", flCF(0.42, -0.92, s * 0.3, 0, s * -6, 0), V(0.48, 1.26, 1.1), P.jowl:Lerp(P.warm, 0.3), "SmoothPlastic", nil, { name = "SidePlane" })
 	end
 
 	-- ===================== ГЛАЗА =====================
@@ -278,7 +284,7 @@ function Head.build(g, opts)
 	for _, s in { 1, -1 } do
 		local ear = if s == 1 then "RightEar" else "LeftEar"
 		local base = DP(ear)
-		local tip = base + V(s * 0.12, 0.76, 0.02)
+		local tip = base + V(s * 0.12, 0.7, 0.02)
 		local outA = V(s * 0.55, 0.1, 1).Unit -- наружная (задняя) сторона уха
 		g:ellSeg(ear, base + V(0, -0.14, 0.03), tip, 0.36, 0.23, P.earOut, "SmoothPlastic", outA)
 		g:ellSeg(ear, base:Lerp(tip, 0.45), tip + V(s * 0.012, 0.05, 0.0), 0.21, 0.15, P.earOut:Lerp(P.earTip, 0.45), "SmoothPlastic", outA)
@@ -292,16 +298,16 @@ function Head.build(g, opts)
 	-- ===================== КОК (чёрный глянцевый помпадур между ушами, зачёсан назад) =====================
 	local mp = DP("Mane")
 	-- основание кока лежит на темени (наполовину внутри черепа)
-	g:ell("Mane", mp + V(0, -0.04, 0.06), V(0.46, 0.3, 0.76), P.mane, "SmoothPlastic")
-	-- три широкие пряди, зачёсанные назад от лба (средняя — с бликом), выгнуты дугой по темени
-	for i, x in { -0.11, 0, 0.11 } do
-		local h = if i == 2 then 0.2 else 0.14
-		g:ellSeg("Mane", mp + V(x, 0.1, -0.42), mp + V(x * 1.3, h, 0.06), 0.24, 0.2, if i == 2 then P.maneHi else P.mane, "SmoothPlastic", V(0, 1, 0))
-		g:ellSeg("Mane", mp + V(x * 1.3, h, -0.06), mp + V(x * 1.4, -0.02, 0.42), 0.22, 0.16, P.mane, "SmoothPlastic", V(0, 1, 0))
+	g:ell("Mane", mp + V(0, -0.1, 0.04), V(0.52, 0.28, 0.82), P.mane, "SmoothPlastic")
+	-- кок: густая прядь поднимается от темени вверх-вперёд (глянцевый «помпадур»)
+	g:ellSeg("Mane", mp + V(0, -0.02, 0.24), mp + V(0, 0.34, -0.34), 0.44, 0.34, P.mane, "SmoothPlastic", V(0, 1, 0.3), { name = "Pompadour" })
+	g:ellSeg("Mane", mp + V(0.03, 0.12, 0.26), mp + V(0.05, 0.42, -0.24), 0.24, 0.16, P.maneHi, "SmoothPlastic", V(0, 1, 0.3))
+	-- боковые пряди, зачёсаны назад
+	for _, x in { -0.15, 0.15 } do
+		g:ellSeg("Mane", mp + V(x, -0.04, 0.28), mp + V(x * 1.3, 0.22, -0.3), 0.22, 0.16, P.mane, "SmoothPlastic", V(0, 1, 0.3))
 	end
-	-- чёлка-завиток: валик над лбом и прядь, падающая вперёд
-	g:ellSeg("Mane", mp + V(0.0, 0.16, -0.5), mp + V(0.04, 0.2, -0.18), 0.3, 0.22, P.mane, "SmoothPlastic", V(0, 1, 0))
-	g:ellSeg("Mane", mp + V(0.04, 0.2, -0.46), mp + V(0.1, 0.0, -0.66), 0.14, 0.11, P.mane:Lerp(P.maneHi, 0.5), "SmoothPlastic")
+	-- чёлка: кончик кока загибается вперёд-вниз над лбом
+	g:ellSeg("Mane", mp + V(0.04, 0.34, -0.34), mp + V(0.1, 0.12, -0.56), 0.16, 0.12, P.mane:Lerp(P.maneHi, 0.5), "SmoothPlastic")
 
 	-- ===================== НОС: мягкая угольная «подушка» и ноздри-полумесяцы =====================
 	g:ell("Head", flCF(1.03 + Head.SL, -0.24, 0, -8, 0, 0), V(0.72, 0.6, 0.62), P.muzzle, "SmoothPlastic", nil, { name = "Muzzle" })
@@ -320,8 +326,7 @@ function Head.build(g, opts)
 		-- внутренняя складка (закрывает внутренне-верхний край — форма полумесяца)
 		g:ell("Head", ncf * CFrame.new(-s * 0.055, 0.05, 0.012) * CFrame.Angles(0, 0, rad(s * 8)), V(0.11, 0.28, 0.09), P.muzzle, "SmoothPlastic")
 		-- наружный валик: пологая выпуклость вокруг ноздри (почти утоплена в нос)
-		g:ell("Head", ncf * CFrame.new(s * 0.095, -0.04, 0.045) * CFrame.Angles(0, 0, rad(-s * 6)), V(0.12, 0.4, 0.12), P.nosePad:Lerp(P.nostrilRim, 0.5), "SmoothPlastic")
-		g:ell("Head", ncf * CFrame.new(s * 0.02, 0.17, 0.05), V(0.19, 0.1, 0.1), P.nosePad:Lerp(P.nostrilRim, 0.5), "SmoothPlastic")
+		g:ell("Head", ncf * CFrame.new(s * 0.09, -0.04, 0.05) * CFrame.Angles(0, 0, rad(-s * 6)), V(0.1, 0.38, 0.08), P.nosePad:Lerp(P.nostrilRim, 0.5), "SmoothPlastic")
 	end
 
 	-- ===================== РОТ: верх (кость Head) =====================
@@ -331,7 +336,7 @@ function Head.build(g, opts)
 	-- задняя стенка рта и щёки изнутри (видны, когда челюсть открыта; при закрытом рте — внутри челюсти)
 	g:ell("Head", Head.MF * CFrame.new(0, -0.18, 0.66), V(0.5, 0.6, 0.22), P.mouthIn:Lerp(P.throat, 0.5), "SmoothPlastic", nil, { castShadow = false })
 	for _, s in { 1, -1 } do
-		g:ell("Head", Head.MF * CFrame.new(s * 0.21, -0.14, 0.5), V(0.08, 0.38, 0.46), P.mouthIn:Lerp(P.throat, 0.25), "SmoothPlastic", nil, { castShadow = false })
+		g:ell("Head", Head.MF * CFrame.new(s * 0.19, -0.14, 0.56), V(0.07, 0.36, 0.4), P.mouthIn:Lerp(P.throat, 0.6), "SmoothPlastic", nil, { castShadow = false })
 	end
 	g:caps("Head", archPts(AX - 0.012, AZ - 0.014, Z0, -84, 84, 14, function(phi)
 		return biteY(phi) + 0.21 - 0.07 * (math.abs(phi) / 90)
@@ -356,7 +361,7 @@ function Head.build(g, opts)
 		-- боковины нижней челюсти: от углов рта назад к ганашам
 		g:ellSeg("Jaw", Head.mf(s * 0.27, -0.24, 0.22), V(s * 0.36, 5.62, -0.18), 0.4, 0.8, P.jowl, "SmoothPlastic", V(0, 1, 0))
 		-- ганаши: округлые «щёки» сзади-снизу, под ушами
-		g:ell("Jaw", V(s * 0.38, 5.8, -0.14), V(0.42, 0.78, 0.78), P.jowl:Lerp(P.neck, 0.3), "SmoothPlastic", V(-14, 0, 0), { name = "Ganache" })
+		g:ell("Jaw", V(s * 0.36, 5.86, -0.08), V(0.38, 0.72, 0.76), P.jowl:Lerp(P.neck, 0.3), "SmoothPlastic", V(-14, 0, 0), { name = "Ganache" })
 	end
 
 	-- уголки рта: «перепонка» на челюсти — верх спрятан за верхней губой, при открытии рта уголок не рвётся
@@ -372,18 +377,19 @@ function Head.build(g, opts)
 	local llp = Head.LOWER_LIP_PIVOT
 	local llpC = Head.map(llp)
 	rig:joint("LowerLip", "Jaw", llpC, llpC, V(0.2, 0.2, 0.2))
-	local llip = archPts(AX + 0.03, AZ + 0.035, Z0, -88, 88, 16, function(phi)
+	-- в покое (grin = 0) верх губы — у середины нижних зубов: при открытой челюсти они видны и без канала grin
+	local llip = archPts(AX + 0.018, AZ + 0.022, Z0, -88, 88, 11, function(phi)
 		local k = math.abs(phi) / 88
-		return biteY(phi) - 0.085 + 0.06 * k * k * k
+		return biteY(phi) - 0.13 + 0.07 * k * k * k
 	end, 0)
 	lipBand(g, "LowerLip", llip, function(k)
-		return 0.13 - 0.06 * k * k
+		return 0.12 - 0.05 * k * k
 	end, function(k)
-		return 0.085 - 0.03 * k * k
+		return 0.075 - 0.025 * k * k
 	end, P.lip)
 
 	-- ===================== ВЕРХНЯЯ ГУБА (UpperLip) =====================
-	local ulip = archPts(AX + 0.025, AZ + 0.03, Z0, -88, 88, 16, function(phi)
+	local ulip = archPts(AX + 0.025, AZ + 0.03, Z0, -88, 88, 11, function(phi)
 		local k = math.abs(phi) / 88
 		return biteY(phi) + 0.1 - 0.1 * k * k * k
 	end, 0)
