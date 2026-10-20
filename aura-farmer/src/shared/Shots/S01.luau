@@ -4,23 +4,13 @@ local Config = require(script.Parent.Parent:WaitForChild("Config"))
 
 -- Камера смотрит на город (+Z): +X мира — СЛЕВА в кадре. pan > 0 — поворот вправо по кадру (к -X),
 -- pitch > 0 — вверх, roll < 0 — «по часовой» (горизонт поднимается к правому краю кадра).
--- Ключ задаётся кадрированием: точка AIM (центр головы) должна оказаться в точке кадра (sx, sy)
--- (доли ширины/высоты, 0,0 — левый верх) на расстоянии dist по лучу; ориентация — pan/pitch/roll.
--- Точка постановки (зона постановки декорации у (0,0,0); вокруг неё — следы и вмятины на песке).
+-- Ключ: позиция камеры (локально в декорации, x/y/z) + ориентация pan/pitch/roll. Позиции решены по кадрам клипа
+-- (ближний глаз, макушка, низ бороды; pitch — по высоте горизонта) и сглажены в ровный наезд.
 local SX, SZ = 0, 0
-local AIM = Config.at("Beach", SX + 0.1, 3.3, SZ)
-local ASPECT = 16 / 9
-local function camKey(t: number, sx: number, sy: number, dist: number, pan: number, pitch: number, roll: number, fov: number, ease: string?): any
-	local p, w, r = math.rad(pitch), math.rad(pan), math.rad(roll)
+local function camKey(t: number, x: number, y: number, z: number, pan: number, pitch: number, roll: number, fov: number, ease: string?): any
+	local p, w = math.rad(pitch), math.rad(pan)
 	local look = Vector3.new(-math.sin(w) * math.cos(p), math.sin(p), math.cos(w) * math.cos(p))
-	local right = look:Cross(Vector3.new(0, 1, 0)).Unit
-	local up = right:Cross(look).Unit
-	-- крен как в CameraTrack: lookAt(...) * CFrame.Angles(0, 0, roll)
-	local rx = right * math.cos(r) + up * math.sin(r)
-	local ry = up * math.cos(r) - right * math.sin(r)
-	local th = math.tan(math.rad(fov) / 2)
-	local ray = (look + rx * ((2 * sx - 1) * th * ASPECT) + ry * ((1 - 2 * sy) * th)).Unit
-	local pos = AIM - ray * dist
+	local pos = Config.at("Beach", SX + x, y, SZ + z)
 	return { t = t, pos = pos, look = pos + look * 10, fov = fov, roll = roll, ease = ease }
 end
 
@@ -35,16 +25,19 @@ return {
 	lighting = {
 		sunDir = Vector3.new(0.42, 0.85, -0.32),
 		lighting = {
-			Brightness = 3.0,
-			ExposureCompensation = -0.15,
+			Brightness = 2.3,
+			ExposureCompensation = -0.7,
 			ShadowSoftness = 0.05,
-			OutdoorAmbient = Color3.fromRGB(118, 128, 148),
-			Ambient = Color3.fromRGB(94, 100, 112),
+			-- тёплое солнце на коже (в клипе ≈5600K, без «бледности»), тёплый отсвет песка снизу, холодное небо
+			ColorShift_Top = Color3.fromRGB(255, 226, 196),
+			ColorShift_Bottom = Color3.fromRGB(96, 72, 52),
+			OutdoorAmbient = Color3.fromRGB(120, 126, 140),
+			Ambient = Color3.fromRGB(112, 94, 80),
 		},
-		atmosphere = { Density = 0.28, Offset = 0.15, Haze = 1.1, Glare = 0, Color = Color3.fromRGB(199, 214, 224), Decay = Color3.fromRGB(84, 124, 168) },
+		atmosphere = { Density = 0.26, Offset = 0.12, Haze = 0.9, Glare = 0, Color = Color3.fromRGB(118, 156, 184), Decay = Color3.fromRGB(64, 108, 150) },
 		bloom = { Intensity = 0.45, Size = 28, Threshold = 1.1 },
 		sunRays = { Intensity = 0.01, Spread = 0.5 },
-		cc = { Brightness = 0, Contrast = 0.26, Saturation = 0.26, TintColor = Color3.fromRGB(255, 244, 232) },
+		cc = { Brightness = 0, Contrast = 0.24, Saturation = 0.2, TintColor = Color3.fromRGB(255, 240, 228) },
 		dof = { Enabled = true, FarIntensity = 0.42, NearIntensity = 0, InFocusRadius = 1.8, FocusDistance = 4.6 },
 		clouds = { Cover = 0.22, Density = 0.12 },
 	},
@@ -54,7 +47,7 @@ return {
 		-- друг полулёжа на локтях позади-справа по кадру (не в фокусе), ноги к камере и вправо
 		Friend = {
 			char = "Human",
-			place = Config.place("Beach", SX - 6.2, SZ + 7.95, 40),
+			place = Config.place("Beach", SX - 4.8, SZ + 10.6, 40),
 			opts = {
 				skin = Color3.fromRGB(214, 162, 140),
 				hair = Color3.fromRGB(42, 26, 20),
@@ -74,13 +67,13 @@ return {
 	},
 	camera = {
 		keys = {
-			-- кадрирование сверено с клипом: макушка/подбородок/горизонт; наезд ~12%, подъём взгляда 2.6° -> 5.9°
-			camKey(0, 0.447, 0.35, 4.90, 0, 2.6, -1, 34, "linear"),
-			camKey(0.3, 0.437, 0.38, 4.80, 0.35, 3.2, -1.1, 34, "linear"),
-			camKey(0.633, 0.405, 0.44, 4.65, 0.85, 4.2, -1.2, 34, "linear"),
-			camKey(0.8, 0.39, 0.455, 4.55, 1.0, 5.0, -1.25, 34, "linear"),
-			camKey(1.0, 0.38, 0.47, 4.52, 1.3, 5.6, -1.3, 34, "linear"),
-			camKey(1.4333, 0.375, 0.465, 4.48, 1.5, 5.9, -1.3, 34, "linear"),
+			-- наезд ~0.3 студа с подъёмом взгляда (горизонт 0.55 -> 0.65 кадра) и панорамой вправо 1.5°
+			camKey(0, -0.227, 3.10, -4.945, 0, 1.75, -1, 34),
+			camKey(0.3, -0.27, 3.17, -4.91, 0.35, 2.45, -1.1, 34),
+			camKey(0.633, -0.33, 3.22, -4.81, 0.85, 3.15, -1.2, 34),
+			camKey(0.8, -0.39, 3.20, -4.74, 1.0, 4.2, -1.25, 34),
+			camKey(1.0, -0.44, 3.17, -4.66, 1.3, 4.54, -1.3, 34),
+			camKey(1.4333, -0.455, 3.13, -4.59, 1.5, 5.07, -1.3, 34),
 		},
 		shake = { rot = 0.2, pos = 0.012, freq = 1.6, seed = 11 },
 		focus = { actor = "Man", part = "Head" },

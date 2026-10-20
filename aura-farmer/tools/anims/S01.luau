@@ -8,7 +8,7 @@
 
 -- ===== Геометрия очков (Man: height 1.04, R головы 0.6; см. tools/chars/Human.luau) =====
 local H = 1.04
-local HC = (4.05 + 0.74) * H -- центр головы (поза покоя)
+local HC = (4.62 + 0.92) * H -- центр головы (поза покоя) = rig.headCenter.Y
 local G_HOME = { 0, HC, 0.6 + 0.075 } -- переносица {x, y, f} = опора сустава Glasses
 
 -- Точка оправы (локально от переносицы {x, y, f}) в осях головы при смещении очков g = { y, f, rx }.
@@ -30,12 +30,12 @@ end
 -- большой палец — под внешним краем стекла. Кисть стоит почти вертикально (тыльная сторона к камере),
 -- запястье ниже и правее по кадру. Направления — в осях головы (IK space = "head").
 -- (ориентация подобрана по направлениям «запястье -> костяшки -> кончик» на кадрах клипа)
-local PALM = { 0.526, -0.132, -0.833 }
-local FING = { 0.464, 0.877, 0.157 }
+local PALM = { 0.15, -0.2, -0.97 }
+local FING = { 0.3, 0.9, 0.1 }
 -- смещение «запястье -> кончик указательного» для PINCH при PALM/FING (замерено на риге)
-local TIPS = { 0.235, 0.577, -0.249 }
+local TIPS = { 0.040, 0.660, -0.243 }
 local GRIP = { -0.39, 0.1, 0.02 } -- точка хвата на оправе (от переносицы): верх внешнего угла стекла у петли
-local POLE = { -0.1, -1, 0.35 } -- локоть вниз и вперёд (к камере), из кадра справа снизу
+local POLE = { 0.3, -1, 0.45 } -- локоть вниз и вперёд (к камере), из кадра справа снизу
 
 -- Цель IK запястья: хват на оправе (едет с очками) минус смещение кончиков (поворачивается с оправой).
 -- d — смещение от позиции хвата (оси головы), для подлёта.
@@ -53,12 +53,12 @@ end
 
 -- Доп. суставы: очки + верхняя губа чуть опущена (рот «О» без зубов, как в клипе).
 local function glasses(g)
-	return { Glasses = { y = g.y or 0, f = g.f or 0, rx = g.rx or 0 }, UpperLip = { y = -0.018, f = 0.008 }, Mouth = { y = 0.05, f = 0.004 } }
+	return { Glasses = { y = g.y or 0, f = g.f or 0, rx = g.rx or 0 } }
 end
 
 -- Сидит на песке: таз опущен, колени согнуты, правая рука опирается о песок сбоку.
 local function seat(bend, dy, f)
-	return { y = -1.66 + (dy or 0), bend = bend, f = f or 0 }
+	return { y = -2.08 + (dy or 0), bend = bend, f = f or 0 }
 end
 -- правая рука опирается ладонью о песок у бедра (вне кадра, видно только плечо)
 local R_ARM = { ik = { 1.7, 0.35, 0.25 }, pole = { 1, 0, -0.2 }, wrist = { palm = { 0.1, -1, 0 }, fingers = { 0.25, 0, 1 } } }
@@ -67,8 +67,8 @@ local L_LEG = { ik = { -0.85, 0.28, 1.85 }, pole = { -0.4, 1, 1 } }
 
 -- Пальцы: «когти» на подлёте, щипок на оправе, дожим (squash) в момент контакта.
 local CLAW = { index = 0.3, middle = 0.36, ring = 0.52, pinky = 0.6, thumb = 0.5, thumbOut = 0.45, spread = 0.25 }
-local PINCH = { index = 0.45, middle = 0.5, ring = 0.7, pinky = 0.8, thumb = 0.85, thumbOut = 0.25, spread = 0.1 }
-local PRESS = { index = 0.5, middle = 0.55, ring = 0.73, pinky = 0.83, thumb = 0.9, thumbOut = 0.22, spread = 0.08 }
+local PINCH = { index = 0.4, middle = 0.5, ring = 0.6, pinky = 0.65, thumb = 0.7, thumbOut = 0.5, spread = 0.05 }
+local PRESS = { index = 0.45, middle = 0.55, ring = 0.64, pinky = 0.68, thumb = 0.75, thumbOut = 0.48, spread = 0.04 }
 
 -- Очки: на месте -> на кончике носа (вниз, чуть вперёд, верх оправы наклонён от лица).
 local G0 = { y = 0, f = 0, rx = 0 }
@@ -78,7 +78,7 @@ local function gl(k)
 end
 
 -- Голова: поворот шеи (к его левому плечу), кивок (+ вниз), наклон к правому плечу.
-local TURN = 18
+local TURN = 30
 local function neck(nod, turn, tilt)
 	return { nod = nod, turn = TURN + (turn or 0), tilt = tilt or 5 }
 end
@@ -88,7 +88,7 @@ end
 -- Веки чуть приоткрыты (blink < 0): в клипе глаза над оправой широко открыты.
 local function face(jaw, knit, squint, look, up)
 	return {
-		jaw = 0.15 + jaw * 1.2,
+		jaw = 0.05 + jaw * 1.0,
 		oh = 1,
 		frown = math.min(1, knit * 1.5),
 		brows = -0.25 * knit,
@@ -166,9 +166,9 @@ return {
 		local function k(t, breath)
 			return {
 				t = t,
-				root = { y = -1.72, bend = -62 + breath * 0.6 },
+				root = { y = -2.1, bend = -70 + breath * 0.6 },
 				waist = { bend = -2 + breath * 0.8, turn = -10 },
-				neck = { nod = 50, turn = -25, tilt = -6 },
+				neck = { nod = 58, turn = -25, tilt = -6 },
 				rArm = { ik = { 1.45, 0.28, -0.55 }, pole = { 0.3, -1, -1 } },
 				lArm = { ik = { -1.45, 0.28, -0.5 }, pole = { -0.3, -1, -1 } },
 				rLeg = { ik = { 0.6, 0.24, 2.0 }, pole = { 0, 1, 0.4 } },

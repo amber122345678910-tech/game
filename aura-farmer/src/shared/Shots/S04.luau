@@ -17,7 +17,7 @@ end
 
 local FOV = 38.5
 local CAM = at(3.52, 3.89, 3.76)
-local LOOK = at(-0.1, 5.45, 0.2)
+local LOOK = at(-0.1, 5.5, 0.2)
 -- базис камеры (вручную: CFrame.lookAt в Lune-превью транспонирован)
 local FWD = (LOOK - CAM).Unit
 local RIGHT = FWD:Cross(Vector3.new(0, 1, 0)).Unit
@@ -31,9 +31,9 @@ local function screenDir(x: number, y: number): Vector3
 	return (FWD + RIGHT * nx + UP * ny).Unit
 end
 
--- микро-толчок камеры на кадре хлыста: сдвиг ≈0.02 студа и поворот ≈0.35° (фон смещается ≈0.6% ширины кадра)
+-- микро-толчок камеры на кадре хлыста: сдвиг ≈0.02 студа и поворот ≈0.4° (фон смещается ≈0.6% ширины кадра)
 local JOLT = CAM + RIGHT * 0.02
-local JOLT_LOOK = LOOK + RIGHT * 0.035
+local JOLT_LOOK = LOOK + RIGHT * 0.055
 -- «живой» дрейф: за 4.07–4.97 камера едва заметно поворачивает влево (фон ползёт вправо ≈0.2°)
 local LOOK_DRIFT = LOOK - RIGHT * 0.016
 
@@ -62,7 +62,7 @@ return {
 			Color = Color3.fromRGB(201, 214, 227),
 			Decay = Color3.fromRGB(95, 134, 166),
 			Glare = 0.7,
-			Haze = 1.2,
+			Haze = 1.0,
 		},
 		bloom = { Intensity = 1.2, Size = 56, Threshold = 0.9 },
 		sunRays = { Intensity = 0.06, Spread = 0.9 },
@@ -79,11 +79,11 @@ return {
 		keys = {
 			{ t = 3.8667, pos = CAM, look = LOOK, fov = FOV, blur = 0, ease = "linear" },
 			-- хлыст: смаз (BlurEffect) и микро-толчок на один кадр
-			{ t = 3.8833, pos = CAM, look = LOOK, fov = FOV, blur = 3, ease = "linear" },
-			{ t = 3.9, pos = JOLT, look = JOLT_LOOK, fov = FOV, blur = 6, ease = "linear" },
-			{ t = 3.9333, pos = CAM, look = LOOK, fov = FOV, blur = 5, ease = "linear" },
-			{ t = 3.9667, pos = CAM, look = LOOK, fov = FOV, blur = 2.5, ease = "linear" },
-			{ t = 4.0, pos = CAM, look = LOOK, fov = FOV, blur = 1, ease = "linear" },
+			{ t = 3.8833, pos = CAM, look = LOOK, fov = FOV, blur = 2, ease = "linear" },
+			{ t = 3.9, pos = JOLT, look = JOLT_LOOK, fov = FOV, blur = 7, ease = "linear" },
+			{ t = 3.9333, pos = CAM, look = LOOK, fov = FOV, blur = 6, ease = "linear" },
+			{ t = 3.9667, pos = CAM, look = LOOK, fov = FOV, blur = 3, ease = "linear" },
+			{ t = 4.0, pos = CAM, look = LOOK, fov = FOV, blur = 1.2, ease = "linear" },
 			{ t = 4.0333, pos = CAM, look = LOOK, fov = FOV, blur = 0, ease = "linear" },
 			-- «живой» дрейф: едва заметная панорама влево до склейки
 			{ t = 4.0667, pos = CAM, look = LOOK, fov = FOV, blur = 0, ease = "Sine_InOut" },
@@ -93,6 +93,6 @@ return {
 	},
 	effects = {
 		-- очки ловят солнце на хлысте: короткий тёплый «блик» (лёгкая вспышка кадра)
-		{ t = 3.8833, dur = 0.1, kind = "flash", color = Color3.fromRGB(255, 244, 222), from = 0.9, to = 1, ease = "out" },
+		{ t = 3.895, dur = 0.075, kind = "flash", color = Color3.fromRGB(255, 240, 214), from = 0.82, to = 1, ease = "out" },
 	},
 }

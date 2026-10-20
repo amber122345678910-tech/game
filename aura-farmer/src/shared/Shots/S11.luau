@@ -14,12 +14,12 @@ local ARC = {
 	center = Vector3.new(0, 0, 0.2),
 	az0 = -5,
 	az1 = 30,
-	r0 = 9.6,
-	r1 = 9.4,
-	h0 = 2.0,
-	h1 = 2.1,
-	look0 = Vector3.new(-0.09, 3.71, -0.56),
-	look1 = Vector3.new(0.09, 3.72, -0.38),
+	r0 = 8.8,
+	r1 = 8.6,
+	h0 = 1.8,
+	h1 = 1.9,
+	look0 = Vector3.new(-0.4, 3.92, 0.15),
+	look1 = Vector3.new(-0.83, 4.0, -0.1),
 	roll0 = -6,
 	roll1 = 20,
 	fov = 55,
@@ -57,7 +57,7 @@ return {
 	-- Клип: жёсткий тёплый верхний прожектор, всё вокруг — чистый чёрный; насыщенный фиолетовый пиджак и красный
 	-- бархат, сильный ореол (bloom) на золоте; глубокая резкость (всё от колена до гребня резкое).
 	lighting = {
-		lighting = { Ambient = Color3.fromRGB(22, 16, 30), ExposureCompensation = 0.05 },
+		lighting = { Ambient = Color3.fromRGB(46, 32, 72), ExposureCompensation = 0.05 },
 		bloom = { Intensity = 1.4, Size = 44, Threshold = 0.95 },
 		cc = { Brightness = 0.01, Contrast = 0.22, Saturation = 0.2, TintColor = Color3.fromRGB(255, 244, 236) },
 		dof = { FarIntensity = 0.08, NearIntensity = 0, InFocusRadius = 10 },

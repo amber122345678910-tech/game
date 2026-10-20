@@ -6,7 +6,7 @@ local Config = require(script.Parent.Parent:WaitForChild("Config"))
 -- камера стоит в −Z и смотрит в +Z сцены — на город, повернув на YAW° к +X мира, чтобы высотки
 -- (x < 0) оказались справа в кадре, а слева — пустой пляж до горизонта.
 local YAW = 15
-local FOV = 80
+local FOV = 72
 local STAGE = Config.place("Beach", 0, 0, YAW)
 local function W(x: number, y: number, z: number): Vector3
 	return (STAGE * CFrame.new(x, y, z)).Position
@@ -66,7 +66,7 @@ return {
 		},
 		WomanB = {
 			char = "WomanB",
-			place = STAGE * CFrame.new(-1.97, 0, 1.0) * CFrame.Angles(0, math.rad(8), 0),
+			place = STAGE * CFrame.new(-1.8, 0, 0.85) * CFrame.Angles(0, math.rad(0), 0),
 			opts = {
 				glassesOn = "RightHand",
 				-- шорты B в этом плане видны только краем в правом нижнем углу (в клипе там белая майка):
@@ -79,11 +79,10 @@ return {
 	camera = {
 		keys = {
 			-- 6.6–7.0: быстрый наезд с подъёмом (Sine Out, приходит на долю 6.992), дальше — медленный дрейф вперёд-вправо
-			camKey(6.6, { -0.78, 2.95, -2.2 }, 9, 15, "linear"),
-			camKey(6.8, { -0.96, 3.3, -2.02 }, 9, 15.6, "Sine_Out"),
-			camKey(7.0, { -1.05, 3.55, -1.98 }, 9, 16, "linear"),
-			camKey(7.4, { -1.06, 3.58, -2.0 }, 9, 16.6, "linear"),
-			camKey(7.8667, { -1.1, 3.6, -2.0 }, 9, 17.5),
+			camKey(6.6, { -0.78, 3.85, -2.25 }, 8, 13.5, "Sine_Out"),
+			camKey(7.0, { -1.02, 4.42, -2.12 }, 8, 15, "linear"),
+			camKey(7.4, { -1.06, 4.47, -2.16 }, 8, 15.5, "linear"),
+			camKey(7.8667, { -1.1, 4.52, -2.24 }, 8, 16.0),
 		},
 		shake = { rot = 0.1, pos = 0.005, freq = 1.5, seed = 7 },
 		focus = { actor = "WomanA", part = "Head" },
