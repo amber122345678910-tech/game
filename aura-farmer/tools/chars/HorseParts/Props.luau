@@ -51,12 +51,16 @@ function Props.dumbbell(g, grip)
 		g:cylSeg(B, grip + V(0, 0, zc - plateT / 2), grip + V(0, 0, zc + plateT / 2), plateD - 0.08, P.plate, "Rubber")
 		g:cylSeg(B, grip + V(0, 0, zc - plateT / 2 + 0.05), grip + V(0, 0, zc + plateT / 2 - 0.05), plateD, P.plateRim, "Rubber")
 		-- центральная ступица
-		g:cylSeg(B, grip + V(0, 0, zc + s * (plateT / 2 - 0.01)), grip + V(0, 0, zc + s * (plateT / 2 + 0.025)), 0.34, P.chrome, "Metal", { reflectance = 0.2 })
-		-- торец с надписью
+		g:cylSeg(B, grip + V(0, 0, zc + s * (plateT / 2 - 0.01)), grip + V(0, 0, zc + s * (plateT / 2 + 0.03)), 0.2, P.chrome:Lerp(P.plate, 0.35), "Metal", { reflectance = 0.15 })
+		-- торец (чуть утоплен внутрь обода) и надпись «500 / KG» белым — две тонкие таблички цвета диска
 		local face = g:cylSeg(B, grip + V(0, 0, zc + s * (plateT / 2 - 0.02)), grip + V(0, 0, zc + s * (plateT / 2 + 0.006)), plateD - 0.2, P.plate, "Rubber")
 		face.Name = "PlateFace"
-		-- текст на торце: Part Cylinder вдоль X -> торцы Right/Left
-		label(face, "Right", "500\nKG", 0)
+		local zf = zc + s * (plateT / 2 + 0.014)
+		local rot = if s > 0 then CFrame.Angles(0, math.pi, 0) else CFrame.new()
+		for _, t in { { "500", 0.27, 0.6, 0.3 }, { "KG", -0.27, 0.44, 0.3 } } do
+			local tag = g:box(B, CFrame.new(grip + V(0, t[2], zf)) * rot, V(t[3], t[4], 0.012), P.plate, "Rubber", nil, { castShadow = false, name = "PlateText" })
+			label(tag, "Front", t[1], 0)
+		end
 	end
 end
 

@@ -3,6 +3,7 @@
 -- и собираются из треугольников (клинья), поэтому лацканы/воротник/планки облегают грудь.
 local roblox = require("@lune/roblox")
 local CFrame = roblox.CFrame
+local Vector3 = roblox.Vector3
 local V = roblox.Vector3.new
 
 local Drape = {}
@@ -139,6 +140,53 @@ function Drape:rod(bone, pts, off, d, color, mat, maxLen, closed, extra)
 		end
 	end
 	return p3
+end
+
+-- Плоская панель над поверхностью (выпуклый контур pts = { {x, y}, ... }, веер от первой точки):
+-- плоскость по средней нормали, поднята так, чтобы все вершины были не ниже поверхности + off.
+-- Мало крупных треугольников в одной плоскости — без «граней». Возвращает frame (−Z — наружу) и 2D-контур.
+function Drape:flat(bone, pts, off, thick, color, mat, extra, nrm, skipLift)
+	local P3, N, c = {}, Vector3.zero, Vector3.zero
+	for _, p in pts do
+		local q, n = self:at(p[1], p[2], 0)
+		table.insert(P3, q)
+		N += n
+		c += q
+	end
+	c /= #pts
+	N = N.Unit
+	if nrm == "center" then
+		-- нормаль в центре контура (без влияния крутых краёв)
+		local cx, cy = 0, 0
+		for _, p in pts do
+			cx += p[1]
+			cy += p[2]
+		end
+		local _, n0 = self:at(cx / #pts, cy / #pts, 0)
+		N = n0
+	elseif nrm then
+		N = nrm
+	end
+	local h = -math.huge
+	for i, q in P3 do
+		if not (skipLift and skipLift[i]) then
+			h = math.max(h, (q - c):Dot(N))
+		end
+	end
+	local o = c + N * (h + off)
+	local zf = -N
+	local xf = V(0, 1, 0):Cross(zf).Unit
+	local yf = zf:Cross(xf).Unit
+	local frame = CFrame.fromMatrix(o, xf, yf, zf)
+	local pts2 = {}
+	for _, q in P3 do
+		local d = q - o
+		table.insert(pts2, { d:Dot(xf), d:Dot(yf) })
+	end
+	if color then
+		self.g:poly(bone, frame, pts2, thick, color, mat, -thick / 2, extra)
+	end
+	return frame, pts2
 end
 
 -- CFrame детали, лежащей на поверхности в (x, y): -Z смотрит наружу по нормали, поворот rot (град) вокруг нормали.

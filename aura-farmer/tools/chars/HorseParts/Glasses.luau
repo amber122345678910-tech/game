@@ -1,9 +1,11 @@
 --!nocheck
 -- Золотые авиаторы на суставе Glasses (опора — центр перемычки на переносице).
 -- Всё — настоящие детали Part (в Roblox материал на SpecialMesh не виден):
---   линза — горизонтальные «ломтики» Block + Wedge (Glass, полупрозрачная), каплевидный контур;
---   оправа — цилиндры по контуру (Foil), двойная перемычка (прямая верхняя планка + изогнутый мост),
---   носоупоры, шарниры, дужки до ушей.
+--   линза — тонкая (0.005) пластина из клиньев (зигзаг-триангуляция контура, Glass, полупрозрачная),
+--   каплевидный контур; внутренние грани — волосяные, без «жалюзи»;
+--   оправа — цилиндры точно между вершинами контура + шарики в вершинах (Foil, гладкий обод),
+--   двойная перемычка (прямая верхняя планка + изогнутый мост), держатели носоупоров, шарниры, дужки до ушей.
+-- Строится в проектном пространстве головы (см. Head.map).
 local roblox = require("@lune/roblox")
 local CFrame = roblox.CFrame
 local V = roblox.Vector3.new
@@ -11,15 +13,16 @@ local rad = math.rad
 
 local Geo = require("./Geo")
 local P = require("./Palette")
+local Head = require("./Head")
 
 local Glasses = {}
 
 -- Контур правой линзы (u — наружу к виску, v — вверх) относительно центра линзы.
-Glasses.LENS = { a = 0.35, b = 0.29, cu = 0.0, cv = -0.03, rot = -20, top = 0.2, topSlope = 0.06, e = 2.6 }
-Glasses.LENS_X = 0.385 -- центр линзы от середины
-Glasses.WRAP = 9 -- разворот линз по лицу (град)
-Glasses.TILT = -7 -- пантоскопический наклон (низ ближе к лицу)
-Glasses.Z = -0.02 -- плоскость линз относительно опоры
+Glasses.LENS = { a = 0.37, b = 0.31, cu = 0.0, cv = -0.04, rot = -18, top = 0.19, topSlope = 0.05, e = 2.3 }
+Glasses.LENS_X = 0.44 -- центр линзы от середины
+Glasses.WRAP = 15 -- разворот линз по лицу (град)
+Glasses.TILT = 10 -- наклон по линии морды (верх ближе ко лбу)
+Glasses.Z = 0.0 -- плоскость линз относительно опоры
 
 -- Замкнутый контур линзы: эллипс, срезанный сверху прямой (верхняя кромка авиатора).
 function Glasses.outline(n)
@@ -68,16 +71,16 @@ local function span(pts, v)
 end
 
 function Glasses.build(g, opts)
-	local rig = g.rig
-	local G = rig:pivotOf("Glasses")
+	local G = Head.DP("Glasses")
 	local yellow = opts.glasses == "yellow"
 	local lensColor = if yellow then P.lensYellow else P.lensAmber
-	local lensT = if yellow then 0.42 else 0.32
-	local frameD = 0.038
+	local lensT = if yellow then 0.62 else 0.45
+	local frameD = 0.044
 	local gold = P.frame
 	local GM = "Foil"
 	g.xf = nil
-	local outline = Glasses.outline(28)
+	Head.setMap(g)
+	local outline = Glasses.outline(16)
 	local frames = {}
 	for _, s in { 1, -1 } do
 		-- плоскость линзы: -Z — наружу; разворот по лицу и наклон
@@ -97,25 +100,29 @@ function Glasses.build(g, opts)
 			end
 			pts = rev
 		end
-		-- ===== линза: горизонтальные ломтики =====
-		local vmin, vmax = math.huge, -math.huge
-		for _, p in pts do
-			vmin = math.min(vmin, p[2])
-			vmax = math.max(vmax, p[2])
+		-- ===== линза: зигзаг-триангуляция контура (тонкая пластина, внутренние грани волосяные) =====
+		local LENS = { transparency = lensT, reflectance = 0.12, castShadow = false, name = "Lens" }
+		-- контур линзы грубее обода (12 вершин): меньше внутренних граней; край прячется под ободом
+		local lpts = {}
+		for i, p in Glasses.outline(12) do
+			lpts[i] = { s * p[1], p[2] }
 		end
-		local NS = 7
-		local inset = 0.006
-		for k = 0, NS - 1 do
-			local v0 = vmin + inset + (vmax - vmin - 2 * inset) * k / NS
-			local v1 = vmin + inset + (vmax - vmin - 2 * inset) * (k + 1) / NS
-			local L0, R0 = span(pts, v0)
-			local L1, R1 = span(pts, v1)
-			g:trap("Glasses", frame, v0, v1, L0 + inset, L1 + inset, R0 - inset, R1 - inset, 0.016, lensColor, "Glass", 0, {
-				transparency = lensT,
-				reflectance = 0.12,
-				castShadow = false,
-				name = "Lens",
-			})
+		local in3 = {}
+		for _, p in Geo.inset(lpts, 0.006) do
+			table.insert(in3, frame * V(p[1], p[2], 0))
+		end
+		local n3 = #in3
+		local lo, hi = 1, n3
+		local flip = false
+		while hi - lo >= 2 do
+			if not flip then
+				g:tri3("Glasses", in3[lo], in3[lo + 1], in3[hi], 0.005, lensColor, "Glass", LENS)
+				lo += 1
+			else
+				g:tri3("Glasses", in3[lo], in3[hi - 1], in3[hi], 0.005, lensColor, "Glass", LENS)
+				hi -= 1
+			end
+			flip = not flip
 		end
 		-- ===== оправа по контуру =====
 		local n = #pts
@@ -123,11 +130,10 @@ function Glasses.build(g, opts)
 			local a, b = pts[i], pts[i % n + 1]
 			local pa = frame * V(a[1], a[2], -0.004)
 			local pb = frame * V(b[1], b[2], -0.004)
-			local d = (pb - pa)
-			if d.Magnitude > 1e-3 then
-				local u = d.Unit
-				g:cylSeg("Glasses", pa - u * frameD * 0.5, pb + u * frameD * 0.5, frameD, gold, GM, { name = "Frame" })
+			if (pb - pa).Magnitude > 1e-3 then
+				g:cylSeg("Glasses", pa, pb, frameD, gold, GM, { name = "Frame" })
 			end
+			g:ball("Glasses", pa, frameD * 1.02, gold, GM, { name = "Frame" })
 		end
 	end
 	local function fp(s, u, v, z)
@@ -139,11 +145,11 @@ function Glasses.build(g, opts)
 	local topIn = L.top + L.topSlope * -0.3
 	local a1, a2 = fp(1, 0.335, topOut + 0.004, -0.012), fp(1, -0.3, topIn + 0.006, -0.012)
 	local b1, b2 = fp(-1, -0.3, topIn + 0.006, -0.012), fp(-1, 0.335, topOut + 0.004, -0.012)
-	g:cylSeg("Glasses", a1, a2, 0.042, gold, GM, { name = "BrowBar" })
-	g:cylSeg("Glasses", b1, b2, 0.042, gold, GM, { name = "BrowBar" })
-	g:cylSeg("Glasses", a2, b1, 0.04, gold, GM, { name = "BrowBar" })
+	g:cylSeg("Glasses", a1, a2, 0.05, gold, GM, { name = "BrowBar" })
+	g:cylSeg("Glasses", b1, b2, 0.05, gold, GM, { name = "BrowBar" })
+	g:cylSeg("Glasses", a2, b1, 0.048, gold, GM, { name = "BrowBar" })
 	for _, p in { a1, a2, b1, b2 } do
-		g:ball("Glasses", p, 0.046, gold, GM)
+		g:ball("Glasses", p, 0.056, gold, GM)
 	end
 	-- нижний мост: дуга между внутренними краями линз
 	local ba, bb = fp(1, -0.31, 0.06), fp(-1, -0.31, 0.06)
@@ -154,27 +160,27 @@ function Glasses.build(g, opts)
 		local d = (bridge[i + 1] - bridge[i]).Unit
 		g:cylSeg("Glasses", bridge[i] - d * 0.012, bridge[i + 1] + d * 0.012, 0.03, gold, GM, { name = "Bridge" })
 	end
-	-- носоупоры: прозрачные «капли» на золотых держателях
+	-- держатели носоупоров (тонкие золотые дужки за линзами; самих прозрачных «капель» нет — в кадре они белели)
 	for _, s in { 1, -1 } do
 		local base = fp(s, -0.29, -0.02, 0.0)
 		local pad = base + V(-s * 0.05, -0.06, 0.07)
 		g:cylSeg("Glasses", base, pad, 0.014, gold, GM)
-		g:box("Glasses", CFrame.new(pad) * CFrame.Angles(0, rad(s * 30), 0), V(0.035, 0.08, 0.02), P.tooth, "Glass", nil, { transparency = 0.4 })
 	end
 	-- шарниры и дужки (к ушам)
 	for _, s in { 1, -1 } do
 		local hinge = fp(s, 0.345, topOut - 0.03, 0.0)
 		local back = hinge + V(s * 0.0, 0.0, 0.08)
 		g:box("Glasses", Geo.axisX(hinge:Lerp(back, 0.5), back - hinge), V(0.1, 0.06, 0.035), gold, GM, nil, { name = "Hinge" })
-		local mid = V(s * 0.6, G.Y + 0.17, -0.52)
-		local ear = V(s * 0.56, G.Y + 0.2, -0.02)
-		local tipEnd = V(s * 0.5, G.Y + 0.08, 0.14)
+		local mid = V(s * 0.8, G.Y + 0.13, -0.5)
+		local ear = V(s * 0.75, G.Y + 0.17, 0.0)
+		local tipEnd = V(s * 0.66, G.Y + 0.03, 0.2)
 		g:cylSeg("Glasses", back, mid, 0.026, gold, GM, { name = "Temple" })
 		g:cylSeg("Glasses", mid, ear, 0.024, gold, GM, { name = "Temple" })
 		g:cylSeg("Glasses", ear, tipEnd, 0.03, P.frame:Lerp(P.goldDeep, 0.5), GM, { name = "Temple" })
 		g:ball("Glasses", mid, 0.03, gold, GM)
 		g:ball("Glasses", ear, 0.03, gold, GM)
 	end
+	g:setMap(nil)
 end
 
 return Glasses

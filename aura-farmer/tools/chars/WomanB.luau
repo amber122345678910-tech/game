@@ -1,5 +1,5 @@
 --!nocheck
--- Девушка справа (S03, S07, S10): тёмные короткие кудри, белая майка в рубчик с круглым вырезом,
+-- Девушка справа (S03, S07, S10): тёмные густые кудри «шапкой» (завитки падают на лоб), оливково-смуглая кожа, белая майка в рубчик с круглым вырезом,
 -- чёрные спортивные шорты с тремя белыми лампасами, белые носки, оранжевые кроссовки с белой полосой;
 -- золотая цепочка с подвеской, серебряный браслет, маленькие серьги; красные прямоугольные очки.
 local roblox = require("@lune/roblox")
@@ -13,14 +13,15 @@ end
 return function(opts)
 	local o = {
 		female = true,
-		skin = rgb(200, 134, 100),
+		skin = rgb(212, 156, 124),
+		rosy = 0.25,
 		eyes = rgb(66, 44, 32),
 		lips = rgb(170, 94, 84),
 		lashes = true,
 		browThick = 0.95,
 		brows = rgb(30, 22, 18),
 		nose = 0.95,
-		hair = rgb(40, 28, 24),
+		hair = rgb(46, 32, 26),
 		hairStyle = "curls",
 		top = rgb(244, 243, 240),
 		topStyle = "tank",
@@ -42,6 +43,7 @@ return function(opts)
 		glassesFrame = rgb(220, 38, 36),
 		glassesLens = rgb(232, 46, 46),
 		glassesLensTransparency = 0.3,
+		armW = 0.42,
 		build = 0.96,
 		height = 0.98,
 	}

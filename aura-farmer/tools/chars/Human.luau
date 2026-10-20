@@ -1,24 +1,33 @@
 --!nocheck
 -- Человек в стиле Roblox: блочное R15-тело с мягкими фасками (скруглённые рёбра), кисти с пальцами,
--- «динамическая» лепная голова (череп + лицо + челюсть + щёки из эллипсоидов), глаза (белок/радужка/зрачок/блики)
--- на суставах взгляда, верхние/нижние веки (моргание, прищур, «смеющиеся» глаза), брови на суставах, нос,
--- губы, рот на суставе Jaw (открывается в «О» и в смех с зубами). Одежда и причёски собираются из примитивов
--- по опциям (см. DEFAULTS). Использование: require("./Human")(opts).
+-- «динамическая» лепная голова (череп + лицо + челюсть + щёки из эллипсоидов), глаза-«миндаль» (белок, крупная
+-- радужка, зрачок, блики, линия ресниц) на суставах взгляда, верхние веки (моргание) и нижние веки (улыбка —
+-- глаза-дуги «◠»), брови на суставах, нос, губы. Рот — настоящий проём: при раскрытии челюсти за губами видна
+-- тёмная полость, верхние зубы и язык (смех — «D»-форма с полосой зубов, «О» — скруглённый проём).
+-- Щетина облегает лицо (окрашена кожа челюсти + плоские накладки на щеках вровень с кожей). Одежда и причёски
+-- собираются из примитивов по опциям (см. DEFAULTS). Использование: require("./Human")(opts).
 --
 -- КОНТРАКТ ДЛЯ АНИМАТОРОВ
 --   Пальцы: R15 + Right/Left Index1/2, Middle1/2, Ring1/2, Pinky1/2, Thumb1/2 (rHand/lHand в ключах; по умолчанию "relaxed").
---   Доп. суставы головы: Jaw (нижняя челюсть, губа, подбородок, щетина), Mouth (полость рта и верхние зубы),
---     UpperLip (верхняя губа + усы), RightMouth/LeftMouth (уголки рта), RightCheek/LeftCheek (щёки),
+--   Доп. суставы головы: Jaw (нижняя челюсть, нижняя губа, зубы, язык, подбородок), Mouth (полость рта и верхние
+--     зубы), UpperLip (середина верхней губы + усы), RightMouth/LeftMouth (уголки: края верхней губы),
+--     RightCornerSkin/LeftCornerSkin (кожа у уголков, скругляет проём при «О»), RightCheek/LeftCheek (щёки),
 --     RightBrow/LeftBrow, RightLid/LeftLid (верхние веки), RightLowerLid/LeftLowerLid, RightEye/LeftEye (взгляд),
 --     Glasses (если есть очки).
---   Центр головы (поза покоя): y = neckY + 0.74·height (neckY = 4.05·height), переносица очков — (0, y, f = 0.675).
+--   Пропорции (·height): ankleY 0.28, kneeY 1.28, hipY 2.45, pelvisY 2.65, waistY 2.9, shoulderY 4.42, neckY 4.62,
+--     плечо 1.22, предплечье 1.1 (≈4.7 головы ростом). Центр головы (поза покоя): y = neckY + 0.92·height
+--     (= 5.54·height), переносица очков — (0, y, f = 0.675). Удобно: rig.headCenter (Vector3, char space) и
+--     rig.glassesHome (опора сустава Glasses на носу).
 --   Лицевые каналы (face = {...}):
---     jaw 0..1 (рот открыт), smile 0..1 (улыбка: уголки вверх/в стороны, щёки вверх, «смеющиеся» глаза),
---     oh 0..1 (губы в «О»), brows -1..1 (обе брови вверх+/вниз-), browR/browL, frown 0..1 (сведённые брови),
---     blink 0..1, squint 0..1, lookX -1..1 (взгляд вправо от персонажа +), lookY -1..1 (вверх +).
---     «Ах!» (awe):  face = { jaw = 0.7, oh = 1, brows = 1 };  смех: face = { jaw = 0.8, smile = 1, squint = 0.3 }.
+--     jaw 0..1 (рот открыт), smile 0..1 (улыбка-оскал с верхними зубами: уголки вверх/в стороны, щёки вверх,
+--     нижние веки вверх — глаза-дуги), oh 0..1 (губы в «О»), brows -1..1 (обе брови вверх+/вниз-), browR/browL,
+--     frown 0..1 (сведённые брови), blink 0..1, squint 0..1, lookX -1..1 (взгляд вправо от персонажа +),
+--     lookY -1..1 (вверх +).
+--     «Ах!» (awe):  face = { jaw = 0.7, oh = 1, brows = 1 };  смех: face = { jaw = 0.8, smile = 1, squint = 0.3 }
+--     (с blink глаза закрываются полностью — «прищур от смеха»; глаза-дуги без blink).
 --   Очки: joints = { Glasses = { x, y, f, rx, ry, rz } } — смещение от позы покоя (на носу) в осях головы;
 --     «спустить на кончик носа»: { y = -0.13, f = 0.05, rx = -13 }. opts.glassesOn = "RightHand"/"LeftHand" — очки в руке.
+--     Формы оправ: glasses = "aviator" | "round" | "hex" | "rect".
 
 local roblox = require("@lune/roblox")
 local Vector3 = roblox.Vector3
@@ -55,7 +64,8 @@ local DEFAULTS = {
 	brows = nil, -- цвет бровей (по умолчанию темнее волос)
 	browThick = 1.0,
 	lashes = false, -- выразительные ресницы (женские)
-	beard = nil, -- Color3 короткой бороды-щетины (челюсть, подбородок, усы)
+	beard = nil, -- Color3 короткой бороды-щетины (челюсть, подбородок, щёки, усы)
+	beardAmount = 0.52, -- густота щетины 0..1
 	nose = 1.0, -- масштаб носа
 	-- волосы
 	hair = rgb(60, 42, 30),
@@ -83,7 +93,7 @@ local DEFAULTS = {
 	bracelets = nil, -- { right = { Color3, ... }, left = { ... } }
 	watch = nil, -- "left" | "right": металлический браслет-часы
 	rings = nil, -- Color3 колец
-	glasses = nil, -- "aviator" | "hex" | "rect"
+	glasses = nil, -- "aviator" | "round" | "hex" | "rect"
 	glassesFrame = rgb(204, 168, 92),
 	glassesLens = rgb(30, 52, 40),
 	glassesLensTransparency = 0,
@@ -114,19 +124,19 @@ return function(opts)
 
 	local rig = Rig.new("Human", {
 		hipX = hipX,
-		hipY = 2.05 * h,
-		kneeY = 1.04 * h,
-		ankleY = 0.26 * h,
+		hipY = 2.45 * h,
+		kneeY = 1.28 * h,
+		ankleY = 0.28 * h,
 		footLen = (if fem then 0.92 else 1.02) * bw,
 		footFwd = (if fem then 0.6 else 0.66) * bw,
 		footW = 0.8,
-		pelvisY = 2.25 * h,
-		waistY = 2.45 * h,
-		neckY = 4.05 * h,
+		pelvisY = 2.65 * h,
+		waistY = 2.9 * h,
+		neckY = 4.62 * h,
 		shoulderX = tw / 2 + aw / 2 + 0.02,
-		shoulderY = 3.86 * h,
-		upperArm = 1.06 * h,
-		lowerArm = 0.98 * h,
+		shoulderY = 4.42 * h,
+		upperArm = 1.22 * h,
+		lowerArm = 1.1 * h,
 		handLen = 0.36 * h * bw,
 		handW = pw * 1.06,
 		torsoW = tw,
@@ -231,7 +241,8 @@ return function(opts)
 	local hipW = if fem then tw * 0.97 else tw * 0.95
 	local cropped = topStyle == "crop"
 	local pad = 0.032
-	local waistTop = yW + (if cropped then 0.1 else 0.2) * h -- верх пояса низа
+	-- верх пояса низа (под майкой/футболкой — ниже: при наклоне корпуса пояс не протыкает ткань)
+	local waistTop = yW + (if cropped then 0.1 elseif topStyle then 0.0 else 0.2) * h
 	local halfW = tw / 2
 	local rT = 0.2 * bw
 	rboxY("UpperTorso", 0, chestBot, yN, 0, tw, td, rT, skin, "SmoothPlastic", "Chest")
@@ -254,11 +265,11 @@ return function(opts)
 	if topStyle == "tee" then
 		-- футболка: оболочка до плеч, круглый вырез, рукава (см. руки)
 		local hem = yW - 0.12
-		rboxY("UpperTorso", 0, hem, yN + 0.014, 0, math.max(tw, hipW) + pad, D, rT, topC, "Fabric", "Shirt")
+		rboxY("UpperTorso", 0, hem, yN + 0.026, 0, math.max(tw, hipW) + pad, D, rT + pad / 2, topC, "Fabric", "Shirt")
 		local fz = -D / 2
 		ell("UpperTorso", at(0, yN + 0.004, fz - 0.008), v(0.5 * bw, 0.18, 0.024), skin, "SmoothPlastic", "Neckline")
 		ell("UpperTorso", at(0, yN + 0.012, fz - 0.004), v(0.6 * bw, 0.26, 0.026), topC:Lerp(BLACK, 0.12), "SmoothPlastic", "Collar")
-		part("UpperTorso", at(0, yN + 0.016, 0.04), v(0.5 * bw, 0.02, td * 0.62), skin, "SmoothPlastic", "NeckTop")
+		part("UpperTorso", at(0, yN + 0.028, 0.04), v(0.5 * bw, 0.02, td * 0.62), skin, "SmoothPlastic", "NeckTop")
 	elseif topStyle == "tank" or topStyle == "crop" then
 		-- so — наружный край бретели, si — внутренний (полуширина выреза), ya — низ проймы
 		local so, si, ya, scoopF, scoopB, hem
@@ -273,14 +284,14 @@ return function(opts)
 			so, si, ya, scoopF, scoopB = 0.6 * bw, 0.35 * bw, yN - (0.62 + 0.45 * ah) * h, o.scoop * h, 0.26 * h
 			hem = yW - 0.14 -- навыпуск поверх шорт
 		end
-		local W = (if fem and cropped then tw else math.max(tw, hipW + 0.04)) + pad
-		local Dt = if fem then D else D + 0.02
+		local W = (if fem and cropped then tw else math.max(tw, hipW + 0.07)) + pad
+		local Dt = if fem and cropped then D else D + 0.05
 		local rS = 0.17 * bw
 		-- нижняя оболочка: от подола до проймы
 		rboxY("UpperTorso", 0, hem, ya + 0.016, 0, W, Dt, rS, topC, "Fabric", "Shirt")
 		if cropped then
 			-- кант по низу
-			rboxY("UpperTorso", 0, hem - 0.006, hem + 0.05, 0, W + 0.014, Dt + 0.014, rS + 0.007, topC:Lerp(BLACK, 0.06), "Fabric", "Hem")
+			rboxY("UpperTorso", 0, hem - 0.045, hem + 0.065, 0, W + 0.028, Dt + 0.028, rS + 0.014, topC:Lerp(BLACK, 0.06), "Fabric", "Hem")
 		end
 		-- верх: перёд и спина до линии выреза, бретели, проймы (две ступени клиньев — плавная дуга)
 		local yS_f, yS_b = yN - scoopF, yN - scoopB
@@ -336,12 +347,10 @@ return function(opts)
 		if cropped then
 			bustY = math.max(bustY, chestBot + semi * 0.9)
 		end
-		bustOut = 0.07
+		bustOut = 0.05
 		local fz0 = if covered then -D / 2 else -td / 2
-		ell("UpperTorso", at(0, bustY, fz0 + 0.07), v(tw * 0.8, semi * 2, 0.28), bc, "SmoothPlastic", "Bust")
-		for _, s in { 1, -1 } do
-			ell("UpperTorso", at(s * tw * 0.16, bustY - 0.025, fz0 + 0.07), v(tw * 0.4, semi * 1.8, 0.29), bc, "SmoothPlastic", "Bust")
-		end
+		-- один мягкий объём (без «мультяшных» полусфер): выступ ~0.045 над тканью
+		ell("UpperTorso", at(0, bustY, fz0 + 0.075), v(tw * 0.84, semi * 2.1, 0.24), bc, "SmoothPlastic", "Bust")
 	end
 
 	-- ===== Таз и низ =====
@@ -350,7 +359,7 @@ return function(opts)
 	rboxY("LowerTorso", 0, yH - 0.22, waistTop - 0.03, 0, hipW, td * 0.98, rT, botC, "Fabric", "Pelvis")
 	-- пояс
 	local bandC = if bstyle == "track" then botC:Lerp(BLACK, 0.3) else botC:Lerp(BLACK, 0.12)
-	rboxY("LowerTorso", 0, waistTop - 0.15, waistTop + 0.012, 0, hipW + 0.034, td * 0.98 + 0.034, rT + 0.017, bandC, "Fabric", "Waistband")
+	rboxY("LowerTorso", 0, waistTop - 0.096, waistTop + 0.012, 0, hipW + 0.034, td * 0.98 + 0.034, rT + 0.017, bandC, "Fabric", "Waistband")
 	if bstyle == "track" then
 		-- шнурок-завязка
 		for _, s in { 1, -1 } do
@@ -364,10 +373,10 @@ return function(opts)
 			part("LowerTorso", at(x * bw, waistTop - 0.07, fzb - 0.01), v(0.04, 0.16, 0.02), bandC:Lerp(BLACK, 0.2), "Fabric", "BeltLoop")
 		end
 		-- ширинка
-		part("LowerTorso", at(0.06, yH + 0.05, fzb + 0.02), v(0.012, 0.36, 0.02), o.stitch or bandC:Lerp(WHITE, 0.3), "Fabric", "Fly")
+		part("LowerTorso", at(0.06, yH + 0.05, fzb + 0.004), v(0.012, 0.36, 0.02), o.stitch or bandC:Lerp(WHITE, 0.3), "Fabric", "Fly")
 	end
 	-- «сиденье»: заполняет зазор у тазобедренных при сгибе ног (спрятано в штанинах стоя)
-	local sleeveW = if bstyle == "baggy" then lw + 0.2 elseif bstyle == "track" then lw + 0.18 elseif bstyle == "leggings" then lw + 0.02 else lw + 0.08
+	local sleeveW = if bstyle == "baggy" then lw + 0.2 elseif bstyle == "track" then lw + 0.24 elseif bstyle == "leggings" then lw + 0.02 else lw + 0.08
 	local seatW = 2 * hipX + lw - 0.06
 	rboxY("LowerTorso", 0, yH - 0.42, yH + 0.05, 0.0, seatW, lw - 0.06, 0.16, botC, "Fabric", "Seat")
 
@@ -379,16 +388,16 @@ return function(opts)
 		local kY, aY = P.kneeY, P.ankleY
 		-- бедро (кожа) и голень
 		rboxY(UL, x, kY, yH + 0.1, 0, lw, lw, 0.2, skin, "SmoothPlastic", "Thigh")
-		rboxY(LL, x, aY - 0.04, kY + sw * 0.45, 0, sw, sw, 0.18, skin, "SmoothPlastic", "Shin")
+		rboxY(LL, x, aY - 0.04, kY + sw * 0.36, 0, sw, sw, 0.18, skin, "SmoothPlastic", "Shin")
 		ell(LL, at(x, kY - 0.38 * h, 0.08), v(sw * 0.86, 0.5 * h, sw * 0.5), skin, "SmoothPlastic", "Calf")
 		-- колено
 		ell(LL, at(x, kY, -0.01), v(sw + 0.04, 0.42, sw + 0.06), skin, "SmoothPlastic", "Knee")
 		-- штанина
 		local hem
 		if bstyle == "baggy" then
-			hem = kY - 0.42 * h
+			hem = kY - 0.06 * h -- чуть ниже колена
 		elseif bstyle == "track" then
-			hem = kY + 0.2 * h
+			hem = kY + 0.48 * h -- до середины бедра
 		elseif bstyle == "leggings" then
 			hem = aY + 0.12
 		else
@@ -410,7 +419,7 @@ return function(opts)
 				local lowW = sleeveW - 0.04
 				rboxY(LL, cx, hem, kY + 0.1, 0, lowW, lowW, 0.21, botC, "Fabric", "PantLow")
 				ell(LL, at(cx, kY - 0.02, 0.0), v(lowW + 0.02, 0.5, lowW + 0.02), botC, "Fabric", "KneeCloth")
-				rboxY(LL, cx, hem - 0.03, hem + 0.07, 0, lowW + 0.024, lowW + 0.024, 0.22, botC:Lerp(BLACK, 0.1), "Fabric", "Hem")
+				rboxY(LL, cx, hem - 0.03, hem + 0.07, 0, lowW + 0.04, lowW + 0.04, 0.23, botC:Lerp(BLACK, 0.1), "Fabric", "Hem")
 				if o.stitch then
 					-- двойная строчка по низу
 					for _, dy in { 0.1, 0.14 } do
@@ -535,10 +544,13 @@ return function(opts)
 			end
 			-- носок
 			if o.socks then
-				rboxY(LL, x, aY + 0.02, aY + 0.44, 0, sw + 0.03, sw + 0.03, 0.19, o.socks, "Fabric", "Sock")
-				rboxY(LL, x, aY + 0.36, aY + 0.46, 0, sw + 0.05, sw + 0.05, 0.2, o.socks:Lerp(BLACK, 0.04), "Fabric", "SockCuff")
+				-- короткие носки до щиколотки (crew): тонкий слой поверх голени + манжета
+				rboxY(LL, x, aY + 0.02, aY + 0.22, 0, sw + 0.02, sw + 0.02, 0.19, o.socks, "Fabric", "Sock")
+				rboxY(LL, x, aY + 0.16, aY + 0.24, 0, sw + 0.04, sw + 0.04, 0.2, o.socks:Lerp(BLACK, 0.04), "Fabric", "SockCuff")
+				ell(FT, at(x, aY + 0.06, 0.04), v(sw * 0.92, 0.34, sw * 0.92), o.socks, "SmoothPlastic", "Ankle")
+			else
+				ell(FT, at(x, 0.4, 0.04), v(sw * 0.92, 0.36, sw * 0.92), skin, "SmoothPlastic", "Ankle")
 			end
-			ell(FT, at(x, 0.4, 0.04), v(sw * 0.92, 0.36, sw * 0.92), o.socks or skin, "SmoothPlastic", "Ankle")
 		end
 	end
 
@@ -551,18 +563,21 @@ return function(opts)
 		local eY = sY - P.upperArm
 		local wY = eY - P.lowerArm
 		-- плечо (дельта шире бицепса)
-		rboxY(UA, x, eY, sY - 0.1, 0, aw * 0.94, aw * 0.94, aw * 0.3, skin, "SmoothPlastic", "UpperArm")
-		ell(UA, at(x, sY - 0.08, 0), v(aw * 1.04, 0.62 * h, aw * 1.02), skin, "SmoothPlastic", "Deltoid")
-		ell(UA, at(x, sY, 0), v(aw, 0.36 * h, aw), skin, "SmoothPlastic", "ShoulderCap")
+		rboxY(UA, x, eY, sY - 0.1, 0, aw * 0.86, aw * 0.88, aw * 0.3, skin, "SmoothPlastic", "UpperArm")
+		-- бицепс: мягкий объём спереди (рука не «труба»)
+		ell(UA, at(x, sY - 0.5 * h, -0.03), v(aw * 0.92, 0.62 * h, aw * 0.94), skin, "SmoothPlastic", "Biceps")
+		ell(UA, at(x, sY - 0.12, 0), v(aw * 0.9, 0.56 * h, aw * 0.9), skin, "SmoothPlastic", "Deltoid")
+		ell(UA, at(x, sY - 0.02, 0), v(aw * 0.88, 0.22 * h, aw * 0.88), skin, "SmoothPlastic", "ShoulderCap")
 		if topStyle == "tee" then
 			rboxY(UA, x, sY - 0.55 * h, sY - 0.045, 0, aw + 0.09, aw + 0.09, aw * 0.3 + 0.045, o.top, "Fabric", "Sleeve")
-			ell(UA, at(x, sY + 0.005, 0), v(aw + 0.08, 0.4 * h, aw + 0.08), o.top, "SmoothPlastic", "SleeveCap")
-			ell(UA, at(x, sY - 0.08, 0), v(aw * 1.04 + 0.06, 0.62 * h, aw * 1.02 + 0.06), o.top, "SmoothPlastic", "SleeveDelt")
+			ell(UA, at(x, sY - 0.015, 0), v(aw * 0.94 + 0.06, 0.36 * h, aw * 0.94 + 0.06), o.top, "SmoothPlastic", "SleeveCap")
+			ell(UA, at(x, sY - 0.12, 0), v(aw + 0.06, 0.6 * h, aw * 0.99 + 0.06), o.top, "SmoothPlastic", "SleeveDelt")
 		end
 		-- локоть + предплечье
 		ell(LA, at(x, eY - 0.02, 0.02), v(aw * 0.9, 0.5, aw * 0.9), skin, "SmoothPlastic", "Elbow")
-		rboxY(LA, x, wY + 0.04, eY - 0.05, 0, fx, fz, fx * 0.36, skin, "SmoothPlastic", "Forearm")
-		ell(LA, at(x, eY - 0.3, -0.02), v(fx * 1.08, 0.5, fz * 1.04), skin, "SmoothPlastic", "ForearmMuscle")
+		-- предплечье сужается к запястью: тонкий rbox (запястье) + мышечный объём у локтя
+		rboxY(LA, x, wY + 0.04, eY - 0.05, 0, fx * 0.74, fz * 0.76, fx * 0.3, skin, "SmoothPlastic", "Forearm")
+		ell(LA, at(x, eY - 0.34 * h, -0.015), v(fx * 1.02, 0.8 * h, fz * 1.0), skin, "SmoothPlastic", "ForearmMuscle")
 		-- запястье и ладонь
 		ell(HD, at(x, wY - 0.02, 0), v(pt + 0.1, 0.3, pw * 0.92), skin, "SmoothPlastic", "Wrist")
 		local hl = P.handLen
@@ -609,7 +624,7 @@ return function(opts)
 	end
 
 	-- ===== Голова =====
-	local hc = yN + 0.74 * h -- центр головы
+	local hc = yN + 0.92 * h -- центр головы (длинная шея: подбородок заметно выше выреза майки)
 	local R = 0.6
 	local function H(x, y, z)
 		return v(x, hc + y, z)
@@ -668,49 +683,51 @@ return function(opts)
 
 	-- шея
 	local neckD = (if fem then 0.38 else 0.46) * bw
-	cylY("Head", Hc(0, -0.66, 0.06), 0.76, neckD, skin, "SmoothPlastic", "Neck")
+	cylY("Head", Hc(0, -0.75, 0.06), 0.96, neckD, skin, "SmoothPlastic", "Neck")
 	ell("Head", Hc(0, -0.4, 0.1), v(neckD * 0.98, 0.5, neckD * 0.98), skin, "SmoothPlastic", "NeckTop")
 	if not fem then
 		ell("Head", Hc(0, -0.62, -neckD * 0.36), v(0.1, 0.12, 0.1), skin, "SmoothPlastic", "AdamsApple")
 	end
 	-- череп, лицо, надбровье, «муфта» под носом
-	local cran = if fem then v(1.04, 1.16, 1.14) else v(1.06, 1.2, 1.18)
+	-- Лицо у всех одной «глубинной» схемы (слои рта подобраны по глубине), у девушек уже по X.
+	local fx = if fem then 0.94 else 1.0
+	local cran = if fem then v(1.04, 1.17, 1.16) else v(1.06, 1.2, 1.18)
 	local headHW = cran.X / 2 -- полуширина черепа
 	sk("Head", v(0, 0.1, 0.06), cran, skin, "Cranium")
-	sk("Head", v(0, -0.0, -0.3), if fem then v(0.88, 0.98, 0.58) else v(0.92, 1.0, 0.6), skin, "Face")
-	if fem then
-		sk("Head", v(0, 0.17, -0.4), v(0.7, 0.18, 0.34), skin, "BrowRidge")
-	else
-		sk("Head", v(0, 0.17, -0.42), v(0.76, 0.2, 0.36), skin, "BrowRidge")
-	end
-	if fem then
-		sk("Head", v(0, -0.235, -0.4), v(0.38, 0.2, 0.34), skin, "Muzzle")
-	else
-		sk("Head", v(0, -0.235, -0.43), v(0.42, 0.22, 0.36), skin, "Muzzle")
-	end
+	sk("Head", v(0, -0.0, -0.3), v(0.92 * fx, 1.0, 0.6), skin, "Face")
+	sk("Head", v(0, 0.17, -0.42 + (if fem then 0.008 else 0)), v(0.76 * fx, 0.2, 0.36), skin, "BrowRidge")
+	sk("Head", v(0, -0.25, -0.43), v(0.42 * fx, 0.26, 0.36), skin, "Muzzle")
 	-- нижняя челюсть на суставе Jaw
+	local beardOn = o.beard ~= nil
+	-- щетина: не отдельный объём, а цвет кожи нижней части лица (облегает челюсть), чуть темнее у подбородка
+	local bAmt = o.beardAmount or 0.52 -- густота щетины (0..1): смешение цвета кожи с цветом бороды
+	local stub = if beardOn then skin:Lerp(o.beard, bAmt) else skin
+	local stubD = if beardOn then skin:Lerp(o.beard, bAmt + 0.1) else skin
 	local jawPivot = H(0, -0.22, 0.18)
 	rig:joint("Jaw", "Head", jawPivot, jawPivot, v(0.1, 0.1, 0.1))
-	local jawS = if fem then v(0.68, 0.5, 0.9) else v(0.78, 0.52, 0.96)
-	local jawC = v(0, -0.34, -0.14)
-	local jawR = v(-16, 0, 0) -- наклон: угол челюсти у уха выше, подбородок ниже
-	local chinS = if fem then v(0.28, 0.25, 0.3) else v(0.34, 0.28, 0.34)
-	local chinC = if fem then v(0, -0.5, -0.37) else v(0, -0.52, -0.37)
-	sk("Jaw", jawC, jawS, skin, "JawSkin", jawR)
-	sk("Jaw", chinC, chinS, skin, "Chin")
-	-- щёки на суставах (поднимаются при улыбке)
-	local cheekC = skin:Lerp(rosyC, if fem then 0.25 else 0.35)
+	local jawS = v(0.78 * (if fem then 0.88 else 1), 0.44, if fem then 0.99 else 1.02)
+	-- верх-перёд челюсти уходит назад (над линией рта лицо — «муфта» на голове): при открытом рте
+	-- в проёме видна полость, а не кожа челюсти
+	local jawC = v(0, -0.4, -0.1)
+	local jawR = v(-10, 0, 0) -- наклон: угол челюсти у уха выше, подбородок ниже
+	local chinS = if fem then v(0.25, 0.24, 0.3) else v(0.34, 0.28, 0.34)
+	local chinC = if fem then v(0, -0.525, -0.425) else v(0, -0.52, -0.37)
+	sk("Jaw", jawC, jawS, stub, "JawSkin", jawR)
+	sk("Jaw", chinC, chinS, stubD, "Chin")
+	-- щёки на суставах (поднимаются при улыбке): цвет кожи с лёгким румянцем
+	local cheekC = skin:Lerp(rosyC, if fem then 0.1 else 0.08)
 	for _, side in { "Right", "Left" } do
 		local s = if side == "Right" then 1 else -1
 		local cj = side .. "Cheek"
-		local cc = if fem then v(s * 0.22, -0.14, -0.33) else v(s * 0.22, -0.13, -0.36)
+		-- в покое «яблочко» щеки утоплено в лицо (не видно), улыбка выдвигает его вперёд-вверх
+		local cc = v(s * 0.22 * fx, -0.15, -0.345)
 		rig:joint(cj, "Head", H(cc.X, cc.Y, cc.Z), H(cc.X, cc.Y, cc.Z), v(0.05, 0.05, 0.05))
-		sk(cj, cc, if fem then v(0.3, 0.25, 0.38) else v(0.34, 0.3, 0.44), cheekC, "Cheek")
+		ell(cj, Hc(cc.X, cc.Y, cc.Z + 0.02), v(0.3 * fx, 0.26, 0.42), cheekC, "SmoothPlastic", "Cheek")
 	end
 	-- уши
 	for _, s in { 1, -1 } do
 		local ec = Hc(s * (headHW + 0.02), -0.04, 0.09) * ang(0, s * -14, s * -5)
-		local earC = skin:Lerp(rosyC, 0.5)
+		local earC = skin:Lerp(rosyC, 0.4)
 		ell("Head", ec, v(0.13, 0.31, 0.21), earC, "SmoothPlastic", "Ear")
 		ell("Head", ec * at(s * 0.04, 0.02, -0.004), v(0.05, 0.2, 0.12), skinDeep, "SmoothPlastic", "EarInner")
 		ell("Head", ec * at(s * 0.045, 0.025, 0.02), v(0.04, 0.22, 0.06), earC, "SmoothPlastic", "EarRim")
@@ -718,45 +735,55 @@ return function(opts)
 	end
 
 	-- ----- глаза -----
+	-- Белок-«миндаль» с тёмной линией ресниц по верху (обод позади белка, смещён вверх), крупная радужка
+	-- под верхним веком. Верхнее веко — тонкая «шторка» над глазом (моргание — вниз), нижнее веко
+	-- в покое утоплено под белок; улыбка поднимает его вперёд-вверх: видимая часть глаза — дуга «◠».
 	local eyeY = 0.0
-	local eyeX = if fem then 0.205 else 0.2
-	local eyeW, eyeH, eyeD = (if fem then 0.215 else 0.195), (if fem then 0.178 else 0.15), 0.1
-	local lashC = rgb(34, 22, 20)
-	local eyeCFs = {}
+	local eyeX = if fem then 0.212 else 0.205
+	local eyeW, eyeH, eyeD = (if fem then 0.236 else 0.214), (if fem then 0.176 else 0.155), 0.1
+	local lashC = rgb(30, 20, 18)
+	local whiteC = rgb(248, 244, 238)
 	for _, side in { "Right", "Left" } do
 		local s = if side == "Right" then 1 else -1
 		local ex = s * eyeX
-		local eyeCF = onFace(ex, eyeY, 0) * at(0, 0, eyeD / 2 - 0.014)
-		eyeCFs[side] = eyeCF
-		ell("Head", eyeCF, v(eyeW, eyeH, eyeD), rgb(246, 242, 236), "SmoothPlastic", "EyeWhite")
-		-- тёмный контур глаза (ресницы сверху толще): чуть больше белка и позади него
-		ell("Head", eyeCF * at(0, eyeH * 0.07, 0.006), v(eyeW + (if o.lashes then 0.03 else 0.022), eyeH + (if o.lashes then 0.026 else 0.018), eyeD * 0.96), lashC, "SmoothPlastic", "EyeRim")
-		-- взгляд: радужка-«колпачок», зрачок, два блика
+		-- лёгкий наклон: внешний уголок чуть выше (у девушек заметнее)
+		local eyeCF = onFace(ex, eyeY, 0, s * (if fem then 5 else 3)) * at(0, 0, eyeD / 2 - 0.016)
+		ell("Head", eyeCF, v(eyeW, eyeH, eyeD), whiteC, "SmoothPlastic", "EyeWhite")
+		-- линия ресниц: обод позади белка, смещён вверх (снизу почти не виден)
+		local rimT = if o.lashes then 0.04 else 0.03
+		ell("Head", eyeCF * at(0, rimT / 2, 0.006), v(eyeW + rimT * 0.8, eyeH + rimT, eyeD * 0.94), lashC, "SmoothPlastic", "LashRim")
+		if o.lashes then
+			-- «стрелка» ресниц у внешнего уголка
+			ell("Head", eyeCF * at(s * eyeW * 0.46, eyeH * 0.3, 0.008) * ang(0, 0, s * 24), v(0.09, 0.03, eyeD * 0.8), lashC, "SmoothPlastic", "LashFlick")
+		end
+		-- взгляд: радужка, зрачок, блики
 		local eyeJ = side .. "Eye"
 		rig:joint(eyeJ, "Head", eyeCF.Position, eyeCF.Position, v(0.05, 0.05, 0.05))
-		local irisD = eyeH * (if fem then 0.86 else 0.82)
+		local irisD = eyeH * (if fem then 0.84 else 0.86)
 		local irisC = o.eyes
-		ell(eyeJ, eyeCF * at(0, 0, -eyeD / 2 + 0.018), v(irisD, irisD, 0.05), irisC:Lerp(BLACK, 0.55), "SmoothPlastic", "IrisRing")
-		ell(eyeJ, eyeCF * at(0, 0, -eyeD / 2 + 0.014), v(irisD * 0.84, irisD * 0.84, 0.05), irisC, "SmoothPlastic", "Iris")
-		ell(eyeJ, eyeCF * at(0, -irisD * 0.12, -eyeD / 2 + 0.0105), v(irisD * 0.5, irisD * 0.36, 0.05), irisC:Lerp(WHITE, 0.25), "SmoothPlastic", "IrisLight")
-		ell(eyeJ, eyeCF * at(0, 0, -eyeD / 2 + 0.008), v(irisD * 0.44, irisD * 0.44, 0.05), rgb(10, 8, 8), "SmoothPlastic", "Pupil")
-		ell(eyeJ, eyeCF * at(irisD * 0.2, irisD * 0.2, -eyeD / 2 + 0.002), v(irisD * 0.24, irisD * 0.24, 0.02), WHITE, "SmoothPlastic", "Glint")
-		ell(eyeJ, eyeCF * at(-irisD * 0.18, -irisD * 0.2, -eyeD / 2 + 0.003), v(irisD * 0.1, irisD * 0.1, 0.02), WHITE, "SmoothPlastic", "Glint")
-		-- верхнее веко (кожа) + линия ресниц; моргание — сдвиг вниз
+		local iy = eyeH * 0.03
+		local fz = -eyeD / 2
+		ell(eyeJ, eyeCF * at(0, iy, fz + 0.018), v(irisD, irisD, 0.05), irisC:Lerp(BLACK, 0.6), "SmoothPlastic", "IrisRing")
+		ell(eyeJ, eyeCF * at(0, iy, fz + 0.0145), v(irisD * 0.86, irisD * 0.86, 0.05), irisC, "SmoothPlastic", "Iris")
+		ell(eyeJ, eyeCF * at(0, iy - irisD * 0.14, fz + 0.011), v(irisD * 0.56, irisD * 0.38, 0.05), irisC:Lerp(WHITE, 0.28), "SmoothPlastic", "IrisLight")
+		ell(eyeJ, eyeCF * at(0, iy, fz + 0.0085), v(irisD * 0.46, irisD * 0.46, 0.05), rgb(12, 8, 8), "SmoothPlastic", "Pupil")
+		ell(eyeJ, eyeCF * at(-irisD * 0.2, iy + irisD * 0.2, fz + 0.002), v(irisD * 0.26, irisD * 0.26, 0.02), WHITE, "SmoothPlastic", "Glint")
+		ell(eyeJ, eyeCF * at(irisD * 0.2, iy - irisD * 0.18, fz + 0.003), v(irisD * 0.1, irisD * 0.1, 0.02), WHITE, "SmoothPlastic", "Glint")
+		-- верхнее веко: «шторка» над глазом, нижний край — по верху линии ресниц
 		local lidJ = side .. "Lid"
 		rig:joint(lidJ, "Head", eyeCF.Position, eyeCF.Position, v(0.05, 0.05, 0.05))
-		local lidY = if fem then 1.12 else 0.94
-		ell(lidJ, eyeCF * at(0, eyeH * lidY, 0.02) * ang(16, 0, 0), v(eyeW + 0.036, eyeH * 1.22, eyeD + 0.02), skin, "SmoothPlastic", "Lid")
-		local lashT = if o.lashes then 0.03 else 0.022
-		local lashY = eyeH * (lidY - 0.6)
-		ell(lidJ, eyeCF * at(0, lashY, 0.016), v(eyeW * 1.02, lashT, eyeD + 0.006), lashC, "SmoothPlastic", "LashLine")
-		if o.lashes then
-			ell(lidJ, eyeCF * at(s * eyeW * 0.5, eyeH * 0.36, 0.006) * ang(0, 0, s * 28), v(0.066, 0.022, eyeD * 0.86), lashC, "SmoothPlastic", "LashFlick")
-		end
-		-- нижнее веко (поднимается при улыбке/прищуре — «смеющиеся» глаза)
+		local lidH = eyeH * 1.05
+		local lidBot = eyeH / 2 + rimT * 0.75
+		ell(lidJ, eyeCF * at(0, lidBot + lidH / 2, fz + 0.07), v(eyeW + 0.05, lidH, 0.05), skin, "SmoothPlastic", "Lid")
+		-- ресницы по краю века: видны при моргании и прищуре (в покое совпадают с линией ресниц)
+		ell(lidJ, eyeCF * at(0, lidBot + 0.008, fz + 0.074), v(eyeW * 1.04, rimT * 0.8, 0.03), lashC, "SmoothPlastic", "LashLine")
+		-- нижнее веко: в покое утоплено под белок
 		local llJ = side .. "LowerLid"
 		rig:joint(llJ, "Head", eyeCF.Position, eyeCF.Position, v(0.05, 0.05, 0.05))
-		ell(llJ, eyeCF * at(0, -eyeH * 0.88, 0.014) * ang(-20, 0, 0), v(eyeW + 0.036, eyeH * 0.95, eyeD + 0.008), skin, "SmoothPlastic", "LowerLid")
+		local llH = eyeH * 0.9
+		ell(llJ, eyeCF * at(0, -eyeH / 2 - llH / 2 + 0.01, fz + 0.03) * ang(10, 0, 0), v(eyeW + 0.02, llH, 0.05), skin:Lerp(rosyC, 0.08), "SmoothPlastic", "LowerLid")
+		-- нижняя линия ресниц по краю нижнего века (в покое — тонкая линия под глазом, при смехе — линия «прищура»)
+		ell(llJ, eyeCF * at(0, -eyeH / 2 + 0.006, fz + 0.012), v(eyeW * 0.8, 0.014, 0.02), lashC:Lerp(skin, 0.25), "SmoothPlastic", "LowerLash")
 	end
 
 	-- ----- брови -----
@@ -764,21 +791,21 @@ return function(opts)
 	local bt = o.browThick
 	for _, side in { "Right", "Left" } do
 		local s = if side == "Right" then 1 else -1
-		local by = eyeY + eyeH * 0.5 + (if fem then 0.115 else 0.08)
+		local by = eyeY + eyeH * 0.5 + (if fem then 0.11 else 0.075)
 		local bj = side .. "Brow"
 		local pivot = onFace(s * (eyeX + 0.005), by, 0.01).Position
 		rig:joint(bj, "Head", pivot, pivot, v(0.05, 0.05, 0.05))
 		-- три сегмента: толстое начало у переносицы, дуга, тонкий хвост
-		ell(bj, onFace(s * (eyeX - 0.07), by, 0.016, -s * 5), v(0.13, 0.06 * bt, 0.05), browC, "SmoothPlastic", "Brow")
-		ell(bj, onFace(s * (eyeX + 0.01), by + 0.012, 0.016, -s * 6), v(0.14, 0.052 * bt, 0.05), browC, "SmoothPlastic", "Brow")
-		ell(bj, onFace(s * (eyeX + 0.085), by - 0.002, 0.012, -s * 20), v(0.12, 0.038 * bt, 0.045), browC, "SmoothPlastic", "Brow")
+		ell(bj, onFace(s * (eyeX - 0.07), by - 0.002, -0.01, -s * 4), v(0.13, 0.062 * bt, 0.05), browC, "SmoothPlastic", "Brow")
+		ell(bj, onFace(s * (eyeX + 0.0), by + 0.012, -0.01, -s * 8), v(0.15, 0.056 * bt, 0.05), browC, "SmoothPlastic", "Brow")
+		ell(bj, onFace(s * (eyeX + 0.075), by + 0.0, -0.011, -s * 20), v(0.13, 0.042 * bt, 0.05), browC, "SmoothPlastic", "Brow")
 	end
 
 	-- ----- нос -----
 	local ns = o.nose
-	local noseC = skin:Lerp(rosyC, if fem then 0.25 else 0.45)
+	local noseC = skin:Lerp(rosyC, if fem then 0.2 else 0.35)
 	ell("Head", onFace(0, -0.03, 0.006), v(0.1 * ns, 0.3 * ns, 0.1 * ns), skin, "SmoothPlastic", "NoseBridge")
-	ell("Head", onFace(0, -0.1, 0.022 * ns), v(0.12 * ns, 0.16 * ns, 0.1 * ns), skin, "SmoothPlastic", "NoseBridge")
+	ell("Head", onFace(0, -0.1, 0.022 * ns), v(0.12 * ns, 0.16 * ns, 0.1 * ns), skin:Lerp(noseC, 0.5), "SmoothPlastic", "NoseBridge")
 	local tipZ = surfZ(0, -0.155) - 0.05 * ns
 	ell("Head", Hc(0, -0.155 * ns, tipZ), v(0.15 * ns, 0.13 * ns, 0.13 * ns), noseC, "SmoothPlastic", "NoseTip")
 	for _, s in { 1, -1 } do
@@ -787,58 +814,89 @@ return function(opts)
 	end
 
 	-- ----- рот -----
-	-- Полость рта и верхние зубы на суставе Mouth: в покое утоплены за поверхность лица (не видны),
-	-- канал jaw выдвигает их вперёд, нижняя губа, зубы, язык и подбородок (сустав Jaw) опускаются.
+	-- Рот — настоящий проём: позади губ тёмная полость и верхние зубы (сустав Mouth на голове).
+	-- Нижняя губа — «полумесяц» на Jaw (середина + края, приподнятые к уголкам; в покое концы спрятаны за
+	-- краями верхней губы). Середина верхней губы — UpperLip, края верхней губы и кожа у уголков — на уголках
+	-- RightMouth/LeftMouth; кожа между уголком и нижней губой (видна при раскрытом рте) — RightLowerLip/LeftLowerLip.
+	-- jaw опускает челюсть, smile поднимает и разводит уголки (верхняя губа — «улыбкой»), oh сводит уголки
+	-- и выгибает верхнюю губу аркой («О»).
 	local my = -0.355 -- линия смыкания губ
 	local mz = surfZ(0, my)
-	local mouthDark = rgb(66, 20, 26)
-	local lipC = skin:Lerp(o.lips, if fem then 0.78 else 0.55)
-	local teethC = rgb(250, 247, 238)
+	local mw = if fem then 0.88 else 1.0 -- ширина рта (и всей «механики» рта по X — слои глубины одинаковы)
+	local cw = 0.135 * mw -- уголок рта (x)
+	local mouthDark = rgb(74, 24, 30)
+	local lipC = skin:Lerp(o.lips, if fem then 0.8 else 0.5)
+	local lipLo = lipC:Lerp(WHITE, 0.05)
+	local teethC = rgb(250, 248, 240)
 	local mPivot = H(0, my, -0.5)
 	rig:joint("Mouth", "Head", mPivot, mPivot, v(0.05, 0.05, 0.05))
-	ell("Mouth", Hc(0, my - 0.065, mz + 0.115), v(0.42, 0.27, 0.16), mouthDark, "SmoothPlastic", "MouthInside")
-	ell("Mouth", Hc(0, my - 0.012, mz + 0.044), v(0.26, 0.1, 0.06), teethC, "SmoothPlastic", "UpperTeeth")
-	-- верхняя губа (с «луком Купидона»)
+	-- полость: передняя поверхность — между кожей челюсти (позади) и губами (впереди)
+	local cavC, cavS = v(0, my - 0.07, -0.488), v(0.34 * mw, 0.36, 0.124)
+	local function cavFront(x, y)
+		local dx, dy = x / (cavS.X / 2), (y - cavC.Y) / (cavS.Y / 2)
+		return cavC.Z - cavS.Z / 2 * math.sqrt(math.max(0, 1 - dx * dx - dy * dy))
+	end
+	-- низ полости наклонён вперёд (перед опустившейся кожей челюсти), верх — позади зубов
+	ell("Mouth", Hc(cavC.X, cavC.Y, cavC.Z) * ang(5, 0, 0), cavS, mouthDark, "SmoothPlastic", "MouthInside")
+	-- верхние зубы: верх спрятан за губой, видна нижняя половина — дуга «∪» во всю ширину проёма
+	ell("Mouth", Hc(0, my + 0.008, -0.462), v(0.27 * mw, 0.1, 0.22), teethC, "SmoothPlastic", "UpperTeeth")
+	-- нижняя челюсть: зубы, язык, нижняя губа-«полумесяц»
+	ell("Jaw", Hc(0, my - 0.04, -0.452), v(0.2 * mw, 0.05, 0.2), teethC:Lerp(rgb(226, 214, 196), 0.3), "SmoothPlastic", "LowerTeeth")
+	ell("Jaw", Hc(0, my - 0.075, -0.452), v(0.22 * mw, 0.1, 0.2), rgb(190, 86, 96), "SmoothPlastic", "Tongue")
+	ell("Jaw", Hc(0, my - 0.031, surfZ(0, my - 0.031) - 0.01), v(0.2 * mw, if fem then 0.068 else 0.062, 0.06), lipLo, "SmoothPlastic", "LowerLip")
+	for _, s in { 1, -1 } do
+		local x0 = s * 0.075 * mw
+		ell("Jaw", Hc(x0, my - 0.022, surfZ(x0, my - 0.022) - 0.003) * ang(0, -s * 12, s * 11), v(0.11 * mw, 0.046, 0.046), lipLo, "SmoothPlastic", "LowerLipSide")
+	end
+	-- середина верхней губы (с «луком Купидона»), шов губ и желобок
 	local ulPivot = H(0, my + 0.04, mz)
 	rig:joint("UpperLip", "Head", ulPivot, ulPivot, v(0.05, 0.05, 0.05))
-	local lipW = if fem then 0.25 else 0.27
-	ell("UpperLip", Hc(0, my + 0.017, mz - 0.008), v(lipW, 0.044, 0.05), lipC, "SmoothPlastic", "UpperLip")
+	ell("UpperLip", Hc(0, my + 0.017, surfZ(0, my + 0.017) - 0.01), v(0.19 * mw, 0.044, 0.054), lipC, "SmoothPlastic", "UpperLip")
 	for _, s in { 1, -1 } do
-		ell("UpperLip", Hc(s * 0.045, my + 0.028, mz - 0.009) * ang(0, 0, s * -12), v(0.11, 0.036, 0.044), lipC, "SmoothPlastic", "UpperLipBow")
+		ell("UpperLip", Hc(s * 0.036 * mw, my + 0.028, surfZ(s * 0.036, my + 0.028) - 0.006) * ang(0, 0, s * -14), v(0.09 * mw, 0.03, 0.04), lipC, "SmoothPlastic", "UpperLipBow")
 	end
-	ell("UpperLip", Hc(0, my + 0.072, surfZ(0, my + 0.072) + 0.008), v(0.06, 0.07, 0.03), skinShade:Lerp(skin, 0.4), "SmoothPlastic", "Philtrum")
-	-- нижняя челюсть: губа, зубы, язык
-	ell("Jaw", Hc(0, my - 0.03, mz + 0.03), v(0.21, 0.05, 0.05), teethC:Lerp(rgb(220, 210, 190), 0.3), "SmoothPlastic", "LowerTeeth")
-	ell("Jaw", Hc(0, my - 0.095, mz + 0.085), v(0.22, 0.09, 0.16), rgb(196, 92, 100), "SmoothPlastic", "Tongue")
-	ell("Jaw", Hc(0, my - 0.028, mz - 0.008), v(lipW - 0.04, if fem then 0.068 else 0.062, 0.058), lipC:Lerp(WHITE, 0.04), "SmoothPlastic", "LowerLip")
-	ell("Jaw", Hc(0, my - 0.075, mz + 0.004), v(0.16, 0.04, 0.04), skinShade:Lerp(skin, 0.3), "SmoothPlastic", "LipShadow")
-	-- уголки рта (+ складка)
+	ell("UpperLip", Hc(0, my - 0.002, mz - 0.028), v(0.17 * mw, 0.01, 0.03), mouthDark, "SmoothPlastic", "LipSeam")
+	ell("UpperLip", Hc(0, my + 0.07, surfZ(0, my + 0.07) + 0.012), v(0.07, 0.08, 0.03), skinShade:Lerp(skin, 0.6), "SmoothPlastic", "Philtrum")
+	-- уголки: края верхней губы, кожа снаружи уголка (закрывает полость при раскрытом рте), складка
 	for _, side in { "Right", "Left" } do
 		local s = if side == "Right" then 1 else -1
-		local mj = side .. "Mouth"
-		local cx = s * 0.135
+		local cx = s * cw
 		local mp = H(cx, my, surfZ(cx, my))
+		local mj = side .. "Mouth"
 		rig:joint(mj, "Head", mp, mp, v(0.05, 0.05, 0.05))
-		ell(mj, Hc(s * 0.15, my + 0.006, surfZ(s * 0.15, my) - 0.001) * ang(0, -s * 22, s * 30), v(0.04, 0.014, 0.03), skinShade:Lerp(skinDeep, 0.4), "SmoothPlastic", "CornerCrease")
+		local ex = s * (cw - 0.058 * mw)
+		ell(mj, Hc(ex, my + 0.014, surfZ(ex, my + 0.014) - 0.014) * ang(0, -s * 14, -s * 9), v(0.13 * mw, 0.034, 0.046), lipC, "SmoothPlastic", "UpperLipSide")
+		-- щека сбоку от рта (неподвижна; у края проёма уходит за полость — край проёма не шире ±0.16)
+		-- сбоку от рта (неподвижно; форма подобрана по глубине: у края проёма уходит за полость, проём не шире ±0.13)
+		sk("Head", v(s * 0.1626 * mw, -0.3504, -0.2102), v(0.4335 * mw, 0.4647, 0.704), stub, "MouthSide", v(-23.6, s * 9.39, -s * 1.18))
+		-- кожа у уголка: тонкий слой чуть впереди полости — закрывает её, когда уголки сходятся («О»)
+		local ccx = cx + s * 0.012
+		-- «щёчка» у уголка на своём суставе (RightCornerSkin/LeftCornerSkin): тонкий слой перед полостью,
+		-- при «О» сдвигается к середине и скругляет проём, при улыбке уходит наружу за щёку
+		local csj = side .. "CornerSkin"
+		rig:joint(csj, "Head", mp, mp, v(0.05, 0.05, 0.05))
+		-- в покое — позади полости (не видна); jaw/oh выдвигают её вперёд (перед полостью, но позади губ)
+		ell(csj, Hc(cx, my - 0.06, -0.495), v(0.14, 0.2, 0.05), stub, "SmoothPlastic", "CornerSkin")
+		ell(mj, onFace(cx + s * 0.012, my + 0.004, -0.003) * ang(0, 0, s * 60), v(0.04, 0.011, 0.02), skinShade:Lerp(skin, 0.3), "SmoothPlastic", "CornerCrease")
 	end
 
 	-- ----- борода-щетина -----
-	-- Короткая густая щетина, облегающая лицо: оболочки на 0.015–0.03 больше кожи, всё на суставе Jaw
-	-- (открывается вместе со ртом). Щёки — оболочка «лица», сдвинутая вниз: её верхняя граница
-	-- проходит под скулами (яблоки щёк остаются кожей) и поднимается к бакенбардам.
-	if o.beard then
-		local bC = o.beard:Lerp(skin, 0.12)
-		local bSoft = o.beard:Lerp(skin, 0.32)
-		ell("Jaw", Hc(jawC.X, jawC.Y - 0.01, jawC.Z) * ang(jawR.X, 0, 0), jawS + v(0.034, 0.034, 0.034), bC, "SmoothPlastic", "BeardJaw")
-		ell("Jaw", Hc(chinC.X, chinC.Y - 0.006, chinC.Z - 0.004), chinS + v(0.04, 0.04, 0.04), bC, "SmoothPlastic", "BeardChin")
-		ell("Jaw", Hc(0, -0.2, -0.27), v(0.96, 0.84, 0.63), bSoft, "SmoothPlastic", "BeardCheeks")
+	-- Короткая густая борода облегает лицо: челюсть и подбородок окрашены (см. выше), усы, бакенбарды.
+	if beardOn then
+		local bSoft = skin:Lerp(o.beard, 0.42)
+		local must = skin:Lerp(o.beard, math.min(0.9, bAmt + 0.28))
 		for _, s in { 1, -1 } do
-			-- бакенбарды: от висков к щетине на щеках
-			ell("Head", Hc(s * (headHW - 0.01), -0.0, 0.0) * ang(0, s * -12, 0), v(0.1, 0.36, 0.2), bSoft:Lerp(o.hair, 0.25), "SmoothPlastic", "Sideburn")
+			ell("Head", Hc(s * (headHW - 0.02), -0.08, -0.02) * ang(0, s * -12, s * 8), v(0.1, 0.42, 0.22), stub:Lerp(o.hair, 0.35), "SmoothPlastic", "Sideburn")
+			-- щетина на щеках: тонкие накладки вровень с кожей (выступают на ~0.005), граница — диагональ
+			-- от бакенбарды к уголку рта
+			for _, pt in { { 0.36, -0.15, 0.22, 0.2, 30 }, { 0.28, -0.21, 0.2, 0.14, 22 }, { 0.2, -0.255, 0.15, 0.09, 14 } } do
+				ell("Head", onFace(s * pt[1], pt[2], -0.011, s * pt[5]), v(pt[3], pt[4], 0.03), stub, "SmoothPlastic", "BeardCheek")
+			end
 			-- усы: от середины к уголкам рта
-			ell("UpperLip", Hc(s * 0.07, my + 0.062, surfZ(s * 0.07, my + 0.062) - 0.008) * ang(0, -s * 10, s * -12), v(0.17, 0.07, 0.05), bC, "SmoothPlastic", "Moustache")
-			ell("UpperLip", Hc(s * 0.15, my + 0.02, surfZ(s * 0.15, my + 0.02) - 0.004) * ang(0, -s * 22, s * -62), v(0.1, 0.05, 0.05), bC, "SmoothPlastic", "Moustache")
+			ell("UpperLip", Hc(s * 0.062, my + 0.064, surfZ(s * 0.062, my + 0.064) - 0.006) * ang(0, -s * 10, s * -10), v(0.15, 0.06, 0.03), must, "SmoothPlastic", "Moustache")
+			ell(if s > 0 then "RightMouth" else "LeftMouth", Hc(s * (cw - 0.01), my + 0.04, surfZ(s * (cw - 0.01), my + 0.04) - 0.005) * ang(0, -s * 18, s * -24), v(0.08, 0.04, 0.026), must, "SmoothPlastic", "Moustache")
 		end
+		ell("Jaw", Hc(0, my - 0.095, surfZ(0, my - 0.095) - 0.003), v(0.08, 0.06, 0.025), must, "SmoothPlastic", "SoulPatch")
 	end
 
 	-- ===== Причёски =====
@@ -871,25 +929,33 @@ return function(opts)
 		return H(math.sin(p) * rx * r, y, 0.06 - math.cos(p) * rz * r)
 	end
 	if style == "quiff" then
-		local fade = hairC:Lerp(skin, 0.38)
+		-- зачёс-кок: короткие виски и затылок (плотная «оболочка» по черепу, книзу светлее — фейд),
+		-- сверху объём из длинных прядей: от линии роста вверх-вперёд, затем назад к макушке
+		local fade = hairC:Lerp(skin, 0.32)
 		local sideC = hairC:Lerp(skin, 0.08)
-		local hi = shade(hairC, 0.1)
-		local lo = shade(hairC, -0.3)
-		-- короткие виски и затылок («фейд»: снизу светлее), граница волос — у верха ушей;
-		-- оболочки сдвинуты назад: линия роста волос на лбу дугой, виски с залысинами
-		ell("Head", Hc(0, 0.06, 0.15), v(cran.X + 0.05, cran.Y - 0.1, cran.Z - 0.06), fade, "SmoothPlastic", "HairFade")
-		ell("Head", Hc(0, 0.2, 0.11), v(cran.X + 0.07, cran.Y - 0.28, cran.Z), sideC, "SmoothPlastic", "HairSides")
-		-- объём сверху (уже головы — без «шляпки») и приподнятый кок надо лбом
-		ell("Head", Hc(0, 0.5, 0.1), v(cran.X - 0.02, 0.6, cran.Z - 0.04), hairC, "SmoothPlastic", "HairTop")
-		ell("Head", Hc(0.03, 0.62, -0.17) * ang(26, 0, -4), v(cran.X - 0.2, 0.36, 0.6), hairC, "SmoothPlastic", "Quiff")
-		-- пряди: от лба вверх-назад к макушке (лёгкая фактура)
-		for i, x in { -0.27, -0.14, -0.01, 0.12, 0.24 } do
-			local a = H(x * 0.92, 0.7 - math.abs(x) * 0.25, -0.32 + math.abs(x) * 0.1)
-			local m = H(x * 1.02, 0.8 - math.abs(x) * 0.3, -0.02)
-			local b = H(x * 0.96, 0.7 - math.abs(x) * 0.3, 0.34)
-			local c = if i % 2 == 0 then hi else lo:Lerp(hairC, 0.5)
-			lock(a, m, 0.15, 0.07, c, "QuiffLock")
-			lock(m, b, 0.16, 0.07, c, "QuiffLock")
+		ell("Head", Hc(0, 0.0, 0.14), v(cran.X + 0.03, cran.Y - 0.16, cran.Z - 0.08), fade, "SmoothPlastic", "HairFade")
+		ell("Head", Hc(0, 0.14, 0.14), v(cran.X + 0.06, cran.Y - 0.2, cran.Z - 0.01), sideC, "SmoothPlastic", "HairSides")
+		ell("Head", Hc(0, 0.42, 0.06), v(cran.X - 0.06, 0.62, cran.Z + 0.02), hairC, "SmoothPlastic", "HairTop")
+		-- объём кока надо лбом (основа под прядями)
+		ell("Head", Hc(0, 0.62, -0.26) * ang(-20, 0, 0), v(cran.X - 0.22, 0.42, 0.62), shade(hairC, -0.04), "SmoothPlastic", "Quiff")
+		local function shine(k)
+			return shade(hairC, k)
+		end
+		-- пряди: x — смещение от пробора, rise — высота кока
+		for i, q in { { -0.3, 0.06 }, { -0.17, 0.15 }, { -0.04, 0.2 }, { 0.09, 0.2 }, { 0.21, 0.15 }, { 0.31, 0.06 } } do
+			local x, rise = q[1], q[2]
+			local ax = math.abs(x)
+			local p0 = H(x * 0.95, 0.44 - ax * 0.12, -0.45 + ax * 0.18) -- линия роста
+			local p1 = H(x * 1.05, 0.62 + rise, -0.44 + ax * 0.16) -- вершина кока
+			local p2 = H(x * 1.08, 0.68 + rise * 0.6 - ax * 0.15, -0.08)
+			local p3 = H(x * 1.02, 0.6 - ax * 0.3, 0.3)
+			local p4 = H(x * 0.9, 0.32 - ax * 0.2, 0.56)
+			local c = if i % 2 == 0 then shine(0.05) else shine(-0.01)
+			local w = 0.32 + rise * 0.2
+			lock(p0, p1, w, 0.13, c, "QuiffLock", v(x * 0.4, -0.3, -1).Unit)
+			lock(p1, p2, w + 0.02, 0.13, c, "QuiffLock", v(x * 0.6, 1, -0.3).Unit)
+			lock(p2, p3, w, 0.12, c, "QuiffLock", v(x * 0.8, 1, 0.3).Unit)
+			lock(p3, p4, w - 0.02, 0.1, shine(-0.04), "QuiffLock", v(x * 0.8, 0.3, 1).Unit)
 		end
 	elseif style == "crop" then
 		local fade = hairC:Lerp(skin, 0.3)
@@ -898,11 +964,13 @@ return function(opts)
 		ell("Head", Hc(0, 0.46, 0.04), v(1.14, 0.6, 1.16), hairC, "SmoothPlastic", "HairTop")
 		ell("Head", Hc(0.06, 0.5, -0.4) * ang(-8, 0, -8), v(0.74, 0.22, 0.3), hairC, "SmoothPlastic", "Fringe")
 	elseif style == "shag" or style == "bob" then
-		-- «шэг»: светлая макушка и густая чёлка до бровей из прядей, «шторки» у лица,
-		-- каштановая масса по бокам и сзади до подбородка слоями, кончики отогнуты наружу; bob — без флипов
+		-- «шэг» до плеч: каштановая масса крупными прядями (без «шлема»), густая чёлка до бровей из
+		-- нескольких широких прядей, «шторки» у лица; светлые пряди (hairHighlight) — у лица справа и на
+		-- концах; кончики отогнуты наружу (bob — внутрь)
 		local hl = o.hairHighlight or shade(hairC, 0.35)
 		local dark = shade(hairC, -0.3)
-		local mid = hairC:Lerp(hl, 0.45)
+		local mid = hairC:Lerp(hl, 0.3)
+		local warm = hairC:Lerp(rgb(150, 92, 60), 0.35)
 		local hsurf = {}
 		local function hk(c, size, color, name, rot)
 			local cf = CFrame.new(c) * (if rot then ang(rot.X, rot.Y, rot.Z) else CFrame.new())
@@ -912,95 +980,115 @@ return function(opts)
 		local function hairZ(x, y)
 			return math.min(frontZ(hsurf, x, y), surfZ(x, y))
 		end
-		-- масса по бокам и сзади (лицо «вырезано» выступающей кожей), подслой темнее
-		hk(v(0, -0.06, 0.13), v(cran.X + 0.18, 1.12, cran.Z + 0.12), hairC, "HairMass")
-		ell("Head", Hc(0, -0.34, 0.2), v(cran.X + 0.1, 0.62, cran.Z - 0.02), dark, "SmoothPlastic", "HairUnder")
-		-- макушка
-		hk(v(0, 0.38, 0.07), v(cran.X + 0.1, 0.78, cran.Z + 0.1), hairC:Lerp(hl, 0.28), "HairCap")
-		-- чёлка: основа до бровей + пряди поверх, концы неровные
-		local browTop = eyeY + eyeH * 0.5 + 0.13
-		hk(v(0, browTop + 0.17, surfZ(0, browTop + 0.12) + 0.035), v(0.8, 0.38, 0.2), hl:Lerp(mid, 0.5), "Bangs", v(22, 0, 0))
-		for i = -4, 4 do
-			local x = i * 0.092
-			local yb = browTop + 0.015 + math.abs(i) * 0.016 + (if i % 2 == 0 then 0 else 0.022)
-			local ya, ym = 0.62, (0.62 + yb) / 2 + 0.05
-			local a = H(x * 0.6, ya, hairZ(x * 0.6, ya) + 0.012)
-			local m = H(x * 0.88, ym, hairZ(x * 0.88, ym) - 0.016)
-			local b = H(x, yb, hairZ(x, yb + 0.05) - 0.012)
-			local c = if i % 3 == 0 then mid elseif i % 2 == 0 then hl else hl:Lerp(WHITE, 0.12)
-			lock(a, m, 0.16, 0.05, c, "Bang", v(0, 0.6, -1).Unit)
-			lock(m, b, 0.14, 0.045, c, "Bang", v(0, 0.15, -1).Unit)
+		local function hc0z(x, y)
+			return surfZ(x, y)
+		end
+		-- точка на оболочке причёски: phi — градусы вокруг головы (0 — лицо, +90 — правое ухо)
+		local function sp(phi, y, k)
+			local p = rad(phi)
+			local dy = (y - 0.12) / (0.66 + k)
+			local r = if dy > 0 then math.sqrt(math.max(0, 1 - dy * dy)) else 1 - 0.08 * math.min(1, -dy)
+			return H(math.sin(p) * (0.57 + k) * r, y, 0.08 - math.cos(p) * (0.62 + k) * r)
+		end
+		-- основа: масса по бокам и сзади, тёмный подслой на затылке, «шапка» сверху
+		hk(v(0, -0.08, 0.14), v(cran.X + 0.14, 1.14, cran.Z + 0.1), hairC, "HairMass")
+		ell("Head", Hc(0, -0.36, 0.3), v(cran.X - 0.04, 0.56, cran.Z - 0.22), shade(hairC, -0.14), "SmoothPlastic", "HairUnder")
+		hk(v(0, 0.16, 0.08), v(cran.X + 0.1, 1.17, cran.Z + 0.1), hairC, "HairCap")
+		-- пряди макушки: несколько широких прядей от темени (лёгкая фактура, без «колбасок»)
+		local crown = H(0.04, 0.74, 0.16)
+		for i, phi in { -105, -60, 60, 105 } do
+			local b2 = sp(phi, 0.42, 0.035)
+			local c = if i % 2 == 0 then shade(hairC, 0.04) else shade(hairC, -0.04)
+			lock(crown:Lerp(b2, 0.12), b2, 0.4, 0.08, c, "TopLock")
+		end
+		-- слои по бокам и сзади: широкие пряди от висков до низа, перекрываются
+		for i, phi in { 66, 94, 122, 152, 180, -152, -122, -94, -66 } do
+			local s = if phi >= 0 then 1 else -1
+			local c = if i % 2 == 0 then shade(hairC, 0.05) else hairC
+			if s > 0 and phi < 80 then
+				c = hl:Lerp(hairC, 0.45) -- светлая прядь справа у лица
+			end
+			lock(sp(phi, 0.3, 0.05), sp(phi - s * 3, -0.36, 0.07), if math.abs(phi) < 80 then 0.24 else 0.32, 0.1, c, "SideLock")
+		end
+		-- низ: «юбка» из широких концов, отогнутых наружу (bob — подвёрнуты внутрь)
+		local flip = if style == "bob" then -0.5 else 1
+		local nEnd = 12
+		for j = 0, nEnd - 1 do
+			local phi = 74 + j * (212 / (nEnd - 1))
+			local s = if phi <= 180 then 1 else -1
+			local len = -0.6 - ((j * 37) % 5) * 0.018
+			local a2 = sp(phi, -0.18, 0.08)
+			local b2 = sp(phi, len, 0.08 + 0.05 * flip)
+			local c = hairC:Lerp(hl, if j % 3 == 0 then 0.28 else 0.14)
+			if phi < 80 then
+				c = hl:Lerp(hairC, 0.3)
+			end
+			lock(a2, b2, 0.28, 0.1, c, "End")
+		end
+		-- чёлка: четыре широкие пряди до бровей, концы неровные; одна — светлая
+		local browTop = eyeY + eyeH * 0.5 + 0.125
+		-- основа чёлки: плоские накладки цвета волос вровень со лбом (между прядями не просвечивает кожа)
+		for _, x in { -0.25, 0, 0.25 } do
+			ell("Head", onFace(x, browTop + 0.14, -0.008, x * -20), v(0.34, 0.28, 0.03), shade(hairC, -0.06), "SmoothPlastic", "FringeBase")
+		end
+		-- пряди чёлки: от линии роста к бровям, перекрываются, концы неровные; одна — светлая
+		for i, x in { -0.33, -0.22, -0.11, 0.0, 0.11, 0.22, 0.33 } do
+			local yb = browTop + (if i % 2 == 0 then 0.0 else 0.03) + math.abs(x) * 0.12
+			local a2 = H(x * 0.6, 0.62, hairZ(x * 0.6, 0.62) + 0.01)
+			local my2 = (0.62 + yb) / 2 + 0.04
+			local m2 = H(x * 0.88, my2, hc0z(x * 0.88, my2) - 0.04)
+			local b2 = H(x, yb, hc0z(x, yb + 0.05) - 0.026)
+			local c = if i == 6 then hl:Lerp(hairC, 0.15) elseif i % 2 == 0 then shade(hairC, 0.06) else hairC
+			lock(a2, m2, 0.2, 0.09, c, "Bang", v(0, 0.5, -1).Unit)
+			lock(m2, b2, 0.18, 0.07, c, "Bang", v(0, 0.12, -1).Unit)
 		end
 		for _, s in { 1, -1 } do
-			-- «шторки»: от края чёлки к скулам, пряди у лица
-			ell("Head", Hc(s * 0.39, 0.15, -0.38) * ang(14, s * -32, s * 12), v(0.17, 0.58, 0.12), hl, "SmoothPlastic", "Curtain")
-			lock(H(s * 0.43, 0.12, -0.36), H(s * 0.47, -0.4, -0.31), 0.15, 0.07, hl, "FaceFrame", v(s * 0.7, 0, -1).Unit)
-			-- слои по бокам
-			ell("Head", Hc(s * 0.56, -0.26, -0.04) * ang(0, s * -8, s * 6), v(0.14, 0.62, 0.44), mid, "SmoothPlastic", "Layer")
-		end
-		-- кончики вокруг низа: отогнуты наружу и вверх
-		for j = 0, 11 do
-			local ph = 58 + j * (244 / 11)
-			local p = rad(ph)
-			local r = 0.58 + (j % 2) * 0.03
-			local y = -0.56 + (j % 3) * 0.035
-			local pos = H(math.sin(p) * r, y, 0.12 - math.cos(p) * r * 0.9)
-			local out = v(math.sin(p), 0, -math.cos(p))
-			local Y = (out * (if style == "bob" then 0.2 else 0.75) + v(0, if style == "bob" then -1 else 0.66, 0)).Unit
-			local X = Y:Cross(out).Unit
-			local Z = X:Cross(Y)
-			ell("Head", CFrame.fromMatrix(pos, X, Y, Z), v(0.22, 0.26, 0.1), if j % 3 == 0 then dark elseif j % 3 == 1 then hairC else mid, "SmoothPlastic", "Flick")
+			-- «шторки» у лица: от края чёлки к скулам и ниже (справа — светлая)
+			local c = if s > 0 then hl:Lerp(hairC, 0.42) else shade(hairC, 0.06)
+			lock(H(s * 0.39, 0.42, -0.34), H(s * 0.45, -0.38, -0.33), 0.2, 0.09, c, "Curtain", v(s * 0.75, 0.1, -1).Unit)
 		end
 	elseif style == "curls" then
-		-- густые короткие кудри: объём сверху и у висков, кудри падают на лоб, затылок короче
-		local mat = "Plastic"
-		ell("Head", Hc(0, 0.4, 0.06), v(cran.X + 0.14, 0.94, cran.Z + 0.12), hairC, "SmoothPlastic", "HairBase")
-		ell("Head", Hc(0, 0.02, 0.2), v(cran.X + 0.1, 0.9, cran.Z - 0.12), hairC, "SmoothPlastic", "HairBack")
-		local k = 0
-		local c1, c2, c3 = shade(hairC, 0.12), hairC, shade(hairC, -0.22)
-		local function jit(i)
-			return ((i * 37) % 11) / 10 - 0.5 -- псевдослучайно -0.5..0.5
+		-- густые кудри «шапкой»: тёмная основа + завитки-«запятые» разного размера и наклона (точки Фибоначчи
+		-- по оболочке), сверху объём и светлее (солнце), у лба — свисающие завитки, затылок короче
+		local base = shade(hairC, -0.08)
+		ell("Head", Hc(0, 0.32, 0.1), v(cran.X + 0.08, 1.0, cran.Z + 0.04), base, "SmoothPlastic", "HairBase")
+		ell("Head", Hc(0, -0.02, 0.2), v(cran.X + 0.06, 0.84, cran.Z - 0.12), base, "SmoothPlastic", "HairBack")
+		local function rnd(i, k)
+			local x = math.sin(i * 12.9898 + k * 78.233) * 43758.5453
+			return x - math.floor(x)
 		end
-		local function curl(p, d)
-			k += 1
-			local m = (k * 7) % 5
-			local c = if m == 0 then c1 elseif m <= 2 then c2 else c3
-			local out = (p - HC0).Unit
-			p += out * jit(k) * 0.06
-			ball("Head", p, d, c, mat, "Curl")
-			if k % 3 == 0 then
-				-- завиток: колечко поверх
-				ball("Head", p + out * d * 0.38 + v(0, d * 0.1, 0), d * 0.52, shade(c, 0.08), mat, "Curl")
+		local C0 = H(0, 0.22, 0.07)
+		local function curl(i, p, d, sz, c)
+			-- завиток: вытянутая вдоль «потока» (вниз по голове, ±35°) прядь + колечко на конце
+			local up = if math.abs(d.Y) > 0.95 then v(1, 0, 0) else v(0, 1, 0)
+			local X = up:Cross(d).Unit
+			local Y = d:Cross(X)
+			local cf = CFrame.fromMatrix(p, X, Y, d) * ang(0, 0, (rnd(i, 3) - 0.5) * 70)
+			ell("Head", cf, v(sz * 0.8, sz * 1.25, sz * 0.55), c, "SmoothPlastic", "Curl")
+			ell("Head", cf * at((rnd(i, 6) - 0.5) * sz * 0.4, -sz * 0.52, -sz * 0.08), v(sz * 0.62, sz * 0.5, sz * 0.5), shade(c, 0.06), "SmoothPlastic", "Curl")
+		end
+		local n = 150
+		for i = 0, n - 1 do
+			local yN = 1 - (i + 0.5) / n * 2
+			local r = math.sqrt(1 - yN * yN)
+			local th = i * 2.39996
+			local d = v(math.sin(th) * r, yN, -math.cos(th) * r)
+			local fr = -d.Z
+			local skip = (fr > 0.45 and d.Y < 0.3) or (fr > 0.15 and d.Y < -0.1) or d.Y < -0.66 or (fr > -0.2 and d.Y < -0.42)
+			if not skip then
+				local R = v(0.6, 0.62, 0.68)
+				local p = C0 + v(d.X * R.X, d.Y * R.Y, d.Z * R.Z) * (0.99 + 0.08 * rnd(i, 1))
+				local sz = 0.19 + 0.08 * rnd(i, 2)
+				local lit = math.clamp(d.Y, 0, 1) * 0.12
+				local c = if rnd(i, 4) < 0.3 then shade(hairC, -0.1 + lit) else shade(hairC, lit + 0.04 * rnd(i, 5))
+				curl(i, p, d, sz, c)
 			end
 		end
-		-- купол: кольца по широте (сверху выше — объём)
-		local rings = { { 84, 3 }, { 70, 9 }, { 56, 13 }, { 42, 16 }, { 28, 19 }, { 14, 20 }, { 0, 21 }, { -14, 20 }, { -28, 18 } }
-		for ri, rg in rings do
-			local lat = rad(rg[1])
-			local yy = 0.34 + 0.58 * math.sin(lat)
-			for j = 0, rg[2] - 1 do
-				local th = (j + (ri % 2) * 0.5) / rg[2] * math.pi * 2
-				local fc = math.cos(th)
-				local isFace = (fc > 0.62 and yy < 0.46) or (fc > 0.25 and yy < 0.1)
-				if not isFace then
-					local rr = math.cos(lat) * (0.6 + (if fc < 0 then 0.02 else 0.0))
-					local x = math.sin(th) * rr * 1.04
-					local z = -fc * rr + 0.07
-					curl(H(x, yy + ((j * 5) % 3 - 1) * 0.02, z), 0.16 + ((j * 7 + ri * 3) % 5) * 0.012)
-				end
-			end
-		end
-		-- нижний ряд за ушами и на затылке (короче)
-		local n = 14
-		for j = 0, n - 1 do
-			local th = rad(96 + j * (168 / (n - 1)))
-			local x = math.sin(th) * 0.58
-			local z = -math.cos(th) * 0.62 + 0.08
-			curl(H(x, -0.22 - (j % 2) * 0.04, z), 0.15)
-		end
-		-- кудри, падающие на лоб (асимметрично)
-		for i, p in { { -0.32, 0.44, -0.46 }, { -0.16, 0.48, -0.52 }, { 0.02, 0.47, -0.55 }, { 0.19, 0.43, -0.52 }, { -0.07, 0.4, -0.57 }, { 0.33, 0.36, -0.45 }, { -0.4, 0.33, -0.4 }, { 0.12, 0.38, -0.57 } } do
-			ball("Head", H(p[1], p[2], p[3]), 0.14 + (i % 3) * 0.02, if i % 2 == 0 then c2 else c1, mat, "FringeCurl")
+		-- завитки, падающие на лоб (асимметрично, больше на правую сторону)
+		for i, q in { { -0.32, 0.36, -0.45 }, { -0.16, 0.38, -0.52 }, { 0.02, 0.37, -0.54 }, { 0.19, 0.34, -0.52 }, { 0.34, 0.28, -0.44 }, { 0.1, 0.29, -0.56 }, { -0.07, 0.3, -0.56 } } do
+			local p = H(q[1], q[2], q[3])
+			local d = v(q[1] * 0.8, 0.25, -1).Unit
+			curl(200 + i, p, d, 0.17 + (i % 3) * 0.025, shade(hairC, 0.05 * (i % 2)))
 		end
 	elseif style == "bun" then
 		ell("Head", Hc(0, 0.36, 0.06), v(1.2, 0.86, 1.24), hairC, "SmoothPlastic", "HairTop")
@@ -1171,6 +1259,19 @@ return function(opts)
 				end
 				ell("Glasses", c1 * at(s * 0.01, -0.02, 0.004), v(0.355, 0.255, 0.018), lens, "SmoothPlastic", "LensBack", { reflectance = 0.3 })
 				loop(c1, s, pts, 0.017, -0.003)
+			elseif kind == "round" then
+				-- овальные линзы (круглые «ретро»), тонкая оправа
+				local pts = {}
+				for k = 0, 13 do
+					local t = k / 14 * math.pi * 2
+					table.insert(pts, { 0.15 * math.cos(t), 0.115 * math.sin(t) })
+				end
+				for _, rw in { { 0.07, 0.24 }, { 0.022, 0.29 }, { -0.026, 0.29 }, { -0.072, 0.23 } } do
+					part("Glasses", c1 * at(0, rw[1], 0), v(rw[2], 0.05, 0.016), lens, "Glass", "Lens", { reflectance = 0.2, transparency = lensT })
+				end
+				ell("Glasses", c1 * at(0, 0, 0.004), v(0.29, 0.22, 0.018), lens, "SmoothPlastic", "LensBack", { transparency = math.min(0.6, lensT) })
+				loop(c1, s, pts, 0.026, 0)
+				templeX = 0.39
 			elseif kind == "hex" then
 				-- «геометрическая» восьмиугольная оправа
 				local pts = { { -0.17, 0.04 }, { -0.13, 0.1 }, { 0.13, 0.1 }, { 0.17, 0.04 }, { 0.17, -0.04 }, { 0.13, -0.1 }, { -0.13, -0.1 }, { -0.17, -0.04 } }
@@ -1198,38 +1299,57 @@ return function(opts)
 		end
 	end
 
+	-- ===== Контрольные точки для аниматоров =====
+	rig.headCenter = H(0, 0, 0)
+	rig.glassesHome = H(0, 0.0, -R - 0.075)
+
 	-- ===== Лицевые каналы =====
-	local blinkK = (if fem then 1.12 else 0.94) - 0.61 + 0.53 -- веко от покоя до низа глаза
+	local rimT = if o.lashes then 0.04 else 0.03
+	local blinkD = eyeH + rimT * 0.75 -- веко от покоя до низа глаза
+	local function pair(jr, jl, pos, rot)
+		local out = { joint = jr, pos = pos, rot = rot }
+		local m = { joint = jl, pos = if pos then v(-pos.X, pos.Y, pos.Z) else nil, rot = if rot then v(rot.X, -rot.Y, -rot.Z) else nil }
+		return out, m
+	end
+	local function list(...)
+		local t = {}
+		for _, e in { ... } do
+			table.insert(t, e)
+		end
+		return t
+	end
+	local function both(jr, jl, pos, rot)
+		return pair(jr, jl, pos, rot)
+	end
+	local jr2, jl2 = both("RightMouth", "LeftMouth", v(0, -0.025, -0.006), nil)
+	local sr1, sl1 = both("RightMouth", "LeftMouth", v(0.035, 0.05, -0.012), v(0, 0, 14))
+	local sr3, sl3 = both("RightCheek", "LeftCheek", v(0.012, 0.045, -0.036), nil)
+	local or1, ol1 = both("RightMouth", "LeftMouth", v(-0.035, 0, -0.004), v(0, 0, -12))
+	local or3, ol3 = both("RightCornerSkin", "LeftCornerSkin", v(-0.012, 0, -0.016), nil)
+	local sr4, sl4 = both("RightCornerSkin", "LeftCornerSkin", v(0.045, 0.03, 0), nil)
+	local jr4, jl4 = both("RightCornerSkin", "LeftCornerSkin", v(0, -0.02, -0.03), v(0, 0, -14))
 	rig.face = {
-		jaw = { { joint = "Jaw", rot = v(-16, 0, 0), pos = v(0, -0.015, 0) }, { joint = "Mouth", pos = v(0, -0.012, -0.036) } },
-		smile = {
-			{ joint = "RightMouth", pos = v(0.04, 0.045, -0.012), rot = v(0, 0, 12) },
-			{ joint = "LeftMouth", pos = v(-0.04, 0.045, -0.012), rot = v(0, 0, -12) },
-			{ joint = "RightCheek", pos = v(0.01, 0.035, -0.016) },
-			{ joint = "LeftCheek", pos = v(-0.01, 0.035, -0.016) },
-			{ joint = "UpperLip", pos = v(0, 0.018, -0.004) },
-			{ joint = "Mouth", pos = v(0, 0.01, -0.004) },
-			{ joint = "RightLid", pos = v(0, -eyeH * 0.32, -0.018) },
-			{ joint = "LeftLid", pos = v(0, -eyeH * 0.32, -0.018) },
-			{ joint = "RightLowerLid", pos = v(0, eyeH * 0.32, -0.018) },
-			{ joint = "LeftLowerLid", pos = v(0, eyeH * 0.32, -0.018) },
-		},
-		oh = {
-			{ joint = "RightMouth", pos = v(-0.04, 0.0, -0.02) },
-			{ joint = "LeftMouth", pos = v(0.04, 0.0, -0.02) },
-			{ joint = "UpperLip", pos = v(0, 0.02, -0.012) },
-			{ joint = "Jaw", pos = v(0, 0, -0.01) },
-		},
+		jaw = list({ joint = "Jaw", rot = v(-14, 0, 0), pos = v(0, -0.012, -0.054) }, { joint = "Mouth", pos = v(0, -0.006, -0.004) }, jr2, jl2, jr4, jl4),
+		smile = list(
+			sr1, sl1, sr3, sl3, sr4, sl4,
+			{ joint = "UpperLip", pos = v(0, 0.026, -0.006) },
+			{ joint = "Jaw", rot = v(-3, 0, 0), pos = v(0, 0, -0.012) },
+			{ joint = "RightLid", pos = v(0, eyeH * 0.22, 0.02) },
+			{ joint = "LeftLid", pos = v(0, eyeH * 0.22, 0.02) },
+			{ joint = "RightLowerLid", pos = v(0, eyeH * 0.6, -0.026) },
+			{ joint = "LeftLowerLid", pos = v(0, eyeH * 0.6, -0.026) }
+		),
+		oh = list(or1, ol1, or3, ol3, { joint = "UpperLip", pos = v(0, 0.02, -0.014) }, { joint = "Jaw", pos = v(0, 0, -0.012) }, { joint = "Mouth", pos = v(0, 0.035, 0.006) }),
 		brows = { { joint = "RightBrow", pos = v(0, 0.06, 0), rot = v(0, 0, -4) }, { joint = "LeftBrow", pos = v(0, 0.06, 0), rot = v(0, 0, 4) } },
 		browR = { { joint = "RightBrow", pos = v(0, 0.06, 0), rot = v(0, 0, -4) } },
 		browL = { { joint = "LeftBrow", pos = v(0, 0.06, 0), rot = v(0, 0, 4) } },
 		frown = { { joint = "RightBrow", pos = v(-0.012, -0.025, 0), rot = v(0, 0, 12) }, { joint = "LeftBrow", pos = v(0.012, -0.025, 0), rot = v(0, 0, -12) } },
-		blink = { { joint = "RightLid", pos = v(0, -eyeH * blinkK, -0.032) }, { joint = "LeftLid", pos = v(0, -eyeH * blinkK, -0.032) } },
+		blink = { { joint = "RightLid", pos = v(0, -blinkD, -0.074) }, { joint = "LeftLid", pos = v(0, -blinkD, -0.074) } },
 		squint = {
-			{ joint = "RightLid", pos = v(0, -eyeH * 0.42, -0.02) },
-			{ joint = "LeftLid", pos = v(0, -eyeH * 0.42, -0.02) },
-			{ joint = "RightLowerLid", pos = v(0, eyeH * 0.22, -0.014) },
-			{ joint = "LeftLowerLid", pos = v(0, eyeH * 0.22, -0.014) },
+			{ joint = "RightLid", pos = v(0, -eyeH * 0.14, -0.06) },
+			{ joint = "LeftLid", pos = v(0, -eyeH * 0.14, -0.06) },
+			{ joint = "RightLowerLid", pos = v(0, eyeH * 0.32, -0.03) },
+			{ joint = "LeftLowerLid", pos = v(0, eyeH * 0.32, -0.03) },
 		},
 		lookX = { { joint = "RightEye", rot = v(0, -22, 0) }, { joint = "LeftEye", rot = v(0, -22, 0) } },
 		lookY = { { joint = "RightEye", rot = v(18, 0, 0) }, { joint = "LeftEye", rot = v(18, 0, 0) } },

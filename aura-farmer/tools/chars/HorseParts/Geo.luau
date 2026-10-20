@@ -13,20 +13,50 @@ local Geo = {}
 Geo.__index = Geo
 
 function Geo.new(rig)
-	return setmetatable({ rig = rig, xf = nil }, Geo)
+	return setmetatable({ rig = rig, xf = nil, map = nil }, Geo)
 end
 
--- Создать деталь; если задан self.xf (CFrame), он применяется ко всей детали (напр. наклон морды).
+-- Преобразование «проектного» пространства в char space (для головы): подобие
+--   p' = T + R * (p - C) * k   (k — масштаб, R — поворот, C — центр в проекте, T — куда он попадает).
+-- Размеры деталей умножаются на k. Задаётся через g:setMap(...) / g.map = nil.
+function Geo:setMap(C, T, k, R)
+	if C == nil then
+		self.map = nil
+		return
+	end
+	self.map = { C = C, T = T, k = k, R = R or CFrame.new() }
+end
+
+local function mapCF(m, cf)
+	local p = m.T + (m.R * ((cf.Position - m.C) * m.k))
+	local r = m.R * (cf - cf.Position)
+	return r + p
+end
+Geo.mapCF = mapCF
+
+-- Создать деталь; если задан self.xf (CFrame), он применяется ко всей детали (напр. наклон морды),
+-- затем — отображение self.map (масштаб головы).
 function Geo:put(bone, spec)
 	if self.xf then
 		spec.cf = self.xf * spec.cf
 	end
+	if self.map then
+		spec.cf = mapCF(self.map, spec.cf)
+		spec.size = spec.size * self.map.k
+	end
 	return self.rig:part(bone, spec)
 end
 
--- Точка с учётом текущего преобразования.
+-- Точка (проект -> char space) с учётом текущих преобразований.
 function Geo:pt(p)
-	return if self.xf then self.xf * p else p
+	if self.xf then
+		p = self.xf * p
+	end
+	if self.map then
+		local m = self.map
+		p = m.T + m.R * ((p - m.C) * m.k)
+	end
+	return p
 end
 
 function Geo.hex(h: string)

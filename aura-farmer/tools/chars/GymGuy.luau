@@ -1,6 +1,6 @@
 --!nocheck
--- Статист в спортзале (S10, на скамье/у зеркала на заднем плане): короткая тёмная стрижка, лёгкая щетина,
--- чёрная футболка, серые шорты, белые носки и кроссовки.
+-- Статист в спортзале (S10, на заднем плане за конём / у зеркала): короткие тёмные кудри, белая майка,
+-- чёрные спортивные шорты с белыми лампасами, белые носки и кроссовки. Собран на Human.
 local roblox = require("@lune/roblox")
 local Color3 = roblox.Color3
 local Human = require("./Human")
@@ -11,23 +11,28 @@ end
 
 return function(opts)
 	local o = {
-		skin = rgb(204, 148, 118),
+		skin = rgb(204, 140, 104),
+		rosy = 0.2,
 		eyes = rgb(64, 46, 34),
 		lips = rgb(170, 100, 92),
-		hair = rgb(30, 22, 18),
+		hair = rgb(34, 24, 20),
 		brows = rgb(32, 22, 18),
 		browThick = 1.1,
-		hairStyle = "crop",
-		beard = rgb(120, 86, 70),
-		top = rgb(30, 30, 34),
-		topStyle = "tee",
-		bottom = rgb(112, 114, 120),
-		bottomStyle = "shorts",
+		hairStyle = "curls",
+		beard = rgb(70, 50, 40),
+		beardAmount = 0.3,
+		top = rgb(240, 239, 236),
+		topStyle = "tank",
+		scoop = 0.45,
+		bottom = rgb(20, 20, 24),
+		bottomStyle = "track",
+		stripe = rgb(242, 242, 240),
 		shoes = "sneakers",
 		shoeColor = rgb(240, 240, 238),
 		socks = rgb(240, 240, 238),
-		build = 1.06,
-		height = 1.03,
+		build = 1.0,
+		height = 1.02,
+		armW = 0.58,
 	}
 	for k, v in opts or {} do
 		o[k] = v
