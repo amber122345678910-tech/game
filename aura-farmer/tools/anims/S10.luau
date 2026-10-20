@@ -1,11 +1,12 @@
 --!nocheck
 -- Ключи анимации плана S10 (см. tools/lib/Pose.luau — формат ключей).
 -- Конь сидит верхом на переднем конце скамьи лицом к камере, качает гантель «500 KG» правой рукой
--- в долю: подъём на долях 23 и 25 (11.383, 12.358), опускание на 24 и 26 (11.870, 12.846);
+-- в долю: подъём на долях 23 и 25 (11.382, 12.358), опускание на 24 и 26 (11.870, 12.846);
 -- движение — первая половина доли (~0.24 с), вторая половина — стоп-поза. Левая ладонь лежит на левом колене.
+-- Корпус наклонён к коленям и «складывается» на опускании; голова повёрнута и наклонена к правому плечу.
 -- Статисты за ним делают махи ногой назад синхронно с гантелью.
 
-local B23, B24, B25, B26 = 11.382, 11.870, 12.358, 12.846
+local B23, B24, B25, B26 = 11.3824, 11.8702, 12.358, 12.8458
 
 local function merge(...)
 	local out = {}
@@ -16,90 +17,146 @@ local function merge(...)
 	end
 	return out
 end
+local function lerp(a, b, k)
+	return a + (b - a) * k
+end
+local function lerpV(a, b, k)
+	return { lerp(a[1], b[1], k), lerp(a[2], b[2], k), lerp(a[3], b[3], k) }
+end
+local function lerpT(A, B, k)
+	local o = {}
+	for key, va in A do
+		o[key] = lerp(va, B[key] or 0, k)
+	end
+	return o
+end
 
 -- ===================== КОНЬ =====================
+-- Фаза «сгиба» k: 0 — гантель внизу, 1 — вверху (k<0 — упреждающий присед, k>1 — перелёт).
+local CURL = {
+	{ 11.0, 0 },
+	{ 11.1333, 0 },
+	{ 11.26, 0.01 },
+	{ B23 - 0.016, -0.07 }, -- упреждение: кисть и плечо чуть проседают
+	{ B23 + 0.1, 0.62, "out" }, -- подъём: резкий старт (cubic out)
+	{ B23 + 0.215, 1.06 }, -- перелёт ~3°
+	{ B23 + 0.3, 1.0 },
+	{ B24 - 0.005, 0.99 },
+	{ B24 + 0.13, 0.5 }, -- опускание: sine in-out
+	{ B24 + 0.255, -0.02 },
+	{ B24 + 0.32, 0 },
+	{ B25 - 0.016, -0.07 },
+	{ B25 + 0.1, 0.62, "out" },
+	{ B25 + 0.215, 1.06 },
+	{ B25 + 0.3, 1.0 },
+	{ B26 - 0.005, 0.99 },
+	{ B26 + 0.13, 0.5 },
+	{ B26 + 0.255, -0.02 },
+	{ 13.25, 0 },
+}
+local function curlAt(t)
+	if t <= CURL[1][1] then
+		return CURL[1][2]
+	end
+	for i = 1, #CURL - 1 do
+		local a, b = CURL[i], CURL[i + 1]
+		if t <= b[1] then
+			return lerp(a[2], b[2], (t - a[1]) / (b[1] - a[1]))
+		end
+	end
+	return CURL[#CURL][2]
+end
+
+-- таз: сидит на сиденье, наклонён вперёд
+local ROOT = { y = -0.72, f = 0, bend = 10, turn = 0, tilt = 0 }
+-- верх корпуса: внизу — наклон к коленям, крен и поворот к правому плечу; вверху — выпрямляется
+local W_DN = { bend = 24, turn = -8, tilt = 12 }
+local W_UP = { bend = 9, turn = 4, tilt = 0 }
+local function waistK(k)
+	return lerpT(W_DN, W_UP, k)
+end
+
 local LEGS = {
-	root = { y = -0.72, f = 0, bend = 8 },
+	root = ROOT,
 	rLeg = { ik = { 1.42, 0.62, 0.95 }, pole = { 0.7, 0.2, 1 } },
 	lLeg = { ik = { -1.42, 0.62, 0.95 }, pole = { -0.7, 0.2, 1 } },
 }
 -- левая ладонь на левом колене
-local LARM = { lArm = { ik = { -1.36, 2.25, 0.85 }, pole = { -1, 0.1, -0.3 }, wrist = { palm = { 0, -1, 0 }, fingers = { 0.2, -0.5, 1 } } }, lHand = { curl = 0.4, thumb = 0.2, thumbOut = 0.5, spread = 0.1 } }
-
--- правая рука: внизу (гантель у правого колена), середина подъёма, верх (у морды)
-local function rArmDown(dy)
-	return { ik = { 2.9, 1.68 + (dy or 0), 1.8 }, pole = { 1, 0.1, -0.5 }, wrist = { palm = { -0.45, 0, -0.9 }, fingers = { 0, -1, 0 } } }
-end
-local R_MID = { ik = { 2.8, 2.3, 1.95 }, pole = { 1, -0.5, -0.4 }, wrist = { palm = { -0.18, 0.79, -0.57 }, fingers = { 0.25, 0.6, 0.75 } } }
-local function rArmUp(dy)
-	return { ik = { 2.45, 3.38 + (dy or 0), 2.15 }, pole = { 0.6, -1, -0.2 }, wrist = { palm = { -0.82, 0, -0.55 }, fingers = { -0.1, 1, 0.15 } } }
-end
-local R_MID_DN = { ik = { 2.8, 2.15, 1.95 }, pole = { 1, -0.5, -0.4 }, wrist = { palm = { -0.18, 0.79, -0.57 }, fingers = { 0.25, 0.6, 0.75 } } }
-
-local W_DOWN = { bend = 30, turn = 16, tilt = 18 }
-local W_MID = { bend = 24, turn = 4, tilt = 9 }
-local W_UP = { bend = 18, turn = -4, tilt = 2 }
-local W_UP_OS = { bend = 16, turn = -5, tilt = 1 }
-
-local DB_DOWN = { Dumbbell = { rz = 0 } }
-local DB_MID = { Dumbbell = { rz = 45 } }
-local DB_UP = { Dumbbell = { rz = 88 } }
-
-local function bodyKey(t, waist, rArm, db, ease)
-	return merge(LEGS, LARM, { t = t, waist = waist, rArm = rArm, rHand = "fist", joints = db, ease = ease })
-end
-
-local horse = {
-	-- нижняя стоп-поза
-	bodyKey(11.0, W_DOWN, rArmDown(), DB_DOWN),
-	bodyKey(11.1333, W_DOWN, rArmDown(), DB_DOWN),
-	bodyKey(11.30, { bend = 30.5, turn = 16, tilt = 18.5 }, rArmDown(0.01), DB_DOWN),
-	-- упреждение: кисть и плечо чуть проседают
-	bodyKey(B23 - 0.01, { bend = 31.5, turn = 16.5, tilt = 19.5 }, rArmDown(-0.06), DB_DOWN),
-	-- подъём (резкий, ease-out) с перелётом
-	bodyKey(B23 + 0.095, W_MID, R_MID, DB_MID),
-	bodyKey(B23 + 0.215, W_UP_OS, rArmUp(0.08), DB_UP),
-	bodyKey(B23 + 0.29, W_UP, rArmUp(), DB_UP),
-	-- верхняя стоп-поза
-	bodyKey(B24 - 0.005, { bend = 18.5, turn = -4, tilt = 2.5 }, rArmUp(-0.01), DB_UP),
-	-- опускание (sine in-out)
-	bodyKey(B24 + 0.12, W_MID, R_MID_DN, DB_MID),
-	bodyKey(B24 + 0.245, W_DOWN, rArmDown(-0.02), DB_DOWN),
-	bodyKey(B24 + 0.30, W_DOWN, rArmDown(), DB_DOWN),
-	-- нижняя стоп-поза 2
-	bodyKey(B25 - 0.01, { bend = 31.5, turn = 16.5, tilt = 19.5 }, rArmDown(-0.06), DB_DOWN),
-	bodyKey(B25 + 0.095, W_MID, R_MID, DB_MID),
-	bodyKey(B25 + 0.215, W_UP_OS, rArmUp(0.08), DB_UP),
-	bodyKey(B25 + 0.29, W_UP, rArmUp(), DB_UP),
-	bodyKey(B26 - 0.005, { bend = 18.5, turn = -4, tilt = 2.5 }, rArmUp(-0.01), DB_UP),
-	bodyKey(B26 + 0.12, W_MID, R_MID_DN, DB_MID),
-	bodyKey(B26 + 0.245, W_DOWN, rArmDown(-0.02), DB_DOWN),
-	bodyKey(13.25, W_DOWN, rArmDown(), DB_DOWN),
+local LARM = {
+	lArm = { ik = { -1.36, 2.25, 0.85 }, pole = { -1, 0.1, -0.3 }, wrist = { palm = { 0, -1, 0 }, fingers = { 0.2, -0.5, 1 } } },
+	lHand = { curl = 0.4, thumb = 0.2, thumbOut = 0.5, spread = 0.1 },
 }
 
--- голова/шея (отдельная дорожка: кивки, подъём головы при пении)
-local NECK = {
-	{ 11.0, -8, -28, 7 },
-	{ 11.1333, -8, -28, 7 },
-	{ 11.30, -7, -28, 7 },
-	{ B23 + 0.10, -8, -24, 4 },
-	{ B23 + 0.25, -6, -22, 6 },
-	{ 11.75, -4, -22, 6 }, -- кивок вниз в стоп-позе
-	{ B24, -7, -22, 6 },
-	{ 12.0, -14, -24, 5 }, -- AIN'T: голова вверх
-	{ 12.133, -12, -26, 4 },
-	{ 12.333, -18, -26, 2 }, -- GOT: запрокинута
-	{ B25 + 0.08, -16, -24, 3 },
-	{ 12.533, -22, -22, 2 }, -- NO
-	{ 12.633, -16, -21, 5 },
-	{ 12.767, -18, -21, 5 }, -- WOR-
-	{ B26 + 0.02, -17, -22, 5 },
-	{ 12.967, -12, -24, 5 }, -- -RIES
-	{ 13.1, -14, -26, 4 },
-	{ 13.25, -14, -26, 4 },
+-- правая рука: низ (гантель у правого колена), середина, верх (у морды)
+local A_DN = { ik = { 2.9, 1.68, 1.8 }, pole = { 1, 0.1, -0.5 }, palm = { -0.45, 0, -0.9 }, fingers = { 0, -1, 0 } }
+local A_MID = { ik = { 2.8, 2.3, 1.95 }, pole = { 1, -0.5, -0.4 }, palm = { -0.18, 0.79, -0.57 }, fingers = { 0.25, 0.6, 0.75 } }
+local A_UP = { ik = { 2.45, 3.38, 2.15 }, pole = { 0.6, -1, -0.2 }, palm = { -0.82, 0, -0.55 }, fingers = { -0.1, 1, 0.15 } }
+local function armOf(a, dy)
+	return { ik = { a.ik[1], a.ik[2] + (dy or 0), a.ik[3] }, pole = a.pole, wrist = { palm = a.palm, fingers = a.fingers } }
+end
+local function lerpArm(a, b, k)
+	return { ik = lerpV(a.ik, b.ik, k), pole = lerpV(a.pole, b.pole, k), palm = lerpV(a.palm, b.palm, k), fingers = lerpV(a.fingers, b.fingers, k) }
+end
+local K_MID = 0.6
+local function armK(k)
+	if k <= 0 then
+		return armOf(A_DN, k * 0.9)
+	elseif k <= K_MID then
+		return armOf(lerpArm(A_DN, A_MID, k / K_MID))
+	elseif k <= 1 then
+		return armOf(lerpArm(A_MID, A_UP, (k - K_MID) / (1 - K_MID)))
+	end
+	return armOf(A_UP, (k - 1) * 1.4)
+end
+local function dbK(k)
+	return { Dumbbell = { rz = 88 * math.clamp(k, 0, 1.03) } }
+end
+
+local horse = {}
+for _, c in CURL do
+	local k = c[2]
+	table.insert(horse, merge(LEGS, LARM, {
+		t = c[1],
+		ease = c[3],
+		waist = waistK(k),
+		rArm = armK(k),
+		rHand = "fist",
+		joints = dbK(k),
+	}))
+end
+
+-- голова: мировые углы (вверх+, вправо+ — к правому плечу коня, крен к правому плечу+); шея = голова − корпус
+local HEAD = {
+	{ 11.0, -15, 25, 20 },
+	{ 11.1333, -15, 25, 20 },
+	{ 11.3, -15, 25, 20 },
+	{ B23 + 0.1, -10, 20, 20 },
+	{ B23 + 0.25, -5, 15, 20 },
+	{ 11.75, -8, 15, 20 }, -- лёгкий кивок в верхней стоп-позе
+	{ B24, -5, 15, 20 },
+	{ 12.0, 5, 18, 19 }, -- AIN'T: голова вверх
+	{ 12.133, 0, 20, 18 },
+	{ 12.25, 3, 20, 17 },
+	{ 12.333, 10, 20, 15 }, -- GOT: запрокинута
+	{ 12.43, 8, 18, 15 },
+	{ 12.533, 12, 16, 15 }, -- NO
+	{ 12.633, 5, 15, 18 },
+	{ 12.767, 8, 15, 18 }, -- WOR-
+	{ B26 + 0.02, 6, 16, 18 },
+	{ 12.967, 0, 18, 18 }, -- -RIES
+	{ 13.1, 2, 20, 18 },
+	{ 13.25, 2, 20, 18 },
 }
-for _, n in NECK do
-	table.insert(horse, { t = n[1], neck = { nod = n[2], turn = n[3], tilt = n[4] } })
+for _, h in HEAD do
+	local w = waistK(curlAt(h[1]))
+	table.insert(horse, {
+		t = h[1],
+		neck = {
+			nod = -h[2] - (ROOT.bend + w.bend),
+			turn = -h[3] - (ROOT.turn + w.turn),
+			tilt = h[4] - (ROOT.tilt + w.tilt),
+		},
+	})
 end
 
 -- лицо: челюсть (0 — зубы сомкнуты), оскал, брови, уши

@@ -7,28 +7,30 @@ local Config = require(script.Parent.Parent:WaitForChild("Config"))
 local START, FINISH = 13.1333, 15.6333
 
 -- Параметры дуги (локальные координаты декорации Throne; трон смотрит в -Z, камера спереди).
--- az > 0 — камера уходит к правому боку персонажа (+X, слева в кадре).
+-- az > 0 — камера уходит к правому боку персонажа (+X, слева в кадре). Значения заданы на первом (13.133)
+-- и последнем (15.600) кадрах референса; движение равномерное (без сглаживания), до 15.633 — экстраполяция.
+local T0, T1 = START, 15.6
 local ARC = {
 	center = Vector3.new(0, 0, 0.2),
-	az0 = -6,
-	az1 = 26,
-	r0 = 7.6,
-	r1 = 7.44,
-	h0 = 1.68,
-	h1 = 1.81,
-	look0 = Vector3.new(0.04, 3.67, -1.74),
-	look1 = Vector3.new(-1.25, 4.45, 0.22),
-	roll0 = -11,
-	roll1 = 17.1,
+	az0 = -5,
+	az1 = 30,
+	r0 = 9.6,
+	r1 = 9.4,
+	h0 = 2.0,
+	h1 = 2.1,
+	look0 = Vector3.new(-0.09, 3.71, -0.56),
+	look1 = Vector3.new(0.09, 3.72, -0.38),
+	roll0 = -6,
+	roll1 = 20,
 	fov = 55,
 }
 
 local function camKeys(): { any }
 	local keys = {}
-	local n = 6
+	local n = 8
 	for i = 0, n do
-		local a = i / n
-		local t = START + (FINISH - START) * a
+		local t = START + (FINISH - START) * i / n
+		local a = (t - T0) / (T1 - T0)
 		local az = math.rad(ARC.az0 + (ARC.az1 - ARC.az0) * a)
 		local r = ARC.r0 + (ARC.r1 - ARC.r0) * a
 		local h = ARC.h0 + (ARC.h1 - ARC.h0) * a

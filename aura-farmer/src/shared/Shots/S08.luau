@@ -5,9 +5,17 @@
 -- Конец плана: радиальный «зум-блюр» (9.467–9.533) — размытие + лёгкий рывок FOV, подводит к наезду-отъезду S09.
 local Config = require(script.Parent.Parent:WaitForChild("Config"))
 
-local CAM = Config.at("Park", 0.125, 2.48, -5.54)
-local LOOK = Config.at("Park", 0.125, 2.71, -2.35)
-local FOV = 36
+local CX, CY, CZ = 0.09, 1.7, -4.3
+local PITCH = math.rad(3)
+local CAM = Config.at("Park", CX, CY, CZ)
+local LOOK = Config.at("Park", CX, CY + 3 * math.sin(PITCH), CZ + 3 * math.cos(PITCH))
+local FOV = 42
+local DEBUG_SIDE = true
+if DEBUG_SIDE then
+	CAM = Config.at("Park", -7, 1.6, -1.6)
+	LOOK = Config.at("Park", 0, 1.4, -1.0)
+	FOV = 40
+end
 
 return {
 	id = "S08",

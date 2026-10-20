@@ -17,7 +17,7 @@ end
 
 local FOV = 38.5
 local CAM = at(3.52, 3.89, 3.76)
-local LOOK = at(-0.1, 5.35, 0.2)
+local LOOK = at(-0.1, 5.45, 0.2)
 -- базис камеры (вручную: CFrame.lookAt в Lune-превью транспонирован)
 local FWD = (LOOK - CAM).Unit
 local RIGHT = FWD:Cross(Vector3.new(0, 1, 0)).Unit
