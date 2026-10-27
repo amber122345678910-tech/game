@@ -54,7 +54,11 @@ print("А это выполнится")</pre>`,
       check(r) {
         const e = noErr(r);
         if (e) return { ok: false, msg: e };
-        if (r.out.length < 3) return { ok: false, msg: `Строчек вывелось: ${r.out.length}. Нужно хотя бы 3.` };
+        // считаем строчки с текстом: print("а\nб") — тоже две строчки, а пустые не в счёт
+        const lines = r.out.flatMap((l) => String(l).split("\n")).map((l) => l.trim()).filter(Boolean);
+        if (lines.length < 3 && r.out.length > lines.length) return { ok: false, msg: "Есть пустые строчки. Внутри кавычек напиши своё имя, возраст и любимую игру." };
+        if (lines.length < 3) return { ok: false, msg: `Строчек вывелось: ${lines.length}. Нужно хотя бы 3.` };
+        if (new Set(lines).size < 3) return { ok: false, msg: "Строчки повторяются. Нужно три разные: имя, возраст и любимая игра." };
         return { ok: true };
       },
     },
@@ -103,6 +107,8 @@ coins += 5          -- то же самое, коротко</pre>
         if (e) return { ok: false, msg: e };
         if (!codeHas(r, /\blocal\b/)) return { ok: false, msg: "Создай переменную через local." };
         if (!hasLine(r, /(^|\D)75(\D|$)/)) return { ok: false, msg: "В выводе нет числа 75. Отними 25 от hp и выведи hp через print." };
+        // 75 должен посчитать компьютер, а не мы: hp = hp - 25 или hp -= 25
+        if (!codeHas(r, /-=|[\w)\]]\s*-\s*[\w(]/)) return { ok: false, msg: "Пусть вычтет компьютер: напиши hp = hp - 25" };
         return { ok: true };
       },
     },
@@ -159,7 +165,7 @@ print("Выпало: " .. roll)</pre>
         const e = noErr(r);
         if (e) return { ok: false, msg: e };
         if (!hasLine(r, /3600/)) return { ok: false, msg: "Ответ должен быть 3600. Используй * для умножения." };
-        if (!codeHas(r, /\*/)) return { ok: false, msg: "Пусть посчитает компьютер: используй умножение *." };
+        if (!codeHas(r, /\*|\^/)) return { ok: false, msg: "Пусть посчитает компьютер: используй умножение *." };
         return { ok: true };
       },
     },

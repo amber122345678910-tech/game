@@ -546,23 +546,43 @@ async function offerHomework(explain) {
   else await say("claude", "Когда будешь готов — жми </>. Домашка уже будет открыта.");
 }
 
-// проверяем «заданную» домашку сами. Если её код пустой или не работает,
-// пробуем код из последнего открытого задания и из урока: вдруг домашку написали туда
-async function autoCheckHw(hid) {
+// снимок до проверки: какие домашки заданы и какой в них код (переносы его не портят)
+function hwSnapshot() {
   const s = G.save;
+  return { code: { ...s.code }, given: Object.keys(HOMEWORK).filter((h) => s.hw[h] === "given"), own: {} };
+}
+
+// подходит ли код домашки к ней самой (запоминаем, чтобы не гонять дважды)
+async function hwOwnOk(hid, snap) {
+  if (!(hid in snap.own)) {
+    const code = snap.code["h:" + hid] || "";
+    snap.own[hid] = code.trim() ? (await runCheck(taskFor("h:" + hid), code)).ok : false;
+  }
+  return snap.own[hid];
+}
+
+// проверяем «заданную» домашку сами. Если её код пустой или не работает,
+// пробуем код из последнего открытого задания, из урока и из других заданных домашек: вдруг написали туда
+async function autoCheckHw(hid, snap) {
+  const s = G.save;
+  snap = snap || hwSnapshot();
   const key = "h:" + hid;
   const T = taskFor(key);
-  const own = (s.code[key] || "").trim();
+  const own = (snap.code[key] || "").trim();
   const empty = !own || own === (T.starter || "").trim();
+  const others = snap.given.filter((h) => h !== hid).map((h) => "h:" + h);
   // свою мини-игру (№10) берём только из самой домашки
-  const keys = T.review ? [key] : [key, s.lastTask, "p:" + T.lesson.id];
+  const keys = T.review ? [key] : [key, s.lastTask, "p:" + T.lesson.id, ...others];
   const tried = new Set();
   let msg = "";
   for (const k of keys) {
-    if (!k || (k !== key && k.startsWith("h:"))) continue;
-    const code = s.code[k];
+    const otherHw = !!k && k !== key && k.startsWith("h:");
+    if (!k || (otherHw && !others.includes(k))) continue;
+    const code = snap.code[k];
     if (!code || !code.trim() || tried.has(code)) continue;
     tried.add(code);
+    // код другой домашки не трогаем, если он подходит к ней самой
+    if (otherHw && (await hwOwnOk(k.slice(2), snap))) continue;
     const res = await runCheck(T, code);
     if (res.ok) {
       s.code[key] = code;
@@ -601,8 +621,9 @@ async function acceptHomework(hid) {
   else await say("claude", ["Чисто. Работает. Я бы лучше не написал. Ладно, написал бы, но не сильно.", "Отличная работа! Компьютер понял каждую строчку.", "Код запустился без ошибок. Это уже уровень профи!"][H.lesson.n % 3]);
   s.hw[hid] = "done";
   s.atkBonus = (s.atkBonus || 0) + 1;
-  addXp(20);
+  // монеты до addXp: он обновляет HUD
   s.gold += 10;
+  addXp(20);
   sfx("victory");
   await say("sys", `* Домашка №${H.lesson.n} засчитана! +20 XP, +10 монет, +1 к силе атаки.`);
 }
@@ -662,8 +683,8 @@ async function showCustom(custom) {
   }
   if (pass) {
     h.status = "done";
-    addXp(25);
     s.gold += 15;
+    addXp(25);
     sfx("victory");
     await say("sys", "* Особая домашка засчитана! +25 XP, +15 монет.");
   } else {
@@ -682,15 +703,23 @@ async function showHomework() {
   if (given.length && !LuaRT.available()) fail = { hid: given[0], engine: true };
   else if (given.length) {
     const moved = [];
+    const snap = hwSnapshot();
     dlgThinking("Клод запускает твой код");
     try {
       for (const hid of given) {
-        const r = await autoCheckHw(hid);
+        const r = await autoCheckHw(hid, snap);
         if (r.ok && r.from !== "h:" + hid) moved.push([hid, r.from]);
         if (!r.ok && !fail) fail = { hid, ...r };
       }
     } finally {
       dlgThinking(null);
+    }
+    // код перенесли из другой домашки — там теперь пусто, пусть пишет её заново
+    for (const [, from] of moved) {
+      const src = from.startsWith("h:") ? from.slice(2) : null;
+      if (!src || s.hw[src] !== "given" || s.code[from] !== snap.code[from]) continue;
+      s.code[from] = HOMEWORK[src].starter || "";
+      if (fail && fail.hid === src) fail = { hid: src, ok: false, empty: true, msg: "" };
     }
     for (const [hid, from] of moved) await say("claude", `Ага! Домашку №${HOMEWORK[hid].lesson.n} ты написал в «${taskFor(from).title}». Ничего страшного — я перенёс код куда надо.`);
   }
@@ -705,7 +734,9 @@ async function showHomework() {
   const custom = (s.customHw || []).filter((h) => h.status !== "done");
   if (fail && !(await explainFail(fail))) return;
   if (custom.length) await showCustom(custom);
-  else if (!fail) await say("claude", "Домашек пока нет. Хочешь, придумаю? Напиши мне в чате: «дай домашку».");
+  // придумать новую домашку может только живой Клод
+  else if (!fail && Claude.sample && !Claude.disabled) await say("claude", "Домашек пока нет. Хочешь, придумаю? Напиши мне в чате: «дай домашку».");
+  else if (!fail) await say("claude", `Домашек пока нет. Что дальше: ${objective()}.`);
   saveSoon();
 }
 
