@@ -3242,7 +3242,36 @@ function drawPortal(c, x, y, t, open = true, w = 2) {
     R(c, x + 4, y + 4, W - 8, 26, "#2a2d3a");
     R(c, x + 6, y + 6, W - 12, 22, "#1a1c26");
     R(c, x + 6, y + 6, W - 12, 1, "#3a3d4c");
-    if (Math.floor(t * 6) % 3 === 0) R(c, x + W / 2 - 1, y + 10, 2, 8, "#5aff8a");
+    // аппарат «дышит»: слабое зелёное свечение и мигающее ядро
+    const pulse = 0.5 + 0.5 * Math.sin(t * 3);
+    c.globalAlpha = 0.1 + pulse * 0.2;
+    R(c, x + 7, y + 8, W - 14, 19, "#5aff8a");
+    c.globalAlpha = 1;
+    const cx = x + W / 2, cy = y + 17;
+    R(c, cx - 2, cy - 2, 4, 4, pulse > 0.5 ? "#2aff6a" : "#18c94a");
+    R(c, cx - 1, cy - 1, 2, 2, "#d8ffe0");
+    // искрит: молния от ядра к краю, каждый раз в новом месте
+    const k = Math.floor(t * 9);
+    if (hsh(k, 7) % 10 < 7) {
+      const a = (hsh(k, 3) / 1000) * Math.PI * 2;
+      const ex = cx + Math.cos(a) * (W / 2 - 6), ey = cy + Math.sin(a) * 10;
+      let px = cx, py = cy;
+      for (let s = 1; s <= 4; s++) {
+        const nx = cx + ((ex - cx) * s) / 4 + (s < 4 ? (hsh(k, s) % 5) - 2 : 0);
+        const ny = cy + ((ey - cy) * s) / 4 + (s < 4 ? (hsh(k, s + 9) % 5) - 2 : 0);
+        const n = Math.max(1, Math.round(Math.max(Math.abs(nx - px), Math.abs(ny - py))));
+        for (let i = 0; i <= n; i++) R(c, px + ((nx - px) * i) / n, py + ((ny - py) * i) / n, 1, 1, s < 3 ? "#ffffff" : "#9affb0");
+        px = nx; py = ny;
+      }
+      R(c, ex - 1, ey, 3, 1, "#d8ffe0"); R(c, ex, ey - 1, 1, 3, "#d8ffe0");
+    }
+    // искры вылетают из углов рамки
+    for (let i = 0; i < 3; i++) {
+      const ph = (t * 1.6 + i * 0.37) % 1;
+      if (ph > 0.6) continue;
+      const left = i % 2 === 0;
+      R(c, x + (left ? 4 - ph * 8 : W - 5 + ph * 8), y + 4 + i * 9 - ph * 10, 1, 1, ph < 0.3 ? "#ffffff" : "#5aff8a");
+    }
     return;
   }
   // мягкое свечение
@@ -3401,6 +3430,7 @@ function speakerDraw(id) {
   return S.draw;
 }
 
+// drawLook живёт в main.js: здесь он вызывается только при рисовании, когда весь код уже загружен
 const SPEAKERS = {
   claude: { name: "Профессор Клод", color: "#ffb08a", pitch: 1.5, draw: (c, t) => drawClaude(c, 0, 0, "down", t) },
   player: { name: "Ты", color: "#bfe0ff", pitch: 1.0, draw: (c, t) => drawKid(c, 0, 0, "down", 0, playerLook()) },
@@ -3412,16 +3442,16 @@ const SPEAKERS = {
   gslime: { name: "Глюк-Слизень", color: "#ff3a8a", pitch: 0.7, draw: (c, t) => drawSlime(c, 0, 0, t, "#c03aff") },
   owl: { name: "Сова Иначе", color: "#e9c99a", pitch: 0.9, draw: (c, t) => drawOwl(c, 0, 0, t) },
   shroom: { name: "Гриб Логик", color: "#9ae6ff", pitch: 1.3, draw: (c, t) => drawMushroom(c, 0, 0, t) },
-  guard: { name: "Страж Ветвления", color: "#7fd8c2", pitch: 0.6, draw: null },
+  guard: { name: "Страж Ветвления", color: "#7fd8c2", pitch: 0.6, draw: (c, t) => drawLook(c, "guard", 0, 0, t) },
   mayor: { name: "Мэр Повторяшкин", color: "#f2c46b", pitch: 0.8, draw: (c, t) => drawKid(c, 0, 0, "down", 0, { shirt: "#7a3a5a", hair: "#ddd", hat: "tophat" }) },
   townie: { name: "Житель", color: "#d8c8ff", pitch: 1.1, draw: (c, t) => drawKid(c, 0, 0, "down", 0, { shirt: "#c05a8a", hair: "#2a1a1a" }) },
   baker: { name: "Пекарь Тесто", color: "#ffd8a8", pitch: 1.0, draw: (c, t) => drawKid(c, 0, 0, "down", 0, { shirt: "#f2f2f2", hair: "#8a5a2a", hat: "cap" }) },
-  serpent: { name: "Змей Бесконечности", color: "#b08aff", pitch: 0.6, draw: null },
+  serpent: { name: "Змей Бесконечности", color: "#b08aff", pitch: 0.6, draw: (c, t) => drawLook(c, "serpent", 0, 0, t) },
   robo: { name: "Робот Ж-2", color: "#9ae6ff", pitch: 1.4, draw: (c, t) => drawRobot(c, 0, 0, t) },
   keeper: { name: "Кладовщик Т-4", color: "#ffcf3a", pitch: 1.0, draw: (c, t) => drawRobot(c, 0, 0, t, "#d6a83a", { eye: "#ff8a3a" }) },
-  roboboss: { name: "Робо-Начальник", color: "#ff8a8a", pitch: 0.6, draw: null },
+  roboboss: { name: "Робо-Начальник", color: "#ff8a8a", pitch: 0.6, draw: (c, t) => drawLook(c, "roboboss", 0, 0, t) },
   noob: { name: "Нубик", color: "#ffe36b", pitch: 1.2, draw: (c, t) => drawNoob(c, 0, 0, "down", 0) },
-  lava: { name: "Лава-Блок", color: "#ff8a3a", pitch: 0.5, draw: null },
+  lava: { name: "Лава-Блок", color: "#ff8a3a", pitch: 0.5, draw: (c, t) => drawLook(c, "lavaboss", 0, 0, t) },
   zero: { name: "Клод-Ноль", color: "#b0b0c0", pitch: 0.6, draw: (c, t) => drawClaude(c, 0, 0, "down", t, { color: "#6a6a7a", dark: "#4a4a5a", evil: true, coat: "#2a2a33", noGun: true }) },
   glitchik: { name: "Глюкич", color: "#ff9ad0", pitch: 1.5, draw: (c, t) => drawClaude(c, 0, 0, "down", t, { color: "#c88ad6", dark: "#9a5aaa", noGun: true }) },
   cat: { name: "Кот Шрёдингера", color: "#cfcfe0", pitch: 1.2, draw: (c, t) => drawCat(c, 0, 0, t) },
@@ -3458,17 +3488,11 @@ function battleSprite(c, e, cx, cy, t, hurt) {
   const shake = hurt > 0 ? Math.round(Math.sin(t * 60) * 3) : 0;
   const ox = Math.round(cx - 8 * sc + shake), oy = Math.round(cy - 10 * sc);
   c.drawImage(BSPR.a, 0, 0, w, h, ox - P * sc, oy - P * sc, w, h);
-  // надписи на спрайте рисуем поверх, без обводки
+  // надписи на спрайте: пиксельным шрифтом, по центру своей таблички
   const lab = BATTLE_LABELS[e.look];
   if (lab) {
-    c.save();
-    c.translate(ox, oy);
-    c.scale(sc, sc);
-    c.textAlign = "left";
-    c.font = lab.font;
-    c.fillStyle = lab.color;
-    for (const [txt, x, y] of lab.lines) c.fillText(txt, x, y);
-    c.restore();
+    const ps = sc >= 4 ? 2 : 1;
+    for (const [txt, x, y] of lab.lines) pxText(c, txt, Math.round(ox + x * sc - (pxTextW(txt) * ps) / 2), Math.round(oy + y * sc - (5 * ps) / 2), ps, lab.color);
   }
   // эффект глюка у боссов
   if (e.glitch && Math.random() < 0.18) {
@@ -3478,11 +3502,64 @@ function battleSprite(c, e, cx, cy, t, hurt) {
   }
 }
 
+// строки: [текст, центр x, центр y] в пикселях спрайта
 const BATTLE_LABELS = {
-  tree: { font: "4px monospace", color: "#1a1a22", lines: [["if", -1.5, 13], ["else", 13.6, 13]] },
-  serpent: { font: "3px monospace", color: "#fff", lines: [["while true", 1.5, 11]] },
-  "boss-robot": { font: "3px monospace", color: "#ffcf3a", lines: [["return", 3.5, 18.5]] },
+  tree: { color: "#1a1a22", lines: [["if", -2, 12], ["else", 18, 12]] },
+  serpent: { color: "#fff", lines: [["while", 8, 8.6], ["true", 8, 11.6]] },
+  "boss-robot": { color: "#ffcf3a", lines: [["return", 8, 17]] },
 };
+
+// крошечный пиксельный шрифт 5 точек в высоту (строчные буквы для надписей на боссах)
+const PXF = {
+  a: ["...", ".##", "..#", "###", "###"], b: ["#..", "##.", "#.#", "#.#", "##."], c: ["...", ".##", "#..", "#..", ".##"],
+  d: ["..#", ".##", "#.#", "#.#", ".##"], e: ["...", ".#.", "###", "#..", ".##"], f: [".##", "#..", "##.", "#..", "#.."],
+  h: ["#..", "#..", "##.", "#.#", "#.#"], i: ["#", ".", "#", "#", "#"], l: ["#.", "#.", "#.", "#.", ".#"],
+  n: ["...", "##.", "#.#", "#.#", "#.#"], o: ["...", ".#.", "#.#", "#.#", ".#."], r: ["...", "#.#", "##.", "#..", "#.."],
+  s: ["...", ".##", "#..", "..#", "##."], t: [".#.", "###", ".#.", ".#.", "..#"], u: ["...", "#.#", "#.#", "#.#", ".##"],
+  w: [".....", "#...#", "#...#", "#.#.#", ".#.#."], " ": ["..", "..", "..", "..", ".."],
+};
+function pxTextW(s) {
+  let w = 0;
+  for (const ch of s) w += ((PXF[ch] || PXF[" "])[0].length) + 1;
+  return Math.max(0, w - 1);
+}
+function pxText(c, s, x, y, ps, col) {
+  c.fillStyle = col;
+  for (const ch of s) {
+    const g = PXF[ch] || PXF[" "];
+    for (let j = 0; j < 5; j++) for (let i = 0; i < g[j].length; i++) if (g[j][i] === "#") c.fillRect(x + i * ps, y + j * ps, ps, ps);
+    x += (g[0].length + 1) * ps;
+  }
+}
+
+// текст на canvas: буквы шрифтом Handjet, а скобки — моноширинным, чтобы ( ) не путались с [ ]
+function mixText(c, s, x, y, px, draw = true) {
+  let w = 0;
+  for (const part of String(s).split(/([()[\]{}]+)/)) {
+    if (!part) continue;
+    c.font = /[()[\]{}]/.test(part[0]) ? `${px - 2}px "JetBrains Mono", ui-monospace, monospace` : `${px}px "Handjet", monospace`;
+    if (draw) c.fillText(part, x + w, y);
+    w += c.measureText(part).width;
+  }
+  return w;
+}
+// разбить текст на строки не шире maxW (длинное слово режем по буквам)
+function wrapMix(c, s, maxW, px) {
+  const lines = [];
+  let cur = "";
+  for (const word of String(s).split(" ")) {
+    const tryLine = cur ? cur + " " + word : word;
+    if (mixText(c, tryLine, 0, 0, px, false) <= maxW) { cur = tryLine; continue; }
+    if (cur) lines.push(cur);
+    cur = "";
+    for (const ch of word) {
+      if (cur && mixText(c, cur + ch, 0, 0, px, false) > maxW) { lines.push(cur); cur = ""; }
+      cur += ch;
+    }
+  }
+  if (cur) lines.push(cur);
+  return lines;
+}
 function battleLook(c, e, tt) {
   switch (e.look) {
     case "slime": drawSlime(c, 0, 0, tt, e.color, { happy: e.happy }); break;
@@ -3502,7 +3579,10 @@ function battleLook(c, e, tt) {
       R(c, 4, 6, 3, 3, "#fff"); R(c, 9, 6, 3, 3, "#fff");
       R(c, 5, 7, 1, 1, "#1a1a22"); R(c, 10, 7, 1, 1, "#1a1a22");
       R(c, 6, 11, 4, 1, "#1a1a22");
-      R(c, -2, 9, 4, 6, "#c0c8d0"); R(c, 14, 9, 4, 6, "#c0c8d0");
+      // таблички «if» и «else» — широкие, чтобы надпись помещалась
+      R(c, -6, 9, 8, 6, "#c0c8d0"); R(c, 14, 9, 8, 6, "#c0c8d0");
+      R(c, -6, 9, 8, 1, "#e6ecf2"); R(c, 14, 9, 8, 1, "#e6ecf2");
+      R(c, -6, 14, 8, 1, "#9aa2ae"); R(c, 14, 14, 8, 1, "#9aa2ae");
       break;
     }
     case "serpent": {
@@ -3535,7 +3615,7 @@ function battleLook(c, e, tt) {
       R(c, 0, 4, 16, 6, "#1b1e25");
       const k = Math.floor(tt * 3) % 3;
       R(c, 2 + k * 4, 6, 3, 2, "#ff3a3a");
-      R(c, 3, 14, 10, 6, "#8a3a3a");
+      R(c, 1, 14, 14, 6, "#8a3a3a");
       R(c, 6, 0, 4, 2, "#ffcf3a");
       break;
     }
@@ -4660,8 +4740,47 @@ function startBattle(id, extra) {
   });
 }
 
-function bText(t) {
-  return typeInto(document.getElementById("batText"), t, "sys");
+// текст боя. mode: "tap" — ждём нажатия (▼), число — подержать столько мс, иначе — сразу дальше
+function bText(t, mode) {
+  const b = Battle.b;
+  const el = document.getElementById("batText");
+  Battle.wait = null;
+  return new Promise((res) => {
+    typeInto(el, t, "sys").then(() => {
+      // бой сбросили или текст уже сменился — эту ветку не продолжаем / не держим
+      if (!b || Battle.b !== b) return;
+      if (el.textContent !== t) return res();
+      if (mode === "tap") {
+        const m = document.createElement("span");
+        m.className = "batNext";
+        m.textContent = "▼";
+        m.style.cssText = "display:inline-block;margin-left:8px;color:var(--gold);animation:bob .8s steps(2) infinite";
+        el.appendChild(m);
+        // и большая кнопка «Дальше» на месте кнопок боя
+        const box = document.getElementById("batBtns");
+        box.innerHTML = "";
+        box.className = "";
+        const nb = document.createElement("button");
+        nb.className = "bbtn wide next";
+        nb.textContent = "Дальше ▼";
+        nb.onclick = () => batTap();
+        box.appendChild(nb);
+        Battle.wait = { res, at: performance.now(), m, nb };
+      } else if (mode > 0) setTimeout(() => { if (Battle.b === b) res(); }, mode);
+      else res();
+    });
+  });
+}
+// нажатие во время боя: сначала дописать текст, потом — дальше (если ждём ▼)
+function batTap() {
+  if (typing && typing.el.id === "batText") { typing.skip(); return; }
+  const w = Battle.wait;
+  if (!w || performance.now() - w.at < 250) return;
+  Battle.wait = null;
+  w.m.remove();
+  w.nb.remove();
+  sfx("select");
+  w.res();
 }
 function bButtons(list) {
   const el = document.getElementById("batBtns");
@@ -4684,10 +4803,9 @@ function bButtons(list) {
   });
 }
 
-async function battleMenuIntro() {
-  const b = Battle.b;
-  await bText(b.def.intro);
-  battleMenu();
+// первая строка боя остаётся над кнопками, пока не выберешь действие
+function battleMenuIntro() {
+  battleMenu(Battle.b.def.intro);
 }
 
 function nameWithMercy() {
@@ -4695,13 +4813,13 @@ function nameWithMercy() {
   return b.mercy >= 100 ? `<span style="color:#ffe03a">${b.def.name}</span>` : b.def.name;
 }
 
-async function battleMenu() {
+async function battleMenu(text) {
   const b = Battle.b;
   if (!b) return;
   b.phase = "menu";
   setBox(224, 62);
   const fl = b.def.flavor[b.turn % b.def.flavor.length];
-  bText(b.mercy >= 100 ? `* ${b.def.name} больше не хочет драться. Можно пощадить.` : fl);
+  bText(text || (b.mercy >= 100 ? `* ${b.def.name} больше не хочет драться. Можно пощадить.` : fl));
   const c = await bButtons([
     { html: "<b>⚔</b> БОЙ", cls: "fight" },
     { html: "<b>&lt;/&gt;</b> КОД", cls: "act" },
@@ -4759,14 +4877,14 @@ async function doAct() {
   const c = await bButtons(acts);
   if (c === acts.length - 1) return battleMenu();
   if (c === 0) {
-    await bText(`* ${b.def.name} — АТК ${b.def.atk}, HP ${b.hp}/${b.maxHp}. ${b.def.boss ? "Босс. Сражается за свой код." : "Мелкая ошибка в коде мира."}`);
+    await bText(`* ${b.def.name} — АТК ${b.def.atk}, HP ${b.hp}/${b.maxHp}. ${b.def.boss ? "Босс. Сражается за свой код." : "Мелкая ошибка в коде мира."}`, "tap");
     return afterPlayer("check");
   }
   if (c === 1) return doQuiz();
   const a = b.def.acts[c - 2];
   b.mercy = Math.min(100, b.mercy + a.mercy);
   sfx("heal");
-  await bText(a.text);
+  await bText(a.text, "tap");
   afterPlayer("act");
 }
 
@@ -4791,7 +4909,7 @@ async function doQuiz() {
     sfx("heal");
     b.mercy = Math.min(100, b.mercy + 45);
     const dmg = Math.round(6 + G.save.lv * 3 + playerAtk() * 0.6);
-    await bText("* ПРАВИЛЬНО! " + q.why);
+    await bText("* ПРАВИЛЬНО! " + q.why, "tap");
     b.claudeLine = "КОМБО КОДА!";
     sfx("portal");
     hitEnemy(dmg, "КОМБО!");
@@ -4799,7 +4917,7 @@ async function doQuiz() {
     setTimeout(() => afterPlayer("quizRight"), 600);
   } else {
     sfx("hurt");
-    await bText(`* Мимо! Правильно: «${q.a[q.ok]}». ${q.why}`);
+    await bText(`* Мимо! Правильно: «${q.a[q.ok]}». ${q.why}`, "tap");
     G.save.stats.wrong = (G.save.stats.wrong || 0) + 1;
     afterPlayer("quizWrong");
   }
@@ -4809,10 +4927,7 @@ async function doQuiz() {
 async function doItem() {
   const b = Battle.b;
   const items = G.save.items;
-  if (!items.length) {
-    await bText("* Карманы пусты. Только фантик от конфеты.");
-    return battleMenu();
-  }
+  if (!items.length) return battleMenu("* Карманы пусты. Только фантик от конфеты.");
   const list = items.map((it) => ({ t: `${it.name} (+${it.heal})` }));
   list.push({ t: "← Назад" });
   const c = await bButtons(list);
@@ -4820,8 +4935,9 @@ async function doItem() {
   const it = items.splice(c, 1)[0];
   const max = playerMaxHp();
   G.save.hp = Math.min(max, G.save.hp + it.heal);
+  updateHud();
   sfx("heal");
-  await bText(`* Ты съедаешь «${it.name}». HP +${it.heal}.`);
+  await bText(`* Ты съедаешь «${it.name}». HP +${it.heal}.`, 1000);
   afterPlayer("item");
 }
 
@@ -4835,14 +4951,14 @@ async function doMercy() {
   if (c === opts.length - 1) return battleMenu();
   if (c === 0) {
     if (b.mercy >= 100) return endBattle("spare");
-    await bText(`* ${b.def.name} пока не готов мириться.`);
+    await bText(`* ${b.def.name} пока не готов мириться.`, 900);
     return afterPlayer("mercyFail");
   }
   if (Math.random() < 0.7) {
-    await bText("* Ты сбегаешь! Клод: «Тактическое отступление! Это не трусость, это стратегия!»");
+    await bText("* Ты сбегаешь! Клод: «Тактическое отступление! Это не трусость, это стратегия!»", "tap");
     return endBattle("flee");
   }
-  await bText("* Не получилось сбежать!");
+  await bText("* Не получилось сбежать!", 900);
   afterPlayer("fleeFail");
 }
 
@@ -4858,6 +4974,7 @@ async function afterPlayer(kind) {
     const heal = Math.round(max * 0.35);
     G.save.hp = Math.min(max, G.save.hp + heal);
     b.lastHeal = b.turn;
+    updateHud();
     sfx("heal");
     line = `Клод бросает тебе портальную газировку: +${heal} HP!`;
   } else if (kind === "quizRight") {
@@ -4878,7 +4995,7 @@ async function afterPlayer(kind) {
     line = "Клод протирает очки и анализирует врага.";
   }
   b.claudeLine = line;
-  await bText("* " + line);
+  await bText("* " + line, 700);
   if (b.hp <= 0) return endBattle("win");
   enemyTurn();
 }
@@ -4989,10 +5106,12 @@ async function gameOver() {
   b.phase = "dead";
   music(null);
   sfx("die");
-  await bText("* Твоё сердце раскололось...");
+  updateHud();
+  await bText("* Твоё сердце раскололось...", "tap");
   await bText("* Клод: «Стажёр! Вставай! Мультивселенная без тебя не справится. И я тоже.»");
   const c = await bButtons([{ t: "НЕ СДАВАТЬСЯ (заново)", cls: "fight wide" }, { t: "Вернуться к порталу", cls: "wide" }]);
   G.save.hp = playerMaxHp();
+  updateHud();
   if (c === 0) {
     b.hp = b.maxHp;
     b.mercy = 0;
@@ -5015,7 +5134,7 @@ async function endBattle(res) {
     sfx("victory");
     s.kills = (s.kills || 0) + 1;
     s.gold += b.def.gold;
-    await bText(`* ПОБЕДА! ${b.def.name} повержен. +${b.def.xp} XP, +${b.def.gold} монет.`);
+    await bText(`* ПОБЕДА! ${b.def.name} повержен. +${b.def.xp} XP, +${b.def.gold} монет.`, "tap");
     addXp(b.def.xp);
   } else if (res === "spare") {
     music(null);
@@ -5024,7 +5143,7 @@ async function endBattle(res) {
     const g = Math.round(b.def.gold * 1.2);
     s.gold += g;
     const xp = Math.round(b.def.xp * 0.7);
-    await bText(`${b.def.spare} +${xp} XP, +${g} монет.`);
+    await bText(`${b.def.spare} +${xp} XP, +${g} монет.`, "tap");
     addXp(xp);
   }
   finishBattle(res);
@@ -5041,8 +5160,9 @@ function finishBattle(res, fled) {
     if (res === "win" || res === "spare") b.roamer.gone = true;
     else b.roamer.cool = 3;
   }
+  // «Вернуться к порталу»: встаём у портала (точка входа в мир), а не там, где проиграли
   if (fled) {
-    enterZone(G.zone.id, true);
+    enterZone(G.zone.id, false);
   }
   saveSoon();
   b.resolve(fled ? "flee" : res);
@@ -5120,6 +5240,7 @@ function battleUpdate(dt) {
         if ((R_.enemyDamage ?? 1) === 0) dmg = 0;
         b.shield = 0;
         G.save.hp = Math.max(0, G.save.hp - dmg);
+        updateHud();
         b.inv = 0.9;
         sfx("hurt");
         shake(3);
@@ -5162,18 +5283,28 @@ function battleDraw(c) {
     outText(c, String(d.v), Math.round(d.x), 40 - dy, col);
     if (d.label) { c.font = '6px "Press Start 2P", monospace'; outText(c, d.label, Math.round(d.x), 50 - dy, col); }
   }
-  // реплика врага
+  // реплика врага: облачко справа, длинную фразу переносим, чтобы не уезжала за край
   if (b.bubble) {
-    c.font = '12px "Handjet", monospace';
-    const w = Math.min(110, c.measureText(b.bubble.text).width + 10);
-    R(c, 169, 19, w + 2, 20, "#000");
-    R(c, 165, 25, 5, 6, "#000");
-    R(c, 170, 20, w, 18, "#fff");
-    R(c, 166, 26, 4, 4, "#fff");
-    R(c, 170, 37, w, 1, "#c8c8d8");
-    c.fillStyle = "#000";
     c.textAlign = "left";
-    c.fillText(b.bubble.text.slice(0, Math.floor(b.bubble.t * 30)), 175, 32);
+    const bb = b.bubble;
+    if (!bb.lines) {
+      bb.lines = wrapMix(c, bb.text, 72, 12).slice(0, 3);
+      bb.w = Math.ceil(Math.max(...bb.lines.map((l) => mixText(c, l, 0, 0, 12, false)))) + 10;
+    }
+    const w = bb.w, h = bb.lines.length * 11 + 7;
+    const x = Math.min(170, 252 - w), y = 16;
+    R(c, x - 1, y - 1, w + 2, h + 2, "#000");
+    R(c, x - 5, y + 5, 5, 6, "#000");
+    R(c, x, y, w, h, "#fff");
+    R(c, x - 4, y + 6, 4, 4, "#fff");
+    R(c, x, y + h - 1, w, 1, "#c8c8d8");
+    c.fillStyle = "#000";
+    let left = Math.floor(bb.t * 30);
+    bb.lines.forEach((l, i) => {
+      if (left <= 0) return;
+      mixText(c, l.slice(0, left), x + 5, y + 12 + i * 11, 12);
+      left -= l.length + 1;
+    });
   }
   // рамка
   const bx = b.box;
@@ -5184,10 +5315,15 @@ function battleDraw(c) {
     drawKid(c, cx - 30, bx.y + 22, "up", Math.floor(b.t * 2) % 2, playerLook());
     drawClaude(c, cx + 14, bx.y + 22, "up", b.t);
     if (b.claudeLine) {
-      c.font = '12px "Handjet", monospace';
+      // реплика Клода над рамкой: укорачиваем по ширине рамки (считаем один раз)
+      c.textAlign = "left";
+      if (!b.claudeFit || b.claudeFit.src !== b.claudeLine) {
+        let t = b.claudeLine;
+        while (t.length > 4 && mixText(c, t, 0, 0, 12, false) > bx.tw - 10) t = t.slice(0, -2).trimEnd() + "…";
+        b.claudeFit = { src: b.claudeLine, t, w: mixText(c, t, 0, 0, 12, false) };
+      }
       c.fillStyle = "#ffb08a";
-      c.textAlign = "center";
-      c.fillText(b.claudeLine.length > 34 ? b.claudeLine.slice(0, 33) + "…" : b.claudeLine, cx, bx.y + 15);
+      mixText(c, b.claudeFit.t, Math.round(cx - b.claudeFit.w / 2), bx.y + 15, 12);
     }
   }
   if (b.phase === "fight") {
@@ -5273,6 +5409,11 @@ function setupDodgeTouch() {
     l2 = [e.clientX, e.clientY];
   });
   scr.addEventListener("pointerup", () => { l2 = null; });
+  // нажатие на текст боя или пустое место пульта: дописать текст / «дальше ▼»
+  document.getElementById("bat").addEventListener("click", (e) => {
+    if (!Battle.active || G.overlay || e.target.closest("button") || e.target.closest("#batTouch")) return;
+    batTap();
+  });
 }
 
 // бой, созданный живым Клодом
@@ -7210,7 +7351,8 @@ function typeInto(el, text, who, instant) {
       if (i % 2 === 0 && text[i] && text[i] !== " ") sfx("blip", pitch);
       if (i >= text.length) fin();
     }, 1000 / speed);
-    typing = { el, cancel: fin, skip: fin };
+    // abort — остановить без продолжения (при сбросе игры)
+    typing = { el, cancel: fin, skip: fin, abort: () => { done = true; clearInterval(tm); typing = null; } };
   });
 }
 
@@ -7295,6 +7437,40 @@ async function runScene(fn) {
 }
 const queueScene = runScene;
 
+// полный сброс всего, что идёт сейчас: бой, сцены, диалог, окна поверх игры
+function resetRuntime() {
+  if (Battle.b) { Battle.b.bullets = []; Battle.b = null; }
+  Battle.active = false;
+  Battle.wait = null;
+  document.getElementById("batBtns").innerHTML = "";
+  document.getElementById("batText").textContent = "";
+  G.sceneRunning = false;
+  G.sceneQueue = [];
+  G.pendingBattle = null;
+  G.pendingTravel = null;
+  // старые сцены просто не продолжаются: их ожидания не выполняем
+  if (typing) typing.abort();
+  typing = null;
+  dlgWait = null;
+  dlgThinking(null);
+  document.getElementById("dlgChoices").innerHTML = "";
+  if (!document.getElementById("editor").hidden) { Editor.resolve = null; closeEditor(); }
+  if (!document.getElementById("chat").hidden) closeChat();
+  document.getElementById("menu").hidden = true;
+  G.overlay = null;
+  G.target = null;
+  G.near = null;
+  G.fadeDir = 0;
+  G.fadeDone = null;
+  G.fade = 0;
+  G.flashT = 0;
+  G.shakeT = 0;
+  G.particles = [];
+  G.input.dragX = 0;
+  G.input.dragY = 0;
+  panel("pad");
+}
+
 // ---------------- миры ----------------
 function enterZone(id, keepPos) {
   const def = ZONES[id];
@@ -7311,6 +7487,8 @@ function enterZone(id, keepPos) {
       if (mk) {
         map[ty][tx] = ".";
         if (mk.if && !mk.if()) continue;
+        // Клода-Ноль после финала нет — и невидимой стены на его месте тоже
+        if (mk.type === "boss" && mk.enemy === "zero" && G.save.flags["boss_" + id]) continue;
         const o = { ...mk, x: tx * 16, y: ty * 16 - 4, w: mk.w || 16, solid: true };
         if (mk.type === "machine") { o.y = ty * 16 - 18; }
         if (mk.type === "clock") { o.y = ty * 16; }
@@ -7450,7 +7628,12 @@ function update(dt) {
     if ((G.fadeDir > 0 && G.fade >= 1) || (G.fadeDir < 0 && G.fade <= 0)) { G.fadeDir = 0; const r = G.fadeDone; G.fadeDone = null; r && r(); }
   }
   updateInputAxes();
-  if (Battle.active) { battleUpdate(dt); return; }
+  if (Battle.active) {
+    // пока открыт редактор, чат или меню — бой стоит на паузе
+    if (!G.overlay) battleUpdate(dt);
+    else { G.input.dragX = 0; G.input.dragY = 0; }
+    return;
+  }
   if (G.mode !== "world" || !G.zone) return;
   const z = G.zone;
   const p = G.player;
@@ -7488,12 +7671,18 @@ function update(dt) {
     G.trail.push({ x: p.x, y: p.y, dir: p.dir });
     if (G.trail.length > 60) G.trail.shift();
   } else p.step = 0;
-  // Клод идёт следом
-  const lag = Math.max(0, G.trail.length - Math.round(14 / Math.max(0.5, Math.min(2, R_.speed || 1))));
-  const tp = G.trail[lag];
+  // Клод идёт следом: берём точку следа примерно в 16 px позади (по пути), на любой скорости
+  let tp = null;
+  for (let i = G.trail.length - 1, acc = 0; i > 0; i--) {
+    const a = G.trail[i], b = G.trail[i - 1];
+    acc += Math.hypot(a.x - b.x, a.y - b.y);
+    if (acc >= 16) { tp = b; break; }
+  }
+  if (!tp) tp = G.trail[0];
   if (tp && Math.hypot(tp.x - p.x, tp.y - p.y) > 10) {
-    G.claude.x += (tp.x - G.claude.x) * Math.min(1, dt * 8);
-    G.claude.y += (tp.y - G.claude.y) * Math.min(1, dt * 8);
+    const k = Math.min(1, dt * 8 * Math.max(1, R_.speed || 1));
+    G.claude.x += (tp.x - G.claude.x) * k;
+    G.claude.y += (tp.y - G.claude.y) * k;
     G.claude.dir = tp.dir;
   }
   // жуки-баги
@@ -7861,9 +8050,20 @@ function render() {
     list.sort((a, b) => a.y - b.y);
     for (const it of list) it.f();
     ambient(c, z, ox, oy);
-    // «!» над тем, с чем можно поговорить
-    if (G.near) {
-      const n = G.near.type === "claude" ? G.claude : G.near;
+    // стрелка над портал-аппаратом, пока не пройден первый урок
+    if (!G.save.practice.l1) for (const o of z.objs) if (o.type === "machine" && G.near !== o) {
+      const ax = o.x + 12, ay = Math.round(o.y - 16 + Math.sin(G.t * 5) * 2);
+      R(c, ax + 1, ay - 1, 6, 5, INK); R(c, ax - 2, ay + 3, 12, 1, INK); R(c, ax + 3, ay + 9, 2, 1, INK);
+      for (let i = 0; i < 5; i++) R(c, ax - 2 + i, ay + 4 + i, 12 - i * 2, 1, INK);
+      R(c, ax + 2, ay, 4, 4, "#ffe03a");
+      for (let i = 0; i < 5; i++) R(c, ax - 1 + i, ay + 4 + i, 10 - i * 2, 1, "#ffe03a");
+      R(c, ax + 2, ay, 1, 4, "#fff3b0");
+    }
+    // у Клода свой значок: только когда есть что показать ему (домашка)
+    if (G.save.rules.claudeFollows && hwAttention()) drawHwBubble(c, G.claude.x, G.claude.y);
+    // «!» над тем, с чем можно поговорить (над Клодом-спутником не рисуем)
+    if (G.near && G.near.type !== "claude") {
+      const n = G.near;
       const bx = Math.round(n.x + (n.w ? n.w / 2 : 8) - 4), by = Math.round(n.y - 11 + Math.sin(G.t * 6) * 1.5);
       R(c, bx - 1, by - 1, 11, 11, INK);
       R(c, bx + 3, by + 10, 3, 2, INK);
@@ -7922,6 +8122,40 @@ function resizeScreen() {
   scr.height = Math.max(H, Math.round(r.height * dpr));
 }
 
+// ---------------- домашка ждёт Клода ----------------
+// есть ли что показать Клоду: проверенная домашка или заданная, в которой уже есть свой код
+const HWA = { t: -1, v: false };
+function hwAttention() {
+  const s = G.save;
+  if (!s) return false;
+  if (Math.abs(G.t - HWA.t) < 0.5) return HWA.v;
+  HWA.t = G.t;
+  const hasCode = (key) => {
+    const own = (s.code[key] || "").trim();
+    if (!own) return false;
+    try { return own !== (taskFor(key).starter || "").trim(); } catch (e) { return false; }
+  };
+  let v = false;
+  for (const h in s.hw) if (s.hw[h] === "checked" || (s.hw[h] === "given" && hasCode("h:" + h))) v = true;
+  for (const h of s.customHw || []) if (h.status !== "done" && hasCode("c:" + h.id)) v = true;
+  HWA.v = v;
+  return v;
+}
+// оранжевое облачко со свитком над Клодом
+function drawHwBubble(c, x, y) {
+  const bx = Math.round(x + 2), by = Math.round(y - 15 + Math.sin(G.t * 5) * 1.5);
+  const hi = Math.floor(G.t * 3) % 2;
+  R(c, bx - 1, by - 1, 14, 12, INK);
+  R(c, bx + 4, by + 11, 4, 2, INK); R(c, bx + 5, by + 13, 2, 1, INK);
+  R(c, bx, by, 12, 10, hi ? "#ffa04a" : "#ff8a27");
+  R(c, bx + 5, by + 10, 2, 2, hi ? "#ffa04a" : "#ff8a27");
+  R(c, bx, by, 12, 1, "#ffc890");
+  // свиток
+  R(c, bx + 2, by + 2, 8, 6, "#f2e6c8");
+  R(c, bx + 2, by + 2, 1, 6, "#b08850"); R(c, bx + 9, by + 2, 1, 6, "#b08850");
+  R(c, bx + 4, by + 3, 4, 1, "#6a4a2a"); R(c, bx + 4, by + 5, 3, 1, "#6a4a2a");
+}
+
 // ---------------- HUD ----------------
 function updateHud() {
   if (!G.save) return;
@@ -7932,9 +8166,11 @@ function updateHud() {
   document.getElementById("hudHp").textContent = `${s.hp}/${max}`;
   document.getElementById("hudGold").textContent = s.gold;
   document.getElementById("objective").textContent = "➤ " + objective();
-  const ready = Object.values(s.hw).filter((v) => v === "checked").length;
-  document.getElementById("btnCode").classList.toggle("ping", Object.values(s.hw).some((v) => v === "given"));
-  document.getElementById("btnChat").dataset.badge = ready ? "!" : "";
+  // в чате нельзя сдать домашку, поэтому «!» на 💬 не ставим: значок рисуется над Клодом в мире
+  const ready = Object.values(s.hw).some((v) => v === "checked");
+  document.getElementById("btnCode").classList.toggle("ping", Object.values(s.hw).some((v) => v === "given") || (ready && !s.rules.claudeFollows));
+  document.getElementById("btnChat").dataset.badge = "";
+  HWA.t = -1;
   applyRules();
 }
 function applyRules() {
@@ -8004,7 +8240,7 @@ function setupInput() {
   // нажатие на экран: идти туда или поговорить с тем, на кого нажал
   scr.addEventListener("pointerdown", (e) => {
     audioUnlock();
-    if (Battle.active) { if (Battle.b.phase === "fight") strike(); return; }
+    if (Battle.active) { if (Battle.b.phase === "fight") strike(); else if (Battle.b.phase !== "dodge") batTap(); return; }
     if (curPanel === "dlg") { dlgTap(); return; }
     if (G.mode !== "world" || G.sceneRunning || G.overlay) return;
     const r = scr.getBoundingClientRect();
@@ -8031,7 +8267,7 @@ function setupInput() {
 }
 function pressA() {
   if (G.overlay) return;
-  if (Battle.active) { if (Battle.b.phase === "fight") strike(); else if (typing) typing.skip(); return; }
+  if (Battle.active) { if (Battle.b.phase === "fight") strike(); else batTap(); return; }
   if (curPanel === "dlg") return dlgTap();
   if (G.mode === "world" && !G.sceneRunning) { const n = nearestInteract(); if (n) interact(n); }
 }
@@ -8075,8 +8311,10 @@ function menuTab(tab) {
         <div><span>Запусков кода</span><b>${s.stats.runs || 0}</b></div>
       </div>
       <h3>Вещи</h3>
-      ${s.items.length ? s.items.map((it, i) => `<div class="row"><div><b>${escHtml(it.name)}</b><small>${escHtml(it.desc || "")}</small></div><button class="pill" data-eat="${i}">Съесть +${it.heal}</button></div>`).join("") : '<p class="dim">Пусто. Загляни в холодильник Клода.</p>'}`;
+      ${s.items.length && Battle.active ? '<p class="dim">Идёт бой. Чтобы съесть вещь, закрой меню и нажми ✚ ВЕЩИ — на это уйдёт твой ход.</p>' : ""}
+      ${s.items.length ? s.items.map((it, i) => `<div class="row"><div><b>${escHtml(it.name)}</b><small>${escHtml(it.desc || "")}</small></div><button class="pill" data-eat="${i}"${Battle.active ? ' disabled style="opacity:.55"' : ""}>${Battle.active ? "В бою — через ВЕЩИ" : "Съесть +" + it.heal}</button></div>`).join("") : '<p class="dim">Пусто. Загляни в холодильник Клода.</p>'}`;
     el.querySelectorAll("[data-eat]").forEach((b) => (b.onclick = () => {
+      if (Battle.active) return;
       const it = s.items.splice(+b.dataset.eat, 1)[0];
       s.hp = Math.min(max, s.hp + it.heal);
       sfx("heal");
@@ -8088,19 +8326,45 @@ function menuTab(tab) {
       return `<div class="row"><div><b>${s.practice[L.id] ? "✅" : avail ? "📘" : "🔒"} Урок ${L.n}: ${L.title}</b><small>${escHtml(L.topic)} · ${ZONES[L.zone].name}</small></div>${avail ? `<button class="pill" data-open="p:${L.id}">Открыть</button>` : ""}</div>`;
     }).join("");
   } else if (tab === "hw") {
-    const rows = LESSONS.map((L) => {
+    // сначала то, что надо делать сейчас, потом сданное; закрытые — одной строкой
+    const row = (L) => {
       const st = s.hw[L.homework.id];
-      const txt = { given: "📝 задана", checked: "✅ проверена — покажи Клоду", done: "⭐ сдана" }[st] || "🔒 ещё не задана";
-      return `<div class="row"><div><b>№${L.n} ${L.homework.title}</b><small>${txt}</small></div>${st ? `<button class="pill" data-open="h:${L.homework.id}">Открыть</button>` : ""}</div>`;
-    });
-    for (const h of s.customHw || []) rows.push(`<div class="row"><div><b>★ ${escHtml(h.title)}</b><small>${h.status === "done" ? "⭐ сдана" : "от живого Клода"}</small></div><button class="pill" data-open="c:${h.id}">Открыть</button></div>`);
+      const txt = { given: "📝 задана", checked: "✅ проверена — покажи Клоду", done: "⭐ сдана" }[st];
+      return `<div class="row"><div><b>№${L.n} ${L.homework.title}</b><small>${txt}</small></div><button class="pill" data-open="h:${L.homework.id}">Открыть</button></div>`;
+    };
+    const crow = (h) => `<div class="row"><div><b>★ ${escHtml(h.title)}</b><small>${h.status === "done" ? "⭐ сдана" : "📝 от живого Клода"}</small></div><button class="pill" data-open="c:${h.id}">Открыть</button></div>`;
+    const hwOf = (st) => LESSONS.filter((L) => s.hw[L.homework.id] === st);
+    const custom = s.customHw || [];
+    const rows = [
+      ...hwOf("checked").map(row), ...hwOf("given").map(row), ...custom.filter((h) => h.status !== "done").map(crow),
+      ...hwOf("done").map(row), ...custom.filter((h) => h.status === "done").map(crow),
+    ];
+    const locked = LESSONS.filter((L) => !s.hw[L.homework.id]).length;
+    const word = locked % 10 === 1 && locked % 100 !== 11 ? "домашка" : [2, 3, 4].includes(locked % 10) && ![12, 13, 14].includes(locked % 100) ? "домашки" : "домашек";
+    if (locked) rows.push(`<div class="row"><div><b>🔒 Ещё ${locked} ${word}</b><small>${word === "домашка" ? "откроется" : "откроются"} позже, после уроков</small></div></div>`);
     el.innerHTML = `<p class="dim">Сделай домашку в редакторе, нажми «Проверить», а потом подойди к Клоду в мире и выбери «Показать домашку».</p>` + rows.join("");
   } else if (tab === "rules") {
     const r = s.rules;
-    const names = { speed: "Скорость", maxHpBonus: "Бонус HP", attackBonus: "Бонус атаки", enemyDamage: "Урон врагов ×", bulletSpeed: "Скорость пуль ×", godMode: "Бессмертие", weather: "Погода", worldHue: "Цвет мира", playerColor: "Цвет одежды", playerSize: "Размер", hat: "Шляпа", night: "Ночь", encounters: "Жуки-баги", claudeFollows: "Клод рядом", textSpeed: "Скорость текста" };
+    const names = { speed: "Скорость", maxHpBonus: "Бонус HP", attackBonus: "Бонус атаки", enemyDamage: "Урон врагов", bulletSpeed: "Скорость пуль", godMode: "Бессмертие", weather: "Погода", worldHue: "Цвет мира", playerColor: "Цвет одежды", playerSize: "Размер", hat: "Шляпа", night: "Ночь", encounters: "Жуки-баги", claudeFollows: "Клод рядом", textSpeed: "Скорость текста" };
     const changed = Object.keys(names).filter((k) => r[k] !== RULE_DEFAULTS[k]);
+    // значения по-русски, без true/snow/#ff7ac0
+    const WEATHER = { none: "нет", rain: "дождь", snow: "снег", confetti: "конфетти", glitch: "глюки", stars: "звёзды", leaves: "листопад" };
+    const HATS = { none: "нет", crown: "корона", cap: "кепка", wizard: "шляпа волшебника", horns: "рожки", tophat: "цилиндр", antenna: "антенна" };
+    const swatch = (col) => `<span style="display:inline-block;width:16px;height:16px;background:${col};border:2px solid #fff;vertical-align:-3px;margin-left:6px"></span>`;
+    const num = (v) => String(Math.round(v * 100) / 100).replace(".", ",");
+    const nice = (k) => {
+      const v = r[k];
+      if (typeof v === "boolean") return v ? "вкл" : "выкл";
+      if (k === "weather") return WEATHER[v] || escHtml(String(v));
+      if (k === "hat") return HATS[v] || escHtml(String(v));
+      if (k === "playerColor") return /^#[0-9a-f]{6}$/i.test(v || "") ? "свой" + swatch(v) : "обычный";
+      if (k === "worldHue") return v ? "другой" + swatch(`hsl(${Math.round(120 + v) % 360}, 70%, 50%)`) : "обычный";
+      if (k === "maxHpBonus" || k === "attackBonus") return "+" + num(v);
+      if (k === "textSpeed") return num(v) + " из 5";
+      return "×" + num(v);
+    };
     el.innerHTML = `<p class="dim">Эти правила меняет Профессор Клод. Напиши ему в чат 💬, например: «сделай меня в два раза быстрее» или «включи ночь и снег».</p>
-      ${changed.length ? changed.map((k) => `<div class="row"><div><b>${names[k]}</b></div><code>${escHtml(String(r[k]))}</code></div>`).join("") : '<p class="dim">Все правила обычные.</p>'}
+      ${changed.length ? changed.map((k) => `<div class="row"><div><b>${names[k]}</b></div><b class="rv">${nice(k)}</b></div>`).join("") : '<p class="dim">Все правила обычные.</p>'}
       <button class="pill wide" id="rulesReset">Вернуть обычные правила</button>`;
     document.getElementById("rulesReset").onclick = () => { Object.assign(s.rules, RULE_DEFAULTS); s.hp = Math.min(s.hp, playerMaxHp()); applyRules(); menuTab("rules"); };
   } else if (tab === "settings") {
@@ -8110,7 +8374,7 @@ function menuTab(tab) {
       <div class="row"><div><b>Режим Клода в чате</b><small>Быстрый — отвечает сразу. Умный — думает дольше, объясняет лучше.</small></div><button class="pill" id="setSmart">${s.settings.smart ? "🧠 Умный" : "⚡ Быстрый"}</button></div>
       <div class="row"><div><b>Сохранение</b><small>${Store.db ? "Сохраняется в твоём аккаунте Claude и в браузере." : "Сохраняется в браузере на этом телефоне."}</small></div><button class="pill" id="setSave">Сохранить</button></div>
       <div class="row"><div><b>Начать заново</b><small>Сотрёт весь прогресс</small></div><button class="pill danger" id="setReset">Стереть</button></div>
-      <p class="dim">Управление: джойстик слева — ходить, A — говорить, или просто нажимай на экран куда идти и на кого смотреть. Кнопка &lt;/&gt; — редактор кода, 💬 — живой Клод.</p>`;
+      <p class="dim">Управление: джойстик ${padWhere()} — ходить, A — говорить, или просто нажимай на экран, куда идти и с кем говорить. Кнопка &lt;/&gt; — редактор кода, 💬 — живой Клод.</p>`;
     document.getElementById("setMusic").onclick = () => { s.settings.music = !s.settings.music; if (s.settings.music) { Snd.theme = null; music(Snd.want); } menuTab("settings"); };
     document.getElementById("setSfx").onclick = () => { s.settings.sfx = !s.settings.sfx; menuTab("settings"); };
     document.getElementById("setSmart").onclick = () => { s.settings.smart = !s.settings.smart; Claude.paintMode && Claude.paintMode(); menuTab("settings"); };
@@ -8120,13 +8384,22 @@ function menuTab(tab) {
       if (rb.dataset.armed !== "1") { rb.dataset.armed = "1"; rb.textContent = "Точно? Нажми ещё"; return; }
       try { localStorage.removeItem(SAVE_KEY); } catch (e) {}
       if (Store.db) Store.db.doc("data/users/" + Store.uid + "/save").delete().catch(() => {});
+      clearTimeout(saveTimer);
+      resetRuntime();
       G.save = null;
-      closeMenu();
+      G.zone = null;
       G.mode = "title";
       showTitle();
     };
   }
   el.querySelectorAll("[data-open]").forEach((b) => (b.onclick = () => { closeMenu(); openEditor(b.dataset.open); }));
+}
+
+// где джойстик: в широком экране пульт справа от картинки, в узком — под ней
+function padWhere() {
+  const st = document.getElementById("stage").getBoundingClientRect();
+  const pn = document.getElementById("panel").getBoundingClientRect();
+  return pn.left >= st.right - 4 ? "справа от экрана" : "внизу слева";
 }
 
 // ---------------- титульный экран и новая игра ----------------
@@ -8150,6 +8423,7 @@ function setupTitle() {
     const b = document.createElement("button");
     b.className = "sw" + (i === 0 ? " on" : "");
     b.style.background = c;
+    b.type = "button";
     b.setAttribute("aria-label", "Цвет одежды " + (i + 1));
     b.onclick = () => { shirt = c; sw.querySelectorAll(".sw").forEach((x) => x.classList.remove("on")); b.classList.add("on"); drawPreview(); };
     sw.appendChild(b);
@@ -8159,6 +8433,7 @@ function setupTitle() {
     const b = document.createElement("button");
     b.className = "sw" + (i === 0 ? " on" : "");
     b.style.background = c;
+    b.type = "button";
     b.setAttribute("aria-label", "Цвет волос " + (i + 1));
     b.onclick = () => { hair = c; hw.querySelectorAll(".sw").forEach((x) => x.classList.remove("on")); b.classList.add("on"); drawPreview(); };
     hw.appendChild(b);
@@ -8192,6 +8467,7 @@ function setupTitle() {
 }
 
 function startGame(save, fresh) {
+  resetRuntime();
   G.save = save;
   G.save.hp = Math.min(G.save.hp || 20, playerMaxHp());
   if (fresh) G.save.hp = playerMaxHp();
@@ -8219,7 +8495,7 @@ async function introScene() {
   if (c === 0) await say("claude", "Отлично! Значит, научу с нуля. Все лучшие программисты начинали с нуля. Буквально все. Я проверял.");
   else await say("claude", "Вот это настрой! Но сначала научу, а то ты нам реальность сломаешь ещё сильнее.");
   await say("claude", "Код в этой мультивселенной пишется на Luau. Это язык Roblox. Всё, что выучишь здесь, заработает в настоящем Roblox Studio.");
-  await say("claude", "Управление: джойстик внизу слева — ходить. Кнопка A — говорить. Или просто нажимай на экран, куда идти.");
+  await say("claude", `Управление: джойстик ${padWhere()} — ходить. Кнопка A — говорить. Или просто нажимай на экран, куда идти.`);
   await say("claude", "А если захочешь спросить меня о чём угодно — жми 💬 вверху. Я отвечу по-настоящему. И даже могу поменять правила игры. Я же гений.");
   await say("claude", "Теперь подойди к портал-аппарату. Вон та штука посередине, которая искрит.");
   s.flags.intro = true;
