@@ -4,3 +4,4 @@ sourcemap.json
 *.rbxlx.lock
 /build/
 claude-quest/dist/
+.claude/worktrees/
