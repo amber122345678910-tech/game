@@ -11,6 +11,8 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Handjet:wght@400;600&family=JetBrains+Mono:wght@400;600&family=Press+Start+2P&display=swap">
+<!-- только скобки ( ) [ ] { }: в Handjet круглые скобки похожи на квадратные -->
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Saira+Condensed:wght@400;600&text=()%5B%5D%7B%7D&display=swap">
 <style>
 /* Раскладка: полоса HUD, экран игры 4:3, под ним пульт (в портрете); в ландшафте экран слева, HUD и пульт справа. Одна тёмная тема в духе Undertale.
    Всё компактное: телефон с высокой плотностью (Galaxy S26 Ultra), ничего не должно требовать прокрутки. */
@@ -28,7 +30,8 @@
   --code: #0d0b16;
   --raise: #17142a;
   --display: "Press Start 2P", ui-monospace, monospace;
-  --body: "Handjet", "Arial Narrow", system-ui, sans-serif;
+  /* Saira Condensed загружен только для скобок — остальные буквы берутся из Handjet */
+  --body: "Saira Condensed", "Handjet", "Arial Narrow", system-ui, sans-serif;
   --mono: "JetBrains Mono", ui-monospace, Menlo, Consolas, monospace;
   color-scheme: dark;
 }
@@ -73,23 +76,26 @@ button:focus-visible, select:focus-visible, input:focus-visible, textarea:focus-
 #hud .hp {
   display: flex; align-items: center; gap: 5px;
   background: rgba(0,0,0,.62); padding: 4px 6px; border: 2px solid var(--line);
-  font-family: var(--display); font-size: 8px; line-height: 1; white-space: nowrap; min-width: 0;
+  font-family: var(--display); font-size: 10px; line-height: 1; white-space: nowrap; min-width: 0;
 }
-#hud .bar { width: 44px; height: 7px; background: #8a1a1a; display: block; }
+#hud .bar { width: 44px; height: 7px; background: #8a1a1a; display: block; flex: 0 1 auto; min-width: 14px; }
 #hud .bar i { display: block; height: 100%; background: var(--gold); width: 100%; transition: width .2s; }
-#hud .gold { color: var(--gold); }
+#hud .gold { color: var(--gold); display: flex; align-items: baseline; gap: 1px; font-size: 14px; line-height: 10px; }
+#hud .gold b { font-size: 10px; }
 #hud .btns { display: flex; gap: 5px; }
 #hud .btns button {
-  min-width: 40px; height: 34px; padding: 0 6px;
+  min-width: 40px; height: 36px; padding: 0 6px;
   background: rgba(0,0,0,.7); border: 2px solid var(--line);
   font-family: var(--display); font-size: 10px; position: relative;
 }
+/* значки 💬 и ☰ крупнее, коробка та же */
+#hud .btns #btnChat, #hud .btns #btnMenu { font-family: var(--body); font-size: 18px; line-height: 1; }
 #hud .btns button:active { background: var(--raise); }
 #btnCode { color: var(--good); }
 #btnChat { border-color: var(--claude) !important; }
 #btnChat[data-badge="!"]::after, #btnCode.ping::after {
   content: "!"; position: absolute; top: -6px; right: -5px; width: 14px; height: 14px;
-  background: var(--gold); color: #000; font-size: 8px; line-height: 14px; text-align: center;
+  background: var(--gold); color: #000; font-family: var(--display); font-size: 8px; line-height: 14px; text-align: center;
 }
 #objective { margin-top: 3px; font-size: 16px; line-height: 1.1; color: var(--gold); }
 #zoneTitle {
@@ -155,16 +161,20 @@ button:focus-visible, select:focus-visible, input:focus-visible, textarea:focus-
 #bat { flex: 1; display: flex; flex-direction: column; gap: 6px; min-height: 0; position: relative; }
 #batText { background: #000; border: 3px solid var(--line); padding: 7px 10px; font-size: 17px; line-height: 1.2; min-height: 52px; white-space: pre-wrap; overflow: auto; flex: none; max-height: 55%; }
 #batBtns { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 6px; }
-#batBtns.list { grid-template-columns: minmax(0, 1fr); overflow: auto; min-height: 0; }
+#batBtns.list { grid-template-columns: minmax(0, 1fr); grid-auto-rows: min-content; align-content: start; overflow: auto; min-height: 0; }
 /* длинный список (вещи, действия) — в две колонки */
 #batBtns.list:has(> :nth-child(5)) { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
 #batBtns.list:has(> :nth-child(5)) > :last-child:nth-child(odd) { grid-column: 1 / -1; }
+/* «← Назад» (последняя кнопка списка) всегда видна, даже если список прокручивается */
+#batBtns.list > .bbtn:not(.quiz):last-child { position: sticky; bottom: 0; z-index: 1; }
 .bbtn {
   padding: 8px 6px; background: #000; border: 3px solid var(--orange); color: var(--orange);
   font-family: var(--display); font-size: 10px; line-height: 1.3; min-height: 46px; text-transform: none;
 }
 .bbtn b { font-family: var(--body); font-size: 18px; }
 .bbtn.quiz, #batBtns.list .bbtn { font-family: var(--body); font-size: 17px; line-height: 1.1; text-align: left; padding: 6px 10px; min-height: 42px; }
+/* вещи и действия: плотнее, длинное название — в две строки, но внутри рамки */
+#batBtns.list .bbtn:not(.quiz) { min-height: 36px; padding: 3px 8px; line-height: 1; }
 .bbtn:active { color: var(--gold); border-color: var(--gold); }
 .bbtn.mercy.ready { color: var(--gold); border-color: var(--gold); }
 .bbtn.wide { grid-column: 1 / -1; }
@@ -184,7 +194,7 @@ button:focus-visible, select:focus-visible, input:focus-visible, textarea:focus-
 .shHead { display: flex; align-items: center; gap: 6px; padding: 5px max(10px, env(safe-area-inset-left, 0px)); border-bottom: 2px solid var(--line); background: #000; flex: none; }
 .shHead b { font-family: var(--display); font-size: 10px; flex: 1; }
 .x { width: 36px; height: 36px; background: #000; border: 2px solid var(--line); font-size: 16px; flex: none; }
-.pill { padding: 4px 10px; background: var(--raise); border: 2px solid var(--line); font-size: 16px; line-height: 1.1; }
+.pill { min-height: 36px; padding: 4px 10px; background: var(--raise); border: 2px solid var(--line); font-size: 16px; line-height: 1.1; }
 .pill:active { background: #2a2548; }
 .pill.wide { width: 100%; margin-top: 10px; }
 .pill.danger { border-color: var(--bad); color: var(--bad); }
@@ -202,29 +212,38 @@ code { font-family: var(--mono); font-size: .88em; background: var(--code); padd
 #tContinue { border-color: var(--gold); color: var(--gold); }
 #tNewForm label { font-size: 18px; text-align: left; }
 #tName { font: inherit; font-size: 19px; padding: 7px 10px; background: #000; color: var(--ink); border: 2px solid var(--line); -webkit-user-select: text; user-select: text; }
-.look { display: flex; gap: 10px; align-items: center; text-align: left; }
-#tPreview { width: 88px; height: 53px; image-rendering: pixelated; flex: none; }
+.look { display: flex; gap: 6px; align-items: center; text-align: left; }
+#tPreview { width: 64px; height: 38px; image-rendering: pixelated; flex: none; }
 .look span { font-size: 15px; color: var(--dim); }
-#tShirts, #tHairs { display: flex; flex-wrap: wrap; gap: 5px; margin: 3px 0 6px; }
-.sw { width: 30px; height: 30px; border: 2px solid #000; outline: 2px solid transparent; }
+#tShirts, #tHairs { display: flex; flex-wrap: wrap; gap: 3px; margin: 3px 0 6px; }
+.sw { width: 36px; height: 36px; border: 2px solid #000; outline: 2px solid transparent; }
 .sw.on { outline-color: var(--gold); }
-.link { background: none; border: 0; color: var(--dim); text-decoration: underline; padding: 4px; font-size: 16px; }
+.link { min-height: 36px; background: none; border: 0; color: var(--dim); text-decoration: underline; padding: 4px; font-size: 16px; }
 .tSmall { margin: 0; font-size: 16px; color: var(--dim); line-height: 1.2; }
 #tScene { width: 100%; max-width: 280px; aspect-ratio: 2 / 1; margin: 0 auto; image-rendering: pixelated; display: block; }
+/* форма новой игры при открытой клавиатуре: без картинки и с маленьким логотипом, чтобы цвета и «Поехали!» были видны */
+#title { container-type: size; }
+@container (max-height: 540px) and (max-aspect-ratio: 4/3) {
+  .tWrap:has(#tNewForm:not([hidden])) { gap: 6px; padding-top: 6px; padding-bottom: 6px; }
+  .tWrap:has(#tNewForm:not([hidden])) #tScene, .tWrap:has(#tNewForm:not([hidden])) .logo small { display: none; }
+  .tWrap:has(#tNewForm:not([hidden])) .logo h1 { font-size: 13px; }
+  #tNewForm { gap: 6px; }
+}
 
 /* редактор: в портрете колонки .edCol прозрачные, в ландшафте — код слева, задание и вывод справа */
 .edCol { display: contents; }
 #edTask { flex: 1; min-width: 0; height: 36px; font: inherit; font-size: 16px; padding: 4px 6px; background: #000; color: var(--ink); border: 2px solid var(--line); }
-.edTop { flex: none; max-height: 24%; overflow: auto; padding: 5px max(10px, env(safe-area-inset-left, 0px)); border-bottom: 1px solid #2a2640; }
+.edTop { flex: 0 1 auto; min-height: 44px; max-height: 24%; overflow: auto; padding: 5px max(10px, env(safe-area-inset-left, 0px)); border-bottom: 1px solid #2a2640; }
 #edTaskText { font-size: 16px; line-height: 1.2; }
 #edTaskText b { color: var(--gold); }
 #edCard { margin-top: 3px; }
-#edCard summary, #edCardBody summary { cursor: pointer; color: var(--good); font-size: 15px; padding: 2px 0; }
+#edCard summary, #edCardBody summary { cursor: pointer; color: var(--good); font-size: 15px; line-height: 18px; padding: 9px 0; }
 #edCardBody { font-size: 15px; line-height: 1.25; max-width: 70ch; }
 #edCardBody p { margin: 5px 0; }
-#edCardBody pre, .bubble pre { font-family: var(--mono); font-size: 13px; line-height: 1.4; background: var(--code); border-left: 3px solid var(--claude); padding: 6px 8px; overflow-x: auto; white-space: pre; margin: 5px 0; }
+/* длинная строка кода переносится, хвост переноса — с отступом, чтобы не путать с новой строкой */
+#edCardBody pre, .bubble pre { font-family: var(--mono); font-size: 13px; line-height: 1.4; background: var(--code); border-left: 3px solid var(--claude); padding: 6px 8px; white-space: pre-wrap; overflow-wrap: anywhere; text-indent: 4ch hanging each-line; margin: 5px 0; }
 #edCardBody ul { padding-left: 18px; margin: 5px 0; }
-#edWrap { flex: 1 1 36%; min-height: 100px; display: flex; background: var(--code); position: relative; border-bottom: 1px solid #2a2640; }
+#edWrap { flex: 36 1 0; min-height: 100px; display: flex; background: var(--code); position: relative; border-bottom: 1px solid #2a2640; }
 #edGutter { margin: 0; padding: 8px 5px 8px 6px; width: 30px; text-align: right; color: #4a4566; font: 13px/1.45 var(--mono); overflow: hidden; flex: none; user-select: none; }
 .edMain { flex: 1; position: relative; min-width: 0; }
 #edHl, #edCode {
@@ -238,7 +257,22 @@ code { font-family: var(--mono); font-size: .88em; background: var(--code); padd
 .errline { background: rgba(255,74,90,.25); box-shadow: -40px 0 0 rgba(255,74,90,.25); }
 #edKeys { flex: none; display: flex; gap: 5px; overflow-x: auto; padding: 5px max(8px, env(safe-area-inset-left, 0px)); background: #000; scrollbar-width: none; }
 #edKeys::-webkit-scrollbar { display: none; }
-#edKeys button { flex: none; min-width: 34px; height: 32px; padding: 0 8px; background: var(--raise); border: 1px solid #3a3560; font: 600 14px var(--mono); color: var(--ink); }
+/* края ряда кнопок затухают — видно, что ряд листается вбок (и подсказки в чате тоже) */
+@property --keysL { syntax: "<length>"; inherits: false; initial-value: 0px; }
+@property --keysR { syntax: "<length>"; inherits: false; initial-value: 44px; }
+#edKeys, #chatChips {
+  -webkit-mask-image: linear-gradient(to right, transparent, #000 var(--keysL), #000 calc(100% - var(--keysR)), transparent);
+  mask-image: linear-gradient(to right, transparent, #000 var(--keysL), #000 calc(100% - var(--keysR)), transparent);
+}
+@supports (animation-timeline: scroll()) {
+  #edKeys, #chatChips { animation: keysFade linear both; animation-timeline: scroll(self inline); }
+}
+@keyframes keysFade {
+  0% { --keysL: 0px; --keysR: 44px; }
+  6%, 94% { --keysL: 28px; --keysR: 44px; }
+  100% { --keysL: 28px; --keysR: 0px; }
+}
+#edKeys button { flex: none; min-width: 36px; height: 36px; padding: 0 8px; background: var(--raise); border: 1px solid #3a3560; font: 600 14px var(--mono); color: var(--ink); }
 #edKeys button.word { color: var(--good); font-size: 12px; }
 #edKeys button:active { background: #3a3560; }
 #edBar { flex: none; display: flex; gap: 6px; padding: 5px max(8px, env(safe-area-inset-left, 0px)); }
@@ -247,24 +281,28 @@ code { font-family: var(--mono); font-size: .88em; background: var(--code); padd
 #edRun.running { background: rgba(90,255,138,.12); }
 #edCheck { flex: 1.3; color: var(--gold); border-color: var(--gold) !important; }
 #edStop { width: 40px; }
-#edResult { flex: none; margin: 0 max(8px, env(safe-area-inset-left, 0px)) 5px; padding: 5px 8px; font-size: 16px; border: 2px solid var(--dim); position: relative; overflow: hidden; line-height: 1.25; }
+#edResult { flex: 0 1 auto; min-height: 34px; margin: 0 max(8px, env(safe-area-inset-left, 0px)) 5px; padding: 5px 8px; font-size: 16px; border: 2px solid var(--dim); position: relative; overflow: hidden auto; line-height: 1.25; }
 #edResult.ok { border-color: var(--good); color: var(--good); }
 #edResult.bad { border-color: var(--bad); color: #ffb0b8; }
 #edResult .pill { margin-top: 4px; display: inline-block; color: var(--ink); }
 .conf { position: absolute; top: -6px; width: 6px; height: 8px; animation: fall 1.2s ease-in forwards; }
 @keyframes fall { to { transform: translateY(90px) rotate(260deg); opacity: 0; } }
 #edTabs { flex: none; display: flex; gap: 5px; align-items: center; padding: 0 max(8px, env(safe-area-inset-left, 0px)); }
-#edTabs [data-tab] { padding: 2px 12px; background: none; border: 2px solid #3a3560; border-bottom: 0; font-size: 16px; position: relative; }
+#edTabs [data-tab] { min-height: 36px; padding: 2px 12px; background: none; border: 2px solid #3a3560; border-bottom: 0; font-size: 16px; position: relative; }
 #edTabs [data-tab].on { border-color: var(--line); background: #000; }
 #edTabs [data-tab].ping::after { content: ""; position: absolute; top: 3px; right: 3px; width: 6px; height: 6px; background: var(--gold); }
-.inpart { margin-left: auto; font-size: 15px; color: var(--dim); display: flex; gap: 5px; align-items: center; }
-#edPane { flex: 1 1 30%; min-height: 90px; transition: flex-basis .2s;
+.inpart { margin-left: auto; min-height: 36px; padding-left: 6px; font-size: 15px; color: var(--dim); display: flex; gap: 6px; align-items: center; cursor: pointer; }
+.inpart input { width: 20px; height: 20px; margin: 0; accent-color: var(--good); flex: none; }
+/* код и вывод делят свободное место 36:30; если места мало — сжимаются задание и результат, а не кнопки внизу */
+#edPane { flex: 30 1 0; min-height: 56px; transition: flex-grow .2s;
 }
-#editor.world #edPane { flex-basis: 50%; }
-#editor.world #edWrap { flex-basis: 26%; }
+#editor.world #edPane { flex-grow: 50; }
+#editor.world #edWrap { flex-grow: 26; }
 #editor.world .edTop { max-height: 16%; }
 /* открыта шпаргалка — ей чуть больше места */
 #editor .edTop:has(#edCard[open]) { max-height: 36%; }
+/* показан результат проверки при открытой шпаргалке — она ниже, чтобы вывод и кнопки Клода не уехали за экран */
+#editor:has(#edResult:not([hidden])) .edTop:has(#edCard[open]) { max-height: 18%; }
 #edPane { position: relative; border-top: 2px solid var(--line); background: #000; }
 #edOut { position: absolute; inset: 0; overflow: auto; padding: 6px 8px; font: 13px/1.45 var(--mono); white-space: pre-wrap; overflow-wrap: anywhere; }
 .o-print { color: #e6e2ff; } .o-warn { color: var(--gold); } .o-error { color: var(--bad); } .o-hint { color: var(--claude); font-family: var(--body); font-size: 16px; line-height: 1.2; margin: 2px 0 4px; }
@@ -273,7 +311,7 @@ code { font-family: var(--mono); font-size: .88em; background: var(--code); padd
 #edWorld { position: absolute; inset: 0; }
 #edCanvas { width: 100%; height: 100%; display: block; touch-action: none; }
 .vbtns { position: absolute; right: 6px; bottom: 6px; display: flex; gap: 5px; }
-.vbtns button { width: 34px; height: 34px; background: rgba(0,0,0,.6); border: 2px solid var(--line); font-size: 15px; }
+.vbtns button { width: 36px; height: 36px; background: rgba(0,0,0,.6); border: 2px solid var(--line); font-size: 15px; }
 .vhint { position: absolute; left: 6px; top: 4px; font-size: 14px; line-height: 1.15; color: rgba(255,255,255,.75); pointer-events: none; text-shadow: 0 1px 0 #000; max-width: 70%; }
 #edToast { position: absolute; left: 50%; top: 40%; transform: translateX(-50%); background: rgba(0,0,0,.8); border: 2px solid var(--gold); padding: 5px 9px; font-size: 16px; opacity: 0; transition: .2s; pointer-events: none; white-space: nowrap; }
 #edToast.show { opacity: 1; }
@@ -281,7 +319,16 @@ code { font-family: var(--mono); font-size: .88em; background: var(--code); padd
 #edClaudeAva { width: 20px; height: 25px; image-rendering: pixelated; }
 #edClaudeText { flex: 1 1 140px; font-size: 15px; line-height: 1.15; color: var(--claude); min-width: 0; }
 #edClaude .pill { font-size: 15px; padding: 3px 8px; }
+/* видны все три кнопки (после ошибки) — без текста, в одну строку: так выводу больше места */
+#edClaude:has(#edHint:not([hidden])):has(#edAskErr:not([hidden])) #edClaudeText { display: none; }
+#edClaude:has(#edHint:not([hidden])):has(#edAskErr:not([hidden])) .pill { flex: 1 1 auto; }
 #editor.kb .edTop, #editor.kb #edPane, #editor.kb #edTabs, #editor.kb #edClaude, #editor.kb #edResult { display: none !important; }
+/* лист редактора — контейнер: так видно его настоящую высоту, когда открыта клавиатура */
+#editor { container-type: size; }
+/* очень низко (ландшафт с клавиатурой) — прячем шапку, чтобы ▶ Запуск и ✓ Проверить остались видны */
+@container (max-height: 260px) {
+  #editor.kb .shHead { display: none; }
+}
 
 /* чат */
 #chatAva { width: 20px; height: 25px; image-rendering: pixelated; }
@@ -301,16 +348,21 @@ code { font-family: var(--mono); font-size: .88em; background: var(--code); padd
 .thinking i:nth-child(2) { animation-delay: .2s; } .thinking i:nth-child(3) { animation-delay: .4s; }
 @keyframes blink { 50% { opacity: 0; } }
 #chatChips { flex: none; display: flex; gap: 5px; overflow-x: auto; padding: 5px max(10px, env(safe-area-inset-left, 0px)); scrollbar-width: none; }
-#chatChips button { flex: none; padding: 4px 9px; background: var(--raise); border: 1px solid #3a3560; font-size: 15px; line-height: 1.15; }
+#chatChips button { flex: none; min-height: 36px; padding: 4px 9px; background: var(--raise); border: 1px solid #3a3560; font-size: 15px; line-height: 1.15; }
 #chatCtx { flex: none; padding: 3px 10px; font-size: 15px; color: var(--good); }
 .chatIn { flex: none; display: flex; gap: 6px; padding: 6px max(10px, env(safe-area-inset-left, 0px)) 8px; border-top: 2px solid var(--line); background: #000; }
 #chatInput { flex: 1; min-width: 0; font: inherit; font-size: 17px; line-height: 1.2; padding: 6px 8px; background: var(--code); color: var(--ink); border: 2px solid #3a3560; resize: none; -webkit-user-select: text; user-select: text; }
 #chatSend, #chatStop { width: 46px; background: var(--claude); color: #000; border: 0; font-size: 18px; }
 #chatStop { background: var(--bad); }
+/* клавиатура открыта (класс kb ставит JS) — прячем баннер и кнопки-подсказки, поле в одну строку */
+#chat.kb #chatBanner, #chat.kb #chatChips { display: none !important; }
+#chat.kb #chatInput { height: 38px; }
+#chat.kb .shHead { padding-top: 3px; padding-bottom: 3px; }
+#chat.kb .chatIn { padding-top: 4px; padding-bottom: 4px; }
 
 /* меню */
 #menuTabs { flex: none; display: flex; gap: 5px; overflow-x: auto; padding: 6px max(10px, env(safe-area-inset-left, 0px)); scrollbar-width: none; }
-#menuTabs button { flex: none; padding: 4px 10px; background: none; border: 2px solid #3a3560; font-size: 16px; line-height: 1.15; }
+#menuTabs button { flex: none; min-height: 36px; padding: 4px 10px; background: none; border: 2px solid #3a3560; font-size: 16px; line-height: 1.15; }
 #menuTabs button.on { border-color: var(--gold); color: var(--gold); }
 #menuBody { flex: 1; overflow: auto; padding: 2px max(14px, env(safe-area-inset-left, 0px)) 16px; max-width: 640px; width: 100%; margin: 0 auto; }
 #menuBody p { margin: 6px 0; line-height: 1.2; }
@@ -333,13 +385,15 @@ code { font-family: var(--mono); font-size: .88em; background: var(--code); padd
   #dlgText { font-size: 17px; }
   .choice { font-size: 16px; min-height: 36px; }
   #batText { font-size: 16px; }
+  /* длинный список вещей — без строки текста, чтобы все кнопки и «← Назад» влезли */
+  #bat:has(#batBtns.list > .bbtn:nth-child(9)):not(:has(.bbtn.quiz)) #batText { display: none; }
   .ab { width: 92px; gap: 10px; }
   .ab button { width: 58px; height: 58px; }
   #btnB { width: 46px; height: 46px; }
   #joy { width: 80px; height: 80px; margin: -40px 0 0 -40px; }
   #hud .bar { width: 28px; }
   #hud .hp { padding: 4px 5px; gap: 4px; }
-  #hud .btns button { min-width: 36px; height: 32px; padding: 0 5px; }
+  #hud .btns button { min-width: 36px; height: 36px; padding: 0 5px; }
   #objective { font-size: 15px; }
 
   /* титул: логотип слева, кнопки и форма справа */
@@ -357,8 +411,11 @@ code { font-family: var(--mono); font-size: .88em; background: var(--code); padd
   #editor .edTop, #editor.world .edTop { max-height: 30vh; }
   #editor .edTop:has(#edCard[open]) { max-height: 48vh; }
   #edWrap, #editor.world #edWrap { flex: 1 1 auto; min-height: 90px; }
-  #edPane, #editor.world #edPane { flex: 1 1 auto; min-height: 70px; }
+  #edPane, #editor.world #edPane { flex: 1 1 auto; min-height: 48px; }
   #edResult { margin-top: 5px; }
+  /* есть результат — задание короче, чтобы справа влезли результат, вывод и кнопки Клода */
+  #editor:has(#edResult:not([hidden])) .edTop { max-height: 22vh; }
+  #editor.kb #edWrap { min-height: 40px; }
   /* клавиатура открыта — всё в одну колонку, как в портрете */
   #editor.kb { display: flex; }
   #editor.kb .edCol { display: contents; }
@@ -370,6 +427,8 @@ code { font-family: var(--mono); font-size: .88em; background: var(--code); padd
   #menuTabs { grid-column: 1; grid-row: 1; align-items: center; background: #000; border-bottom: 2px solid var(--line); }
   #menuBody { grid-column: 1 / -1; grid-row: 2; max-width: 900px; padding-top: 8px; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); column-gap: 24px; align-content: start; }
   #menuBody > :not(.row) { grid-column: 1 / -1; }
+  /* длинное имя героя не рвётся посреди слова */
+  .stats div:first-child { grid-column: span 2; }
 }
 @media (prefers-reduced-motion: reduce) {
   #zoneTitle.show, #dlgNext, .conf { animation: none; }
