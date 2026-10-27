@@ -234,11 +234,46 @@ function zoneMissing(z) {
 const zoneOpen = (z) => z === "lab" || zoneMissing(z).length === 0;
 const zoneLessonsDone = (z) => ZONES[z].lessons.every((l) => G.save.practice[l]);
 
+// ---------------- домашки: кто что должен ----------------
+// выдаём домашки, которые уже положены (если сцена оборвалась — например, перезагрузкой)
+function syncHomework() {
+  const s = G.save;
+  if (!s) return;
+  let added = null;
+  const give = (h) => { if (!s.hw[h]) { s.hw[h] = "given"; added = added || h; } };
+  if (s.practice.l1) give("h1");
+  for (const z of ZONE_ORDER) if (s.flags["boss_" + z]) for (const l of ZONES[z].lessons) give(LESSON[l].homework.id);
+  if (added) {
+    s.lastTask = "h:" + added;
+    saveSoon();
+  }
+}
+
+// первая домашка, которую ждёт Клод: сначала «задана», потом «проверена»
+function pendingHw() {
+  const s = G.save;
+  if (!s) return null;
+  const ids = Object.keys(HOMEWORK);
+  return ids.find((h) => s.hw[h] === "given") || ids.find((h) => s.hw[h] === "checked") || null;
+}
+
+// куда идти с домашками из списка
+function hwObjective(ids) {
+  const s = G.save;
+  const need = ids.filter((h) => s.hw[h] !== "done");
+  if (!need.length) return null;
+  if (need.some((h) => s.hw[h] === "checked")) return s.rules.claudeFollows ? "Домашка проверена! Нажми на Клода → «Показать домашку»" : "Домашка проверена! Нажми </> → «Показать Клоду»";
+  const g = need.find((h) => s.hw[h] === "given");
+  if (g) return `Нажми </> — там уже открыта Домашка №${HOMEWORK[g].lesson.n}`;
+  return "Поговори с Клодом — он даст домашку";
+}
+
 // ---------------- что делать дальше ----------------
 function objective() {
   const s = G.save;
+  syncHomework();
   if (!s.practice.l1) return "Подойди к портал-аппарату в центре гаража";
-  if (s.hw.h1 !== "done") return s.hw.h1 === "checked" ? "Покажи домашку №1 Клоду (нажми на него)" : "Сделай домашку №1 в редакторе </>";
+  if (s.hw.h1 !== "done") return hwObjective(["h1"]);
   if (!s.flags.arrived_slime) return "Отправляйся на Планету Слизи через портал-аппарат";
   for (const z of ZONE_ORDER.slice(1)) {
     if (!zoneOpen(z)) {
@@ -248,8 +283,8 @@ function objective() {
         return `${ZONES[prev].name}: найди учебный камень «${LESSON[l].title}»`;
       }
       if (!s.flags["boss_" + prev]) return `${ZONES[prev].name}: стена Глюка пала — сразись с боссом`;
-      const h = (ZONE_NEEDS[z].hw || []).find((id) => s.hw[id] !== "done");
-      if (h) return s.hw[h] === "checked" ? `Покажи домашку №${HOMEWORK[h].lesson.n} Клоду` : `Сделай домашку №${HOMEWORK[h].lesson.n} «${HOMEWORK[h].title}» в редакторе </>`;
+      const h = hwObjective(ZONE_NEEDS[z].hw || []);
+      if (h) return h;
     }
     if (!s.flags["arrived_" + z]) return `Портал открыт: ${ZONES[z].name}. Иди к портал-аппарату в гараже`;
   }
@@ -299,7 +334,10 @@ async function talkMachine() {
   const miss = zoneMissing(z);
   if (miss.length) {
     await say("claude", "Туда пока нельзя. Портал требует: " + miss.join(", ") + ".");
-    if (miss.some((m) => m.startsWith("домашка"))) await say("claude", "Сначала домашка, стажёр. Мультивселенная подождёт. Она терпеливая.");
+    if (miss.some((m) => m.startsWith("домашка"))) {
+      await say("claude", "Сначала домашка, стажёр. Мультивселенная подождёт. Она терпеливая.");
+      await offerHomework();
+    }
     return;
   }
   await travel(z);
@@ -432,6 +470,14 @@ async function talkNoob() {
 async function lessonScene(id) {
   const L = LESSON[id];
   if (G.save.practice[id]) {
+    const hid = pendingHw();
+    if (hid && G.save.hw[hid] === "given") {
+      // урок пройден, а домашка ждёт — не даём перепутать
+      const c = await ask("claude", `Урок ${L.n} уже пройден ✅ Сейчас нужна Домашка №${HOMEWORK[hid].lesson.n}.`, ["📝 Открыть домашку", "Повторить урок", "Не надо"]);
+      if (c === 0) await openEditor("h:" + hid);
+      else if (c === 1) await openEditor("p:" + id);
+      return;
+    }
     const c = await ask("claude", `Урок ${L.n} «${L.title}» уже пройден. Повторим?`, ["Открыть урок", "Не надо"]);
     if (c === 0) await openEditor("p:" + id);
     return;
@@ -455,6 +501,7 @@ async function onPracticeDone(id) {
       await say("claude", "Ты только что написал свою первую программу. Официально: ты программист. Ну, стажёр-программист.");
       await say("claude", "Но прежде чем прыгать в портал — домашка. Да-да. Я строгий, но справедливый.");
       await assignHomework("h1");
+      await offerHomework(true);
       return;
     }
     await say("claude", `Урок ${L.n} пройден! ${["Гениально.", "Неплохо для человека.", "Я почти горжусь.", "Вот это код!"][L.n % 4]}`);
@@ -472,71 +519,193 @@ async function onPracticeDone(id) {
 
 async function assignHomework(hid) {
   const H = HOMEWORK[hid];
+  // записываем сразу, чтобы домашка не потерялась, даже если игру закроют посреди разговора
+  if (!G.save.hw[hid]) G.save.hw[hid] = "given";
+  if (G.save.hw[hid] !== "done") G.save.lastTask = "h:" + hid;
+  saveSoon();
   await say("claude", `Домашка №${H.lesson.n}: «${H.title}».`);
   await say("claude", H.task);
-  await say("claude", "Сделай её в редакторе (кнопка </> вверху экрана), нажми «Проверить», а потом подойди ко мне и покажи.");
-  if (!G.save.hw[hid]) G.save.hw[hid] = "given";
-  saveSoon();
 }
 
-// показать домашку Клоду в мире
-async function showHomework() {
+// предложить сразу открыть домашку (или показать уже проверенную)
+async function offerHomework(explain) {
+  syncHomework();
   const s = G.save;
-  const ready = Object.keys(HOMEWORK).filter((h) => s.hw[h] === "checked");
-  const custom = (s.customHw || []).filter((h) => h.status !== "done");
-  const pending = Object.keys(HOMEWORK).filter((h) => s.hw[h] === "given");
-  if (!ready.length && !custom.length) {
-    if (pending.length) {
-      const H = HOMEWORK[pending[0]];
-      await say("claude", `Домашка №${H.lesson.n} «${H.title}» ещё не проверена. Открой редактор, выбери её и нажми «Проверить».`);
-    } else await say("claude", "Домашек пока нет. Хочешь, придумаю? Напиши мне в чате: «дай домашку».");
+  const hid = pendingHw();
+  if (!hid) return;
+  const n = HOMEWORK[hid].lesson.n;
+  if (s.hw[hid] === "checked") {
+    const c = await ask("claude", `Домашка №${n} уже проверена. Покажешь мне?`, ["📜 Показать", "Потом"]);
+    if (c === 0) await showHomework();
     return;
   }
-  const opts = ready.map((h) => `№${HOMEWORK[h].lesson.n} ${HOMEWORK[h].title}`).concat(custom.map((h) => `★ ${h.title}`));
-  opts.push("Отмена");
-  const c = ready.length + custom.length === 1 ? 0 : await ask("claude", "Какую домашку покажешь?", opts);
-  if (c >= ready.length + custom.length) return;
-  if (c < ready.length) {
-    const hid = ready[c];
-    const H = HOMEWORK[hid];
-    await say("claude", "Так-так, посмотрим...");
-    const code = s.code["h:" + hid] || "";
-    const live = await claudeReview(H.title, H.task, code, true);
-    if (live) await sayLong("claude", live.text);
-    else await say("claude", ["Чисто. Работает. Я бы лучше не написал. Ладно, написал бы, но не сильно.", "Отличная работа! Компьютер понял каждую строчку.", "Код запустился без ошибок. Это уже уровень профи!"][H.lesson.n % 3]);
-    s.hw[hid] = "done";
-    s.atkBonus = (s.atkBonus || 0) + 1;
-    addXp(20);
-    s.gold += 10;
-    sfx("victory");
-    await say("sys", `* Домашка №${H.lesson.n} засчитана! +20 XP, +10 монет, +1 к силе атаки.`);
-    const nextZ = ZONE_ORDER.find((z) => ZONE_NEEDS[z] && (ZONE_NEEDS[z].hw || []).includes(hid));
-    if (nextZ && zoneOpen(nextZ)) {
+  s.lastTask = "h:" + hid;
+  if (explain) await say("claude", "Домашка — это отдельное задание, не урок. Пишешь код → ✓ Проверить → показываешь мне.");
+  const c = await ask("claude", `Открыть Домашку №${n} прямо сейчас?`, ["📝 Открыть домашку", "Потом"]);
+  if (c === 0) await openEditor("h:" + hid);
+  else await say("claude", "Когда будешь готов — жми </>. Домашка уже будет открыта.");
+}
+
+// проверяем «заданную» домашку сами. Если её код пустой или не работает,
+// пробуем код из последнего открытого задания и из урока: вдруг домашку написали туда
+async function autoCheckHw(hid) {
+  const s = G.save;
+  const key = "h:" + hid;
+  const T = taskFor(key);
+  const own = (s.code[key] || "").trim();
+  const empty = !own || own === (T.starter || "").trim();
+  // свою мини-игру (№10) берём только из самой домашки
+  const keys = T.review ? [key] : [key, s.lastTask, "p:" + T.lesson.id];
+  const tried = new Set();
+  let msg = "";
+  for (const k of keys) {
+    if (!k || (k !== key && k.startsWith("h:"))) continue;
+    const code = s.code[k];
+    if (!code || !code.trim() || tried.has(code)) continue;
+    tried.add(code);
+    const res = await runCheck(T, code);
+    if (res.ok) {
+      s.code[key] = code;
+      s.hw[hid] = "checked";
+      return { ok: true, from: k };
+    }
+    if (k === key) msg = res.msg || "";
+  }
+  return { ok: false, empty, msg };
+}
+
+// Клод объясняет, почему домашка не принята; true — если ученик выбрал «Потом»
+async function explainFail(f) {
+  const H = HOMEWORK[f.hid];
+  const n = H.lesson.n;
+  if (f.engine) {
+    await say("claude", "Не могу запустить код: движок Lua не загрузился. Нужен интернет — обнови страницу.");
+    return true;
+  }
+  if (f.empty) await say("claude", `Домашка №${n} «${H.title}» пока пустая. Её надо написать в редакторе.`);
+  else await say("claude", `Я запустил Домашку №${n}, но она пока не работает. ${String(f.msg || "").replace(/\s+/g, " ").slice(0, 160)}`);
+  const c = await ask("claude", `Открыть Домашку №${n} в редакторе?`, ["📝 Открыть домашку", "Потом"]);
+  if (c === 0) {
+    await openEditor("h:" + f.hid);
+    return false;
+  }
+  return true;
+}
+
+async function acceptHomework(hid) {
+  const s = G.save;
+  const H = HOMEWORK[hid];
+  await say("claude", `Так-так, Домашка №${H.lesson.n}. Посмотрим...`);
+  const live = await claudeReview(H.title, H.task, s.code["h:" + hid] || "", true);
+  if (live) await sayLong("claude", live.text);
+  else await say("claude", ["Чисто. Работает. Я бы лучше не написал. Ладно, написал бы, но не сильно.", "Отличная работа! Компьютер понял каждую строчку.", "Код запустился без ошибок. Это уже уровень профи!"][H.lesson.n % 3]);
+  s.hw[hid] = "done";
+  s.atkBonus = (s.atkBonus || 0) + 1;
+  addXp(20);
+  s.gold += 10;
+  sfx("victory");
+  await say("sys", `* Домашка №${H.lesson.n} засчитана! +20 XP, +10 монет, +1 к силе атаки.`);
+}
+
+// после сдачи: открылся ли портал и что осталось
+async function afterAccepted(done, fail) {
+  const zs = ZONE_ORDER.filter((z) => ZONE_NEEDS[z] && (ZONE_NEEDS[z].hw || []).some((h) => done.includes(h)));
+  for (const z of zs) {
+    if (zoneOpen(z)) {
       sfx("portal");
-      await say("claude", `Портал-аппарат принял твой код! Открыт путь: ${ZONES[nextZ].name}. Жду тебя у аппарата в гараже.`);
-    }
-  } else {
-    const h = custom[c - ready.length];
-    const code = s.code["c:" + h.id] || "";
-    if (!code.trim()) {
-      await say("claude", `Для «${h.title}» в редакторе пусто. Открой </>, выбери ★ ${h.title} и напиши код.`);
-      return;
-    }
-    await say("claude", "Секундочку, вчитываюсь...");
-    const live = await claudeReview(h.title, h.task, code, false);
-    if (!live) {
-      await say("claude", "Мой мозг сейчас не подключён, и я не могу проверить такую домашку. Открой игру по ссылке Claude.");
-      return;
-    }
-    await sayLong("claude", live.text);
-    if (live.pass) {
-      h.status = "done";
-      addXp(25);
-      s.gold += 15;
-      sfx("victory");
-      await say("sys", "* Особая домашка засчитана! +25 XP, +15 монет.");
+      await say("claude", `Портал-аппарат принял твой код! Открыт путь: ${ZONES[z].name}.`);
+      if (!G.save.flags["arrived_" + z]) {
+        const c = await ask("claude", "Прыгнем туда прямо сейчас? Я открою портал прямо здесь.", ["🌀 Поехали!", "Потом"]);
+        if (c === 0) {
+          await travel(z);
+          return;
+        }
+        await say("claude", "Ладно. Портал-аппарат в гараже будет ждать.");
+      }
+    } else {
+      const left = (ZONE_NEEDS[z].hw || []).filter((h) => G.save.hw[h] !== "done").map((h) => "№" + HOMEWORK[h].lesson.n);
+      if (left.length) await say("claude", `Для пути в «${ZONES[z].name}» осталась домашка ${left.join(" и ")}.`);
     }
   }
+  if (fail) await explainFail(fail);
+  else await offerHomework();
+}
+
+// особое задание от живого Клода
+async function showCustom(custom) {
+  const s = G.save;
+  const c = custom.length === 1 ? 0 : await ask("claude", "Какое особое задание покажешь?", custom.map((h) => `★ ${h.title}`).concat(["Отмена"]));
+  if (c >= custom.length) return;
+  const h = custom[c];
+  const code = s.code["c:" + h.id] || "";
+  if (!code.trim() || code.trim() === "-- " + h.title) {
+    await say("claude", `Для «${h.title}» в редакторе пока пусто.`);
+    const o = await ask("claude", "Открыть это задание в редакторе?", ["📝 Открыть", "Потом"]);
+    if (o === 0) await openEditor("c:" + h.id);
+    return;
+  }
+  await say("claude", "Секундочку, вчитываюсь...");
+  const live = await claudeReview(h.title, h.task, code, false);
+  let pass = false;
+  if (live) {
+    await sayLong("claude", live.text);
+    pass = live.pass;
+  } else if (LuaRT.available()) {
+    // мозг не подключён — хотя бы запускаем код, чтобы задание не висело вечно
+    const res = await runCheck({ time: 3, check: (r) => (noErr(r) ? { ok: false, msg: noErr(r) } : r.out.length || userParts(r).length ? { ok: true } : { ok: false, msg: "Код ничего не вывел и ничего не построил." }) }, code);
+    if (res.ok) await say("claude", "Мой мозг сейчас не подключён, но я запустил твой код — работает без ошибок! Засчитываю.");
+    else await say("claude", "Я запустил твой код, но что-то не так: " + String(res.msg || "").replace(/\s+/g, " ").slice(0, 160));
+    pass = res.ok;
+  } else {
+    await say("claude", "Не могу проверить: нет интернета. Попробуй позже.");
+    return;
+  }
+  if (pass) {
+    h.status = "done";
+    addXp(25);
+    s.gold += 15;
+    sfx("victory");
+    await say("sys", "* Особая домашка засчитана! +25 XP, +15 монет.");
+  } else {
+    const o = await ask("claude", "Открыть задание и поправить?", ["📝 Открыть", "Потом"]);
+    if (o === 0) await openEditor("c:" + h.id);
+  }
+}
+
+// показать домашку Клоду
+async function showHomework() {
+  const s = G.save;
+  syncHomework();
+  // «заданные» домашки Клод проверяет сам — вдруг код уже готов
+  const given = Object.keys(HOMEWORK).filter((h) => s.hw[h] === "given");
+  let fail = null;
+  if (given.length && !LuaRT.available()) fail = { hid: given[0], engine: true };
+  else if (given.length) {
+    const moved = [];
+    dlgThinking("Клод запускает твой код");
+    try {
+      for (const hid of given) {
+        const r = await autoCheckHw(hid);
+        if (r.ok && r.from !== "h:" + hid) moved.push([hid, r.from]);
+        if (!r.ok && !fail) fail = { hid, ...r };
+      }
+    } finally {
+      dlgThinking(null);
+    }
+    for (const [hid, from] of moved) await say("claude", `Ага! Домашку №${HOMEWORK[hid].lesson.n} ты написал в «${taskFor(from).title}». Ничего страшного — я перенёс код куда надо.`);
+  }
+  const ready = Object.keys(HOMEWORK).filter((h) => s.hw[h] === "checked");
+  if (ready.length) {
+    for (const hid of ready) await acceptHomework(hid);
+    saveSoon();
+    await afterAccepted(ready, fail);
+    saveSoon();
+    return;
+  }
+  const custom = (s.customHw || []).filter((h) => h.status !== "done");
+  if (fail && !(await explainFail(fail))) return;
+  if (custom.length) await showCustom(custom);
+  else if (!fail) await say("claude", "Домашек пока нет. Хочешь, придумаю? Напиши мне в чате: «дай домашку».");
   saveSoon();
 }
 
@@ -621,6 +790,7 @@ async function bossScene(enemyId) {
   await say("claude", "Мир спасён. Почти. Остались домашки — без них портал дальше не пустит.");
   for (const h of L) await assignHomework(h);
   saveSoon();
+  await offerHomework(true);
 }
 
 async function endingScene(spared) {
@@ -655,5 +825,11 @@ async function talkClaude() {
   const c = await ask("claude", ["Что, стажёр?", "Слушаю.", "Говори, я гений, у меня мало времени. Шучу, у меня его бесконечно."][Math.floor(G.t) % 3], opts);
   if (c === 0) openChat();
   else if (c === 1) await showHomework();
-  else if (c === 2) await say("claude", objective() + ".");
+  else if (c === 2) await nextStep();
+}
+
+// «Что делать дальше?» — говорим, куда идти, и сразу предлагаем домашку
+async function nextStep() {
+  await say("claude", objective() + ".");
+  if (pendingHw()) await offerHomework();
 }

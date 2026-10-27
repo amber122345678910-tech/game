@@ -72,7 +72,7 @@ function taskList() {
 }
 
 function taskFor(key) {
-  if (!key || key === "sandbox") return { title: "Песочница", task: "Пиши любой код и запускай. Тут ничего не проверяется — просто экспериментируй!", starter: "-- Песочница: пробуй что хочешь\nprint(\"Привет из песочницы!\")\n", card: sandboxCard() };
+  if (!key || key === "sandbox") return { kind: "sandbox", title: "Песочница", task: "Пиши любой код и запускай. Тут ничего не проверяется — просто экспериментируй!", starter: "-- Песочница: пробуй что хочешь\nprint(\"Привет из песочницы!\")\n", card: sandboxCard() };
   const [t, id] = key.split(":");
   if (t === "p") {
     const L = LESSON[id];
@@ -103,11 +103,34 @@ function openEditor(key) {
     const el = document.getElementById("editor");
     el.hidden = false;
     G.overlay = "editor";
-    key = key || G.save.lastTask || "sandbox";
+    // без ключа: сначала открываем домашку, которую ждёт Клод, а не старый урок
+    syncHomework();
+    const hid = pendingHw();
+    key = key || (hid && "h:" + hid) || G.save.lastTask || "sandbox";
     if (!taskList().some((t) => t.key === key)) key = "sandbox";
     loadTask(key);
     fitSheet();
   });
+}
+
+// закрыть редактор и сразу показать домашку Клоду
+function showToClaude() {
+  closeEditor();
+  if (G.mode !== "world" || Battle.active) return;
+  if (!G.sceneQueue.includes(showHomework)) runScene(showHomework);
+}
+
+function switchTask(key) {
+  stopRun();
+  loadTask(key);
+}
+
+// перенести код в домашку и сразу проверить
+function carryToHw(hid, code) {
+  stopRun();
+  G.save.code["h:" + hid] = code;
+  loadTask("h:" + hid);
+  checkTask();
 }
 
 function closeEditor() {
@@ -120,10 +143,7 @@ function closeEditor() {
   if (r) r();
 }
 
-function loadTask(key) {
-  const s = G.save;
-  Editor.key = key;
-  s.lastTask = key;
+function fillTaskSelect(key) {
   const sel = document.getElementById("edTask");
   sel.innerHTML = "";
   for (const t of taskList()) {
@@ -133,8 +153,99 @@ function loadTask(key) {
     if (t.key === key) o.selected = true;
     sel.appendChild(o);
   }
+}
+
+// ярлык: какое задание открыто
+const KIND_TAGS = {
+  practice: ["УРОК", "var(--good)"],
+  homework: ["ДОМАШКА", "var(--gold)"],
+  custom: ["ОСОБОЕ ЗАДАНИЕ", "var(--claude)"],
+  sandbox: ["ПЕСОЧНИЦА", "#8ad8ff"],
+};
+function kindTag(kind) {
+  const [text, color] = KIND_TAGS[kind] || KIND_TAGS.sandbox;
+  return `<span class="edKind" style="display:inline-block;margin:0 6px 3px 0;padding:3px 5px 2px;border:2px solid ${color};color:${color};font-family:var(--display);font-size:9px;line-height:1.2;vertical-align:middle">${text}</span>`;
+}
+function taskStatus(T) {
+  const s = G.save;
+  if (T.kind === "practice") return s.practice[T.id] ? "✅ пройден" : "";
+  if (T.kind === "homework") return { given: "📝 задана", checked: "✅ проверена", done: "⭐ сдана" }[s.hw[T.id]] || "";
+  if (T.kind === "custom") return { ready: "✅ готово", done: "⭐ сдано" }[T.custom.status] || "";
+  return "";
+}
+
+function renderTaskHead(T, noNote) {
+  const st = taskStatus(T);
+  document.getElementById("edTaskText").innerHTML = `${kindTag(T.kind)}<b>${escHtml(T.title)}</b>${st ? ` <span class="dim" style="white-space:nowrap">${st}</span>` : ""}<br>${escHtml(T.task)}`;
+  if (!noNote) taskNote(T);
+}
+
+// плашка сверху задания с кнопкой
+function setNote(text, btn, fn, good) {
+  const box = document.getElementById("edTaskText");
+  let el = document.getElementById("edNote");
+  if (!el) {
+    el = document.createElement("div");
+    el.id = "edNote";
+    box.prepend(el);
+  }
+  const c = good ? "var(--good)" : "var(--gold)";
+  el.style.cssText = `margin:0 0 6px;padding:4px 8px 6px;border:2px solid ${c};color:${c}`;
+  el.textContent = text + " ";
+  const b = document.createElement("button");
+  b.type = "button";
+  b.className = "pill";
+  b.style.cssText = "margin-top:4px;color:var(--ink)";
+  b.textContent = btn;
+  b.onclick = fn;
+  el.appendChild(b);
+  const top = document.querySelector(".edTop");
+  if (top) top.scrollTop = 0;
+}
+
+// если открыто не то задание, которое сейчас нужно, — подсказываем
+function taskNote(T) {
+  const s = G.save;
+  if (T.kind === "homework" && s.hw[T.id] === "checked") {
+    setNote("✅ Код проверен! Теперь покажи его Клоду.", "📜 Показать Клоду →", showToClaude, true);
+    return;
+  }
+  const hid = pendingHw();
+  if (!hid) return;
+  const finished = T.kind === "sandbox" || (T.kind === "practice" && s.practice[T.id]) || (T.kind === "homework" && s.hw[T.id] === "done");
+  if (!finished) return;
+  const n = HOMEWORK[hid].lesson.n;
+  const head = T.kind === "practice" ? `Урок ${T.lesson.n} уже пройден ✅ ` : T.kind === "homework" ? "Эта домашка уже сдана ⭐ " : "";
+  if (s.hw[hid] === "checked") setNote(`${head}Домашка №${n} проверена — покажи её Клоду.`, "📜 Показать Клоду →", showToClaude);
+  else setNote(`${head}Сейчас нужна Домашка №${n}.`, "📝 Открыть домашку →", () => switchTask("h:" + hid));
+}
+
+// домашка пустая, а код для неё уже написан в другом задании (например, в уроке)
+async function suggestCarry(T, prev) {
+  const s = G.save;
+  const key = "h:" + T.id;
+  const own = (s.code[key] || "").trim();
+  if (s.hw[T.id] !== "given" || (own && own !== (T.starter || "").trim()) || !LuaRT.available()) return;
+  for (const k of [prev, "p:" + T.lesson.id]) {
+    const code = k && k !== key ? s.code[k] : "";
+    if (!code || !code.trim()) continue;
+    const res = await runCheck(T, code);
+    if (Editor.key !== key || document.getElementById("editor").hidden) return;
+    if (res.ok) {
+      setNote(`Ты уже написал эту домашку в «${taskFor(k).title}» — и код подходит!`, "Перенести сюда →", () => carryToHw(T.id, code), true);
+      return;
+    }
+  }
+}
+
+function loadTask(key) {
+  const s = G.save;
+  const prev = s.lastTask;
+  Editor.key = key;
+  s.lastTask = key;
+  fillTaskSelect(key);
   const T = taskFor(key);
-  document.getElementById("edTaskText").innerHTML = `<b>${escHtml(T.title)}</b><br>${escHtml(T.task)}`;
+  renderTaskHead(T);
   document.getElementById("edCardBody").innerHTML = T.card || "";
   const code = s.code[key] ?? T.starter ?? "";
   const ta = document.getElementById("edCode");
@@ -150,7 +261,9 @@ function loadTask(key) {
   card.open = T.kind === "practice" && !G.save.practice[T.id];
   const wantsWorld = T.lesson && T.lesson.n >= 8;
   showTab(wantsWorld ? "world" : "out");
-  edClaude(T.kind === "practice" ? "Прочитай шпаргалку (📖), напиши код и нажми ▶ Запуск. Потом ✓ Проверить." : T.kind === "homework" ? "Домашка! Сделай сам, а если застрял — нажми «Спросить Клода»." : T.kind === "custom" ? "Особое задание. Когда допишешь — нажми «Готово» и покажи мне в мире." : "Песочница. Тут можно ломать всё что угодно!");
+  edClaude(T.kind === "practice" ? "Прочитай шпаргалку (📖), напиши код и нажми ▶ Запуск. Потом ✓ Проверить." : T.kind === "homework" ? "Домашка! Сделай сам, а если застрял — нажми «Спросить Клода»." : T.kind === "custom" ? "Особое задание. Когда допишешь — нажми «Готово» и покажи мне." : "Песочница. Тут можно ломать всё что угодно!");
+  if (document.getElementById("edNote")) edClaude(T.kind === "homework" && s.hw[T.id] === "checked" ? "Код рабочий. Неси показывать — кнопка сверху." : "Это задание уже сделано. Жми кнопку сверху — там то, что нужно сейчас.");
+  if (T.kind === "homework") setTimeout(() => suggestCarry(T, prev), 60);
 }
 
 function refreshHl() {
@@ -366,8 +479,11 @@ async function runCheck(T, code) {
       for (const id of ids) {
         if (rt.world.avatar && rt.world.avatar.dead) rt.fastForward(3.5);
         rt.touch(id);
-        rt.fastForward(5);
-        if (pred(rt.world)) return true;
+        // смотрим часто: персонаж оживает через 3 секунды, и смерть можно пропустить
+        for (let t = 0; t < 6; t += 0.25) {
+          rt.fastForward(0.25);
+          if (pred(rt.world)) return true;
+        }
       }
       return false;
     },
@@ -398,26 +514,36 @@ async function checkTask() {
   const code = document.getElementById("edCode").value;
   G.save.code[Editor.key] = code;
   if (T.kind === "custom") {
-    T.custom.status = "ready";
-    setResult("✓ Записал! Теперь подойди к Клоду в мире и выбери «Показать домашку».", true);
-    edClaude("Жду тебя в мире. Посмотрим, что ты там накодил.");
+    if (!code.trim() || code.trim() === T.starter.trim()) {
+      setResult("Сначала напиши код для задания, потом жми «Готово».", false);
+      return;
+    }
+    if (T.custom.status !== "done") T.custom.status = "ready";
+    setResult(`✓ Записал! Теперь покажи Клоду. <button id="edBack" class="pill">📜 Показать Клоду →</button>`, true);
+    edClaude("Жду тебя. Посмотрим, что ты там накодил.");
+    document.getElementById("edBack").onclick = showToClaude;
+    renderTaskHead(T, true);
     saveSoon();
     return;
   }
   if (!LuaRT.available()) return setResult("Движок Lua не загрузился — нужен интернет.", false);
   setResult("Проверяю…");
+  const s = G.save;
+  const hid = pendingHw();
+  // урок уже пройден, а Клод ждёт домашку — может, домашку пишут не туда
+  const wrongPlace = T.kind === "practice" && s.practice[T.id] && hid && s.hw[hid] === "given";
   const res = await runCheck(T, code);
   if (!res.ok) {
     sfx("hurt");
     setResult("✖ Пока не получилось. " + escHtml(res.msg || ""), false);
     edClaude(["Почти! Читай подсказку и пробуй ещё.", "Ошибки — это нормально. Я делаю их миллион в секунду.", "Не сдавайся. Каждый программист видит красное чаще, чем зелёное."][Math.floor(Math.random() * 3)]);
     Editor.fails = (Editor.fails || 0) + 1;
-    if (T.hint) document.getElementById("edHint").hidden = false;
+    if (T.hint && !wrongPlace) document.getElementById("edHint").hidden = false;
+    if (wrongPlace) await hwHint(T, hid, code);
     return;
   }
   sfx("victory");
   confetti();
-  const s = G.save;
   if (T.kind === "practice") {
     const first = !s.practice[T.id];
     s.practice[T.id] = true;
@@ -425,13 +551,36 @@ async function checkTask() {
     edClaude("Гениально! Возвращайся в мир — там кое-что изменилось.");
     document.getElementById("edBack").onclick = closeEditor;
     if (first) onPracticeDone(T.id);
+    else if (wrongPlace) await hwHint(T, hid, code);
   } else if (T.kind === "homework") {
     if (s.hw[T.id] !== "done") s.hw[T.id] = "checked";
-    setResult(`✓ Домашка работает! ${escHtml(res.msg || "")}<br>Теперь подойди к Клоду в мире и выбери «📜 Показать домашку». <button id="edBack" class="pill">В мир →</button>`, true);
+    setResult(`✓ Домашка работает! ${escHtml(res.msg || "")}<br>Теперь покажи её Клоду. <button id="edBack" class="pill">📜 Показать Клоду →</button>`, true);
     edClaude("Код рабочий. Неси показывать — я жду.");
-    document.getElementById("edBack").onclick = closeEditor;
+    document.getElementById("edBack").onclick = showToClaude;
+    fillTaskSelect(Editor.key);
+    renderTaskHead(T, true);
   }
   saveSoon();
+}
+
+// подсказка под результатом: домашка — это другое задание
+async function hwHint(T, hid, code) {
+  const n = HOMEWORK[hid].lesson.n;
+  const fits = (await runCheck(taskFor("h:" + hid), code)).ok;
+  if (Editor.key !== "p:" + T.id) return;
+  const d = document.createElement("div");
+  d.style.cssText = "margin-top:6px;color:var(--gold)";
+  d.textContent = fits
+    ? `💡 Это код для Домашки №${n}, а открыт Урок ${T.lesson.n} (он уже пройден). Для домашки код подходит! `
+    : `💡 Урок ${T.lesson.n} уже пройден. Домашка №${n} — это другое задание, оно открывается отдельно. `;
+  const b = document.createElement("button");
+  b.type = "button";
+  b.className = "pill";
+  b.textContent = fits ? "Перенести в домашку →" : "📝 Открыть домашку →";
+  b.onclick = fits ? () => carryToHw(hid, code) : () => switchTask("h:" + hid);
+  d.appendChild(b);
+  document.getElementById("edResult").appendChild(d);
+  edClaude(`Стоп! Ты в Уроке ${T.lesson.n}, а нужна Домашка №${n}. Жми кнопку выше.`);
 }
 
 function askClaudeAboutCode(withErr) {
