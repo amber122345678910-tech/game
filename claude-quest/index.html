@@ -497,12 +497,13 @@ code { font-family: var(--mono); font-size: .88em; background: var(--code); padd
 <script src="https://cdn.jsdelivr.net/npm/fengari-web@0.1.4/dist/fengari-web.js"></script>
 <script>
 "use strict";
-const LUA_PRELUDE = "-- Мини-Roblox: эмуляция части API Roblox для песочницы в игре.\n-- Код игрока запускается внутри корутин, поэтому wait() работает как в Roblox.\n\nlocal __out, __clock = __out, __clock\n__startTime = __clock()\n__dirty = true\nlocal co_create, co_resume, co_status, co_yield, co_running =\n  coroutine.create, coroutine.resume, coroutine.status, coroutine.yield, coroutine.running\nlocal sethook = debug.sethook\nlocal unpack = table.unpack\n\n-------------------------------------------------------------- вывод\nlocal raw_tostring = tostring\nlocal function fmtnum(v)\n  if math.type(v) == \"float\" and v == math.floor(v) and math.abs(v) < 1e15 then\n    return string.format(\"%d\", v)\n  end\n  return raw_tostring(v)\nend\nfunction tostring(v)\n  if type(v) == \"number\" then return fmtnum(v) end\n  return raw_tostring(v)\nend\nlocal function joinargs(...)\n  local n = select(\"#\", ...)\n  local t = {}\n  for i = 1, n do t[i] = tostring((select(i, ...))) end\n  return table.concat(t, \" \")\nend\nfunction print(...) __out(\"print\", joinargs(...)) end\nfunction warn(...) __out(\"warn\", joinargs(...)) end\n\n-------------------------------------------------------------- Luau-дополнения\nfunction math.clamp(x, a, b) if x < a then return a elseif x > b then return b end return x end\nfunction math.sign(x) if x > 0 then return 1 elseif x < 0 then return -1 end return 0 end\nfunction math.round(x) return math.floor(x + 0.5) end\nfunction table.find(t, v) for i = 1, #t do if t[i] == v then return i end end return nil end\nfunction table.clear(t) for k in pairs(t) do t[k] = nil end end\nfunction string.split(s, sep)\n  sep = sep or \",\"\n  local out, i = {}, 1\n  if sep == \"\" then for c in s:gmatch(\".\") do out[#out + 1] = c end return out end\n  while true do\n    local a, b = string.find(s, sep, i, true)\n    if not a then out[#out + 1] = s:sub(i) break end\n    out[#out + 1] = s:sub(i, a - 1)\n    i = b + 1\n  end\n  return out\nend\nfunction tick() return __clock() end\nfunction time() return __clock() - __startTime end\nos.clock = function() return __clock() end\n\n-------------------------------------------------------------- планировщик\nlocal tasks = {}\nlocal budget = 0\nlocal LIMIT = 400 -- x 10000 инструкций без wait()\n\nlocal function hook()\n  budget = budget + 1\n  if budget > LIMIT then\n    budget = 0\n    error(\"__TOO_LONG__\", 0)\n  end\nend\n\nlocal function spawn(fn, ...)\n  local co = co_create(fn)\n  sethook(co, hook, \"\", 10000)\n  tasks[#tasks + 1] = { co = co, wake = 0, args = table.pack(...), started = false, since = 0 }\n  return co\nend\n__spawn = spawn\n\nfunction wait(n)\n  n = tonumber(n) or 0\n  if n < 0.03 then n = 0.03 end\n  if not co_running() then return n end\n  local got = co_yield(n)\n  return got or n, __clock()\nend\n\ntask = {\n  wait = wait,\n  spawn = function(fn, ...)\n    if type(fn) ~= \"function\" then error(\"task.spawn ждёт функцию\", 2) end\n    spawn(fn, ...)\n  end,\n  delay = function(t, fn, ...)\n    local args = table.pack(...)\n    spawn(function() wait(t) fn(unpack(args, 1, args.n)) end)\n  end,\n  defer = function(fn, ...) spawn(fn, ...) end,\n}\ndelay = task.delay\n\nlocal physics -- объявим ниже\n\nfunction __tick(now)\n  local i = 1\n  while i <= #tasks do\n    local t = tasks[i]\n    if t.wake <= now then\n      budget = 0\n      local ok, res\n      if not t.started then\n        t.started = true\n        ok, res = co_resume(t.co, unpack(t.args, 1, t.args.n))\n      else\n        ok, res = co_resume(t.co, now - t.since)\n      end\n      if not ok then\n        __out(\"error\", raw_tostring(res))\n        table.remove(tasks, i)\n      elseif co_status(t.co) == \"dead\" then\n        table.remove(tasks, i)\n      else\n        t.since = now\n        t.wake = now + (tonumber(res) or 0.03)\n        i = i + 1\n      end\n    else\n      i = i + 1\n    end\n  end\n  physics(now)\n  local dirty = __dirty\n  __dirty = false\n  return #tasks, dirty\nend\n\n-------------------------------------------------------------- Signal\nlocal Signal = {}\nSignal.__index = Signal\nlocal function newSignal(name)\n  return setmetatable({ _h = {}, _name = name }, Signal)\nend\nfunction Signal:Connect(fn)\n  if type(fn) ~= \"function\" then error(\"Connect ждёт функцию: :Connect(function(...) ... end)\", 2) end\n  local h = { fn = fn, on = true }\n  table.insert(self._h, h)\n  local c = { Connected = true }\n  function c:Disconnect() h.on = false; self.Connected = false end\n  c.disconnect = c.Disconnect\n  return c\nend\nSignal.connect = Signal.Connect\nfunction Signal:Once(fn)\n  local c\n  c = self:Connect(function(...) c:Disconnect() fn(...) end)\n  return c\nend\nfunction Signal:Fire(...)\n  for _, h in ipairs(self._h) do\n    if h.on then spawn(h.fn, ...) end\n  end\nend\nfunction Signal:Wait()\n  local done, res = false, nil\n  local c\n  c = self:Connect(function(...) done = true; res = table.pack(...); c:Disconnect() end)\n  while not done do wait() end\n  return unpack(res, 1, res.n)\nend\nSignal.wait = Signal.Wait\n\n-------------------------------------------------------------- Vector3\nlocal V3 = {}\nlocal function isV3(v) return getmetatable(v) == V3 end\nVector3 = {}\nfunction Vector3.new(x, y, z)\n  return setmetatable({ __x = tonumber(x) or 0, __y = tonumber(y) or 0, __z = tonumber(z) or 0 }, V3)\nend\nV3.__index = function(v, k)\n  if k == \"X\" or k == \"x\" then return v.__x end\n  if k == \"Y\" or k == \"y\" then return v.__y end\n  if k == \"Z\" or k == \"z\" then return v.__z end\n  if k == \"Magnitude\" or k == \"magnitude\" then return math.sqrt(v.__x ^ 2 + v.__y ^ 2 + v.__z ^ 2) end\n  if k == \"Unit\" or k == \"unit\" then\n    local m = math.sqrt(v.__x ^ 2 + v.__y ^ 2 + v.__z ^ 2)\n    if m == 0 then return Vector3.new(0, 0, 0) end\n    return Vector3.new(v.__x / m, v.__y / m, v.__z / m)\n  end\n  if k == \"Lerp\" then\n    return function(a, b, t) return Vector3.new(a.__x + (b.__x - a.__x) * t, a.__y + (b.__y - a.__y) * t, a.__z + (b.__z - a.__z) * t) end\n  end\n  if k == \"Dot\" then return function(a, b) return a.__x * b.__x + a.__y * b.__y + a.__z * b.__z end end\n  error(\"У Vector3 нет поля «\" .. tostring(k) .. \"» (есть X, Y, Z, Magnitude, Unit)\", 2)\nend\nV3.__newindex = function(_, k)\n  error(\"Нельзя менять \" .. tostring(k) .. \" у Vector3 по отдельности. Пиши: part.Position = Vector3.new(x, y, z)\", 2)\nend\nV3.__add = function(a, b) return Vector3.new(a.__x + b.__x, a.__y + b.__y, a.__z + b.__z) end\nV3.__sub = function(a, b) return Vector3.new(a.__x - b.__x, a.__y - b.__y, a.__z - b.__z) end\nV3.__mul = function(a, b)\n  if type(a) == \"number\" then return Vector3.new(a * b.__x, a * b.__y, a * b.__z) end\n  if type(b) == \"number\" then return Vector3.new(a.__x * b, a.__y * b, a.__z * b) end\n  return Vector3.new(a.__x * b.__x, a.__y * b.__y, a.__z * b.__z)\nend\nV3.__div = function(a, b)\n  if type(b) == \"number\" then return Vector3.new(a.__x / b, a.__y / b, a.__z / b) end\n  return Vector3.new(a.__x / b.__x, a.__y / b.__y, a.__z / b.__z)\nend\nV3.__unm = function(a) return Vector3.new(-a.__x, -a.__y, -a.__z) end\nV3.__eq = function(a, b) return a.__x == b.__x and a.__y == b.__y and a.__z == b.__z end\nV3.__tostring = function(v) return tostring(v.__x) .. \", \" .. tostring(v.__y) .. \", \" .. tostring(v.__z) end\nVector3.zero = Vector3.new(0, 0, 0)\nVector3.one = Vector3.new(1, 1, 1)\nVector3.xAxis = Vector3.new(1, 0, 0)\nVector3.yAxis = Vector3.new(0, 1, 0)\nVector3.zAxis = Vector3.new(0, 0, 1)\n\n-------------------------------------------------------------- CFrame (только позиция)\nlocal CF = {}\nlocal function isCF(v) return getmetatable(v) == CF end\nCFrame = {}\nfunction CFrame.new(x, y, z)\n  if isV3(x) then return setmetatable({ __p = x }, CF) end\n  return setmetatable({ __p = Vector3.new(x, y, z) }, CF)\nend\nfunction CFrame.Angles() return setmetatable({ __p = Vector3.new(0, 0, 0), __rot = true }, CF) end\nCFrame.fromEulerAnglesXYZ = CFrame.Angles\nCF.__index = function(c, k)\n  if k == \"Position\" or k == \"p\" then return c.__p end\n  if k == \"X\" or k == \"Y\" or k == \"Z\" then return c.__p[k] end\n  error(\"У CFrame нет поля «\" .. tostring(k) .. \"»\", 2)\nend\nCF.__mul = function(a, b)\n  if isCF(b) then return CFrame.new(a.__p + b.__p) end\n  if isV3(b) then return a.__p + b end\n  error(\"CFrame можно умножать только на CFrame или Vector3\", 2)\nend\nCF.__add = function(a, b) return CFrame.new(a.__p + b) end\nCF.__sub = function(a, b) return CFrame.new(a.__p - b) end\nCF.__tostring = function(c) return tostring(c.__p) .. \", 1, 0, 0, 0, 1, 0, 0, 0, 1\" end\n\n-------------------------------------------------------------- Color3\nlocal C3 = {}\nlocal function isC3(v) return getmetatable(v) == C3 end\nColor3 = {}\nlocal function clamp01(v) v = tonumber(v) or 0 if v < 0 then return 0 elseif v > 1 then return 1 end return v end\nfunction Color3.new(r, g, b) return setmetatable({ __r = clamp01(r), __g = clamp01(g), __b = clamp01(b) }, C3) end\nfunction Color3.fromRGB(r, g, b) return Color3.new((tonumber(r) or 0) / 255, (tonumber(g) or 0) / 255, (tonumber(b) or 0) / 255) end\nfunction Color3.fromHSV(h, s, v)\n  h, s, v = clamp01(h), clamp01(s), clamp01(v)\n  local i = math.floor(h * 6) % 6\n  local f = h * 6 - math.floor(h * 6)\n  local p, q, t = v * (1 - s), v * (1 - f * s), v * (1 - (1 - f) * s)\n  local r, g, b\n  if i == 0 then r, g, b = v, t, p elseif i == 1 then r, g, b = q, v, p elseif i == 2 then r, g, b = p, v, t\n  elseif i == 3 then r, g, b = p, q, v elseif i == 4 then r, g, b = t, p, v else r, g, b = v, p, q end\n  return Color3.new(r, g, b)\nend\nfunction Color3.fromHex(hex)\n  hex = tostring(hex):gsub(\"#\", \"\")\n  return Color3.fromRGB(tonumber(hex:sub(1, 2), 16) or 0, tonumber(hex:sub(3, 4), 16) or 0, tonumber(hex:sub(5, 6), 16) or 0)\nend\nC3.__index = function(c, k)\n  if k == \"R\" or k == \"r\" then return c.__r end\n  if k == \"G\" or k == \"g\" then return c.__g end\n  if k == \"B\" or k == \"b\" then return c.__b end\n  if k == \"Lerp\" then\n    return function(a, b, t) return Color3.new(a.__r + (b.__r - a.__r) * t, a.__g + (b.__g - a.__g) * t, a.__b + (b.__b - a.__b) * t) end\n  end\n  error(\"У Color3 нет поля «\" .. tostring(k) .. \"» (есть R, G, B)\", 2)\nend\nC3.__newindex = function() error(\"Цвет нельзя менять по частям. Пиши: part.Color = Color3.fromRGB(255, 0, 0)\", 2) end\nC3.__eq = function(a, b) return a.__r == b.__r and a.__g == b.__g and a.__b == b.__b end\nC3.__tostring = function(c) return tostring(c.__r) .. \", \" .. tostring(c.__g) .. \", \" .. tostring(c.__b) end\n\n-------------------------------------------------------------- BrickColor\nlocal BRICK = {\n  [\"White\"] = { 242, 243, 243 }, [\"Institutional white\"] = { 248, 248, 248 }, [\"Black\"] = { 27, 42, 53 },\n  [\"Really black\"] = { 17, 17, 17 }, [\"Medium stone grey\"] = { 163, 162, 165 }, [\"Dark stone grey\"] = { 99, 95, 98 },\n  [\"Bright red\"] = { 196, 40, 28 }, [\"Really red\"] = { 255, 0, 0 }, [\"Bright blue\"] = { 13, 105, 172 },\n  [\"Really blue\"] = { 0, 0, 255 }, [\"Bright green\"] = { 75, 151, 75 }, [\"Lime green\"] = { 0, 255, 0 },\n  [\"Bright yellow\"] = { 245, 205, 48 }, [\"New Yeller\"] = { 255, 255, 0 }, [\"Bright orange\"] = { 218, 133, 65 },\n  [\"Deep orange\"] = { 255, 176, 0 }, [\"Hot pink\"] = { 255, 102, 204 }, [\"Pink\"] = { 255, 102, 204 },\n  [\"Royal purple\"] = { 98, 37, 209 }, [\"Bright violet\"] = { 107, 50, 124 }, [\"Magenta\"] = { 170, 0, 170 },\n  [\"Cyan\"] = { 4, 175, 236 }, [\"Toothpaste\"] = { 0, 255, 255 }, [\"Pastel blue\"] = { 128, 187, 219 },\n  [\"Brown\"] = { 124, 92, 70 }, [\"Reddish brown\"] = { 105, 64, 40 }, [\"Gold\"] = { 239, 184, 56 },\n  [\"Sand green\"] = { 120, 144, 130 }, [\"Teal\"] = { 18, 238, 212 }, [\"Electric blue\"] = { 9, 137, 207 },\n}\nlocal BRICK_NAMES = {}\nfor k in pairs(BRICK) do BRICK_NAMES[#BRICK_NAMES + 1] = k end\ntable.sort(BRICK_NAMES)\nlocal BC = {}\nlocal function isBC(v) return getmetatable(v) == BC end\nBrickColor = {}\nlocal function makeBC(name)\n  local c = BRICK[name]\n  return setmetatable({ Name = name, Color = Color3.fromRGB(c[1], c[2], c[3]) }, BC)\nend\nfunction BrickColor.new(name, g, b)\n  if type(name) == \"number\" and g then\n    return BrickColor.nearest(Color3.new(name, g, b))\n  end\n  if isC3(name) then return BrickColor.nearest(name) end\n  name = tostring(name)\n  if not BRICK[name] then\n    warn(\"Цвет «\" .. name .. \"» мне неизвестен, беру серый. Примеры: \\\"Bright red\\\", \\\"Lime green\\\", \\\"Really blue\\\"\")\n    name = \"Medium stone grey\"\n  end\n  return makeBC(name)\nend\nfunction BrickColor.nearest(c3)\n  local best, bd = \"Medium stone grey\", 1e9\n  for name, c in pairs(BRICK) do\n    local d = (c[1] / 255 - c3.R) ^ 2 + (c[2] / 255 - c3.G) ^ 2 + (c[3] / 255 - c3.B) ^ 2\n    if d < bd then best, bd = name, d end\n  end\n  return makeBC(best)\nend\nfunction BrickColor.Random() return makeBC(BRICK_NAMES[math.random(1, #BRICK_NAMES)]) end\nfunction BrickColor.Red() return makeBC(\"Bright red\") end\nfunction BrickColor.Blue() return makeBC(\"Bright blue\") end\nfunction BrickColor.Green() return makeBC(\"Bright green\") end\nfunction BrickColor.Yellow() return makeBC(\"Bright yellow\") end\nfunction BrickColor.White() return makeBC(\"White\") end\nfunction BrickColor.Black() return makeBC(\"Black\") end\nfunction BrickColor.Gray() return makeBC(\"Medium stone grey\") end\nBC.__tostring = function(b) return b.Name end\nBC.__eq = function(a, b) return a.Name == b.Name end\n\n-------------------------------------------------------------- Enum\nlocal function enumGroup(groupName, items)\n  local g = {}\n  for i, n in ipairs(items) do\n    g[n] = setmetatable({ Name = n, Value = i - 1, EnumType = groupName }, {\n      __tostring = function() return \"Enum.\" .. groupName .. \".\" .. n end,\n    })\n  end\n  return setmetatable(g, {\n    __index = function(_, k) error(\"В Enum.\" .. groupName .. \" нет «\" .. tostring(k) .. \"»\", 2) end,\n  })\nend\nEnum = {\n  Material = enumGroup(\"Material\", { \"Plastic\", \"SmoothPlastic\", \"Neon\", \"Wood\", \"WoodPlanks\", \"Grass\", \"Brick\", \"Glass\", \"Metal\", \"DiamondPlate\", \"ForceField\", \"Ice\", \"Sand\", \"Slate\", \"Concrete\", \"Marble\", \"Granite\", \"Fabric\", \"Foil\" }),\n  PartType = enumGroup(\"PartType\", { \"Block\", \"Ball\", \"Cylinder\", \"Wedge\" }),\n  EasingStyle = enumGroup(\"EasingStyle\", { \"Linear\", \"Sine\", \"Quad\", \"Back\", \"Bounce\", \"Elastic\", \"Cubic\", \"Quart\", \"Exponential\" }),\n  EasingDirection = enumGroup(\"EasingDirection\", { \"In\", \"Out\", \"InOut\" }),\n  HumanoidStateType = enumGroup(\"HumanoidStateType\", { \"Dead\", \"Running\", \"Jumping\" }),\n}\n\n-------------------------------------------------------------- Instance\nlocal nextId = 0\nlocal byId = {}\nlocal Inst = {}      -- методы\nlocal IMT = {}       -- метатаблица\nlocal function D(o) return rawget(o, \"__d\") end\nlocal function isInst(v) return type(v) == \"table\" and getmetatable(v) == IMT end\n\nlocal BASEPART = { Part = true, SpawnLocation = true, WedgePart = true, MeshPart = true, TrussPart = true }\nlocal VALUES = { IntValue = 0, NumberValue = 0, StringValue = \"\", BoolValue = false, ObjectValue = false, Color3Value = false, Vector3Value = false }\nlocal isA = {\n  BasePart = function(c) return BASEPART[c] end,\n  ValueBase = function(c) return VALUES[c] ~= nil end,\n  Instance = function() return true end,\n  PVInstance = function(c) return BASEPART[c] or c == \"Model\" end,\n}\n\nlocal function defaultsFor(class)\n  local p = { Name = class, ClassName = class, Archivable = true }\n  if BASEPART[class] then\n    p.Size = Vector3.new(4, 1, 2)\n    p.Position = Vector3.new(0, 0.5, 0)\n    p.Color = Color3.fromRGB(163, 162, 165)\n    p.Transparency = 0\n    p.Reflectance = 0\n    p.Anchored = false\n    p.CanCollide = true\n    p.CanTouch = true\n    p.Locked = false\n    p.Material = Enum.Material.Plastic\n    p.Shape = Enum.PartType.Block\n    p.Velocity = Vector3.new(0, 0, 0)\n    if class == \"SpawnLocation\" then p.Size = Vector3.new(12, 1, 12); p.Anchored = true; p.Color = Color3.fromRGB(99, 95, 98) end\n    if class == \"WedgePart\" then p.Shape = Enum.PartType.Wedge end\n  elseif VALUES[class] ~= nil then\n    if class == \"ObjectValue\" then p.Value = nil\n    elseif class == \"Color3Value\" then p.Value = Color3.new(0, 0, 0)\n    elseif class == \"Vector3Value\" then p.Value = Vector3.new(0, 0, 0)\n    else p.Value = VALUES[class] end\n  elseif class == \"Humanoid\" then\n    p.Health = 100; p.MaxHealth = 100; p.WalkSpeed = 16; p.JumpPower = 50; p.JumpHeight = 7.2; p.DisplayName = \"\"\n  elseif class == \"ClickDetector\" then\n    p.MaxActivationDistance = 32\n  elseif class == \"PointLight\" or class == \"SpotLight\" then\n    p.Brightness = 1; p.Range = 8; p.Color = Color3.new(1, 1, 1); p.Enabled = true\n  elseif class == \"Sound\" then\n    p.SoundId = \"\"; p.Volume = 0.5; p.Playing = false; p.Looped = false\n  elseif class == \"Script\" or class == \"LocalScript\" or class == \"ModuleScript\" then\n    p.Disabled = false; p.Enabled = true\n  elseif class == \"Lighting\" then\n    p.ClockTime = 14; p.Brightness = 2; p.Ambient = Color3.fromRGB(70, 70, 70); p.FogEnd = 100000\n  elseif class == \"Workspace\" then\n    p.Gravity = 196.2\n  end\n  return p\nend\n\nlocal function newInstance(class)\n  nextId = nextId + 1\n  local d = {\n    id = nextId, props = defaultsFor(class), children = {}, parent = nil, events = {},\n    destroyed = false, vy = 0,\n  }\n  d.events.Changed = newSignal(\"Changed\")\n  d.events.ChildAdded = newSignal(\"ChildAdded\")\n  d.events.ChildRemoved = newSignal(\"ChildRemoved\")\n  d.events.AncestryChanged = newSignal(\"AncestryChanged\")\n  d.events.Destroying = newSignal(\"Destroying\")\n  d.propSignals = {}\n  if BASEPART[class] then\n    d.events.Touched = newSignal(\"Touched\")\n    d.events.TouchEnded = newSignal(\"TouchEnded\")\n  elseif class == \"ClickDetector\" then\n    d.events.MouseClick = newSignal(\"MouseClick\")\n    d.events.MouseHoverEnter = newSignal(\"MouseHoverEnter\")\n    d.events.MouseHoverLeave = newSignal(\"MouseHoverLeave\")\n  elseif class == \"Humanoid\" then\n    d.events.Died = newSignal(\"Died\")\n    d.events.HealthChanged = newSignal(\"HealthChanged\")\n  elseif class == \"Players\" then\n    d.events.PlayerAdded = newSignal(\"PlayerAdded\")\n    d.events.PlayerRemoving = newSignal(\"PlayerRemoving\")\n  elseif class == \"Player\" then\n    d.events.CharacterAdded = newSignal(\"CharacterAdded\")\n    d.events.Chatted = newSignal(\"Chatted\")\n  elseif class == \"RunService\" then\n    d.events.Heartbeat = newSignal(\"Heartbeat\")\n    d.events.Stepped = newSignal(\"Stepped\")\n    d.events.RenderStepped = d.events.Heartbeat\n  elseif class == \"BindableEvent\" then\n    d.events.Event = newSignal(\"Event\")\n  elseif class == \"RemoteEvent\" then\n    d.events.OnServerEvent = newSignal(\"OnServerEvent\")\n    d.events.OnClientEvent = newSignal(\"OnClientEvent\")\n  end\n  local o = setmetatable({ __d = d }, IMT)\n  byId[nextId] = o\n  return o\nend\n\nlocal function fullName(o)\n  local d = D(o)\n  if not d.parent or d.props.ClassName == \"DataModel\" then return d.props.Name end\n  if D(d.parent).props.ClassName == \"DataModel\" then return d.props.Name end\n  return fullName(d.parent) .. \".\" .. d.props.Name\nend\n\nlocal function isDescendantOf(o, anc)\n  local p = D(o).parent\n  while p do\n    if p == anc then return true end\n    p = D(p).parent\n  end\n  return false\nend\n\nlocal function method(o, name, fn)\n  local d = D(o)\n  d.methods = d.methods or {}\n  d.methods[name] = fn\nend\n\nlocal function setParent(o, p)\n  local d = D(o)\n  if d.destroyed then error(\"Объект «\" .. d.props.Name .. \"» уже уничтожен (Destroy), его нельзя вернуть\", 3) end\n  if p ~= nil and not isInst(p) then error(\"Parent должен быть объектом (например, workspace), а не \" .. type(p), 3) end\n  if p == o or (p and isDescendantOf(p, o)) then error(\"Нельзя положить объект сам в себя\", 3) end\n  local old = d.parent\n  if old == p then return end\n  if old then\n    local oc = D(old).children\n    for i = #oc, 1, -1 do if oc[i] == o then table.remove(oc, i) end end\n    D(old).events.ChildRemoved:Fire(o)\n  end\n  d.parent = p\n  if p then\n    table.insert(D(p).children, o)\n    D(p).events.ChildAdded:Fire(o)\n  end\n  d.events.AncestryChanged:Fire(o, p)\n  __dirty = true\nend\n\nlocal function findChild(o, name)\n  for _, c in ipairs(D(o).children) do\n    if D(c).props.Name == name then return c end\n  end\n  return nil\nend\n\nlocal typeCheck = {\n  Position = isV3, Size = isV3, Velocity = isV3,\n  Color = isC3, Ambient = isC3,\n}\nlocal numberProps = {\n  Transparency = true, Reflectance = true, Health = true, MaxHealth = true, WalkSpeed = true, JumpPower = true,\n  JumpHeight = true, ClockTime = true, Brightness = true, Range = true, Volume = true, Gravity = true,\n  MaxActivationDistance = true, FogEnd = true,\n}\nlocal boolProps = { Anchored = true, CanCollide = true, CanTouch = true, Locked = true, Enabled = true, Disabled = true, Playing = true, Looped = true, Archivable = true }\n\nIMT.__index = function(o, k)\n  local d = D(o)\n  if k == \"Parent\" then return d.parent end\n  if k == \"CFrame\" and d.props.Position then return CFrame.new(d.props.Position) end\n  if k == \"BrickColor\" and d.props.Color then return BrickColor.nearest(d.props.Color) end\n  if k == \"Orientation\" or k == \"Rotation\" then return Vector3.new(0, 0, 0) end\n  local v = d.props[k]\n  if v ~= nil then return v end\n  local m = d.methods and d.methods[k]\n  if m then return m end\n  if Inst[k] then return Inst[k] end\n  local ev = d.events[k]\n  if ev then return ev end\n  if k == \"Value\" and VALUES[d.props.ClassName] ~= nil then return nil end\n  if k == \"Character\" and d.props.ClassName == \"Player\" then return nil end\n  local c = findChild(o, k)\n  if c then return c end\n  error(\"«\" .. tostring(k) .. \"» не найден в \" .. fullName(o) .. \" (is not a valid member). Проверь имя и большие/маленькие буквы\", 2)\nend\n\nIMT.__newindex = function(o, k, v)\n  local d = D(o)\n  local class = d.props.ClassName\n  if k == \"Parent\" then setParent(o, v) return end\n  if k == \"ClassName\" then error(\"ClassName менять нельзя\", 2) end\n  if k == \"Name\" then\n    d.props.Name = tostring(v)\n  elseif k == \"CFrame\" and d.props.Position then\n    if isCF(v) then d.props.Position = v.Position\n    else error(\"CFrame должен быть CFrame.new(x, y, z)\", 2) end\n    d.vy = 0\n  elseif k == \"BrickColor\" and d.props.Color then\n    if isBC(v) then d.props.Color = v.Color\n    elseif type(v) == \"string\" then d.props.Color = BrickColor.new(v).Color\n    else error(\"BrickColor должен быть BrickColor.new(\\\"Bright red\\\")\", 2) end\n  elseif k == \"Material\" and d.props.Material then\n    if type(v) == \"string\" then v = Enum.Material[v] end\n    if type(v) ~= \"table\" or not v.EnumType then error(\"Material: пиши Enum.Material.Neon\", 2) end\n    d.props.Material = v\n  elseif k == \"Shape\" and d.props.Shape then\n    if type(v) == \"string\" then v = Enum.PartType[v] end\n    d.props.Shape = v\n  elseif k == \"Orientation\" or k == \"Rotation\" then\n    -- вращение в песочнице не рисуем, но ошибки не даём\n  elseif k == \"Value\" and VALUES[class] ~= nil then\n    if class == \"IntValue\" then\n      local n = tonumber(v)\n      if n == nil then error(\"IntValue.Value должен быть числом\", 2) end\n      v = math.floor(n)\n    elseif class == \"NumberValue\" then\n      v = tonumber(v)\n      if v == nil then error(\"NumberValue.Value должен быть числом\", 2) end\n    elseif class == \"StringValue\" then v = tostring(v)\n    elseif class == \"BoolValue\" then v = not not v end\n    local changed = d.props.Value ~= v\n    d.props.Value = v\n    if changed then d.events.Changed:Fire(v) end\n    __dirty = true\n    return\n  elseif typeCheck[k] and d.props[k] ~= nil then\n    if not typeCheck[k](v) then\n      local hint = (k == \"Color\" or k == \"Ambient\") and \"Color3.fromRGB(255, 0, 0)\" or \"Vector3.new(0, 5, 0)\"\n      error(k .. \" нужно задавать так: \" .. hint, 2)\n    end\n    if k == \"Size\" then\n      v = Vector3.new(math.max(0.05, v.X), math.max(0.05, v.Y), math.max(0.05, v.Z))\n    end\n    if k == \"Position\" then d.vy = 0 end\n    d.props[k] = v\n  elseif numberProps[k] and d.props[k] ~= nil then\n    local n = tonumber(v)\n    if n == nil then error(k .. \" должен быть числом\", 2) end\n    if k == \"Transparency\" or k == \"Reflectance\" then n = math.clamp(n, 0, 1) end\n    if class == \"Humanoid\" and k == \"Health\" then\n      local old = d.props.Health\n      n = math.clamp(n, 0, d.props.MaxHealth)\n      d.props.Health = n\n      if n ~= old then d.events.HealthChanged:Fire(n) end\n      if old > 0 and n <= 0 then d.events.Died:Fire() end\n      __dirty = true\n      return\n    end\n    d.props[k] = n\n  elseif boolProps[k] and d.props[k] ~= nil then\n    d.props[k] = not not v\n    if k == \"Anchored\" then d.vy = 0 end\n  elseif d.props[k] ~= nil then\n    d.props[k] = v\n  else\n    error(\"У \" .. class .. \" нет свойства «\" .. tostring(k) .. \"». Проверь написание\", 2)\n  end\n  local ps = d.propSignals[k]\n  if ps then ps:Fire() end\n  d.events.Changed:Fire(k)\n  __dirty = true\nend\nIMT.__tostring = function(o) return D(o).props.Name end\nIMT.__eq = function(a, b) return rawequal(a, b) end\n\nfunction Inst.Destroy(o)\n  local d = D(o)\n  if d.destroyed then return end\n  d.events.Destroying:Fire()\n  for i = #d.children, 1, -1 do Inst.Destroy(d.children[i]) end\n  if d.parent then setParent(o, nil) end\n  d.destroyed = true\n  __dirty = true\nend\nInst.destroy = Inst.Destroy\nInst.Remove = Inst.Destroy\nfunction Inst.ClearAllChildren(o)\n  local d = D(o)\n  for i = #d.children, 1, -1 do Inst.Destroy(d.children[i]) end\nend\nfunction Inst.Clone(o)\n  local d = D(o)\n  local c = newInstance(d.props.ClassName)\n  local cd = D(c)\n  for k, v in pairs(d.props) do cd.props[k] = v end\n  for _, ch in ipairs(d.children) do\n    local cc = Inst.Clone(ch)\n    setParent(cc, c)\n  end\n  return c\nend\nfunction Inst.GetChildren(o)\n  local t = {}\n  for i, c in ipairs(D(o).children) do t[i] = c end\n  return t\nend\nInst.getChildren = Inst.GetChildren\nInst.children = Inst.GetChildren\nfunction Inst.GetDescendants(o)\n  local t = {}\n  local function walk(x)\n    for _, c in ipairs(D(x).children) do t[#t + 1] = c; walk(c) end\n  end\n  walk(o)\n  return t\nend\nfunction Inst.FindFirstChild(o, name, recursive)\n  local c = findChild(o, name)\n  if c or not recursive then return c end\n  for _, ch in ipairs(D(o).children) do\n    local r = Inst.FindFirstChild(ch, name, true)\n    if r then return r end\n  end\n  return nil\nend\nInst.findFirstChild = Inst.FindFirstChild\nfunction Inst.FindFirstChildOfClass(o, class)\n  for _, c in ipairs(D(o).children) do if D(c).props.ClassName == class then return c end end\n  return nil\nend\nfunction Inst.IsA(o, class)\n  local c = D(o).props.ClassName\n  if c == class then return true end\n  local f = isA[class]\n  return f and f(c) and true or false\nend\nfunction Inst.FindFirstChildWhichIsA(o, class)\n  for _, c in ipairs(D(o).children) do if Inst.IsA(c, class) then return c end end\n  return nil\nend\nfunction Inst.FindFirstAncestor(o, name)\n  local p = D(o).parent\n  while p do if D(p).props.Name == name then return p end p = D(p).parent end\n  return nil\nend\nfunction Inst.FindFirstAncestorOfClass(o, class)\n  local p = D(o).parent\n  while p do if D(p).props.ClassName == class then return p end p = D(p).parent end\n  return nil\nend\nfunction Inst.WaitForChild(o, name, timeout)\n  local t0 = __clock()\n  local warned = false\n  while true do\n    local c = findChild(o, name)\n    if c then return c end\n    if timeout and __clock() - t0 > timeout then return nil end\n    if not warned and __clock() - t0 > 5 then\n      warned = true\n      warn(\"WaitForChild всё ещё ждёт «\" .. tostring(name) .. \"» в \" .. fullName(o) .. \"…\")\n    end\n    wait(0.05)\n  end\nend\nfunction Inst.GetFullName(o) return fullName(o) end\nfunction Inst.IsDescendantOf(o, anc) return isDescendantOf(o, anc) end\nfunction Inst.IsAncestorOf(o, desc) return isDescendantOf(desc, o) end\nfunction Inst.GetPropertyChangedSignal(o, prop)\n  local d = D(o)\n  if not d.propSignals[prop] then d.propSignals[prop] = newSignal(prop .. \"Changed\") end\n  return d.propSignals[prop]\nend\nfunction Inst.GetAttribute(o, name) local a = D(o).attrs return a and a[name] end\nfunction Inst.SetAttribute(o, name, v) local d = D(o) d.attrs = d.attrs or {} d.attrs[name] = v end\nfunction Inst.GetAttributes(o) return D(o).attrs or {} end\nfunction Inst.Fire(o, ...)\n  local d = D(o)\n  if d.events.Event then d.events.Event:Fire(...) else error(\"Fire есть только у BindableEvent\", 2) end\nend\nfunction Inst.FireServer(o, ...)\n  local d = D(o)\n  if not d.events.OnServerEvent then error(\"FireServer есть только у RemoteEvent\", 2) end\n  d.events.OnServerEvent:Fire(__player, ...)\nend\nfunction Inst.FireClient(o, _, ...) local d = D(o) d.events.OnClientEvent:Fire(...) end\nfunction Inst.FireAllClients(o, ...) local d = D(o) d.events.OnClientEvent:Fire(...) end\nfunction Inst.Play(o) local d = D(o) if d.props.ClassName == \"Sound\" then d.props.Playing = true __out(\"sound\", d.props.Name) end end\nfunction Inst.Stop(o) local d = D(o) if d.props.ClassName == \"Sound\" then d.props.Playing = false end end\nfunction Inst.Kill() end\n\nInstance = {}\nfunction Instance.new(class, parent)\n  if type(class) ~= \"string\" then error(\"Instance.new ждёт название класса в кавычках, например Instance.new(\\\"Part\\\")\", 2) end\n  local o = newInstance(class)\n  if parent ~= nil then setParent(o, parent) end\n  return o\nend\n\n-------------------------------------------------------------- мир\ngame = newInstance(\"DataModel\")\nD(game).props.Name = \"Game\"\nlocal services = {}\nlocal function service(class)\n  local s = newInstance(class)\n  D(s).props.Name = class\n  setParent(s, game)\n  services[class] = s\n  return s\nend\nworkspace = service(\"Workspace\")\nWorkspace = workspace\nlocal Players = service(\"Players\")\nlocal Lighting = service(\"Lighting\")\nservice(\"ReplicatedStorage\"); service(\"ServerStorage\"); service(\"ServerScriptService\")\nservice(\"StarterGui\"); service(\"StarterPack\"); service(\"SoundService\"); service(\"Teams\")\nlocal RunService = service(\"RunService\")\nlocal TweenService = service(\"TweenService\")\nlocal Debris = service(\"Debris\")\nservice(\"UserInputService\"); service(\"Chat\")\n\nfunction Inst.GetService(o, name)\n  local s = services[name]\n  if not s then error(\"Сервис «\" .. tostring(name) .. \"» в песочнице не поддерживается\", 2) end\n  return s\nend\nInst.getService = Inst.GetService\nInst.service = Inst.GetService\n\nmethod(RunService, \"IsServer\", function() return true end)\nmethod(RunService, \"IsClient\", function() return true end)\nmethod(RunService, \"IsStudio\", function() return true end)\n\nlocal base = Instance.new(\"Part\")\nbase.Name = \"Baseplate\"\nbase.Size = Vector3.new(512, 16, 512)\nbase.Position = Vector3.new(0, -8, 0)\nbase.Anchored = true\nbase.Color = Color3.fromRGB(91, 93, 105)\nbase.Locked = true\nbase.Parent = workspace\nlocal spawnPad = Instance.new(\"SpawnLocation\")\nspawnPad.Name = \"SpawnLocation\"\nspawnPad.Position = Vector3.new(0, 0.5, 0)\nspawnPad.Parent = workspace\n\n-------------------------------------------------------------- игрок и персонаж\nlocal player = newInstance(\"Player\")\nD(player).props.Name = __playerName or \"Player\"\nD(player).props.DisplayName = __playerName or \"Player\"\nD(player).props.UserId = 1\nD(player).props.Team = false\n__player = player\n\nlocal char = newInstance(\"Model\")\nD(char).props.Name = D(player).props.Name\nlocal hum = Instance.new(\"Humanoid\")\nhum.Parent = char\nlocal function bodyPart(name, size, off)\n  local p = Instance.new(\"Part\")\n  p.Name = name\n  p.Size = size\n  p.Anchored = true\n  p.CanCollide = false\n  D(p).avatar = off\n  p.Parent = char\n  return p\nend\nlocal root = bodyPart(\"HumanoidRootPart\", Vector3.new(2, 2, 1), Vector3.new(0, 0, 0))\nD(root).props.Transparency = 1\nbodyPart(\"Head\", Vector3.new(2, 1, 1), Vector3.new(0, 1.5, 0))\nbodyPart(\"Torso\", Vector3.new(2, 2, 1), Vector3.new(0, 0, 0))\nlocal foot = bodyPart(\"LeftFoot\", Vector3.new(1, 1, 1), Vector3.new(-0.5, -2.5, 0))\nbodyPart(\"RightFoot\", Vector3.new(1, 1, 1), Vector3.new(0.5, -2.5, 0))\nD(char).props.PrimaryPart = root\nD(player).props.Character = char\n\nlocal avatar = { x = 0, z = 6, y = 3, tx = nil, tz = nil, target = nil, dead = false, deadAt = 0, joined = false }\n\nlocal function placeAvatar()\n  for _, c in ipairs(D(char).children) do\n    local off = D(c).avatar\n    if off then D(c).props.Position = Vector3.new(avatar.x + off.X, avatar.y + off.Y, avatar.z + off.Z) end\n  end\nend\nplaceAvatar()\n\nmethod(Players, \"GetPlayers\", function() if avatar.joined then return { player } end return {} end)\nmethod(Players, \"GetPlayerFromCharacter\", function(_, model)\n  if model == char then return player end\n  return nil\nend)\nmethod(Players, \"FindFirstChild\", function(o, name)\n  if avatar.joined and name == D(player).props.Name then return player end\n  return Inst.FindFirstChild(o, name)\nend)\nD(Players).props.LocalPlayer = player\nD(Players).props.MaxPlayers = 1\n\nlocal function join()\n  avatar.joined = true\n  setParent(player, Players)\n  setParent(char, workspace)\n  D(Players).events.PlayerAdded:Fire(player)\n  D(player).events.CharacterAdded:Fire(char)\n  __dirty = true\nend\n\nlocal function respawn()\n  avatar.dead = false\n  avatar.x, avatar.z, avatar.y = 0, 6, 3\n  avatar.tx, avatar.tz, avatar.target = nil, nil, nil\n  D(hum).props.Health = D(hum).props.MaxHealth\n  placeAvatar()\n  D(player).events.CharacterAdded:Fire(char)\n  __dirty = true\nend\n\n-------------------------------------------------------------- твины\nlocal function lerpVal(a, b, t)\n  if type(a) == \"number\" then return a + (b - a) * t end\n  if isV3(a) then return a:Lerp(b, t) end\n  if isC3(a) then return a:Lerp(b, t) end\n  if isCF(a) then return CFrame.new(a.Position:Lerp(b.Position, t)) end\n  return t < 1 and a or b\nend\nlocal function ease(style, dir, t)\n  local name = style and style.Name or \"Quad\"\n  local f\n  if name == \"Linear\" then f = function(x) return x end\n  elseif name == \"Sine\" then f = function(x) return 1 - math.cos(x * math.pi / 2) end\n  elseif name == \"Back\" then f = function(x) return x * x * (2.70158 * x - 1.70158) end\n  elseif name == \"Bounce\" then\n    f = function(x)\n      x = 1 - x\n      local r\n      if x < 1 / 2.75 then r = 7.5625 * x * x\n      elseif x < 2 / 2.75 then x = x - 1.5 / 2.75 r = 7.5625 * x * x + 0.75\n      elseif x < 2.5 / 2.75 then x = x - 2.25 / 2.75 r = 7.5625 * x * x + 0.9375\n      else x = x - 2.625 / 2.75 r = 7.5625 * x * x + 0.984375 end\n      return 1 - r\n    end\n  elseif name == \"Elastic\" then f = function(x) if x == 0 or x == 1 then return x end return -(2 ^ (10 * x - 10)) * math.sin((x * 10 - 10.75) * (2 * math.pi) / 3) end\n  else f = function(x) return x * x end end\n  local d = dir and dir.Name or \"Out\"\n  if d == \"In\" then return f(t) end\n  if d == \"Out\" then return 1 - f(1 - t) end\n  if t < 0.5 then return f(t * 2) / 2 end\n  return 1 - f((1 - t) * 2) / 2\nend\nTweenInfo = {}\nfunction TweenInfo.new(time, style, dir, repeatCount, reverses, delayTime)\n  return { Time = tonumber(time) or 1, EasingStyle = style, EasingDirection = dir, RepeatCount = repeatCount or 0, Reverses = reverses or false, DelayTime = delayTime or 0 }\nend\nmethod(TweenService, \"Create\", function(_, obj, info, goals)\n  if not isInst(obj) then error(\"TweenService:Create(деталь, TweenInfo.new(1), {Свойство = значение})\", 2) end\n  if type(info) ~= \"table\" or not info.Time then info = TweenInfo.new(1) end\n  local tw = { Completed = newSignal(\"Completed\"), PlaybackState = \"Begin\" }\n  local playing = false\n  function tw:Play()\n    if playing then return end\n    playing = true\n    spawn(function()\n      if info.DelayTime > 0 then wait(info.DelayTime) end\n      local reps = info.RepeatCount\n      local loops = 0\n      repeat\n        local from = {}\n        for k in pairs(goals) do from[k] = obj[k] end\n        local passes = info.Reverses and 2 or 1\n        for pass = 1, passes do\n          local t0 = __clock()\n          while playing do\n            local t = math.min(1, (__clock() - t0) / math.max(0.01, info.Time))\n            local e = ease(info.EasingStyle, info.EasingDirection, pass == 1 and t or 1 - t)\n            for k, g in pairs(goals) do obj[k] = lerpVal(from[k], g, e) end\n            if t >= 1 then break end\n            wait(0.03)\n          end\n        end\n        loops = loops + 1\n      until not playing or (reps >= 0 and loops > reps)\n      playing = false\n      tw.PlaybackState = \"Completed\"\n      tw.Completed:Fire(\"Completed\")\n    end)\n  end\n  function tw:Cancel() playing = false end\n  tw.Pause = tw.Cancel\n  return tw\nend)\nmethod(Debris, \"AddItem\", function(_, obj, t)\n  spawn(function() wait(t or 10) if isInst(obj) then Inst.Destroy(obj) end end)\nend)\n\n-------------------------------------------------------------- физика\nlocal function partsInWorkspace()\n  local t = {}\n  local function walk(x)\n    for _, c in ipairs(D(x).children) do\n      local cd = D(c)\n      if BASEPART[cd.props.ClassName] and not cd.avatar then t[#t + 1] = c end\n      walk(c)\n    end\n  end\n  walk(workspace)\n  return t\nend\nlocal function overlapXZ(a, b)\n  local pa, sa, pb, sb = a.Position, a.Size, b.Position, b.Size\n  return math.abs(pa.X - pb.X) < (sa.X + sb.X) / 2 - 0.01 and math.abs(pa.Z - pb.Z) < (sa.Z + sb.Z) / 2 - 0.01\nend\nlocal lastPhys = nil\nlocal hbAcc = 0\nphysics = function(now)\n  local dt = lastPhys and math.min(0.1, now - lastPhys) or 0\n  lastPhys = now\n  if dt <= 0 then return end\n  local g = D(workspace).props.Gravity\n  local parts = partsInWorkspace()\n  for _, p in ipairs(parts) do\n    local d = D(p)\n    local pr = d.props\n    if not pr.Anchored and p ~= base then\n      local pos, size = pr.Position, pr.Size\n      local bottom = pos.Y - size.Y / 2\n      -- ищем, на что можно упасть\n      local floor = -1e9\n      local floorPart = nil\n      for _, q in ipairs(parts) do\n        if q ~= p then\n          local qp = D(q).props\n          if qp.CanCollide and pr.CanCollide and overlapXZ(pr, qp) then\n            local top = qp.Position.Y + qp.Size.Y / 2\n            if top <= bottom + 0.05 and top > floor then floor = top; floorPart = q end\n          end\n        end\n      end\n      d.vy = (d.vy or 0) - g * dt\n      local nb = bottom + d.vy * dt\n      if nb <= floor then\n        nb = floor\n        if d.vy < -20 and floorPart then\n          if pr.CanTouch then d.events.Touched:Fire(floorPart) end\n          if D(floorPart).props.CanTouch then D(floorPart).events.Touched:Fire(p) end\n        end\n        d.vy = 0\n      end\n      if nb < -200 then\n        Inst.Destroy(p) -- упало за край мира\n      elseif math.abs(nb - bottom) > 0.0001 then\n        pr.Position = Vector3.new(pos.X, nb + size.Y / 2, pos.Z)\n        __dirty = true\n      end\n    end\n  end\n  -- персонаж идёт к цели\n  if avatar.joined and not avatar.dead and avatar.tx then\n    local speed = math.max(0, D(hum).props.WalkSpeed)\n    local dx, dz = avatar.tx - avatar.x, avatar.tz - avatar.z\n    local dist = math.sqrt(dx * dx + dz * dz)\n    local step = speed * dt\n    if dist <= step or speed <= 0 then\n      if speed > 0 then avatar.x, avatar.z = avatar.tx, avatar.tz end\n      local target = avatar.target\n      avatar.tx, avatar.tz, avatar.target = nil, nil, nil\n      if target and isInst(target) and not D(target).destroyed then\n        local tp = D(target).props\n        avatar.y = tp.Position.Y + tp.Size.Y / 2 + 3\n        placeAvatar()\n        if tp.CanTouch then D(target).events.Touched:Fire(foot) end\n      end\n    else\n      avatar.x = avatar.x + dx / dist * step\n      avatar.z = avatar.z + dz / dist * step\n    end\n    placeAvatar()\n    __dirty = true\n  end\n  if avatar.joined and not avatar.dead and D(hum).props.Health <= 0 then\n    avatar.dead = true\n    avatar.deadAt = now\n    __dirty = true\n  end\n  if avatar.dead and now - avatar.deadAt > 3 then respawn() end\n  -- Heartbeat ~20 раз в секунду\n  hbAcc = hbAcc + dt\n  if hbAcc >= 0.05 then\n    D(RunService).events.Heartbeat:Fire(hbAcc)\n    D(RunService).events.Stepped:Fire(now, hbAcc)\n    hbAcc = 0\n  end\nend\n\n-------------------------------------------------------------- связь с JS\nfunction __touch(id)\n  local o = byId[id]\n  if not o or D(o).destroyed or not avatar.joined or avatar.dead then return end\n  local p = D(o).props\n  avatar.tx, avatar.tz, avatar.target = p.Position.X, p.Position.Z, o\nend\nfunction __click(id)\n  local o = byId[id]\n  if not o or D(o).destroyed then return false end\n  local cd = Inst.FindFirstChildOfClass(o, \"ClickDetector\")\n  if cd then D(cd).events.MouseClick:Fire(player) return true end\n  return false\nend\nfunction __hasClick(id)\n  local o = byId[id]\n  return o ~= nil and Inst.FindFirstChildOfClass(o, \"ClickDetector\") ~= nil\nend\nfunction __chat(msg)\n  D(player).events.Chatted:Fire(msg)\nend\n\nlocal function f(n) return string.format(\"%.3f\", n) end\nfunction __snapshot()\n  local out = {}\n  local function walk(x, depth)\n    for _, c in ipairs(D(x).children) do\n      local d = D(c)\n      local p = d.props\n      if BASEPART[p.ClassName] and not d.avatar and c ~= base then\n        local hasClick = Inst.FindFirstChildOfClass(c, \"ClickDetector\") and 1 or 0\n        local light = Inst.FindFirstChildOfClass(c, \"PointLight\") and 1 or 0\n        out[#out + 1] = table.concat({ \"P\", d.id, p.Name, f(p.Position.X), f(p.Position.Y), f(p.Position.Z),\n          f(p.Size.X), f(p.Size.Y), f(p.Size.Z), f(p.Color.R), f(p.Color.G), f(p.Color.B), f(p.Transparency),\n          p.Material.Name, p.Shape.Name, hasClick, light, p.Anchored and 1 or 0 }, \"\\t\")\n      end\n      walk(c, depth + 1)\n    end\n  end\n  walk(workspace, 0)\n  out[#out + 1] = table.concat({ \"A\", avatar.joined and 1 or 0, avatar.dead and 1 or 0, f(avatar.x), f(avatar.y), f(avatar.z),\n    f(D(hum).props.Health), f(D(hum).props.MaxHealth), avatar.tx and 1 or 0 }, \"\\t\")\n  local ls = findChild(player, \"leaderstats\")\n  if ls and avatar.joined then\n    for _, v in ipairs(D(ls).children) do\n      local vp = D(v).props\n      if vp.Value ~= nil then out[#out + 1] = table.concat({ \"L\", vp.Name, tostring(vp.Value) }, \"\\t\") end\n    end\n  end\n  out[#out + 1] = table.concat({ \"W\", f(D(Lighting).props.ClockTime), f(D(workspace).props.Gravity) }, \"\\t\")\n  return table.concat(out, \"\\n\")\nend\n\n-------------------------------------------------------------- запуск кода игрока\nscript = newInstance(\"Script\")\nD(script).props.Name = \"Script\"\n\nfunction __start(src, inPart)\n  if inPart then\n    local holder = Instance.new(\"Part\")\n    holder.Name = \"Деталь\"\n    holder.Anchored = true\n    holder.Position = Vector3.new(0, 0.5, -8)\n    holder.Size = Vector3.new(6, 1, 6)\n    holder.Color = Color3.fromRGB(13, 105, 172)\n    holder.Parent = workspace\n    setParent(script, holder)\n  else\n    setParent(script, services.ServerScriptService)\n  end\n  local fn, err = load(src, \"=Script\", \"t\")\n  if not fn then\n    __out(\"error\", err)\n    return false\n  end\n  spawn(fn)\n  spawn(function() wait(0.15) join() end)\n  return true\nend\n\n_G.spawn = task.spawn\n";
+const LUA_PRELUDE = "-- Мини-Roblox: эмуляция части API Roblox для песочницы в игре.\n-- Код игрока запускается внутри корутин, поэтому wait() работает как в Roblox.\n\nlocal __out, __clock = __out, __clock\n__startTime = __clock()\n__dirty = true\nlocal co_create, co_resume, co_status, co_yield, co_running =\n  coroutine.create, coroutine.resume, coroutine.status, coroutine.yield, coroutine.running\nlocal sethook = debug.sethook\nlocal unpack = table.unpack\n\n-------------------------------------------------------------- вывод\nlocal raw_tostring = tostring\nlocal function fmtnum(v)\n  if math.type(v) == \"float\" and v == math.floor(v) and math.abs(v) < 1e15 then\n    return string.format(\"%d\", v)\n  end\n  return raw_tostring(v)\nend\nfunction tostring(v)\n  if type(v) == \"number\" then return fmtnum(v) end\n  return raw_tostring(v)\nend\nlocal function joinargs(...)\n  local n = select(\"#\", ...)\n  local t = {}\n  for i = 1, n do t[i] = tostring((select(i, ...))) end\n  return table.concat(t, \" \")\nend\n-- сколько строк напечатано без паузы: print в цикле без wait() вешает страницу\nlocal printed = 0\nlocal PRINT_LIMIT = 2000\nlocal function countPrint()\n  printed = printed + 1\n  if printed > PRINT_LIMIT then error(\"__PRINT_FLOOD__\", 0) end\nend\nfunction print(...) countPrint() __out(\"print\", joinargs(...)) end\nfunction warn(...) countPrint() __out(\"warn\", joinargs(...)) end\n\n-------------------------------------------------------------- Luau-дополнения\nfunction math.clamp(x, a, b) if x < a then return a elseif x > b then return b end return x end\nfunction math.sign(x) if x > 0 then return 1 elseif x < 0 then return -1 end return 0 end\nfunction math.round(x) return math.floor(x + 0.5) end\nfunction table.find(t, v) for i = 1, #t do if t[i] == v then return i end end return nil end\nfunction table.clear(t) for k in pairs(t) do t[k] = nil end end\nfunction string.split(s, sep)\n  sep = sep or \",\"\n  local out, i = {}, 1\n  if sep == \"\" then for c in s:gmatch(\".\") do out[#out + 1] = c end return out end\n  while true do\n    local a, b = string.find(s, sep, i, true)\n    if not a then out[#out + 1] = s:sub(i) break end\n    out[#out + 1] = s:sub(i, a - 1)\n    i = b + 1\n  end\n  return out\nend\nfunction tick() return __clock() end\nfunction time() return __clock() - __startTime end\nos.clock = function() return __clock() end\n\n-------------------------------------------------------------- планировщик\nlocal tasks = {}\nlocal budget = 0\nlocal LIMIT = 400 -- x 10000 инструкций без wait()\nlocal TIME_LIMIT = 0.4 -- или 0.4 секунды настоящего времени (на медленном телефоне это наступит раньше)\nlocal rnow = __rnow or function() return 0 end\nlocal resumedAt = 0\n\nlocal function hook()\n  budget = budget + 1\n  if budget > LIMIT or rnow() - resumedAt > TIME_LIMIT then\n    budget = 0\n    error(\"__TOO_LONG__\", 0)\n  end\nend\n\nlocal function spawn(fn, ...)\n  local co = co_create(fn)\n  sethook(co, hook, \"\", 10000)\n  tasks[#tasks + 1] = { co = co, wake = 0, args = table.pack(...), started = false, since = 0 }\n  return co\nend\n__spawn = spawn\n\nfunction wait(n)\n  n = tonumber(n) or 0\n  if n < 0.03 then n = 0.03 end\n  if not co_running() then return n end\n  local got = co_yield(n)\n  return got or n, __clock()\nend\n\ntask = {\n  wait = wait,\n  spawn = function(fn, ...)\n    if type(fn) ~= \"function\" then error(\"task.spawn ждёт функцию\", 2) end\n    spawn(fn, ...)\n  end,\n  delay = function(t, fn, ...)\n    local args = table.pack(...)\n    spawn(function() wait(t) fn(unpack(args, 1, args.n)) end)\n  end,\n  defer = function(fn, ...) spawn(fn, ...) end,\n}\ndelay = task.delay\n\nlocal physics -- объявим ниже\n\nfunction __tick(now)\n  local i = 1\n  while i <= #tasks do\n    local t = tasks[i]\n    if t.wake <= now then\n      budget = 0\n      printed = 0\n      resumedAt = rnow()\n      local ok, res\n      if not t.started then\n        t.started = true\n        ok, res = co_resume(t.co, unpack(t.args, 1, t.args.n))\n      else\n        ok, res = co_resume(t.co, now - t.since)\n      end\n      if not ok then\n        __out(\"error\", raw_tostring(res))\n        table.remove(tasks, i)\n      elseif co_status(t.co) == \"dead\" then\n        table.remove(tasks, i)\n      else\n        t.since = now\n        t.wake = now + (tonumber(res) or 0.03)\n        i = i + 1\n      end\n    else\n      i = i + 1\n    end\n  end\n  physics(now)\n  local dirty = __dirty\n  __dirty = false\n  return #tasks, dirty\nend\n\n-------------------------------------------------------------- Signal\nlocal Signal = {}\nSignal.__index = Signal\nlocal function newSignal(name)\n  return setmetatable({ _h = {}, _name = name }, Signal)\nend\nfunction Signal:Connect(fn)\n  if type(fn) ~= \"function\" then error(\"Connect ждёт функцию: :Connect(function(...) ... end)\", 2) end\n  local h = { fn = fn, on = true }\n  table.insert(self._h, h)\n  local c = { Connected = true }\n  function c:Disconnect() h.on = false; self.Connected = false end\n  c.disconnect = c.Disconnect\n  return c\nend\nSignal.connect = Signal.Connect\nfunction Signal:Once(fn)\n  local c\n  c = self:Connect(function(...) c:Disconnect() fn(...) end)\n  return c\nend\nfunction Signal:Fire(...)\n  for _, h in ipairs(self._h) do\n    if h.on then spawn(h.fn, ...) end\n  end\nend\nfunction Signal:Wait()\n  local done, res = false, nil\n  local c\n  c = self:Connect(function(...) done = true; res = table.pack(...); c:Disconnect() end)\n  while not done do wait() end\n  return unpack(res, 1, res.n)\nend\nSignal.wait = Signal.Wait\n\n-------------------------------------------------------------- Vector3\nlocal V3 = {}\nlocal function isV3(v) return getmetatable(v) == V3 end\nVector3 = {}\nfunction Vector3.new(x, y, z)\n  return setmetatable({ __x = tonumber(x) or 0, __y = tonumber(y) or 0, __z = tonumber(z) or 0 }, V3)\nend\nV3.__index = function(v, k)\n  if k == \"X\" or k == \"x\" then return v.__x end\n  if k == \"Y\" or k == \"y\" then return v.__y end\n  if k == \"Z\" or k == \"z\" then return v.__z end\n  if k == \"Magnitude\" or k == \"magnitude\" then return math.sqrt(v.__x ^ 2 + v.__y ^ 2 + v.__z ^ 2) end\n  if k == \"Unit\" or k == \"unit\" then\n    local m = math.sqrt(v.__x ^ 2 + v.__y ^ 2 + v.__z ^ 2)\n    if m == 0 then return Vector3.new(0, 0, 0) end\n    return Vector3.new(v.__x / m, v.__y / m, v.__z / m)\n  end\n  if k == \"Lerp\" then\n    return function(a, b, t) return Vector3.new(a.__x + (b.__x - a.__x) * t, a.__y + (b.__y - a.__y) * t, a.__z + (b.__z - a.__z) * t) end\n  end\n  if k == \"Dot\" then return function(a, b) return a.__x * b.__x + a.__y * b.__y + a.__z * b.__z end end\n  error(\"У Vector3 нет поля «\" .. tostring(k) .. \"» (есть X, Y, Z, Magnitude, Unit)\", 2)\nend\nV3.__newindex = function(_, k)\n  error(\"Нельзя менять \" .. tostring(k) .. \" у Vector3 по отдельности. Пиши: part.Position = Vector3.new(x, y, z)\", 2)\nend\nV3.__add = function(a, b) return Vector3.new(a.__x + b.__x, a.__y + b.__y, a.__z + b.__z) end\nV3.__sub = function(a, b) return Vector3.new(a.__x - b.__x, a.__y - b.__y, a.__z - b.__z) end\nV3.__mul = function(a, b)\n  if type(a) == \"number\" then return Vector3.new(a * b.__x, a * b.__y, a * b.__z) end\n  if type(b) == \"number\" then return Vector3.new(a.__x * b, a.__y * b, a.__z * b) end\n  return Vector3.new(a.__x * b.__x, a.__y * b.__y, a.__z * b.__z)\nend\nV3.__div = function(a, b)\n  if type(b) == \"number\" then return Vector3.new(a.__x / b, a.__y / b, a.__z / b) end\n  return Vector3.new(a.__x / b.__x, a.__y / b.__y, a.__z / b.__z)\nend\nV3.__unm = function(a) return Vector3.new(-a.__x, -a.__y, -a.__z) end\nV3.__eq = function(a, b) return a.__x == b.__x and a.__y == b.__y and a.__z == b.__z end\nV3.__tostring = function(v) return tostring(v.__x) .. \", \" .. tostring(v.__y) .. \", \" .. tostring(v.__z) end\nVector3.zero = Vector3.new(0, 0, 0)\nVector3.one = Vector3.new(1, 1, 1)\nVector3.xAxis = Vector3.new(1, 0, 0)\nVector3.yAxis = Vector3.new(0, 1, 0)\nVector3.zAxis = Vector3.new(0, 0, 1)\n\n-------------------------------------------------------------- CFrame (только позиция)\nlocal CF = {}\nlocal function isCF(v) return getmetatable(v) == CF end\nCFrame = {}\nfunction CFrame.new(x, y, z)\n  if isV3(x) then return setmetatable({ __p = x }, CF) end\n  return setmetatable({ __p = Vector3.new(x, y, z) }, CF)\nend\nfunction CFrame.Angles() return setmetatable({ __p = Vector3.new(0, 0, 0), __rot = true }, CF) end\nCFrame.fromEulerAnglesXYZ = CFrame.Angles\nCF.__index = function(c, k)\n  if k == \"Position\" or k == \"p\" then return c.__p end\n  if k == \"X\" or k == \"Y\" or k == \"Z\" then return c.__p[k] end\n  error(\"У CFrame нет поля «\" .. tostring(k) .. \"»\", 2)\nend\nCF.__mul = function(a, b)\n  if isCF(b) then return CFrame.new(a.__p + b.__p) end\n  if isV3(b) then return a.__p + b end\n  error(\"CFrame можно умножать только на CFrame или Vector3\", 2)\nend\nCF.__add = function(a, b) return CFrame.new(a.__p + b) end\nCF.__sub = function(a, b) return CFrame.new(a.__p - b) end\nCF.__tostring = function(c) return tostring(c.__p) .. \", 1, 0, 0, 0, 1, 0, 0, 0, 1\" end\n\n-------------------------------------------------------------- Color3\nlocal C3 = {}\nlocal function isC3(v) return getmetatable(v) == C3 end\nColor3 = {}\nlocal function clamp01(v) v = tonumber(v) or 0 if v < 0 then return 0 elseif v > 1 then return 1 end return v end\nfunction Color3.new(r, g, b) return setmetatable({ __r = clamp01(r), __g = clamp01(g), __b = clamp01(b) }, C3) end\nfunction Color3.fromRGB(r, g, b) return Color3.new((tonumber(r) or 0) / 255, (tonumber(g) or 0) / 255, (tonumber(b) or 0) / 255) end\nfunction Color3.fromHSV(h, s, v)\n  h, s, v = clamp01(h), clamp01(s), clamp01(v)\n  local i = math.floor(h * 6) % 6\n  local f = h * 6 - math.floor(h * 6)\n  local p, q, t = v * (1 - s), v * (1 - f * s), v * (1 - (1 - f) * s)\n  local r, g, b\n  if i == 0 then r, g, b = v, t, p elseif i == 1 then r, g, b = q, v, p elseif i == 2 then r, g, b = p, v, t\n  elseif i == 3 then r, g, b = p, q, v elseif i == 4 then r, g, b = t, p, v else r, g, b = v, p, q end\n  return Color3.new(r, g, b)\nend\nfunction Color3.fromHex(hex)\n  hex = tostring(hex):gsub(\"#\", \"\")\n  return Color3.fromRGB(tonumber(hex:sub(1, 2), 16) or 0, tonumber(hex:sub(3, 4), 16) or 0, tonumber(hex:sub(5, 6), 16) or 0)\nend\nC3.__index = function(c, k)\n  if k == \"R\" or k == \"r\" then return c.__r end\n  if k == \"G\" or k == \"g\" then return c.__g end\n  if k == \"B\" or k == \"b\" then return c.__b end\n  if k == \"Lerp\" then\n    return function(a, b, t) return Color3.new(a.__r + (b.__r - a.__r) * t, a.__g + (b.__g - a.__g) * t, a.__b + (b.__b - a.__b) * t) end\n  end\n  error(\"У Color3 нет поля «\" .. tostring(k) .. \"» (есть R, G, B)\", 2)\nend\nC3.__newindex = function() error(\"Цвет нельзя менять по частям. Пиши: part.Color = Color3.fromRGB(255, 0, 0)\", 2) end\nC3.__eq = function(a, b) return a.__r == b.__r and a.__g == b.__g and a.__b == b.__b end\nC3.__tostring = function(c) return tostring(c.__r) .. \", \" .. tostring(c.__g) .. \", \" .. tostring(c.__b) end\n\n-------------------------------------------------------------- BrickColor\nlocal BRICK = {\n  [\"White\"] = { 242, 243, 243 }, [\"Institutional white\"] = { 248, 248, 248 }, [\"Black\"] = { 27, 42, 53 },\n  [\"Really black\"] = { 17, 17, 17 }, [\"Medium stone grey\"] = { 163, 162, 165 }, [\"Dark stone grey\"] = { 99, 95, 98 },\n  [\"Bright red\"] = { 196, 40, 28 }, [\"Really red\"] = { 255, 0, 0 }, [\"Bright blue\"] = { 13, 105, 172 },\n  [\"Really blue\"] = { 0, 0, 255 }, [\"Bright green\"] = { 75, 151, 75 }, [\"Lime green\"] = { 0, 255, 0 },\n  [\"Bright yellow\"] = { 245, 205, 48 }, [\"New Yeller\"] = { 255, 255, 0 }, [\"Bright orange\"] = { 218, 133, 65 },\n  [\"Deep orange\"] = { 255, 176, 0 }, [\"Hot pink\"] = { 255, 102, 204 }, [\"Pink\"] = { 255, 102, 204 },\n  [\"Royal purple\"] = { 98, 37, 209 }, [\"Bright violet\"] = { 107, 50, 124 }, [\"Magenta\"] = { 170, 0, 170 },\n  [\"Cyan\"] = { 4, 175, 236 }, [\"Toothpaste\"] = { 0, 255, 255 }, [\"Pastel blue\"] = { 128, 187, 219 },\n  [\"Brown\"] = { 124, 92, 70 }, [\"Reddish brown\"] = { 105, 64, 40 }, [\"Gold\"] = { 239, 184, 56 },\n  [\"Sand green\"] = { 120, 144, 130 }, [\"Teal\"] = { 18, 238, 212 }, [\"Electric blue\"] = { 9, 137, 207 },\n}\nlocal BRICK_NAMES = {}\nfor k in pairs(BRICK) do BRICK_NAMES[#BRICK_NAMES + 1] = k end\ntable.sort(BRICK_NAMES)\nlocal BC = {}\nlocal function isBC(v) return getmetatable(v) == BC end\nBrickColor = {}\nlocal function makeBC(name)\n  local c = BRICK[name]\n  return setmetatable({ Name = name, Color = Color3.fromRGB(c[1], c[2], c[3]) }, BC)\nend\nfunction BrickColor.new(name, g, b)\n  if type(name) == \"number\" and g then\n    return BrickColor.nearest(Color3.new(name, g, b))\n  end\n  if isC3(name) then return BrickColor.nearest(name) end\n  name = tostring(name)\n  if not BRICK[name] then\n    warn(\"Цвет «\" .. name .. \"» мне неизвестен, беру серый. Примеры: \\\"Bright red\\\", \\\"Lime green\\\", \\\"Really blue\\\"\")\n    name = \"Medium stone grey\"\n  end\n  return makeBC(name)\nend\nfunction BrickColor.nearest(c3)\n  local best, bd = \"Medium stone grey\", 1e9\n  for name, c in pairs(BRICK) do\n    local d = (c[1] / 255 - c3.R) ^ 2 + (c[2] / 255 - c3.G) ^ 2 + (c[3] / 255 - c3.B) ^ 2\n    if d < bd then best, bd = name, d end\n  end\n  return makeBC(best)\nend\nfunction BrickColor.Random() return makeBC(BRICK_NAMES[math.random(1, #BRICK_NAMES)]) end\nfunction BrickColor.Red() return makeBC(\"Bright red\") end\nfunction BrickColor.Blue() return makeBC(\"Bright blue\") end\nfunction BrickColor.Green() return makeBC(\"Bright green\") end\nfunction BrickColor.Yellow() return makeBC(\"Bright yellow\") end\nfunction BrickColor.White() return makeBC(\"White\") end\nfunction BrickColor.Black() return makeBC(\"Black\") end\nfunction BrickColor.Gray() return makeBC(\"Medium stone grey\") end\nBC.__tostring = function(b) return b.Name end\nBC.__eq = function(a, b) return a.Name == b.Name end\n\n-------------------------------------------------------------- Enum\nlocal function enumGroup(groupName, items)\n  local g = {}\n  for i, n in ipairs(items) do\n    g[n] = setmetatable({ Name = n, Value = i - 1, EnumType = groupName }, {\n      __tostring = function() return \"Enum.\" .. groupName .. \".\" .. n end,\n    })\n  end\n  return setmetatable(g, {\n    __index = function(_, k) error(\"В Enum.\" .. groupName .. \" нет «\" .. tostring(k) .. \"»\", 2) end,\n  })\nend\nEnum = {\n  Material = enumGroup(\"Material\", { \"Plastic\", \"SmoothPlastic\", \"Neon\", \"Wood\", \"WoodPlanks\", \"Grass\", \"Brick\", \"Glass\", \"Metal\", \"DiamondPlate\", \"ForceField\", \"Ice\", \"Sand\", \"Slate\", \"Concrete\", \"Marble\", \"Granite\", \"Fabric\", \"Foil\" }),\n  PartType = enumGroup(\"PartType\", { \"Block\", \"Ball\", \"Cylinder\", \"Wedge\" }),\n  EasingStyle = enumGroup(\"EasingStyle\", { \"Linear\", \"Sine\", \"Quad\", \"Back\", \"Bounce\", \"Elastic\", \"Cubic\", \"Quart\", \"Exponential\" }),\n  EasingDirection = enumGroup(\"EasingDirection\", { \"In\", \"Out\", \"InOut\" }),\n  HumanoidStateType = enumGroup(\"HumanoidStateType\", { \"Dead\", \"Running\", \"Jumping\" }),\n}\n\n-------------------------------------------------------------- Instance\nlocal nextId = 0\nlocal byId = {}\nlocal Inst = {}      -- методы\nlocal IMT = {}       -- метатаблица\nlocal function D(o) return rawget(o, \"__d\") end\nlocal function isInst(v) return type(v) == \"table\" and getmetatable(v) == IMT end\n\nlocal BASEPART = { Part = true, SpawnLocation = true, WedgePart = true, MeshPart = true, TrussPart = true }\nlocal VALUES = { IntValue = 0, NumberValue = 0, StringValue = \"\", BoolValue = false, ObjectValue = false, Color3Value = false, Vector3Value = false }\nlocal isA = {\n  BasePart = function(c) return BASEPART[c] end,\n  ValueBase = function(c) return VALUES[c] ~= nil end,\n  Instance = function() return true end,\n  PVInstance = function(c) return BASEPART[c] or c == \"Model\" end,\n}\n\nlocal function defaultsFor(class)\n  local p = { Name = class, ClassName = class, Archivable = true }\n  if BASEPART[class] then\n    p.Size = Vector3.new(4, 1, 2)\n    p.Position = Vector3.new(0, 0.5, 0)\n    p.Color = Color3.fromRGB(163, 162, 165)\n    p.Transparency = 0\n    p.Reflectance = 0\n    p.Anchored = false\n    p.CanCollide = true\n    p.CanTouch = true\n    p.Locked = false\n    p.Material = Enum.Material.Plastic\n    p.Shape = Enum.PartType.Block\n    p.Velocity = Vector3.new(0, 0, 0)\n    if class == \"SpawnLocation\" then p.Size = Vector3.new(12, 1, 12); p.Anchored = true; p.Color = Color3.fromRGB(99, 95, 98) end\n    if class == \"WedgePart\" then p.Shape = Enum.PartType.Wedge end\n  elseif VALUES[class] ~= nil then\n    if class == \"ObjectValue\" then p.Value = nil\n    elseif class == \"Color3Value\" then p.Value = Color3.new(0, 0, 0)\n    elseif class == \"Vector3Value\" then p.Value = Vector3.new(0, 0, 0)\n    else p.Value = VALUES[class] end\n  elseif class == \"Humanoid\" then\n    p.Health = 100; p.MaxHealth = 100; p.WalkSpeed = 16; p.JumpPower = 50; p.JumpHeight = 7.2; p.DisplayName = \"\"\n  elseif class == \"ClickDetector\" then\n    p.MaxActivationDistance = 32\n  elseif class == \"PointLight\" or class == \"SpotLight\" then\n    p.Brightness = 1; p.Range = 8; p.Color = Color3.new(1, 1, 1); p.Enabled = true\n  elseif class == \"Sound\" then\n    p.SoundId = \"\"; p.Volume = 0.5; p.Playing = false; p.Looped = false\n  elseif class == \"Script\" or class == \"LocalScript\" or class == \"ModuleScript\" then\n    p.Disabled = false; p.Enabled = true\n  elseif class == \"Lighting\" then\n    p.ClockTime = 14; p.Brightness = 2; p.Ambient = Color3.fromRGB(70, 70, 70); p.FogEnd = 100000\n  elseif class == \"Workspace\" then\n    p.Gravity = 196.2\n  end\n  return p\nend\n\nlocal function newInstance(class)\n  nextId = nextId + 1\n  local d = {\n    id = nextId, props = defaultsFor(class), children = {}, parent = nil, events = {},\n    destroyed = false, vy = 0,\n  }\n  d.events.Changed = newSignal(\"Changed\")\n  d.events.ChildAdded = newSignal(\"ChildAdded\")\n  d.events.ChildRemoved = newSignal(\"ChildRemoved\")\n  d.events.AncestryChanged = newSignal(\"AncestryChanged\")\n  d.events.Destroying = newSignal(\"Destroying\")\n  d.propSignals = {}\n  if BASEPART[class] then\n    d.events.Touched = newSignal(\"Touched\")\n    d.events.TouchEnded = newSignal(\"TouchEnded\")\n  elseif class == \"ClickDetector\" then\n    d.events.MouseClick = newSignal(\"MouseClick\")\n    d.events.MouseHoverEnter = newSignal(\"MouseHoverEnter\")\n    d.events.MouseHoverLeave = newSignal(\"MouseHoverLeave\")\n  elseif class == \"Humanoid\" then\n    d.events.Died = newSignal(\"Died\")\n    d.events.HealthChanged = newSignal(\"HealthChanged\")\n  elseif class == \"Players\" then\n    d.events.PlayerAdded = newSignal(\"PlayerAdded\")\n    d.events.PlayerRemoving = newSignal(\"PlayerRemoving\")\n  elseif class == \"Player\" then\n    d.events.CharacterAdded = newSignal(\"CharacterAdded\")\n    d.events.Chatted = newSignal(\"Chatted\")\n  elseif class == \"RunService\" then\n    d.events.Heartbeat = newSignal(\"Heartbeat\")\n    d.events.Stepped = newSignal(\"Stepped\")\n    d.events.RenderStepped = d.events.Heartbeat\n  elseif class == \"BindableEvent\" then\n    d.events.Event = newSignal(\"Event\")\n  elseif class == \"RemoteEvent\" then\n    d.events.OnServerEvent = newSignal(\"OnServerEvent\")\n    d.events.OnClientEvent = newSignal(\"OnClientEvent\")\n  end\n  local o = setmetatable({ __d = d }, IMT)\n  byId[nextId] = o\n  return o\nend\n\nlocal function fullName(o)\n  local d = D(o)\n  if not d.parent or d.props.ClassName == \"DataModel\" then return d.props.Name end\n  if D(d.parent).props.ClassName == \"DataModel\" then return d.props.Name end\n  return fullName(d.parent) .. \".\" .. d.props.Name\nend\n\nlocal function isDescendantOf(o, anc)\n  local p = D(o).parent\n  while p do\n    if p == anc then return true end\n    p = D(p).parent\n  end\n  return false\nend\n\nlocal function method(o, name, fn)\n  local d = D(o)\n  d.methods = d.methods or {}\n  d.methods[name] = fn\nend\n\n-- учёт деталей в мире: их число ограничено, иначе страница зависнет\nlocal treeVer = 0      -- растёт, когда меняется дерево объектов\nlocal wsCount = 0      -- сколько деталей сейчас в workspace\nlocal MAX_PARTS = 600\nlocal warnedMax = false\nlocal function countParts(o)\n  local d = D(o)\n  local n = (BASEPART[d.props.ClassName] and not d.avatar) and 1 or 0\n  for _, c in ipairs(d.children) do n = n + countParts(c) end\n  return n\nend\n-- деталь (и всё внутри) сдвинули или убрали: будим тех, кто на ней лежит\nlocal function bumpGeo(o)\n  local d = D(o)\n  d.geo = (d.geo or 0) + 1\n  d.ver = (d.ver or 0) + 1\n  d.sleeping = nil\n  for _, c in ipairs(d.children) do bumpGeo(c) end\nend\nlocal wsRoot = nil      -- сам workspace (запомним, когда создадим)\nlocal function inWorkspace(p)\n  return p ~= nil and wsRoot ~= nil and (p == wsRoot or isDescendantOf(p, wsRoot))\nend\n\nlocal function setParent(o, p)\n  local d = D(o)\n  if d.destroyed then error(\"Объект «\" .. d.props.Name .. \"» уже уничтожен (Destroy), его нельзя вернуть\", 3) end\n  if p ~= nil and not isInst(p) then error(\"Parent должен быть объектом (например, workspace), а не \" .. type(p), 3) end\n  if p == o or (p and isDescendantOf(p, o)) then error(\"Нельзя положить объект сам в себя\", 3) end\n  local old = d.parent\n  if old == p then return end\n  local wasIn, willIn = inWorkspace(old), inWorkspace(p)\n  if wasIn ~= willIn then\n    local n = countParts(o)\n    if willIn and n > 0 and wsCount + n > MAX_PARTS then\n      if not warnedMax then\n        warnedMax = true\n        warn(\"В мире уже \" .. wsCount .. \" деталей — это предел. Новые детали я не ставлю, иначе игра начнёт тормозить. Сделай цикл поменьше.\")\n      end\n      return\n    end\n    wsCount = wsCount + (willIn and n or -n)\n  end\n  treeVer = treeVer + 1\n  bumpGeo(o)\n  if old then D(old).ver = (D(old).ver or 0) + 1 end\n  if p then D(p).ver = (D(p).ver or 0) + 1 end\n  if old then\n    local oc = D(old).children\n    for i = #oc, 1, -1 do if oc[i] == o then table.remove(oc, i) end end\n    D(old).events.ChildRemoved:Fire(o)\n  end\n  d.parent = p\n  if p then\n    table.insert(D(p).children, o)\n    D(p).events.ChildAdded:Fire(o)\n  end\n  d.events.AncestryChanged:Fire(o, p)\n  __dirty = true\nend\n\nlocal function findChild(o, name)\n  for _, c in ipairs(D(o).children) do\n    if D(c).props.Name == name then return c end\n  end\n  return nil\nend\n\nlocal typeCheck = {\n  Position = isV3, Size = isV3, Velocity = isV3,\n  Color = isC3, Ambient = isC3,\n}\nlocal numberProps = {\n  Transparency = true, Reflectance = true, Health = true, MaxHealth = true, WalkSpeed = true, JumpPower = true,\n  JumpHeight = true, ClockTime = true, Brightness = true, Range = true, Volume = true, Gravity = true,\n  MaxActivationDistance = true, FogEnd = true,\n}\nlocal boolProps = { Anchored = true, CanCollide = true, CanTouch = true, Locked = true, Enabled = true, Disabled = true, Playing = true, Looped = true, Archivable = true }\n-- свойства, после которых деталь может начать падать (или опора — исчезнуть)\nlocal GEO = { Position = true, Size = true, CFrame = true, Anchored = true, CanCollide = true }\n\nIMT.__index = function(o, k)\n  local d = D(o)\n  if k == \"Parent\" then return d.parent end\n  if k == \"CFrame\" and d.props.Position then return CFrame.new(d.props.Position) end\n  if k == \"BrickColor\" and d.props.Color then return BrickColor.nearest(d.props.Color) end\n  if k == \"Orientation\" or k == \"Rotation\" then return Vector3.new(0, 0, 0) end\n  local v = d.props[k]\n  if v ~= nil then return v end\n  local m = d.methods and d.methods[k]\n  if m then return m end\n  if Inst[k] then return Inst[k] end\n  local ev = d.events[k]\n  if ev then return ev end\n  if k == \"Value\" and VALUES[d.props.ClassName] ~= nil then return nil end\n  if k == \"Character\" and d.props.ClassName == \"Player\" then return nil end\n  local c = findChild(o, k)\n  if c then return c end\n  error(\"«\" .. tostring(k) .. \"» не найден в \" .. fullName(o) .. \" (is not a valid member). Проверь имя и большие/маленькие буквы\", 2)\nend\n\nIMT.__newindex = function(o, k, v)\n  local d = D(o)\n  local class = d.props.ClassName\n  if k == \"Parent\" then setParent(o, v) return end\n  if k == \"ClassName\" then error(\"ClassName менять нельзя\", 2) end\n  if k == \"Name\" then\n    d.props.Name = tostring(v)\n  elseif k == \"CFrame\" and d.props.Position then\n    if isCF(v) then d.props.Position = v.Position\n    else error(\"CFrame должен быть CFrame.new(x, y, z)\", 2) end\n    d.vy = 0\n  elseif k == \"BrickColor\" and d.props.Color then\n    if isBC(v) then d.props.Color = v.Color\n    elseif type(v) == \"string\" then d.props.Color = BrickColor.new(v).Color\n    else error(\"BrickColor должен быть BrickColor.new(\\\"Bright red\\\")\", 2) end\n  elseif k == \"Material\" and d.props.Material then\n    if type(v) == \"string\" then v = Enum.Material[v] end\n    if type(v) ~= \"table\" or not v.EnumType then error(\"Material: пиши Enum.Material.Neon\", 2) end\n    d.props.Material = v\n  elseif k == \"Shape\" and d.props.Shape then\n    if type(v) == \"string\" then v = Enum.PartType[v] end\n    d.props.Shape = v\n  elseif k == \"Orientation\" or k == \"Rotation\" then\n    -- вращение в песочнице не рисуем, но ошибки не даём\n  elseif k == \"Value\" and VALUES[class] ~= nil then\n    if class == \"IntValue\" then\n      local n = tonumber(v)\n      if n == nil then error(\"IntValue.Value должен быть числом\", 2) end\n      v = math.floor(n)\n    elseif class == \"NumberValue\" then\n      v = tonumber(v)\n      if v == nil then error(\"NumberValue.Value должен быть числом\", 2) end\n    elseif class == \"StringValue\" then v = tostring(v)\n    elseif class == \"BoolValue\" then v = not not v end\n    local changed = d.props.Value ~= v\n    d.props.Value = v\n    if changed then d.events.Changed:Fire(v) end\n    __dirty = true\n    return\n  elseif typeCheck[k] and d.props[k] ~= nil then\n    if not typeCheck[k](v) then\n      local hint = (k == \"Color\" or k == \"Ambient\") and \"Color3.fromRGB(255, 0, 0)\" or \"Vector3.new(0, 5, 0)\"\n      error(k .. \" нужно задавать так: \" .. hint, 2)\n    end\n    if k == \"Size\" then\n      v = Vector3.new(math.max(0.05, v.X), math.max(0.05, v.Y), math.max(0.05, v.Z))\n    end\n    if k == \"Position\" then d.vy = 0 end\n    d.props[k] = v\n  elseif numberProps[k] and d.props[k] ~= nil then\n    local n = tonumber(v)\n    if n == nil then error(k .. \" должен быть числом\", 2) end\n    if k == \"Transparency\" or k == \"Reflectance\" then n = math.clamp(n, 0, 1) end\n    if class == \"Humanoid\" and k == \"Health\" then\n      local old = d.props.Health\n      n = math.clamp(n, 0, d.props.MaxHealth)\n      d.props.Health = n\n      if n ~= old then d.events.HealthChanged:Fire(n) end\n      if old > 0 and n <= 0 then d.events.Died:Fire() end\n      __dirty = true\n      return\n    end\n    d.props[k] = n\n  elseif boolProps[k] and d.props[k] ~= nil then\n    d.props[k] = not not v\n    if k == \"Anchored\" then d.vy = 0 end\n  elseif d.props[k] ~= nil then\n    d.props[k] = v\n  else\n    error(\"У \" .. class .. \" нет свойства «\" .. tostring(k) .. \"». Проверь написание\", 2)\n  end\n  d.ver = (d.ver or 0) + 1\n  if GEO[k] then\n    d.geo = (d.geo or 0) + 1\n    d.sleeping = nil\n  end\n  local ps = d.propSignals[k]\n  if ps then ps:Fire() end\n  d.events.Changed:Fire(k)\n  __dirty = true\nend\nIMT.__tostring = function(o) return D(o).props.Name end\nIMT.__eq = function(a, b) return rawequal(a, b) end\n\nfunction Inst.Destroy(o)\n  local d = D(o)\n  if d.destroyed then return end\n  d.events.Destroying:Fire()\n  for i = #d.children, 1, -1 do Inst.Destroy(d.children[i]) end\n  if d.parent then setParent(o, nil) end\n  d.destroyed = true\n  __dirty = true\nend\nInst.destroy = Inst.Destroy\nInst.Remove = Inst.Destroy\nfunction Inst.ClearAllChildren(o)\n  local d = D(o)\n  for i = #d.children, 1, -1 do Inst.Destroy(d.children[i]) end\nend\nfunction Inst.Clone(o)\n  local d = D(o)\n  local c = newInstance(d.props.ClassName)\n  local cd = D(c)\n  for k, v in pairs(d.props) do cd.props[k] = v end\n  for _, ch in ipairs(d.children) do\n    local cc = Inst.Clone(ch)\n    setParent(cc, c)\n  end\n  return c\nend\nfunction Inst.GetChildren(o)\n  local t = {}\n  for i, c in ipairs(D(o).children) do t[i] = c end\n  return t\nend\nInst.getChildren = Inst.GetChildren\nInst.children = Inst.GetChildren\nfunction Inst.GetDescendants(o)\n  local t = {}\n  local function walk(x)\n    for _, c in ipairs(D(x).children) do t[#t + 1] = c; walk(c) end\n  end\n  walk(o)\n  return t\nend\nfunction Inst.FindFirstChild(o, name, recursive)\n  local c = findChild(o, name)\n  if c or not recursive then return c end\n  for _, ch in ipairs(D(o).children) do\n    local r = Inst.FindFirstChild(ch, name, true)\n    if r then return r end\n  end\n  return nil\nend\nInst.findFirstChild = Inst.FindFirstChild\nfunction Inst.FindFirstChildOfClass(o, class)\n  for _, c in ipairs(D(o).children) do if D(c).props.ClassName == class then return c end end\n  return nil\nend\nfunction Inst.IsA(o, class)\n  local c = D(o).props.ClassName\n  if c == class then return true end\n  local f = isA[class]\n  return f and f(c) and true or false\nend\nfunction Inst.FindFirstChildWhichIsA(o, class)\n  for _, c in ipairs(D(o).children) do if Inst.IsA(c, class) then return c end end\n  return nil\nend\nfunction Inst.FindFirstAncestor(o, name)\n  local p = D(o).parent\n  while p do if D(p).props.Name == name then return p end p = D(p).parent end\n  return nil\nend\nfunction Inst.FindFirstAncestorOfClass(o, class)\n  local p = D(o).parent\n  while p do if D(p).props.ClassName == class then return p end p = D(p).parent end\n  return nil\nend\nfunction Inst.WaitForChild(o, name, timeout)\n  local t0 = __clock()\n  local warned = false\n  while true do\n    local c = findChild(o, name)\n    if c then return c end\n    if timeout and __clock() - t0 > timeout then return nil end\n    if not warned and __clock() - t0 > 5 then\n      warned = true\n      warn(\"WaitForChild всё ещё ждёт «\" .. tostring(name) .. \"» в \" .. fullName(o) .. \"…\")\n    end\n    wait(0.05)\n  end\nend\nfunction Inst.GetFullName(o) return fullName(o) end\nfunction Inst.IsDescendantOf(o, anc) return isDescendantOf(o, anc) end\nfunction Inst.IsAncestorOf(o, desc) return isDescendantOf(desc, o) end\nfunction Inst.GetPropertyChangedSignal(o, prop)\n  local d = D(o)\n  if not d.propSignals[prop] then d.propSignals[prop] = newSignal(prop .. \"Changed\") end\n  return d.propSignals[prop]\nend\nfunction Inst.GetAttribute(o, name) local a = D(o).attrs return a and a[name] end\nfunction Inst.SetAttribute(o, name, v) local d = D(o) d.attrs = d.attrs or {} d.attrs[name] = v end\nfunction Inst.GetAttributes(o) return D(o).attrs or {} end\nfunction Inst.Fire(o, ...)\n  local d = D(o)\n  if d.events.Event then d.events.Event:Fire(...) else error(\"Fire есть только у BindableEvent\", 2) end\nend\nfunction Inst.FireServer(o, ...)\n  local d = D(o)\n  if not d.events.OnServerEvent then error(\"FireServer есть только у RemoteEvent\", 2) end\n  d.events.OnServerEvent:Fire(__player, ...)\nend\nfunction Inst.FireClient(o, _, ...) local d = D(o) d.events.OnClientEvent:Fire(...) end\nfunction Inst.FireAllClients(o, ...) local d = D(o) d.events.OnClientEvent:Fire(...) end\nfunction Inst.Play(o) local d = D(o) if d.props.ClassName == \"Sound\" then d.props.Playing = true __out(\"sound\", d.props.Name) end end\nfunction Inst.Stop(o) local d = D(o) if d.props.ClassName == \"Sound\" then d.props.Playing = false end end\nfunction Inst.Kill() end\n\nInstance = {}\nfunction Instance.new(class, parent)\n  if type(class) ~= \"string\" then error(\"Instance.new ждёт название класса в кавычках, например Instance.new(\\\"Part\\\")\", 2) end\n  local o = newInstance(class)\n  if parent ~= nil then setParent(o, parent) end\n  return o\nend\n\n-------------------------------------------------------------- мир\ngame = newInstance(\"DataModel\")\nD(game).props.Name = \"Game\"\nlocal services = {}\nlocal function service(class)\n  local s = newInstance(class)\n  D(s).props.Name = class\n  setParent(s, game)\n  services[class] = s\n  return s\nend\nworkspace = service(\"Workspace\")\nWorkspace = workspace\nwsRoot = workspace\nlocal Players = service(\"Players\")\nlocal Lighting = service(\"Lighting\")\nservice(\"ReplicatedStorage\"); service(\"ServerStorage\"); service(\"ServerScriptService\")\nservice(\"StarterGui\"); service(\"StarterPack\"); service(\"SoundService\"); service(\"Teams\")\nlocal RunService = service(\"RunService\")\nlocal TweenService = service(\"TweenService\")\nlocal Debris = service(\"Debris\")\nservice(\"UserInputService\"); service(\"Chat\")\n\nfunction Inst.GetService(o, name)\n  local s = services[name]\n  if not s then error(\"Сервис «\" .. tostring(name) .. \"» в песочнице не поддерживается\", 2) end\n  return s\nend\nInst.getService = Inst.GetService\nInst.service = Inst.GetService\n\nmethod(RunService, \"IsServer\", function() return true end)\nmethod(RunService, \"IsClient\", function() return true end)\nmethod(RunService, \"IsStudio\", function() return true end)\n\nlocal base = Instance.new(\"Part\")\nbase.Name = \"Baseplate\"\nbase.Size = Vector3.new(512, 16, 512)\nbase.Position = Vector3.new(0, -8, 0)\nbase.Anchored = true\nbase.Color = Color3.fromRGB(91, 93, 105)\nbase.Locked = true\nbase.Parent = workspace\nlocal spawnPad = Instance.new(\"SpawnLocation\")\nspawnPad.Name = \"SpawnLocation\"\nspawnPad.Position = Vector3.new(0, 0.5, 0)\nspawnPad.Parent = workspace\n\n-------------------------------------------------------------- игрок и персонаж\nlocal player = newInstance(\"Player\")\nD(player).props.Name = __playerName or \"Player\"\nD(player).props.DisplayName = __playerName or \"Player\"\nD(player).props.UserId = 1\nD(player).props.Team = false\n__player = player\n\nlocal char = newInstance(\"Model\")\nD(char).props.Name = D(player).props.Name\nlocal hum = Instance.new(\"Humanoid\")\nhum.Parent = char\nlocal function bodyPart(name, size, off)\n  local p = Instance.new(\"Part\")\n  p.Name = name\n  p.Size = size\n  p.Anchored = true\n  p.CanCollide = false\n  D(p).avatar = off\n  p.Parent = char\n  return p\nend\nlocal root = bodyPart(\"HumanoidRootPart\", Vector3.new(2, 2, 1), Vector3.new(0, 0, 0))\nD(root).props.Transparency = 1\nbodyPart(\"Head\", Vector3.new(2, 1, 1), Vector3.new(0, 1.5, 0))\nbodyPart(\"Torso\", Vector3.new(2, 2, 1), Vector3.new(0, 0, 0))\nlocal foot = bodyPart(\"LeftFoot\", Vector3.new(1, 1, 1), Vector3.new(-0.5, -2.5, 0))\nbodyPart(\"RightFoot\", Vector3.new(1, 1, 1), Vector3.new(0.5, -2.5, 0))\nD(char).props.PrimaryPart = root\nD(player).props.Character = char\n\nlocal avatar = { x = 0, z = 6, y = 3, tx = nil, tz = nil, target = nil, dead = false, deadAt = 0, joined = false }\n\nlocal function placeAvatar()\n  for _, c in ipairs(D(char).children) do\n    local off = D(c).avatar\n    if off then D(c).props.Position = Vector3.new(avatar.x + off.X, avatar.y + off.Y, avatar.z + off.Z) end\n  end\nend\nplaceAvatar()\n\nmethod(Players, \"GetPlayers\", function() if avatar.joined then return { player } end return {} end)\nmethod(Players, \"GetPlayerFromCharacter\", function(_, model)\n  if model == char then return player end\n  return nil\nend)\nmethod(Players, \"FindFirstChild\", function(o, name)\n  if avatar.joined and name == D(player).props.Name then return player end\n  return Inst.FindFirstChild(o, name)\nend)\nD(Players).props.LocalPlayer = player\nD(Players).props.MaxPlayers = 1\n\nlocal function join()\n  avatar.joined = true\n  setParent(player, Players)\n  setParent(char, workspace)\n  D(Players).events.PlayerAdded:Fire(player)\n  D(player).events.CharacterAdded:Fire(char)\n  __dirty = true\nend\n\nlocal function respawn()\n  avatar.dead = false\n  avatar.x, avatar.z, avatar.y = 0, 6, 3\n  avatar.tx, avatar.tz, avatar.target = nil, nil, nil\n  D(hum).props.Health = D(hum).props.MaxHealth\n  placeAvatar()\n  D(player).events.CharacterAdded:Fire(char)\n  __dirty = true\nend\n\n-------------------------------------------------------------- твины\nlocal function lerpVal(a, b, t)\n  if type(a) == \"number\" then return a + (b - a) * t end\n  if isV3(a) then return a:Lerp(b, t) end\n  if isC3(a) then return a:Lerp(b, t) end\n  if isCF(a) then return CFrame.new(a.Position:Lerp(b.Position, t)) end\n  return t < 1 and a or b\nend\nlocal function ease(style, dir, t)\n  local name = style and style.Name or \"Quad\"\n  local f\n  if name == \"Linear\" then f = function(x) return x end\n  elseif name == \"Sine\" then f = function(x) return 1 - math.cos(x * math.pi / 2) end\n  elseif name == \"Back\" then f = function(x) return x * x * (2.70158 * x - 1.70158) end\n  elseif name == \"Bounce\" then\n    f = function(x)\n      x = 1 - x\n      local r\n      if x < 1 / 2.75 then r = 7.5625 * x * x\n      elseif x < 2 / 2.75 then x = x - 1.5 / 2.75 r = 7.5625 * x * x + 0.75\n      elseif x < 2.5 / 2.75 then x = x - 2.25 / 2.75 r = 7.5625 * x * x + 0.9375\n      else x = x - 2.625 / 2.75 r = 7.5625 * x * x + 0.984375 end\n      return 1 - r\n    end\n  elseif name == \"Elastic\" then f = function(x) if x == 0 or x == 1 then return x end return -(2 ^ (10 * x - 10)) * math.sin((x * 10 - 10.75) * (2 * math.pi) / 3) end\n  else f = function(x) return x * x end end\n  local d = dir and dir.Name or \"Out\"\n  if d == \"In\" then return f(t) end\n  if d == \"Out\" then return 1 - f(1 - t) end\n  if t < 0.5 then return f(t * 2) / 2 end\n  return 1 - f((1 - t) * 2) / 2\nend\nTweenInfo = {}\nfunction TweenInfo.new(time, style, dir, repeatCount, reverses, delayTime)\n  return { Time = tonumber(time) or 1, EasingStyle = style, EasingDirection = dir, RepeatCount = repeatCount or 0, Reverses = reverses or false, DelayTime = delayTime or 0 }\nend\nmethod(TweenService, \"Create\", function(_, obj, info, goals)\n  if not isInst(obj) then error(\"TweenService:Create(деталь, TweenInfo.new(1), {Свойство = значение})\", 2) end\n  if type(info) ~= \"table\" or not info.Time then info = TweenInfo.new(1) end\n  local tw = { Completed = newSignal(\"Completed\"), PlaybackState = \"Begin\" }\n  local playing = false\n  function tw:Play()\n    if playing then return end\n    playing = true\n    spawn(function()\n      if info.DelayTime > 0 then wait(info.DelayTime) end\n      local reps = info.RepeatCount\n      local loops = 0\n      repeat\n        local from = {}\n        for k in pairs(goals) do from[k] = obj[k] end\n        local passes = info.Reverses and 2 or 1\n        for pass = 1, passes do\n          local t0 = __clock()\n          while playing do\n            local t = math.min(1, (__clock() - t0) / math.max(0.01, info.Time))\n            local e = ease(info.EasingStyle, info.EasingDirection, pass == 1 and t or 1 - t)\n            for k, g in pairs(goals) do obj[k] = lerpVal(from[k], g, e) end\n            if t >= 1 then break end\n            wait(0.03)\n          end\n        end\n        loops = loops + 1\n      until not playing or (reps >= 0 and loops > reps)\n      playing = false\n      tw.PlaybackState = \"Completed\"\n      tw.Completed:Fire(\"Completed\")\n    end)\n  end\n  function tw:Cancel() playing = false end\n  tw.Pause = tw.Cancel\n  return tw\nend)\nmethod(Debris, \"AddItem\", function(_, obj, t)\n  spawn(function() wait(t or 10) if isInst(obj) then Inst.Destroy(obj) end end)\nend)\n\n-------------------------------------------------------------- физика\nlocal function partsInWorkspace()\n  local t = {}\n  local function walk(x)\n    for _, c in ipairs(D(x).children) do\n      local cd = D(c)\n      if BASEPART[cd.props.ClassName] and not cd.avatar then t[#t + 1] = c end\n      walk(c)\n    end\n  end\n  walk(wsRoot)\n  return t\nend\n-- список деталей пересобираем, только когда меняется дерево объектов\nlocal partsList, partsVer = {}, -1\nlocal function wsParts()\n  if partsVer ~= treeVer then\n    partsList = partsInWorkspace()\n    partsVer = treeVer\n  end\n  return partsList\nend\n-- Физика сделана «дешёвой», потому что Lua тут работает внутри браузера и он медленный:\n-- * лежащие детали засыпают, пока их опора не сдвинется;\n-- * опору ищем в сетке по X/Z, а не среди всех деталей;\n-- * на шаг физики есть лимит настоящего времени.\n-- Поля Vector3 читаем напрямую (__x, __y, __z) — так намного быстрее, чем через .X\nlocal CELL = 4\nlocal HALF = CELL / 2   -- границы клеток сдвинуты на полклетки: деталь в (0, y, 0) попадает в одну клетку\nlocal BIG = 64          -- деталь больше 64 клеток (например, Baseplate) проверяем отдельно\nlocal QK = 8192         -- в клетке лежат числа «верх × QK + номер детали»: они сортируются без своей функции\nlocal SORT_MIN = 8      -- маленькие клетки не сортируем, а просто смотрим целиком\n\nlocal function buildGrid(parts)\n  local grid, big = {}, {}\n  for i = 1, #parts do\n    local q = parts[i]\n    local qp = q.__d.props\n    if qp.CanCollide then\n      local pos, size = qp.Position, qp.Size\n      -- 0.005: детали, которые только касаются краями, друг на друга не опираются\n      local hx, hz = size.__x / 2 - 0.005, size.__z / 2 - 0.005\n      if hx < 0 then hx = 0 end\n      if hz < 0 then hz = 0 end\n      local x, z = pos.__x + HALF, pos.__z + HALF\n      local x0, x1, z0, z1 = (x - hx) // CELL, (x + hx) // CELL, (z - hz) // CELL, (z + hz) // CELL\n      if i >= QK or not ((x1 - x0 + 1) * (z1 - z0 + 1) <= BIG) then\n        big[#big + 1] = q\n      else\n        local t = pos.__y + size.__y / 2\n        if t ~= t or t < -1e9 then t = -1e9 elseif t > 1e9 then t = 1e9 end\n        local key = -((-t * 1024) // 1) * QK + i -- верх округляем вверх\n        for cx = x0, x1 do\n          for cz = z0, z1 do\n            local ck = cx * 65536 + cz\n            local cell = grid[ck]\n            if cell then cell[#cell + 1] = key else grid[ck] = { key } end\n          end\n        end\n      end\n    end\n  end\n  -- в больших клетках: снизу вверх по верхней грани\n  for _, cell in pairs(grid) do\n    if #cell > SORT_MIN then table.sort(cell) end\n  end\n  return grid, big\nend\n\n-- самая высокая опора в клетке: верх не выше lim, и деталь перекрывает p по X/Z.\n-- pd — данные детали p: сравниваем их, а не сами детали (у деталей сравнение — медленный __eq)\nlocal function scanCell(cell, parts, pd, ax, az, hx, hz, lim, bound, floor, floorPart)\n  local n = #cell\n  local j, stop = n, false\n  if n > SORT_MIN then\n    -- двоичный поиск: последняя деталь, чей верх не выше низа p\n    local lo, hi = 1, n\n    j = 0\n    while lo <= hi do\n      local mid = (lo + hi) // 2\n      if cell[mid] < bound then j = mid; lo = mid + 1 else hi = mid - 1 end\n    end\n    stop = true\n  end\n  for k = j, 1, -1 do\n    local key = cell[k]\n    local i = key % QK\n    -- в отсортированной клетке ниже искать нечего: за шаг детали только опускались\n    if stop and (key - i) // QK <= floor * 1024 then break end\n    local q = parts[i]\n    local qd = q.__d\n    if qd ~= pd then\n      local qp = qd.props\n      local pb, sb = qp.Position, qp.Size\n      local dx, dz = ax - pb.__x, az - pb.__z\n      if dx < 0 then dx = -dx end\n      if dz < 0 then dz = -dz end\n      if dx < hx + sb.__x / 2 and dz < hz + sb.__z / 2 then\n        local top = pb.__y + sb.__y / 2\n        if top <= lim and top > floor then floor, floorPart = top, q end\n      end\n    end\n  end\n  return floor, floorPart\nend\n\nlocal function findFloor(parts, pd, pr, lim, grid, big)\n  local floor, floorPart = -1e9, nil\n  if lim ~= lim then return floor, floorPart end -- NaN\n  local pa, sa = pr.Position, pr.Size\n  local ax, az = pa.__x, pa.__z\n  local hx, hz = sa.__x / 2 - 0.01, sa.__z / 2 - 0.01\n  for i = 1, #big do\n    local q = big[i]\n    local qd = q.__d\n    if qd ~= pd then\n      local qp = qd.props\n      local pb, sb = qp.Position, qp.Size\n      local dx, dz = ax - pb.__x, az - pb.__z\n      if dx < 0 then dx = -dx end\n      if dz < 0 then dz = -dz end\n      if dx < hx + sb.__x / 2 and dz < hz + sb.__z / 2 then\n        local top = pb.__y + sb.__y / 2\n        if top <= lim and top > floor then floor, floorPart = top, q end\n      end\n    end\n  end\n  local l = lim\n  if l > 1e9 then l = 1e9 elseif l < -1e9 then l = -1e9 end\n  local bound = (-((-l * 1024) // 1) + 1) * QK\n  local ex, ez = hx + 0.005, hz + 0.005\n  if ex < 0 then ex = 0 end\n  if ez < 0 then ez = 0 end\n  local x, z = ax + HALF, az + HALF\n  local x0, x1, z0, z1 = (x - ex) // CELL, (x + ex) // CELL, (z - ez) // CELL, (z + ez) // CELL\n  if not ((x1 - x0 + 1) * (z1 - z0 + 1) <= BIG) then\n    -- сама деталь огромная: смотрим все клетки\n    for _, cell in pairs(grid) do floor, floorPart = scanCell(cell, parts, pd, ax, az, hx, hz, lim, bound, floor, floorPart) end\n  else\n    for cx = x0, x1 do\n      for cz = z0, z1 do\n        local cell = grid[cx * 65536 + cz]\n        if cell then floor, floorPart = scanCell(cell, parts, pd, ax, az, hx, hz, lim, bound, floor, floorPart) end\n      end\n    end\n  end\n  return floor, floorPart\nend\n\nlocal function stepPart(parts, p, d, now, dt, g, grid, big)\n  local pr = d.props\n  local pdt = now - (d.pt or (now - dt))\n  if pdt > 0.1 then pdt = 0.1 end\n  d.pt = now\n  local pos, size = pr.Position, pr.Size\n  local bottom = pos.__y - size.__y / 2\n  -- ищем, на что можно упасть\n  local floor, floorPart = -1e9, nil\n  if pr.CanCollide then floor, floorPart = findFloor(parts, d, pr, bottom + 0.05, grid, big) end\n  local vy = (d.vy or 0) - g * pdt\n  local nb = bottom + vy * pdt\n  local landed = false\n  if nb <= floor then\n    nb = floor\n    if vy < -20 and floorPart then\n      if pr.CanTouch then d.events.Touched:Fire(floorPart) end\n      if floorPart.__d.props.CanTouch then floorPart.__d.events.Touched:Fire(p) end\n    end\n    vy = 0\n    landed = true\n  end\n  d.vy = vy\n  if nb < -200 then\n    Inst.Destroy(p) -- упало за край мира\n  elseif nb - bottom > 0.0001 or bottom - nb > 0.0001 then\n    pr.Position = setmetatable({ __x = pos.__x, __y = nb + size.__y / 2, __z = pos.__z }, V3)\n    d.geo = (d.geo or 0) + 1\n    __dirty = true\n  elseif landed or (vy == 0 and g == 0) then\n    -- лежит и не двигается: засыпает, пока опора на месте\n    d.sleeping = true\n    d.sleepOn = floorPart\n    d.sleepGeo = floorPart and (floorPart.__d.geo or 0) or 0\n    d.pt = nil\n  end\nend\n\nlocal lastPhys = nil\nlocal hbAcc = 0\nlocal lastG = nil\nlocal cursor = 1\nlocal heavyFlip = false\nlocal PHYS_BUDGET = 0.010 -- секунд настоящего времени на падение деталей за шаг\nphysics = function(now)\n  local dt = lastPhys and math.min(0.1, now - lastPhys) or 0\n  lastPhys = now\n  if dt <= 0 then return end\n  local g = D(wsRoot).props.Gravity\n  local parts = wsParts()\n  if g ~= lastG then\n    -- поменяли гравитацию — будим всех\n    lastG = g\n    for i = 1, #parts do parts[i].__d.sleeping = nil end\n  end\n  -- кто сейчас падает (спящие детали пропускаем)\n  local awake = {}\n  local baseD = base.__d\n  for i = 1, #parts do\n    local p = parts[i]\n    local d = p.__d\n    if not d.props.Anchored and d ~= baseD then\n      local s = d.sleeping and d.sleepOn\n      if d.sleeping and (not s or ((s.__d.geo or 0) == d.sleepGeo and not s.__d.destroyed)) then\n        -- спит\n      else\n        d.sleeping = nil\n        awake[#awake + 1] = p\n      end\n    end\n  end\n  local n = #awake\n  -- падает очень много деталей: двигаем их через шаг — вдвое дешевле, а падают так же быстро\n  if n > 100 then heavyFlip = not heavyFlip else heavyFlip = false end\n  if n > 0 and not heavyFlip then\n    local t0 = rnow()\n    local grid, big = buildGrid(parts)\n    if cursor > n then cursor = 1 end\n    local start = cursor\n    for k = 0, n - 1 do\n      local idx = (start - 1 + k) % n + 1\n      local p = awake[idx]\n      local d = p.__d\n      if not d.destroyed then stepPart(parts, p, d, now, dt, g, grid, big) end\n      -- не успели всех — продолжим с этого места на следующем шаге\n      if k % 32 == 31 and rnow() - t0 > PHYS_BUDGET then\n        cursor = idx % n + 1\n        break\n      end\n    end\n  end\n  -- персонаж идёт к цели\n  if avatar.joined and not avatar.dead and avatar.tx then\n    local speed = math.max(0, D(hum).props.WalkSpeed)\n    local dx, dz = avatar.tx - avatar.x, avatar.tz - avatar.z\n    local dist = math.sqrt(dx * dx + dz * dz)\n    local step = speed * dt\n    if dist <= step or speed <= 0 then\n      if speed > 0 then avatar.x, avatar.z = avatar.tx, avatar.tz end\n      local target = avatar.target\n      avatar.tx, avatar.tz, avatar.target = nil, nil, nil\n      if target and isInst(target) and not D(target).destroyed then\n        local tp = D(target).props\n        avatar.y = tp.Position.Y + tp.Size.Y / 2 + 3\n        placeAvatar()\n        if tp.CanTouch then D(target).events.Touched:Fire(foot) end\n      end\n    else\n      avatar.x = avatar.x + dx / dist * step\n      avatar.z = avatar.z + dz / dist * step\n    end\n    placeAvatar()\n    __dirty = true\n  end\n  if avatar.joined and not avatar.dead and D(hum).props.Health <= 0 then\n    avatar.dead = true\n    avatar.deadAt = now\n    __dirty = true\n  end\n  if avatar.dead and now - avatar.deadAt > 3 then respawn() end\n  -- Heartbeat ~20 раз в секунду\n  hbAcc = hbAcc + dt\n  if hbAcc >= 0.05 then\n    D(RunService).events.Heartbeat:Fire(hbAcc)\n    D(RunService).events.Stepped:Fire(now, hbAcc)\n    hbAcc = 0\n  end\nend\n\n-------------------------------------------------------------- связь с JS\nfunction __touch(id)\n  local o = byId[id]\n  if not o or D(o).destroyed or not avatar.joined or avatar.dead then return end\n  local p = D(o).props\n  avatar.tx, avatar.tz, avatar.target = p.Position.X, p.Position.Z, o\nend\nfunction __click(id)\n  local o = byId[id]\n  if not o or D(o).destroyed then return false end\n  local cd = Inst.FindFirstChildOfClass(o, \"ClickDetector\")\n  if cd then D(cd).events.MouseClick:Fire(player) return true end\n  return false\nend\nfunction __hasClick(id)\n  local o = byId[id]\n  return o ~= nil and Inst.FindFirstChildOfClass(o, \"ClickDetector\") ~= nil\nend\nfunction __chat(msg)\n  D(player).events.Chatted:Fire(msg)\nend\n\nlocal function f(n) return string.format(\"%.3f\", n) end\nfunction __snapshot()\n  local out = {}\n  local function walk(x, depth)\n    for _, c in ipairs(D(x).children) do\n      local d = D(c)\n      local p = d.props\n      if BASEPART[p.ClassName] and not d.avatar and c ~= base then\n        -- строчку детали пересобираем, только если деталь менялась (при падении — только место)\n        local line = d.snapLine\n        if not line or d.snapVer ~= d.ver or d.snapGeo ~= d.geo then\n          if not d.snapRest or d.snapVer ~= d.ver then\n            local hasClick = Inst.FindFirstChildOfClass(c, \"ClickDetector\") and 1 or 0\n            local light = Inst.FindFirstChildOfClass(c, \"PointLight\") and 1 or 0\n            local s, col = p.Size, p.Color\n            d.snapHead = \"P\\t\" .. d.id .. \"\\t\" .. p.Name .. \"\\t\"\n            d.snapRest = \"\\t\" .. s.__x .. \"\\t\" .. s.__y .. \"\\t\" .. s.__z .. \"\\t\" .. col.__r .. \"\\t\" .. col.__g .. \"\\t\" .. col.__b .. \"\\t\" ..\n              p.Transparency .. \"\\t\" .. p.Material.Name .. \"\\t\" .. p.Shape.Name .. \"\\t\" .. hasClick .. \"\\t\" .. light .. \"\\t\" .. (p.Anchored and 1 or 0)\n            d.snapVer = d.ver\n          end\n          local pos = p.Position\n          line = d.snapHead .. pos.__x .. \"\\t\" .. pos.__y .. \"\\t\" .. pos.__z .. d.snapRest\n          d.snapLine = line\n          d.snapGeo = d.geo\n        end\n        out[#out + 1] = line\n      end\n      walk(c, depth + 1)\n    end\n  end\n  walk(wsRoot, 0)\n  out[#out + 1] = table.concat({ \"A\", avatar.joined and 1 or 0, avatar.dead and 1 or 0, f(avatar.x), f(avatar.y), f(avatar.z),\n    f(D(hum).props.Health), f(D(hum).props.MaxHealth), avatar.tx and 1 or 0 }, \"\\t\")\n  local ls = findChild(player, \"leaderstats\")\n  if ls and avatar.joined then\n    for _, v in ipairs(D(ls).children) do\n      local vp = D(v).props\n      if vp.Value ~= nil then out[#out + 1] = table.concat({ \"L\", vp.Name, tostring(vp.Value) }, \"\\t\") end\n    end\n  end\n  out[#out + 1] = table.concat({ \"W\", f(D(Lighting).props.ClockTime), f(D(workspace).props.Gravity) }, \"\\t\")\n  return table.concat(out, \"\\n\")\nend\n\n-------------------------------------------------------------- запуск кода игрока\nscript = newInstance(\"Script\")\nD(script).props.Name = \"Script\"\n\nfunction __start(src, inPart)\n  if inPart then\n    local holder = Instance.new(\"Part\")\n    holder.Name = \"Деталь\"\n    holder.Anchored = true\n    holder.Position = Vector3.new(0, 0.5, -8)\n    holder.Size = Vector3.new(6, 1, 6)\n    holder.Color = Color3.fromRGB(13, 105, 172)\n    holder.Parent = workspace\n    setParent(script, holder)\n  else\n    setParent(script, services.ServerScriptService)\n  end\n  local fn, err = load(src, \"=Script\", \"t\")\n  if not fn then\n    __out(\"error\", err)\n    return false\n  end\n  spawn(fn)\n  spawn(function() wait(0.15) join() end)\n  return true\nend\n\n_G.spawn = task.spawn\n";
 
 // ===== luart.js =====
 // Запуск Luau-кода игрока через Fengari (Lua 5.3 в браузере) + мини-Roblox из prelude.lua
 const LuaRT = (() => {
   const TOO_LONG = "__TOO_LONG__";
+  const PRINT_FLOOD = "__PRINT_FLOOD__";
 
   function available() {
     return typeof window !== "undefined" && !!window.fengari;
@@ -646,13 +647,87 @@ const LuaRT = (() => {
     return out;
   }
 
-  // Ошибки Lua → понятные подсказки на русском
-  function explain(msg) {
+  // код без строк и комментариев: их содержимое → пробелы (номера строк не меняются)
+  function codeOnly(src) {
+    const s = String(src || "").replace(/[“”„«»″]/g, '"').replace(/[‘’‚′]/g, "'").replace(/\r\n?/g, "\n");
+    const blank = (t) => t.replace(/[^\n]/g, " ");
+    let out = "";
+    let i = 0;
+    while (i < s.length) {
+      const c = s[i];
+      let m;
+      if (c === "-" && s[i + 1] === "-") {
+        let j;
+        if ((m = s.slice(i, i + 64).match(/^--\[(=*)\[/))) { const close = "]" + m[1] + "]"; j = s.indexOf(close, i + m[0].length); j = j < 0 ? s.length : j + close.length; }
+        else { j = s.indexOf("\n", i); if (j < 0) j = s.length; }
+        out += blank(s.slice(i, j));
+        i = j;
+      } else if (c === "[" && (m = s.slice(i, i + 64).match(/^\[(=*)\[/))) {
+        const close = "]" + m[1] + "]";
+        let j = s.indexOf(close, i + m[0].length);
+        j = j < 0 ? s.length : j + close.length;
+        out += '"' + blank(s.slice(i + 1, j - 1)) + '"';
+        i = j;
+      } else if (c === '"' || c === "'" || c === "`") {
+        let j = i + 1;
+        while (j < s.length && s[j] !== c && s[j] !== "\n") j += s[j] === "\\" ? 2 : 1;
+        j = Math.min(j, s.length);
+        out += c + blank(s.slice(i + 1, j)) + (s[j] === c ? c : "");
+        i = s[j] === c ? j + 1 : j;
+      } else {
+        out += c;
+        i++;
+      }
+    }
+    return out;
+  }
+
+  const CYR = /[Ѐ-ӿ]/;
+  // русские буквы, похожие на латинские
+  const LOOKALIKE = "аеорсухАВЕКМНОРСТХ";
+
+  // слово с русскими буквами вне кавычек: { word, letters, line, mixed }
+  function findCyrWord(code, prefer) {
+    const re = /[A-Za-z0-9_Ѐ-ӿ]+/g;
+    let m;
+    let first = null;
+    while ((m = re.exec(code))) {
+      if (!CYR.test(m[0])) continue;
+      const line = code.slice(0, m.index).split("\n").length;
+      const w = { word: m[0], letters: [...new Set(m[0].match(/[Ѐ-ӿ]/g))], line, mixed: /[A-Za-z]/.test(m[0]) };
+      if (line === prefer) return w;
+      if (!first) first = w;
+    }
+    return first;
+  }
+
+  // перевод сообщений парсера Lua на простой русский
+  function ruParse(msg) {
+    const q = (t) => (t === "<eof>" ? "концом кода" : "«" + t.replace(/^'|'$/g, "") + "»");
+    let m;
+    if ((m = msg.match(/^'(.+?)' expected \(to close '(.+?)' at line (\d+)\) near (.+)$/))) return `ждал «${m[1]}», чтобы закрыть «${m[2]}» из строки ${m[3]} (рядом с ${q(m[4])})`;
+    if ((m = msg.match(/^'(.+?)' expected near (.+)$/))) return `ждал «${m[1] === "<eof>" ? "конец кода" : m[1]}» рядом с ${q(m[2])}`;
+    if ((m = msg.match(/^<name> expected near (.+)$/))) return `ждал имя рядом с ${q(m[1])}`;
+    if ((m = msg.match(/^unexpected symbol near (.+)$/))) return `непонятный символ рядом с ${q(m[1])}`;
+    if ((m = msg.match(/^syntax error near (.+)$/))) return `ошибка в записи рядом с ${q(m[1])}`;
+    if ((m = msg.match(/^unfinished string near (.+)$/))) return `строка не закрыта: ${m[1].replace(/^'|'$/g, "")}`;
+    if ((m = msg.match(/^malformed number near (.+)$/))) return `странное число ${q(m[1])}`;
+    return msg;
+  }
+
+  // Ошибки Lua → понятные подсказки на русском. src — код ученика (необязательно)
+  function explain(msg, src) {
     msg = String(msg || "ошибка");
     if (msg.indexOf(TOO_LONG) >= 0) {
       return {
         text: "Скрипт слишком долго работал без паузы, и я его остановил.",
         hint: "Если у тебя бесконечный цикл (while true do), добавь внутрь wait(0.1). В Roblox без wait() такой цикл заморозит игру.",
+      };
+    }
+    if (msg.indexOf(PRINT_FLOOD) >= 0) {
+      return {
+        text: "Скрипт напечатал больше 2000 строк без паузы, и я его остановил.",
+        hint: "print в цикле без wait(): окно Вывода переполнится, и игра зависнет. Добавь в цикл wait(0.1).",
       };
     }
     let line = null;
@@ -661,7 +736,86 @@ const LuaRT = (() => {
       line = +lm[1];
       msg = msg.slice(lm[0].length);
     }
+    const parse = /expected|unexpected symbol|syntax error|unfinished string|malformed number/.test(msg);
+    const code = src ? codeOnly(src) : "";
+    const lines = code.split("\n");
+    const lineOf = (n) => (n && lines[n - 1] !== undefined ? lines[n - 1].trim() : "");
+    // предыдущая непустая строка кода (до строки n)
+    const prevLine = (n) => { for (let k = n - 1; k >= 1; k--) if (lineOf(k)) return k; return null; };
+    const lastLine = () => { for (let k = lines.length; k >= 1; k--) if (lineOf(k)) return k; return null; };
+    const nearTok = (msg.match(/near (<eof>|'(?:[^'\\]|\\.)*')/) || [])[1] || "";
+    const atEof = nearTok === "<eof>";
+    if (src && line && atEof) line = lastLine() || line;
+    let hint = "";
+    let cyr = null;
+    let badChar = null; // какой символ показать вместо «<\208>»
+
+    // Подсказки по коду ученика — они точнее общих
+    if (src && parse) {
+      // 60 x 60 — умножение пишут звёздочкой
+      const mul = /(\d|\))(\s*)([xXхХ×·])(\s*)(\d|\()/g;
+      let mm;
+      while ((mm = mul.exec(code))) {
+        const hex = mm[1] === "0" && !mm[2] && /[xX]/.test(mm[3]) && !/[\w.]/.test(code[mm.index - 1] || "");
+        if (hex) continue;
+        const tok = nearTok.replace(/^'|'$/g, "");
+        if (/^[xX]/.test(tok) || /^<\\\d+>/.test(tok) || /malformed number/.test(msg)) {
+          line = code.slice(0, mm.index).split("\n").length;
+          badChar = mm[3];
+          hint = `Умножение в коде — звёздочка *, а не «${mm[3]}»: 60 * 60`;
+        }
+        break;
+      }
+      // русская буква вне кавычек
+      if (!hint && /<\\\d+>/.test(msg)) {
+        cyr = findCyrWord(code, line);
+        if (cyr) {
+          line = cyr.line;
+          badChar = cyr.letters[0];
+          const ls = cyr.letters.map((c) => `«${c}»`).join(", ");
+          const allLook = cyr.letters.every((c) => LOOKALIKE.includes(c));
+          if (cyr.mixed) hint = `В слове «${cyr.word}» ${cyr.letters.length > 1 ? "буквы " + ls + " русские" : "буква " + ls + " русская"}. Переключи клавиатуру на английскую и напиши это слово заново.`;
+          else if (allLook && cyr.word.length <= 3) hint = `«${cyr.word}» тут написано русскими буквами. Переключи клавиатуру на английскую и напиши заново.`;
+          else hint = `«${cyr.word}» — без кавычек. Русские слова можно писать только внутри кавычек: print("${cyr.word}"). Имена переменных и команд — латиницей.`;
+        }
+      }
+      // print["..."] — у print скобки круглые
+      if (!hint) {
+        const tok = nearTok.replace(/^'|'$/g, "");
+        const cand = tok && line && lineOf(line).startsWith(tok) ? [prevLine(line), line] : [line, prevLine(line || lines.length + 1)];
+        const pl = cand.find((n) => n && /\bprint\s*\[/.test(lineOf(n)));
+        if (pl) { line = pl; hint = 'У print скобки круглые ( ), а не квадратные [ ]: print("текст")'; }
+      }
+      // local x =   (пусто) — значение пропущено, а ошибка видна строкой ниже
+      if (!hint && /unexpected symbol|syntax error/.test(msg) && line) {
+        const pv = atEof ? line : prevLine(line);
+        const t = lineOf(pv);
+        if (pv && /(^|[^=~<>])=\s*$/.test(t)) {
+          line = pv;
+          hint = `В строке ${pv} после «=» ничего нет. Допиши значение: число (10) или текст в кавычках ("Боб").`;
+        } else if (pv && pv !== line && /(\.\.|[+\-*\/,(]|\band|\bor|\bnot)\s*$/.test(t)) {
+          line = pv;
+          hint = `Строка ${pv} обрывается на «${t.match(/(\.\.|[+\-*\/,(]|and|or|not)\s*$/)[1]}» — допиши, что идёт дальше.`;
+        }
+      }
+      // hp - 25 — результат никуда не положили
+      if (!hint && /syntax error near '[-+*\/%^]'/.test(msg)) {
+        const t = lineOf(line);
+        const m = t.match(/^([A-Za-z_][\w.]*)\s*([-+*\/%^])\s*(.+)$/);
+        hint = m ? `Результат надо положить в переменную: ${m[1]} = ${m[1]} ${m[2]} ${m[3]}` : "Результат надо положить в переменную: hp = hp - 25";
+      }
+      // print("Герой" heroName) — между значениями нужен знак
+      if (!hint && /'\)' expected near '[^']+'/.test(msg) && !/near '[=!&|]'/.test(msg)) {
+        const t = lineOf(line);
+        if (/("[^"]*"|\w)\s+("|[A-Za-z_])/.test(t.replace(/\b(and|or|not)\b/g, "+"))) hint = "Между двумя значениями нужен знак: две точки .. чтобы склеить текст, или запятая. Или не хватает скобки «)».";
+      }
+    }
+
     const hints = [
+      [/^'[^']+' expected near '='/, () => "Чтобы сравнить, пиши два знака ==: if key == true then. Один = только кладёт значение в переменную."],
+      [/near '!'/, () => "В Luau «не равно» пишется ~= (а не !=), а «не» — словом not."],
+      [/near '(&|\|)'/, () => "В Luau «и» пишется словом and, а «или» — словом or (а не && и ||)."],
+      [/near '?<\\\d+>/, () => "Русские буквы можно писать только внутри кавычек: print(\"Привет\"). Имена переменных и команд — латиницей."],
       [/attempt to call a nil value \((?:global|field|method) '([^']+)'\)/, (m) => `Команды «${m[1]}» не существует. Проверь опечатку: Luau различает большие и маленькие буквы (print, а не Print).`],
       [/attempt to call a (\w+) value/, (m) => `Ты пытаешься вызвать как функцию то, что ею не является (это ${m[1]}).`],
       [/attempt to perform arithmetic on a nil value(?: \((?:global|local|field) '([^']+)'\))?/, (m) => `${m[1] ? "«" + m[1] + "»" : "Значение"} пустое (nil). Может, переменная не создана или в имени опечатка?`],
@@ -669,31 +823,39 @@ const LuaRT = (() => {
       [/attempt to concatenate a nil value(?: \((?:global|local|field) '([^']+)'\))?/, (m) => `Склеиваешь (..) текст с пустым значением${m[1] ? " «" + m[1] + "»" : ""}. Такой переменной нет или в ней nil.`],
       [/attempt to concatenate a (boolean|table) value/, (m) => `Нельзя склеить текст с ${m[1] === "boolean" ? "true/false" : "таблицей"}. Оберни в tostring(...)`],
       [/attempt to index a nil value(?: \((?:global|local|field|upvalue) '([^']+)'\))?/, (m) => `Ты пишешь «${m[1] || "что-то"}.что-то», но ${m[1] ? "«" + m[1] + "»" : "это"} пустое (nil). Объект не создан или имя неверное.`],
+      [/attempt to index a function value \(global 'print'\)/, () => 'У print скобки круглые ( ), а не квадратные [ ]: print("текст")'],
       [/attempt to compare/, () => "Сравнивать можно числа с числами и текст с текстом. Проверь, что с обеих сторон одинаковые типы."],
       [/'end' expected/, () => "Не хватает слова end. Каждый if, for, while и function нужно закрыть словом end."],
       [/'then' expected/, () => "После условия в if нужно слово then: if hp > 0 then"],
       [/'do' expected/, () => "После for или while нужно слово do: for i = 1, 10 do"],
       [/'=' expected near/, () => "Компьютер ждал знак «=». Проверь слово перед этим местом: может, опечатка или лишний пробел в имени?"],
+      [/'\)' expected near <eof>/, () => "Не хватает закрывающей скобки «)» в конце."],
       [/'\)' expected/, () => "Не хватает закрывающей скобки «)»."],
       [/'}' expected/, () => "Не хватает закрывающей фигурной скобки «}»."],
-      [/unfinished string/, () => "Строка не закрыта: не хватает кавычки \" в конце текста."],
-      [/unexpected symbol near '!'/, () => "В Luau «не равно» пишется ~= (а не !=), а «не» — словом not."],
-      [/near '?<\\\d+>/, () => "Русские буквы можно писать только внутри кавычек: print(\"Привет\"). Имена переменных и команд — латиницей."],
+      [/unfinished string/, () => "Строка не закрыта: кавычка \" и скобка ) должны быть на той же строчке, что и текст. Может, ты нажал Enter внутри кавычек?"],
+      [/<name> expected near '='/, () => "После local нужно имя переменной: local hp = 100"],
+      [/<name> expected near '\('/, () => "После function нужно имя: local function hello()"],
+      [/<name> expected/, () => "После точки «.» должно идти имя, например part.Color. Похоже, тут лишняя точка — убери её. Склеить текст — это две точки .. и значение после них."],
+      [/unexpected symbol near <eof>/, () => "Код оборвался на последней строчке. Допиши команду: закрой скобку ) или кавычку \", или удали лишнее."],
+      [/syntax error near/, () => "Эта строчка — не команда. Команда — это вызов со скобками, например print(\"Привет\"), или присваивание: hp = 5"],
+      [/unexpected symbol near '(local|print|end|if|for|while|return|function)'/, () => "В строке выше чего-то не хватает: например, после «=» нужно значение."],
       [/unexpected symbol near '([^']*)'/, (m) => `Непонятный символ «${m[1]}». Проверь кавычки, скобки и знаки.`],
       [/<eof> expected near 'end'/, () => "Лишнее слово end. Посчитай: сколько if/for/function открыто, столько end и нужно."],
       [/malformed number/, () => "Странное число. Дробные числа пишутся через точку: 0.5, а не 0,5"],
       [/bad argument #(\d+) to '([^']+)'/, (m) => `Функции ${m[2]} передано что-то не то (аргумент №${m[1]}).`],
       [/stack overflow/, () => "Функция вызывает сама себя бесконечно."],
     ];
-    let hint = "";
-    for (const [re, fn] of hints) {
-      const m = msg.match(re);
-      if (m) {
-        hint = fn(m);
-        break;
+    if (!hint) {
+      for (const [re, fn] of hints) {
+        const m = msg.match(re);
+        if (m) {
+          hint = fn(m);
+          break;
+        }
       }
     }
-    msg = msg.replace(/'?(<\\\d+>)+'?/g, "«русская буква»");
+    if (parse) msg = ruParse(msg);
+    msg = msg.replace(/«?'?(<\\\d+>)+'?»?/g, badChar ? `«${badChar}»` : "«русская буква»");
     return { text: (line ? `Строка ${line}: ` : "") + msg, hint, line };
   }
 
@@ -703,11 +865,12 @@ const LuaRT = (() => {
     const L = lauxlib.luaL_newstate();
     lualib.luaL_openlibs(L);
     let stopped = false;
+    let srcCode = "";
 
     const out = (kind, text) => {
       if (stopped) return;
       if (kind === "error") {
-        const e = explain(text);
+        const e = explain(text, srcCode);
         opts.onOut("error", e.text, e.hint, e.line);
       } else opts.onOut(kind, text);
     };
@@ -725,6 +888,12 @@ const LuaRT = (() => {
       return 1;
     });
     lua.lua_setglobal(L, to_luastring("__clock"));
+    // настоящее время в секундах: физика следит, чтобы не тормозить страницу
+    lua.lua_pushcfunction(L, (L) => {
+      lua.lua_pushnumber(L, performance.now() / 1000);
+      return 1;
+    });
+    lua.lua_setglobal(L, to_luastring("__rnow"));
     lua.lua_pushstring(L, to_luastring(opts.playerName || "Player"));
     lua.lua_setglobal(L, to_luastring("__playerName"));
 
@@ -815,9 +984,11 @@ const LuaRT = (() => {
       opts.onTick && opts.onTick(count || 0);
     }
 
+    let ffSpent = 0; // сколько мс ушло на «промотку» — защита от зависания проверки
     const api = {
       get world() { return world; },
       start(code, inPart) {
+        srcCode = String(code || "");
         const src = preprocess(code);
         const [ok] = call("__start", [src, !!inPart], 1);
         tick();
@@ -831,18 +1002,29 @@ const LuaRT = (() => {
       // для автопроверок: прогнать N тиков симуляции синхронно
       fastForward(seconds) {
         const steps = Math.ceil(seconds / 0.033);
+        const t0 = performance.now();
+        let dirtyAny = false;
         for (let i = 0; i < steps && !stopped; i++) {
+          // слишком тяжёлый мир: дальше не мотаем, чтобы страница не зависла
+          if (ffSpent + performance.now() - t0 > 4000) {
+            if (!api.slow) { api.slow = true; out("warn", "Мир слишком тяжёлый — проверка промотала не всё время."); }
+            break;
+          }
           vnow += 0.033;
           const [, dirty] = call("__tick", [vnow], 2);
-          if (dirty) {
-            const [snap] = call("__snapshot", [], 1);
-            if (snap) world = parseSnapshot(snap);
-          }
+          if (dirty) dirtyAny = true;
         }
+        // снимок мира один раз в конце, а не на каждом шаге
+        if (dirtyAny) {
+          const [snap] = call("__snapshot", [], 1);
+          if (snap) world = parseSnapshot(snap);
+        }
+        ffSpent += performance.now() - t0;
         lastReal = performance.now();
       },
       // запустить без таймера (для автопроверки)
       startSilent(code, inPart) {
+        srcCode = String(code || "");
         const src = preprocess(code);
         const [ok] = call("__start", [src, !!inPart], 1);
         return !!ok;
@@ -889,6 +1071,8 @@ const Viewport = (() => {
     let dpr = 1;
     let W = 0;
     let H = 0;
+    let needDraw = true; // перерисовываем, только когда что-то поменялось
+    let lastView = "";
 
     function resize() {
       dpr = Math.min(3, window.devicePixelRatio || 1);
@@ -897,6 +1081,7 @@ const Viewport = (() => {
       H = Math.max(50, r.height);
       canvas.width = Math.round(W * dpr);
       canvas.height = Math.round(H * dpr);
+      needDraw = true;
     }
 
     function proj(x, y, z) {
@@ -1043,7 +1228,6 @@ const Viewport = (() => {
     function render() {
       if (!W) resize();
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-      autoFit();
       const light = sky();
       // плита Baseplate
       const R = 48;
@@ -1190,12 +1374,20 @@ const Viewport = (() => {
     canvas.addEventListener("pointercancel", up);
 
     function loop() {
-      render();
+      if (!W) resize();
+      autoFit();
+      // мир, камера и размер те же — кадр не рисуем (бережём батарею телефона)
+      const view = `${cam.x.toFixed(3)},${cam.y.toFixed(3)},${cam.z.toFixed(3)},${zoom.toFixed(3)},${W},${H}`;
+      if (needDraw || ripple || view !== lastView) {
+        needDraw = false;
+        lastView = view;
+        render();
+      }
       raf = requestAnimationFrame(loop);
     }
 
     return {
-      setWorld(w) { world = w || world; },
+      setWorld(w) { world = w || world; needDraw = true; },
       start() { resize(); cancelAnimationFrame(raf); loop(); },
       stop() { cancelAnimationFrame(raf); raf = 0; },
       resize,
@@ -1265,7 +1457,11 @@ print("А это выполнится")</pre>`,
       check(r) {
         const e = noErr(r);
         if (e) return { ok: false, msg: e };
-        if (r.out.length < 3) return { ok: false, msg: `Строчек вывелось: ${r.out.length}. Нужно хотя бы 3.` };
+        // считаем строчки с текстом: print("а\nб") — тоже две строчки, а пустые не в счёт
+        const lines = r.out.flatMap((l) => String(l).split("\n")).map((l) => l.trim()).filter(Boolean);
+        if (lines.length < 3 && r.out.length > lines.length) return { ok: false, msg: "Есть пустые строчки. Внутри кавычек напиши своё имя, возраст и любимую игру." };
+        if (lines.length < 3) return { ok: false, msg: `Строчек вывелось: ${lines.length}. Нужно хотя бы 3.` };
+        if (new Set(lines).size < 3) return { ok: false, msg: "Строчки повторяются. Нужно три разные: имя, возраст и любимая игра." };
         return { ok: true };
       },
     },
@@ -1314,6 +1510,8 @@ coins += 5          -- то же самое, коротко</pre>
         if (e) return { ok: false, msg: e };
         if (!codeHas(r, /\blocal\b/)) return { ok: false, msg: "Создай переменную через local." };
         if (!hasLine(r, /(^|\D)75(\D|$)/)) return { ok: false, msg: "В выводе нет числа 75. Отними 25 от hp и выведи hp через print." };
+        // 75 должен посчитать компьютер, а не мы: hp = hp - 25 или hp -= 25
+        if (!codeHas(r, /-=|[\w)\]]\s*-\s*[\w(]/)) return { ok: false, msg: "Пусть вычтет компьютер: напиши hp = hp - 25" };
         return { ok: true };
       },
     },
@@ -1370,7 +1568,7 @@ print("Выпало: " .. roll)</pre>
         const e = noErr(r);
         if (e) return { ok: false, msg: e };
         if (!hasLine(r, /3600/)) return { ok: false, msg: "Ответ должен быть 3600. Используй * для умножения." };
-        if (!codeHas(r, /\*/)) return { ok: false, msg: "Пусть посчитает компьютер: используй умножение *." };
+        if (!codeHas(r, /\*|\^/)) return { ok: false, msg: "Пусть посчитает компьютер: используй умножение *." };
         return { ok: true };
       },
     },
@@ -3959,23 +4157,43 @@ async function offerHomework(explain) {
   else await say("claude", "Когда будешь готов — жми </>. Домашка уже будет открыта.");
 }
 
-// проверяем «заданную» домашку сами. Если её код пустой или не работает,
-// пробуем код из последнего открытого задания и из урока: вдруг домашку написали туда
-async function autoCheckHw(hid) {
+// снимок до проверки: какие домашки заданы и какой в них код (переносы его не портят)
+function hwSnapshot() {
   const s = G.save;
+  return { code: { ...s.code }, given: Object.keys(HOMEWORK).filter((h) => s.hw[h] === "given"), own: {} };
+}
+
+// подходит ли код домашки к ней самой (запоминаем, чтобы не гонять дважды)
+async function hwOwnOk(hid, snap) {
+  if (!(hid in snap.own)) {
+    const code = snap.code["h:" + hid] || "";
+    snap.own[hid] = code.trim() ? (await runCheck(taskFor("h:" + hid), code)).ok : false;
+  }
+  return snap.own[hid];
+}
+
+// проверяем «заданную» домашку сами. Если её код пустой или не работает,
+// пробуем код из последнего открытого задания, из урока и из других заданных домашек: вдруг написали туда
+async function autoCheckHw(hid, snap) {
+  const s = G.save;
+  snap = snap || hwSnapshot();
   const key = "h:" + hid;
   const T = taskFor(key);
-  const own = (s.code[key] || "").trim();
+  const own = (snap.code[key] || "").trim();
   const empty = !own || own === (T.starter || "").trim();
+  const others = snap.given.filter((h) => h !== hid).map((h) => "h:" + h);
   // свою мини-игру (№10) берём только из самой домашки
-  const keys = T.review ? [key] : [key, s.lastTask, "p:" + T.lesson.id];
+  const keys = T.review ? [key] : [key, s.lastTask, "p:" + T.lesson.id, ...others];
   const tried = new Set();
   let msg = "";
   for (const k of keys) {
-    if (!k || (k !== key && k.startsWith("h:"))) continue;
-    const code = s.code[k];
+    const otherHw = !!k && k !== key && k.startsWith("h:");
+    if (!k || (otherHw && !others.includes(k))) continue;
+    const code = snap.code[k];
     if (!code || !code.trim() || tried.has(code)) continue;
     tried.add(code);
+    // код другой домашки не трогаем, если он подходит к ней самой
+    if (otherHw && (await hwOwnOk(k.slice(2), snap))) continue;
     const res = await runCheck(T, code);
     if (res.ok) {
       s.code[key] = code;
@@ -4014,8 +4232,9 @@ async function acceptHomework(hid) {
   else await say("claude", ["Чисто. Работает. Я бы лучше не написал. Ладно, написал бы, но не сильно.", "Отличная работа! Компьютер понял каждую строчку.", "Код запустился без ошибок. Это уже уровень профи!"][H.lesson.n % 3]);
   s.hw[hid] = "done";
   s.atkBonus = (s.atkBonus || 0) + 1;
-  addXp(20);
+  // монеты до addXp: он обновляет HUD
   s.gold += 10;
+  addXp(20);
   sfx("victory");
   await say("sys", `* Домашка №${H.lesson.n} засчитана! +20 XP, +10 монет, +1 к силе атаки.`);
 }
@@ -4075,8 +4294,8 @@ async function showCustom(custom) {
   }
   if (pass) {
     h.status = "done";
-    addXp(25);
     s.gold += 15;
+    addXp(25);
     sfx("victory");
     await say("sys", "* Особая домашка засчитана! +25 XP, +15 монет.");
   } else {
@@ -4095,15 +4314,23 @@ async function showHomework() {
   if (given.length && !LuaRT.available()) fail = { hid: given[0], engine: true };
   else if (given.length) {
     const moved = [];
+    const snap = hwSnapshot();
     dlgThinking("Клод запускает твой код");
     try {
       for (const hid of given) {
-        const r = await autoCheckHw(hid);
+        const r = await autoCheckHw(hid, snap);
         if (r.ok && r.from !== "h:" + hid) moved.push([hid, r.from]);
         if (!r.ok && !fail) fail = { hid, ...r };
       }
     } finally {
       dlgThinking(null);
+    }
+    // код перенесли из другой домашки — там теперь пусто, пусть пишет её заново
+    for (const [, from] of moved) {
+      const src = from.startsWith("h:") ? from.slice(2) : null;
+      if (!src || s.hw[src] !== "given" || s.code[from] !== snap.code[from]) continue;
+      s.code[from] = HOMEWORK[src].starter || "";
+      if (fail && fail.hid === src) fail = { hid: src, ok: false, empty: true, msg: "" };
     }
     for (const [hid, from] of moved) await say("claude", `Ага! Домашку №${HOMEWORK[hid].lesson.n} ты написал в «${taskFor(from).title}». Ничего страшного — я перенёс код куда надо.`);
   }
@@ -4118,7 +4345,9 @@ async function showHomework() {
   const custom = (s.customHw || []).filter((h) => h.status !== "done");
   if (fail && !(await explainFail(fail))) return;
   if (custom.length) await showCustom(custom);
-  else if (!fail) await say("claude", "Домашек пока нет. Хочешь, придумаю? Напиши мне в чате: «дай домашку».");
+  // придумать новую домашку может только живой Клод
+  else if (!fail && Claude.sample && !Claude.disabled) await say("claude", "Домашек пока нет. Хочешь, придумаю? Напиши мне в чате: «дай домашку».");
+  else if (!fail) await say("claude", `Домашек пока нет. Что дальше: ${objective()}.`);
   saveSoon();
 }
 
@@ -5027,6 +5256,9 @@ const Editor = {
   errLine: null,
   lastOut: [],
   lastErr: null,
+  outBuf: [],   // строки вывода, которые ещё не нарисованы
+  outRaf: 0,
+  keyBtns: {},  // кнопки быстрых клавиш по подписи
 };
 
 const KW = new Set("local function end if then else elseif for in do while repeat until return break and or not nil true false".split(" "));
@@ -5116,6 +5348,37 @@ function sandboxCard() {
   return "<p>Шпаргалки пройденных уроков:</p>" + done.map((l) => `<details><summary>Урок ${l.n}: ${l.title}</summary>${l.card}</details>`).join("");
 }
 
+// задание уже сделано? (урок пройден, домашка сдана, особое задание сдано)
+function taskDone(key) {
+  const s = G.save;
+  const [t, id] = String(key || "").split(":");
+  if (t === "p") return !!s.practice[id];
+  if (t === "h") return s.hw[id] === "done";
+  if (t === "c") {
+    const h = (s.customHw || []).find((x) => x.id === id);
+    return !h || h.status === "done";
+  }
+  return false;
+}
+
+// первый доступный урок, который ещё не пройден
+function nextLessonKey() {
+  const t = taskList().find((x) => x.key.startsWith("p:") && !G.save.practice[x.key.slice(2)]);
+  return t ? t.key : null;
+}
+
+// что открыть по кнопке </>: домашка, которую ждёт Клод → непройденный урок → прошлое несделанное → песочница
+function defaultTask() {
+  syncHomework();
+  const hid = pendingHw();
+  if (hid) return "h:" + hid;
+  const last = G.save.lastTask;
+  const keys = taskList().map((t) => t.key);
+  const openLast = last && last !== "sandbox" && keys.includes(last) && !taskDone(last);
+  if (openLast && !last.startsWith("h:")) return last;
+  return nextLessonKey() || (openLast ? last : "sandbox");
+}
+
 function openEditor(key) {
   return new Promise((resolve) => {
     if (Editor.resolve) Editor.resolve();
@@ -5124,9 +5387,7 @@ function openEditor(key) {
     el.hidden = false;
     G.overlay = "editor";
     // без ключа: сначала открываем домашку, которую ждёт Клод, а не старый урок
-    syncHomework();
-    const hid = pendingHw();
-    key = key || (hid && "h:" + hid) || G.save.lastTask || "sandbox";
+    key = key || defaultTask();
     if (!taskList().some((t) => t.key === key)) key = "sandbox";
     loadTask(key);
     fitSheet();
@@ -5145,9 +5406,11 @@ function switchTask(key) {
   loadTask(key);
 }
 
-// перенести код в домашку и сразу проверить
-function carryToHw(hid, code) {
+// перенести код в домашку и сразу проверить.
+// fromKey — если код лежал в другой домашке, та снова становится пустой заготовкой
+function carryToHw(hid, code, fromKey) {
   stopRun();
+  if (fromKey && fromKey.startsWith("h:") && fromKey !== "h:" + hid) G.save.code[fromKey] = taskFor(fromKey).starter || "";
   G.save.code["h:" + hid] = code;
   loadTask("h:" + hid);
   checkTask();
@@ -5155,6 +5418,8 @@ function carryToHw(hid, code) {
 
 function closeEditor() {
   stopRun();
+  // окно «Мир» больше не рисуем — бережём батарею
+  if (Editor.vp) Editor.vp.stop();
   document.getElementById("editor").hidden = true;
   G.overlay = null;
   saveSoon();
@@ -5200,7 +5465,7 @@ function renderTaskHead(T, noNote) {
   if (!noNote) taskNote(T);
 }
 
-// плашка сверху задания с кнопкой
+// плашка сверху задания с кнопкой (кнопки может и не быть)
 function setNote(text, btn, fn, good) {
   const box = document.getElementById("edTaskText");
   let el = document.getElementById("edNote");
@@ -5212,15 +5477,29 @@ function setNote(text, btn, fn, good) {
   const c = good ? "var(--good)" : "var(--gold)";
   el.style.cssText = `margin:0 0 6px;padding:4px 8px 6px;border:2px solid ${c};color:${c}`;
   el.textContent = text + " ";
-  const b = document.createElement("button");
-  b.type = "button";
-  b.className = "pill";
-  b.style.cssText = "margin-top:4px;color:var(--ink)";
-  b.textContent = btn;
-  b.onclick = fn;
-  el.appendChild(b);
+  if (btn) {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = "pill";
+    b.style.cssText = "margin-top:4px;color:var(--ink)";
+    b.textContent = btn;
+    b.onclick = fn;
+    el.appendChild(b);
+  }
   const top = document.querySelector(".edTop");
   if (top) top.scrollTop = 0;
+}
+
+// что делать дальше: { label, fn } для кнопки
+function nextStep() {
+  const hid = pendingHw();
+  if (hid) {
+    const n = HOMEWORK[hid].lesson.n;
+    return G.save.hw[hid] === "checked" ? { label: `📜 Показать Домашку №${n} Клоду →`, fn: showToClaude } : { label: `📝 Открыть Домашку №${n} →`, fn: () => switchTask("h:" + hid) };
+  }
+  const next = nextLessonKey();
+  if (next) return { label: `📘 Открыть Урок ${LESSON[next.slice(2)].n} →`, fn: () => switchTask(next) };
+  return { label: "Вернуться в игру →", fn: closeEditor };
 }
 
 // если открыто не то задание, которое сейчас нужно, — подсказываем
@@ -5231,13 +5510,23 @@ function taskNote(T) {
     return;
   }
   const hid = pendingHw();
-  if (!hid) return;
   const finished = T.kind === "sandbox" || (T.kind === "practice" && s.practice[T.id]) || (T.kind === "homework" && s.hw[T.id] === "done");
   if (!finished) return;
-  const n = HOMEWORK[hid].lesson.n;
   const head = T.kind === "practice" ? `Урок ${T.lesson.n} уже пройден ✅ ` : T.kind === "homework" ? "Эта домашка уже сдана ⭐ " : "";
-  if (s.hw[hid] === "checked") setNote(`${head}Домашка №${n} проверена — покажи её Клоду.`, "📜 Показать Клоду →", showToClaude);
-  else setNote(`${head}Сейчас нужна Домашка №${n}.`, "📝 Открыть домашку →", () => switchTask("h:" + hid));
+  if (hid) {
+    const n = HOMEWORK[hid].lesson.n;
+    if (s.hw[hid] === "checked") setNote(`${head}Домашка №${n} проверена — покажи её Клоду.`, "📜 Показать Клоду →", showToClaude);
+    else setNote(`${head}Сейчас нужна Домашка №${n}.`, "📝 Открыть домашку →", () => switchTask("h:" + hid));
+    return;
+  }
+  // домашек нет: говорим, что нужно сейчас
+  const next = nextLessonKey();
+  if (T.kind === "sandbox") {
+    if (next) setNote(`Урок ${LESSON[next.slice(2)].n} ещё не пройден.`, "📘 Открыть урок →", () => switchTask(next));
+    return;
+  }
+  const step = nextStep();
+  setNote(`${head}Сейчас нужно: ${objective()}`, step.label, step.fn);
 }
 
 // домашка пустая, а код для неё уже написан в другом задании (например, в уроке)
@@ -5279,10 +5568,16 @@ function loadTask(key) {
   document.getElementById("edCheck").textContent = T.kind === "custom" ? "✓ Готово" : "✓ Проверить";
   const card = document.getElementById("edCard");
   card.open = T.kind === "practice" && !G.save.practice[T.id];
+  card.hidden = !T.card;
+  // у особого задания там пример от Клода, а не шпаргалка урока
+  card.querySelector("summary").textContent = T.kind === "custom" ? "💡 Пример от Клода" : T.kind === "sandbox" ? "📖 Шпаргалки" : "📖 Шпаргалка урока";
+  orderKeys(T);
   const wantsWorld = T.lesson && T.lesson.n >= 8;
   showTab(wantsWorld ? "world" : "out");
   edClaude(T.kind === "practice" ? "Прочитай шпаргалку (📖), напиши код и нажми ▶ Запуск. Потом ✓ Проверить." : T.kind === "homework" ? "Домашка! Сделай сам, а если застрял — нажми «Спросить Клода»." : T.kind === "custom" ? "Особое задание. Когда допишешь — нажми «Готово» и покажи мне." : "Песочница. Тут можно ломать всё что угодно!");
-  if (document.getElementById("edNote")) edClaude(T.kind === "homework" && s.hw[T.id] === "checked" ? "Код рабочий. Неси показывать — кнопка сверху." : "Это задание уже сделано. Жми кнопку сверху — там то, что нужно сейчас.");
+  if (document.getElementById("edNote")) {
+    edClaude(T.kind === "homework" && s.hw[T.id] === "checked" ? "Код рабочий. Неси показывать — кнопка сверху." : T.kind === "sandbox" ? "Песочница — пробуй что хочешь. А урок ждёт: кнопка сверху." : "Это задание уже сделано. Жми кнопку сверху — там то, что нужно сейчас.");
+  }
   if (T.kind === "homework") setTimeout(() => suggestCarry(T, prev), 60);
 }
 
@@ -5332,28 +5627,54 @@ function insertAtCursor(text) {
   codeChanged();
 }
 
+const INDENT_AFTER = /(\bthen|\bdo|\belse|\brepeat|function\s*[\w.:]*\s*\([^)]*\)|\{)\s*$/;
+
 function newlineIndent() {
   const ta = document.getElementById("edCode");
-  const st = ta.selectionStart;
-  const before = ta.value.slice(0, st);
+  const v = ta.value;
+  let st = ta.selectionStart;
+  let en = ta.selectionEnd;
+  // умный Enter: курсор стоит перед закрывающими ") или ) — переносим всю строку,
+  // иначе print("|") после Enter ломает текст в кавычках
+  if (st === en) {
+    let eol = v.indexOf("\n", st);
+    if (eol < 0) eol = v.length;
+    const rest = v.slice(st, eol);
+    const head = v.slice(v.lastIndexOf("\n", st - 1) + 1, st).replace(/--.*$/, "");
+    if (rest && (/^["'][)\]}"']*\s*$/.test(rest) || (/^[)\]]+\s*$/.test(rest) && !INDENT_AFTER.test(head)))) st = en = eol;
+  }
+  const before = v.slice(0, st);
   const line = before.slice(before.lastIndexOf("\n") + 1);
   let indent = line.match(/^\s*/)[0];
-  if (/(\bthen|\bdo|\belse|\brepeat|function\s*[\w.:]*\s*\([^)]*\)|\{)\s*$/.test(line.replace(/--.*$/, ""))) indent += "  ";
+  if (INDENT_AFTER.test(line.replace(/--.*$/, ""))) indent += "  ";
   const t = "\n" + indent;
-  ta.value = before + t + ta.value.slice(ta.selectionEnd);
+  ta.value = before + t + v.slice(en);
   ta.selectionStart = ta.selectionEnd = st + t.length;
   codeChanged();
 }
 
+// сначала то, что нужно с первого урока; потом слова; потом остальные знаки
 const QUICK_KEYS = [
-  ["(", "(|)"], [")", ")"], ['"', '"|"'], ["=", " = "], [".", "."], [",", ", "], [":", ":"], ["..", " .. "],
-  ["==", " == "], ["~=", " ~= "], ["<", " < "], [">", " > "], ["+", " + "], ["-", " - "], ["*", " * "], ["/", " / "],
-  ["{", "{|}"], ["[", "[|]"], ["#", "#"], ["_", "_"], ["⇥", "  "], ["--", "-- "],
-  ["local", "local |"], ["print", 'print("|")'], ["if", "if | then\n  \nend"], ["else", "else\n  "], ["for", "for i = 1, 10 do\n  |\nend"],
-  ["while", "while | do\n  wait(0.1)\nend"], ["function", "local function |()\n  \nend"], ["end", "end"], ["return", "return |"],
-  ["wait", "wait(1)"], ["Part", 'Instance.new("Part")'], ["Vector3", "Vector3.new(|)"], ["Color3", "Color3.fromRGB(|)"],
-  ["workspace", "workspace"], ["Anchored", ".Anchored = true"], ["Connect", ":Connect(function(hit)\n  |\nend)"],
+  ["print", 'print("|")'], ["local", "local |"], ['"', '"|"'], ["(", "(|)"], [")", ")"], ["=", " = "], ["..", " .. "], ["--", "-- "],
+  ["if", "if | then\n  \nend"], ["else", "else\n  "], ["for", "for i = 1, 10 do\n  |\nend"], ["while", "while | do\n  wait(0.1)\nend"],
+  ["function", "local function |()\n  \nend"], ["end", "end"], ["return", "return |"], ["wait", "wait(1)"],
+  ["Part", 'Instance.new("Part")'], ["Vector3", "Vector3.new(|)"], ["Color3", "Color3.fromRGB(|)"], ["workspace", "workspace"],
+  ["Anchored", ".Anchored = true"], ["Connect", ":Connect(function(hit)\n  |\nend)"],
+  [".", "."], [",", ", "], [":", ":"], ["==", " == "], ["~=", " ~= "], ["<", " < "], [">", " > "],
+  ["+", " + "], ["-", " - "], ["*", " * "], ["/", " / "], ["{", "{|}"], ["[", "[|]"], ["#", "#"], ["_", "_"], ["⇥", "  "],
 ];
+// какие клавиши нужны в уроке — они встают сразу после print, local, ", ( ), =, .., --
+const LESSON_KEYS = {
+  2: ["-", "+"],
+  3: ["*", "/", "+", "-"],
+  4: ["if", "else", "end", "==", "~=", ">", "<"],
+  5: ["for", "while", "wait", "end", ","],
+  6: ["function", "return", "end", ","],
+  7: ["{", "[", "#", ",", "for", "end"],
+  8: ["Part", "Vector3", "Color3", "Anchored", "workspace", ".", ","],
+  9: ["Part", "Connect", "if", "end", ".", ":", "Anchored", "workspace"],
+  10: ["Connect", "Part", "if", "end", ".", ":", "workspace"],
+};
 
 function buildKeys() {
   const el = document.getElementById("edKeys");
@@ -5366,33 +5687,68 @@ function buildKeys() {
     b.addEventListener("pointerdown", (e) => e.preventDefault());
     b.addEventListener("click", () => insertAtCursor(ins));
     el.appendChild(b);
+    Editor.keyBtns[label] = b;
   }
+}
+
+// порядок быстрых клавиш под задание: нужные уроку — в начале ряда
+function orderKeys(T) {
+  const el = document.getElementById("edKeys");
+  const head = QUICK_KEYS.slice(0, 8).map((k) => k[0]);
+  const want = head.concat((T.lesson && LESSON_KEYS[T.lesson.n]) || [], QUICK_KEYS.map((k) => k[0]));
+  const seen = new Set();
+  for (const k of want) {
+    if (seen.has(k) || !Editor.keyBtns[k]) continue;
+    seen.add(k);
+    el.appendChild(Editor.keyBtns[k]);
+  }
+  el.scrollLeft = 0;
 }
 
 // ---------- запуск ----------
 function clearOut() {
   document.getElementById("edOut").innerHTML = '<div class="o-dim">Здесь появится вывод (Output). Нажми ▶ Запуск.</div>';
+  Editor.outBuf = [];
   Editor.lastOut = [];
   Editor.lastErr = null;
+  // старой ошибки больше нет — и кнопки «Почему ошибка?» тоже
+  document.getElementById("edAskErr").hidden = true;
 }
 
+// вывод копим и рисуем один раз за кадр: print в цикле не вешает страницу
+const OUT_MAX = 400;
 function outLine(kind, text, hint) {
-  const el = document.getElementById("edOut");
-  if (el.querySelector(".o-dim")) el.innerHTML = "";
-  const d = document.createElement("div");
-  d.className = "o-" + kind;
-  d.textContent = (kind === "error" ? "✖ " : kind === "warn" ? "⚠ " : "") + text;
-  el.appendChild(d);
-  if (hint) {
-    const h = document.createElement("div");
-    h.className = "o-hint";
-    h.textContent = "Клод: " + hint;
-    el.appendChild(h);
-  }
-  if (el.children.length > 400) el.removeChild(el.firstChild);
-  el.scrollTop = el.scrollHeight;
+  const buf = Editor.outBuf;
+  buf.push([kind, text, hint]);
+  if (buf.length > OUT_MAX * 2) buf.splice(0, buf.length - OUT_MAX);
   Editor.lastOut.push((kind === "print" ? "" : kind + ": ") + text);
   if (Editor.lastOut.length > 60) Editor.lastOut.shift();
+  if (!Editor.outRaf) Editor.outRaf = requestAnimationFrame(flushOut);
+}
+
+function flushOut() {
+  Editor.outRaf = 0;
+  const buf = Editor.outBuf;
+  if (!buf.length) return;
+  Editor.outBuf = [];
+  const el = document.getElementById("edOut");
+  if (el.querySelector(".o-dim")) el.innerHTML = "";
+  const frag = document.createDocumentFragment();
+  for (const [kind, text, hint] of buf.slice(-OUT_MAX)) {
+    const d = document.createElement("div");
+    d.className = "o-" + kind;
+    d.textContent = (kind === "error" ? "✖ " : kind === "warn" ? "⚠ " : "") + text;
+    frag.appendChild(d);
+    if (hint) {
+      const h = document.createElement("div");
+      h.className = "o-hint";
+      h.textContent = "Клод: " + hint;
+      frag.appendChild(h);
+    }
+  }
+  el.appendChild(frag);
+  for (let extra = el.children.length - OUT_MAX; extra > 0; extra--) el.removeChild(el.firstChild);
+  el.scrollTop = el.scrollHeight;
 }
 
 function runCode() {
@@ -5419,11 +5775,10 @@ function runCode() {
     },
     onWorld(w) {
       if (Editor.vp) Editor.vp.setWorld(w);
-      const userP = w.parts.filter((p) => p.name !== "SpawnLocation").length;
-      if (userP && !sawPart) {
+      if (!sawPart && w.parts.some((p) => p.name !== "SpawnLocation")) {
         sawPart = true;
-        const tabBtn = document.querySelector('#edTabs [data-tab="world"]');
-        tabBtn.classList.add("ping");
+        // точка «новое» — только если вкладка «Мир» сейчас не открыта
+        if (document.getElementById("edWorld").hidden) document.querySelector('#edTabs [data-tab="world"]').classList.add("ping");
       }
     },
   });
@@ -5457,7 +5812,13 @@ function showTab(tab) {
         },
       });
     }
-    setTimeout(() => { Editor.vp.resize(); Editor.vp.start(); }, 220);
+    clearTimeout(showTab.t);
+    showTab.t = setTimeout(() => {
+      // за это время редактор могли закрыть или переключить вкладку
+      if (document.getElementById("editor").hidden || document.getElementById("edWorld").hidden) return;
+      Editor.vp.resize();
+      Editor.vp.start();
+    }, 220);
   } else if (Editor.vp) Editor.vp.stop();
 }
 
@@ -5526,13 +5887,34 @@ async function runCheck(T, code) {
     res = { ok: false, msg: "Проверка споткнулась: " + e.message };
   }
   rt.stop();
+  // первая ошибка Lua: редактор подсветит строку и покажет «Почему ошибка?»
+  if (res && !res.ok && errors.length) res.err = errors[0];
   return res;
+}
+
+// показать ошибку из проверки так же, как после ▶ Запуск
+function showCheckErr(err) {
+  document.getElementById("edAskErr").hidden = !err;
+  if (!err) return;
+  Editor.lastErr = err.text + (err.hint ? " (" + err.hint + ")" : "");
+  if (err.line) {
+    Editor.errLine = err.line;
+    refreshHl();
+  }
+}
+
+// закрыть шпаргалку и прокрутить верх, чтобы результат и кнопки Клода были видны
+function revealResult() {
+  document.getElementById("edCard").open = false;
+  const top = document.querySelector(".edTop");
+  if (top) top.scrollTop = 0;
 }
 
 async function checkTask() {
   const T = taskFor(Editor.key);
   const code = document.getElementById("edCode").value;
   G.save.code[Editor.key] = code;
+  revealResult();
   if (T.kind === "custom") {
     if (!code.trim() || code.trim() === T.starter.trim()) {
       setResult("Сначала напиши код для задания, потом жми «Готово».", false);
@@ -5558,8 +5940,20 @@ async function checkTask() {
     setResult("✖ Пока не получилось. " + escHtml(res.msg || ""), false);
     edClaude(["Почти! Читай подсказку и пробуй ещё.", "Ошибки — это нормально. Я делаю их миллион в секунду.", "Не сдавайся. Каждый программист видит красное чаще, чем зелёное."][Math.floor(Math.random() * 3)]);
     Editor.fails = (Editor.fails || 0) + 1;
+    showCheckErr(res.err);
     if (T.hint && !wrongPlace) document.getElementById("edHint").hidden = false;
     if (wrongPlace) await hwHint(T, hid, code);
+    else if (T.kind === "homework") await otherHwHint(T, code);
+    return;
+  }
+  document.getElementById("edAskErr").hidden = true;
+  if (T.kind === "homework" && s.hw[T.id] === "done") {
+    // уже сдана: показывать Клоду нечего, говорим, что нужно сейчас
+    const step = nextStep();
+    setResult(`⭐ Эта домашка уже сдана — код и сейчас работает. ${escHtml(res.msg || "")}<br>Сейчас нужно: ${escHtml(objective())} <button id="edBack" class="pill">${escHtml(step.label)}</button>`, true);
+    edClaude("Эту домашку я уже принял. Смотри, что нужно сейчас.");
+    document.getElementById("edBack").onclick = step.fn;
+    saveSoon();
     return;
   }
   sfx("victory");
@@ -5603,7 +5997,37 @@ async function hwHint(T, hid, code) {
   edClaude(`Стоп! Ты в Уроке ${T.lesson.n}, а нужна Домашка №${n}. Жми кнопку выше.`);
 }
 
+// домашка не прошла — а может, это код для другой заданной домашки?
+async function otherHwHint(T, code) {
+  const s = G.save;
+  const key = Editor.key;
+  for (const L of LESSONS) {
+    const H = HOMEWORK[L.homework.id];
+    // свою мини-игру (№10) проверяет сам Клод, её не угадываем
+    if (H.id === T.id || H.review || s.hw[H.id] !== "given") continue;
+    const res = await runCheck(taskFor("h:" + H.id), code);
+    if (Editor.key !== key || document.getElementById("editor").hidden) return;
+    if (!res.ok) continue;
+    const n = L.n;
+    const d = document.createElement("div");
+    d.style.cssText = "margin-top:6px;color:var(--gold)";
+    d.textContent = `💡 Это код для Домашки №${n}, а открыта Домашка №${T.lesson.n}. `;
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = "pill";
+    b.textContent = "Перенести →";
+    b.onclick = () => carryToHw(H.id, code, key);
+    d.appendChild(b);
+    document.getElementById("edResult").appendChild(d);
+    document.getElementById("edHint").hidden = true;
+    edClaude(`Это же Домашка №${n}! Жми «Перенести» — и код окажется на своём месте.`);
+    return;
+  }
+}
+
 function askClaudeAboutCode(withErr) {
+  // ошибки уже нет (сменили задание или всё прошло) — просто просим помочь
+  if (withErr && !Editor.lastErr) withErr = false;
   const T = taskFor(Editor.key);
   const code = document.getElementById("edCode").value;
   const msg = withErr
@@ -5658,6 +6082,7 @@ function setupEditor() {
     const T = taskFor(Editor.key);
     outLine("hint", "Подсказка:\n" + (T.hint || "Перечитай шпаргалку 📖"));
     showTab("out");
+    revealResult();
   };
   document.getElementById("edReset").onclick = () => {
     const T = taskFor(Editor.key);
@@ -5676,10 +6101,12 @@ function setupEditor() {
   document.getElementById("vpIn").onclick = () => Editor.vp && Editor.vp.zoomIn();
   document.getElementById("vpOut").onclick = () => Editor.vp && Editor.vp.zoomOut();
   document.getElementById("vpReset").onclick = () => Editor.vp && Editor.vp.reset();
-  window.addEventListener("resize", () => { fitSheet(); if (Editor.vp && !document.getElementById("edWorld").hidden) Editor.vp.resize(); });
+  // мир виден, только если открыт редактор и вкладка «Мир»
+  const worldShown = () => Editor.vp && !document.getElementById("editor").hidden && !document.getElementById("edWorld").hidden;
+  window.addEventListener("resize", () => { fitSheet(); if (worldShown()) Editor.vp.resize(); });
   if (window.visualViewport) window.visualViewport.addEventListener("resize", fitSheet);
   // окно «Мир» меняет размер, когда открывается шпаргалка или результат — перерисовываем canvas
-  if (window.ResizeObserver) new ResizeObserver(() => { if (Editor.vp && !document.getElementById("edWorld").hidden) Editor.vp.resize(); }).observe(document.getElementById("edPane"));
+  if (window.ResizeObserver) new ResizeObserver(() => { if (worldShown()) Editor.vp.resize(); }).observe(document.getElementById("edPane"));
   ta.addEventListener("focus", () => setTimeout(fitSheet, 300));
   ta.addEventListener("blur", () => setTimeout(fitSheet, 100));
   drawClaude(document.getElementById("edClaudeAva").getContext("2d"), 0, 0, "down", 0.3);
@@ -5718,7 +6145,7 @@ function updateChatBanner() {
   if (!Claude.checked) { el.textContent = "Подключаю мозг Клода…"; el.hidden = false; return; }
   if (Claude.disabled) { el.innerHTML = Claude.disabled; el.hidden = false; return; }
   if (!Claude.sample) {
-    el.innerHTML = "Живой Клод отвечает, когда игра открыта по ссылке в Claude. Сейчас я в офлайн-режиме: понимаю команды вроде «быстрее», «бессмертие», «снег», «корона», «босс», «вылечи».";
+    el.innerHTML = "Офлайн-режим: понимаю «что дальше», «домашка», «объясни урок», «быстрее», «снег», «корона», «босс», «вылечи».";
     el.hidden = false;
     return;
   }
@@ -5845,6 +6272,7 @@ function makeTools() {
         }
         if (i.xp) { addXp(Math.round(clampNum(i.xp, 0, 200, 0))); got.push(i.xp + " XP"); }
         if (i.gold) { G.save.gold += Math.round(clampNum(i.gold, 0, 500, 0)); got.push(i.gold + " монет"); }
+        updateHud();
         chatNote("🎁 Получено: " + (got.join(", ") || "ничего"));
         saveSoon();
         return { ok: true, got };
@@ -5955,17 +6383,22 @@ function openChat(prefill, ctx) {
   G.overlay = "chat";
   Claude.ctx = ctx || null;
   renderChat();
+  renderChips();
   updateChatBanner();
   fitSheet();
   const inp = document.getElementById("chatInput");
   if (prefill) inp.value = prefill;
   document.getElementById("chatCtx").hidden = !ctx;
-  setTimeout(() => inp.focus(), 50);
+  // на телефоне не открываем клавиатуру сразу — пусть сначала прочитает
+  if (!(window.matchMedia && matchMedia("(pointer: coarse)").matches)) setTimeout(() => inp.focus(), 50);
+  fitChat();
 }
 
 function closeChat() {
   if (Claude.ctl) Claude.ctl.abort();
+  document.getElementById("chatInput").blur();
   document.getElementById("chat").hidden = true;
+  fitChat();
   G.overlay = null;
   if (document.getElementById("editor").hidden === false) G.overlay = "editor";
   if (G.pendingTravel && G.overlay !== "editor") {
@@ -5978,6 +6411,60 @@ function closeChat() {
     G.pendingBattle = null;
     queueScene(async () => { await startBattle(e); });
   }
+}
+
+// клавиатура телефона открыта: page.html прячет баннер и подсказки (#chat.kb), поле — в одну строку
+function fitChat() {
+  const el = document.getElementById("chat");
+  const inp = document.getElementById("chatInput");
+  const vv = window.visualViewport;
+  const h = vv ? vv.height : window.innerHeight;
+  const kb = !el.hidden && document.activeElement === inp && h < 520;
+  if (el.classList.contains("kb") === kb) return;
+  el.classList.toggle("kb", kb);
+  inp.rows = kb ? 1 : 2;
+  if (kb) document.getElementById("chatLog").scrollTop = 1e9;
+}
+
+// есть ли что сдать Клоду: проверенная домашка, готовое особое задание или уже написанный код
+function hwToShow() {
+  const s = G.save;
+  if (!s) return false;
+  for (const h of Object.keys(HOMEWORK)) {
+    if (s.hw[h] === "checked") return true;
+    const code = (s.code["h:" + h] || "").trim();
+    if (s.hw[h] === "given" && code && code !== (HOMEWORK[h].starter || "").trim()) return true;
+  }
+  return (s.customHw || []).some((h) => {
+    const code = (s.code["c:" + h.id] || "").trim();
+    return h.status === "ready" || (h.status !== "done" && code && code !== "-- " + h.title);
+  });
+}
+
+// кнопка «📜 Сдать домашку» первой в подсказках чата
+function renderChips() {
+  const box = document.getElementById("chatChips");
+  let b = document.getElementById("chatHwChip");
+  if (!(hwToShow() && G.mode === "world" && !Battle.active)) {
+    if (b) b.remove();
+    return;
+  }
+  if (!b) {
+    b = document.createElement("button");
+    b.id = "chatHwChip";
+    b.className = "hwChip";
+    b.textContent = "📜 Сдать домашку";
+    box.prepend(b);
+  }
+  box.scrollLeft = 0;
+}
+
+// закрываем чат (и редактор) и показываем домашку Клоду в мире
+function handInHomework() {
+  closeChat();
+  if (!document.getElementById("editor").hidden) closeEditor();
+  if (G.mode !== "world" || Battle.active) return;
+  if (!G.sceneQueue.includes(showHomework)) runScene(showHomework);
 }
 
 function mdToHtml(t) {
@@ -6006,12 +6493,23 @@ function renderChat() {
   }
   for (const m of hist) {
     if (m.role === "note") addNote(m.content);
-    else addBubble(m.role, m.content, true);
+    else if (m.role === "user") {
+      const u = userShown(m);
+      addBubble("user", u.text, false, u.att);
+    } else addBubble(m.role, m.content, true);
   }
   box.scrollTop = box.scrollHeight;
 }
 
-function addBubble(role, text, md) {
+// что показать в пузыре ученика: только его текст, без кода из редактора (старые сохранения — обрезаем)
+function userShown(m) {
+  const c = String(m.content || "");
+  const cut = c.indexOf("\n\n[Из редактора]");
+  if (m.display != null) return { text: m.display, att: !!m.ctx };
+  return { text: cut >= 0 ? c.slice(0, cut) : c, att: cut >= 0 };
+}
+
+function addBubble(role, text, md, att) {
   const box = document.getElementById("chatLog");
   const row = document.createElement("div");
   row.className = "msg " + (role === "user" ? "me" : "cl");
@@ -6028,6 +6526,12 @@ function addBubble(role, text, md) {
   b.className = "bubble";
   if (md) b.innerHTML = mdToHtml(text);
   else b.textContent = text;
+  if (att) {
+    const a = document.createElement("div");
+    a.className = "att";
+    a.textContent = "📎 код из редактора";
+    b.appendChild(a);
+  }
   row.appendChild(b);
   box.appendChild(row);
   box.scrollTop = box.scrollHeight;
@@ -6061,20 +6565,21 @@ async function sendChat() {
   const text = inp.value.trim();
   if (!text || Claude.busy) return;
   inp.value = "";
+  // модель получает код из редактора, а в пузыре — только то, что написал ученик
   let content = text;
-  if (Claude.ctx) {
-    const c = Claude.ctx;
+  const c = Claude.ctx;
+  if (c) {
     content += `\n\n[Из редактора] Задание: ${c.task || "песочница"}\nКод:\n\`\`\`lua\n${String(c.code || "").slice(0, 3000)}\n\`\`\`\nВывод:\n${String(c.out || "(пусто)").slice(0, 800)}`;
     Claude.ctx = null;
     document.getElementById("chatCtx").hidden = true;
   }
-  G.save.chat.push({ role: "user", content });
-  addBubble("user", content, true);
+  G.save.chat.push(c ? { role: "user", content, display: text, ctx: true } : { role: "user", content });
+  addBubble("user", text, false, !!c);
   saveSoon();
   if (!Claude.sample || Claude.disabled) {
-    const reply = offlineReply(text);
+    const reply = offlineReply(text, c);
     G.save.chat.push({ role: "assistant", content: reply });
-    setTimeout(() => addBubble("assistant", reply, true), 250);
+    setTimeout(() => { addBubble("assistant", reply, true); renderChips(); }, 250);
     return;
   }
   Claude.busy = true;
@@ -6110,7 +6615,7 @@ async function sendChat() {
     } else if (code === "not_granted" || code === "sampling_disabled" || code === "not_declared" || code === "capability_disabled" || code === "capability_removed") {
       Claude.disabled = "Живой Клод выключен: доступ к Claude не разрешён. Сейчас я в офлайн-режиме. Чтобы включить, открой игру заново и нажми «Разрешить».";
       updateChatBanner();
-      const reply = offlineReply(text);
+      const reply = offlineReply(text, c);
       bubble.innerHTML = mdToHtml(reply);
       G.save.chat.push({ role: "assistant", content: reply });
     } else if (code === "rate_limited") {
@@ -6127,6 +6632,7 @@ async function sendChat() {
     Claude.busy = false;
     Claude.ctl = null;
     setChatBusy(false);
+    renderChips();
     if (G.save.chat.length > 80) G.save.chat = G.save.chat.slice(-60);
     saveSoon();
     document.getElementById("chatLog").scrollTop = 1e9;
@@ -6171,66 +6677,206 @@ ${autoPassed ? "" : "Последней отдельной строкой нап
 }
 
 // ---------- офлайн-Клод: простые команды без интернета ----------
-function offlineReply(msg) {
-  const m = msg.toLowerCase();
-  const r = G.save.rules;
+// слово, которое начинается с одной из основ (у кириллицы нет \b, поэтому границы делаем сами)
+const offW = (stems) => new RegExp("(?<![а-яa-z0-9_])(?:" + stems + ")", "i");
+// просьбы: «сделай», «включи», «дай», «хочу»…
+const OFF_ASK = offW("сдела|включ|выключ|отключ|дай|дайт|хочу|надень|наден|одень|сним|убер|убра|верн|вылеч|полеч|подлеч|созда|вызов|позов|начн|давай|постав|покрас|перекрас|увелич|уменьш|ускор|замедл|пусть|стань|преврат|запуст|устрой|сбрось|можешь|сможешь|пожалуйста|добав|восстанов|измени|поменя");
+const OFF_OFF = offW("выключ|отключ|убер|убра|сним|без(?![а-я])|не надо|хватит");
+const OFF_TOPICS = [
+  [/print|вывод|напечат|принт/, "l1"],
+  [/перемен|local|(?<![а-яa-z])(hp|хп)(?![а-яa-z])|отн(ять|ими|имать)|вычест|вычит|прибав/, "l2"],
+  [/random|случайн|числ|математ|умнож|делени|раздел|кубик|посчита/, "l3"],
+  [/(?<![a-z])(if|else|elseif)(?![a-z])|услов|если|сравн|больше|меньше|равно|[<>~=]=/, "l4"],
+  [/цикл|(?<![a-z])(for|while)(?![a-z])|повтор|wait|пауз/, "l5"],
+  [/функц|function|return/, "l6"],
+  [/таблиц|список|массив|ipairs|инвентар/, "l7"],
+  [/part|детал|instance|vector|color|цвет|anchored/, "l8"],
+  [/событ|touched|click|connect|касан|кнопк|клик/, "l9"],
+  [/leaderstats|монет|лидер|coins|playeradded/, "l10"],
+];
+
+// шпаргалка урока текстом для чата: без HTML, код — в блоках ```lua
+function lessonText(L) {
+  const unesc = (t) => t.replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&amp;/g, "&");
+  const text = L.card
+    .replace(/<pre>([\s\S]*?)<\/pre>/g, (_, c) => "\n```lua\n" + unesc(c) + "\n```\n")
+    .split(/(```lua\n[\s\S]*?\n```)/)
+    .map((p, i) => (i % 2 ? p : unesc(p.replace(/<code>([\s\S]*?)<\/code>/g, "`$1`").replace(/<b>([\s\S]*?)<\/b>/g, "**$1**").replace(/\s*<li>/g, "\n• ").replace(/<p>/g, "\n\n").replace(/<[^>]+>/g, "").replace(/[ \t]*\n[ \t]*/g, "\n"))))
+    .join("")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+  return `Урок ${L.n} «${L.title}», коротко:\n\n${text}`;
+}
+
+// урок, про который сейчас речь: открытый в редакторе, следующий непройденный или урок текущей домашки
+function currentLesson() {
+  const s = G.save;
+  if (!document.getElementById("editor").hidden && Editor.key) {
+    const T = taskFor(Editor.key);
+    if (T.lesson) return T.lesson;
+  }
+  const next = LESSONS.find((L) => !s.practice[L.id] && (L.id === "l1" || s.flags["arrived_" + L.zone]));
+  if (next) return next;
+  const hid = pendingHw();
+  if (hid) return HOMEWORK[hid].lesson;
+  return LESSONS.filter((L) => s.practice[L.id]).pop() || LESSONS[0];
+}
+
+// подсказка: текст — как есть, код (строчки латиницей) — блоком
+function hintText(h) {
+  const lines = String(h).split("\n");
+  const i = lines.findIndex((l) => /^[\x20-\x7e]/.test(l));
+  if (i < 0) return h;
+  return (i ? lines.slice(0, i).join("\n") + "\n" : "") + "```lua\n" + lines.slice(i).join("\n") + "\n```";
+}
+
+// офлайн: рассказать про домашку
+function offlineHw(m) {
+  const s = G.save;
+  syncHomework();
+  const ids = Object.keys(HOMEWORK);
+  const num = m.match(/(?:№|номер)\s*(\d+)|(?<![0-9a-z])(\d+)(?![0-9])/);
+  let named = num ? ids.find((h) => HOMEWORK[h].lesson.n === +(num[1] || num[2])) : null;
+  if (!named) named = ids.find((h) => m.includes(HOMEWORK[h].title.toLowerCase().replace(/ё/g, "е").slice(0, 5)));
+  const help = offW("помог|помощ|подскаж|не понима|не получа|не могу|застрял").test(m);
+  const how = "Как сдать: нажми </> — домашка откроется сама. Напиши код → ✓ Проверить → закрой чат и нажми «📜 Сдать домашку» (или подойди ко мне в мире).";
+  const about = (h) => {
+    const H = HOMEWORK[h];
+    let t = `Домашка №${H.lesson.n} «${H.title}»: ${H.task}`;
+    if (help && H.hint) t += "\n\nПодсказка:\n" + hintText(H.hint);
+    return t;
+  };
+  let pre = "";
+  if (offW("нов|ещ[её] домашк|друг(ую|ая) домашк").test(m) && !named) pre = "Новые домашки придумывает живой Клод — он включается, когда игра открыта по ссылке в Claude. ";
+  if (named) {
+    const st = s.hw[named];
+    const H = HOMEWORK[named];
+    if (st === "given") return `${about(named)}\n\n${how}`;
+    if (st === "checked") return `Домашка №${H.lesson.n} «${H.title}» уже проверена ✅ Закрой чат и нажми «📜 Сдать домашку».`;
+    if (st === "done") pre = `Домашку №${H.lesson.n} ты уже сдал ⭐ `;
+    else pre = `Домашка №${H.lesson.n} «${H.title}» будет позже — после урока ${H.lesson.n} «${H.lesson.title}». `;
+  }
+  const hid = pendingHw();
+  if (hid && s.hw[hid] === "checked") return `${pre}Домашка №${HOMEWORK[hid].lesson.n} уже проверена ✅ Закрой чат и нажми «📜 Сдать домашку».`;
+  if (hid) return `${pre}${pre ? "А пока сделай эту. " : ""}${about(hid)}\n\n${how}`;
+  const custom = (s.customHw || []).find((h) => h.status !== "done");
+  if (custom) return `${pre}Особое задание «${custom.title}»: ${custom.task}\n\nОткрой его в редакторе </>, напиши код и нажми «Готово».`;
+  return `${pre}Сейчас домашек нет — все сданы! Что дальше: ${objective()}.`;
+}
+
+// офлайн: команды, которые меняют игру; каждую часть фразы («включи снег и надень корону») разбираем отдельно
+function offlineCommands(m) {
+  const s = G.save;
+  const r = s.rules;
   const done = [];
   const set = (k, v, t) => { r[k] = v; done.push(t); };
-  if (/сброс|как было|обычн/.test(m)) { Object.assign(r, RULE_DEFAULTS); done.push("вернул обычные правила"); }
-  if (/быстр|скорост|бег/.test(m)) set("speed", Math.min(5, (r.speed || 1) + 0.75), "ускорил тебя");
-  if (/медлен/.test(m)) set("speed", Math.max(0.3, (r.speed || 1) - 0.4), "замедлил тебя");
-  if (/бессмерт|неуязв|god/.test(m)) set("godMode", !/выключ|убери|отключ/.test(m), r.godMode ? "выключил бессмертие" : "включил бессмертие (жульничество, но ладно)");
-  if (/снег/.test(m)) set("weather", "snow", "включил снег");
-  if (/дожд/.test(m)) set("weather", "rain", "включил дождь");
-  if (/конфет|праздн/.test(m)) set("weather", "confetti", "включил конфетти");
-  if (/без погоды|убери погоду|ясно/.test(m)) set("weather", "none", "убрал погоду");
-  if (/ночь|темн/.test(m)) set("night", true, "выключил солнце");
-  if (/день|светл/.test(m)) set("night", false, "включил день");
-  if (/корон/.test(m)) set("hat", "crown", "надел на тебя корону");
-  if (/кепк/.test(m)) set("hat", "cap", "выдал кепку");
-  if (/волшеб|маг/.test(m)) set("hat", "wizard", "выдал шляпу волшебника");
-  if (/больш|гигант/.test(m)) set("playerSize", 1.6, "увеличил тебя");
-  if (/маленьк|крош/.test(m)) set("playerSize", 0.6, "уменьшил тебя");
-  const colors = { красн: "#e0425a", син: "#3a6ef0", зел: "#3ac25a", жёлт: "#f2c43a", желт: "#f2c43a", фиол: "#8a3ad6", розов: "#ff7ac0", чёрн: "#2a2a33", черн: "#2a2a33", бел: "#f2f2f2", оранж: "#ff8a3a" };
-  if (/цвет|одежд|футболк/.test(m)) for (const k in colors) if (m.includes(k)) { set("playerColor", colors[k], "перекрасил одежду"); break; }
-  if (/вылеч|здоров|хп|hp/.test(m)) { G.save.hp = playerMaxHp(); done.push("вылечил тебя"); }
-  if (/легч|прощ|легко/.test(m)) set("enemyDamage", 0.5, "ослабил врагов");
-  if (/сложн|хардкор|трудн/.test(m)) set("enemyDamage", 2, "усилил врагов");
-  if (/босс|бой|драк|сраж|враг/.test(m)) {
-    G.pendingBattle = customEnemy({ name: "Офлайн-Глюк", look: "slime", color: "#ff5aa0", hp: 30, attack: 4, patterns: ["rain", "ring", "code"] });
-    done.push("вызвал врага — бой начнётся, когда закроешь чат");
-  }
-  if (done.length) {
-    applyRules();
-    saveSoon();
-    return "Готово: " + done.join(", ") + "! (Это офлайн-режим: я понимаю только простые команды. Полный мозг включается, когда игра открыта через Claude.)";
-  }
-  const topics = [
-    [/print|вывод|напечат/, "l1"], [/перемен|local/, "l2"], [/random|случайн|числ|математ/, "l3"], [/\bif\b|услов|если/, "l4"],
-    [/цикл|for|while|повтор|wait/, "l5"], [/функц|function|return/, "l6"], [/таблиц|список|массив/, "l7"],
-    [/part|детал|instance|vector|color/, "l8"], [/событ|touched|click|connect|касан/, "l9"], [/leaderstats|монет|лидер/, "l10"],
-  ];
-  for (const [re, id] of topics) {
-    if (re.test(m)) {
-      const L = LESSON[id];
-      const text = L.card.replace(/<pre>([\s\S]*?)<\/pre>/g, (_, c) => "\n```lua\n" + c.replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&amp;/g, "&") + "\n```\n").replace(/<[^>]+>/g, "").replace(/\n{3,}/g, "\n\n").trim();
-      return `Урок ${L.n} «${L.title}», коротко:\n\n${text}`;
+  const short = m.split(/\s+/).filter(Boolean).length <= 2;
+  let fight = false;
+  for (const c of m.split(/\s+и\s+|[,;.!]+/).map((x) => x.trim()).filter(Boolean)) {
+    const off = OFF_OFF.test(c);
+    if (offW("сброс|сбрось").test(c) || /как было|обычные правила/.test(c)) { Object.assign(r, RULE_DEFAULTS); done.push("вернул обычные правила"); }
+    const times = c.match(/в\s*(\d)\s*раз/);
+    if (offW("медлен|помедлен|замедл").test(c)) set("speed", Math.max(0.3, times ? (r.speed || 1) / +times[1] : (r.speed || 1) - 0.4), "замедлил тебя");
+    else if (offW("(по)?быстре|(по)?быстрей|ускор|быстр(ым|ой|ая)(?![а-я])").test(c)) set("speed", Math.min(5, times ? (r.speed || 1) * +times[1] : (r.speed || 1) + 0.75), "ускорил тебя");
+    if (offW("бессмерт|неуязвим|god").test(c)) set("godMode", !off, off ? "выключил бессмертие" : "включил бессмертие (жульничество, но ладно)");
+    for (const [re, w, name] of [["снег|снеж", "snow", "снег"], ["дожд|ливен|ливн", "rain", "дождь"], ["конфетт|праздник", "confetti", "конфетти"]]) {
+      if (offW(re).test(c)) set("weather", off ? "none" : w, (off ? "выключил " : "включил ") + name);
+    }
+    if (off && offW("погод").test(c)) set("weather", "none", "убрал погоду");
+    if (offW("ночь|ночн|темн|стемн").test(c)) set("night", !off, off ? "включил день" : "выключил солнце");
+    else if (offW("(день|днем|утро|светло|светлее)(?![а-я])").test(c)) set("night", off, off ? "выключил солнце" : "включил день");
+    let hat = false;
+    for (const [re, h, name] of [["корон", "crown", "корону"], ["кепк", "cap", "кепку"], ["волшеб|колпак|маг(а|ом)?(?![а-я])", "wizard", "шляпу волшебника"], ["рог(а|и)?(?![а-я])", "horns", "рога"], ["цилиндр", "tophat", "цилиндр"], ["антенн", "antenna", "антенну"]]) {
+      if (!offW(re).test(c)) continue;
+      hat = true;
+      if (off) set("hat", "none", "снял " + name);
+      else set("hat", h, "надел на тебя " + name);
+    }
+    if (!hat && off && offW("шляп|шапк").test(c)) set("hat", "none", "снял шляпу");
+    if (offW("гигант|огромн|великан|увелич|вырасти|больш(им|ой|ая|ого)(?![а-я])").test(c)) set("playerSize", 1.6, "увеличил тебя");
+    else if (offW("маленьк|крошечн|уменьш|мелк(им|ий|ой)(?![а-я])").test(c)) set("playerSize", 0.6, "уменьшил тебя");
+    // цвет одежды — только когда про игрока, а не про деталь
+    const forMe = offW("покрас|перекрас|цвет|одежд|футболк|кофт").test(c) || offW("(меня|себя)(?![а-я])").test(c);
+    if (forMe && !offW("детал|part|кубик|блок|кнопк|лав|монет|мир").test(c)) {
+      for (const [re, hex] of [["красн", "#e0425a"], ["син(ий|ей|его|им|юю|яя|ее|ь)?(?![а-я])|голуб", "#3a6ef0"], ["зелен", "#3ac25a"], ["желт", "#f2c43a"], ["фиолет", "#8a3ad6"], ["розов", "#ff7ac0"], ["черн", "#2a2a33"], ["бел(ый|ым|ой|ую|ая|ого)(?![а-я])", "#f2f2f2"], ["оранж", "#ff8a3a"]]) {
+        if (offW(re).test(c)) { set("playerColor", hex, "перекрасил одежду"); break; }
+      }
+    }
+    if (offW("вылеч|полеч|подлеч|лечи|исцел").test(c) || /(дай|верни|восстанови|добавь|полн\S*)\s+(мне\s+)?(хп|hp|здоровь|жизн)/.test(c)) { s.hp = playerMaxHp(); done.push("вылечил тебя"); }
+    const foes = offW("враг|монстр|жук|баг").test(c);
+    if (offW("(по)?легче|(по)?проще").test(c) || (foes && offW("слаб").test(c))) set("enemyDamage", 0.5, "ослабил врагов");
+    else if (offW("(по)?сложнее|(по)?труднее|хардкор").test(c) || (foes && offW("сильн").test(c))) set("enemyDamage", 2, "усилил врагов");
+    else if (offW("сильнее|сильней").test(c)) set("attackBonus", (r.attackBonus || 0) + 5, "сделал тебя сильнее");
+    if (foes && off) set("encounters", false, "убрал жуков из миров");
+    // бой — только по ясной просьбе: «босс», «создай босса», «давай драться»
+    const wantFight = offW("босс|битв|сраж|драк|подрат|подерем|деремся|бо[йя](?![а-я])").test(c) || (foes && OFF_ASK.test(c));
+    if (wantFight && !off && !fight && (short || OFF_ASK.test(c))) {
+      fight = true;
+      G.pendingBattle = customEnemy({ name: "Офлайн-Глюк", look: "slime", color: "#ff5aa0", hp: 30, attack: 4, patterns: ["rain", "ring", "code"] });
+      done.push("вызвал врага — бой начнётся, когда закроешь чат");
     }
   }
-  return "Мой мозг сейчас не подключён к Claude, поэтому я понимаю только простые команды: «быстрее», «медленнее», «бессмертие», «снег», «дождь», «ночь», «корона», «вылечи», «босс», «сброс», и вопросы про темы уроков (переменные, циклы, if, функции, Part, события). Чтобы говорить со мной по-настоящему, открой игру по ссылке в Claude.";
+  return done;
+}
+
+function offlineReply(msg, ctx) {
+  const raw = String(msg || "");
+  const m = raw.toLowerCase().replace(/ё/g, "е").trim();
+  const words = m.split(/\s+/).filter(Boolean).length;
+  // вопрос или код — сначала ищем ответ в уроках, игру не трогаем
+  const question = raw.includes("?") || /^((а|и|ну)\s+)?(как|почему|что|зачем|где|когда|сколько|какой|какая|какое|какие|каким|чем|кто|откуда|куда|чего)(?![а-я])/.test(m);
+  const polite = /^((а|ну)\s+)?(ты\s+)?(можешь|сможешь|можно(?!\s+ли)|пожалуйста)(?![а-я])/.test(m);
+  const code = /```|[a-z_][\w.:]*\s*\(|[a-z_\]]\s*(==|~=|\+=|-=|=)\s*\S|(?<![a-z])(local|function|then|elseif|end|return)(?![a-z])/i.test(raw);
+  const topic = () => {
+    for (const [re, id] of OFF_TOPICS) if (re.test(m)) return lessonText(LESSON[id]);
+    return null;
+  };
+  // из редактора: «Почему ошибка?» / «Помоги с заданием»
+  if (ctx && offW("ошибк|помог|помощ|не понима|не получа|не могу|подскаж|застрял").test(m)) {
+    const T = Editor.key ? taskFor(Editor.key) : null;
+    let t = offW("ошибк").test(m) ? "Смотри в ошибку: там номер строки и подсказка. Чаще всего забывают кавычки, end, then или do, пишут Print с большой буквы или путают = и ==.\n\n" : "";
+    t += `Задание: ${ctx.task || (T && T.task) || "песочница"}`;
+    if (T && T.hint) t += "\n\nПодсказка:\n" + hintText(T.hint);
+    return t;
+  }
+  if (offW("дальше").test(m) || /что (мне |теперь )?делать|куда (мне )?идти/.test(m)) return `Что дальше: ${objective()}.`;
+  if (offW("домашк|домашн|дз(?![а-я])").test(m)) return offlineHw(m);
+  if ((!question || polite) && !code && (polite || words <= 3 || OFF_ASK.test(m))) {
+    const done = offlineCommands(m);
+    if (done.length) {
+      applyRules();
+      updateHud();
+      saveSoon();
+      return "Готово: " + done.join(", ") + "! (Это офлайн-режим: я понимаю только простые команды. Полный мозг включается, когда игра открыта через Claude.)";
+    }
+  }
+  const t = topic();
+  if (t) return t;
+  if (offW("урок|объясн|пример|шпаргалк|не понима|не понял").test(m)) return lessonText(currentLesson());
+  if (code) return "Вижу код! Открой редактор </>, вставь его и нажми ▶ Запуск — посмотрим, что выйдет. Если будет ошибка, нажми «Почему ошибка?».";
+  if (offW("спасиб|благодар").test(m)) return "Всегда пожалуйста, стажёр! Если что — я тут.";
+  if (offW("привет|здравств|хай(?![а-я])|хелло|салют").test(m)) return "Привет, стажёр! Спроси про урок, напиши «что дальше» или дай команду: «снег», «корона», «быстрее».";
+  return "Мой мозг сейчас не подключён к Claude, поэтому я понимаю только простые команды: «быстрее», «медленнее», «бессмертие», «снег», «дождь», «ночь», «корона», «вылечи», «босс», «сброс». Ещё могу: «что дальше», «домашка», «объясни урок» и вопросы про темы уроков (переменные, циклы, if, функции, Part, события). Чтобы говорить со мной по-настоящему, открой игру по ссылке в Claude.";
 }
 
 function setupChat() {
   document.getElementById("chatClose").onclick = closeChat;
   document.getElementById("chatSend").onclick = sendChat;
   document.getElementById("chatStop").onclick = () => Claude.ctl && Claude.ctl.abort();
-  document.getElementById("chatInput").addEventListener("keydown", (e) => {
+  const inp = document.getElementById("chatInput");
+  inp.addEventListener("keydown", (e) => {
     if (e.key === "Enter" && !e.shiftKey && !e.isComposing) { e.preventDefault(); sendChat(); }
   });
+  // клавиатура телефона: следим за фокусом и размером экрана
+  inp.addEventListener("focus", () => { fitChat(); setTimeout(fitChat, 300); });
+  inp.addEventListener("blur", () => setTimeout(fitChat, 100));
+  window.addEventListener("resize", fitChat);
+  if (window.visualViewport) window.visualViewport.addEventListener("resize", fitChat);
   document.getElementById("chatChips").addEventListener("click", (e) => {
     const b = e.target.closest("button");
     if (!b) return;
-    document.getElementById("chatInput").value = b.dataset.say || b.textContent;
+    if (b.id === "chatHwChip") { handInHomework(); return; }
+    inp.value = b.dataset.say || b.textContent;
     sendChat();
   });
   document.getElementById("chatLog").addEventListener("click", (e) => {
@@ -6238,7 +6884,9 @@ function setupChat() {
     if (!b) return;
     G.save.code.sandbox = decodeURIComponent(b.dataset.code);
     saveSoon();
+    inp.blur();
     document.getElementById("chat").hidden = true;
+    fitChat();
     G.overlay = null;
     openEditor("sandbox");
   });
