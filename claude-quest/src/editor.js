@@ -658,6 +658,8 @@ function setupEditor() {
   document.getElementById("vpReset").onclick = () => Editor.vp && Editor.vp.reset();
   window.addEventListener("resize", () => { fitSheet(); if (Editor.vp && !document.getElementById("edWorld").hidden) Editor.vp.resize(); });
   if (window.visualViewport) window.visualViewport.addEventListener("resize", fitSheet);
+  // окно «Мир» меняет размер, когда открывается шпаргалка или результат — перерисовываем canvas
+  if (window.ResizeObserver) new ResizeObserver(() => { if (Editor.vp && !document.getElementById("edWorld").hidden) Editor.vp.resize(); }).observe(document.getElementById("edPane"));
   ta.addEventListener("focus", () => setTimeout(fitSheet, 300));
   ta.addEventListener("blur", () => setTimeout(fitSheet, 100));
   drawClaude(document.getElementById("edClaudeAva").getContext("2d"), 0, 0, "down", 0.3);
