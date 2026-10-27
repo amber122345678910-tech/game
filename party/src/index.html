@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<title>Дуо Пати 3D</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Rubik:wght@500;600;700;800;900&display=swap">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="app">
+  <div id="view"></div>
+  <div id="divider" hidden></div>
+  <div id="halves"></div>
+  <div id="scorebar" hidden></div>
+
+  <div id="title" class="screen">
+    <div class="logo">
+      <span class="l1"><span>Д</span><span>У</span><span>О</span> <span>П</span><span>А</span><span>Т</span><span>И</span></span>
+      <span class="l2">3D мини-игры на двоих · один экран</span>
+    </div>
+    <div class="btns">
+      <button class="btn go" id="btn-play">▶ ИГРАТЬ</button>
+    </div>
+    <div class="btns">
+      <button class="btn blue small" id="btn-help">🎮 Управление</button>
+      <button class="btn small" id="btn-settings">⚙ Настройки</button>
+      <button class="btn small" id="btn-full">⛶ Во весь экран</button>
+    </div>
+    <div class="tiny">Левая половина экрана — Игрок 1 (WASD), правая — Игрок 2 (стрелки). Можно подключить два геймпада.</div>
+  </div>
+
+  <div id="help" class="screen dim" hidden>
+    <div class="card">
+      <h2>Управление</h2>
+      <div class="keys">
+        <div class="col p0">
+          <h3>Игрок 1 · левая половина</h3>
+          <p><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> <b>бег</b></p>
+          <p><kbd>Пробел</kbd> <b>прыжок</b></p>
+          <p><kbd>F</kbd> <b>шлепок / толчок</b></p>
+          <p><kbd>Q</kbd> <kbd>E</kbd> <b>повернуть камеру</b></p>
+        </div>
+        <div class="col p1">
+          <h3>Игрок 2 · правая половина</h3>
+          <p><kbd>↑</kbd><kbd>←</kbd><kbd>↓</kbd><kbd>→</kbd> <b>бег</b></p>
+          <p><kbd>Enter</kbd> или <kbd>Right Shift</kbd> <b>прыжок</b></p>
+          <p><kbd>/</kbd> или <kbd>Right Ctrl</kbd> <b>шлепок / толчок</b></p>
+          <p><kbd>[</kbd> <kbd>]</kbd> <b>повернуть камеру</b></p>
+        </div>
+      </div>
+      <p class="note">Геймпады: левый стик — бег, правый стик — камера, A — прыжок, X/B — шлепок, Start — пауза.<br>
+        <kbd>Esc</kbd> — пауза и выбор игры. На планшете у каждого своя половина экрана с джойстиком.</p>
+      <div class="btns" style="margin-top:16px"><button class="btn go small" data-close>Понятно!</button></div>
+    </div>
+  </div>
+
+  <div id="settings" class="screen dim" hidden>
+    <div class="card" style="min-width: min(440px, 100%)">
+      <h2>Настройки</h2>
+      <div class="set-row"><span>🎵 Музыка</span><input type="range" id="set-music" min="0" max="1" step="0.05"></div>
+      <div class="set-row"><span>🔊 Звуки</span><input type="range" id="set-sfx" min="0" max="1" step="0.05"></div>
+      <div class="set-row"><span>✨ Графика</span><div class="seg" id="set-quality"><button data-v="low">Быстро</button><button data-v="mid">Средне</button><button data-v="high">Красиво</button></div></div>
+      <div class="set-row"><span>🎮 Один геймпад у</span><div class="seg" id="set-pad"><button data-v="0">Игрока 1</button><button data-v="1">Игрока 2</button></div></div>
+      <div class="set-row"><span>🏆 Сбросить счёт</span><button class="btn small pink" id="set-reset">Сбросить</button></div>
+      <div class="btns" style="margin-top:14px"><button class="btn go small" data-close>Готово</button></div>
+    </div>
+  </div>
+
+  <div id="pause" class="screen dim" hidden>
+    <div class="card">
+      <h2>Пауза</h2>
+      <div class="btns">
+        <button class="btn go small" id="pz-resume">▶ Продолжить</button>
+        <button class="btn blue small" id="pz-restart">🔁 Заново</button>
+        <button class="btn small" id="pz-lobby">🏠 В лобби</button>
+        <button class="btn small" id="pz-settings">⚙ Настройки</button>
+        <button class="btn small" id="pz-help">🎮 Управление</button>
+      </div>
+      <div class="games" id="pz-games"></div>
+      <p class="note">Можно сразу выбрать игру — или зайти в портал в лобби вдвоём.</p>
+    </div>
+  </div>
+
+  <div id="results" class="screen" hidden>
+    <div class="card">
+      <p class="who" id="res-who"></p>
+      <div class="lines" id="res-lines"></div>
+      <div class="btns">
+        <button class="btn go small" id="res-again">🔁 Ещё раз <kbd style="margin-left:6px">Пробел</kbd></button>
+        <button class="btn small" id="res-lobby">🏠 В лобби <kbd style="margin-left:6px">Esc</kbd></button>
+      </div>
+    </div>
+  </div>
+
+  <div id="loading">Загрузка…</div>
+</div>
+<script src="../vendor/three.min.js"></script>
+<script src="js/util.js"></script>
+<script src="js/audio.js"></script>
+<script src="js/physics.js"></script>
+<script src="js/gfx.js"></script>
+<script src="js/avatar.js"></script>
+<script src="js/input.js"></script>
+<script src="js/player.js"></script>
+<script src="js/ui.js"></script>
+<script src="js/course.js"></script>
+<script src="js/modes/base.js"></script>
+<script src="js/modes/lobby.js"></script>
+<script src="js/modes/obby.js"></script>
+<script src="js/modes/slap.js"></script>
+<script src="js/modes/blocks.js"></script>
+<script src="js/modes/glass.js"></script>
+<script src="js/modes/chained.js"></script>
+<script src="js/modes/lava.js"></script>
+<script src="js/main.js"></script>
+</body>
+</html>
