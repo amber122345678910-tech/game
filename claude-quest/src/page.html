@@ -4,7 +4,8 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Handjet:wght@400;600&family=JetBrains+Mono:wght@400;600&family=Press+Start+2P&display=swap">
 <style>
-/* Раскладка: полоса HUD, экран игры 4:3, под ним пульт (в портрете); в ландшафте экран слева, HUD и пульт справа. Одна тёмная тема в духе Undertale. */
+/* Раскладка: полоса HUD, экран игры 4:3, под ним пульт (в портрете); в ландшафте экран слева, HUD и пульт справа. Одна тёмная тема в духе Undertale.
+   Всё компактное: телефон с высокой плотностью (Galaxy S26 Ultra), ничего не должно требовать прокрутки. */
 :root {
   --bg: #07060c;
   --panel: #000000;
@@ -26,10 +27,12 @@
 *, *::before, *::after { box-sizing: border-box; }
 html, body { height: 100%; }
 body {
+  margin: 0;
   background: var(--bg);
   color: var(--ink);
   font-family: var(--body);
-  font-size: 20px;
+  font-size: 17px;
+  line-height: 1.2;
   overflow: hidden;
   touch-action: manipulation;
   -webkit-user-select: none;
@@ -57,100 +60,109 @@ button:focus-visible, select:focus-visible, input:focus-visible, textarea:focus-
   background: #000;
 }
 #screen { width: 100%; height: 100%; display: block; image-rendering: pixelated; touch-action: none; }
-#hud { flex: none; padding: 6px 8px 6px; background: #000; border-bottom: 2px solid #1d1a30; }
-#hud .row1 { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+#hud { flex: none; padding: 4px 8px; background: #000; border-bottom: 2px solid #1d1a30; }
+#hud .row1 { display: flex; justify-content: space-between; align-items: center; gap: 6px; }
 #hud .hp {
-  display: flex; align-items: center; gap: 6px;
-  background: rgba(0,0,0,.62); padding: 5px 8px; border: 2px solid var(--line);
-  font-family: var(--display); font-size: 9px; line-height: 1; white-space: nowrap; min-width: 0;
+  display: flex; align-items: center; gap: 5px;
+  background: rgba(0,0,0,.62); padding: 4px 6px; border: 2px solid var(--line);
+  font-family: var(--display); font-size: 8px; line-height: 1; white-space: nowrap; min-width: 0;
 }
-#hud .bar { width: 46px; height: 8px; background: #8a1a1a; display: block; }
+#hud .bar { width: 44px; height: 7px; background: #8a1a1a; display: block; }
 #hud .bar i { display: block; height: 100%; background: var(--gold); width: 100%; transition: width .2s; }
 #hud .gold { color: var(--gold); }
-#hud .btns { display: flex; gap: 6px; }
+#hud .btns { display: flex; gap: 5px; }
 #hud .btns button {
-  min-width: 44px; height: 40px; padding: 0 8px;
+  min-width: 40px; height: 34px; padding: 0 6px;
   background: rgba(0,0,0,.7); border: 2px solid var(--line);
-  font-family: var(--display); font-size: 11px; position: relative;
+  font-family: var(--display); font-size: 10px; position: relative;
 }
 #hud .btns button:active { background: var(--raise); }
 #btnCode { color: var(--good); }
 #btnChat { border-color: var(--claude) !important; }
 #btnChat[data-badge="!"]::after, #btnCode.ping::after {
-  content: "!"; position: absolute; top: -7px; right: -6px; width: 16px; height: 16px;
-  background: var(--gold); color: #000; font-size: 9px; line-height: 16px; text-align: center;
+  content: "!"; position: absolute; top: -6px; right: -5px; width: 14px; height: 14px;
+  background: var(--gold); color: #000; font-size: 8px; line-height: 14px; text-align: center;
 }
-#objective { margin-top: 5px; font-size: 18px; line-height: 1.15; color: var(--gold); }
+#objective { margin-top: 3px; font-size: 16px; line-height: 1.1; color: var(--gold); }
 #zoneTitle {
   position: absolute; left: 0; right: 0; top: 34%; text-align: center; pointer-events: none; opacity: 0;
   text-shadow: 0 2px 0 #000;
 }
-#zoneTitle b { display: block; font-family: var(--display); font-size: clamp(12px, 4.2vw, 20px); color: var(--gold); text-wrap: balance; }
-#zoneTitle span { display: block; margin-top: 6px; font-size: 18px; color: var(--ink); letter-spacing: .08em; }
+#zoneTitle b { display: block; font-family: var(--display); font-size: clamp(11px, 4vw, 18px); color: var(--gold); text-wrap: balance; }
+#zoneTitle span { display: block; margin-top: 5px; font-size: 16px; color: var(--ink); letter-spacing: .08em; }
 #zoneTitle.show { animation: zt 2.6s ease forwards; }
 @keyframes zt { 0% { opacity: 0; transform: translateY(6px); } 15%, 75% { opacity: 1; transform: none; } 100% { opacity: 0; } }
 #toast {
-  position: absolute; left: 50%; bottom: 10px; transform: translateX(-50%) translateY(-8px);
+  position: absolute; left: 50%; bottom: 8px; transform: translateX(-50%) translateY(-8px);
   background: #000; border: 2px solid var(--gold); color: var(--ink);
-  padding: 8px 12px; font-size: 18px; opacity: 0; transition: .25s; pointer-events: none; max-width: 90%; text-align: center;
+  padding: 6px 10px; font-size: 16px; line-height: 1.15; opacity: 0; transition: .25s; pointer-events: none; max-width: 90%; text-align: center;
 }
 #toast.show { opacity: 1; transform: translateX(-50%); }
 
 /* пульт */
-#panel { flex: 1; min-height: 0; position: relative; padding: 10px max(12px, env(safe-area-inset-left, 0px)) calc(10px + env(safe-area-inset-bottom, 0px)); display: flex; }
-#pad { flex: 1; display: flex; gap: 12px; align-items: stretch; }
-#joyZone { flex: 1; position: relative; touch-action: none; border: 2px dashed rgba(255,255,255,.12); min-height: 120px; }
-#joyZone .hint { position: absolute; left: 10px; bottom: 8px; font-size: 16px; color: var(--dim); pointer-events: none; }
+#panel { flex: 1; min-height: 0; position: relative; padding: 8px max(10px, env(safe-area-inset-left, 0px)) calc(8px + env(safe-area-inset-bottom, 0px)); display: flex; }
+#pad { flex: 1; display: flex; gap: 10px; align-items: stretch; }
+#joyZone { flex: 1; position: relative; touch-action: none; border: 2px dashed rgba(255,255,255,.12); min-height: 100px; }
+#joyZone .hint { position: absolute; left: 8px; bottom: 6px; font-size: 15px; color: var(--dim); pointer-events: none; }
 #joy {
-  position: absolute; left: 50%; top: 50%; width: 100px; height: 100px; margin: -50px 0 0 -50px;
+  position: absolute; left: 50%; top: 50%; width: 88px; height: 88px; margin: -44px 0 0 -44px;
   border: 3px solid rgba(255,255,255,.35); border-radius: 50%; pointer-events: none;
 }
 #joy.on { border-color: var(--line); }
-#joyKnob { position: absolute; left: 30px; top: 30px; width: 40px; height: 40px; background: var(--line); border-radius: 50%; }
-.ab { display: flex; flex-direction: column-reverse; justify-content: center; gap: 14px; width: 128px; position: relative; }
+#joyKnob { position: absolute; left: calc(50% - 18px); top: calc(50% - 18px); width: 36px; height: 36px; background: var(--line); border-radius: 50%; }
+.ab { display: flex; flex-direction: column-reverse; justify-content: center; gap: 12px; width: 112px; position: relative; }
 .ab button {
-  width: 76px; height: 76px; border-radius: 50%; border: 3px solid var(--line); background: #000;
-  font-family: var(--display); font-size: 18px; touch-action: none;
+  width: 66px; height: 66px; border-radius: 50%; border: 3px solid var(--line); background: #000;
+  font-family: var(--display); font-size: 16px; touch-action: none;
 }
 #btnA { align-self: flex-end; background: var(--gold); color: #000; border-color: var(--gold); }
-#btnB { align-self: flex-start; width: 58px; height: 58px; font-size: 13px; }
+#btnB { align-self: flex-start; width: 50px; height: 50px; font-size: 12px; }
 .ab button:active { transform: scale(.94); }
 
-/* диалог */
+/* диалог: высота по тексту, без прокрутки; портрет слева, варианты ответа во всю ширину под ним */
 #dlg {
-  flex: 1; align-self: flex-start; max-height: 100%; min-height: 150px; display: flex; gap: 12px; align-items: flex-start; background: #000; border: 3px solid var(--line);
-  padding: 12px 12px 26px; position: relative; overflow: auto; cursor: pointer;
+  flex: 1; align-self: flex-start; max-height: 100%; min-height: 108px; display: grid; grid-template-columns: auto minmax(0, 1fr); grid-template-rows: auto 1fr auto; align-content: start; align-items: start;
+  background: #000; border: 3px solid var(--line);
+  padding: 9px 10px 18px; position: relative; overflow: auto; cursor: pointer;
 }
-#dlgPortrait { width: 48px; height: 66px; image-rendering: pixelated; flex: none; }
-.dlgBody { flex: 1; min-width: 0; }
-#dlgName { font-family: var(--display); font-size: 10px; margin-bottom: 8px; letter-spacing: .04em; }
-#dlgText { font-size: 24px; line-height: 1.2; white-space: pre-wrap; overflow-wrap: anywhere; }
-#dlgChoices { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; }
+#dlg:has(#dlgNext[hidden]) { padding-bottom: 10px; }
+#dlgPortrait { grid-column: 1; grid-row: 1 / 3; width: 40px; height: 55px; margin-right: 10px; image-rendering: pixelated; }
+.dlgBody { display: contents; }
+#dlgName { grid-column: 2; grid-row: 1; font-family: var(--display); font-size: 9px; line-height: 1.2; margin-bottom: 6px; letter-spacing: .04em; }
+#dlgText { grid-column: 2; grid-row: 2; font-size: 18px; line-height: 1.2; white-space: pre-wrap; overflow-wrap: anywhere; }
+#dlgChoices { grid-column: 1 / -1; grid-row: 3; display: flex; flex-direction: column; gap: 6px; margin-top: 8px; }
+#dlgChoices:empty { display: none; }
+/* много вариантов (портал-аппарат) — в две колонки */
+#dlgChoices:has(> :nth-child(4)) { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+#dlgChoices:has(> :nth-child(4)) > :last-child:nth-child(odd) { grid-column: 1 / -1; }
 .choice {
-  text-align: left; padding: 10px 12px; background: #000; border: 2px solid var(--line); font-size: 22px; line-height: 1.1;
+  text-align: left; padding: 6px 9px; min-height: 38px; background: #000; border: 2px solid var(--line); font-size: 17px; line-height: 1.1;
 }
 .choice::before { content: "♥ "; color: var(--bad); }
 .choice:active { background: var(--raise); color: var(--gold); }
-#dlgNext { position: absolute; right: 12px; bottom: 8px; color: var(--gold); animation: bob .8s steps(2) infinite; }
+#dlgNext { position: absolute; right: 10px; bottom: 2px; font-size: 14px; color: var(--gold); animation: bob .8s steps(2) infinite; }
 @keyframes bob { 50% { transform: translateY(3px); } }
 
 /* бой */
-#bat { flex: 1; display: flex; flex-direction: column; gap: 10px; min-height: 0; position: relative; }
-#batText { background: #000; border: 3px solid var(--line); padding: 10px 12px; font-size: 22px; line-height: 1.2; min-height: 64px; white-space: pre-wrap; overflow: auto; flex: none; max-height: 42%; }
-#batBtns { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-#batBtns.list { grid-template-columns: 1fr; overflow: auto; }
+#bat { flex: 1; display: flex; flex-direction: column; gap: 6px; min-height: 0; position: relative; }
+#batText { background: #000; border: 3px solid var(--line); padding: 7px 10px; font-size: 17px; line-height: 1.2; min-height: 52px; white-space: pre-wrap; overflow: auto; flex: none; max-height: 55%; }
+#batBtns { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 6px; }
+#batBtns.list { grid-template-columns: minmax(0, 1fr); overflow: auto; min-height: 0; }
+/* длинный список (вещи, действия) — в две колонки */
+#batBtns.list:has(> :nth-child(5)) { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+#batBtns.list:has(> :nth-child(5)) > :last-child:nth-child(odd) { grid-column: 1 / -1; }
 .bbtn {
-  padding: 12px 8px; background: #000; border: 3px solid var(--orange); color: var(--orange);
-  font-family: var(--display); font-size: 11px; line-height: 1.4; min-height: 48px; text-transform: none;
+  padding: 8px 6px; background: #000; border: 3px solid var(--orange); color: var(--orange);
+  font-family: var(--display); font-size: 10px; line-height: 1.3; min-height: 46px; text-transform: none;
 }
-.bbtn b { font-family: var(--body); font-size: 20px; }
-.bbtn.quiz, #batBtns.list .bbtn { font-family: var(--body); font-size: 21px; line-height: 1.1; text-align: left; padding: 10px 12px; }
+.bbtn b { font-family: var(--body); font-size: 18px; }
+.bbtn.quiz, #batBtns.list .bbtn { font-family: var(--body); font-size: 17px; line-height: 1.1; text-align: left; padding: 6px 10px; min-height: 42px; }
 .bbtn:active { color: var(--gold); border-color: var(--gold); }
 .bbtn.mercy.ready { color: var(--gold); border-color: var(--gold); }
 .bbtn.wide { grid-column: 1 / -1; }
 #batTouch {
-  position: absolute; inset: 72px 0 0 0; border: 2px dashed rgba(255,255,255,.3); touch-action: none;
-  display: flex; align-items: center; justify-content: center; text-align: center; color: var(--dim); font-size: 18px; padding: 12px;
+  position: absolute; inset: 64px 0 0 0; border: 2px dashed rgba(255,255,255,.3); touch-action: none;
+  display: flex; align-items: center; justify-content: center; text-align: center; color: var(--dim); font-size: 16px; padding: 10px;
   background: rgba(255,42,58,.04);
 }
 
@@ -161,158 +173,195 @@ button:focus-visible, select:focus-visible, input:focus-visible, textarea:focus-
   padding: env(safe-area-inset-top, 0px) max(0px, env(safe-area-inset-right, 0px)) env(safe-area-inset-bottom, 0px) max(0px, env(safe-area-inset-left, 0px));
   -webkit-user-select: text; user-select: text;
 }
-.shHead { display: flex; align-items: center; gap: 8px; padding: 8px max(12px, env(safe-area-inset-left, 0px)); border-bottom: 2px solid var(--line); background: #000; flex: none; }
-.shHead b { font-family: var(--display); font-size: 11px; flex: 1; }
-.x { width: 40px; height: 40px; background: #000; border: 2px solid var(--line); font-size: 18px; flex: none; }
-.pill { padding: 6px 12px; background: var(--raise); border: 2px solid var(--line); font-size: 19px; line-height: 1.1; }
+.shHead { display: flex; align-items: center; gap: 6px; padding: 5px max(10px, env(safe-area-inset-left, 0px)); border-bottom: 2px solid var(--line); background: #000; flex: none; }
+.shHead b { font-family: var(--display); font-size: 10px; flex: 1; }
+.x { width: 36px; height: 36px; background: #000; border: 2px solid var(--line); font-size: 16px; flex: none; }
+.pill { padding: 4px 10px; background: var(--raise); border: 2px solid var(--line); font-size: 16px; line-height: 1.1; }
 .pill:active { background: #2a2548; }
-.pill.wide { width: 100%; margin-top: 12px; }
+.pill.wide { width: 100%; margin-top: 10px; }
 .pill.danger { border-color: var(--bad); color: var(--bad); }
 .dim { color: var(--dim); }
 code { font-family: var(--mono); font-size: .88em; background: var(--code); padding: 1px 4px; }
 
 /* титульный экран */
-#title { z-index: 40; overflow: auto; justify-content: center; background: radial-gradient(ellipse at 50% 30%, #1a1440 0%, var(--bg) 70%); }
-.tWrap { width: 100%; max-width: 440px; margin: 0 auto; padding: 24px max(16px, env(safe-area-inset-left, 0px)); display: flex; flex-direction: column; gap: 18px; align-items: stretch; text-align: center; }
-.logo small { display: block; font-family: var(--display); font-size: 10px; color: var(--claude); letter-spacing: .2em; margin-bottom: 10px; }
-.logo h1 { margin: 0; font-family: var(--display); font-size: clamp(18px, 7vw, 30px); line-height: 1.35; color: var(--gold); text-shadow: 3px 3px 0 #6a2a00; text-wrap: balance; }
-#tMain, #tNewForm { display: flex; flex-direction: column; gap: 12px; }
-.big { padding: 14px; font-family: var(--display); font-size: 13px; background: #000; border: 3px solid var(--line); }
+#title { z-index: 40; overflow: auto; justify-content: flex-start; background: radial-gradient(ellipse at 50% 30%, #1a1440 0%, var(--bg) 70%); }
+.tWrap { width: 100%; max-width: 420px; margin: auto; padding: 14px max(16px, env(safe-area-inset-left, 0px)); display: flex; flex-direction: column; gap: 12px; align-items: stretch; text-align: center; }
+.logo small { display: block; font-family: var(--display); font-size: 9px; color: var(--claude); letter-spacing: .2em; margin-bottom: 8px; }
+.logo h1 { margin: 0; font-family: var(--display); font-size: clamp(16px, 6vw, 26px); line-height: 1.35; color: var(--gold); text-shadow: 2px 2px 0 #6a2a00; text-wrap: balance; }
+#tMain, #tNewForm { display: flex; flex-direction: column; gap: 10px; }
+.big { padding: 11px; font-family: var(--display); font-size: 12px; background: #000; border: 3px solid var(--line); }
 .big:active { color: var(--gold); border-color: var(--gold); }
 #tContinue { border-color: var(--gold); color: var(--gold); }
-#tNewForm label { font-size: 22px; text-align: left; }
-#tName { font: inherit; font-size: 24px; padding: 10px 12px; background: #000; color: var(--ink); border: 2px solid var(--line); -webkit-user-select: text; user-select: text; }
-.look { display: flex; gap: 14px; align-items: center; text-align: left; }
-#tPreview { width: 120px; height: 72px; image-rendering: pixelated; flex: none; }
-.look span { font-size: 18px; color: var(--dim); }
-#tShirts, #tHairs { display: flex; flex-wrap: wrap; gap: 6px; margin: 4px 0 8px; }
+#tNewForm label { font-size: 18px; text-align: left; }
+#tName { font: inherit; font-size: 19px; padding: 7px 10px; background: #000; color: var(--ink); border: 2px solid var(--line); -webkit-user-select: text; user-select: text; }
+.look { display: flex; gap: 10px; align-items: center; text-align: left; }
+#tPreview { width: 88px; height: 53px; image-rendering: pixelated; flex: none; }
+.look span { font-size: 15px; color: var(--dim); }
+#tShirts, #tHairs { display: flex; flex-wrap: wrap; gap: 5px; margin: 3px 0 6px; }
 .sw { width: 30px; height: 30px; border: 2px solid #000; outline: 2px solid transparent; }
 .sw.on { outline-color: var(--gold); }
-.link { background: none; border: 0; color: var(--dim); text-decoration: underline; padding: 6px; }
-.tSmall { font-size: 20px; color: var(--dim); line-height: 1.25; }
-#tScene { width: 100%; max-width: 320px; aspect-ratio: 2 / 1; margin: 0 auto; image-rendering: pixelated; display: block; }
+.link { background: none; border: 0; color: var(--dim); text-decoration: underline; padding: 4px; font-size: 16px; }
+.tSmall { margin: 0; font-size: 16px; color: var(--dim); line-height: 1.2; }
+#tScene { width: 100%; max-width: 280px; aspect-ratio: 2 / 1; margin: 0 auto; image-rendering: pixelated; display: block; }
 
-/* редактор */
-#edTask { flex: 1; min-width: 0; font: inherit; font-size: 19px; padding: 8px; background: #000; color: var(--ink); border: 2px solid var(--line); }
-.edTop { flex: none; max-height: 26%; overflow: auto; padding: 8px max(12px, env(safe-area-inset-left, 0px)); border-bottom: 1px solid #2a2640; }
-#edTaskText { font-size: 20px; line-height: 1.2; }
+/* редактор: в портрете колонки .edCol прозрачные, в ландшафте — код слева, задание и вывод справа */
+.edCol { display: contents; }
+#edTask { flex: 1; min-width: 0; height: 36px; font: inherit; font-size: 16px; padding: 4px 6px; background: #000; color: var(--ink); border: 2px solid var(--line); }
+.edTop { flex: none; max-height: 24%; overflow: auto; padding: 5px max(10px, env(safe-area-inset-left, 0px)); border-bottom: 1px solid #2a2640; }
+#edTaskText { font-size: 16px; line-height: 1.2; }
 #edTaskText b { color: var(--gold); }
-#edCard { margin-top: 6px; }
-#edCard summary, #edCardBody summary { cursor: pointer; color: var(--good); font-size: 19px; padding: 4px 0; }
-#edCardBody { font-size: 19px; line-height: 1.3; max-width: 70ch; }
-#edCardBody pre, .bubble pre { font-family: var(--mono); font-size: 13px; background: var(--code); border-left: 3px solid var(--claude); padding: 8px 10px; overflow-x: auto; white-space: pre; margin: 6px 0; }
-#edCardBody ul { padding-left: 20px; margin: 6px 0; }
-#edWrap { flex: 1 1 34%; min-height: 110px; display: flex; background: var(--code); position: relative; border-bottom: 1px solid #2a2640; }
-#edGutter { margin: 0; padding: 10px 6px 10px 8px; width: 34px; text-align: right; color: #4a4566; font: 14px/1.5 var(--mono); overflow: hidden; flex: none; user-select: none; }
+#edCard { margin-top: 3px; }
+#edCard summary, #edCardBody summary { cursor: pointer; color: var(--good); font-size: 15px; padding: 2px 0; }
+#edCardBody { font-size: 15px; line-height: 1.25; max-width: 70ch; }
+#edCardBody p { margin: 5px 0; }
+#edCardBody pre, .bubble pre { font-family: var(--mono); font-size: 13px; line-height: 1.4; background: var(--code); border-left: 3px solid var(--claude); padding: 6px 8px; overflow-x: auto; white-space: pre; margin: 5px 0; }
+#edCardBody ul { padding-left: 18px; margin: 5px 0; }
+#edWrap { flex: 1 1 36%; min-height: 100px; display: flex; background: var(--code); position: relative; border-bottom: 1px solid #2a2640; }
+#edGutter { margin: 0; padding: 8px 5px 8px 6px; width: 30px; text-align: right; color: #4a4566; font: 13px/1.45 var(--mono); overflow: hidden; flex: none; user-select: none; }
 .edMain { flex: 1; position: relative; min-width: 0; }
 #edHl, #edCode {
-  position: absolute; inset: 0; margin: 0; padding: 10px 10px 10px 4px; border: 0;
-  font: 14px/1.5 var(--mono); white-space: pre; overflow: auto; tab-size: 2; letter-spacing: 0;
+  position: absolute; inset: 0; margin: 0; padding: 8px 8px 8px 4px; border: 0;
+  font: 13px/1.45 var(--mono); white-space: pre; overflow: auto; tab-size: 2; letter-spacing: 0;
 }
 #edHl { color: #e6e2ff; pointer-events: none; }
 #edCode { background: transparent; color: transparent; caret-color: var(--gold); resize: none; outline: none; -webkit-text-fill-color: transparent; }
 #edCode::selection { background: rgba(255,224,58,.3); }
 .tk { color: #ff7ab6; } .ts { color: #ffd27a; } .tc { color: #6f8a6f; font-style: italic; } .tn { color: #8ad8ff; } .tg { color: #7fffc4; } .tf { color: #c8b6ff; }
 .errline { background: rgba(255,74,90,.25); box-shadow: -40px 0 0 rgba(255,74,90,.25); }
-#edKeys { flex: none; display: flex; gap: 6px; overflow-x: auto; padding: 6px max(8px, env(safe-area-inset-left, 0px)); background: #000; scrollbar-width: none; }
+#edKeys { flex: none; display: flex; gap: 5px; overflow-x: auto; padding: 5px max(8px, env(safe-area-inset-left, 0px)); background: #000; scrollbar-width: none; }
 #edKeys::-webkit-scrollbar { display: none; }
-#edKeys button { flex: none; min-width: 40px; height: 38px; padding: 0 10px; background: var(--raise); border: 1px solid #3a3560; font: 600 15px var(--mono); color: var(--ink); }
-#edKeys button.word { color: var(--good); font-size: 13px; }
+#edKeys button { flex: none; min-width: 34px; height: 32px; padding: 0 8px; background: var(--raise); border: 1px solid #3a3560; font: 600 14px var(--mono); color: var(--ink); }
+#edKeys button.word { color: var(--good); font-size: 12px; }
 #edKeys button:active { background: #3a3560; }
-#edBar { flex: none; display: flex; gap: 8px; padding: 6px max(8px, env(safe-area-inset-left, 0px)); }
-#edBar button { height: 42px; padding: 0 10px; background: #000; border: 2px solid var(--line); font-size: 20px; white-space: nowrap; }
+#edBar { flex: none; display: flex; gap: 6px; padding: 5px max(8px, env(safe-area-inset-left, 0px)); }
+#edBar button { height: 38px; padding: 0 8px; background: #000; border: 2px solid var(--line); font-size: 17px; white-space: nowrap; }
 #edRun { flex: 1.3; color: var(--good); border-color: var(--good) !important; }
 #edRun.running { background: rgba(90,255,138,.12); }
 #edCheck { flex: 1.3; color: var(--gold); border-color: var(--gold) !important; }
-#edStop { width: 46px; }
-#edResult { flex: none; margin: 0 max(8px, env(safe-area-inset-left, 0px)) 6px; padding: 8px 10px; font-size: 19px; border: 2px solid var(--dim); position: relative; overflow: hidden; line-height: 1.4; }
+#edStop { width: 40px; }
+#edResult { flex: none; margin: 0 max(8px, env(safe-area-inset-left, 0px)) 5px; padding: 5px 8px; font-size: 16px; border: 2px solid var(--dim); position: relative; overflow: hidden; line-height: 1.25; }
 #edResult.ok { border-color: var(--good); color: var(--good); }
 #edResult.bad { border-color: var(--bad); color: #ffb0b8; }
-#edResult .pill { margin-top: 6px; display: inline-block; color: var(--ink); }
+#edResult .pill { margin-top: 4px; display: inline-block; color: var(--ink); }
 .conf { position: absolute; top: -6px; width: 6px; height: 8px; animation: fall 1.2s ease-in forwards; }
 @keyframes fall { to { transform: translateY(90px) rotate(260deg); opacity: 0; } }
-#edTabs { flex: none; display: flex; gap: 6px; align-items: center; padding: 0 max(8px, env(safe-area-inset-left, 0px)); }
-#edTabs [data-tab] { padding: 4px 14px; background: none; border: 2px solid #3a3560; border-bottom: 0; font-size: 19px; position: relative; }
+#edTabs { flex: none; display: flex; gap: 5px; align-items: center; padding: 0 max(8px, env(safe-area-inset-left, 0px)); }
+#edTabs [data-tab] { padding: 2px 12px; background: none; border: 2px solid #3a3560; border-bottom: 0; font-size: 16px; position: relative; }
 #edTabs [data-tab].on { border-color: var(--line); background: #000; }
-#edTabs [data-tab].ping::after { content: ""; position: absolute; top: 4px; right: 4px; width: 7px; height: 7px; background: var(--gold); }
-.inpart { margin-left: auto; font-size: 18px; color: var(--dim); display: flex; gap: 6px; align-items: center; }
-#edPane { flex: 1 1 30%; min-height: 100px; transition: flex-basis .2s;
+#edTabs [data-tab].ping::after { content: ""; position: absolute; top: 3px; right: 3px; width: 6px; height: 6px; background: var(--gold); }
+.inpart { margin-left: auto; font-size: 15px; color: var(--dim); display: flex; gap: 5px; align-items: center; }
+#edPane { flex: 1 1 30%; min-height: 90px; transition: flex-basis .2s;
 }
-#editor.world #edPane { flex-basis: 48%; }
-#editor.world #edWrap { flex-basis: 24%; }
+#editor.world #edPane { flex-basis: 50%; }
+#editor.world #edWrap { flex-basis: 26%; }
 #editor.world .edTop { max-height: 16%; }
+/* открыта шпаргалка — ей чуть больше места */
+#editor .edTop:has(#edCard[open]) { max-height: 36%; }
 #edPane { position: relative; border-top: 2px solid var(--line); background: #000; }
-#edOut { position: absolute; inset: 0; overflow: auto; padding: 8px 10px; font: 13px/1.5 var(--mono); white-space: pre-wrap; overflow-wrap: anywhere; }
-.o-print { color: #e6e2ff; } .o-warn { color: var(--gold); } .o-error { color: var(--bad); } .o-hint { color: var(--claude); font-family: var(--body); font-size: 19px; margin: 2px 0 6px; }
+#edOut { position: absolute; inset: 0; overflow: auto; padding: 6px 8px; font: 13px/1.45 var(--mono); white-space: pre-wrap; overflow-wrap: anywhere; }
+.o-print { color: #e6e2ff; } .o-warn { color: var(--gold); } .o-error { color: var(--bad); } .o-hint { color: var(--claude); font-family: var(--body); font-size: 16px; line-height: 1.2; margin: 2px 0 4px; }
 .o-hint.o-hint, .o-hint { white-space: pre-wrap; }
-.o-dim { color: var(--dim); font-family: var(--body); font-size: 19px; }
+.o-dim { color: var(--dim); font-family: var(--body); font-size: 16px; line-height: 1.2; }
 #edWorld { position: absolute; inset: 0; }
 #edCanvas { width: 100%; height: 100%; display: block; touch-action: none; }
-.vbtns { position: absolute; right: 8px; bottom: 8px; display: flex; gap: 6px; }
-.vbtns button { width: 36px; height: 36px; background: rgba(0,0,0,.6); border: 2px solid var(--line); font-size: 16px; }
-.vhint { position: absolute; left: 8px; top: 6px; font-size: 16px; color: rgba(255,255,255,.75); pointer-events: none; text-shadow: 0 1px 0 #000; max-width: 70%; }
-#edToast { position: absolute; left: 50%; top: 40%; transform: translateX(-50%); background: rgba(0,0,0,.8); border: 2px solid var(--gold); padding: 6px 10px; font-size: 18px; opacity: 0; transition: .2s; pointer-events: none; white-space: nowrap; }
+.vbtns { position: absolute; right: 6px; bottom: 6px; display: flex; gap: 5px; }
+.vbtns button { width: 34px; height: 34px; background: rgba(0,0,0,.6); border: 2px solid var(--line); font-size: 15px; }
+.vhint { position: absolute; left: 6px; top: 4px; font-size: 14px; line-height: 1.15; color: rgba(255,255,255,.75); pointer-events: none; text-shadow: 0 1px 0 #000; max-width: 70%; }
+#edToast { position: absolute; left: 50%; top: 40%; transform: translateX(-50%); background: rgba(0,0,0,.8); border: 2px solid var(--gold); padding: 5px 9px; font-size: 16px; opacity: 0; transition: .2s; pointer-events: none; white-space: nowrap; }
 #edToast.show { opacity: 1; }
-#edClaude { flex: none; display: flex; align-items: center; gap: 8px; padding: 6px max(8px, env(safe-area-inset-left, 0px)); background: #000; border-top: 1px solid #2a2640; flex-wrap: wrap; }
-#edClaudeAva { width: 24px; height: 30px; image-rendering: pixelated; }
-#edClaudeText { flex: 1 1 140px; font-size: 18px; color: var(--claude); min-width: 0; }
+#edClaude { flex: none; display: flex; align-items: center; gap: 6px; padding: 4px max(8px, env(safe-area-inset-left, 0px)); background: #000; border-top: 1px solid #2a2640; flex-wrap: wrap; }
+#edClaudeAva { width: 20px; height: 25px; image-rendering: pixelated; }
+#edClaudeText { flex: 1 1 140px; font-size: 15px; line-height: 1.15; color: var(--claude); min-width: 0; }
+#edClaude .pill { font-size: 15px; padding: 3px 8px; }
 #editor.kb .edTop, #editor.kb #edPane, #editor.kb #edTabs, #editor.kb #edClaude, #editor.kb #edResult { display: none !important; }
 
 /* чат */
-#chatAva { width: 24px; height: 30px; image-rendering: pixelated; }
-#chatMode { font-size: 17px; padding: 5px 8px; }
-#chatBanner { flex: none; padding: 8px 12px; background: #2a1a12; color: #ffcfb8; font-size: 18px; line-height: 1.2; border-bottom: 1px solid var(--claude); }
-#chatLog { flex: 1; overflow: auto; padding: 12px max(12px, env(safe-area-inset-left, 0px)); display: flex; flex-direction: column; gap: 10px; }
-.msg { display: flex; gap: 8px; align-items: flex-end; max-width: 100%; }
+#chatAva { width: 20px; height: 25px; image-rendering: pixelated; }
+#chatMode { font-size: 15px; padding: 4px 8px; }
+#chatBanner { flex: none; padding: 6px 10px; background: #2a1a12; color: #ffcfb8; font-size: 15px; line-height: 1.2; border-bottom: 1px solid var(--claude); }
+#chatLog { flex: 1; overflow: auto; padding: 10px max(10px, env(safe-area-inset-left, 0px)); display: flex; flex-direction: column; gap: 8px; }
+.msg { display: flex; gap: 6px; align-items: flex-end; max-width: 100%; }
 .msg.me { justify-content: flex-end; }
-.msg .avatar { width: 24px; height: 30px; image-rendering: pixelated; flex: none; }
-.bubble { max-width: min(82%, 60ch); min-width: 0; padding: 9px 12px; font-size: 20px; line-height: 1.25; border: 2px solid var(--line); background: #000; overflow-wrap: anywhere; }
+.msg .avatar { width: 20px; height: 25px; image-rendering: pixelated; flex: none; }
+.bubble { max-width: min(85%, 60ch); min-width: 0; padding: 6px 10px; font-size: 16px; line-height: 1.25; border: 2px solid var(--line); background: #000; overflow-wrap: anywhere; }
 .msg.cl .bubble { border-color: var(--claude); }
 .msg.me .bubble { background: var(--raise); border-color: #3a3560; white-space: pre-wrap; }
-.bubble .code { margin: 6px 0; }
-.bubble .tocode { font-size: 17px; padding: 3px 8px; }
-.note { align-self: center; font-size: 17px; color: var(--gold); border: 1px dashed var(--gold); padding: 4px 10px; }
+.bubble .code { margin: 5px 0; }
+.bubble .tocode { font-size: 15px; padding: 2px 8px; }
+.note { align-self: center; font-size: 15px; line-height: 1.2; color: var(--gold); border: 1px dashed var(--gold); padding: 3px 8px; }
 .thinking i { animation: blink 1s infinite; font-style: normal; }
 .thinking i:nth-child(2) { animation-delay: .2s; } .thinking i:nth-child(3) { animation-delay: .4s; }
 @keyframes blink { 50% { opacity: 0; } }
-#chatChips { flex: none; display: flex; gap: 6px; overflow-x: auto; padding: 6px max(12px, env(safe-area-inset-left, 0px)); scrollbar-width: none; }
-#chatChips button { flex: none; padding: 6px 10px; background: var(--raise); border: 1px solid #3a3560; font-size: 18px; }
-#chatCtx { flex: none; padding: 4px 12px; font-size: 17px; color: var(--good); }
-.chatIn { flex: none; display: flex; gap: 8px; padding: 8px max(12px, env(safe-area-inset-left, 0px)) 10px; border-top: 2px solid var(--line); background: #000; }
-#chatInput { flex: 1; min-width: 0; font: inherit; font-size: 20px; padding: 8px 10px; background: var(--code); color: var(--ink); border: 2px solid #3a3560; resize: none; -webkit-user-select: text; user-select: text; }
-#chatSend, #chatStop { width: 52px; background: var(--claude); color: #000; border: 0; font-size: 20px; }
+#chatChips { flex: none; display: flex; gap: 5px; overflow-x: auto; padding: 5px max(10px, env(safe-area-inset-left, 0px)); scrollbar-width: none; }
+#chatChips button { flex: none; padding: 4px 9px; background: var(--raise); border: 1px solid #3a3560; font-size: 15px; line-height: 1.15; }
+#chatCtx { flex: none; padding: 3px 10px; font-size: 15px; color: var(--good); }
+.chatIn { flex: none; display: flex; gap: 6px; padding: 6px max(10px, env(safe-area-inset-left, 0px)) 8px; border-top: 2px solid var(--line); background: #000; }
+#chatInput { flex: 1; min-width: 0; font: inherit; font-size: 17px; line-height: 1.2; padding: 6px 8px; background: var(--code); color: var(--ink); border: 2px solid #3a3560; resize: none; -webkit-user-select: text; user-select: text; }
+#chatSend, #chatStop { width: 46px; background: var(--claude); color: #000; border: 0; font-size: 18px; }
 #chatStop { background: var(--bad); }
 
 /* меню */
-#menuTabs { flex: none; display: flex; gap: 6px; overflow-x: auto; padding: 8px max(12px, env(safe-area-inset-left, 0px)); scrollbar-width: none; }
-#menuTabs button { flex: none; padding: 6px 12px; background: none; border: 2px solid #3a3560; font-size: 19px; }
+#menuTabs { flex: none; display: flex; gap: 5px; overflow-x: auto; padding: 6px max(10px, env(safe-area-inset-left, 0px)); scrollbar-width: none; }
+#menuTabs button { flex: none; padding: 4px 10px; background: none; border: 2px solid #3a3560; font-size: 16px; line-height: 1.15; }
 #menuTabs button.on { border-color: var(--gold); color: var(--gold); }
-#menuBody { flex: 1; overflow: auto; padding: 8px max(16px, env(safe-area-inset-left, 0px)) 24px; max-width: 640px; width: 100%; margin: 0 auto; }
-#menuBody h3 { font-family: var(--display); font-size: 11px; margin: 18px 0 8px; color: var(--gold); }
-.stats { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 8px; }
-.stats div { border: 2px solid #3a3560; padding: 8px 10px; display: flex; flex-direction: column; gap: 4px; }
-.stats span { font-size: 17px; color: var(--dim); }
-.stats b { font-size: 22px; font-variant-numeric: tabular-nums; }
-.row { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 0; border-bottom: 1px solid #2a2640; }
+#menuBody { flex: 1; overflow: auto; padding: 2px max(14px, env(safe-area-inset-left, 0px)) 16px; max-width: 640px; width: 100%; margin: 0 auto; }
+#menuBody p { margin: 6px 0; line-height: 1.2; }
+#menuBody h3 { font-family: var(--display); font-size: 10px; margin: 12px 0 6px; color: var(--gold); }
+.stats { display: grid; grid-template-columns: repeat(auto-fill, minmax(112px, 1fr)); gap: 6px; }
+.stats div { border: 2px solid #3a3560; padding: 5px 8px; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.stats span { font-size: 15px; color: var(--dim); }
+.stats b { font-size: 18px; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.row { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 6px 0; border-bottom: 1px solid #2a2640; }
 .row > div { min-width: 0; }
-.row small { display: block; color: var(--dim); font-size: 17px; margin-top: 2px; }
+.row small { display: block; color: var(--dim); font-size: 15px; line-height: 1.15; margin-top: 1px; }
 .row .pill { flex: none; }
 
-/* ландшафт: экран слева, пульт справа */
-@media (orientation: landscape) and (max-height: 620px) {
+/* ландшафт: экран слева, пульт справа (портрет с открытой клавиатурой почти квадратный — он сюда не попадает) */
+@media (orientation: landscape) and (max-height: 620px) and (min-aspect-ratio: 4/3) {
   #app { display: grid; grid-template-columns: auto minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); }
   #stage { grid-row: 1 / 3; grid-column: 1; height: 100%; width: auto; max-width: none; aspect-ratio: 4 / 3; margin: 0; }
   #hud { grid-row: 1; grid-column: 2; }
-  #panel { grid-row: 2; grid-column: 2; padding: 8px 12px; }
-  #dlgText { font-size: 20px; }
-  #batText { font-size: 18px; }
-  .ab { width: 96px; }
-  .ab button { width: 64px; height: 64px; }
-  #btnB { width: 50px; height: 50px; }
+  #panel { grid-row: 2; grid-column: 2; padding: 6px 10px; }
+  #dlgText { font-size: 17px; }
+  .choice { font-size: 16px; min-height: 36px; }
+  #batText { font-size: 16px; }
+  .ab { width: 92px; gap: 10px; }
+  .ab button { width: 58px; height: 58px; }
+  #btnB { width: 46px; height: 46px; }
+  #joy { width: 80px; height: 80px; margin: -40px 0 0 -40px; }
   #hud .bar { width: 28px; }
-  #hud .hp { padding: 5px 6px; gap: 4px; }
-  #hud .btns button { min-width: 38px; height: 36px; padding: 0 6px; }
-  #objective { font-size: 16px; }
+  #hud .hp { padding: 4px 5px; gap: 4px; }
+  #hud .btns button { min-width: 36px; height: 32px; padding: 0 5px; }
+  #objective { font-size: 15px; }
+
+  /* титул: логотип слева, кнопки и форма справа */
+  .tWrap { max-width: 860px; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); column-gap: 28px; row-gap: 10px; align-items: center; padding-top: 10px; padding-bottom: 10px; }
+  .logo { grid-column: 1; grid-row: 1; }
+  #tScene { grid-column: 1; grid-row: 2; max-width: 300px; }
+  #tMain, #tNewForm { grid-column: 2; grid-row: 1 / 3; }
+
+  /* редактор: код слева, задание и вывод справа */
+  #editor { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); }
+  #editor .edCol { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+  #editor .edInfo { grid-column: 2; grid-row: 1; }
+  #editor .edCodeCol { grid-column: 1; grid-row: 1 / 3; border-right: 2px solid var(--line); }
+  #editor .edRes { grid-column: 2; grid-row: 2; }
+  #editor .edTop, #editor.world .edTop { max-height: 30vh; }
+  #editor .edTop:has(#edCard[open]) { max-height: 48vh; }
+  #edWrap, #editor.world #edWrap { flex: 1 1 auto; min-height: 90px; }
+  #edPane, #editor.world #edPane { flex: 1 1 auto; min-height: 70px; }
+  #edResult { margin-top: 5px; }
+  /* клавиатура открыта — всё в одну колонку, как в портрете */
+  #editor.kb { display: flex; }
+  #editor.kb .edCol { display: contents; }
+
+  /* меню: вкладки рядом с крестиком, строки в две колонки */
+  #menu { display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-rows: auto minmax(0, 1fr); }
+  #menu .shHead { grid-column: 2; grid-row: 1; }
+  #menu .shHead b { display: none; }
+  #menuTabs { grid-column: 1; grid-row: 1; align-items: center; background: #000; border-bottom: 2px solid var(--line); }
+  #menuBody { grid-column: 1 / -1; grid-row: 2; max-width: 900px; padding-top: 8px; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); column-gap: 24px; align-content: start; }
+  #menuBody > :not(.row) { grid-column: 1 / -1; }
 }
 @media (prefers-reduced-motion: reduce) {
   #zoneTitle.show, #dlgNext, .conf { animation: none; }
@@ -378,34 +427,40 @@ code { font-family: var(--mono); font-size: .88em; background: var(--code); padd
 </div>
 
 <div id="editor" class="sheet" hidden>
-  <div class="shHead"><select id="edTask" aria-label="Что делаем"></select><button id="edClose" class="x" aria-label="Закрыть редактор">✕</button></div>
-  <div class="edTop">
-    <div id="edTaskText"></div>
-    <details id="edCard"><summary>📖 Шпаргалка урока</summary><div id="edCardBody"></div></details>
-  </div>
-  <div id="edWrap">
-    <pre id="edGutter">1</pre>
-    <div class="edMain"><pre id="edHl" aria-hidden="true"></pre><textarea id="edCode" spellcheck="false" autocapitalize="off" autocomplete="off" autocorrect="off" wrap="off" aria-label="Код"></textarea></div>
-  </div>
-  <div id="edKeys" aria-label="Быстрые символы"></div>
-  <div id="edBar"><button id="edRun">▶ Запуск</button><button id="edStop" aria-label="Стоп">■</button><button id="edCheck">✓ Проверить</button><button id="edReset">⟲ Сброс</button></div>
-  <div id="edResult" hidden></div>
-  <div id="edTabs"><button data-tab="out" class="on">Вывод</button><button data-tab="world">Мир</button><label class="inpart"><input type="checkbox" id="edInPart"> скрипт в детали</label></div>
-  <div id="edPane">
-    <div id="edOut"></div>
-    <div id="edWorld" hidden>
-      <canvas id="edCanvas"></canvas>
-      <div class="vhint">Нажми на деталь — персонаж дойдёт и наступит. Двигай мир пальцем.</div>
-      <div class="vbtns"><button id="vpIn" aria-label="Приблизить">+</button><button id="vpOut" aria-label="Отдалить">−</button><button id="vpReset" aria-label="Показать всё">⌖</button></div>
-      <div id="edToast"></div>
+  <div class="edCol edInfo">
+    <div class="shHead"><select id="edTask" aria-label="Что делаем"></select><button id="edClose" class="x" aria-label="Закрыть редактор">✕</button></div>
+    <div class="edTop">
+      <div id="edTaskText"></div>
+      <details id="edCard"><summary>📖 Шпаргалка урока</summary><div id="edCardBody"></div></details>
     </div>
   </div>
-  <div id="edClaude">
-    <canvas id="edClaudeAva" width="16" height="20"></canvas>
-    <span id="edClaudeText"></span>
-    <button id="edHint" class="pill" hidden>💡 Подсказка</button>
-    <button id="edAskErr" class="pill" hidden>Почему ошибка?</button>
-    <button id="edAsk" class="pill">Спросить Клода</button>
+  <div class="edCol edCodeCol">
+    <div id="edWrap">
+      <pre id="edGutter">1</pre>
+      <div class="edMain"><pre id="edHl" aria-hidden="true"></pre><textarea id="edCode" spellcheck="false" autocapitalize="off" autocomplete="off" autocorrect="off" wrap="off" aria-label="Код"></textarea></div>
+    </div>
+    <div id="edKeys" aria-label="Быстрые символы"></div>
+    <div id="edBar"><button id="edRun">▶ Запуск</button><button id="edStop" aria-label="Стоп">■</button><button id="edCheck">✓ Проверить</button><button id="edReset">⟲ Сброс</button></div>
+  </div>
+  <div class="edCol edRes">
+    <div id="edResult" hidden></div>
+    <div id="edTabs"><button data-tab="out" class="on">Вывод</button><button data-tab="world">Мир</button><label class="inpart"><input type="checkbox" id="edInPart"> скрипт в детали</label></div>
+    <div id="edPane">
+      <div id="edOut"></div>
+      <div id="edWorld" hidden>
+        <canvas id="edCanvas"></canvas>
+        <div class="vhint">Нажми на деталь — персонаж дойдёт и наступит. Двигай мир пальцем.</div>
+        <div class="vbtns"><button id="vpIn" aria-label="Приблизить">+</button><button id="vpOut" aria-label="Отдалить">−</button><button id="vpReset" aria-label="Показать всё">⌖</button></div>
+        <div id="edToast"></div>
+      </div>
+    </div>
+    <div id="edClaude">
+      <canvas id="edClaudeAva" width="16" height="20"></canvas>
+      <span id="edClaudeText"></span>
+      <button id="edHint" class="pill" hidden>💡 Подсказка</button>
+      <button id="edAskErr" class="pill" hidden>Почему ошибка?</button>
+      <button id="edAsk" class="pill">Спросить Клода</button>
+    </div>
   </div>
 </div>
 
