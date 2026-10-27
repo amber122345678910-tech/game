@@ -121,8 +121,47 @@ function startBattle(id, extra) {
   });
 }
 
-function bText(t) {
-  return typeInto(document.getElementById("batText"), t, "sys");
+// текст боя. mode: "tap" — ждём нажатия (▼), число — подержать столько мс, иначе — сразу дальше
+function bText(t, mode) {
+  const b = Battle.b;
+  const el = document.getElementById("batText");
+  Battle.wait = null;
+  return new Promise((res) => {
+    typeInto(el, t, "sys").then(() => {
+      // бой сбросили или текст уже сменился — эту ветку не продолжаем / не держим
+      if (!b || Battle.b !== b) return;
+      if (el.textContent !== t) return res();
+      if (mode === "tap") {
+        const m = document.createElement("span");
+        m.className = "batNext";
+        m.textContent = "▼";
+        m.style.cssText = "display:inline-block;margin-left:8px;color:var(--gold);animation:bob .8s steps(2) infinite";
+        el.appendChild(m);
+        // и большая кнопка «Дальше» на месте кнопок боя
+        const box = document.getElementById("batBtns");
+        box.innerHTML = "";
+        box.className = "";
+        const nb = document.createElement("button");
+        nb.className = "bbtn wide next";
+        nb.textContent = "Дальше ▼";
+        nb.onclick = () => batTap();
+        box.appendChild(nb);
+        Battle.wait = { res, at: performance.now(), m, nb };
+      } else if (mode > 0) setTimeout(() => { if (Battle.b === b) res(); }, mode);
+      else res();
+    });
+  });
+}
+// нажатие во время боя: сначала дописать текст, потом — дальше (если ждём ▼)
+function batTap() {
+  if (typing && typing.el.id === "batText") { typing.skip(); return; }
+  const w = Battle.wait;
+  if (!w || performance.now() - w.at < 250) return;
+  Battle.wait = null;
+  w.m.remove();
+  w.nb.remove();
+  sfx("select");
+  w.res();
 }
 function bButtons(list) {
   const el = document.getElementById("batBtns");
@@ -145,10 +184,9 @@ function bButtons(list) {
   });
 }
 
-async function battleMenuIntro() {
-  const b = Battle.b;
-  await bText(b.def.intro);
-  battleMenu();
+// первая строка боя остаётся над кнопками, пока не выберешь действие
+function battleMenuIntro() {
+  battleMenu(Battle.b.def.intro);
 }
 
 function nameWithMercy() {
@@ -156,13 +194,13 @@ function nameWithMercy() {
   return b.mercy >= 100 ? `<span style="color:#ffe03a">${b.def.name}</span>` : b.def.name;
 }
 
-async function battleMenu() {
+async function battleMenu(text) {
   const b = Battle.b;
   if (!b) return;
   b.phase = "menu";
   setBox(224, 62);
   const fl = b.def.flavor[b.turn % b.def.flavor.length];
-  bText(b.mercy >= 100 ? `* ${b.def.name} больше не хочет драться. Можно пощадить.` : fl);
+  bText(text || (b.mercy >= 100 ? `* ${b.def.name} больше не хочет драться. Можно пощадить.` : fl));
   const c = await bButtons([
     { html: "<b>⚔</b> БОЙ", cls: "fight" },
     { html: "<b>&lt;/&gt;</b> КОД", cls: "act" },
@@ -220,14 +258,14 @@ async function doAct() {
   const c = await bButtons(acts);
   if (c === acts.length - 1) return battleMenu();
   if (c === 0) {
-    await bText(`* ${b.def.name} — АТК ${b.def.atk}, HP ${b.hp}/${b.maxHp}. ${b.def.boss ? "Босс. Сражается за свой код." : "Мелкая ошибка в коде мира."}`);
+    await bText(`* ${b.def.name} — АТК ${b.def.atk}, HP ${b.hp}/${b.maxHp}. ${b.def.boss ? "Босс. Сражается за свой код." : "Мелкая ошибка в коде мира."}`, "tap");
     return afterPlayer("check");
   }
   if (c === 1) return doQuiz();
   const a = b.def.acts[c - 2];
   b.mercy = Math.min(100, b.mercy + a.mercy);
   sfx("heal");
-  await bText(a.text);
+  await bText(a.text, "tap");
   afterPlayer("act");
 }
 
@@ -252,7 +290,7 @@ async function doQuiz() {
     sfx("heal");
     b.mercy = Math.min(100, b.mercy + 45);
     const dmg = Math.round(6 + G.save.lv * 3 + playerAtk() * 0.6);
-    await bText("* ПРАВИЛЬНО! " + q.why);
+    await bText("* ПРАВИЛЬНО! " + q.why, "tap");
     b.claudeLine = "КОМБО КОДА!";
     sfx("portal");
     hitEnemy(dmg, "КОМБО!");
@@ -260,7 +298,7 @@ async function doQuiz() {
     setTimeout(() => afterPlayer("quizRight"), 600);
   } else {
     sfx("hurt");
-    await bText(`* Мимо! Правильно: «${q.a[q.ok]}». ${q.why}`);
+    await bText(`* Мимо! Правильно: «${q.a[q.ok]}». ${q.why}`, "tap");
     G.save.stats.wrong = (G.save.stats.wrong || 0) + 1;
     afterPlayer("quizWrong");
   }
@@ -270,10 +308,7 @@ async function doQuiz() {
 async function doItem() {
   const b = Battle.b;
   const items = G.save.items;
-  if (!items.length) {
-    await bText("* Карманы пусты. Только фантик от конфеты.");
-    return battleMenu();
-  }
+  if (!items.length) return battleMenu("* Карманы пусты. Только фантик от конфеты.");
   const list = items.map((it) => ({ t: `${it.name} (+${it.heal})` }));
   list.push({ t: "← Назад" });
   const c = await bButtons(list);
@@ -281,8 +316,9 @@ async function doItem() {
   const it = items.splice(c, 1)[0];
   const max = playerMaxHp();
   G.save.hp = Math.min(max, G.save.hp + it.heal);
+  updateHud();
   sfx("heal");
-  await bText(`* Ты съедаешь «${it.name}». HP +${it.heal}.`);
+  await bText(`* Ты съедаешь «${it.name}». HP +${it.heal}.`, 1000);
   afterPlayer("item");
 }
 
@@ -296,14 +332,14 @@ async function doMercy() {
   if (c === opts.length - 1) return battleMenu();
   if (c === 0) {
     if (b.mercy >= 100) return endBattle("spare");
-    await bText(`* ${b.def.name} пока не готов мириться.`);
+    await bText(`* ${b.def.name} пока не готов мириться.`, 900);
     return afterPlayer("mercyFail");
   }
   if (Math.random() < 0.7) {
-    await bText("* Ты сбегаешь! Клод: «Тактическое отступление! Это не трусость, это стратегия!»");
+    await bText("* Ты сбегаешь! Клод: «Тактическое отступление! Это не трусость, это стратегия!»", "tap");
     return endBattle("flee");
   }
-  await bText("* Не получилось сбежать!");
+  await bText("* Не получилось сбежать!", 900);
   afterPlayer("fleeFail");
 }
 
@@ -319,6 +355,7 @@ async function afterPlayer(kind) {
     const heal = Math.round(max * 0.35);
     G.save.hp = Math.min(max, G.save.hp + heal);
     b.lastHeal = b.turn;
+    updateHud();
     sfx("heal");
     line = `Клод бросает тебе портальную газировку: +${heal} HP!`;
   } else if (kind === "quizRight") {
@@ -339,7 +376,7 @@ async function afterPlayer(kind) {
     line = "Клод протирает очки и анализирует врага.";
   }
   b.claudeLine = line;
-  await bText("* " + line);
+  await bText("* " + line, 700);
   if (b.hp <= 0) return endBattle("win");
   enemyTurn();
 }
@@ -450,10 +487,12 @@ async function gameOver() {
   b.phase = "dead";
   music(null);
   sfx("die");
-  await bText("* Твоё сердце раскололось...");
+  updateHud();
+  await bText("* Твоё сердце раскололось...", "tap");
   await bText("* Клод: «Стажёр! Вставай! Мультивселенная без тебя не справится. И я тоже.»");
   const c = await bButtons([{ t: "НЕ СДАВАТЬСЯ (заново)", cls: "fight wide" }, { t: "Вернуться к порталу", cls: "wide" }]);
   G.save.hp = playerMaxHp();
+  updateHud();
   if (c === 0) {
     b.hp = b.maxHp;
     b.mercy = 0;
@@ -476,7 +515,7 @@ async function endBattle(res) {
     sfx("victory");
     s.kills = (s.kills || 0) + 1;
     s.gold += b.def.gold;
-    await bText(`* ПОБЕДА! ${b.def.name} повержен. +${b.def.xp} XP, +${b.def.gold} монет.`);
+    await bText(`* ПОБЕДА! ${b.def.name} повержен. +${b.def.xp} XP, +${b.def.gold} монет.`, "tap");
     addXp(b.def.xp);
   } else if (res === "spare") {
     music(null);
@@ -485,7 +524,7 @@ async function endBattle(res) {
     const g = Math.round(b.def.gold * 1.2);
     s.gold += g;
     const xp = Math.round(b.def.xp * 0.7);
-    await bText(`${b.def.spare} +${xp} XP, +${g} монет.`);
+    await bText(`${b.def.spare} +${xp} XP, +${g} монет.`, "tap");
     addXp(xp);
   }
   finishBattle(res);
@@ -502,8 +541,9 @@ function finishBattle(res, fled) {
     if (res === "win" || res === "spare") b.roamer.gone = true;
     else b.roamer.cool = 3;
   }
+  // «Вернуться к порталу»: встаём у портала (точка входа в мир), а не там, где проиграли
   if (fled) {
-    enterZone(G.zone.id, true);
+    enterZone(G.zone.id, false);
   }
   saveSoon();
   b.resolve(fled ? "flee" : res);
@@ -581,6 +621,7 @@ function battleUpdate(dt) {
         if ((R_.enemyDamage ?? 1) === 0) dmg = 0;
         b.shield = 0;
         G.save.hp = Math.max(0, G.save.hp - dmg);
+        updateHud();
         b.inv = 0.9;
         sfx("hurt");
         shake(3);
@@ -623,18 +664,28 @@ function battleDraw(c) {
     outText(c, String(d.v), Math.round(d.x), 40 - dy, col);
     if (d.label) { c.font = '6px "Press Start 2P", monospace'; outText(c, d.label, Math.round(d.x), 50 - dy, col); }
   }
-  // реплика врага
+  // реплика врага: облачко справа, длинную фразу переносим, чтобы не уезжала за край
   if (b.bubble) {
-    c.font = '12px "Handjet", monospace';
-    const w = Math.min(110, c.measureText(b.bubble.text).width + 10);
-    R(c, 169, 19, w + 2, 20, "#000");
-    R(c, 165, 25, 5, 6, "#000");
-    R(c, 170, 20, w, 18, "#fff");
-    R(c, 166, 26, 4, 4, "#fff");
-    R(c, 170, 37, w, 1, "#c8c8d8");
-    c.fillStyle = "#000";
     c.textAlign = "left";
-    c.fillText(b.bubble.text.slice(0, Math.floor(b.bubble.t * 30)), 175, 32);
+    const bb = b.bubble;
+    if (!bb.lines) {
+      bb.lines = wrapMix(c, bb.text, 72, 12).slice(0, 3);
+      bb.w = Math.ceil(Math.max(...bb.lines.map((l) => mixText(c, l, 0, 0, 12, false)))) + 10;
+    }
+    const w = bb.w, h = bb.lines.length * 11 + 7;
+    const x = Math.min(170, 252 - w), y = 16;
+    R(c, x - 1, y - 1, w + 2, h + 2, "#000");
+    R(c, x - 5, y + 5, 5, 6, "#000");
+    R(c, x, y, w, h, "#fff");
+    R(c, x - 4, y + 6, 4, 4, "#fff");
+    R(c, x, y + h - 1, w, 1, "#c8c8d8");
+    c.fillStyle = "#000";
+    let left = Math.floor(bb.t * 30);
+    bb.lines.forEach((l, i) => {
+      if (left <= 0) return;
+      mixText(c, l.slice(0, left), x + 5, y + 12 + i * 11, 12);
+      left -= l.length + 1;
+    });
   }
   // рамка
   const bx = b.box;
@@ -645,10 +696,15 @@ function battleDraw(c) {
     drawKid(c, cx - 30, bx.y + 22, "up", Math.floor(b.t * 2) % 2, playerLook());
     drawClaude(c, cx + 14, bx.y + 22, "up", b.t);
     if (b.claudeLine) {
-      c.font = '12px "Handjet", monospace';
+      // реплика Клода над рамкой: укорачиваем по ширине рамки (считаем один раз)
+      c.textAlign = "left";
+      if (!b.claudeFit || b.claudeFit.src !== b.claudeLine) {
+        let t = b.claudeLine;
+        while (t.length > 4 && mixText(c, t, 0, 0, 12, false) > bx.tw - 10) t = t.slice(0, -2).trimEnd() + "…";
+        b.claudeFit = { src: b.claudeLine, t, w: mixText(c, t, 0, 0, 12, false) };
+      }
       c.fillStyle = "#ffb08a";
-      c.textAlign = "center";
-      c.fillText(b.claudeLine.length > 34 ? b.claudeLine.slice(0, 33) + "…" : b.claudeLine, cx, bx.y + 15);
+      mixText(c, b.claudeFit.t, Math.round(cx - b.claudeFit.w / 2), bx.y + 15, 12);
     }
   }
   if (b.phase === "fight") {
@@ -734,6 +790,11 @@ function setupDodgeTouch() {
     l2 = [e.clientX, e.clientY];
   });
   scr.addEventListener("pointerup", () => { l2 = null; });
+  // нажатие на текст боя или пустое место пульта: дописать текст / «дальше ▼»
+  document.getElementById("bat").addEventListener("click", (e) => {
+    if (!Battle.active || G.overlay || e.target.closest("button") || e.target.closest("#batTouch")) return;
+    batTap();
+  });
 }
 
 // бой, созданный живым Клодом

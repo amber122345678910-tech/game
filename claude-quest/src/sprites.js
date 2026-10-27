@@ -1077,7 +1077,36 @@ function drawPortal(c, x, y, t, open = true, w = 2) {
     R(c, x + 4, y + 4, W - 8, 26, "#2a2d3a");
     R(c, x + 6, y + 6, W - 12, 22, "#1a1c26");
     R(c, x + 6, y + 6, W - 12, 1, "#3a3d4c");
-    if (Math.floor(t * 6) % 3 === 0) R(c, x + W / 2 - 1, y + 10, 2, 8, "#5aff8a");
+    // аппарат «дышит»: слабое зелёное свечение и мигающее ядро
+    const pulse = 0.5 + 0.5 * Math.sin(t * 3);
+    c.globalAlpha = 0.1 + pulse * 0.2;
+    R(c, x + 7, y + 8, W - 14, 19, "#5aff8a");
+    c.globalAlpha = 1;
+    const cx = x + W / 2, cy = y + 17;
+    R(c, cx - 2, cy - 2, 4, 4, pulse > 0.5 ? "#2aff6a" : "#18c94a");
+    R(c, cx - 1, cy - 1, 2, 2, "#d8ffe0");
+    // искрит: молния от ядра к краю, каждый раз в новом месте
+    const k = Math.floor(t * 9);
+    if (hsh(k, 7) % 10 < 7) {
+      const a = (hsh(k, 3) / 1000) * Math.PI * 2;
+      const ex = cx + Math.cos(a) * (W / 2 - 6), ey = cy + Math.sin(a) * 10;
+      let px = cx, py = cy;
+      for (let s = 1; s <= 4; s++) {
+        const nx = cx + ((ex - cx) * s) / 4 + (s < 4 ? (hsh(k, s) % 5) - 2 : 0);
+        const ny = cy + ((ey - cy) * s) / 4 + (s < 4 ? (hsh(k, s + 9) % 5) - 2 : 0);
+        const n = Math.max(1, Math.round(Math.max(Math.abs(nx - px), Math.abs(ny - py))));
+        for (let i = 0; i <= n; i++) R(c, px + ((nx - px) * i) / n, py + ((ny - py) * i) / n, 1, 1, s < 3 ? "#ffffff" : "#9affb0");
+        px = nx; py = ny;
+      }
+      R(c, ex - 1, ey, 3, 1, "#d8ffe0"); R(c, ex, ey - 1, 1, 3, "#d8ffe0");
+    }
+    // искры вылетают из углов рамки
+    for (let i = 0; i < 3; i++) {
+      const ph = (t * 1.6 + i * 0.37) % 1;
+      if (ph > 0.6) continue;
+      const left = i % 2 === 0;
+      R(c, x + (left ? 4 - ph * 8 : W - 5 + ph * 8), y + 4 + i * 9 - ph * 10, 1, 1, ph < 0.3 ? "#ffffff" : "#5aff8a");
+    }
     return;
   }
   // мягкое свечение
@@ -1236,6 +1265,7 @@ function speakerDraw(id) {
   return S.draw;
 }
 
+// drawLook живёт в main.js: здесь он вызывается только при рисовании, когда весь код уже загружен
 const SPEAKERS = {
   claude: { name: "Профессор Клод", color: "#ffb08a", pitch: 1.5, draw: (c, t) => drawClaude(c, 0, 0, "down", t) },
   player: { name: "Ты", color: "#bfe0ff", pitch: 1.0, draw: (c, t) => drawKid(c, 0, 0, "down", 0, playerLook()) },
@@ -1247,16 +1277,16 @@ const SPEAKERS = {
   gslime: { name: "Глюк-Слизень", color: "#ff3a8a", pitch: 0.7, draw: (c, t) => drawSlime(c, 0, 0, t, "#c03aff") },
   owl: { name: "Сова Иначе", color: "#e9c99a", pitch: 0.9, draw: (c, t) => drawOwl(c, 0, 0, t) },
   shroom: { name: "Гриб Логик", color: "#9ae6ff", pitch: 1.3, draw: (c, t) => drawMushroom(c, 0, 0, t) },
-  guard: { name: "Страж Ветвления", color: "#7fd8c2", pitch: 0.6, draw: null },
+  guard: { name: "Страж Ветвления", color: "#7fd8c2", pitch: 0.6, draw: (c, t) => drawLook(c, "guard", 0, 0, t) },
   mayor: { name: "Мэр Повторяшкин", color: "#f2c46b", pitch: 0.8, draw: (c, t) => drawKid(c, 0, 0, "down", 0, { shirt: "#7a3a5a", hair: "#ddd", hat: "tophat" }) },
   townie: { name: "Житель", color: "#d8c8ff", pitch: 1.1, draw: (c, t) => drawKid(c, 0, 0, "down", 0, { shirt: "#c05a8a", hair: "#2a1a1a" }) },
   baker: { name: "Пекарь Тесто", color: "#ffd8a8", pitch: 1.0, draw: (c, t) => drawKid(c, 0, 0, "down", 0, { shirt: "#f2f2f2", hair: "#8a5a2a", hat: "cap" }) },
-  serpent: { name: "Змей Бесконечности", color: "#b08aff", pitch: 0.6, draw: null },
+  serpent: { name: "Змей Бесконечности", color: "#b08aff", pitch: 0.6, draw: (c, t) => drawLook(c, "serpent", 0, 0, t) },
   robo: { name: "Робот Ж-2", color: "#9ae6ff", pitch: 1.4, draw: (c, t) => drawRobot(c, 0, 0, t) },
   keeper: { name: "Кладовщик Т-4", color: "#ffcf3a", pitch: 1.0, draw: (c, t) => drawRobot(c, 0, 0, t, "#d6a83a", { eye: "#ff8a3a" }) },
-  roboboss: { name: "Робо-Начальник", color: "#ff8a8a", pitch: 0.6, draw: null },
+  roboboss: { name: "Робо-Начальник", color: "#ff8a8a", pitch: 0.6, draw: (c, t) => drawLook(c, "roboboss", 0, 0, t) },
   noob: { name: "Нубик", color: "#ffe36b", pitch: 1.2, draw: (c, t) => drawNoob(c, 0, 0, "down", 0) },
-  lava: { name: "Лава-Блок", color: "#ff8a3a", pitch: 0.5, draw: null },
+  lava: { name: "Лава-Блок", color: "#ff8a3a", pitch: 0.5, draw: (c, t) => drawLook(c, "lavaboss", 0, 0, t) },
   zero: { name: "Клод-Ноль", color: "#b0b0c0", pitch: 0.6, draw: (c, t) => drawClaude(c, 0, 0, "down", t, { color: "#6a6a7a", dark: "#4a4a5a", evil: true, coat: "#2a2a33", noGun: true }) },
   glitchik: { name: "Глюкич", color: "#ff9ad0", pitch: 1.5, draw: (c, t) => drawClaude(c, 0, 0, "down", t, { color: "#c88ad6", dark: "#9a5aaa", noGun: true }) },
   cat: { name: "Кот Шрёдингера", color: "#cfcfe0", pitch: 1.2, draw: (c, t) => drawCat(c, 0, 0, t) },
@@ -1293,17 +1323,11 @@ function battleSprite(c, e, cx, cy, t, hurt) {
   const shake = hurt > 0 ? Math.round(Math.sin(t * 60) * 3) : 0;
   const ox = Math.round(cx - 8 * sc + shake), oy = Math.round(cy - 10 * sc);
   c.drawImage(BSPR.a, 0, 0, w, h, ox - P * sc, oy - P * sc, w, h);
-  // надписи на спрайте рисуем поверх, без обводки
+  // надписи на спрайте: пиксельным шрифтом, по центру своей таблички
   const lab = BATTLE_LABELS[e.look];
   if (lab) {
-    c.save();
-    c.translate(ox, oy);
-    c.scale(sc, sc);
-    c.textAlign = "left";
-    c.font = lab.font;
-    c.fillStyle = lab.color;
-    for (const [txt, x, y] of lab.lines) c.fillText(txt, x, y);
-    c.restore();
+    const ps = sc >= 4 ? 2 : 1;
+    for (const [txt, x, y] of lab.lines) pxText(c, txt, Math.round(ox + x * sc - (pxTextW(txt) * ps) / 2), Math.round(oy + y * sc - (5 * ps) / 2), ps, lab.color);
   }
   // эффект глюка у боссов
   if (e.glitch && Math.random() < 0.18) {
@@ -1313,11 +1337,64 @@ function battleSprite(c, e, cx, cy, t, hurt) {
   }
 }
 
+// строки: [текст, центр x, центр y] в пикселях спрайта
 const BATTLE_LABELS = {
-  tree: { font: "4px monospace", color: "#1a1a22", lines: [["if", -1.5, 13], ["else", 13.6, 13]] },
-  serpent: { font: "3px monospace", color: "#fff", lines: [["while true", 1.5, 11]] },
-  "boss-robot": { font: "3px monospace", color: "#ffcf3a", lines: [["return", 3.5, 18.5]] },
+  tree: { color: "#1a1a22", lines: [["if", -2, 12], ["else", 18, 12]] },
+  serpent: { color: "#fff", lines: [["while", 8, 8.6], ["true", 8, 11.6]] },
+  "boss-robot": { color: "#ffcf3a", lines: [["return", 8, 17]] },
 };
+
+// крошечный пиксельный шрифт 5 точек в высоту (строчные буквы для надписей на боссах)
+const PXF = {
+  a: ["...", ".##", "..#", "###", "###"], b: ["#..", "##.", "#.#", "#.#", "##."], c: ["...", ".##", "#..", "#..", ".##"],
+  d: ["..#", ".##", "#.#", "#.#", ".##"], e: ["...", ".#.", "###", "#..", ".##"], f: [".##", "#..", "##.", "#..", "#.."],
+  h: ["#..", "#..", "##.", "#.#", "#.#"], i: ["#", ".", "#", "#", "#"], l: ["#.", "#.", "#.", "#.", ".#"],
+  n: ["...", "##.", "#.#", "#.#", "#.#"], o: ["...", ".#.", "#.#", "#.#", ".#."], r: ["...", "#.#", "##.", "#..", "#.."],
+  s: ["...", ".##", "#..", "..#", "##."], t: [".#.", "###", ".#.", ".#.", "..#"], u: ["...", "#.#", "#.#", "#.#", ".##"],
+  w: [".....", "#...#", "#...#", "#.#.#", ".#.#."], " ": ["..", "..", "..", "..", ".."],
+};
+function pxTextW(s) {
+  let w = 0;
+  for (const ch of s) w += ((PXF[ch] || PXF[" "])[0].length) + 1;
+  return Math.max(0, w - 1);
+}
+function pxText(c, s, x, y, ps, col) {
+  c.fillStyle = col;
+  for (const ch of s) {
+    const g = PXF[ch] || PXF[" "];
+    for (let j = 0; j < 5; j++) for (let i = 0; i < g[j].length; i++) if (g[j][i] === "#") c.fillRect(x + i * ps, y + j * ps, ps, ps);
+    x += (g[0].length + 1) * ps;
+  }
+}
+
+// текст на canvas: буквы шрифтом Handjet, а скобки — моноширинным, чтобы ( ) не путались с [ ]
+function mixText(c, s, x, y, px, draw = true) {
+  let w = 0;
+  for (const part of String(s).split(/([()[\]{}]+)/)) {
+    if (!part) continue;
+    c.font = /[()[\]{}]/.test(part[0]) ? `${px - 2}px "JetBrains Mono", ui-monospace, monospace` : `${px}px "Handjet", monospace`;
+    if (draw) c.fillText(part, x + w, y);
+    w += c.measureText(part).width;
+  }
+  return w;
+}
+// разбить текст на строки не шире maxW (длинное слово режем по буквам)
+function wrapMix(c, s, maxW, px) {
+  const lines = [];
+  let cur = "";
+  for (const word of String(s).split(" ")) {
+    const tryLine = cur ? cur + " " + word : word;
+    if (mixText(c, tryLine, 0, 0, px, false) <= maxW) { cur = tryLine; continue; }
+    if (cur) lines.push(cur);
+    cur = "";
+    for (const ch of word) {
+      if (cur && mixText(c, cur + ch, 0, 0, px, false) > maxW) { lines.push(cur); cur = ""; }
+      cur += ch;
+    }
+  }
+  if (cur) lines.push(cur);
+  return lines;
+}
 function battleLook(c, e, tt) {
   switch (e.look) {
     case "slime": drawSlime(c, 0, 0, tt, e.color, { happy: e.happy }); break;
@@ -1337,7 +1414,10 @@ function battleLook(c, e, tt) {
       R(c, 4, 6, 3, 3, "#fff"); R(c, 9, 6, 3, 3, "#fff");
       R(c, 5, 7, 1, 1, "#1a1a22"); R(c, 10, 7, 1, 1, "#1a1a22");
       R(c, 6, 11, 4, 1, "#1a1a22");
-      R(c, -2, 9, 4, 6, "#c0c8d0"); R(c, 14, 9, 4, 6, "#c0c8d0");
+      // таблички «if» и «else» — широкие, чтобы надпись помещалась
+      R(c, -6, 9, 8, 6, "#c0c8d0"); R(c, 14, 9, 8, 6, "#c0c8d0");
+      R(c, -6, 9, 8, 1, "#e6ecf2"); R(c, 14, 9, 8, 1, "#e6ecf2");
+      R(c, -6, 14, 8, 1, "#9aa2ae"); R(c, 14, 14, 8, 1, "#9aa2ae");
       break;
     }
     case "serpent": {
@@ -1370,7 +1450,7 @@ function battleLook(c, e, tt) {
       R(c, 0, 4, 16, 6, "#1b1e25");
       const k = Math.floor(tt * 3) % 3;
       R(c, 2 + k * 4, 6, 3, 2, "#ff3a3a");
-      R(c, 3, 14, 10, 6, "#8a3a3a");
+      R(c, 1, 14, 14, 6, "#8a3a3a");
       R(c, 6, 0, 4, 2, "#ffcf3a");
       break;
     }

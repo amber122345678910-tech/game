@@ -249,7 +249,8 @@ function typeInto(el, text, who, instant) {
       if (i % 2 === 0 && text[i] && text[i] !== " ") sfx("blip", pitch);
       if (i >= text.length) fin();
     }, 1000 / speed);
-    typing = { el, cancel: fin, skip: fin };
+    // abort — остановить без продолжения (при сбросе игры)
+    typing = { el, cancel: fin, skip: fin, abort: () => { done = true; clearInterval(tm); typing = null; } };
   });
 }
 
@@ -334,6 +335,40 @@ async function runScene(fn) {
 }
 const queueScene = runScene;
 
+// полный сброс всего, что идёт сейчас: бой, сцены, диалог, окна поверх игры
+function resetRuntime() {
+  if (Battle.b) { Battle.b.bullets = []; Battle.b = null; }
+  Battle.active = false;
+  Battle.wait = null;
+  document.getElementById("batBtns").innerHTML = "";
+  document.getElementById("batText").textContent = "";
+  G.sceneRunning = false;
+  G.sceneQueue = [];
+  G.pendingBattle = null;
+  G.pendingTravel = null;
+  // старые сцены просто не продолжаются: их ожидания не выполняем
+  if (typing) typing.abort();
+  typing = null;
+  dlgWait = null;
+  dlgThinking(null);
+  document.getElementById("dlgChoices").innerHTML = "";
+  if (!document.getElementById("editor").hidden) { Editor.resolve = null; closeEditor(); }
+  if (!document.getElementById("chat").hidden) closeChat();
+  document.getElementById("menu").hidden = true;
+  G.overlay = null;
+  G.target = null;
+  G.near = null;
+  G.fadeDir = 0;
+  G.fadeDone = null;
+  G.fade = 0;
+  G.flashT = 0;
+  G.shakeT = 0;
+  G.particles = [];
+  G.input.dragX = 0;
+  G.input.dragY = 0;
+  panel("pad");
+}
+
 // ---------------- миры ----------------
 function enterZone(id, keepPos) {
   const def = ZONES[id];
@@ -350,6 +385,8 @@ function enterZone(id, keepPos) {
       if (mk) {
         map[ty][tx] = ".";
         if (mk.if && !mk.if()) continue;
+        // Клода-Ноль после финала нет — и невидимой стены на его месте тоже
+        if (mk.type === "boss" && mk.enemy === "zero" && G.save.flags["boss_" + id]) continue;
         const o = { ...mk, x: tx * 16, y: ty * 16 - 4, w: mk.w || 16, solid: true };
         if (mk.type === "machine") { o.y = ty * 16 - 18; }
         if (mk.type === "clock") { o.y = ty * 16; }
@@ -489,7 +526,12 @@ function update(dt) {
     if ((G.fadeDir > 0 && G.fade >= 1) || (G.fadeDir < 0 && G.fade <= 0)) { G.fadeDir = 0; const r = G.fadeDone; G.fadeDone = null; r && r(); }
   }
   updateInputAxes();
-  if (Battle.active) { battleUpdate(dt); return; }
+  if (Battle.active) {
+    // пока открыт редактор, чат или меню — бой стоит на паузе
+    if (!G.overlay) battleUpdate(dt);
+    else { G.input.dragX = 0; G.input.dragY = 0; }
+    return;
+  }
   if (G.mode !== "world" || !G.zone) return;
   const z = G.zone;
   const p = G.player;
@@ -527,12 +569,18 @@ function update(dt) {
     G.trail.push({ x: p.x, y: p.y, dir: p.dir });
     if (G.trail.length > 60) G.trail.shift();
   } else p.step = 0;
-  // Клод идёт следом
-  const lag = Math.max(0, G.trail.length - Math.round(14 / Math.max(0.5, Math.min(2, R_.speed || 1))));
-  const tp = G.trail[lag];
+  // Клод идёт следом: берём точку следа примерно в 16 px позади (по пути), на любой скорости
+  let tp = null;
+  for (let i = G.trail.length - 1, acc = 0; i > 0; i--) {
+    const a = G.trail[i], b = G.trail[i - 1];
+    acc += Math.hypot(a.x - b.x, a.y - b.y);
+    if (acc >= 16) { tp = b; break; }
+  }
+  if (!tp) tp = G.trail[0];
   if (tp && Math.hypot(tp.x - p.x, tp.y - p.y) > 10) {
-    G.claude.x += (tp.x - G.claude.x) * Math.min(1, dt * 8);
-    G.claude.y += (tp.y - G.claude.y) * Math.min(1, dt * 8);
+    const k = Math.min(1, dt * 8 * Math.max(1, R_.speed || 1));
+    G.claude.x += (tp.x - G.claude.x) * k;
+    G.claude.y += (tp.y - G.claude.y) * k;
     G.claude.dir = tp.dir;
   }
   // жуки-баги
@@ -900,9 +948,20 @@ function render() {
     list.sort((a, b) => a.y - b.y);
     for (const it of list) it.f();
     ambient(c, z, ox, oy);
-    // «!» над тем, с чем можно поговорить
-    if (G.near) {
-      const n = G.near.type === "claude" ? G.claude : G.near;
+    // стрелка над портал-аппаратом, пока не пройден первый урок
+    if (!G.save.practice.l1) for (const o of z.objs) if (o.type === "machine" && G.near !== o) {
+      const ax = o.x + 12, ay = Math.round(o.y - 16 + Math.sin(G.t * 5) * 2);
+      R(c, ax + 1, ay - 1, 6, 5, INK); R(c, ax - 2, ay + 3, 12, 1, INK); R(c, ax + 3, ay + 9, 2, 1, INK);
+      for (let i = 0; i < 5; i++) R(c, ax - 2 + i, ay + 4 + i, 12 - i * 2, 1, INK);
+      R(c, ax + 2, ay, 4, 4, "#ffe03a");
+      for (let i = 0; i < 5; i++) R(c, ax - 1 + i, ay + 4 + i, 10 - i * 2, 1, "#ffe03a");
+      R(c, ax + 2, ay, 1, 4, "#fff3b0");
+    }
+    // у Клода свой значок: только когда есть что показать ему (домашка)
+    if (G.save.rules.claudeFollows && hwAttention()) drawHwBubble(c, G.claude.x, G.claude.y);
+    // «!» над тем, с чем можно поговорить (над Клодом-спутником не рисуем)
+    if (G.near && G.near.type !== "claude") {
+      const n = G.near;
       const bx = Math.round(n.x + (n.w ? n.w / 2 : 8) - 4), by = Math.round(n.y - 11 + Math.sin(G.t * 6) * 1.5);
       R(c, bx - 1, by - 1, 11, 11, INK);
       R(c, bx + 3, by + 10, 3, 2, INK);
@@ -961,6 +1020,40 @@ function resizeScreen() {
   scr.height = Math.max(H, Math.round(r.height * dpr));
 }
 
+// ---------------- домашка ждёт Клода ----------------
+// есть ли что показать Клоду: проверенная домашка или заданная, в которой уже есть свой код
+const HWA = { t: -1, v: false };
+function hwAttention() {
+  const s = G.save;
+  if (!s) return false;
+  if (Math.abs(G.t - HWA.t) < 0.5) return HWA.v;
+  HWA.t = G.t;
+  const hasCode = (key) => {
+    const own = (s.code[key] || "").trim();
+    if (!own) return false;
+    try { return own !== (taskFor(key).starter || "").trim(); } catch (e) { return false; }
+  };
+  let v = false;
+  for (const h in s.hw) if (s.hw[h] === "checked" || (s.hw[h] === "given" && hasCode("h:" + h))) v = true;
+  for (const h of s.customHw || []) if (h.status !== "done" && hasCode("c:" + h.id)) v = true;
+  HWA.v = v;
+  return v;
+}
+// оранжевое облачко со свитком над Клодом
+function drawHwBubble(c, x, y) {
+  const bx = Math.round(x + 2), by = Math.round(y - 15 + Math.sin(G.t * 5) * 1.5);
+  const hi = Math.floor(G.t * 3) % 2;
+  R(c, bx - 1, by - 1, 14, 12, INK);
+  R(c, bx + 4, by + 11, 4, 2, INK); R(c, bx + 5, by + 13, 2, 1, INK);
+  R(c, bx, by, 12, 10, hi ? "#ffa04a" : "#ff8a27");
+  R(c, bx + 5, by + 10, 2, 2, hi ? "#ffa04a" : "#ff8a27");
+  R(c, bx, by, 12, 1, "#ffc890");
+  // свиток
+  R(c, bx + 2, by + 2, 8, 6, "#f2e6c8");
+  R(c, bx + 2, by + 2, 1, 6, "#b08850"); R(c, bx + 9, by + 2, 1, 6, "#b08850");
+  R(c, bx + 4, by + 3, 4, 1, "#6a4a2a"); R(c, bx + 4, by + 5, 3, 1, "#6a4a2a");
+}
+
 // ---------------- HUD ----------------
 function updateHud() {
   if (!G.save) return;
@@ -971,9 +1064,11 @@ function updateHud() {
   document.getElementById("hudHp").textContent = `${s.hp}/${max}`;
   document.getElementById("hudGold").textContent = s.gold;
   document.getElementById("objective").textContent = "➤ " + objective();
-  const ready = Object.values(s.hw).filter((v) => v === "checked").length;
-  document.getElementById("btnCode").classList.toggle("ping", Object.values(s.hw).some((v) => v === "given"));
-  document.getElementById("btnChat").dataset.badge = ready ? "!" : "";
+  // в чате нельзя сдать домашку, поэтому «!» на 💬 не ставим: значок рисуется над Клодом в мире
+  const ready = Object.values(s.hw).some((v) => v === "checked");
+  document.getElementById("btnCode").classList.toggle("ping", Object.values(s.hw).some((v) => v === "given") || (ready && !s.rules.claudeFollows));
+  document.getElementById("btnChat").dataset.badge = "";
+  HWA.t = -1;
   applyRules();
 }
 function applyRules() {
@@ -1043,7 +1138,7 @@ function setupInput() {
   // нажатие на экран: идти туда или поговорить с тем, на кого нажал
   scr.addEventListener("pointerdown", (e) => {
     audioUnlock();
-    if (Battle.active) { if (Battle.b.phase === "fight") strike(); return; }
+    if (Battle.active) { if (Battle.b.phase === "fight") strike(); else if (Battle.b.phase !== "dodge") batTap(); return; }
     if (curPanel === "dlg") { dlgTap(); return; }
     if (G.mode !== "world" || G.sceneRunning || G.overlay) return;
     const r = scr.getBoundingClientRect();
@@ -1070,7 +1165,7 @@ function setupInput() {
 }
 function pressA() {
   if (G.overlay) return;
-  if (Battle.active) { if (Battle.b.phase === "fight") strike(); else if (typing) typing.skip(); return; }
+  if (Battle.active) { if (Battle.b.phase === "fight") strike(); else batTap(); return; }
   if (curPanel === "dlg") return dlgTap();
   if (G.mode === "world" && !G.sceneRunning) { const n = nearestInteract(); if (n) interact(n); }
 }
@@ -1114,8 +1209,10 @@ function menuTab(tab) {
         <div><span>Запусков кода</span><b>${s.stats.runs || 0}</b></div>
       </div>
       <h3>Вещи</h3>
-      ${s.items.length ? s.items.map((it, i) => `<div class="row"><div><b>${escHtml(it.name)}</b><small>${escHtml(it.desc || "")}</small></div><button class="pill" data-eat="${i}">Съесть +${it.heal}</button></div>`).join("") : '<p class="dim">Пусто. Загляни в холодильник Клода.</p>'}`;
+      ${s.items.length && Battle.active ? '<p class="dim">Идёт бой. Чтобы съесть вещь, закрой меню и нажми ✚ ВЕЩИ — на это уйдёт твой ход.</p>' : ""}
+      ${s.items.length ? s.items.map((it, i) => `<div class="row"><div><b>${escHtml(it.name)}</b><small>${escHtml(it.desc || "")}</small></div><button class="pill" data-eat="${i}"${Battle.active ? ' disabled style="opacity:.55"' : ""}>${Battle.active ? "В бою — через ВЕЩИ" : "Съесть +" + it.heal}</button></div>`).join("") : '<p class="dim">Пусто. Загляни в холодильник Клода.</p>'}`;
     el.querySelectorAll("[data-eat]").forEach((b) => (b.onclick = () => {
+      if (Battle.active) return;
       const it = s.items.splice(+b.dataset.eat, 1)[0];
       s.hp = Math.min(max, s.hp + it.heal);
       sfx("heal");
@@ -1127,19 +1224,45 @@ function menuTab(tab) {
       return `<div class="row"><div><b>${s.practice[L.id] ? "✅" : avail ? "📘" : "🔒"} Урок ${L.n}: ${L.title}</b><small>${escHtml(L.topic)} · ${ZONES[L.zone].name}</small></div>${avail ? `<button class="pill" data-open="p:${L.id}">Открыть</button>` : ""}</div>`;
     }).join("");
   } else if (tab === "hw") {
-    const rows = LESSONS.map((L) => {
+    // сначала то, что надо делать сейчас, потом сданное; закрытые — одной строкой
+    const row = (L) => {
       const st = s.hw[L.homework.id];
-      const txt = { given: "📝 задана", checked: "✅ проверена — покажи Клоду", done: "⭐ сдана" }[st] || "🔒 ещё не задана";
-      return `<div class="row"><div><b>№${L.n} ${L.homework.title}</b><small>${txt}</small></div>${st ? `<button class="pill" data-open="h:${L.homework.id}">Открыть</button>` : ""}</div>`;
-    });
-    for (const h of s.customHw || []) rows.push(`<div class="row"><div><b>★ ${escHtml(h.title)}</b><small>${h.status === "done" ? "⭐ сдана" : "от живого Клода"}</small></div><button class="pill" data-open="c:${h.id}">Открыть</button></div>`);
+      const txt = { given: "📝 задана", checked: "✅ проверена — покажи Клоду", done: "⭐ сдана" }[st];
+      return `<div class="row"><div><b>№${L.n} ${L.homework.title}</b><small>${txt}</small></div><button class="pill" data-open="h:${L.homework.id}">Открыть</button></div>`;
+    };
+    const crow = (h) => `<div class="row"><div><b>★ ${escHtml(h.title)}</b><small>${h.status === "done" ? "⭐ сдана" : "📝 от живого Клода"}</small></div><button class="pill" data-open="c:${h.id}">Открыть</button></div>`;
+    const hwOf = (st) => LESSONS.filter((L) => s.hw[L.homework.id] === st);
+    const custom = s.customHw || [];
+    const rows = [
+      ...hwOf("checked").map(row), ...hwOf("given").map(row), ...custom.filter((h) => h.status !== "done").map(crow),
+      ...hwOf("done").map(row), ...custom.filter((h) => h.status === "done").map(crow),
+    ];
+    const locked = LESSONS.filter((L) => !s.hw[L.homework.id]).length;
+    const word = locked % 10 === 1 && locked % 100 !== 11 ? "домашка" : [2, 3, 4].includes(locked % 10) && ![12, 13, 14].includes(locked % 100) ? "домашки" : "домашек";
+    if (locked) rows.push(`<div class="row"><div><b>🔒 Ещё ${locked} ${word}</b><small>${word === "домашка" ? "откроется" : "откроются"} позже, после уроков</small></div></div>`);
     el.innerHTML = `<p class="dim">Сделай домашку в редакторе, нажми «Проверить», а потом подойди к Клоду в мире и выбери «Показать домашку».</p>` + rows.join("");
   } else if (tab === "rules") {
     const r = s.rules;
-    const names = { speed: "Скорость", maxHpBonus: "Бонус HP", attackBonus: "Бонус атаки", enemyDamage: "Урон врагов ×", bulletSpeed: "Скорость пуль ×", godMode: "Бессмертие", weather: "Погода", worldHue: "Цвет мира", playerColor: "Цвет одежды", playerSize: "Размер", hat: "Шляпа", night: "Ночь", encounters: "Жуки-баги", claudeFollows: "Клод рядом", textSpeed: "Скорость текста" };
+    const names = { speed: "Скорость", maxHpBonus: "Бонус HP", attackBonus: "Бонус атаки", enemyDamage: "Урон врагов", bulletSpeed: "Скорость пуль", godMode: "Бессмертие", weather: "Погода", worldHue: "Цвет мира", playerColor: "Цвет одежды", playerSize: "Размер", hat: "Шляпа", night: "Ночь", encounters: "Жуки-баги", claudeFollows: "Клод рядом", textSpeed: "Скорость текста" };
     const changed = Object.keys(names).filter((k) => r[k] !== RULE_DEFAULTS[k]);
+    // значения по-русски, без true/snow/#ff7ac0
+    const WEATHER = { none: "нет", rain: "дождь", snow: "снег", confetti: "конфетти", glitch: "глюки", stars: "звёзды", leaves: "листопад" };
+    const HATS = { none: "нет", crown: "корона", cap: "кепка", wizard: "шляпа волшебника", horns: "рожки", tophat: "цилиндр", antenna: "антенна" };
+    const swatch = (col) => `<span style="display:inline-block;width:16px;height:16px;background:${col};border:2px solid #fff;vertical-align:-3px;margin-left:6px"></span>`;
+    const num = (v) => String(Math.round(v * 100) / 100).replace(".", ",");
+    const nice = (k) => {
+      const v = r[k];
+      if (typeof v === "boolean") return v ? "вкл" : "выкл";
+      if (k === "weather") return WEATHER[v] || escHtml(String(v));
+      if (k === "hat") return HATS[v] || escHtml(String(v));
+      if (k === "playerColor") return /^#[0-9a-f]{6}$/i.test(v || "") ? "свой" + swatch(v) : "обычный";
+      if (k === "worldHue") return v ? "другой" + swatch(`hsl(${Math.round(120 + v) % 360}, 70%, 50%)`) : "обычный";
+      if (k === "maxHpBonus" || k === "attackBonus") return "+" + num(v);
+      if (k === "textSpeed") return num(v) + " из 5";
+      return "×" + num(v);
+    };
     el.innerHTML = `<p class="dim">Эти правила меняет Профессор Клод. Напиши ему в чат 💬, например: «сделай меня в два раза быстрее» или «включи ночь и снег».</p>
-      ${changed.length ? changed.map((k) => `<div class="row"><div><b>${names[k]}</b></div><code>${escHtml(String(r[k]))}</code></div>`).join("") : '<p class="dim">Все правила обычные.</p>'}
+      ${changed.length ? changed.map((k) => `<div class="row"><div><b>${names[k]}</b></div><b class="rv">${nice(k)}</b></div>`).join("") : '<p class="dim">Все правила обычные.</p>'}
       <button class="pill wide" id="rulesReset">Вернуть обычные правила</button>`;
     document.getElementById("rulesReset").onclick = () => { Object.assign(s.rules, RULE_DEFAULTS); s.hp = Math.min(s.hp, playerMaxHp()); applyRules(); menuTab("rules"); };
   } else if (tab === "settings") {
@@ -1149,7 +1272,7 @@ function menuTab(tab) {
       <div class="row"><div><b>Режим Клода в чате</b><small>Быстрый — отвечает сразу. Умный — думает дольше, объясняет лучше.</small></div><button class="pill" id="setSmart">${s.settings.smart ? "🧠 Умный" : "⚡ Быстрый"}</button></div>
       <div class="row"><div><b>Сохранение</b><small>${Store.db ? "Сохраняется в твоём аккаунте Claude и в браузере." : "Сохраняется в браузере на этом телефоне."}</small></div><button class="pill" id="setSave">Сохранить</button></div>
       <div class="row"><div><b>Начать заново</b><small>Сотрёт весь прогресс</small></div><button class="pill danger" id="setReset">Стереть</button></div>
-      <p class="dim">Управление: джойстик слева — ходить, A — говорить, или просто нажимай на экран куда идти и на кого смотреть. Кнопка &lt;/&gt; — редактор кода, 💬 — живой Клод.</p>`;
+      <p class="dim">Управление: джойстик ${padWhere()} — ходить, A — говорить, или просто нажимай на экран, куда идти и с кем говорить. Кнопка &lt;/&gt; — редактор кода, 💬 — живой Клод.</p>`;
     document.getElementById("setMusic").onclick = () => { s.settings.music = !s.settings.music; if (s.settings.music) { Snd.theme = null; music(Snd.want); } menuTab("settings"); };
     document.getElementById("setSfx").onclick = () => { s.settings.sfx = !s.settings.sfx; menuTab("settings"); };
     document.getElementById("setSmart").onclick = () => { s.settings.smart = !s.settings.smart; Claude.paintMode && Claude.paintMode(); menuTab("settings"); };
@@ -1159,13 +1282,22 @@ function menuTab(tab) {
       if (rb.dataset.armed !== "1") { rb.dataset.armed = "1"; rb.textContent = "Точно? Нажми ещё"; return; }
       try { localStorage.removeItem(SAVE_KEY); } catch (e) {}
       if (Store.db) Store.db.doc("data/users/" + Store.uid + "/save").delete().catch(() => {});
+      clearTimeout(saveTimer);
+      resetRuntime();
       G.save = null;
-      closeMenu();
+      G.zone = null;
       G.mode = "title";
       showTitle();
     };
   }
   el.querySelectorAll("[data-open]").forEach((b) => (b.onclick = () => { closeMenu(); openEditor(b.dataset.open); }));
+}
+
+// где джойстик: в широком экране пульт справа от картинки, в узком — под ней
+function padWhere() {
+  const st = document.getElementById("stage").getBoundingClientRect();
+  const pn = document.getElementById("panel").getBoundingClientRect();
+  return pn.left >= st.right - 4 ? "справа от экрана" : "внизу слева";
 }
 
 // ---------------- титульный экран и новая игра ----------------
@@ -1189,6 +1321,7 @@ function setupTitle() {
     const b = document.createElement("button");
     b.className = "sw" + (i === 0 ? " on" : "");
     b.style.background = c;
+    b.type = "button";
     b.setAttribute("aria-label", "Цвет одежды " + (i + 1));
     b.onclick = () => { shirt = c; sw.querySelectorAll(".sw").forEach((x) => x.classList.remove("on")); b.classList.add("on"); drawPreview(); };
     sw.appendChild(b);
@@ -1198,6 +1331,7 @@ function setupTitle() {
     const b = document.createElement("button");
     b.className = "sw" + (i === 0 ? " on" : "");
     b.style.background = c;
+    b.type = "button";
     b.setAttribute("aria-label", "Цвет волос " + (i + 1));
     b.onclick = () => { hair = c; hw.querySelectorAll(".sw").forEach((x) => x.classList.remove("on")); b.classList.add("on"); drawPreview(); };
     hw.appendChild(b);
@@ -1231,6 +1365,7 @@ function setupTitle() {
 }
 
 function startGame(save, fresh) {
+  resetRuntime();
   G.save = save;
   G.save.hp = Math.min(G.save.hp || 20, playerMaxHp());
   if (fresh) G.save.hp = playerMaxHp();
@@ -1258,7 +1393,7 @@ async function introScene() {
   if (c === 0) await say("claude", "Отлично! Значит, научу с нуля. Все лучшие программисты начинали с нуля. Буквально все. Я проверял.");
   else await say("claude", "Вот это настрой! Но сначала научу, а то ты нам реальность сломаешь ещё сильнее.");
   await say("claude", "Код в этой мультивселенной пишется на Luau. Это язык Roblox. Всё, что выучишь здесь, заработает в настоящем Roblox Studio.");
-  await say("claude", "Управление: джойстик внизу слева — ходить. Кнопка A — говорить. Или просто нажимай на экран, куда идти.");
+  await say("claude", `Управление: джойстик ${padWhere()} — ходить. Кнопка A — говорить. Или просто нажимай на экран, куда идти.`);
   await say("claude", "А если захочешь спросить меня о чём угодно — жми 💬 вверху. Я отвечу по-настоящему. И даже могу поменять правила игры. Я же гений.");
   await say("claude", "Теперь подойди к портал-аппарату. Вон та штука посередине, которая искрит.");
   s.flags.intro = true;
