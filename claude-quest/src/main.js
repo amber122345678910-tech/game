@@ -607,16 +607,37 @@ function drawLook(c, look, x, y, t, color, extra = {}) {
     case "townie": return drawKid(c, x, y, "down", 0, { shirt: "#c05a8a", hair: "#2a1a1a" });
     case "kid": return drawKid(c, x, y, "down", 0, { shirt: color || "#ff8ad0" });
     case "guard": {
-      R(c, x + 6, y + 12, 4, 8, "#4a3424"); R(c, x + 1, y + 2, 14, 11, "#1f6b4a"); R(c, x + 4, y - 2, 8, 5, "#1f6b4a");
-      R(c, x + 4, y + 5, 2, 2, "#ffe03a"); R(c, x + 10, y + 5, 2, 2, "#ffe03a"); return;
+      x = Math.round(x); y = Math.round(y);
+      shadow(c, x, y, 14);
+      const blink = Math.floor(t * 0.7) % 5 === 0 && t % 1.4 < 0.15;
+      return sprite(c, "guard" + (blink ? 1 : 0), x, y, (g, X, Y) => {
+        R(g, X + 6, Y + 12, 4, 8, "#4a3424"); R(g, X + 9, Y + 12, 1, 8, "#33241a");
+        R(g, X + 3, Y + 18, 3, 2, "#4a3424"); R(g, X + 10, Y + 18, 3, 2, "#4a3424");
+        R(g, X + 1, Y + 2, 14, 11, "#1f6b4a"); R(g, X + 4, Y - 2, 8, 5, "#1f6b4a");
+        R(g, X + 4, Y - 2, 4, 1, "#3a9a6a"); R(g, X + 1, Y + 2, 2, 5, "#3a9a6a"); R(g, X + 12, Y + 3, 3, 10, "#164a34");
+        R(g, X + 1, Y + 12, 14, 1, "#164a34");
+        if (blink) { R(g, X + 4, Y + 6, 2, 1, "#ffe03a"); R(g, X + 10, Y + 6, 2, 1, "#ffe03a"); }
+        else { R(g, X + 4, Y + 5, 2, 2, "#ffe03a"); R(g, X + 10, Y + 5, 2, 2, "#ffe03a"); }
+        R(g, X + 6, Y + 9, 4, 1, "#0d3a24");
+      });
     }
     case "serpent": {
-      for (let i = 0; i < 10; i++) { const a = t * 2 + (i / 10) * Math.PI * 2; R(c, x + 8 + Math.cos(a) * 6 - 1, y + 12 + Math.sin(a) * 6 - 1, 3, 3, i ? "#8a5ad6" : "#d6a8ff"); }
+      // каждый сегмент с тёмной каймой
+      for (let i = 9; i >= 0; i--) { const a = t * 2 + (i / 10) * Math.PI * 2; R(c, x + 8 + Math.cos(a) * 6 - 2, y + 12 + Math.sin(a) * 6 - 2, 5, 5, INK); }
+      for (let i = 9; i >= 0; i--) { const a = t * 2 + (i / 10) * Math.PI * 2; R(c, x + 8 + Math.cos(a) * 6 - 1, y + 12 + Math.sin(a) * 6 - 1, 3, 3, i ? (i % 2 ? "#8a5ad6" : "#6a3ab5") : "#d6a8ff"); }
       return;
     }
     case "lavaboss": {
-      R(c, x, y + 4, 16, 16, "#ff5a1f"); R(c, x, y + 4, 16, 3, "#ffb03a");
-      R(c, x + 3, y + 10, 3, 3, "#1a1a22"); R(c, x + 10, y + 10, 3, 3, "#1a1a22"); return;
+      x = Math.round(x); y = Math.round(y);
+      shadow(c, x, y, 14);
+      const g2 = Math.floor(t * 3) % 2;
+      return sprite(c, "lavaboss" + g2, x, y, (g, X, Y) => {
+        R(g, X, Y + 4, 16, 16, "#ff5a1f"); R(g, X, Y + 4, 16, 3, "#ffb03a");
+        R(g, X + 2, Y + 8 + g2, 5, 2, "#d23c12"); R(g, X + 9, Y + 15 - g2, 5, 2, "#d23c12");
+        R(g, X + 3, Y + 10, 3, 3, "#1a1a22"); R(g, X + 10, Y + 10, 3, 3, "#1a1a22");
+        R(g, X + 3, Y + 10, 1, 1, "#ffe36b"); R(g, X + 10, Y + 10, 1, 1, "#ffe36b");
+        R(g, X + 3, Y + 5, 2, 1, "#ffe36b"); R(g, X + 11, Y + 5, 3, 1, "#ffe36b");
+      });
     }
     case "zero": return drawClaude(c, x, y, "down", t, { color: "#6a6a7a", dark: "#4a4a5a", evil: true, coat: "#2a2a33", noGun: true });
     case "glitchik": return drawClaude(c, x, y, "down", t, { color: "#c88ad6", dark: "#9a5aaa", noGun: true });
@@ -660,6 +681,195 @@ function drawPlayerSprite(c) {
   c.restore();
 }
 
+// статичный слой тайлов зоны рисуется один раз; каждый кадр — только живые тайлы
+const LAYER = { z: null, open: null, cv: null, at: null, anim: [], props: [] };
+function zoneLayer(z) {
+  if (LAYER.z === z && LAYER.open === z.glitchOpen && LAYER.cv) return LAYER;
+  LAYER.z = z;
+  LAYER.open = z.glitchOpen;
+  const cv = LAYER.cv || (LAYER.cv = document.createElement("canvas"));
+  cv.width = z.w * 16;
+  cv.height = z.h * 16;
+  const g = cv.getContext("2d");
+  g.imageSmoothingEnabled = false;
+  const at = (tx, ty) => (tx < 0 || ty < 0 || tx >= z.w || ty >= z.h ? null : z.map[ty][tx] === "x" && z.glitchOpen ? "." : z.map[ty][tx]);
+  LAYER.at = at;
+  LAYER.anim = [];
+  LAYER.props = [];
+  const props = [];
+  for (let ty = 0; ty < z.h; ty++) for (let tx = 0; tx < z.w; tx++) {
+    const ch = at(tx, ty);
+    const nb = (dx, dy) => at(tx + dx, ty + dy);
+    drawTile(g, ch, tx * 16, ty * 16, z.id, 0, tx, ty, nb);
+    const k = tileAnim(ch, z.id, tx, ty, nb);
+    if (k) LAYER.anim.push({ ch, tx, ty, k, nb });
+    if (ch === "T" || ch === "o" || ch === "B") props.push([ch, tx, ty]);
+  }
+  for (const [ch, tx, ty] of props) {
+    drawProp(g, ch, tx * 16, ty * 16, z.id, tx, ty);
+    // дерево рядом с живым тайлом рисуем поверх каждый кадр, чтобы край не затирался
+    if (LAYER.anim.some((a) => a.k === 1 && Math.abs(a.tx - tx) <= 1 && Math.abs(a.ty - ty) <= 1)) LAYER.props.push([ch, tx, ty]);
+  }
+  return LAYER;
+}
+
+// живность зоны: пузыри, светлячки, пыль, искры, глюки
+const AMB = { z: null, list: [], t: 0, acc: 0 };
+const AMB_RATE = { lab: 1.2, slime: 6, forest: 3, loop: 4, robo: 1.4, cube: 5, core: 9 };
+function ambient(c, z, ox, oy) {
+  let dt = G.t - AMB.t;
+  AMB.t = G.t;
+  if (!(dt > 0 && dt < 0.1)) dt = 0.016;
+  if (AMB.z !== z) { AMB.z = z; AMB.list = []; AMB.acc = 0; }
+  const L = AMB.list, id = z.id, at = LAYER.at, rnd = Math.random;
+  // ищем случайный тайл нужного вида на экране
+  const pick = (ok) => {
+    for (let i = 0; i < 6; i++) {
+      const wx = ox + rnd() * W, wy = oy + rnd() * H;
+      const tx = Math.floor(wx / 16), ty = Math.floor(wy / 16);
+      if (ok(at(tx, ty), tx, ty)) return { x: wx, y: wy, tx, ty };
+    }
+    return null;
+  };
+  AMB.acc = Math.min(3, AMB.acc + dt * (AMB_RATE[id] || 0));
+  while (AMB.acc >= 1 && L.length < 60) {
+    AMB.acc -= 1;
+    if (id === "slime") {
+      const p = pick((ch) => ch === "~");
+      if (p) L.push({ k: "bub", x: p.x, y: p.y, vx: 0, vy: -7, t: 0, life: 0.7 + rnd() * 0.6 });
+      else if (rnd() < 0.3) L.push({ k: "spore", x: ox + rnd() * W, y: oy + rnd() * H, vx: (rnd() - 0.5) * 4, vy: -3 - rnd() * 3, t: 0, life: 3 + rnd() * 2, ph: rnd() * 6 });
+    } else if (id === "forest") {
+      if (L.length < 16) L.push({ k: "fly", x: ox + rnd() * W, y: oy + rnd() * H, vx: 0, vy: 0, t: 0, life: 4 + rnd() * 4, ph: rnd() * 6 });
+    } else if (id === "loop") {
+      L.push({ k: rnd() < 0.6 ? "dust" : "leaf", x: ox - 30 + rnd() * (W + 30), y: oy - 4, vx: 5 + rnd() * 6, vy: 9 + rnd() * 8, t: 0, life: 14, ph: rnd() * 6 });
+    } else if (id === "robo") {
+      const p = pick((ch, tx, ty) => ch === "=" || (ch === "#" && at(tx, ty + 1) !== "#" && at(tx, ty + 1) !== null));
+      if (p) for (let i = 0; i < 5; i++) L.push({ k: "spark", x: p.x, y: p.y, vx: (rnd() - 0.5) * 50, vy: -20 - rnd() * 35, t: 0, life: 0.35 + rnd() * 0.35 });
+    } else if (id === "cube") {
+      const p = pick((ch) => ch === "^");
+      if (p) L.push({ k: "ember", x: p.x, y: p.y, vx: (rnd() - 0.5) * 6, vy: -12 - rnd() * 10, t: 0, life: 1 + rnd() * 0.8, ph: rnd() * 6 });
+      else if (rnd() < 0.3) L.push({ k: "tw", x: ox + rnd() * W, y: oy + rnd() * H, vx: 0, vy: 0, t: 0, life: 0.6 });
+    } else if (id === "core") {
+      L.push({ k: "gl", x: ox + rnd() * W, y: oy + rnd() * H, vx: 0, vy: 0, t: 0, life: 0.06 + rnd() * 0.16, w: 3 + Math.floor(rnd() * 10), h: rnd() < 0.3 ? 2 : 1, c: ["#ff3a8a", "#3affd8", "#ffe03a", "#8a3aff"][Math.floor(rnd() * 4)] });
+    } else {
+      L.push({ k: "mote", x: ox + rnd() * W, y: oy + rnd() * H, vx: (rnd() - 0.5) * 3, vy: -2 - rnd() * 2, t: 0, life: 3 + rnd() * 3 });
+    }
+  }
+  let n = 0;
+  for (const p of L) {
+    p.t += dt;
+    if (p.t >= p.life) continue;
+    L[n++] = p;
+    const f = p.t / p.life;
+    p.x += p.vx * dt;
+    p.y += p.vy * dt;
+    switch (p.k) {
+      case "bub":
+        if (f < 0.8) R(c, p.x, p.y, f < 0.35 ? 1 : 2, f < 0.35 ? 1 : 2, "#e0ffd0");
+        else { R(c, p.x - 1, p.y, 1, 1, "#e0ffd0"); R(c, p.x + 2, p.y, 1, 1, "#e0ffd0"); R(c, p.x, p.y - 2, 2, 1, "#e0ffd0"); }
+        break;
+      case "spore":
+        c.globalAlpha = Math.sin(f * Math.PI) * 0.8;
+        R(c, p.x + Math.sin(G.t * 2 + p.ph) * 2, p.y, 1, 1, "#d8ffa0");
+        c.globalAlpha = 1;
+        break;
+      case "fly": {
+        p.x += Math.cos(G.t * 0.9 + p.ph) * 9 * dt;
+        p.y += Math.sin(G.t * 1.3 + p.ph * 2) * 7 * dt;
+        const gl = ((Math.sin(G.t * 3 + p.ph) + 1) / 2) * Math.sin(f * Math.PI);
+        if (gl < 0.1) break;
+        c.globalAlpha = gl * 0.4;
+        R(c, p.x - 1, p.y, 3, 1, "#d8ff7a"); R(c, p.x, p.y - 1, 1, 3, "#d8ff7a");
+        c.globalAlpha = gl;
+        R(c, p.x, p.y, 1, 1, "#f8ffc0");
+        c.globalAlpha = 1;
+        break;
+      }
+      case "dust":
+        R(c, p.x + Math.sin(G.t * 2 + p.ph) * 2, p.y, 1, 1, Math.floor(G.t * 6 + p.ph) % 3 ? "#f2c46b" : "#fff3c8");
+        break;
+      case "leaf": {
+        const fl = Math.floor(G.t * 4 + p.ph) % 2;
+        const lx = p.x + Math.sin(G.t * 1.5 + p.ph) * 4;
+        R(c, lx, p.y, fl ? 2 : 1, fl ? 1 : 2, p.ph > 3 ? "#e0a05a" : "#c86a8a");
+        break;
+      }
+      case "spark":
+        p.vy += 140 * dt;
+        R(c, p.x - p.vx * 0.02, p.y - p.vy * 0.02, 1, 1, "#ff8a3a");
+        R(c, p.x, p.y, 1, 1, f < 0.3 ? "#ffffff" : f < 0.6 ? "#ffe36b" : "#ff9a3a");
+        break;
+      case "ember":
+        c.globalAlpha = 1 - f;
+        R(c, p.x + Math.sin(G.t * 3 + p.ph), p.y, 1, 1, f < 0.5 ? "#ffd84a" : "#ff6a2a");
+        c.globalAlpha = 1;
+        break;
+      case "tw":
+        R(c, p.x, p.y, 1, 1, "#ffffff");
+        if (f < 0.5) { R(c, p.x - 1, p.y, 3, 1, "rgba(255,255,255,0.6)"); R(c, p.x, p.y - 1, 1, 3, "rgba(255,255,255,0.6)"); }
+        break;
+      case "gl":
+        R(c, p.x, p.y, p.w, p.h, p.c);
+        break;
+      case "mote":
+        c.globalAlpha = Math.sin(f * Math.PI) * 0.45;
+        R(c, p.x, p.y, 1, 1, "#d8e0ff");
+        c.globalAlpha = 1;
+        break;
+    }
+  }
+  L.length = n;
+}
+
+// мягкая виньетка по краям: считается один раз
+let VIGNETTE = null;
+function vignette(c) {
+  if (!VIGNETTE) {
+    VIGNETTE = document.createElement("canvas");
+    VIGNETTE.width = W;
+    VIGNETTE.height = H;
+    const g = VIGNETTE.getContext("2d");
+    const gr = g.createRadialGradient(W / 2, H / 2, 80, W / 2, H / 2, 165);
+    gr.addColorStop(0, "rgba(0,0,0,0)");
+    gr.addColorStop(0.6, "rgba(0,0,0,0.12)");
+    gr.addColorStop(1, "rgba(0,0,0,0.38)");
+    g.fillStyle = gr;
+    g.fillRect(0, 0, W, H);
+  }
+  c.drawImage(VIGNETTE, 0, 0);
+}
+
+// погода: только рисование частиц
+function drawWeather(c) {
+  const w = G.save.rules.weather;
+  if (w === "rain") { c.fillStyle = "rgba(20,40,80,0.18)"; c.fillRect(0, 0, W, H); }
+  else if (w === "snow") { c.fillStyle = "rgba(200,220,255,0.07)"; c.fillRect(0, 0, W, H); }
+  for (const q of G.particles) {
+    if (q.w === "rain") { R(c, q.x, q.y, 1, 5, "rgba(150,190,255,0.55)"); R(c, q.x, q.y + 4, 1, 2, "rgba(220,235,255,0.85)"); }
+    else if (q.w === "snow") {
+      const sx = q.x + Math.sin(q.t * 2 + q.vx) * 2;
+      if (q.vy > 30) { R(c, sx - 1, q.y + 2, 3, 1, "rgba(30,40,80,0.35)"); R(c, sx - 1, q.y, 3, 1, "#fff"); R(c, sx, q.y - 1, 1, 3, "#fff"); }
+      else { R(c, sx + 1, q.y + 1, 1, 1, "rgba(30,40,80,0.35)"); R(c, sx, q.y, 1, 1, "#fff"); }
+    }
+    else if (q.w === "confetti") { const s = Math.floor(q.t * 8 + q.x) % 2; R(c, q.x, q.y, s ? 2 : 3, s ? 3 : 1, q.c); }
+    else if (q.w === "leaves") {
+      const col = ["#e08a3a", "#c05a2a", "#e0c03a"][Math.floor(q.vx) % 3];
+      const s = Math.floor(q.t * 5 + q.vx) % 2;
+      const lx = q.x + Math.sin(q.t * 3 + q.vx) * 3;
+      R(c, lx, q.y, 3, 2, col); R(c, lx + (s ? 2 : 0), q.y + (s ? 0 : 1), 1, 1, pxShade(col, -0.3));
+    }
+    else if (q.w === "stars") {
+      const a = Math.sin((q.t / q.life) * Math.PI);
+      c.globalAlpha = a;
+      R(c, q.x, q.y, 1, 1, "#fff");
+      R(c, q.x - 1, q.y, 3, 1, "rgba(255,255,255,0.5)");
+      if (a > 0.7) R(c, q.x, q.y - 1, 1, 3, "rgba(255,255,255,0.5)");
+      c.globalAlpha = 1;
+    }
+    else if (q.w === "glitch") { R(c, q.x, q.y, 6, 2, q.c); R(c, q.x + 6, q.y, 3, 1, "rgba(255,255,255,0.5)"); }
+  }
+}
+
 function render() {
   const c = ctx;
   c.imageSmoothingEnabled = false;
@@ -669,16 +879,19 @@ function render() {
     const z = G.zone;
     let ox = Math.round(G.cam.x), oy = Math.round(G.cam.y);
     if (G.shakeT > 0) { ox += Math.round((Math.random() - 0.5) * G.shakeN * 2); oy += Math.round((Math.random() - 0.5) * G.shakeN * 2); }
+    const L = zoneLayer(z);
     R(c, 0, 0, W, H, "#000");
     c.save();
     c.translate(-ox, -oy);
+    c.drawImage(L.cv, 0, 0);
     const t0x = Math.max(0, Math.floor(ox / 16)), t0y = Math.max(0, Math.floor(oy / 16));
     const t1x = Math.min(z.w - 1, Math.floor((ox + W) / 16)), t1y = Math.min(z.h - 1, Math.floor((oy + H) / 16));
-    for (let ty = t0y; ty <= t1y; ty++) for (let tx = t0x; tx <= t1x; tx++) {
-      let ch = z.map[ty][tx];
-      if (ch === "x" && z.glitchOpen) ch = ".";
-      drawTile(c, ch, tx * 16, ty * 16, z.id, G.t, tx, ty);
+    for (const a of L.anim) {
+      if (a.tx < t0x || a.tx > t1x || a.ty < t0y || a.ty > t1y) continue;
+      if (a.k === 1) drawTile(c, a.ch, a.tx * 16, a.ty * 16, z.id, G.t, a.tx, a.ty, a.nb);
+      else drawTileFx(c, a.ch, a.tx * 16, a.ty * 16, z.id, G.t, a.tx, a.ty);
     }
+    for (const [ch, tx, ty] of L.props) if (tx >= t0x - 1 && tx <= t1x + 1 && ty >= t0y - 1 && ty <= t1y + 1) drawProp(c, ch, tx * 16, ty * 16, z.id, tx, ty, true);
     const list = [];
     for (const o of z.objs) list.push({ y: footBox(o).y + footBox(o).h, f: () => drawObj(c, o, G.t) });
     if (G.save.rules.encounters) for (const r of z.roamers) if (!r.gone) list.push({ y: r.y + 20, f: () => drawLook(c, r.kind, r.x, r.y, G.t + r.x) });
@@ -686,28 +899,26 @@ function render() {
     if (G.save.rules.claudeFollows) list.push({ y: G.claude.y + 20, f: () => drawClaude(c, G.claude.x, G.claude.y, G.claude.dir, G.t) });
     list.sort((a, b) => a.y - b.y);
     for (const it of list) it.f();
+    ambient(c, z, ox, oy);
     // «!» над тем, с чем можно поговорить
     if (G.near) {
       const n = G.near.type === "claude" ? G.claude : G.near;
-      const bx = Math.round(n.x + (n.w ? n.w / 2 : 8) - 4), by = Math.round(n.y - 10 + Math.sin(G.t * 6) * 1.5);
+      const bx = Math.round(n.x + (n.w ? n.w / 2 : 8) - 4), by = Math.round(n.y - 11 + Math.sin(G.t * 6) * 1.5);
+      R(c, bx - 1, by - 1, 11, 11, INK);
+      R(c, bx + 3, by + 10, 3, 2, INK);
       R(c, bx, by, 9, 9, "#fff");
+      R(c, bx + 4, by + 9, 1, 2, "#fff");
+      R(c, bx, by + 8, 9, 1, "#c8c8d8");
       R(c, bx + 4, by + 2, 1, 3, "#000");
       R(c, bx + 4, by + 6, 1, 1, "#000");
     }
     if (G.target && !G.target.obj) {
+      const k = Math.floor(G.t * 4) % 2;
       c.strokeStyle = "rgba(255,255,255,0.6)";
-      c.strokeRect(Math.round(G.target.x + 4) + 0.5, Math.round(G.target.y + 15) + 0.5, 8, 5);
+      c.strokeRect(Math.round(G.target.x + 4 - k) + 0.5, Math.round(G.target.y + 15 - k) + 0.5, 8 + k * 2, 5 + k * 2);
     }
     c.restore();
-    // погода
-    for (const q of G.particles) {
-      if (q.w === "rain") R(c, q.x, q.y, 1, 5, "rgba(150,190,255,0.7)");
-      else if (q.w === "snow") R(c, q.x, q.y, 2, 2, "#fff");
-      else if (q.w === "confetti") R(c, q.x, q.y, 2, 3, q.c);
-      else if (q.w === "leaves") R(c, q.x, q.y, 3, 2, ["#e08a3a", "#c05a2a", "#e0c03a"][Math.floor(q.x) % 3]);
-      else if (q.w === "stars") { const a = Math.sin((q.t / q.life) * Math.PI); c.globalAlpha = a; R(c, q.x, q.y, 1, 1, "#fff"); R(c, q.x - 1, q.y, 3, 1, "rgba(255,255,255,0.5)"); c.globalAlpha = 1; }
-      else if (q.w === "glitch") R(c, q.x, q.y, 6, 2, q.c);
-    }
+    drawWeather(c);
     if (G.save.rules.night) {
       const px = G.player.x + 8 - ox, py = G.player.y + 12 - oy;
       const g = c.createRadialGradient(px, py, 18, px, py, 95);
@@ -716,7 +927,16 @@ function render() {
       c.fillStyle = g;
       c.fillRect(0, 0, W, H);
     }
-    if (z.id === "core") { c.fillStyle = `rgba(80,0,60,${0.1 + Math.sin(G.t * 2) * 0.05})`; c.fillRect(0, 0, W, H); }
+    if (z.id === "core") {
+      c.fillStyle = `rgba(80,0,60,${0.1 + Math.sin(G.t * 2) * 0.05})`;
+      c.fillRect(0, 0, W, H);
+      // иногда кусок экрана «съезжает»
+      if (Math.random() < 0.035) {
+        const yy = Math.floor(Math.random() * (H - 6)), hh = 2 + Math.floor(Math.random() * 5), dx = (Math.random() < 0.5 ? -1 : 1) * (2 + Math.floor(Math.random() * 6));
+        c.drawImage(cv, 0, yy, W, hh, dx, yy, W, hh);
+      }
+    }
+    vignette(c);
   }
   if (G.flashT > 0) { c.globalAlpha = Math.min(1, G.flashT * 2); R(c, 0, 0, W, H, G.flashC); c.globalAlpha = 1; }
   if (G.fade > 0) { c.globalAlpha = G.fade; R(c, 0, 0, W, H, "#000"); c.globalAlpha = 1; }
@@ -1056,19 +1276,90 @@ function frame(ts) {
 }
 
 // маленькая сценка на титульном экране
+const TITLE_FX = { bg: null };
+function titleBackdrop() {
+  const cv = document.createElement("canvas");
+  cv.width = 128;
+  cv.height = 64;
+  const g = cv.getContext("2d");
+  // небо полосами с шахматным переходом
+  const bands = ["#06051a", "#0a0922", "#100d2c", "#171236"];
+  for (let y = 0; y < 48; y++) {
+    const b = Math.min(3, Math.floor(y / 12)), nb = Math.min(3, b + 1);
+    for (let x = 0; x < 128; x++) {
+      const edge = y % 12 >= 10 && (x + y) % 2 === 0;
+      g.fillStyle = edge ? bands[nb] : bands[b];
+      g.fillRect(x, y, 1, 1);
+    }
+  }
+  // далёкая планета с кольцом
+  for (let j = -7; j <= 7; j++) for (let i = -7; i <= 7; i++) {
+    if (i * i + j * j > 49) continue;
+    const lit = (i + 2) * (i + 2) + (j + 2) * (j + 2) < 30;
+    g.fillStyle = lit ? "#5a3a8a" : "#3a2560";
+    g.fillRect(106 + i, 12 + j, 1, 1);
+  }
+  g.fillStyle = "#7a5aaa";
+  g.fillRect(103, 9, 2, 1); g.fillRect(102, 10, 1, 2);
+  g.fillStyle = "#c8a0ff";
+  for (let i = -11; i <= 11; i++) { const y = 12 + Math.round(i * 0.25); if (Math.abs(i) > 6 || i < -2) g.fillRect(106 + i, y, 1, 1); }
+  // горы из кода на горизонте
+  for (let x = 0; x < 128; x++) {
+    const h1 = 8 + Math.round(Math.sin(x * 0.11) * 3 + Math.sin(x * 0.27 + 1) * 2);
+    g.fillStyle = "#1c1640";
+    g.fillRect(x, 48 - h1, 1, h1);
+    const h2 = 4 + Math.round(Math.sin(x * 0.19 + 2) * 2);
+    g.fillStyle = "#241c50";
+    g.fillRect(x, 48 - h2, 1, h2);
+  }
+  for (let x = 4; x < 128; x += 9) { g.fillStyle = (x / 9) % 2 ? "#3a2f70" : "#2f5a4a"; g.fillRect(x, 44 - (x % 3), 2, 1); }
+  return cv;
+}
 function drawTitleScene() {
   const el = document.getElementById("tScene");
   if (!el || document.getElementById("title").hidden) return;
   const c = el.getContext("2d");
   c.imageSmoothingEnabled = false;
   const t = G.t;
-  R(c, 0, 0, 128, 64, "#0b0a18");
-  for (let i = 0; i < 24; i++) {
-    const x = (i * 37 + Math.floor(t * 4) * (i % 3 === 0 ? 1 : 0)) % 128, y = (i * 23) % 40;
-    R(c, x, y, 1, 1, i % 4 ? "#3a3560" : "#ffe03a");
+  if (!TITLE_FX.bg) TITLE_FX.bg = titleBackdrop();
+  c.drawImage(TITLE_FX.bg, 0, 0);
+  // звёзды в два слоя: дальние медленнее (параллакс), мигают
+  for (let i = 0; i < 30; i++) {
+    const far = i < 20;
+    const sp = far ? 1.5 : 5;
+    const x = ((((i * 53 + 7) % 140) - t * sp) % 140 + 140) % 140 - 6;
+    const y = (i * 29 + 5) % (far ? 40 : 34);
+    const tw = Math.sin(t * (1.3 + (i % 5) * 0.6) + i * 1.7);
+    if (far) R(c, x, y, 1, 1, tw > 0.4 ? "#8a86c8" : "#3a3560");
+    else {
+      const col = i % 3 ? "#ffe03a" : "#ffffff";
+      R(c, x, y, 1, 1, col);
+      if (tw > 0.55) { R(c, x - 1, y, 3, 1, col); R(c, x, y - 1, 1, 3, col); }
+    }
   }
+  // падающая звезда
+  const ph = (t * 0.25) % 1;
+  if (ph < 0.18) {
+    const k = ph / 0.18;
+    for (let s = 0; s < 6; s++) R(c, 20 + k * 70 - s * 2, 4 + k * 18 - s * 0.5, 1, 1, s ? "#8a86c8" : "#ffffff");
+  }
+  // пол лаборатории
   for (let x = 0; x < 128; x += 16) drawTile(c, ".", x, 48, "lab", t, x / 16, 3);
+  R(c, 0, 48, 128, 1, "#5c628e");
+  // свечение портала на полу
+  const pulse = 0.5 + 0.5 * Math.sin(t * 3);
+  c.globalAlpha = 0.25 + pulse * 0.15;
+  R(c, 44, 49, 40, 2, "#5aff8a"); R(c, 50, 51, 28, 2, "#5aff8a"); R(c, 56, 53, 16, 1, "#5aff8a");
+  c.globalAlpha = 1;
   drawPortal(c, 48, 16, t, true, 2);
+  // искры улетают из портала
+  for (let i = 0; i < 10; i++) {
+    const p = (t * 0.5 + i / 10) % 1;
+    const a = i * 2.4 + t * 0.8;
+    const r = 6 + p * 24;
+    const col = p < 0.5 ? "#d8ffe0" : "#5aff8a";
+    if (p < 0.9) R(c, 64 + Math.cos(a) * r, 32 + Math.sin(a) * r * 0.7, 1, 1, col);
+  }
   drawKid(c, 26, 30, "right", Math.floor(t * 3) % 2, { shirt: "#3a8ef0" });
   drawClaude(c, 86, 30, "left", t);
 }

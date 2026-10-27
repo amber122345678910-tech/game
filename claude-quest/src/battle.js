@@ -597,38 +597,41 @@ function battleDraw(c) {
   const b = Battle.b;
   if (!b) return;
   R(c, 0, 0, 256, 192, "#000");
-  // фон-сетка
-  c.strokeStyle = "rgba(90,255,138,0.08)";
-  c.lineWidth = 1;
-  for (let i = 0; i < 256; i += 16) { c.beginPath(); c.moveTo(i + 0.5, 0); c.lineTo(i + 0.5, 96); c.stroke(); }
-  for (let j = 0; j < 96; j += 16) { c.beginPath(); c.moveTo(0, j + 0.5); c.lineTo(256, j + 0.5); c.stroke(); }
+  // фон за врагом: своя картинка у каждого мира
+  battleBg(c, G.zone ? G.zone.id : "lab", b.t);
   if (b.phase !== "end" || b.hp > 0) battleSprite(c, b.def, 128, 52, b.t, b.hurt);
   // имя и полоска HP врага
   c.font = '8px "Press Start 2P", monospace';
   c.textAlign = "center";
-  c.fillStyle = b.mercy >= 100 ? "#ffe03a" : "#fff";
-  c.fillText(b.def.name, 128, 10);
+  outText(c, b.def.name, 128, 10, b.mercy >= 100 ? "#ffe03a" : "#fff");
   if (b.hurt > 0 || b.phase === "fight") {
+    R(c, 97, 85, 62, 7, "#000");
     R(c, 98, 86, 60, 5, "#5a1a1a");
     R(c, 98, 86, Math.round((60 * b.hp) / b.maxHp), 5, "#3aff6a");
+    R(c, 98, 86, Math.round((60 * b.hp) / b.maxHp), 1, "#a8ffbe");
   }
   if (b.mercy > 0 && b.mercy < 100) {
+    R(c, 97, 92, 62, 4, "#000");
     R(c, 98, 93, 60, 2, "#333");
     R(c, 98, 93, Math.round(0.6 * b.mercy), 2, "#ffe03a");
   }
-  // цифры урона
+  // цифры урона с обводкой
   for (const d of b.dmgNums) {
-    c.fillStyle = d.label === "Клод" ? "#ffb08a" : "#ff4a4a";
+    const col = d.label === "Клод" ? "#ffb08a" : "#ff4a4a";
+    const dy = Math.round(d.t * 20 + (d.t < 0.25 ? Math.sin(d.t * 12.5) * 6 : 0));
     c.font = '10px "Press Start 2P", monospace';
-    c.fillText(String(d.v), d.x, 40 - d.t * 20);
-    if (d.label) { c.font = '6px "Press Start 2P", monospace'; c.fillText(d.label, d.x, 50 - d.t * 20); }
+    outText(c, String(d.v), Math.round(d.x), 40 - dy, col);
+    if (d.label) { c.font = '6px "Press Start 2P", monospace'; outText(c, d.label, Math.round(d.x), 50 - dy, col); }
   }
   // реплика врага
   if (b.bubble) {
     c.font = '12px "Handjet", monospace';
     const w = Math.min(110, c.measureText(b.bubble.text).width + 10);
+    R(c, 169, 19, w + 2, 20, "#000");
+    R(c, 165, 25, 5, 6, "#000");
     R(c, 170, 20, w, 18, "#fff");
     R(c, 166, 26, 4, 4, "#fff");
+    R(c, 170, 37, w, 1, "#c8c8d8");
     c.fillStyle = "#000";
     c.textAlign = "left";
     c.fillText(b.bubble.text.slice(0, Math.floor(b.bubble.t * 30)), 175, 32);
