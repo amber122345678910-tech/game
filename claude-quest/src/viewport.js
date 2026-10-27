@@ -24,6 +24,8 @@ const Viewport = (() => {
     let dpr = 1;
     let W = 0;
     let H = 0;
+    let needDraw = true; // перерисовываем, только когда что-то поменялось
+    let lastView = "";
 
     function resize() {
       dpr = Math.min(3, window.devicePixelRatio || 1);
@@ -32,6 +34,7 @@ const Viewport = (() => {
       H = Math.max(50, r.height);
       canvas.width = Math.round(W * dpr);
       canvas.height = Math.round(H * dpr);
+      needDraw = true;
     }
 
     function proj(x, y, z) {
@@ -178,7 +181,6 @@ const Viewport = (() => {
     function render() {
       if (!W) resize();
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-      autoFit();
       const light = sky();
       // плита Baseplate
       const R = 48;
@@ -325,12 +327,20 @@ const Viewport = (() => {
     canvas.addEventListener("pointercancel", up);
 
     function loop() {
-      render();
+      if (!W) resize();
+      autoFit();
+      // мир, камера и размер те же — кадр не рисуем (бережём батарею телефона)
+      const view = `${cam.x.toFixed(3)},${cam.y.toFixed(3)},${cam.z.toFixed(3)},${zoom.toFixed(3)},${W},${H}`;
+      if (needDraw || ripple || view !== lastView) {
+        needDraw = false;
+        lastView = view;
+        render();
+      }
       raf = requestAnimationFrame(loop);
     }
 
     return {
-      setWorld(w) { world = w || world; },
+      setWorld(w) { world = w || world; needDraw = true; },
       start() { resize(); cancelAnimationFrame(raf); loop(); },
       stop() { cancelAnimationFrame(raf); raf = 0; },
       resize,

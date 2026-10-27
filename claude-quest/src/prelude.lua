@@ -27,8 +27,15 @@ local function joinargs(...)
   for i = 1, n do t[i] = tostring((select(i, ...))) end
   return table.concat(t, " ")
 end
-function print(...) __out("print", joinargs(...)) end
-function warn(...) __out("warn", joinargs(...)) end
+-- сколько строк напечатано без паузы: print в цикле без wait() вешает страницу
+local printed = 0
+local PRINT_LIMIT = 2000
+local function countPrint()
+  printed = printed + 1
+  if printed > PRINT_LIMIT then error("__PRINT_FLOOD__", 0) end
+end
+function print(...) countPrint() __out("print", joinargs(...)) end
+function warn(...) countPrint() __out("warn", joinargs(...)) end
 
 -------------------------------------------------------------- Luau-дополнения
 function math.clamp(x, a, b) if x < a then return a elseif x > b then return b end return x end
@@ -56,10 +63,13 @@ os.clock = function() return __clock() end
 local tasks = {}
 local budget = 0
 local LIMIT = 400 -- x 10000 инструкций без wait()
+local TIME_LIMIT = 0.4 -- или 0.4 секунды настоящего времени (на медленном телефоне это наступит раньше)
+local rnow = __rnow or function() return 0 end
+local resumedAt = 0
 
 local function hook()
   budget = budget + 1
-  if budget > LIMIT then
+  if budget > LIMIT or rnow() - resumedAt > TIME_LIMIT then
     budget = 0
     error("__TOO_LONG__", 0)
   end
@@ -103,6 +113,8 @@ function __tick(now)
     local t = tasks[i]
     if t.wake <= now then
       budget = 0
+      printed = 0
+      resumedAt = rnow()
       local ok, res
       if not t.started then
         t.started = true
@@ -465,6 +477,30 @@ local function method(o, name, fn)
   d.methods[name] = fn
 end
 
+-- учёт деталей в мире: их число ограничено, иначе страница зависнет
+local treeVer = 0      -- растёт, когда меняется дерево объектов
+local wsCount = 0      -- сколько деталей сейчас в workspace
+local MAX_PARTS = 600
+local warnedMax = false
+local function countParts(o)
+  local d = D(o)
+  local n = (BASEPART[d.props.ClassName] and not d.avatar) and 1 or 0
+  for _, c in ipairs(d.children) do n = n + countParts(c) end
+  return n
+end
+-- деталь (и всё внутри) сдвинули или убрали: будим тех, кто на ней лежит
+local function bumpGeo(o)
+  local d = D(o)
+  d.geo = (d.geo or 0) + 1
+  d.ver = (d.ver or 0) + 1
+  d.sleeping = nil
+  for _, c in ipairs(d.children) do bumpGeo(c) end
+end
+local wsRoot = nil      -- сам workspace (запомним, когда создадим)
+local function inWorkspace(p)
+  return p ~= nil and wsRoot ~= nil and (p == wsRoot or isDescendantOf(p, wsRoot))
+end
+
 local function setParent(o, p)
   local d = D(o)
   if d.destroyed then error("Объект «" .. d.props.Name .. "» уже уничтожен (Destroy), его нельзя вернуть", 3) end
@@ -472,6 +508,22 @@ local function setParent(o, p)
   if p == o or (p and isDescendantOf(p, o)) then error("Нельзя положить объект сам в себя", 3) end
   local old = d.parent
   if old == p then return end
+  local wasIn, willIn = inWorkspace(old), inWorkspace(p)
+  if wasIn ~= willIn then
+    local n = countParts(o)
+    if willIn and n > 0 and wsCount + n > MAX_PARTS then
+      if not warnedMax then
+        warnedMax = true
+        warn("В мире уже " .. wsCount .. " деталей — это предел. Новые детали я не ставлю, иначе игра начнёт тормозить. Сделай цикл поменьше.")
+      end
+      return
+    end
+    wsCount = wsCount + (willIn and n or -n)
+  end
+  treeVer = treeVer + 1
+  bumpGeo(o)
+  if old then D(old).ver = (D(old).ver or 0) + 1 end
+  if p then D(p).ver = (D(p).ver or 0) + 1 end
   if old then
     local oc = D(old).children
     for i = #oc, 1, -1 do if oc[i] == o then table.remove(oc, i) end end
@@ -503,6 +555,8 @@ local numberProps = {
   MaxActivationDistance = true, FogEnd = true,
 }
 local boolProps = { Anchored = true, CanCollide = true, CanTouch = true, Locked = true, Enabled = true, Disabled = true, Playing = true, Looped = true, Archivable = true }
+-- свойства, после которых деталь может начать падать (или опора — исчезнуть)
+local GEO = { Position = true, Size = true, CFrame = true, Anchored = true, CanCollide = true }
 
 IMT.__index = function(o, k)
   local d = D(o)
@@ -594,6 +648,11 @@ IMT.__newindex = function(o, k, v)
     d.props[k] = v
   else
     error("У " .. class .. " нет свойства «" .. tostring(k) .. "». Проверь написание", 2)
+  end
+  d.ver = (d.ver or 0) + 1
+  if GEO[k] then
+    d.geo = (d.geo or 0) + 1
+    d.sleeping = nil
   end
   local ps = d.propSignals[k]
   if ps then ps:Fire() end
@@ -739,6 +798,7 @@ local function service(class)
 end
 workspace = service("Workspace")
 Workspace = workspace
+wsRoot = workspace
 local Players = service("Players")
 local Lighting = service("Lighting")
 service("ReplicatedStorage"); service("ServerStorage"); service("ServerScriptService")
@@ -932,54 +992,233 @@ local function partsInWorkspace()
       walk(c)
     end
   end
-  walk(workspace)
+  walk(wsRoot)
   return t
 end
-local function overlapXZ(a, b)
-  local pa, sa, pb, sb = a.Position, a.Size, b.Position, b.Size
-  return math.abs(pa.X - pb.X) < (sa.X + sb.X) / 2 - 0.01 and math.abs(pa.Z - pb.Z) < (sa.Z + sb.Z) / 2 - 0.01
+-- список деталей пересобираем, только когда меняется дерево объектов
+local partsList, partsVer = {}, -1
+local function wsParts()
+  if partsVer ~= treeVer then
+    partsList = partsInWorkspace()
+    partsVer = treeVer
+  end
+  return partsList
 end
+-- Физика сделана «дешёвой», потому что Lua тут работает внутри браузера и он медленный:
+-- * лежащие детали засыпают, пока их опора не сдвинется;
+-- * опору ищем в сетке по X/Z, а не среди всех деталей;
+-- * на шаг физики есть лимит настоящего времени.
+-- Поля Vector3 читаем напрямую (__x, __y, __z) — так намного быстрее, чем через .X
+local CELL = 4
+local HALF = CELL / 2   -- границы клеток сдвинуты на полклетки: деталь в (0, y, 0) попадает в одну клетку
+local BIG = 64          -- деталь больше 64 клеток (например, Baseplate) проверяем отдельно
+local QK = 8192         -- в клетке лежат числа «верх × QK + номер детали»: они сортируются без своей функции
+local SORT_MIN = 8      -- маленькие клетки не сортируем, а просто смотрим целиком
+
+local function buildGrid(parts)
+  local grid, big = {}, {}
+  for i = 1, #parts do
+    local q = parts[i]
+    local qp = q.__d.props
+    if qp.CanCollide then
+      local pos, size = qp.Position, qp.Size
+      -- 0.005: детали, которые только касаются краями, друг на друга не опираются
+      local hx, hz = size.__x / 2 - 0.005, size.__z / 2 - 0.005
+      if hx < 0 then hx = 0 end
+      if hz < 0 then hz = 0 end
+      local x, z = pos.__x + HALF, pos.__z + HALF
+      local x0, x1, z0, z1 = (x - hx) // CELL, (x + hx) // CELL, (z - hz) // CELL, (z + hz) // CELL
+      if i >= QK or not ((x1 - x0 + 1) * (z1 - z0 + 1) <= BIG) then
+        big[#big + 1] = q
+      else
+        local t = pos.__y + size.__y / 2
+        if t ~= t or t < -1e9 then t = -1e9 elseif t > 1e9 then t = 1e9 end
+        local key = -((-t * 1024) // 1) * QK + i -- верх округляем вверх
+        for cx = x0, x1 do
+          for cz = z0, z1 do
+            local ck = cx * 65536 + cz
+            local cell = grid[ck]
+            if cell then cell[#cell + 1] = key else grid[ck] = { key } end
+          end
+        end
+      end
+    end
+  end
+  -- в больших клетках: снизу вверх по верхней грани
+  for _, cell in pairs(grid) do
+    if #cell > SORT_MIN then table.sort(cell) end
+  end
+  return grid, big
+end
+
+-- самая высокая опора в клетке: верх не выше lim, и деталь перекрывает p по X/Z.
+-- pd — данные детали p: сравниваем их, а не сами детали (у деталей сравнение — медленный __eq)
+local function scanCell(cell, parts, pd, ax, az, hx, hz, lim, bound, floor, floorPart)
+  local n = #cell
+  local j, stop = n, false
+  if n > SORT_MIN then
+    -- двоичный поиск: последняя деталь, чей верх не выше низа p
+    local lo, hi = 1, n
+    j = 0
+    while lo <= hi do
+      local mid = (lo + hi) // 2
+      if cell[mid] < bound then j = mid; lo = mid + 1 else hi = mid - 1 end
+    end
+    stop = true
+  end
+  for k = j, 1, -1 do
+    local key = cell[k]
+    local i = key % QK
+    -- в отсортированной клетке ниже искать нечего: за шаг детали только опускались
+    if stop and (key - i) // QK <= floor * 1024 then break end
+    local q = parts[i]
+    local qd = q.__d
+    if qd ~= pd then
+      local qp = qd.props
+      local pb, sb = qp.Position, qp.Size
+      local dx, dz = ax - pb.__x, az - pb.__z
+      if dx < 0 then dx = -dx end
+      if dz < 0 then dz = -dz end
+      if dx < hx + sb.__x / 2 and dz < hz + sb.__z / 2 then
+        local top = pb.__y + sb.__y / 2
+        if top <= lim and top > floor then floor, floorPart = top, q end
+      end
+    end
+  end
+  return floor, floorPart
+end
+
+local function findFloor(parts, pd, pr, lim, grid, big)
+  local floor, floorPart = -1e9, nil
+  if lim ~= lim then return floor, floorPart end -- NaN
+  local pa, sa = pr.Position, pr.Size
+  local ax, az = pa.__x, pa.__z
+  local hx, hz = sa.__x / 2 - 0.01, sa.__z / 2 - 0.01
+  for i = 1, #big do
+    local q = big[i]
+    local qd = q.__d
+    if qd ~= pd then
+      local qp = qd.props
+      local pb, sb = qp.Position, qp.Size
+      local dx, dz = ax - pb.__x, az - pb.__z
+      if dx < 0 then dx = -dx end
+      if dz < 0 then dz = -dz end
+      if dx < hx + sb.__x / 2 and dz < hz + sb.__z / 2 then
+        local top = pb.__y + sb.__y / 2
+        if top <= lim and top > floor then floor, floorPart = top, q end
+      end
+    end
+  end
+  local l = lim
+  if l > 1e9 then l = 1e9 elseif l < -1e9 then l = -1e9 end
+  local bound = (-((-l * 1024) // 1) + 1) * QK
+  local ex, ez = hx + 0.005, hz + 0.005
+  if ex < 0 then ex = 0 end
+  if ez < 0 then ez = 0 end
+  local x, z = ax + HALF, az + HALF
+  local x0, x1, z0, z1 = (x - ex) // CELL, (x + ex) // CELL, (z - ez) // CELL, (z + ez) // CELL
+  if not ((x1 - x0 + 1) * (z1 - z0 + 1) <= BIG) then
+    -- сама деталь огромная: смотрим все клетки
+    for _, cell in pairs(grid) do floor, floorPart = scanCell(cell, parts, pd, ax, az, hx, hz, lim, bound, floor, floorPart) end
+  else
+    for cx = x0, x1 do
+      for cz = z0, z1 do
+        local cell = grid[cx * 65536 + cz]
+        if cell then floor, floorPart = scanCell(cell, parts, pd, ax, az, hx, hz, lim, bound, floor, floorPart) end
+      end
+    end
+  end
+  return floor, floorPart
+end
+
+local function stepPart(parts, p, d, now, dt, g, grid, big)
+  local pr = d.props
+  local pdt = now - (d.pt or (now - dt))
+  if pdt > 0.1 then pdt = 0.1 end
+  d.pt = now
+  local pos, size = pr.Position, pr.Size
+  local bottom = pos.__y - size.__y / 2
+  -- ищем, на что можно упасть
+  local floor, floorPart = -1e9, nil
+  if pr.CanCollide then floor, floorPart = findFloor(parts, d, pr, bottom + 0.05, grid, big) end
+  local vy = (d.vy or 0) - g * pdt
+  local nb = bottom + vy * pdt
+  local landed = false
+  if nb <= floor then
+    nb = floor
+    if vy < -20 and floorPart then
+      if pr.CanTouch then d.events.Touched:Fire(floorPart) end
+      if floorPart.__d.props.CanTouch then floorPart.__d.events.Touched:Fire(p) end
+    end
+    vy = 0
+    landed = true
+  end
+  d.vy = vy
+  if nb < -200 then
+    Inst.Destroy(p) -- упало за край мира
+  elseif nb - bottom > 0.0001 or bottom - nb > 0.0001 then
+    pr.Position = setmetatable({ __x = pos.__x, __y = nb + size.__y / 2, __z = pos.__z }, V3)
+    d.geo = (d.geo or 0) + 1
+    __dirty = true
+  elseif landed or (vy == 0 and g == 0) then
+    -- лежит и не двигается: засыпает, пока опора на месте
+    d.sleeping = true
+    d.sleepOn = floorPart
+    d.sleepGeo = floorPart and (floorPart.__d.geo or 0) or 0
+    d.pt = nil
+  end
+end
+
 local lastPhys = nil
 local hbAcc = 0
+local lastG = nil
+local cursor = 1
+local heavyFlip = false
+local PHYS_BUDGET = 0.010 -- секунд настоящего времени на падение деталей за шаг
 physics = function(now)
   local dt = lastPhys and math.min(0.1, now - lastPhys) or 0
   lastPhys = now
   if dt <= 0 then return end
-  local g = D(workspace).props.Gravity
-  local parts = partsInWorkspace()
-  for _, p in ipairs(parts) do
-    local d = D(p)
-    local pr = d.props
-    if not pr.Anchored and p ~= base then
-      local pos, size = pr.Position, pr.Size
-      local bottom = pos.Y - size.Y / 2
-      -- ищем, на что можно упасть
-      local floor = -1e9
-      local floorPart = nil
-      for _, q in ipairs(parts) do
-        if q ~= p then
-          local qp = D(q).props
-          if qp.CanCollide and pr.CanCollide and overlapXZ(pr, qp) then
-            local top = qp.Position.Y + qp.Size.Y / 2
-            if top <= bottom + 0.05 and top > floor then floor = top; floorPart = q end
-          end
-        end
+  local g = D(wsRoot).props.Gravity
+  local parts = wsParts()
+  if g ~= lastG then
+    -- поменяли гравитацию — будим всех
+    lastG = g
+    for i = 1, #parts do parts[i].__d.sleeping = nil end
+  end
+  -- кто сейчас падает (спящие детали пропускаем)
+  local awake = {}
+  local baseD = base.__d
+  for i = 1, #parts do
+    local p = parts[i]
+    local d = p.__d
+    if not d.props.Anchored and d ~= baseD then
+      local s = d.sleeping and d.sleepOn
+      if d.sleeping and (not s or ((s.__d.geo or 0) == d.sleepGeo and not s.__d.destroyed)) then
+        -- спит
+      else
+        d.sleeping = nil
+        awake[#awake + 1] = p
       end
-      d.vy = (d.vy or 0) - g * dt
-      local nb = bottom + d.vy * dt
-      if nb <= floor then
-        nb = floor
-        if d.vy < -20 and floorPart then
-          if pr.CanTouch then d.events.Touched:Fire(floorPart) end
-          if D(floorPart).props.CanTouch then D(floorPart).events.Touched:Fire(p) end
-        end
-        d.vy = 0
-      end
-      if nb < -200 then
-        Inst.Destroy(p) -- упало за край мира
-      elseif math.abs(nb - bottom) > 0.0001 then
-        pr.Position = Vector3.new(pos.X, nb + size.Y / 2, pos.Z)
-        __dirty = true
+    end
+  end
+  local n = #awake
+  -- падает очень много деталей: двигаем их через шаг — вдвое дешевле, а падают так же быстро
+  if n > 100 then heavyFlip = not heavyFlip else heavyFlip = false end
+  if n > 0 and not heavyFlip then
+    local t0 = rnow()
+    local grid, big = buildGrid(parts)
+    if cursor > n then cursor = 1 end
+    local start = cursor
+    for k = 0, n - 1 do
+      local idx = (start - 1 + k) % n + 1
+      local p = awake[idx]
+      local d = p.__d
+      if not d.destroyed then stepPart(parts, p, d, now, dt, g, grid, big) end
+      -- не успели всех — продолжим с этого места на следующем шаге
+      if k % 32 == 31 and rnow() - t0 > PHYS_BUDGET then
+        cursor = idx % n + 1
+        break
       end
     end
   end
@@ -1051,16 +1290,29 @@ function __snapshot()
       local d = D(c)
       local p = d.props
       if BASEPART[p.ClassName] and not d.avatar and c ~= base then
-        local hasClick = Inst.FindFirstChildOfClass(c, "ClickDetector") and 1 or 0
-        local light = Inst.FindFirstChildOfClass(c, "PointLight") and 1 or 0
-        out[#out + 1] = table.concat({ "P", d.id, p.Name, f(p.Position.X), f(p.Position.Y), f(p.Position.Z),
-          f(p.Size.X), f(p.Size.Y), f(p.Size.Z), f(p.Color.R), f(p.Color.G), f(p.Color.B), f(p.Transparency),
-          p.Material.Name, p.Shape.Name, hasClick, light, p.Anchored and 1 or 0 }, "\t")
+        -- строчку детали пересобираем, только если деталь менялась (при падении — только место)
+        local line = d.snapLine
+        if not line or d.snapVer ~= d.ver or d.snapGeo ~= d.geo then
+          if not d.snapRest or d.snapVer ~= d.ver then
+            local hasClick = Inst.FindFirstChildOfClass(c, "ClickDetector") and 1 or 0
+            local light = Inst.FindFirstChildOfClass(c, "PointLight") and 1 or 0
+            local s, col = p.Size, p.Color
+            d.snapHead = "P\t" .. d.id .. "\t" .. p.Name .. "\t"
+            d.snapRest = "\t" .. s.__x .. "\t" .. s.__y .. "\t" .. s.__z .. "\t" .. col.__r .. "\t" .. col.__g .. "\t" .. col.__b .. "\t" ..
+              p.Transparency .. "\t" .. p.Material.Name .. "\t" .. p.Shape.Name .. "\t" .. hasClick .. "\t" .. light .. "\t" .. (p.Anchored and 1 or 0)
+            d.snapVer = d.ver
+          end
+          local pos = p.Position
+          line = d.snapHead .. pos.__x .. "\t" .. pos.__y .. "\t" .. pos.__z .. d.snapRest
+          d.snapLine = line
+          d.snapGeo = d.geo
+        end
+        out[#out + 1] = line
       end
       walk(c, depth + 1)
     end
   end
-  walk(workspace, 0)
+  walk(wsRoot, 0)
   out[#out + 1] = table.concat({ "A", avatar.joined and 1 or 0, avatar.dead and 1 or 0, f(avatar.x), f(avatar.y), f(avatar.z),
     f(D(hum).props.Health), f(D(hum).props.MaxHealth), avatar.tx and 1 or 0 }, "\t")
   local ls = findChild(player, "leaderstats")
