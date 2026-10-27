@@ -195,6 +195,9 @@ button:focus-visible, select:focus-visible, input:focus-visible, textarea:focus-
 .shHead b { font-family: var(--display); font-size: 10px; flex: 1; }
 .x { width: 36px; height: 36px; background: #000; border: 2px solid var(--line); font-size: 16px; flex: none; }
 .pill { min-height: 36px; padding: 4px 10px; background: var(--raise); border: 2px solid var(--line); font-size: 16px; line-height: 1.1; }
+.pill:disabled { opacity: .5; cursor: default; }
+#menuBody .rv { font-weight: 600; color: var(--gold); }
+#batBtns .bbtn.next { color: var(--gold); border-color: var(--gold); }
 .pill:active { background: #2a2548; }
 .pill.wide { width: 100%; margin-top: 10px; }
 .pill.danger { border-color: var(--bad); color: var(--bad); }
@@ -349,6 +352,8 @@ code { font-family: var(--mono); font-size: .88em; background: var(--code); padd
 @keyframes blink { 50% { opacity: 0; } }
 #chatChips { flex: none; display: flex; gap: 5px; overflow-x: auto; padding: 5px max(10px, env(safe-area-inset-left, 0px)); scrollbar-width: none; }
 #chatChips button { flex: none; min-height: 36px; padding: 4px 9px; background: var(--raise); border: 1px solid #3a3560; font-size: 15px; line-height: 1.15; }
+#chatChips .hwChip { border: 2px solid var(--gold); color: var(--gold); background: #2a2410; }
+.msg.me .bubble .att { font-size: 13px; color: var(--good); margin-top: 3px; white-space: normal; }
 #chatCtx { flex: none; padding: 3px 10px; font-size: 15px; color: var(--good); }
 .chatIn { flex: none; display: flex; gap: 6px; padding: 6px max(10px, env(safe-area-inset-left, 0px)) 8px; border-top: 2px solid var(--line); background: #000; }
 #chatInput { flex: 1; min-width: 0; font: inherit; font-size: 17px; line-height: 1.2; padding: 6px 8px; background: var(--code); color: var(--ink); border: 2px solid #3a3560; resize: none; -webkit-user-select: text; user-select: text; }
