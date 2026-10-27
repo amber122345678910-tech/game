@@ -1,0 +1,435 @@
+<title>Код Мультивселенной</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Handjet:wght@400;600&family=JetBrains+Mono:wght@400;600&family=Press+Start+2P&display=swap">
+<style>
+/* Раскладка: полоса HUD, экран игры 4:3, под ним пульт (в портрете); в ландшафте экран слева, HUD и пульт справа. Одна тёмная тема в духе Undertale. */
+:root {
+  --bg: #07060c;
+  --panel: #000000;
+  --ink: #f4f1ff;
+  --dim: #9a94b8;
+  --line: #ffffff;
+  --gold: #ffe03a;
+  --orange: #ff8a27;
+  --claude: #da7756;
+  --good: #5aff8a;
+  --bad: #ff4a5a;
+  --code: #0d0b16;
+  --raise: #17142a;
+  --display: "Press Start 2P", ui-monospace, monospace;
+  --body: "Handjet", "Arial Narrow", system-ui, sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, Menlo, Consolas, monospace;
+  color-scheme: dark;
+}
+*, *::before, *::after { box-sizing: border-box; }
+html, body { height: 100%; }
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--body);
+  font-size: 20px;
+  overflow: hidden;
+  touch-action: manipulation;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+button { font: inherit; color: inherit; cursor: pointer; }
+button:focus-visible, select:focus-visible, input:focus-visible, textarea:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+[hidden] { display: none !important; }
+
+#app {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  padding-left: env(safe-area-inset-left, 0px);
+  padding-right: env(safe-area-inset-right, 0px);
+}
+#stage {
+  position: relative;
+  width: 100%;
+  max-width: calc(min(60vh, 60dvh) * 4 / 3);
+  aspect-ratio: 4 / 3;
+  margin: 0 auto;
+  flex: none;
+  background: #000;
+}
+#screen { width: 100%; height: 100%; display: block; image-rendering: pixelated; touch-action: none; }
+#hud { flex: none; padding: 6px 8px 6px; background: #000; border-bottom: 2px solid #1d1a30; }
+#hud .row1 { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+#hud .hp {
+  display: flex; align-items: center; gap: 6px;
+  background: rgba(0,0,0,.62); padding: 5px 8px; border: 2px solid var(--line);
+  font-family: var(--display); font-size: 9px; line-height: 1; white-space: nowrap; min-width: 0;
+}
+#hud .bar { width: 46px; height: 8px; background: #8a1a1a; display: block; }
+#hud .bar i { display: block; height: 100%; background: var(--gold); width: 100%; transition: width .2s; }
+#hud .gold { color: var(--gold); }
+#hud .btns { display: flex; gap: 6px; }
+#hud .btns button {
+  min-width: 44px; height: 40px; padding: 0 8px;
+  background: rgba(0,0,0,.7); border: 2px solid var(--line);
+  font-family: var(--display); font-size: 11px; position: relative;
+}
+#hud .btns button:active { background: var(--raise); }
+#btnCode { color: var(--good); }
+#btnChat { border-color: var(--claude) !important; }
+#btnChat[data-badge="!"]::after, #btnCode.ping::after {
+  content: "!"; position: absolute; top: -7px; right: -6px; width: 16px; height: 16px;
+  background: var(--gold); color: #000; font-size: 9px; line-height: 16px; text-align: center;
+}
+#objective { margin-top: 5px; font-size: 18px; line-height: 1.15; color: var(--gold); }
+#zoneTitle {
+  position: absolute; left: 0; right: 0; top: 34%; text-align: center; pointer-events: none; opacity: 0;
+  text-shadow: 0 2px 0 #000;
+}
+#zoneTitle b { display: block; font-family: var(--display); font-size: clamp(12px, 4.2vw, 20px); color: var(--gold); text-wrap: balance; }
+#zoneTitle span { display: block; margin-top: 6px; font-size: 18px; color: var(--ink); letter-spacing: .08em; }
+#zoneTitle.show { animation: zt 2.6s ease forwards; }
+@keyframes zt { 0% { opacity: 0; transform: translateY(6px); } 15%, 75% { opacity: 1; transform: none; } 100% { opacity: 0; } }
+#toast {
+  position: absolute; left: 50%; bottom: 10px; transform: translateX(-50%) translateY(-8px);
+  background: #000; border: 2px solid var(--gold); color: var(--ink);
+  padding: 8px 12px; font-size: 18px; opacity: 0; transition: .25s; pointer-events: none; max-width: 90%; text-align: center;
+}
+#toast.show { opacity: 1; transform: translateX(-50%); }
+
+/* пульт */
+#panel { flex: 1; min-height: 0; position: relative; padding: 10px max(12px, env(safe-area-inset-left, 0px)) calc(10px + env(safe-area-inset-bottom, 0px)); display: flex; }
+#pad { flex: 1; display: flex; gap: 12px; align-items: stretch; }
+#joyZone { flex: 1; position: relative; touch-action: none; border: 2px dashed rgba(255,255,255,.12); min-height: 120px; }
+#joyZone .hint { position: absolute; left: 10px; bottom: 8px; font-size: 16px; color: var(--dim); pointer-events: none; }
+#joy {
+  position: absolute; left: 50%; top: 50%; width: 100px; height: 100px; margin: -50px 0 0 -50px;
+  border: 3px solid rgba(255,255,255,.35); border-radius: 50%; pointer-events: none;
+}
+#joy.on { border-color: var(--line); }
+#joyKnob { position: absolute; left: 30px; top: 30px; width: 40px; height: 40px; background: var(--line); border-radius: 50%; }
+.ab { display: flex; flex-direction: column-reverse; justify-content: center; gap: 14px; width: 128px; position: relative; }
+.ab button {
+  width: 76px; height: 76px; border-radius: 50%; border: 3px solid var(--line); background: #000;
+  font-family: var(--display); font-size: 18px; touch-action: none;
+}
+#btnA { align-self: flex-end; background: var(--gold); color: #000; border-color: var(--gold); }
+#btnB { align-self: flex-start; width: 58px; height: 58px; font-size: 13px; }
+.ab button:active { transform: scale(.94); }
+
+/* диалог */
+#dlg {
+  flex: 1; align-self: flex-start; max-height: 100%; min-height: 150px; display: flex; gap: 12px; align-items: flex-start; background: #000; border: 3px solid var(--line);
+  padding: 12px 12px 26px; position: relative; overflow: auto; cursor: pointer;
+}
+#dlgPortrait { width: 48px; height: 66px; image-rendering: pixelated; flex: none; }
+.dlgBody { flex: 1; min-width: 0; }
+#dlgName { font-family: var(--display); font-size: 10px; margin-bottom: 8px; letter-spacing: .04em; }
+#dlgText { font-size: 24px; line-height: 1.2; white-space: pre-wrap; overflow-wrap: anywhere; }
+#dlgChoices { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; }
+.choice {
+  text-align: left; padding: 10px 12px; background: #000; border: 2px solid var(--line); font-size: 22px; line-height: 1.1;
+}
+.choice::before { content: "♥ "; color: var(--bad); }
+.choice:active { background: var(--raise); color: var(--gold); }
+#dlgNext { position: absolute; right: 12px; bottom: 8px; color: var(--gold); animation: bob .8s steps(2) infinite; }
+@keyframes bob { 50% { transform: translateY(3px); } }
+
+/* бой */
+#bat { flex: 1; display: flex; flex-direction: column; gap: 10px; min-height: 0; position: relative; }
+#batText { background: #000; border: 3px solid var(--line); padding: 10px 12px; font-size: 22px; line-height: 1.2; min-height: 64px; white-space: pre-wrap; overflow: auto; flex: none; max-height: 42%; }
+#batBtns { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+#batBtns.list { grid-template-columns: 1fr; overflow: auto; }
+.bbtn {
+  padding: 12px 8px; background: #000; border: 3px solid var(--orange); color: var(--orange);
+  font-family: var(--display); font-size: 11px; line-height: 1.4; min-height: 48px; text-transform: none;
+}
+.bbtn b { font-family: var(--body); font-size: 20px; }
+.bbtn.quiz, #batBtns.list .bbtn { font-family: var(--body); font-size: 21px; line-height: 1.1; text-align: left; padding: 10px 12px; }
+.bbtn:active { color: var(--gold); border-color: var(--gold); }
+.bbtn.mercy.ready { color: var(--gold); border-color: var(--gold); }
+.bbtn.wide { grid-column: 1 / -1; }
+#batTouch {
+  position: absolute; inset: 72px 0 0 0; border: 2px dashed rgba(255,255,255,.3); touch-action: none;
+  display: flex; align-items: center; justify-content: center; text-align: center; color: var(--dim); font-size: 18px; padding: 12px;
+  background: rgba(255,42,58,.04);
+}
+
+/* листы поверх игры */
+.sheet {
+  position: fixed; left: 0; top: 0; width: 100%; height: 100%; z-index: 30; background: var(--bg);
+  display: flex; flex-direction: column;
+  padding: env(safe-area-inset-top, 0px) max(0px, env(safe-area-inset-right, 0px)) env(safe-area-inset-bottom, 0px) max(0px, env(safe-area-inset-left, 0px));
+  -webkit-user-select: text; user-select: text;
+}
+.shHead { display: flex; align-items: center; gap: 8px; padding: 8px max(12px, env(safe-area-inset-left, 0px)); border-bottom: 2px solid var(--line); background: #000; flex: none; }
+.shHead b { font-family: var(--display); font-size: 11px; flex: 1; }
+.x { width: 40px; height: 40px; background: #000; border: 2px solid var(--line); font-size: 18px; flex: none; }
+.pill { padding: 6px 12px; background: var(--raise); border: 2px solid var(--line); font-size: 19px; line-height: 1.1; }
+.pill:active { background: #2a2548; }
+.pill.wide { width: 100%; margin-top: 12px; }
+.pill.danger { border-color: var(--bad); color: var(--bad); }
+.dim { color: var(--dim); }
+code { font-family: var(--mono); font-size: .88em; background: var(--code); padding: 1px 4px; }
+
+/* титульный экран */
+#title { z-index: 40; overflow: auto; justify-content: center; background: radial-gradient(ellipse at 50% 30%, #1a1440 0%, var(--bg) 70%); }
+.tWrap { width: 100%; max-width: 440px; margin: 0 auto; padding: 24px max(16px, env(safe-area-inset-left, 0px)); display: flex; flex-direction: column; gap: 18px; align-items: stretch; text-align: center; }
+.logo small { display: block; font-family: var(--display); font-size: 10px; color: var(--claude); letter-spacing: .2em; margin-bottom: 10px; }
+.logo h1 { margin: 0; font-family: var(--display); font-size: clamp(18px, 7vw, 30px); line-height: 1.35; color: var(--gold); text-shadow: 3px 3px 0 #6a2a00; text-wrap: balance; }
+#tMain, #tNewForm { display: flex; flex-direction: column; gap: 12px; }
+.big { padding: 14px; font-family: var(--display); font-size: 13px; background: #000; border: 3px solid var(--line); }
+.big:active { color: var(--gold); border-color: var(--gold); }
+#tContinue { border-color: var(--gold); color: var(--gold); }
+#tNewForm label { font-size: 22px; text-align: left; }
+#tName { font: inherit; font-size: 24px; padding: 10px 12px; background: #000; color: var(--ink); border: 2px solid var(--line); -webkit-user-select: text; user-select: text; }
+.look { display: flex; gap: 14px; align-items: center; text-align: left; }
+#tPreview { width: 120px; height: 72px; image-rendering: pixelated; flex: none; }
+.look span { font-size: 18px; color: var(--dim); }
+#tShirts, #tHairs { display: flex; flex-wrap: wrap; gap: 6px; margin: 4px 0 8px; }
+.sw { width: 30px; height: 30px; border: 2px solid #000; outline: 2px solid transparent; }
+.sw.on { outline-color: var(--gold); }
+.link { background: none; border: 0; color: var(--dim); text-decoration: underline; padding: 6px; }
+.tSmall { font-size: 20px; color: var(--dim); line-height: 1.25; }
+#tScene { width: 100%; max-width: 320px; aspect-ratio: 2 / 1; margin: 0 auto; image-rendering: pixelated; display: block; }
+
+/* редактор */
+#edTask { flex: 1; min-width: 0; font: inherit; font-size: 19px; padding: 8px; background: #000; color: var(--ink); border: 2px solid var(--line); }
+.edTop { flex: none; max-height: 26%; overflow: auto; padding: 8px max(12px, env(safe-area-inset-left, 0px)); border-bottom: 1px solid #2a2640; }
+#edTaskText { font-size: 20px; line-height: 1.2; }
+#edTaskText b { color: var(--gold); }
+#edCard { margin-top: 6px; }
+#edCard summary, #edCardBody summary { cursor: pointer; color: var(--good); font-size: 19px; padding: 4px 0; }
+#edCardBody { font-size: 19px; line-height: 1.3; max-width: 70ch; }
+#edCardBody pre, .bubble pre { font-family: var(--mono); font-size: 13px; background: var(--code); border-left: 3px solid var(--claude); padding: 8px 10px; overflow-x: auto; white-space: pre; margin: 6px 0; }
+#edCardBody ul { padding-left: 20px; margin: 6px 0; }
+#edWrap { flex: 1 1 34%; min-height: 110px; display: flex; background: var(--code); position: relative; border-bottom: 1px solid #2a2640; }
+#edGutter { margin: 0; padding: 10px 6px 10px 8px; width: 34px; text-align: right; color: #4a4566; font: 14px/1.5 var(--mono); overflow: hidden; flex: none; user-select: none; }
+.edMain { flex: 1; position: relative; min-width: 0; }
+#edHl, #edCode {
+  position: absolute; inset: 0; margin: 0; padding: 10px 10px 10px 4px; border: 0;
+  font: 14px/1.5 var(--mono); white-space: pre; overflow: auto; tab-size: 2; letter-spacing: 0;
+}
+#edHl { color: #e6e2ff; pointer-events: none; }
+#edCode { background: transparent; color: transparent; caret-color: var(--gold); resize: none; outline: none; -webkit-text-fill-color: transparent; }
+#edCode::selection { background: rgba(255,224,58,.3); }
+.tk { color: #ff7ab6; } .ts { color: #ffd27a; } .tc { color: #6f8a6f; font-style: italic; } .tn { color: #8ad8ff; } .tg { color: #7fffc4; } .tf { color: #c8b6ff; }
+.errline { background: rgba(255,74,90,.25); box-shadow: -40px 0 0 rgba(255,74,90,.25); }
+#edKeys { flex: none; display: flex; gap: 6px; overflow-x: auto; padding: 6px max(8px, env(safe-area-inset-left, 0px)); background: #000; scrollbar-width: none; }
+#edKeys::-webkit-scrollbar { display: none; }
+#edKeys button { flex: none; min-width: 40px; height: 38px; padding: 0 10px; background: var(--raise); border: 1px solid #3a3560; font: 600 15px var(--mono); color: var(--ink); }
+#edKeys button.word { color: var(--good); font-size: 13px; }
+#edKeys button:active { background: #3a3560; }
+#edBar { flex: none; display: flex; gap: 8px; padding: 6px max(8px, env(safe-area-inset-left, 0px)); }
+#edBar button { height: 42px; padding: 0 10px; background: #000; border: 2px solid var(--line); font-size: 20px; white-space: nowrap; }
+#edRun { flex: 1.3; color: var(--good); border-color: var(--good) !important; }
+#edRun.running { background: rgba(90,255,138,.12); }
+#edCheck { flex: 1.3; color: var(--gold); border-color: var(--gold) !important; }
+#edStop { width: 46px; }
+#edResult { flex: none; margin: 0 max(8px, env(safe-area-inset-left, 0px)) 6px; padding: 8px 10px; font-size: 19px; border: 2px solid var(--dim); position: relative; overflow: hidden; line-height: 1.4; }
+#edResult.ok { border-color: var(--good); color: var(--good); }
+#edResult.bad { border-color: var(--bad); color: #ffb0b8; }
+#edResult .pill { margin-top: 6px; display: inline-block; color: var(--ink); }
+.conf { position: absolute; top: -6px; width: 6px; height: 8px; animation: fall 1.2s ease-in forwards; }
+@keyframes fall { to { transform: translateY(90px) rotate(260deg); opacity: 0; } }
+#edTabs { flex: none; display: flex; gap: 6px; align-items: center; padding: 0 max(8px, env(safe-area-inset-left, 0px)); }
+#edTabs [data-tab] { padding: 4px 14px; background: none; border: 2px solid #3a3560; border-bottom: 0; font-size: 19px; position: relative; }
+#edTabs [data-tab].on { border-color: var(--line); background: #000; }
+#edTabs [data-tab].ping::after { content: ""; position: absolute; top: 4px; right: 4px; width: 7px; height: 7px; background: var(--gold); }
+.inpart { margin-left: auto; font-size: 18px; color: var(--dim); display: flex; gap: 6px; align-items: center; }
+#edPane { flex: 1 1 30%; min-height: 100px; transition: flex-basis .2s;
+}
+#editor.world #edPane { flex-basis: 48%; }
+#editor.world #edWrap { flex-basis: 24%; }
+#editor.world .edTop { max-height: 16%; }
+#edPane { position: relative; border-top: 2px solid var(--line); background: #000; }
+#edOut { position: absolute; inset: 0; overflow: auto; padding: 8px 10px; font: 13px/1.5 var(--mono); white-space: pre-wrap; overflow-wrap: anywhere; }
+.o-print { color: #e6e2ff; } .o-warn { color: var(--gold); } .o-error { color: var(--bad); } .o-hint { color: var(--claude); font-family: var(--body); font-size: 19px; margin: 2px 0 6px; }
+.o-hint.o-hint, .o-hint { white-space: pre-wrap; }
+.o-dim { color: var(--dim); font-family: var(--body); font-size: 19px; }
+#edWorld { position: absolute; inset: 0; }
+#edCanvas { width: 100%; height: 100%; display: block; touch-action: none; }
+.vbtns { position: absolute; right: 8px; bottom: 8px; display: flex; gap: 6px; }
+.vbtns button { width: 36px; height: 36px; background: rgba(0,0,0,.6); border: 2px solid var(--line); font-size: 16px; }
+.vhint { position: absolute; left: 8px; top: 6px; font-size: 16px; color: rgba(255,255,255,.75); pointer-events: none; text-shadow: 0 1px 0 #000; max-width: 70%; }
+#edToast { position: absolute; left: 50%; top: 40%; transform: translateX(-50%); background: rgba(0,0,0,.8); border: 2px solid var(--gold); padding: 6px 10px; font-size: 18px; opacity: 0; transition: .2s; pointer-events: none; white-space: nowrap; }
+#edToast.show { opacity: 1; }
+#edClaude { flex: none; display: flex; align-items: center; gap: 8px; padding: 6px max(8px, env(safe-area-inset-left, 0px)); background: #000; border-top: 1px solid #2a2640; flex-wrap: wrap; }
+#edClaudeAva { width: 24px; height: 30px; image-rendering: pixelated; }
+#edClaudeText { flex: 1 1 140px; font-size: 18px; color: var(--claude); min-width: 0; }
+#editor.kb .edTop, #editor.kb #edPane, #editor.kb #edTabs, #editor.kb #edClaude, #editor.kb #edResult { display: none !important; }
+
+/* чат */
+#chatAva { width: 24px; height: 30px; image-rendering: pixelated; }
+#chatMode { font-size: 17px; padding: 5px 8px; }
+#chatBanner { flex: none; padding: 8px 12px; background: #2a1a12; color: #ffcfb8; font-size: 18px; line-height: 1.2; border-bottom: 1px solid var(--claude); }
+#chatLog { flex: 1; overflow: auto; padding: 12px max(12px, env(safe-area-inset-left, 0px)); display: flex; flex-direction: column; gap: 10px; }
+.msg { display: flex; gap: 8px; align-items: flex-end; max-width: 100%; }
+.msg.me { justify-content: flex-end; }
+.msg .avatar { width: 24px; height: 30px; image-rendering: pixelated; flex: none; }
+.bubble { max-width: min(82%, 60ch); min-width: 0; padding: 9px 12px; font-size: 20px; line-height: 1.25; border: 2px solid var(--line); background: #000; overflow-wrap: anywhere; }
+.msg.cl .bubble { border-color: var(--claude); }
+.msg.me .bubble { background: var(--raise); border-color: #3a3560; white-space: pre-wrap; }
+.bubble .code { margin: 6px 0; }
+.bubble .tocode { font-size: 17px; padding: 3px 8px; }
+.note { align-self: center; font-size: 17px; color: var(--gold); border: 1px dashed var(--gold); padding: 4px 10px; }
+.thinking i { animation: blink 1s infinite; font-style: normal; }
+.thinking i:nth-child(2) { animation-delay: .2s; } .thinking i:nth-child(3) { animation-delay: .4s; }
+@keyframes blink { 50% { opacity: 0; } }
+#chatChips { flex: none; display: flex; gap: 6px; overflow-x: auto; padding: 6px max(12px, env(safe-area-inset-left, 0px)); scrollbar-width: none; }
+#chatChips button { flex: none; padding: 6px 10px; background: var(--raise); border: 1px solid #3a3560; font-size: 18px; }
+#chatCtx { flex: none; padding: 4px 12px; font-size: 17px; color: var(--good); }
+.chatIn { flex: none; display: flex; gap: 8px; padding: 8px max(12px, env(safe-area-inset-left, 0px)) 10px; border-top: 2px solid var(--line); background: #000; }
+#chatInput { flex: 1; min-width: 0; font: inherit; font-size: 20px; padding: 8px 10px; background: var(--code); color: var(--ink); border: 2px solid #3a3560; resize: none; -webkit-user-select: text; user-select: text; }
+#chatSend, #chatStop { width: 52px; background: var(--claude); color: #000; border: 0; font-size: 20px; }
+#chatStop { background: var(--bad); }
+
+/* меню */
+#menuTabs { flex: none; display: flex; gap: 6px; overflow-x: auto; padding: 8px max(12px, env(safe-area-inset-left, 0px)); scrollbar-width: none; }
+#menuTabs button { flex: none; padding: 6px 12px; background: none; border: 2px solid #3a3560; font-size: 19px; }
+#menuTabs button.on { border-color: var(--gold); color: var(--gold); }
+#menuBody { flex: 1; overflow: auto; padding: 8px max(16px, env(safe-area-inset-left, 0px)) 24px; max-width: 640px; width: 100%; margin: 0 auto; }
+#menuBody h3 { font-family: var(--display); font-size: 11px; margin: 18px 0 8px; color: var(--gold); }
+.stats { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 8px; }
+.stats div { border: 2px solid #3a3560; padding: 8px 10px; display: flex; flex-direction: column; gap: 4px; }
+.stats span { font-size: 17px; color: var(--dim); }
+.stats b { font-size: 22px; font-variant-numeric: tabular-nums; }
+.row { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 0; border-bottom: 1px solid #2a2640; }
+.row > div { min-width: 0; }
+.row small { display: block; color: var(--dim); font-size: 17px; margin-top: 2px; }
+.row .pill { flex: none; }
+
+/* ландшафт: экран слева, пульт справа */
+@media (orientation: landscape) and (max-height: 620px) {
+  #app { display: grid; grid-template-columns: auto minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); }
+  #stage { grid-row: 1 / 3; grid-column: 1; height: 100%; width: auto; max-width: none; aspect-ratio: 4 / 3; margin: 0; }
+  #hud { grid-row: 1; grid-column: 2; }
+  #panel { grid-row: 2; grid-column: 2; padding: 8px 12px; }
+  #dlgText { font-size: 20px; }
+  #batText { font-size: 18px; }
+  .ab { width: 96px; }
+  .ab button { width: 64px; height: 64px; }
+  #btnB { width: 50px; height: 50px; }
+  #hud .bar { width: 28px; }
+  #hud .hp { padding: 5px 6px; gap: 4px; }
+  #hud .btns button { min-width: 38px; height: 36px; padding: 0 6px; }
+  #objective { font-size: 16px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  #zoneTitle.show, #dlgNext, .conf { animation: none; }
+  #zoneTitle.show { opacity: 1; }
+}
+</style>
+
+<div id="app">
+  <div id="hud">
+    <div class="row1">
+      <div class="hp"><span id="hudLv">LV 1</span><span class="bar"><i id="hudHpBar"></i></span><span id="hudHp">20/20</span><span class="gold">◆<b id="hudGold">0</b></span></div>
+      <div class="btns">
+        <button id="btnCode" aria-label="Редактор кода">&lt;/&gt;</button>
+        <button id="btnChat" aria-label="Чат с Клодом">💬</button>
+        <button id="btnMenu" aria-label="Меню">☰</button>
+      </div>
+    </div>
+    <div id="objective"></div>
+  </div>
+  <div id="stage">
+    <canvas id="screen" width="256" height="192" aria-label="Экран игры"></canvas>
+    <div id="zoneTitle"></div>
+    <div id="toast" role="status"></div>
+  </div>
+  <div id="panel">
+    <div id="pad">
+      <div id="joyZone"><div id="joy"><div id="joyKnob"></div></div><span class="hint">веди пальцем — ходить</span></div>
+      <div class="ab"><button id="btnB" aria-label="Кнопка B">B</button><button id="btnA" aria-label="Кнопка A">A</button></div>
+    </div>
+    <div id="dlg" hidden>
+      <canvas id="dlgPortrait" width="16" height="22"></canvas>
+      <div class="dlgBody"><div id="dlgName"></div><div id="dlgText"></div><div id="dlgChoices"></div></div>
+      <div id="dlgNext">▼</div>
+    </div>
+    <div id="bat" hidden>
+      <div id="batText"></div>
+      <div id="batBtns"></div>
+      <div id="batTouch" hidden><span>Води пальцем по этому полю или по экрану — сердечко повторяет движение</span></div>
+    </div>
+  </div>
+</div>
+
+<div id="title" class="sheet">
+  <div class="tWrap">
+    <div class="logo"><small>КЛОД И СТАЖЁР</small><h1>КОД МУЛЬТИ&shy;ВСЕЛЕННОЙ</h1></div>
+    <canvas id="tScene" width="128" height="64" aria-hidden="true"></canvas>
+    <div id="tMain">
+      <button id="tContinue" class="big" hidden>Продолжить</button>
+      <button id="tNew" class="big">Начать</button>
+      <p class="tSmall">Пиксельное приключение по мультивселенной. Ты учишься писать код для Roblox с нуля, а Профессор Клод отвечает прямо в игре, даёт домашки и меняет правила.</p>
+    </div>
+    <form id="tNewForm" hidden autocomplete="off">
+      <label for="tName">Как тебя зовут?</label>
+      <input id="tName" maxlength="14" placeholder="Стажёр" enterkeyhint="go">
+      <div class="look">
+        <canvas id="tPreview" width="40" height="24"></canvas>
+        <div><span>Одежда</span><div id="tShirts"></div><span>Волосы</span><div id="tHairs"></div></div>
+      </div>
+      <button type="submit" class="big">Поехали!</button>
+      <button type="button" id="tBack" class="link">Назад</button>
+    </form>
+  </div>
+</div>
+
+<div id="editor" class="sheet" hidden>
+  <div class="shHead"><select id="edTask" aria-label="Что делаем"></select><button id="edClose" class="x" aria-label="Закрыть редактор">✕</button></div>
+  <div class="edTop">
+    <div id="edTaskText"></div>
+    <details id="edCard"><summary>📖 Шпаргалка урока</summary><div id="edCardBody"></div></details>
+  </div>
+  <div id="edWrap">
+    <pre id="edGutter">1</pre>
+    <div class="edMain"><pre id="edHl" aria-hidden="true"></pre><textarea id="edCode" spellcheck="false" autocapitalize="off" autocomplete="off" autocorrect="off" wrap="off" aria-label="Код"></textarea></div>
+  </div>
+  <div id="edKeys" aria-label="Быстрые символы"></div>
+  <div id="edBar"><button id="edRun">▶ Запуск</button><button id="edStop" aria-label="Стоп">■</button><button id="edCheck">✓ Проверить</button><button id="edReset">⟲ Сброс</button></div>
+  <div id="edResult" hidden></div>
+  <div id="edTabs"><button data-tab="out" class="on">Вывод</button><button data-tab="world">Мир</button><label class="inpart"><input type="checkbox" id="edInPart"> скрипт в детали</label></div>
+  <div id="edPane">
+    <div id="edOut"></div>
+    <div id="edWorld" hidden>
+      <canvas id="edCanvas"></canvas>
+      <div class="vhint">Нажми на деталь — персонаж дойдёт и наступит. Двигай мир пальцем.</div>
+      <div class="vbtns"><button id="vpIn" aria-label="Приблизить">+</button><button id="vpOut" aria-label="Отдалить">−</button><button id="vpReset" aria-label="Показать всё">⌖</button></div>
+      <div id="edToast"></div>
+    </div>
+  </div>
+  <div id="edClaude">
+    <canvas id="edClaudeAva" width="16" height="20"></canvas>
+    <span id="edClaudeText"></span>
+    <button id="edHint" class="pill" hidden>💡 Подсказка</button>
+    <button id="edAskErr" class="pill" hidden>Почему ошибка?</button>
+    <button id="edAsk" class="pill">Спросить Клода</button>
+  </div>
+</div>
+
+<div id="chat" class="sheet" hidden>
+  <div class="shHead"><canvas id="chatAva" width="16" height="20"></canvas><b>Профессор Клод</b><button id="chatMode" class="pill">⚡ Быстрый</button><button id="chatClose" class="x" aria-label="Закрыть чат">✕</button></div>
+  <div id="chatBanner" hidden></div>
+  <div id="chatLog"></div>
+  <div id="chatChips">
+    <button data-say="Объясни мой текущий урок ещё раз, совсем просто">Объясни урок</button>
+    <button data-say="Дай мне новую домашку по тому, что я уже прошёл">Дай домашку</button>
+    <button data-say="Сделай меня в 2 раза быстрее">Быстрее!</button>
+    <button data-say="Создай мне смешного босса и начни бой">Создай босса</button>
+    <button data-say="Включи снег и надень на меня корону">Снег и корона</button>
+    <button data-say="Что мне делать дальше?">Что дальше?</button>
+  </div>
+  <div id="chatCtx" hidden>📎 К сообщению прикреплён код из редактора</div>
+  <div class="chatIn"><textarea id="chatInput" rows="2" placeholder="Напиши Клоду…" aria-label="Сообщение Клоду"></textarea><button id="chatSend" aria-label="Отправить">➤</button><button id="chatStop" hidden aria-label="Остановить">■</button></div>
+</div>
+
+<div id="menu" class="sheet" hidden>
+  <div class="shHead"><b>МЕНЮ</b><button id="menuClose" class="x" aria-label="Закрыть меню">✕</button></div>
+  <div id="menuTabs"><button data-tab="hero">Герой</button><button data-tab="lessons">Уроки</button><button data-tab="hw">Домашка</button><button data-tab="rules">Правила</button><button data-tab="settings">Настройки</button></div>
+  <div id="menuBody"></div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/fengari-web@0.1.4/dist/fengari-web.js"></script>
+<!--SCRIPT-->

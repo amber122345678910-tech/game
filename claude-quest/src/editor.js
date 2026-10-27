@@ -1,0 +1,515 @@
+// Редактор кода: пишешь Luau, запускаешь, видишь вывод и мир
+const Editor = {
+  key: null,
+  rt: null,
+  vp: null,
+  resolve: null,
+  errLine: null,
+  lastOut: [],
+  lastErr: null,
+};
+
+const KW = new Set("local function end if then else elseif for in do while repeat until return break and or not nil true false".split(" "));
+const GLOBALS = new Set("game workspace Workspace script Instance Vector3 Color3 BrickColor CFrame Enum print warn wait task math table string tostring tonumber pairs ipairs TweenService TweenInfo Players".split(" "));
+
+function escHtml(s) {
+  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
+function highlight(src) {
+  let out = "";
+  let i = 0;
+  const n = src.length;
+  while (i < n) {
+    const c = src[i];
+    if (c === "-" && src[i + 1] === "-") {
+      let j = src.indexOf("\n", i);
+      if (j < 0) j = n;
+      out += `<span class="tc">${escHtml(src.slice(i, j))}</span>`;
+      i = j;
+    } else if (c === '"' || c === "'") {
+      let j = i + 1;
+      while (j < n && src[j] !== c && src[j] !== "\n") j += src[j] === "\\" ? 2 : 1;
+      j = Math.min(n, j + 1);
+      out += `<span class="ts">${escHtml(src.slice(i, j))}</span>`;
+      i = j;
+    } else if (/[A-Za-z_]/.test(c)) {
+      let j = i + 1;
+      while (j < n && /[A-Za-z0-9_]/.test(src[j])) j++;
+      const w = src.slice(i, j);
+      const cls = KW.has(w) ? "tk" : GLOBALS.has(w) ? "tg" : src[j] === "(" ? "tf" : "";
+      out += cls ? `<span class="${cls}">${w}</span>` : w;
+      i = j;
+    } else if (/[0-9]/.test(c)) {
+      let j = i + 1;
+      while (j < n && /[0-9.xa-fA-F]/.test(src[j])) j++;
+      out += `<span class="tn">${src.slice(i, j)}</span>`;
+      i = j;
+    } else {
+      out += escHtml(c);
+      i++;
+    }
+  }
+  return out + "\n";
+}
+
+function taskList() {
+  const s = G.save;
+  const list = [{ key: "sandbox", label: "🧪 Песочница (свободный код)" }];
+  for (const L of LESSONS) {
+    const avail = L.id === "l1" || s.flags["arrived_" + L.zone] || s.practice[L.id];
+    if (!avail) continue;
+    list.push({ key: "p:" + L.id, label: `${s.practice[L.id] ? "✅" : "📘"} Урок ${L.n}: ${L.title}` });
+  }
+  for (const L of LESSONS) {
+    const st = s.hw[L.homework.id];
+    if (!st) continue;
+    const icon = st === "done" ? "⭐" : st === "checked" ? "✅" : "📝";
+    list.push({ key: "h:" + L.homework.id, label: `${icon} Домашка №${L.n}: ${L.homework.title}` });
+  }
+  for (const h of s.customHw || []) list.push({ key: "c:" + h.id, label: `${h.status === "done" ? "⭐" : "★"} ${h.title}` });
+  return list;
+}
+
+function taskFor(key) {
+  if (!key || key === "sandbox") return { title: "Песочница", task: "Пиши любой код и запускай. Тут ничего не проверяется — просто экспериментируй!", starter: "-- Песочница: пробуй что хочешь\nprint(\"Привет из песочницы!\")\n", card: sandboxCard() };
+  const [t, id] = key.split(":");
+  if (t === "p") {
+    const L = LESSON[id];
+    return { kind: "practice", id, title: `Урок ${L.n}: ${L.title}`, task: L.practice.task, starter: L.practice.starter, hint: L.practice.hint, check: L.practice.check, card: L.card, lesson: L };
+  }
+  if (t === "h") {
+    const H = HOMEWORK[id];
+    return { kind: "homework", id, title: `Домашка №${H.lesson.n}: ${H.title}`, task: H.task, starter: H.starter, hint: H.hint, check: H.check, card: H.lesson.card, time: H.time, lesson: H.lesson, review: H.review };
+  }
+  if (t === "c") {
+    const h = (G.save.customHw || []).find((x) => x.id === id);
+    if (!h) return taskFor("sandbox");
+    return { kind: "custom", id, title: h.title, task: h.task, starter: "-- " + h.title + "\n", hint: h.example || "", card: h.example ? `<p>Пример от Клода:</p><pre>${escHtml(h.example)}</pre>` : "", custom: h };
+  }
+  return taskFor("sandbox");
+}
+
+function sandboxCard() {
+  const done = LESSONS.filter((l) => G.save.practice[l.id]);
+  if (!done.length) return "<p>Пока нет пройденных уроков. Начни с портал-аппарата в гараже.</p>";
+  return "<p>Шпаргалки пройденных уроков:</p>" + done.map((l) => `<details><summary>Урок ${l.n}: ${l.title}</summary>${l.card}</details>`).join("");
+}
+
+function openEditor(key) {
+  return new Promise((resolve) => {
+    if (Editor.resolve) Editor.resolve();
+    Editor.resolve = resolve;
+    const el = document.getElementById("editor");
+    el.hidden = false;
+    G.overlay = "editor";
+    key = key || G.save.lastTask || "sandbox";
+    if (!taskList().some((t) => t.key === key)) key = "sandbox";
+    loadTask(key);
+    fitSheet();
+  });
+}
+
+function closeEditor() {
+  stopRun();
+  document.getElementById("editor").hidden = true;
+  G.overlay = null;
+  saveSoon();
+  const r = Editor.resolve;
+  Editor.resolve = null;
+  if (r) r();
+}
+
+function loadTask(key) {
+  const s = G.save;
+  Editor.key = key;
+  s.lastTask = key;
+  const sel = document.getElementById("edTask");
+  sel.innerHTML = "";
+  for (const t of taskList()) {
+    const o = document.createElement("option");
+    o.value = t.key;
+    o.textContent = t.label;
+    if (t.key === key) o.selected = true;
+    sel.appendChild(o);
+  }
+  const T = taskFor(key);
+  document.getElementById("edTaskText").innerHTML = `<b>${escHtml(T.title)}</b><br>${escHtml(T.task)}`;
+  document.getElementById("edCardBody").innerHTML = T.card || "";
+  const code = s.code[key] ?? T.starter ?? "";
+  const ta = document.getElementById("edCode");
+  ta.value = code;
+  Editor.errLine = null;
+  refreshHl();
+  clearOut();
+  setResult("");
+  document.getElementById("edHint").hidden = true;
+  document.getElementById("edCheck").hidden = !T.check && T.kind !== "custom";
+  document.getElementById("edCheck").textContent = T.kind === "custom" ? "✓ Готово" : "✓ Проверить";
+  const card = document.getElementById("edCard");
+  card.open = T.kind === "practice" && !G.save.practice[T.id];
+  const wantsWorld = T.lesson && T.lesson.n >= 8;
+  showTab(wantsWorld ? "world" : "out");
+  edClaude(T.kind === "practice" ? "Прочитай шпаргалку (📖), напиши код и нажми ▶ Запуск. Потом ✓ Проверить." : T.kind === "homework" ? "Домашка! Сделай сам, а если застрял — нажми «Спросить Клода»." : T.kind === "custom" ? "Особое задание. Когда допишешь — нажми «Готово» и покажи мне в мире." : "Песочница. Тут можно ломать всё что угодно!");
+}
+
+function refreshHl() {
+  const ta = document.getElementById("edCode");
+  const hl = document.getElementById("edHl");
+  let html = highlight(ta.value);
+  if (Editor.errLine) {
+    const lines = html.split("\n");
+    if (lines[Editor.errLine - 1] !== undefined) lines[Editor.errLine - 1] = `<span class="errline">${lines[Editor.errLine - 1] || " "}</span>`;
+    html = lines.join("\n");
+  }
+  hl.innerHTML = html;
+  const nLines = ta.value.split("\n").length;
+  document.getElementById("edGutter").textContent = Array.from({ length: nLines }, (_, i) => i + 1).join("\n");
+  syncScroll();
+}
+
+function syncScroll() {
+  const ta = document.getElementById("edCode");
+  document.getElementById("edHl").scrollTop = ta.scrollTop;
+  document.getElementById("edHl").scrollLeft = ta.scrollLeft;
+  document.getElementById("edGutter").scrollTop = ta.scrollTop;
+}
+
+function codeChanged() {
+  const ta = document.getElementById("edCode");
+  G.save.code[Editor.key] = ta.value;
+  Editor.errLine = null;
+  refreshHl();
+  saveSoon();
+}
+
+function insertAtCursor(text) {
+  const ta = document.getElementById("edCode");
+  const st = ta.selectionStart, en = ta.selectionEnd;
+  const before = ta.value.slice(0, st);
+  const lineStart = before.lastIndexOf("\n") + 1;
+  const indent = before.slice(lineStart).match(/^\s*/)[0];
+  let t = text.replace(/\n/g, "\n" + indent);
+  let cur = t.indexOf("|");
+  if (cur >= 0) t = t.replace("|", "");
+  else cur = t.length;
+  ta.value = before + t + ta.value.slice(en);
+  ta.focus();
+  ta.selectionStart = ta.selectionEnd = st + cur;
+  codeChanged();
+}
+
+function newlineIndent() {
+  const ta = document.getElementById("edCode");
+  const st = ta.selectionStart;
+  const before = ta.value.slice(0, st);
+  const line = before.slice(before.lastIndexOf("\n") + 1);
+  let indent = line.match(/^\s*/)[0];
+  if (/(\bthen|\bdo|\belse|\brepeat|function\s*[\w.:]*\s*\([^)]*\)|\{)\s*$/.test(line.replace(/--.*$/, ""))) indent += "  ";
+  const t = "\n" + indent;
+  ta.value = before + t + ta.value.slice(ta.selectionEnd);
+  ta.selectionStart = ta.selectionEnd = st + t.length;
+  codeChanged();
+}
+
+const QUICK_KEYS = [
+  ["(", "(|)"], [")", ")"], ['"', '"|"'], ["=", " = "], [".", "."], [",", ", "], [":", ":"], ["..", " .. "],
+  ["==", " == "], ["~=", " ~= "], ["<", " < "], [">", " > "], ["+", " + "], ["-", " - "], ["*", " * "], ["/", " / "],
+  ["{", "{|}"], ["[", "[|]"], ["#", "#"], ["_", "_"], ["⇥", "  "], ["--", "-- "],
+  ["local", "local |"], ["print", 'print("|")'], ["if", "if | then\n  \nend"], ["else", "else\n  "], ["for", "for i = 1, 10 do\n  |\nend"],
+  ["while", "while | do\n  wait(0.1)\nend"], ["function", "local function |()\n  \nend"], ["end", "end"], ["return", "return |"],
+  ["wait", "wait(1)"], ["Part", 'Instance.new("Part")'], ["Vector3", "Vector3.new(|)"], ["Color3", "Color3.fromRGB(|)"],
+  ["workspace", "workspace"], ["Anchored", ".Anchored = true"], ["Connect", ":Connect(function(hit)\n  |\nend)"],
+];
+
+function buildKeys() {
+  const el = document.getElementById("edKeys");
+  for (const [label, ins] of QUICK_KEYS) {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.textContent = label;
+    if (/^[a-zA-Z]/.test(label)) b.className = "word";
+    // не отдаём фокус кнопке, чтобы клавиатура не закрывалась
+    b.addEventListener("pointerdown", (e) => e.preventDefault());
+    b.addEventListener("click", () => insertAtCursor(ins));
+    el.appendChild(b);
+  }
+}
+
+// ---------- запуск ----------
+function clearOut() {
+  document.getElementById("edOut").innerHTML = '<div class="o-dim">Здесь появится вывод (Output). Нажми ▶ Запуск.</div>';
+  Editor.lastOut = [];
+  Editor.lastErr = null;
+}
+
+function outLine(kind, text, hint) {
+  const el = document.getElementById("edOut");
+  if (el.querySelector(".o-dim")) el.innerHTML = "";
+  const d = document.createElement("div");
+  d.className = "o-" + kind;
+  d.textContent = (kind === "error" ? "✖ " : kind === "warn" ? "⚠ " : "") + text;
+  el.appendChild(d);
+  if (hint) {
+    const h = document.createElement("div");
+    h.className = "o-hint";
+    h.textContent = "Клод: " + hint;
+    el.appendChild(h);
+  }
+  if (el.children.length > 400) el.removeChild(el.firstChild);
+  el.scrollTop = el.scrollHeight;
+  Editor.lastOut.push((kind === "print" ? "" : kind + ": ") + text);
+  if (Editor.lastOut.length > 60) Editor.lastOut.shift();
+}
+
+function runCode() {
+  if (!LuaRT.available()) {
+    outLine("error", "Движок Lua не загрузился. Нужен интернет, чтобы скачать его один раз. Обнови страницу.");
+    return;
+  }
+  stopRun();
+  clearOut();
+  const el = document.getElementById("edOut");
+  el.innerHTML = "";
+  const code = document.getElementById("edCode").value;
+  let sawPart = false;
+  Editor.rt = LuaRT.create({
+    playerName: G.save.name || "Player",
+    onOut(kind, text, hint, line) {
+      if (kind === "sound") { sfx("blip"); return; }
+      outLine(kind, text, hint);
+      if (kind === "error") {
+        Editor.lastErr = text + (hint ? " (" + hint + ")" : "");
+        if (line) { Editor.errLine = line; refreshHl(); }
+        document.getElementById("edAskErr").hidden = false;
+      }
+    },
+    onWorld(w) {
+      if (Editor.vp) Editor.vp.setWorld(w);
+      const userP = w.parts.filter((p) => p.name !== "SpawnLocation").length;
+      if (userP && !sawPart) {
+        sawPart = true;
+        const tabBtn = document.querySelector('#edTabs [data-tab="world"]');
+        tabBtn.classList.add("ping");
+      }
+    },
+  });
+  document.getElementById("edAskErr").hidden = true;
+  Editor.rt.start(code, document.getElementById("edInPart").checked);
+  document.getElementById("edRun").classList.add("running");
+  G.save.stats.runs = (G.save.stats.runs || 0) + 1;
+  sfx("select");
+}
+
+function stopRun() {
+  if (Editor.rt) Editor.rt.stop();
+  Editor.rt = null;
+  document.getElementById("edRun").classList.remove("running");
+}
+
+function showTab(tab) {
+  document.getElementById("editor").classList.toggle("world", tab === "world");
+  document.querySelectorAll("#edTabs [data-tab]").forEach((b) => b.classList.toggle("on", b.dataset.tab === tab));
+  document.getElementById("edOut").hidden = tab !== "out";
+  document.getElementById("edWorld").hidden = tab !== "world";
+  if (tab === "world") {
+    document.querySelector('#edTabs [data-tab="world"]').classList.remove("ping");
+    if (!Editor.vp) {
+      Editor.vp = Viewport.create(document.getElementById("edCanvas"), {
+        playerName: () => G.save.name || "Player",
+        onTapPart(p) {
+          if (!Editor.rt) return toastEd("Сначала нажми ▶ Запуск");
+          if (p.click && Editor.rt.click(p.id)) toastEd(`👆 Клик по «${p.name}» (ClickDetector)`);
+          else { Editor.rt.touch(p.id); toastEd(`🚶 Персонаж идёт к «${p.name}»…`); }
+        },
+      });
+    }
+    setTimeout(() => { Editor.vp.resize(); Editor.vp.start(); }, 220);
+  } else if (Editor.vp) Editor.vp.stop();
+}
+
+function toastEd(t) {
+  const el = document.getElementById("edToast");
+  el.textContent = t;
+  el.classList.add("show");
+  clearTimeout(toastEd.t);
+  toastEd.t = setTimeout(() => el.classList.remove("show"), 1600);
+}
+
+function setResult(html, ok) {
+  const el = document.getElementById("edResult");
+  el.innerHTML = html;
+  el.className = ok === true ? "ok" : ok === false ? "bad" : "";
+  el.hidden = !html;
+}
+
+function edClaude(text) {
+  document.getElementById("edClaudeText").textContent = text;
+}
+
+// автопроверка: отдельный тихий запуск с «промоткой» времени
+async function runCheck(T, code) {
+  const out = [], errors = [], warns = [];
+  const rt = LuaRT.create({
+    playerName: G.save.name || "Player",
+    onOut(kind, text, hint, line) {
+      if (kind === "print") out.push(text);
+      else if (kind === "warn") warns.push(text);
+      else if (kind === "error") errors.push({ text, hint, line });
+    },
+  });
+  rt.startSilent(code, document.getElementById("edInPart").checked);
+  rt.fastForward(T.time || 2.5);
+  const sim = {
+    async touchEach(pred) {
+      const ids = rt.world.parts.map((p) => p.id);
+      for (const id of ids) {
+        if (rt.world.avatar && rt.world.avatar.dead) rt.fastForward(3.5);
+        rt.touch(id);
+        rt.fastForward(5);
+        if (pred(rt.world)) return true;
+      }
+      return false;
+    },
+    async clickEachChanged() {
+      for (const p of rt.world.parts.filter((q) => q.click)) {
+        const before = [p.r, p.g, p.b].join();
+        rt.click(p.id);
+        rt.fastForward(1.5);
+        const np = rt.world.parts.find((q) => q.id === p.id);
+        if (np && [np.r, np.g, np.b].join() !== before) return true;
+      }
+      return false;
+    },
+  };
+  const r = { out, warns, errors, get world() { return rt.world; }, code, sim };
+  let res;
+  try {
+    res = await T.check(r);
+  } catch (e) {
+    res = { ok: false, msg: "Проверка споткнулась: " + e.message };
+  }
+  rt.stop();
+  return res;
+}
+
+async function checkTask() {
+  const T = taskFor(Editor.key);
+  const code = document.getElementById("edCode").value;
+  G.save.code[Editor.key] = code;
+  if (T.kind === "custom") {
+    T.custom.status = "ready";
+    setResult("✓ Записал! Теперь подойди к Клоду в мире и выбери «Показать домашку».", true);
+    edClaude("Жду тебя в мире. Посмотрим, что ты там накодил.");
+    saveSoon();
+    return;
+  }
+  if (!LuaRT.available()) return setResult("Движок Lua не загрузился — нужен интернет.", false);
+  setResult("Проверяю…");
+  const res = await runCheck(T, code);
+  if (!res.ok) {
+    sfx("hurt");
+    setResult("✖ Пока не получилось. " + escHtml(res.msg || ""), false);
+    edClaude(["Почти! Читай подсказку и пробуй ещё.", "Ошибки — это нормально. Я делаю их миллион в секунду.", "Не сдавайся. Каждый программист видит красное чаще, чем зелёное."][Math.floor(Math.random() * 3)]);
+    Editor.fails = (Editor.fails || 0) + 1;
+    if (T.hint) document.getElementById("edHint").hidden = false;
+    return;
+  }
+  sfx("victory");
+  confetti();
+  const s = G.save;
+  if (T.kind === "practice") {
+    const first = !s.practice[T.id];
+    s.practice[T.id] = true;
+    setResult(`✓ Урок ${T.lesson.n} пройден!${first ? " +10 XP" : ""} ${escHtml(res.msg || "")} <button id="edBack" class="pill">Вернуться в игру →</button>`, true);
+    edClaude("Гениально! Возвращайся в мир — там кое-что изменилось.");
+    document.getElementById("edBack").onclick = closeEditor;
+    if (first) onPracticeDone(T.id);
+  } else if (T.kind === "homework") {
+    if (s.hw[T.id] !== "done") s.hw[T.id] = "checked";
+    setResult(`✓ Домашка работает! ${escHtml(res.msg || "")}<br>Теперь подойди к Клоду в мире и выбери «📜 Показать домашку». <button id="edBack" class="pill">В мир →</button>`, true);
+    edClaude("Код рабочий. Неси показывать — я жду.");
+    document.getElementById("edBack").onclick = closeEditor;
+  }
+  saveSoon();
+}
+
+function askClaudeAboutCode(withErr) {
+  const T = taskFor(Editor.key);
+  const code = document.getElementById("edCode").value;
+  const msg = withErr
+    ? `Почему у меня ошибка?\n\nОшибка: ${Editor.lastErr}`
+    : `Помоги с заданием «${T.title}». Я не понимаю, что делать дальше.`;
+  openChat(msg, { code, task: T.task, out: Editor.lastOut.slice(-12).join("\n") });
+}
+
+function confetti() {
+  const box = document.getElementById("edResult");
+  for (let i = 0; i < 18; i++) {
+    const s = document.createElement("i");
+    s.className = "conf";
+    s.style.left = Math.random() * 100 + "%";
+    s.style.background = ["#ffe03a", "#5aff8a", "#ff5aa0", "#5ac8ff", "#da7756"][i % 5];
+    s.style.animationDelay = Math.random() * 0.3 + "s";
+    box.appendChild(s);
+    setTimeout(() => s.remove(), 1400);
+  }
+}
+
+function fitSheet() {
+  const vv = window.visualViewport;
+  const h = vv ? vv.height : window.innerHeight;
+  document.querySelectorAll(".sheet").forEach((el) => (el.style.height = h + "px"));
+  // открыта клавиатура телефона — прячем всё лишнее, чтобы было видно код
+  const ed = document.getElementById("editor");
+  const focused = document.activeElement && document.activeElement.id === "edCode";
+  ed.classList.toggle("kb", focused && h < 520);
+}
+
+function setupEditor() {
+  buildKeys();
+  const ta = document.getElementById("edCode");
+  ta.addEventListener("input", codeChanged);
+  ta.addEventListener("scroll", syncScroll);
+  ta.addEventListener("keydown", (e) => {
+    if (e.key === "Tab") { e.preventDefault(); insertAtCursor("  "); }
+    else if (e.key === "Enter" && !e.isComposing) { e.preventDefault(); newlineIndent(); }
+  });
+  ta.addEventListener("beforeinput", (e) => {
+    if (e.inputType === "insertLineBreak" || e.inputType === "insertParagraph") { e.preventDefault(); newlineIndent(); }
+  });
+  document.getElementById("edTask").addEventListener("change", (e) => { stopRun(); loadTask(e.target.value); });
+  document.getElementById("edClose").onclick = closeEditor;
+  document.getElementById("edRun").onclick = runCode;
+  document.getElementById("edStop").onclick = () => { stopRun(); outLine("warn", "Скрипт остановлен."); };
+  document.getElementById("edCheck").onclick = checkTask;
+  document.getElementById("edAsk").onclick = () => askClaudeAboutCode(false);
+  document.getElementById("edAskErr").onclick = () => askClaudeAboutCode(true);
+  document.getElementById("edHint").onclick = () => {
+    const T = taskFor(Editor.key);
+    outLine("hint", "Подсказка:\n" + (T.hint || "Перечитай шпаргалку 📖"));
+    showTab("out");
+  };
+  document.getElementById("edReset").onclick = () => {
+    const T = taskFor(Editor.key);
+    if (document.getElementById("edReset").dataset.armed !== "1") {
+      document.getElementById("edReset").dataset.armed = "1";
+      document.getElementById("edReset").textContent = "Точно стереть?";
+      setTimeout(() => { document.getElementById("edReset").dataset.armed = ""; document.getElementById("edReset").textContent = "⟲ Сброс"; }, 2500);
+      return;
+    }
+    document.getElementById("edReset").dataset.armed = "";
+    document.getElementById("edReset").textContent = "⟲ Сброс";
+    ta.value = T.starter || "";
+    codeChanged();
+  };
+  document.querySelectorAll("#edTabs [data-tab]").forEach((b) => (b.onclick = () => showTab(b.dataset.tab)));
+  document.getElementById("vpIn").onclick = () => Editor.vp && Editor.vp.zoomIn();
+  document.getElementById("vpOut").onclick = () => Editor.vp && Editor.vp.zoomOut();
+  document.getElementById("vpReset").onclick = () => Editor.vp && Editor.vp.reset();
+  window.addEventListener("resize", () => { fitSheet(); if (Editor.vp && !document.getElementById("edWorld").hidden) Editor.vp.resize(); });
+  if (window.visualViewport) window.visualViewport.addEventListener("resize", fitSheet);
+  ta.addEventListener("focus", () => setTimeout(fitSheet, 300));
+  ta.addEventListener("blur", () => setTimeout(fitSheet, 100));
+  drawClaude(document.getElementById("edClaudeAva").getContext("2d"), 0, 0, "down", 0.3);
+}
