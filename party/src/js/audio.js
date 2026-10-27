@@ -221,6 +221,7 @@ const SONGS = {
   blocks: { bpm: 124, prog: [[60, 'M'], [64, 'm'], [57, 'm'], [65, 'M']], bass: 'x.x.x.x.x.x.x.x.', kick: 'x...x...x...x...', snare: '....x.......x...', hat: '..x...x...x...x.', arp: [0, 1, 2, 3, 2, 1], arpWave: 'square', lead: 'triangle', seed: 21 },
   glass: { bpm: 92, prog: [[57, 'm'], [53, 'M'], [52, 'M'], [57, 'm']], bass: 'x.......x.......', kick: 'x.......x..x....', snare: '........x.......', hat: 'x...x...x...x...', arp: [0, 1, 2, 1], arpWave: 'triangle', lead: 'sine', seed: 5, pad: true },
   chained: { bpm: 112, prog: [[55, 'M'], [52, 'm'], [60, 'M'], [62, 'M']], bass: 'x...x.x.x...x.x.', kick: 'x.......x.x.....', snare: '....x.......x...', hat: '..x...x...x...xx', arp: [0, 1, 2, 3, 2, 1, 2, 1], arpWave: 'triangle', lead: 'square', seed: 13, pad: true },
+  soccer: { bpm: 128, prog: [[60, 'M'], [65, 'M'], [67, 'M'], [65, 'M']], bass: 'x..x..x.x..x..x.', kick: 'x...x...x...x...', snare: '....x.......x...', hat: 'x.x.x.x.x.x.x.xx', arp: [0, 2, 1, 3], arpWave: 'square', lead: 'triangle', seed: 29 },
   lava: { bpm: 140, prog: [[52, 'm'], [52, 'm'], [48, 'M'], [50, 'M']], bass: 'xx.xx.xx.xx.x.x.', kick: 'x...x...x...x...', snare: '....x.......x...', hat: 'x.xxx.xxx.xxx.xx', arp: [0, 1, 2, 1], arpWave: 'sawtooth', lead: 'square', seed: 17 },
 };
 

@@ -2,8 +2,8 @@
 // Ввод: одна клавиатура на двоих, до двух геймпадов, сенсорные джойстики на планшете.
 
 const KEYMAP = [
-  { up: ['KeyW'], down: ['KeyS'], left: ['KeyA'], right: ['KeyD'], jump: ['Space'], action: ['KeyF', 'KeyG'], camL: ['KeyQ'], camR: ['KeyE'] },
-  { up: ['ArrowUp'], down: ['ArrowDown'], left: ['ArrowLeft'], right: ['ArrowRight'], jump: ['Enter', 'NumpadEnter', 'ShiftRight', 'Numpad0'], action: ['Slash', 'ControlRight', 'NumpadDecimal', 'Period'], camL: ['BracketLeft', 'Numpad4'], camR: ['BracketRight', 'Numpad6'] },
+  { up: ['KeyW'], down: ['KeyS'], left: ['KeyA'], right: ['KeyD'], jump: ['Space'], action: ['KeyF', 'KeyG'], camL: ['KeyQ'], camR: ['KeyE'], emote: ['KeyR'] },
+  { up: ['ArrowUp'], down: ['ArrowDown'], left: ['ArrowLeft'], right: ['ArrowRight'], jump: ['Enter', 'NumpadEnter', 'ShiftRight', 'Numpad0'], action: ['Slash', 'ControlRight', 'NumpadDecimal', 'Period'], camL: ['BracketLeft', 'Numpad4'], camR: ['BracketRight', 'Numpad6'], emote: ['Quote', 'Backslash', 'NumpadAdd'] },
 ];
 
 const GAME_KEYS = new Set(KEYMAP.flatMap((m) => Object.values(m).flat()).concat(['Escape']));
@@ -57,6 +57,7 @@ const Input = {
       let jumpP = this.wasPressed(km.jump);
       let action = this.isDown(km.action);
       let actionP = this.wasPressed(km.action);
+      let emoteP = this.wasPressed(km.emote);
       let pause = false;
       let menuUp = this.wasPressed(km.up);
       let menuDown = this.wasPressed(km.down);
@@ -82,6 +83,7 @@ const Input = {
         action = action || btn(1) || btn(2);
         actionP = actionP || edge(1) || edge(2);
         pause = edge(9);
+        emoteP = emoteP || edge(3);
         const stickEdge = (cond, key) => { const was = prev[key]; prev[key] = cond; return cond && !was; };
         menuUp = menuUp || edge(12) || stickEdge(pad.axes[1] < -0.6, 'sU');
         menuDown = menuDown || edge(13) || stickEdge(pad.axes[1] > 0.6, 'sD');
@@ -100,7 +102,7 @@ const Input = {
       tb.actionP = false;
       const len = Math.hypot(mx, mz);
       if (len > 1) { mx /= len; mz /= len; }
-      this.states[i] = { mx, mz, cam, camY, jump, jumpP, action, actionP, pause, menuUp, menuDown, menuLeft, menuRight };
+      this.states[i] = { mx, mz, cam, camY, jump, jumpP, action, actionP, emoteP, pause, menuUp, menuDown, menuLeft, menuRight };
     }
     return this.states;
   },

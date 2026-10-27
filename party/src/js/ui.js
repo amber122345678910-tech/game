@@ -328,6 +328,7 @@ const UI = {
       const b = e.target.closest('button');
       if (!b) return;
       Store.data.settings.quality = b.dataset.v;
+      Store.data.settings.autoQ = false;
       Store.save();
       applyQuality(b.dataset.v);
       this.syncSettings();

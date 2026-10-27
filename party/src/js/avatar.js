@@ -329,6 +329,7 @@ class Avatar {
     this.t = 0;
     this.slapT = -1;
     this.pushT = -1;
+    this.kickT = -1;
     this.cheer = false;
     this.glove = null;
     this.mats = [];
@@ -803,7 +804,7 @@ class Avatar {
       const s = Math.sin(t * 1.7) * 0.05;
       la = s; ra = -s; laz = -0.04; raz = 0.04;
     }
-    if (this.cheer) {
+    if (this.cheer || this.emote) {
       la = -2.8 + Math.sin(t * 12) * 0.35; ra = -2.8 - Math.sin(t * 12) * 0.35; laz = -0.3; raz = 0.3;
     }
     if (this.pushT >= 0) {
@@ -811,6 +812,16 @@ class Avatar {
       const p = this.pushT / 0.32;
       if (p >= 1) this.pushT = -1;
       else { const a = p < 0.35 ? p / 0.35 : 1 - (p - 0.35) / 0.65; la = ra = -1.55 * a + la * (1 - a); laz = raz = 0; }
+    }
+    if (this.kickT >= 0) {
+      this.kickT += dt;
+      const p = this.kickT / 0.34;
+      if (p >= 1) this.kickT = -1;
+      else {
+        rl = p < 0.3 ? lerp(0, 0.8, p / 0.3) : p < 0.55 ? lerp(0.8, -1.5, (p - 0.3) / 0.25) : lerp(-1.5, 0, (p - 0.55) / 0.45);
+        ra = -rl * 0.5;
+        la = rl * 0.5;
+      }
     }
     let slap = false;
     if (this.slapT >= 0) {
@@ -829,7 +840,7 @@ class Avatar {
     const L = this.legL.rotation;
     const Rr = this.legR.rotation;
     L.x = damp(L.x, ll, k, dt);
-    Rr.x = damp(Rr.x, rl, k, dt);
+    Rr.x = this.kickT >= 0 ? rl : damp(Rr.x, rl, k, dt);
     const A = this.armL.rotation;
     const B = this.armR.rotation;
     A.x = damp(A.x, la, k, dt);

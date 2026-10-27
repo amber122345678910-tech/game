@@ -54,8 +54,8 @@ const Lobby = {
   },
 
   hintFor(i) {
-    return i === 0 ? '<kbd>WASD</kbd> бег · <kbd>Пробел</kbd> прыжок · <kbd>F</kbd> толкнуть · <kbd>Esc</kbd> меню'
-      : '<kbd>Стрелки</kbd> бег · <kbd>Enter</kbd> прыжок · <kbd>/</kbd> толкнуть · <kbd>Esc</kbd> меню';
+    return i === 0 ? '<kbd>WASD</kbd> бег · <kbd>Пробел</kbd> прыжок · <kbd>F</kbd> толкнуть · <kbd>R</kbd> ❤ · <kbd>Esc</kbd> меню'
+      : '<kbd>Стрелки</kbd> бег · <kbd>Enter</kbd> прыжок · <kbd>/</kbd> толкнуть · <kbd>\'</kbd> ❤ · <kbd>Esc</kbd> меню';
   },
 
   spawnPos(i) { return V3(i === 0 ? -4 : 4, 0.4, 12); },
@@ -86,8 +86,8 @@ const Lobby = {
     this.fountainPos = V3(0, 5.5, -6);
 
     // Порталы
-    const angles = [-70, -42, -14, 14, 42, 70];
-    GAME_ORDER.forEach((id, k) => this.buildPortal(MODES[id], (angles[k] * Math.PI) / 180, 44));
+    const angles = [-75, -50, -25, 0, 25, 50, 75];
+    GAME_ORDER.forEach((id, k) => this.buildPortal(MODES[id], (angles[k] * Math.PI) / 180, 46));
 
     // Гардероб
     this.buildWardrobe(V3(0, 0, 34));

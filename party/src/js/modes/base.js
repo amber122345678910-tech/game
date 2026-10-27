@@ -2,7 +2,7 @@
 // Общая основа мини-игр: заставка с правилами → отсчёт 3-2-1 → игра → итог.
 
 const MODES = {};
-const GAME_ORDER = ['obby', 'slap', 'blocks', 'glass', 'chained', 'lava'];
+const GAME_ORDER = ['obby', 'slap', 'blocks', 'soccer', 'glass', 'chained', 'lava'];
 
 function disposeTree(root) {
   root.traverse((o) => {
@@ -68,7 +68,7 @@ class MiniGame {
   hintFor(i) {
     const k = i === 0 ? '<kbd>WASD</kbd> бег · <kbd>Пробел</kbd> прыжок · <kbd>Q</kbd><kbd>E</kbd> камера' : '<kbd>Стрелки</kbd> бег · <kbd>Enter</kbd> прыжок · <kbd>[</kbd><kbd>]</kbd> камера';
     if (!this.ability) return k;
-    return k + (i === 0 ? ' · <kbd>F</kbd> ' : ' · <kbd>/</kbd> ') + (this.ability === 'slap' ? 'шлепок' : 'толчок');
+    return k + (i === 0 ? ' · <kbd>F</kbd> ' : ' · <kbd>/</kbd> ') + (this.ability === 'slap' ? 'шлепок' : this.ability === 'kick' ? 'удар' : 'толчок');
   }
 
   spawnPlayers() {

@@ -294,7 +294,7 @@ const SECTIONS = {
     const W = 10 * c.wide;
     c.plat(0, c.f + 4, c.y, W, 8, { color: c.color() });
     c.box(0, c.y + H / 2, c.f + 9.5, W, H, 3, { color: '#c8b8a6', mat: 'brick' });
-    const tw = c.wide > 1 ? 6 : 2.6;
+    const tw = c.wide > 1 ? 6 : 4;
     c.box(0, c.y + H / 2, c.f + 7.5, tw, H, 1, { color: '#c0c6d0', mat: 'truss', climb: true });
     c.plat(0, c.f + 14, c.y + H, W, 6, { color: shade(c.color(), -0.15) });
     c.y += H;

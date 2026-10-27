@@ -162,6 +162,7 @@ const Game = {
     this.handleGlobalKeys(states);
 
     if (this.state === 'game' && !this.paused) {
+      this.watchFps(dt);
       for (let i = 0; i < 2; i++) {
         if (UI.editorOpen(i)) {
           UI.editorInput(i, states[i]);
@@ -189,6 +190,27 @@ const Game = {
     this.render(dt);
     Input.endFrame();
     requestAnimationFrame((t) => this.frame(t));
+  },
+
+  // Если компьютер не успевает — сами понижаем графику (пока игрок не выбрал её вручную).
+  watchFps(dt) {
+    const f = (this.fps = this.fps || { t: 0, n: 0, skip: 2 });
+    f.t += dt;
+    f.n++;
+    if (f.t < 4) return;
+    const fps = f.n / f.t;
+    f.t = 0;
+    f.n = 0;
+    if (f.skip > 0) { f.skip--; return; }
+    const s = Store.data.settings;
+    if (s.autoQ === false || fps >= 32) return;
+    const next = s.quality === 'high' ? 'mid' : s.quality === 'mid' ? 'low' : null;
+    if (!next) return;
+    s.quality = next;
+    Store.save();
+    applyQuality(next);
+    f.skip = 1;
+    UI.toast(-1, next === 'mid' ? 'Графика: средне (для плавности)' : 'Графика: быстро (для плавности)', '#cfd6ea');
   },
 
   physics(dt) {
@@ -238,6 +260,12 @@ const Game = {
 };
 
 window.addEventListener('load', () => {
+  // Ждём шрифт (до 1.5 с), чтобы надписи на табличках нарисовались им, а не запасным.
+  const font = document.fonts && document.fonts.load ? document.fonts.load('900 64px "Rubik"').catch(() => {}) : Promise.resolve();
+  Promise.race([font, new Promise((r) => setTimeout(r, 1500))]).then(boot);
+});
+
+function boot() {
   try {
     Game.init();
   } catch (e) {
@@ -246,4 +274,4 @@ window.addEventListener('load', () => {
     el.textContent = 'Не получилось запустить 3D (WebGL). Попробуй другой браузер. ' + e.message;
     throw e;
   }
-});
+}

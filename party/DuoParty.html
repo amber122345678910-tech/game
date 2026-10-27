@@ -245,7 +245,7 @@ button { font-family: inherit; }
 #results .lines { color: var(--ink-dim); font-weight: 700; margin-bottom: 14px; font-size: 15px; }
 
 /* ---------- pause menu ---------- */
-.games { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin-top: 12px; }
+.games { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin-top: 12px; }
 .gbtn {
   border: 0; border-radius: 14px; padding: 12px 8px; color: #fff; cursor: pointer; font-weight: 900; font-size: 15px;
   display: flex; flex-direction: column; align-items: center; gap: 4px; box-shadow: 0 4px 0 rgba(0,0,0,0.35);
@@ -311,6 +311,7 @@ button { font-family: inherit; }
           <p><kbd>Пробел</kbd> <b>прыжок</b></p>
           <p><kbd>F</kbd> <b>шлепок / толчок</b></p>
           <p><kbd>Q</kbd> <kbd>E</kbd> <b>повернуть камеру</b></p>
+          <p><kbd>R</kbd> <b>эмоция ❤</b></p>
         </div>
         <div class="col p1">
           <h3>Игрок 2 · правая половина</h3>
@@ -318,9 +319,10 @@ button { font-family: inherit; }
           <p><kbd>Enter</kbd> или <kbd>Right Shift</kbd> <b>прыжок</b></p>
           <p><kbd>/</kbd> или <kbd>Right Ctrl</kbd> <b>шлепок / толчок</b></p>
           <p><kbd>[</kbd> <kbd>]</kbd> <b>повернуть камеру</b></p>
+          <p><kbd>'</kbd> или <kbd>\</kbd> <b>эмоция ❤</b></p>
         </div>
       </div>
-      <p class="note">Геймпады: левый стик — бег, правый стик — камера, A — прыжок, X/B — шлепок, Start — пауза.<br>
+      <p class="note">Геймпады: левый стик — бег, правый стик — камера, A — прыжок, X/B — шлепок, Y — эмоция, Start — пауза.<br>
         <kbd>Esc</kbd> — пауза и выбор игры. На планшете у каждого своя половина экрана с джойстиком.</p>
       <div class="btns" style="margin-top:16px"><button class="btn go small" data-close>Понятно!</button></div>
     </div>
@@ -687,6 +689,7 @@ const SONGS = {
   blocks: { bpm: 124, prog: [[60, 'M'], [64, 'm'], [57, 'm'], [65, 'M']], bass: 'x.x.x.x.x.x.x.x.', kick: 'x...x...x...x...', snare: '....x.......x...', hat: '..x...x...x...x.', arp: [0, 1, 2, 3, 2, 1], arpWave: 'square', lead: 'triangle', seed: 21 },
   glass: { bpm: 92, prog: [[57, 'm'], [53, 'M'], [52, 'M'], [57, 'm']], bass: 'x.......x.......', kick: 'x.......x..x....', snare: '........x.......', hat: 'x...x...x...x...', arp: [0, 1, 2, 1], arpWave: 'triangle', lead: 'sine', seed: 5, pad: true },
   chained: { bpm: 112, prog: [[55, 'M'], [52, 'm'], [60, 'M'], [62, 'M']], bass: 'x...x.x.x...x.x.', kick: 'x.......x.x.....', snare: '....x.......x...', hat: '..x...x...x...xx', arp: [0, 1, 2, 3, 2, 1, 2, 1], arpWave: 'triangle', lead: 'square', seed: 13, pad: true },
+  soccer: { bpm: 128, prog: [[60, 'M'], [65, 'M'], [67, 'M'], [65, 'M']], bass: 'x..x..x.x..x..x.', kick: 'x...x...x...x...', snare: '....x.......x...', hat: 'x.x.x.x.x.x.x.xx', arp: [0, 2, 1, 3], arpWave: 'square', lead: 'triangle', seed: 29 },
   lava: { bpm: 140, prog: [[52, 'm'], [52, 'm'], [48, 'M'], [50, 'M']], bass: 'xx.xx.xx.xx.x.x.', kick: 'x...x...x...x...', snare: '....x.......x...', hat: 'x.xxx.xxx.xxx.xx', arp: [0, 1, 2, 1], arpWave: 'sawtooth', lead: 'square', seed: 17 },
 };
 
@@ -2283,6 +2286,7 @@ class Avatar {
     this.t = 0;
     this.slapT = -1;
     this.pushT = -1;
+    this.kickT = -1;
     this.cheer = false;
     this.glove = null;
     this.mats = [];
@@ -2757,7 +2761,7 @@ class Avatar {
       const s = Math.sin(t * 1.7) * 0.05;
       la = s; ra = -s; laz = -0.04; raz = 0.04;
     }
-    if (this.cheer) {
+    if (this.cheer || this.emote) {
       la = -2.8 + Math.sin(t * 12) * 0.35; ra = -2.8 - Math.sin(t * 12) * 0.35; laz = -0.3; raz = 0.3;
     }
     if (this.pushT >= 0) {
@@ -2765,6 +2769,16 @@ class Avatar {
       const p = this.pushT / 0.32;
       if (p >= 1) this.pushT = -1;
       else { const a = p < 0.35 ? p / 0.35 : 1 - (p - 0.35) / 0.65; la = ra = -1.55 * a + la * (1 - a); laz = raz = 0; }
+    }
+    if (this.kickT >= 0) {
+      this.kickT += dt;
+      const p = this.kickT / 0.34;
+      if (p >= 1) this.kickT = -1;
+      else {
+        rl = p < 0.3 ? lerp(0, 0.8, p / 0.3) : p < 0.55 ? lerp(0.8, -1.5, (p - 0.3) / 0.25) : lerp(-1.5, 0, (p - 0.55) / 0.45);
+        ra = -rl * 0.5;
+        la = rl * 0.5;
+      }
     }
     let slap = false;
     if (this.slapT >= 0) {
@@ -2783,7 +2797,7 @@ class Avatar {
     const L = this.legL.rotation;
     const Rr = this.legR.rotation;
     L.x = damp(L.x, ll, k, dt);
-    Rr.x = damp(Rr.x, rl, k, dt);
+    Rr.x = this.kickT >= 0 ? rl : damp(Rr.x, rl, k, dt);
     const A = this.armL.rotation;
     const B = this.armR.rotation;
     A.x = damp(A.x, la, k, dt);
@@ -2898,8 +2912,8 @@ class Trail {
 // Ввод: одна клавиатура на двоих, до двух геймпадов, сенсорные джойстики на планшете.
 
 const KEYMAP = [
-  { up: ['KeyW'], down: ['KeyS'], left: ['KeyA'], right: ['KeyD'], jump: ['Space'], action: ['KeyF', 'KeyG'], camL: ['KeyQ'], camR: ['KeyE'] },
-  { up: ['ArrowUp'], down: ['ArrowDown'], left: ['ArrowLeft'], right: ['ArrowRight'], jump: ['Enter', 'NumpadEnter', 'ShiftRight', 'Numpad0'], action: ['Slash', 'ControlRight', 'NumpadDecimal', 'Period'], camL: ['BracketLeft', 'Numpad4'], camR: ['BracketRight', 'Numpad6'] },
+  { up: ['KeyW'], down: ['KeyS'], left: ['KeyA'], right: ['KeyD'], jump: ['Space'], action: ['KeyF', 'KeyG'], camL: ['KeyQ'], camR: ['KeyE'], emote: ['KeyR'] },
+  { up: ['ArrowUp'], down: ['ArrowDown'], left: ['ArrowLeft'], right: ['ArrowRight'], jump: ['Enter', 'NumpadEnter', 'ShiftRight', 'Numpad0'], action: ['Slash', 'ControlRight', 'NumpadDecimal', 'Period'], camL: ['BracketLeft', 'Numpad4'], camR: ['BracketRight', 'Numpad6'], emote: ['Quote', 'Backslash', 'NumpadAdd'] },
 ];
 
 const GAME_KEYS = new Set(KEYMAP.flatMap((m) => Object.values(m).flat()).concat(['Escape']));
@@ -2953,6 +2967,7 @@ const Input = {
       let jumpP = this.wasPressed(km.jump);
       let action = this.isDown(km.action);
       let actionP = this.wasPressed(km.action);
+      let emoteP = this.wasPressed(km.emote);
       let pause = false;
       let menuUp = this.wasPressed(km.up);
       let menuDown = this.wasPressed(km.down);
@@ -2978,6 +2993,7 @@ const Input = {
         action = action || btn(1) || btn(2);
         actionP = actionP || edge(1) || edge(2);
         pause = edge(9);
+        emoteP = emoteP || edge(3);
         const stickEdge = (cond, key) => { const was = prev[key]; prev[key] = cond; return cond && !was; };
         menuUp = menuUp || edge(12) || stickEdge(pad.axes[1] < -0.6, 'sU');
         menuDown = menuDown || edge(13) || stickEdge(pad.axes[1] > 0.6, 'sD');
@@ -2996,7 +3012,7 @@ const Input = {
       tb.actionP = false;
       const len = Math.hypot(mx, mz);
       if (len > 1) { mx /= len; mz /= len; }
-      this.states[i] = { mx, mz, cam, camY, jump, jumpP, action, actionP, pause, menuUp, menuDown, menuLeft, menuRight };
+      this.states[i] = { mx, mz, cam, camY, jump, jumpP, action, actionP, emoteP, pause, menuUp, menuDown, menuLeft, menuRight };
     }
     return this.states;
   },
@@ -3143,6 +3159,7 @@ class Player {
     this.score = 0;
     this.pendingKill = false;
     this.aspect = 1;
+    this.emoteT = 0;
   }
 
   makeNameTag() {
@@ -3174,6 +3191,21 @@ class Player {
     if (this.inp.jumpP) this.jumpBuf = 0.15;
     else if (this.inp.jump && this.jumpBuf < 0.03) this.jumpBuf = 0.03;
     if (this.inp.actionP) this.actionQueued = true;
+    if (this.inp.emoteP) this.emote();
+  }
+
+  // Эмоция: машет руками и сыплет сердечками.
+  emote() {
+    if (this.dead || this.emoteT > 0 || !this.avatar.root.visible) return;
+    this.emoteT = 1.8;
+    this.avatar.emote = true;
+    Sound.play('select');
+    for (let k = 0; k < 10; k++) {
+      const a = (k / 10) * TAU;
+      FX.sprite('heart', V3(this.pos.x + Math.cos(a) * 1.4, this.pos.y + 5.5 + rand(0, 1), this.pos.z + Math.sin(a) * 1.4), {
+        color: pick(['#ff4d8d', '#ff7ab0', '#ff2e63', '#ffd23f']), size: rand(0.6, 1), life: 1.4, vx: Math.cos(a) * 1.5, vz: Math.sin(a) * 1.5, vy: rand(2, 4),
+      });
+    }
   }
 
   spawn(pos, heading = 0) {
@@ -3343,15 +3375,17 @@ class Player {
   resolveBox(b, a, key, d, wasGrounded, isPlayer) {
     if (b.kill) this.pendingKill = true;
     if (a === 1) {
-      if (d < 0) {
+      // Сажаем сверху / упираемся головой, только если пришли с этой стороны, иначе — выталкиваем вбок.
+      const prev = this.pos.y - d;
+      if (d < 0 && prev >= b.max.y - 0.06) {
         this.pos.y = b.max.y;
         if (this.vel.y < 0) this.vel.y = 0;
         this.grounded = true;
         this.groundCol = b;
-      } else {
+      } else if (d > 0 && prev + this.h <= b.min.y + 0.06) {
         this.pos.y = b.min.y - this.h;
         if (this.vel.y > 0) this.vel.y = 0;
-      }
+      } else this.pushSide(b);
       return;
     }
     if (isPlayer) {
@@ -3376,6 +3410,18 @@ class Player {
     if (Math.sign(this.vel[key]) === Math.sign(d)) this.vel[key] = 0;
   }
 
+  pushSide(b) {
+    const p = this.pos;
+    const opts = [
+      [b.max.x - (p.x - this.r), 'x', 1], [(p.x + this.r) - b.min.x, 'x', -1],
+      [b.max.z - (p.z - this.r), 'z', 1], [(p.z + this.r) - b.min.z, 'z', -1],
+    ];
+    opts.sort((u, v) => u[0] - v[0]);
+    const [amt, k, s] = opts[0];
+    p[k] += s * (amt + 0.0005);
+    if (Math.sign(this.vel[k]) === -s) this.vel[k] = 0;
+  }
+
   resolveCyl(c, a, d, wasGrounded) {
     const p = this.pos;
     if (!(p.y < c.y1 - 0.001 && p.y + this.h > c.y0 + 0.001)) return;
@@ -3385,14 +3431,20 @@ class Player {
     if (a === 1) {
       if (dist > c.r + this.r * 0.6) return;
       if (c.kill) this.pendingKill = true;
-      if (d < 0) {
+      const prev = p.y - d;
+      if (d < 0 && prev >= c.y1 - 0.06) {
         p.y = c.y1;
         if (this.vel.y < 0) this.vel.y = 0;
         this.grounded = true;
         this.groundCol = c;
-      } else {
+      } else if (d > 0 && prev + this.h <= c.y0 + 0.06) {
         p.y = c.y0 - this.h;
         if (this.vel.y > 0) this.vel.y = 0;
+      } else {
+        const nx = dist > 1e-6 ? dx / dist : 1;
+        const nz = dist > 1e-6 ? dz / dist : 0;
+        p.x = c.x + nx * (c.r + this.r + 0.0005);
+        p.z = c.z + nz * (c.r + this.r + 0.0005);
       }
       return;
     }
@@ -3417,7 +3469,7 @@ class Player {
     if (this.dead) return;
     const p = this.pos;
     for (const b of World.boxes) {
-      if (!b.active || !b.solid || !b.moving || !this.ovBox(b, 0.01)) continue;
+      if (!b.active || !b.solid || !b.moving || b === this.groundCol || !this.ovBox(b, 0.01)) continue;
       const pen = [
         [b.max.x - (p.x - this.r), 'x', 1], [(p.x + this.r) - b.min.x, 'x', -1],
         [b.max.y - p.y, 'y', 1], [(p.y + this.h) - b.min.y, 'y', -1],
@@ -3436,7 +3488,7 @@ class Player {
     if (this.dead) return;
     const p = this.pos;
     for (const b of World.boxes) {
-      if (!b.active || !b.solid || !this.ovBox(b, 0.01)) continue;
+      if (!b.active || !b.solid || !this.ovBox(b, 0.001)) continue;
       const pen = [
         [b.max.x - (p.x - this.r), 'x', 1], [(p.x + this.r) - b.min.x, 'x', -1],
         [b.max.y - p.y, 'y', 1], [(p.y + this.h) - b.min.y, 'y', -1],
@@ -3496,6 +3548,10 @@ class Player {
       this.cool = 0.55;
       this.avatar.slapT = 0;
       this.pendingHit = 0.11;
+    } else if (this.ability === 'kick') {
+      this.cool = 0.35;
+      this.avatar.kickT = 0;
+      this.pendingHit = 0.07;
     } else {
       this.cool = 0.9;
       this.avatar.pushT = 0;
@@ -3505,6 +3561,10 @@ class Player {
   }
 
   doHit() {
+    if (this.ability === 'kick') {
+      if (!this.dead && Game.mode && Game.mode.onAction) Game.mode.onAction(this);
+      return;
+    }
     const o = Game.other(this);
     if (!o || o.dead || this.dead) return;
     const dx = o.pos.x - this.pos.x;
@@ -3551,6 +3611,10 @@ class Player {
       this.tryAction();
     }
     if (this.dead) this.deadT += dt;
+    if (this.emoteT > 0) {
+      this.emoteT -= dt;
+      if (this.emoteT <= 0) this.avatar.emote = false;
+    }
     const sp = Math.hypot(this.vel.x, this.vel.z);
     this.avatar.root.position.copy(this.pos);
     this.avatar.root.rotation.y = this.heading;
@@ -3588,7 +3652,12 @@ class Player {
       if (inp.camY) this.camPitch = clamp(this.camPitch + inp.camY * 1.5 * dt, -0.15, 1.2);
       this.camManualT -= dt;
       const sp = Math.hypot(this.vel.x, this.vel.z);
-      if (this.autoCam && this.camManualT <= 0 && sp > 2 && !this.dead && this.stun <= 0) {
+      const focus = Game.mode && Game.mode.camFocus && this.phaseLive() ? Game.mode.camFocus(this) : null;
+      if (focus) {
+        const fx = focus.x - this.pos.x;
+        const fz = focus.z - this.pos.z;
+        if (this.camManualT <= 0 && !this.dead && Math.hypot(fx, fz) > 5) this.camYaw = dampAngle(this.camYaw, Math.atan2(-fx, -fz), 2.6, dt);
+      } else if (this.autoCam && this.camManualT <= 0 && sp > 2 && !this.dead && this.stun <= 0) {
         const diff = angDiff(this.camYaw, this.heading + Math.PI);
         if (Math.abs(diff) < 2.5) this.camYaw += diff * (1 - Math.exp(-1.5 * Math.min(1, sp / 16) * dt));
       }
@@ -3622,6 +3691,10 @@ class Player {
       cam.aspect = aspect;
       cam.updateProjectionMatrix();
     }
+  }
+
+  phaseLive() {
+    return Game.mode && (Game.mode.phase === 'play' || Game.mode.phase === 'count');
   }
 
   dispose() {
@@ -3963,6 +4036,7 @@ const UI = {
       const b = e.target.closest('button');
       if (!b) return;
       Store.data.settings.quality = b.dataset.v;
+      Store.data.settings.autoQ = false;
       Store.save();
       applyQuality(b.dataset.v);
       this.syncSettings();
@@ -4318,7 +4392,7 @@ const SECTIONS = {
     const W = 10 * c.wide;
     c.plat(0, c.f + 4, c.y, W, 8, { color: c.color() });
     c.box(0, c.y + H / 2, c.f + 9.5, W, H, 3, { color: '#c8b8a6', mat: 'brick' });
-    const tw = c.wide > 1 ? 6 : 2.6;
+    const tw = c.wide > 1 ? 6 : 4;
     c.box(0, c.y + H / 2, c.f + 7.5, tw, H, 1, { color: '#c0c6d0', mat: 'truss', climb: true });
     c.plat(0, c.f + 14, c.y + H, W, 6, { color: shade(c.color(), -0.15) });
     c.y += H;
@@ -4463,7 +4537,7 @@ function pickSections(pool, n) {
 // Общая основа мини-игр: заставка с правилами → отсчёт 3-2-1 → игра → итог.
 
 const MODES = {};
-const GAME_ORDER = ['obby', 'slap', 'blocks', 'glass', 'chained', 'lava'];
+const GAME_ORDER = ['obby', 'slap', 'blocks', 'soccer', 'glass', 'chained', 'lava'];
 
 function disposeTree(root) {
   root.traverse((o) => {
@@ -4529,7 +4603,7 @@ class MiniGame {
   hintFor(i) {
     const k = i === 0 ? '<kbd>WASD</kbd> бег · <kbd>Пробел</kbd> прыжок · <kbd>Q</kbd><kbd>E</kbd> камера' : '<kbd>Стрелки</kbd> бег · <kbd>Enter</kbd> прыжок · <kbd>[</kbd><kbd>]</kbd> камера';
     if (!this.ability) return k;
-    return k + (i === 0 ? ' · <kbd>F</kbd> ' : ' · <kbd>/</kbd> ') + (this.ability === 'slap' ? 'шлепок' : 'толчок');
+    return k + (i === 0 ? ' · <kbd>F</kbd> ' : ' · <kbd>/</kbd> ') + (this.ability === 'slap' ? 'шлепок' : this.ability === 'kick' ? 'удар' : 'толчок');
   }
 
   spawnPlayers() {
@@ -4700,8 +4774,8 @@ const Lobby = {
   },
 
   hintFor(i) {
-    return i === 0 ? '<kbd>WASD</kbd> бег · <kbd>Пробел</kbd> прыжок · <kbd>F</kbd> толкнуть · <kbd>Esc</kbd> меню'
-      : '<kbd>Стрелки</kbd> бег · <kbd>Enter</kbd> прыжок · <kbd>/</kbd> толкнуть · <kbd>Esc</kbd> меню';
+    return i === 0 ? '<kbd>WASD</kbd> бег · <kbd>Пробел</kbd> прыжок · <kbd>F</kbd> толкнуть · <kbd>R</kbd> ❤ · <kbd>Esc</kbd> меню'
+      : '<kbd>Стрелки</kbd> бег · <kbd>Enter</kbd> прыжок · <kbd>/</kbd> толкнуть · <kbd>\'</kbd> ❤ · <kbd>Esc</kbd> меню';
   },
 
   spawnPos(i) { return V3(i === 0 ? -4 : 4, 0.4, 12); },
@@ -4732,8 +4806,8 @@ const Lobby = {
     this.fountainPos = V3(0, 5.5, -6);
 
     // Порталы
-    const angles = [-70, -42, -14, 14, 42, 70];
-    GAME_ORDER.forEach((id, k) => this.buildPortal(MODES[id], (angles[k] * Math.PI) / 180, 44));
+    const angles = [-75, -50, -25, 0, 25, 50, 75];
+    GAME_ORDER.forEach((id, k) => this.buildPortal(MODES[id], (angles[k] * Math.PI) / 180, 46));
 
     // Гардероб
     this.buildWardrobe(V3(0, 0, 34));
@@ -5637,6 +5711,368 @@ new MiniGame({
 </script>
 <script>
 'use strict';
+// Футбол огромным мячом (как Super League Soccer / Kick Off): кто первым забьёт 5 голов.
+
+new MiniGame({
+  id: 'soccer',
+  title: 'Футбол',
+  icon: '⚽',
+  color: '#20b866',
+  short: 'Забей гол другу!',
+  desc: 'Огромный мяч и двое ворот. Толкай мяч, пинай и забивай! До 5 голов или 3 минут.',
+  rules: 'Подбеги к мячу и пни: F / ⁄. Можно вести мяч и бить головой в прыжке. До 5 голов!',
+  ability: 'kick',
+  theme: 'day',
+  music: 'soccer',
+  autoRespawn: true,
+  respawnDelay: 1.2,
+  killY: -30,
+  camDist: 18,
+  camPitch: 0.42,
+  FX: 36,
+  FZ: 23,
+  GW: 7.5,
+  GH: 8,
+  BR: 2.3,
+  TIME: 180,
+  GOALS: 5,
+
+  build() {
+    const root = this.root;
+    const FX2 = this.FX;
+    const FZ2 = this.FZ;
+    // Поле в полоску
+    for (let i = 0; i < 12; i++) {
+      const w = (FX2 * 2) / 12;
+      part(root, -FX2 + w / 2 + i * w, -0.5, 0, w, 1, FZ2 * 2, { mat: 'grass', color: i % 2 ? '#ffffff' : '#d8f0c8', collide: false });
+    }
+    World.addBox(0, -0.5, 0, FX2 * 2 + 30, 1, FZ2 * 2 + 30, {});
+    part(root, 0, -0.6, 0, FX2 * 2 + 30, 1, FZ2 * 2 + 30, { mat: 'grass', color: '#9fd68a', collide: false });
+    const line = (x, z, sx, sz) => part(root, x, 0.03, z, sx, 0.06, sz, { mat: 'smooth', color: '#ffffff', collide: false, cast: false });
+    line(0, 0, 0.4, FZ2 * 2);
+    line(0, -FZ2, FX2 * 2, 0.4);
+    line(0, FZ2, FX2 * 2, 0.4);
+    for (const s of [-1, 1]) {
+      line(s * FX2, 0, 0.4, FZ2 * 2);
+      line(s * (FX2 - 8), 0, 0.4, 24);
+      line(s * (FX2 - 4), -12, 8, 0.4);
+      line(s * (FX2 - 4), 12, 8, 0.4);
+    }
+    const ring = new THREE.Mesh(new THREE.RingGeometry(7.6, 8, 48), new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.6 }));
+    ring.rotation.x = -Math.PI / 2;
+    ring.position.y = 0.05;
+    root.add(ring);
+    // Борта: прозрачные стенки и невидимые стены повыше
+    const glass = Mat.get('glass', '#d8f0ff');
+    const wall = (x, z, sx, sz) => {
+      const m = new THREE.Mesh(boxGeo(sx, 3, sz), glass);
+      m.position.set(x, 1.5, z);
+      root.add(m);
+      World.addBox(x, 10, z, sx, 20, sz, { noCam: true, ballWall: true });
+      part(root, x, 0.3, z, sx, 0.6, sz, { mat: 'smooth', color: '#2b2f3a', collide: false });
+    };
+    wall(0, -FZ2 - 0.5, FX2 * 2 + 2, 1);
+    wall(0, FZ2 + 0.5, FX2 * 2 + 2, 1);
+    const side = (FZ2 - this.GW) / 2;
+    for (const s of [-1, 1]) {
+      wall(s * (FX2 + 0.5), -(this.GW + side), 1, side * 2);
+      wall(s * (FX2 + 0.5), this.GW + side, 1, side * 2);
+      this.buildGoal(s);
+    }
+    // Трибуны со зрителями
+    for (const s of [-1, 1]) {
+      for (let r = 0; r < 4; r++) {
+        const top = 1.6 * (r + 1);
+        part(root, 0, top / 2, s * (FZ2 + 4 + r * 2.4), FX2 * 2 + 10, top, 2.4, { mat: 'smooth', color: r % 2 ? '#3a4060' : '#454c70', collide: false });
+      }
+    }
+    this.crowd = [];
+    const crowdCols = ['#ff5964', '#3ea6ff', '#ffd23f', '#7ed957', '#ff70c8', '#ffffff', '#ff9f1c'];
+    const cg = new THREE.BoxGeometry(1.1, 1.6, 1.1);
+    for (const s of [-1, 1]) {
+      for (let r = 0; r < 4; r++) {
+        for (let i = 0; i < 26; i++) {
+          if (Math.random() < 0.25) continue;
+          const m = new THREE.Mesh(cg, Mat.get('smooth', pick(crowdCols)));
+          m.position.set(-FX2 - 2 + i * 3 + rand(-0.4, 0.4), 1.6 * (r + 1) + 0.8, s * (FZ2 + 4 + r * 2.4));
+          root.add(m);
+          this.crowd.push({ m, base: m.position.y, ph: rand(0, TAU) });
+        }
+      }
+    }
+    for (const [x, z] of [[-FX2 - 6, -FZ2 - 6], [FX2 + 6, -FZ2 - 6], [-FX2 - 6, FZ2 + 6], [FX2 + 6, FZ2 + 6]]) {
+      part(root, x, 14, z, 1.2, 28, 1.2, { mat: 'metal', color: '#3a3f55', collide: false });
+      part(root, x, 28.5, z, 5, 2.5, 2, { mat: 'neon', color: '#fff6d8', collide: false });
+    }
+    for (let i = 0; i < 6; i++) Deco.tree(root, rand(-80, 80), 0, pick([-1, 1]) * rand(48, 70), rand(1, 1.6), { collide: false, pine: chance(0.5) });
+    // Табло
+    this.board = new THREE.Mesh(new THREE.PlaneGeometry(16, 6), new THREE.MeshBasicMaterial({ toneMapped: false }));
+    this.board.position.set(0, 16, -FZ2 - 14);
+    root.add(this.board);
+    const back = new THREE.Mesh(boxGeo(17, 7, 0.8), Mat.get('smooth', '#1b2033'));
+    back.position.set(0, 16, -FZ2 - 14.5);
+    root.add(back);
+    // Мяч
+    const tex = canvasTex(256, 128, (g, w, h) => {
+      g.fillStyle = '#ffffff';
+      g.fillRect(0, 0, w, h);
+      g.fillStyle = '#1d1d24';
+      for (let k = 0; k < 14; k++) {
+        const x = (k % 7) * (w / 7) + (Math.floor(k / 7) % 2 ? w / 14 : 0);
+        const y = Math.floor(k / 7) * (h / 2) + h / 4;
+        g.beginPath();
+        for (let q = 0; q < 5; q++) { const a = (q / 5) * TAU - Math.PI / 2; g.lineTo(x + Math.cos(a) * 13, y + Math.sin(a) * 13); }
+        g.fill();
+      }
+    }, { repeat: false });
+    this.ball = new THREE.Mesh(new THREE.SphereGeometry(this.BR, 32, 20), new THREE.MeshStandardMaterial({ map: tex, roughness: 0.4 }));
+    this.ball.castShadow = true;
+    root.add(this.ball);
+    this.bp = V3(0, this.BR, 0);
+    this.bv = V3();
+    this.score = [0, 0];
+    this.endAt = null;
+    this.lastSec = -1;
+    this.lastTouch = -1;
+    this.freezeT = 0;
+    this.spawns = [{ pos: V3(-12, 0.1, 0), heading: Math.PI / 2 }, { pos: V3(12, 0.1, 0), heading: -Math.PI / 2 }];
+    this.refreshBoard();
+  },
+
+  buildGoal(s) {
+    const root = this.root;
+    const x0 = s * this.FX;
+    const depth = 6;
+    const post = Mat.get('smooth', '#ffffff');
+    const tc = s < 0 ? '#3ea6ff' : '#ff5fa8';
+    for (const z of [-this.GW, this.GW]) {
+      const m = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.4, this.GH, 12), post);
+      m.position.set(x0, this.GH / 2, z);
+      m.castShadow = true;
+      root.add(m);
+      World.addCyl(x0, z, 0.45, 0, this.GH, {});
+    }
+    const bar = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.4, this.GW * 2, 12), post);
+    bar.rotation.x = Math.PI / 2;
+    bar.position.set(x0, this.GH, 0);
+    root.add(bar);
+    const net = new THREE.MeshStandardMaterial({ color: tc, transparent: true, opacity: 0.35, side: THREE.DoubleSide, roughness: 0.8 });
+    const back = new THREE.Mesh(new THREE.PlaneGeometry(this.GW * 2, this.GH), net);
+    back.position.set(x0 + s * depth, this.GH / 2, 0);
+    back.rotation.y = Math.PI / 2;
+    root.add(back);
+    for (const z of [-this.GW, this.GW]) {
+      const sd = new THREE.Mesh(new THREE.PlaneGeometry(depth, this.GH), net);
+      sd.position.set(x0 + (s * depth) / 2, this.GH / 2, z);
+      root.add(sd);
+    }
+    const top = new THREE.Mesh(new THREE.PlaneGeometry(depth, this.GW * 2), net);
+    top.rotation.x = Math.PI / 2;
+    top.position.set(x0 + (s * depth) / 2, this.GH, 0);
+    root.add(top);
+    // Стенки ворот для игроков
+    World.addBox(x0 + s * (depth + 0.5), this.GH / 2, 0, 1, this.GH, this.GW * 2 + 1, { noCam: true });
+    World.addBox(x0 + (s * depth) / 2, this.GH / 2, -this.GW - 0.5, depth, this.GH, 1, { noCam: true });
+    World.addBox(x0 + (s * depth) / 2, this.GH / 2, this.GW + 0.5, depth, this.GH, 1, { noCam: true });
+    World.addBox(x0 + (s * depth) / 2, this.GH + 0.5, 0, depth, 1, this.GW * 2, { noCam: true });
+    part(root, x0 + (s * depth) / 2, 0.04, 0, depth, 0.08, this.GW * 2, { mat: 'neon', color: tc, collide: false, cast: false });
+  },
+
+  refreshBoard() {
+    const P = Game.players;
+    const old = this.board.material.map;
+    this.board.material.map = signTexture([
+      { text: `${P[0].name}  ${this.score[0]} : ${this.score[1]}  ${P[1].name}`, size: 92 },
+      { text: `⏱ ${fmtTime(Math.max(0, this.TIME - (this.playT || 0)))}`, size: 64, color: '#ffd23f' },
+    ], { w: 1024, h: 384, bg: '#1b2033', border: '#20b866' });
+    this.board.material.needsUpdate = true;
+    if (old) old.dispose();
+  },
+
+  resetKickoff() {
+    this.bp.set(0, this.BR + 3, 0);
+    this.bv.set(0, 0, 0);
+    Game.players.forEach((p, i) => {
+      p.spawn(this.spawns[i].pos, this.spawns[i].heading);
+      p.setCheckpoint(this.spawns[i].pos, this.spawns[i].heading);
+    });
+  },
+
+  onCountdown() {
+    for (const p of Game.players) p.camYaw = p.heading + Math.PI;
+  },
+
+  // Удар по мячу.
+  onAction(p) {
+    const dx = this.bp.x - p.pos.x;
+    const dz = this.bp.z - p.pos.z;
+    const dy = this.bp.y - (p.pos.y + 2.5);
+    const dist = Math.hypot(dx, dz);
+    if (dist > 6.2 || Math.abs(dy) > 5) return;
+    const fx = Math.sin(p.heading);
+    const fz = Math.cos(p.heading);
+    if ((dx * fx + dz * fz) / (dist || 1) < 0.1 && dist > 3) return;
+    const kx = dist > 0.01 ? dx / dist : fx;
+    const kz = dist > 0.01 ? dz / dist : fz;
+    const dirx = lerp(kx, fx, 0.6);
+    const dirz = lerp(kz, fz, 0.6);
+    const l = Math.hypot(dirx, dirz) || 1;
+    this.bv.set((dirx / l) * 46 + p.vel.x * 0.3, 16 + (p.grounded ? 0 : 6), (dirz / l) * 46 + p.vel.z * 0.3);
+    this.lastTouch = p.idx;
+    Sound.play('slap', { gap: 0.05 });
+    FX.ring(this.bp.clone(), '#ffffff', { size: 4, life: 0.3 });
+    FX.burst(this.bp.clone(), 10, { color: '#ffffff', speed: 8, glow: true, grav: 0, life: 0.35, size: 0.3 });
+  },
+
+  fixed(dt) {
+    if (this.phase !== 'play' || this.freezeT > 0) {
+      this.ballPhysics(dt, false);
+      return;
+    }
+    this.ballPhysics(dt, true);
+  },
+
+  ballPhysics(dt, live) {
+    const r = this.BR;
+    const b = this.bp;
+    const v = this.bv;
+    v.y -= 80 * dt;
+    v.multiplyScalar(Math.exp(-0.15 * dt));
+    b.addScaledVector(v, dt);
+    if (b.y < r) {
+      b.y = r;
+      if (v.y < 0) v.y = Math.abs(v.y) > 4 ? -v.y * 0.55 : 0;
+      const fr = Math.exp(-1.1 * dt);
+      v.x *= fr;
+      v.z *= fr;
+    }
+    const inGoalMouth = Math.abs(b.z) < this.GW - r * 0.3 && b.y < this.GH - r * 0.3;
+    // Боковые борта
+    if (Math.abs(b.z) > this.FZ - r) {
+      b.z = Math.sign(b.z) * (this.FZ - r);
+      v.z = -v.z * 0.7;
+    }
+    // Торцы и ворота
+    const ax = Math.abs(b.x);
+    if (ax > this.FX - r && !inGoalMouth && ax < this.FX + 1) {
+      b.x = Math.sign(b.x) * (this.FX - r);
+      v.x = -v.x * 0.7;
+    }
+    if (ax > this.FX) {
+      const s = Math.sign(b.x);
+      if (Math.abs(b.z) > this.GW - r) { b.z = Math.sign(b.z) * (this.GW - r); v.z = -v.z * 0.4; }
+      if (b.y > this.GH - r) { b.y = this.GH - r; v.y = -Math.abs(v.y) * 0.4; }
+      if (ax > this.FX + 6 - r) { b.x = s * (this.FX + 6 - r); v.x = -v.x * 0.3; }
+      if (live && ax > this.FX + r * 0.9) this.goal(s > 0 ? 0 : 1);
+    }
+    // Штанги
+    for (const sx of [-1, 1]) {
+      for (const pz of [-this.GW, this.GW]) {
+        const dx = b.x - sx * this.FX;
+        const dz = b.z - pz;
+        const d = Math.hypot(dx, dz);
+        if (d < r + 0.4 && b.y < this.GH + 0.4) {
+          const nx = dx / (d || 1);
+          const nz = dz / (d || 1);
+          b.x = sx * this.FX + nx * (r + 0.4);
+          b.z = pz + nz * (r + 0.4);
+          const vn = v.x * nx + v.z * nz;
+          if (vn < 0) { v.x -= nx * vn * 1.7; v.z -= nz * vn * 1.7; }
+        }
+      }
+    }
+    // Игроки толкают мяч
+    for (const p of Game.players) {
+      if (p.dead) continue;
+      const cx = clamp(b.x, p.pos.x - p.r, p.pos.x + p.r);
+      const cy = clamp(b.y, p.pos.y, p.pos.y + p.h);
+      const cz = clamp(b.z, p.pos.z - p.r, p.pos.z + p.r);
+      let dx = b.x - cx;
+      let dy = b.y - cy;
+      let dz = b.z - cz;
+      let d = Math.hypot(dx, dy, dz);
+      if (d >= r) continue;
+      if (d < 1e-4) { dx = b.x - p.pos.x; dz = b.z - p.pos.z; dy = 0; d = Math.hypot(dx, dz) || 1; }
+      const nx = dx / d;
+      const ny = dy / d;
+      const nz = dz / d;
+      b.set(cx + nx * r, cy + ny * r, cz + nz * r);
+      if (b.y < r) b.y = r;
+      const rv = (v.x - p.vel.x) * nx + (v.y - p.vel.y) * ny + (v.z - p.vel.z) * nz;
+      if (rv < 0) {
+        v.x -= nx * rv * 1.45;
+        v.y -= ny * rv * 1.45;
+        v.z -= nz * rv * 1.45;
+        if (ny > 0.5 && !p.grounded) v.y += 6;
+        this.lastTouch = p.idx;
+        if (-rv > 12) Sound.play('push', { gap: 0.1 });
+      }
+    }
+  },
+
+  goal(team) {
+    if (this.freezeT > 0) return;
+    this.score[team]++;
+    this.freezeT = 2.6;
+    const P = Game.players;
+    const s = team === 0 ? 1 : -1;
+    FX.confetti(V3(s * (this.FX + 3), this.GH, 0), 140);
+    Sound.play('win');
+    const own = this.lastTouch !== -1 && this.lastTouch !== team;
+    UI.banner(-1, 'ГОЛ!', { cls: team === 0 ? 'gold' : 'gold', dur: 2, sub: `${P[team].name} забивает${own ? ' (автогол!)' : ''} · ${this.score[0]} : ${this.score[1]}` });
+    P[team].avatar.cheer = true;
+    this.refreshBoard();
+    if (this.score[team] >= this.GOALS) this.endAt = this.playT + 1.2;
+  },
+
+  end() {
+    const [a, b] = this.score;
+    const lines = `Счёт ${a} : ${b}<br>${gameRecordLine(this.id)}`;
+    if (a === b) this.finish({ winner: -1, title: `Ничья ${a} : ${b}`, lines });
+    else this.finish({ winner: a > b ? 0 : 1, lines, sub: ['Чемпион! ⚽', 'Реванш?'] });
+  },
+
+  tick(dt) {
+    if (this.freezeT > 0) {
+      this.freezeT -= dt;
+      if (this.freezeT <= 0 && this.phase === 'play') {
+        for (const p of Game.players) p.avatar.cheer = false;
+        this.resetKickoff();
+      }
+    }
+    if (Math.floor(this.playT) !== this.lastSec) {
+      this.lastSec = Math.floor(this.playT);
+      this.refreshBoard();
+    }
+    if (this.endAt && this.playT >= this.endAt) this.end();
+    else if (this.playT >= this.TIME && this.freezeT <= 0) this.end();
+  },
+
+  // Камера смотрит на мяч, если игрок сам её не крутит.
+  camFocus() { return this.bp; },
+
+  frame(dt) {
+    if (!this.ball) return;
+    this.ball.position.copy(this.bp);
+    const sp = Math.hypot(this.bv.x, this.bv.z);
+    if (sp > 0.05) {
+      const axis = V3(this.bv.z, 0, -this.bv.x).normalize();
+      this.ball.rotateOnWorldAxis(axis, (sp / this.BR) * dt);
+    }
+    for (const c of this.crowd) c.m.position.y = c.base + Math.max(0, Math.sin(this.t * (this.freezeT > 0 ? 14 : 3) + c.ph)) * (this.freezeT > 0 ? 0.9 : 0.25);
+  },
+
+  drawHud(i) {
+    const P = Game.players;
+    const left = Math.max(0, this.TIME - this.playT);
+    UI.hud(i, `<div class="chip big"><span style="color:var(--p1)">${this.score[0]}</span> : <span style="color:var(--p2)">${this.score[1]}</span></div><div class="chip">⏱ ${fmtTime(left)}<small>до ${this.GOALS} голов · ты бьёшь в ${i === 0 ? 'правые' : 'левые'} ворота</small></div>`);
+    void P;
+  },
+});
+
+</script>
+<script>
+'use strict';
 // Стеклянный мост: в каждой паре одна панель прочная, другая разбивается. Кто первым перейдёт — победил.
 
 new MiniGame({
@@ -6065,7 +6501,7 @@ new MiniGame({
   desc: 'Лава поднимается волнами, каждая выше прошлой. Собирай монеты и прячься наверху. 5 волн — у кого больше очков, тот победил.',
   rules: 'Лава идёт волнами! Монетка +1, пережил волну +5. Толкаться можно: F / ⁄',
   ability: 'push',
-  theme: 'lava',
+  theme: 'sunset',
   music: 'lava',
   autoRespawn: false,
   killY: -30,
@@ -6229,6 +6665,7 @@ new MiniGame({
       this.from = this.lavaY;
       Sound.play('siren');
       UI.banner(-1, 'ЛАВА ИДЁТ!', { cls: 'red', dur: 1.5 });
+      setTheme('lava');
     } else if (this.st === 'rise') {
       const k = 1 - clamp(this.stT / 7, 0, 1);
       this.setLava(lerp(this.from, this.level, smooth01(k)));
@@ -6250,6 +6687,7 @@ new MiniGame({
           }
         });
         Sound.play('checkpoint');
+        setTheme('sunset');
         if (this.wave >= this.WAVES) this.end();
         else this.nextWave();
         return;
@@ -6472,6 +6910,7 @@ const Game = {
     this.handleGlobalKeys(states);
 
     if (this.state === 'game' && !this.paused) {
+      this.watchFps(dt);
       for (let i = 0; i < 2; i++) {
         if (UI.editorOpen(i)) {
           UI.editorInput(i, states[i]);
@@ -6499,6 +6938,27 @@ const Game = {
     this.render(dt);
     Input.endFrame();
     requestAnimationFrame((t) => this.frame(t));
+  },
+
+  // Если компьютер не успевает — сами понижаем графику (пока игрок не выбрал её вручную).
+  watchFps(dt) {
+    const f = (this.fps = this.fps || { t: 0, n: 0, skip: 2 });
+    f.t += dt;
+    f.n++;
+    if (f.t < 4) return;
+    const fps = f.n / f.t;
+    f.t = 0;
+    f.n = 0;
+    if (f.skip > 0) { f.skip--; return; }
+    const s = Store.data.settings;
+    if (s.autoQ === false || fps >= 32) return;
+    const next = s.quality === 'high' ? 'mid' : s.quality === 'mid' ? 'low' : null;
+    if (!next) return;
+    s.quality = next;
+    Store.save();
+    applyQuality(next);
+    f.skip = 1;
+    UI.toast(-1, next === 'mid' ? 'Графика: средне (для плавности)' : 'Графика: быстро (для плавности)', '#cfd6ea');
   },
 
   physics(dt) {
@@ -6548,6 +7008,12 @@ const Game = {
 };
 
 window.addEventListener('load', () => {
+  // Ждём шрифт (до 1.5 с), чтобы надписи на табличках нарисовались им, а не запасным.
+  const font = document.fonts && document.fonts.load ? document.fonts.load('900 64px "Rubik"').catch(() => {}) : Promise.resolve();
+  Promise.race([font, new Promise((r) => setTimeout(r, 1500))]).then(boot);
+});
+
+function boot() {
   try {
     Game.init();
   } catch (e) {
@@ -6556,7 +7022,7 @@ window.addEventListener('load', () => {
     el.textContent = 'Не получилось запустить 3D (WebGL). Попробуй другой браузер. ' + e.message;
     throw e;
   }
-});
+}
 
 </script>
 </body>

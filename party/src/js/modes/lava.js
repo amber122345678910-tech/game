@@ -10,7 +10,7 @@ new MiniGame({
   desc: 'Лава поднимается волнами, каждая выше прошлой. Собирай монеты и прячься наверху. 5 волн — у кого больше очков, тот победил.',
   rules: 'Лава идёт волнами! Монетка +1, пережил волну +5. Толкаться можно: F / ⁄',
   ability: 'push',
-  theme: 'lava',
+  theme: 'sunset',
   music: 'lava',
   autoRespawn: false,
   killY: -30,
@@ -174,6 +174,7 @@ new MiniGame({
       this.from = this.lavaY;
       Sound.play('siren');
       UI.banner(-1, 'ЛАВА ИДЁТ!', { cls: 'red', dur: 1.5 });
+      setTheme('lava');
     } else if (this.st === 'rise') {
       const k = 1 - clamp(this.stT / 7, 0, 1);
       this.setLava(lerp(this.from, this.level, smooth01(k)));
@@ -195,6 +196,7 @@ new MiniGame({
           }
         });
         Sound.play('checkpoint');
+        setTheme('sunset');
         if (this.wave >= this.WAVES) this.end();
         else this.nextWave();
         return;

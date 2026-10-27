@@ -2,7 +2,7 @@
 """Собирает игру в один самодостаточный HTML-файл (three.js, стили и скрипты внутри).
 
 python3 party/tools/build.py            -> party/DuoParty.html
-python3 party/tools/build.py --fragment  -> только содержимое страницы (для публикации как Artifact)
+python3 party/tools/build.py --fragment OUT [--cdn]  -> только содержимое страницы (для публикации как Artifact)
 """
 import re
 import sys
@@ -26,12 +26,15 @@ def inline(html: str) -> str:
         return '<script>\n' + code + '\n</script>'
 
     html = re.sub(r'<link rel="stylesheet" href="(style\.css)">', css, html)
-    html = re.sub(r'<script src="([^"]+)"></script>', js, html)
+    html = re.sub(r'<script src="((?!https?:)[^"]+)"></script>', js, html)
     return html
 
 
 def main():
     html = (SRC / 'index.html').read_text(encoding='utf-8')
+    if '--cdn' in sys.argv:
+        html = html.replace('<script src="../vendor/three.min.js"></script>',
+                            '<script src="https://cdn.jsdelivr.net/npm/three@0.158.0/build/three.min.js"></script>')
     out = inline(html)
     if '--fragment' in sys.argv:
         head = re.search(r'<head>(.*?)</head>', out, re.S).group(1)

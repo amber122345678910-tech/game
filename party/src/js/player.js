@@ -56,6 +56,7 @@ class Player {
     this.score = 0;
     this.pendingKill = false;
     this.aspect = 1;
+    this.emoteT = 0;
   }
 
   makeNameTag() {
@@ -87,6 +88,21 @@ class Player {
     if (this.inp.jumpP) this.jumpBuf = 0.15;
     else if (this.inp.jump && this.jumpBuf < 0.03) this.jumpBuf = 0.03;
     if (this.inp.actionP) this.actionQueued = true;
+    if (this.inp.emoteP) this.emote();
+  }
+
+  // Эмоция: машет руками и сыплет сердечками.
+  emote() {
+    if (this.dead || this.emoteT > 0 || !this.avatar.root.visible) return;
+    this.emoteT = 1.8;
+    this.avatar.emote = true;
+    Sound.play('select');
+    for (let k = 0; k < 10; k++) {
+      const a = (k / 10) * TAU;
+      FX.sprite('heart', V3(this.pos.x + Math.cos(a) * 1.4, this.pos.y + 5.5 + rand(0, 1), this.pos.z + Math.sin(a) * 1.4), {
+        color: pick(['#ff4d8d', '#ff7ab0', '#ff2e63', '#ffd23f']), size: rand(0.6, 1), life: 1.4, vx: Math.cos(a) * 1.5, vz: Math.sin(a) * 1.5, vy: rand(2, 4),
+      });
+    }
   }
 
   spawn(pos, heading = 0) {
@@ -256,15 +272,17 @@ class Player {
   resolveBox(b, a, key, d, wasGrounded, isPlayer) {
     if (b.kill) this.pendingKill = true;
     if (a === 1) {
-      if (d < 0) {
+      // Сажаем сверху / упираемся головой, только если пришли с этой стороны, иначе — выталкиваем вбок.
+      const prev = this.pos.y - d;
+      if (d < 0 && prev >= b.max.y - 0.06) {
         this.pos.y = b.max.y;
         if (this.vel.y < 0) this.vel.y = 0;
         this.grounded = true;
         this.groundCol = b;
-      } else {
+      } else if (d > 0 && prev + this.h <= b.min.y + 0.06) {
         this.pos.y = b.min.y - this.h;
         if (this.vel.y > 0) this.vel.y = 0;
-      }
+      } else this.pushSide(b);
       return;
     }
     if (isPlayer) {
@@ -289,6 +307,18 @@ class Player {
     if (Math.sign(this.vel[key]) === Math.sign(d)) this.vel[key] = 0;
   }
 
+  pushSide(b) {
+    const p = this.pos;
+    const opts = [
+      [b.max.x - (p.x - this.r), 'x', 1], [(p.x + this.r) - b.min.x, 'x', -1],
+      [b.max.z - (p.z - this.r), 'z', 1], [(p.z + this.r) - b.min.z, 'z', -1],
+    ];
+    opts.sort((u, v) => u[0] - v[0]);
+    const [amt, k, s] = opts[0];
+    p[k] += s * (amt + 0.0005);
+    if (Math.sign(this.vel[k]) === -s) this.vel[k] = 0;
+  }
+
   resolveCyl(c, a, d, wasGrounded) {
     const p = this.pos;
     if (!(p.y < c.y1 - 0.001 && p.y + this.h > c.y0 + 0.001)) return;
@@ -298,14 +328,20 @@ class Player {
     if (a === 1) {
       if (dist > c.r + this.r * 0.6) return;
       if (c.kill) this.pendingKill = true;
-      if (d < 0) {
+      const prev = p.y - d;
+      if (d < 0 && prev >= c.y1 - 0.06) {
         p.y = c.y1;
         if (this.vel.y < 0) this.vel.y = 0;
         this.grounded = true;
         this.groundCol = c;
-      } else {
+      } else if (d > 0 && prev + this.h <= c.y0 + 0.06) {
         p.y = c.y0 - this.h;
         if (this.vel.y > 0) this.vel.y = 0;
+      } else {
+        const nx = dist > 1e-6 ? dx / dist : 1;
+        const nz = dist > 1e-6 ? dz / dist : 0;
+        p.x = c.x + nx * (c.r + this.r + 0.0005);
+        p.z = c.z + nz * (c.r + this.r + 0.0005);
       }
       return;
     }
@@ -330,7 +366,7 @@ class Player {
     if (this.dead) return;
     const p = this.pos;
     for (const b of World.boxes) {
-      if (!b.active || !b.solid || !b.moving || !this.ovBox(b, 0.01)) continue;
+      if (!b.active || !b.solid || !b.moving || b === this.groundCol || !this.ovBox(b, 0.01)) continue;
       const pen = [
         [b.max.x - (p.x - this.r), 'x', 1], [(p.x + this.r) - b.min.x, 'x', -1],
         [b.max.y - p.y, 'y', 1], [(p.y + this.h) - b.min.y, 'y', -1],
@@ -349,7 +385,7 @@ class Player {
     if (this.dead) return;
     const p = this.pos;
     for (const b of World.boxes) {
-      if (!b.active || !b.solid || !this.ovBox(b, 0.01)) continue;
+      if (!b.active || !b.solid || !this.ovBox(b, 0.001)) continue;
       const pen = [
         [b.max.x - (p.x - this.r), 'x', 1], [(p.x + this.r) - b.min.x, 'x', -1],
         [b.max.y - p.y, 'y', 1], [(p.y + this.h) - b.min.y, 'y', -1],
@@ -409,6 +445,10 @@ class Player {
       this.cool = 0.55;
       this.avatar.slapT = 0;
       this.pendingHit = 0.11;
+    } else if (this.ability === 'kick') {
+      this.cool = 0.35;
+      this.avatar.kickT = 0;
+      this.pendingHit = 0.07;
     } else {
       this.cool = 0.9;
       this.avatar.pushT = 0;
@@ -418,6 +458,10 @@ class Player {
   }
 
   doHit() {
+    if (this.ability === 'kick') {
+      if (!this.dead && Game.mode && Game.mode.onAction) Game.mode.onAction(this);
+      return;
+    }
     const o = Game.other(this);
     if (!o || o.dead || this.dead) return;
     const dx = o.pos.x - this.pos.x;
@@ -464,6 +508,10 @@ class Player {
       this.tryAction();
     }
     if (this.dead) this.deadT += dt;
+    if (this.emoteT > 0) {
+      this.emoteT -= dt;
+      if (this.emoteT <= 0) this.avatar.emote = false;
+    }
     const sp = Math.hypot(this.vel.x, this.vel.z);
     this.avatar.root.position.copy(this.pos);
     this.avatar.root.rotation.y = this.heading;
@@ -501,7 +549,12 @@ class Player {
       if (inp.camY) this.camPitch = clamp(this.camPitch + inp.camY * 1.5 * dt, -0.15, 1.2);
       this.camManualT -= dt;
       const sp = Math.hypot(this.vel.x, this.vel.z);
-      if (this.autoCam && this.camManualT <= 0 && sp > 2 && !this.dead && this.stun <= 0) {
+      const focus = Game.mode && Game.mode.camFocus && this.phaseLive() ? Game.mode.camFocus(this) : null;
+      if (focus) {
+        const fx = focus.x - this.pos.x;
+        const fz = focus.z - this.pos.z;
+        if (this.camManualT <= 0 && !this.dead && Math.hypot(fx, fz) > 5) this.camYaw = dampAngle(this.camYaw, Math.atan2(-fx, -fz), 2.6, dt);
+      } else if (this.autoCam && this.camManualT <= 0 && sp > 2 && !this.dead && this.stun <= 0) {
         const diff = angDiff(this.camYaw, this.heading + Math.PI);
         if (Math.abs(diff) < 2.5) this.camYaw += diff * (1 - Math.exp(-1.5 * Math.min(1, sp / 16) * dt));
       }
@@ -535,6 +588,10 @@ class Player {
       cam.aspect = aspect;
       cam.updateProjectionMatrix();
     }
+  }
+
+  phaseLive() {
+    return Game.mode && (Game.mode.phase === 'play' || Game.mode.phase === 'count');
   }
 
   dispose() {
