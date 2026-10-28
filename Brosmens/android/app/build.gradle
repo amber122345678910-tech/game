@@ -14,10 +14,30 @@ android {
         versionName '1.0'
     }
 
+    // Постоянный ключ приложения (не в git): android/keystore.properties + keystore.
+    // Новые версии с тем же ключом ставятся поверх старых без потери профиля. Без файла — debug-ключ.
+    def ksFile = rootProject.file('keystore.properties')
+    def ks = new Properties()
+    if (ksFile.exists()) ksFile.withInputStream { ks.load(it) }
+
+    signingConfigs {
+        brosmens {
+            if (ksFile.exists()) {
+                storeFile rootProject.file(ks['storeFile'])
+                storePassword ks['storePassword']
+                keyAlias ks['keyAlias']
+                keyPassword ks['keyPassword']
+            }
+        }
+    }
+
     buildTypes {
+        debug {
+            if (ksFile.exists()) signingConfig signingConfigs.brosmens
+        }
         release {
             minifyEnabled false
-            signingConfig signingConfigs.debug
+            signingConfig ksFile.exists() ? signingConfigs.brosmens : signingConfigs.debug
         }
     }
 
