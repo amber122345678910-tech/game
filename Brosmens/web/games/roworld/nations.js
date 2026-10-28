@@ -96,26 +96,30 @@ export function gender(name, kind) {
 // прошедшее время / краткое причастие мужского рода → нужный род: past('захватил', 'f') = 'захватила'
 export function past(word, g) { return g === 'f' ? word + 'а' : g === 'n' ? word + 'о' : g === 'pl' ? word + (/н$/.test(word) ? 'ы' : 'и') : word; }
 
-// родительный и дательный падежи для названий: «от Монголии», «ПВО Ирана», «близко к Канаде».
-// Ники игроков и аббревиатуры не склоняются; у племени склоняется только слово «Племя».
+// родительный, дательный и творительный падежи для названий: «от Монголии», «близко к Канаде»,
+// «уничтожена Сибирью». Ники игроков и аббревиатуры не склоняются; у племени склоняется только слово «Племя».
 const NODECL = /^(США|ЮАР|Перу|Марокко|ДР Конго)$/;
-function declWord(w, gen) {
+function declWord(w, c) {
   if (!/[а-яё]$/.test(w) || /^[А-ЯЁ]{2,}$/.test(w)) return w;
-  if (w === 'Египет') return gen ? 'Египта' : 'Египту';
+  const gen = c === 'gen', ins = c === 'ins';
+  if (w === 'Египет') return gen ? 'Египта' : ins ? 'Египтом' : 'Египту';
   if (/ая$/.test(w)) return w.slice(0, -2) + 'ой';                 // Саудовская → Саудовской
-  if (/ия$/.test(w)) return w.slice(0, -2) + 'ии';                 // Монголия → Монголии
+  if (/ия$/.test(w)) return w.slice(0, -2) + (ins ? 'ией' : 'ии');   // Монголия → Монголии / Монголией
+  if (ins && /[жшщчц]а$/.test(w)) return w.slice(0, -1) + 'ей';     // Польша → Польшей
+  if (ins && /а$/.test(w)) return w.slice(0, -1) + 'ой';            // Канада → Канадой
   if (/[гкхжшщч]а$/.test(w)) return w.slice(0, -1) + (gen ? 'и' : 'е'); // Аляска → Аляски / Аляске
   if (/а$/.test(w)) return w.slice(0, -1) + (gen ? 'ы' : 'е');       // Канада → Канады / Канаде
-  if (/я$/.test(w)) return w.slice(0, -1) + (gen ? 'и' : 'е');
-  if (/ь$/.test(w)) return w.slice(0, -1) + 'и';                    // Сибирь → Сибири
-  if (/й$/.test(w)) return w.slice(0, -1) + (gen ? 'я' : 'ю');       // Китай → Китая / Китаю
+  if (/я$/.test(w)) return w.slice(0, -1) + (gen ? 'и' : ins ? 'ей' : 'е');
+  if (/ь$/.test(w)) return w.slice(0, -1) + (ins ? 'ью' : 'и');      // Сибирь → Сибири / Сибирью
+  if (/й$/.test(w)) return w.slice(0, -1) + (gen ? 'я' : ins ? 'ем' : 'ю'); // Китай → Китая / Китаем
   if (/[оуеиюэы]$/.test(w)) return w;
-  return w + (gen ? 'а' : 'у');                                     // Иран → Ирана / Ирану
+  return w + (gen ? 'а' : ins ? 'ом' : 'у');                        // Иран → Ирана / Ираном / Ирану
 }
-function decl(name, kind, gen) {
+function decl(name, kind, c) {
   if (kind === 0 || NODECL.test(name) || !/[а-яё]/.test(name)) return name;
-  if (kind === 2) return name.replace(/^Племя/, gen ? 'Племени' : 'Племени');
-  return name.split(' ').map((w) => declWord(w, gen)).join(' ');
+  if (kind === 2) return name.replace(/^Племя/, c === 'ins' ? 'Племенем' : 'Племени');
+  return name.split(' ').map((w) => declWord(w, c)).join(' ');
 }
-export const genName = (p) => decl(p.name, p.kind, true);
-export const datName = (p) => decl(p.name, p.kind, false);
+export const genName = (p) => decl(p.name, p.kind, 'gen');
+export const datName = (p) => decl(p.name, p.kind, 'dat');
+export const insName = (p) => decl(p.name, p.kind, 'ins');

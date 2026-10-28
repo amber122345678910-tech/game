@@ -18,6 +18,7 @@ export function closeRadial() {
   el.classList.remove('show');
   el.innerHTML = '';
   el.style.display = 'none';
+  document.body.classList.remove('radial-open');
 }
 
 export function openRadial(x, y, opts) {
@@ -30,11 +31,14 @@ export function openRadial(x, y, opts) {
     el.addEventListener('pointerup', (e) => { e.stopPropagation(); if (st && st.down) release(e.clientX, e.clientY); });
   }
   const vw = innerWidth, vh = innerHeight;
-  const Ro = Math.min(108, vh * 0.27), Rd = Ro - 15, Rc = 25;
-  const cx = Math.max(Ro + 8, Math.min(vw - Ro - 8, x)), cy = Math.max(Ro + 34, Math.min(vh - Ro - 30, y));
+  // как в оригинале: на телефоне кольцо ≈170 px, на большом экране ≈250 px; диск ≈76% кольца, «✕» ≈40–56 px
+  const Ro = Math.max(80, Math.min(125, vh * 0.21)), Rd = Math.round(Ro * 0.77), Rc = Math.round(Math.max(20, Ro * 0.23));
+  // табличка с именем не должна заезжать под круглые кнопки сверху
+  const cx = Math.max(Ro + 8, Math.min(vw - Ro - 8, x)), cy = Math.max(Math.min(Ro + 88, vh - Ro - 30), Math.min(vh - Ro - 30, y));
   const n = opts.items.length, da = (2 * Math.PI) / n;
-  st = { ...opts, cx, cy, Ro, Rd, Rc, n, da, hov: -1, t0: performance.now(), down: false };
+  st = { ...opts, cx, cy, Ro, Rd, Rc, n, da, hov: -1, hi: -9, t0: performance.now(), down: false };
   el.style.display = 'block';
+  document.body.classList.add('radial-open');
   el.style.setProperty('--ox', cx + 'px'); el.style.setProperty('--oy', cy + 'px');
   el.innerHTML = '';
   const svg = document.createElementNS(NS, 'svg');
@@ -80,8 +84,8 @@ export function hover(x, y) {
   if (!st) return;
   const i = which(x, y);
   const k = i >= 0 && !st.items[i].off ? i : -1;
-  if (k === st.hov && i >= 0) return;
-  st.hov = k;
+  if (i === st.hi && k === st.hov) return; // тот же сектор (в том числе выключенный — его подсказка уже показана)
+  st.hov = k; st.hi = i;
   el.querySelectorAll('.wg').forEach((p) => p.setAttribute('fill', +p.dataset.i === k ? (st.items[k].red ? '#EE4062' : st.items[k].salmon ? '#F2727F' : '#F3B647') : 'transparent'));
   el.querySelectorAll('.wi').forEach((g) => g.classList.toggle('on', +g.dataset.i === k));
   setHint(i >= 0 ? st.items[i].hint || st.items[i].label : st.hint || '');

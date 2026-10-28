@@ -3,8 +3,9 @@
 // и полоса границы в 1 клетку (темнее и насыщеннее). Подписи наций — в самом «толстом» месте территории
 // (максимум карты расстояний), тёмный текст с обводкой цветом владельца, войска под именем, аватар у игроков.
 import { W, H, N_TILES, T_LAKE, T_PLAINS, T_HIGH, T_MTN } from './world.js';
-import { KIND, fmt, fmtT, SPAWN_R, STRUCTS, SHIP, NUKES } from './game.js';
+import { KIND, fmt, fmtT, fmtC, SPAWN_R, STRUCTS, SHIP, NUKES } from './game.js';
 import { drawAvatar } from '../../shared/avatar.js';
+import { graphicsLevel } from '../../shared/ui.js';
 
 const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
 const CH = 50, CWN = Math.ceil(W / CH), CHN = Math.ceil(H / CH);
@@ -16,8 +17,23 @@ const C = {
 const u32 = (rgb, a) => ((a << 24) | (rgb[2] << 16) | (rgb[1] << 8) | rgb[0]) >>> 0;
 const mix = (a, b, k) => [a[0] + (b[0] - a[0]) * k, a[1] + (b[1] - a[1]) * k, a[2] + (b[2] - a[2]) * k];
 const FILL_A = 150, BORDER_A = 235; // 0.588 и почти непрозрачная граница
-// радиация: яркие зелёные пятна с пиксельной «рябью» (#1DDE0D), свежая воронка раскалена до бледно-салатового
-const FALL = [hex('#17B70C'), hex('#1DDE0D'), hex('#22D612'), hex('#3BEA2A')], FALL_HOT = hex('#D9FFB8'), FALL_EDGE = hex('#11960A');
+// радиация как в оригинале: круглое ярко-зелёное пятно #1DDE0D с пиксельным «дизерингом» по краю (#1CAC1C);
+// свежая воронка раскалена и мерцает (#0D660D…#33FF33), остывая — медленно «кипит» двухоктавным шумом и
+// со временем оседает к #0D8C12; внутри чужой земли — оливковая #2E9A2E
+const F_BRIGHT = hex('#1DDE0D'), F_DARK = hex('#0D8C12'), F_EDGE = hex('#1CAC1C'), F_OLIVE = hex('#2E9A2E');
+const F_FL0 = hex('#0D660D'), F_FL1 = hex('#33FF33'), F_HOT = hex('#B9FF9C');
+// гладкий шум по клеткам (значения в узлах решётки — хэш), для «кипения» радиации
+const hash2 = (x, y) => (((Math.imul(x, 374761393) + Math.imul(y, 668265263)) ^ 0x5bd1e995) >>> 0);
+function vnoise(x, y) {
+  const xi = Math.floor(x), yi = Math.floor(y), fx = x - xi, fy = y - yi;
+  const h = (a, b) => { let v = hash2(a, b); v = Math.imul(v ^ (v >>> 13), 1274126177); return ((v ^ (v >>> 16)) >>> 0) / 4294967296; };
+  const u = fx * fx * (3 - 2 * fx), v = fy * fy * (3 - 2 * fy);
+  const a = h(xi, yi), b = h(xi + 1, yi), c = h(xi, yi + 1), d = h(xi + 1, yi + 1);
+  return a + (b - a) * u + (c - a) * v + (a - b - c + d) * u * v;
+}
+// пул частиц (обломки взрыва, искры радиации, дым перехвата): массивы фиксированного размера, без аллокаций в кадре
+const PMAX = 1400;
+const PCOL = ['#2b2118', '#4a3a2c', '#6b5a48', '#8d8d8d', '#ff9a3c', '#ffd27a', '#0D660D', '#1E9E1E', '#26CC26', '#33FF33', '#d9dde6'];
 
 export class Renderer {
   constructor(canvas, dprFn) {
@@ -26,6 +42,11 @@ export class Renderer {
     this.cam = { x: W / 2, y: H / 2, z: 1 };
     this.fly = null;
     this.fx = { rings: [], texts: [], booms: [] };
+    this.blasts = [];   // недавние взрывы: зелёное свечение и искры, пока воронка горячая
+    this.fronts = []; this.frontT = -9; // метки войск на фронтах атак (пересчёт раз в 200 мс, плавный переезд)
+    this.broilT = 0; this.hotT = 0; this.hotI = 0;
+    const F = Float32Array;
+    this.pt = { x: new F(PMAX), y: new F(PMAX), vx: new F(PMAX), vy: new F(PMAX), life: new F(PMAX), max: new F(PMAX), size: new F(PMAX), drag: new F(PMAX), col: new Uint8Array(PMAX), n: 0 };
     this.shk = 0; this.shakeOn = true; this.sub = 0; // тряска камеры от взрывов; доля тика для плавного полёта ракет
     this.hl = 0; // подсвеченный игрок (цель)
     this.labels = []; this.labelT = -9;
@@ -76,6 +97,8 @@ export class Renderer {
     this.alt = false;
     this.hl = 0;
     this.fx = { rings: [], texts: [], booms: [] };
+    this.blasts = []; this.fronts = []; this.pt.n = 0;
+    this.fallBorn = new Float32Array(N_TILES);
     this.labels = []; this.labelT = -9;
     this.avatars.clear();
     this.paintAll();
@@ -121,16 +144,59 @@ export class Renderer {
       else if (hl) v = edge ? this.cBorderHi[id] : this.cFillHi[id];
       else if (G.P[id].posts.length && G.defended(id, t)) v = edge ? ((((t % W) + ((t / W) | 0)) & 1) ? this.cBorderDef[id] : this.cBorder[id]) : this.cFillDef[id];
       else v = edge ? this.cBorder[id] : this.cFill[id];
-    } else if (G.fall[t]) v = this.falloutColor(t, G.fall[t]);
+    }
+    if (!id && G.fall[t]) {
+      if (!this.fallBorn[t]) this.fallBorn[t] = G.tickN * 0.1 + 0.01;
+      v = this.falloutColor(t, G.fall[t]);
+    } else if (this.fallBorn[t]) this.fallBorn[t] = 0;
     this.pol32[t] = v;
     this.dirty[(((t / W) | 0) / CH | 0) * CWN + ((t % W) / CH | 0)] = 1;
   }
   falloutColor(t, heat) {
-    const f = this.game.fall, x = t % W;
-    const edge = (x > 0 && !f[t - 1] && this.game.isLand(t - 1)) || (x < W - 1 && !f[t + 1] && this.game.isLand(t + 1)) || (t >= W && !f[t - W] && this.game.isLand(t - W)) || (t < N_TILES - W && !f[t + W] && this.game.isLand(t + W));
-    const k = heat > 1 ? Math.pow(heat / 255, 1.6) : 0;
-    const base = edge ? FALL_EDGE : FALL[(Math.imul(t, 2654435761) >>> 27) & 3];
-    return u32(k ? mix(base, FALL_HOT, k * 0.85) : base, edge ? 240 : Math.round(205 + 50 * k));
+    const G = this.game, f = G.fall, o = G.owner, x = t % W, y = (t / W) | 0;
+    // край пятна: рядом чистая ничья земля или вода; «внутри чужой земли»: рядом ≥2 занятых клетки
+    let edge = false, owned = 0;
+    for (let dy = -1; dy <= 1; dy++) {
+      const yy = y + dy; if (yy < 0 || yy >= H) continue;
+      for (let dx = -1; dx <= 1; dx++) {
+        if (!dx && !dy) continue;
+        const xx = x + dx; if (xx < 0 || xx >= W) continue;
+        const nb = yy * W + xx;
+        if (o[nb]) owned++;
+        else if (!f[nb] && (!dx || !dy)) edge = true;
+      }
+    }
+    let base, a = 228;
+    if (owned >= 2) { base = F_OLIVE; a = 215; }
+    else if (edge) { const on = ((x + y) & 1) === 0; base = F_EDGE; a = on ? 235 : 105; }
+    else {
+      // «кипение»: два слоя шума медленно плывут; через ~1.5 мин пятно оседает к #0D8C12
+      const tm = G.tickN * 0.1, born = this.fallBorn[t] || tm;
+      const n = 0.62 * vnoise(x * 0.118 + tm * 0.035, y * 0.118 - tm * 0.02) + 0.38 * vnoise(x * 0.342 - tm * 0.06, y * 0.342 + tm * 0.045);
+      const settle = clamp((tm - born - 12) / 80, 0, 1);
+      base = mix(F_BRIGHT, F_DARK, clamp(settle * 0.62 + (n - 0.38) * 0.75, 0, 1));
+    }
+    if (heat > 1) { // раскалённая воронка мерцает и светится
+      const k = Math.pow(heat / 255, 1.3);
+      const fl = mix(F_FL0, F_FL1, Math.random());
+      base = mix(mix(base, fl, 0.62 * k), F_HOT, 0.3 * k * k);
+      a = Math.max(a, Math.round(200 + 55 * k));
+    }
+    return u32(base, a);
+  }
+  // мерцание горячих клеток (не больше ~9000 за проход) и медленное «кипение» видимой радиации
+  animFallout(time, x0, x1, y0, y1, z) {
+    const G = this.game;
+    if (G.hot.length && time - this.hotT > 0.1) {
+      this.hotT = time;
+      const L = G.hot, n = Math.min(L.length, 9000);
+      for (let k = 0; k < n; k++) { this.hotI = (this.hotI + 1) % L.length; const t = L[this.hotI]; if (G.fall[t] && !G.owner[t]) this.paint(t); }
+    }
+    if (G.fallout && z >= 1.1 && time - this.broilT > 0.25) {
+      this.broilT = time;
+      const f = G.fall, o = G.owner;
+      for (let y = y0; y < y1; y++) for (let t = y * W + x0, e = y * W + x1; t < e; t++) if (f[t] === 1 && !o[t]) this.paint(t);
+    }
   }
   // остывание воронок: перекрасить только эти клетки
   onHeat(list) { for (const t of list) this.paint(t); }
@@ -277,8 +343,83 @@ export class Renderer {
   // ---------- эффекты ----------
   ring(x, y, color = '#fff', r1 = 30, dur = 0.5) { if (this.fx.rings.length < 40) this.fx.rings.push({ x, y, color, r1, dur, t: 0 }); }
   text(x, y, s, color = '#fff', size = 14, dur = 1.4) { if (this.fx.texts.length < 30) this.fx.texts.push({ x, y, s, color, size, dur, t: 0 }); }
-  // ядерный взрыв: белая вспышка ~120 мс, оранжевое ядро и ударная волна до 1.5× радиуса за 1.5 с
-  boom(x, y, r, big = true) { if (this.fx.booms.length < 70) this.fx.booms.push({ x, y, r, big, t: 0, dur: big ? 1.6 : 0.9 }); }
+  // ядерный взрыв: белая вспышка ~120 мс, раскалённое ядро, ударная волна до 1.5× радиуса за 1.5 с (толщина 4% радиуса),
+  // обломки ~6 с (из пула), зелёное свечение и искры над свежей воронкой, пока она горячая
+  boom(x, y, r, big = true, vis = true) {
+    if (this.fx.booms.length < 70) this.fx.booms.push({ x, y, r, big, t: 0, dur: big ? 1.5 : 0.9 });
+    this.blasts.push({ x, y, r, t: 0, dur: big ? 10.5 : 7, big, acc: 0 });
+    if (this.blasts.length > 40) this.blasts.shift();
+    if (!vis) return;
+    const g = graphicsLevel(), q = g <= 3 ? 0.35 : g <= 7 ? 0.7 : 1;
+    const n = Math.round((big ? 150 : 7) * q);
+    for (let i = 0; i < n; i++) {
+      const a = Math.random() * 6.283, d = Math.random() * r * 0.35, sp = r * (0.35 + Math.random() * 1.15);
+      const ember = Math.random() < 0.35;
+      this.spawnP(x + Math.cos(a) * d, y + Math.sin(a) * d, Math.cos(a) * sp, Math.sin(a) * sp, 2 + Math.random() * 4, 1.4 + Math.random() * 2.2, 1.1 + Math.random() * 0.8, ember ? 4 + (Math.random() * 2 | 0) : Math.random() * 4 | 0);
+    }
+  }
+  // перехват ПВО: маленькая ударная волна 40 px за 0.8 с и клубок дыма
+  intercept(x, y) {
+    this.ring(x, y, '#ffffff', 40, 0.8);
+    for (let i = 0; i < 10; i++) { const a = Math.random() * 6.283, sp = 1.5 + Math.random() * 3; this.spawnP(x, y, Math.cos(a) * sp, Math.sin(a) * sp, 0.6 + Math.random() * 0.6, 2 + Math.random() * 2, 2.2, Math.random() < 0.3 ? 5 : 10); }
+  }
+  spawnP(x, y, vx, vy, life, size, drag, col) {
+    const P = this.pt;
+    if (P.n >= PMAX) return;
+    const i = P.n++;
+    P.x[i] = x; P.y[i] = y; P.vx[i] = vx; P.vy[i] = vy; P.life[i] = life; P.max[i] = life; P.size[i] = size; P.drag[i] = drag; P.col[i] = col;
+  }
+  drawParticles(toS, z, dt) {
+    const P = this.pt, ctx = this.ctx, w = this.w, h = this.h;
+    let cur = -1;
+    for (let i = 0; i < P.n;) {
+      P.life[i] -= dt;
+      if (P.life[i] <= 0) { // удалить: поменять с последней
+        const j = --P.n;
+        P.x[i] = P.x[j]; P.y[i] = P.y[j]; P.vx[i] = P.vx[j]; P.vy[i] = P.vy[j]; P.life[i] = P.life[j]; P.max[i] = P.max[j]; P.size[i] = P.size[j]; P.drag[i] = P.drag[j]; P.col[i] = P.col[j];
+        continue;
+      }
+      const k = Math.exp(-P.drag[i] * dt);
+      P.vx[i] *= k; P.vy[i] *= k;
+      P.x[i] += P.vx[i] * dt; P.y[i] += P.vy[i] * dt;
+      const sx = (P.x[i] - this.cam.x) * z + w / 2, sy = (P.y[i] - this.cam.y) * z + h / 2;
+      if (sx > -10 && sy > -10 && sx < w + 10 && sy < h + 10) {
+        const f = P.life[i] / P.max[i], c = P.col[i];
+        // угольки остывают: оранжевые → тёмные
+        const ci = c === 4 && f < 0.5 ? 1 : c === 5 && f < 0.6 ? 4 : c;
+        if (ci !== cur) { cur = ci; ctx.fillStyle = PCOL[ci]; }
+        ctx.globalAlpha = Math.min(1, f * 1.6) * (c >= 6 && c <= 9 ? 0.9 : 0.85);
+        const s = P.size[i];
+        ctx.fillRect(sx - s / 2, sy - s / 2, s, s);
+      }
+      i++;
+    }
+    ctx.globalAlpha = 1;
+  }
+  // свечение свежих воронок (#26F226) и мерцающие искры над радиацией
+  drawBlasts(toS, z, dt) {
+    const ctx = this.ctx, G = this.game, f = G.fall, gl = graphicsLevel();
+    ctx.globalCompositeOperation = 'lighter';
+    for (let i = this.blasts.length - 1; i >= 0; i--) {
+      const b = this.blasts[i]; b.t += dt;
+      if (b.t >= b.dur) { this.blasts.splice(i, 1); continue; }
+      const k = Math.pow(1 - b.t / b.dur, 1.4), [x, y] = toS(b.x, b.y), R = Math.max(5, b.r * z * 1.25);
+      if (x < -R || y < -R || x > this.w + R || y > this.h + R) continue;
+      const gr = ctx.createRadialGradient(x, y, 0, x, y, R);
+      gr.addColorStop(0, `rgba(38,242,38,${(0.42 * k).toFixed(3)})`); gr.addColorStop(0.7, `rgba(38,242,38,${(0.16 * k).toFixed(3)})`); gr.addColorStop(1, 'rgba(38,242,38,0)');
+      ctx.fillStyle = gr; ctx.beginPath(); ctx.arc(x, y, R, 0, 7); ctx.fill();
+      // искры: тем чаще, чем горячее воронка
+      b.acc += dt * (b.big ? 70 : 6) * k * (gl <= 3 ? 0.3 : gl <= 7 ? 0.65 : 1);
+      while (b.acc >= 1) {
+        b.acc--;
+        const a = Math.random() * 6.283, d = Math.sqrt(Math.random()) * b.r * 0.95, px = b.x + Math.cos(a) * d, py = b.y + Math.sin(a) * d;
+        const t = Math.floor(py) * W + Math.floor(px);
+        if (t < 0 || t >= N_TILES || !f[t]) continue;
+        this.spawnP(px, py, (Math.random() - 0.5) * 0.6, -0.4 - Math.random() * 1.2, 0.5 + Math.random() * 0.8, 1.5 + Math.random() * 1.6, 0.5, 6 + (Math.random() * 4 | 0));
+      }
+    }
+    ctx.globalCompositeOperation = 'source-over';
+  }
   shake(a) { if (this.shakeOn) this.shk = Math.max(this.shk, a); }
 
   // ---------- кадр ----------
@@ -294,11 +435,15 @@ export class Renderer {
       if (f.t >= 1) this.fly = null;
     }
     const G = this.game;
+    const { ctx, cam, dpr, w, h } = this, z = cam.z;
+    const x0 = Math.max(0, Math.floor(cam.x - w / 2 / z)), x1 = Math.min(W, Math.ceil(cam.x + w / 2 / z) + 1);
+    const y0 = Math.max(0, Math.floor(cam.y - h / 2 / z)), y1 = Math.min(H, Math.ceil(cam.y + h / 2 / z) + 1);
     if (G) {
+      if (G.fallout) this.animFallout(time, x0, x1, y0, y1, z);
       this.flushTiles();
       if (time - this.labelT > 1) { this.labelT = time; this.computeLabels(); }
+      if (time - this.frontT > 0.2) { this.frontT = time; this.computeFronts(); }
     }
-    const { ctx, cam, dpr, w, h } = this, z = cam.z;
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.fillStyle = '#3C3C3C'; ctx.fillRect(0, 0, this.cv.width, this.cv.height);
     const k = z * dpr;
@@ -307,8 +452,6 @@ export class Renderer {
     ctx.setTransform(k, 0, 0, k, (w / 2 - cam.x * z + ox) * dpr, (h / 2 - cam.y * z + oy) * dpr);
     ctx.imageSmoothingEnabled = z < 1.5;
     ctx.imageSmoothingQuality = 'low';
-    const x0 = Math.max(0, Math.floor(cam.x - w / 2 / z)), x1 = Math.min(W, Math.ceil(cam.x + w / 2 / z) + 1);
-    const y0 = Math.max(0, Math.floor(cam.y - h / 2 / z)), y1 = Math.min(H, Math.ceil(cam.y + h / 2 / z) + 1);
     if (x1 > x0 && y1 > y0) {
       ctx.drawImage(this.terrCv, x0, y0, x1 - x0, y1 - y0, x0, y0, x1 - x0, y1 - y0);
       if (G) ctx.drawImage(this.polCv, x0, y0, x1 - x0, y1 - y0, x0, y0, x1 - x0, y1 - y0);
@@ -319,12 +462,15 @@ export class Renderer {
     ctx.setTransform(dpr, 0, 0, dpr, ox * dpr, oy * dpr);
     const toS = (x, y) => [(x - cam.x) * z + w / 2, (y - cam.y) * z + h / 2];
     if (G) {
+      if (this.blasts.length) this.drawBlasts(toS, z, dt);
       if (this.pickMode) this.drawSpawnMarks(toS, z, time);
       this.drawLabels(toS, z, time, dt);
       this.drawStructs(toS, z, time); // значки построек поверх подписей — иначе столицу закрывает имя
       this.drawUnits(toS, z, time);
+      if (this.fronts.length) this.drawFronts(toS, z, dt);
       if (G.nukes.length || G.samShots.length) this.drawNukes(toS, z, time);
       if (this.fx.booms.length) this.drawBooms(toS, z, dt);
+      if (this.pt.n) this.drawParticles(toS, z, dt);
       if (this.ghost) this.drawGhost(toS, z, time);
     }
     // кольца
@@ -347,6 +493,86 @@ export class Renderer {
       ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(20,20,30,.85)';
       const yy = y - 10 - q * 20;
       ctx.strokeText(t.s, x, yy); ctx.fillStyle = t.color; ctx.fillText(t.s, x, yy);
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  // ---------- метки войск на фронтах атак (как в оригинале: «107K» на границе, синие — твои, красные — по тебе) ----------
+  // раз в 200 мс: клетки фронта каждой атаки с твоим участием → кластеры на сетке 6×6 → метка в центре кластера
+  computeFronts() {
+    const G = this.game, me = this.me, o = G.owner, CELL = 6, GW = Math.ceil(W / CELL);
+    const old = this.fronts, out = [];
+    if (me) for (const a of G.attacks) {
+      if (a.dead || a.retreatAt >= 0 || a.troops < 1) continue;
+      const inc = a.target === me;
+      if (a.owner !== me && !inc) continue;
+      const tid = a.target ? a.target.id : 0;
+      const cells = new Map();
+      for (const t of a.front) {
+        if (o[t] !== tid) continue;
+        const x = t % W, y = (t / W) | 0, key = ((y / CELL) | 0) * GW + ((x / CELL) | 0);
+        let c = cells.get(key);
+        if (!c) { c = { n: 0, sx: 0, sy: 0, comp: -1 }; cells.set(key, c); }
+        c.n++; c.sx += x; c.sy += y;
+      }
+      if (!cells.size) continue;
+      const comps = [];
+      for (const [key, c] of cells) {
+        if (c.comp >= 0) continue;
+        const cm = { n: 0, sx: 0, sy: 0, list: [] }, st = [key];
+        c.comp = comps.length;
+        while (st.length) {
+          const kk = st.pop(), cc = cells.get(kk);
+          cm.n += cc.n; cm.sx += cc.sx; cm.sy += cc.sy; cm.list.push(cc);
+          const cx = kk % GW;
+          for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
+            if ((!dx && !dy) || cx + dx < 0 || cx + dx >= GW) continue;
+            const nk = kk + dy * GW + dx, nc = cells.get(nk);
+            if (nc && nc.comp < 0) { nc.comp = comps.length; st.push(nk); }
+          }
+        }
+        comps.push(cm);
+      }
+      comps.sort((p, q) => q.n - p.n);
+      for (let i = 0; i < comps.length && i < 3; i++) {
+        const cm = comps[i];
+        if (i && cm.n < 4) break;
+        // метка — на клетках фронта: центр той ячейки кластера, что ближе всего к его центру
+        const mx = cm.sx / cm.n, my = cm.sy / cm.n;
+        let bx = mx, by = my, bd = 1e18;
+        for (const cc of cm.list) { const x = cc.sx / cc.n, y = cc.sy / cc.n, d = (x - mx) ** 2 + (y - my) ** 2; if (d < bd) { bd = d; bx = x; by = y; } }
+        out.push({ a, inc, owner: a.owner, x: bx + 0.5, y: by + 0.5, dx: bx + 0.5, dy: by + 0.5, al: 0, gone: false });
+      }
+    }
+    // плавный переезд: каждая новая метка забирает ближайшую старую той же атаки
+    const used = new Set();
+    for (const L of out) {
+      let best = null, bd = 30 * 30;
+      for (const P of old) {
+        if (P.gone || P.a !== L.a || used.has(P)) continue;
+        const d = (P.dx - L.x) ** 2 + (P.dy - L.y) ** 2;
+        if (d < bd) { bd = d; best = P; }
+      }
+      if (best) { used.add(best); L.dx = best.dx; L.dy = best.dy; L.al = best.al; }
+    }
+    for (const P of old) if (!used.has(P) && P.al > 0.05) { P.gone = true; out.push(P); }
+    this.fronts = out;
+  }
+  drawFronts(toS, z, dt) {
+    const ctx = this.ctx, w = this.w, h = this.h, fs = h > 600 ? 17 : 15;
+    ctx.font = `800 ${fs}px "Rubik","Segoe UI",system-ui,sans-serif`;
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.lineJoin = 'round';
+    const k = Math.min(1, dt * 7);
+    for (let i = this.fronts.length - 1; i >= 0; i--) {
+      const L = this.fronts[i];
+      if (L.gone) { L.al -= dt * 4; if (L.al <= 0) { this.fronts.splice(i, 1); continue; } }
+      else { L.al = Math.min(1, L.al + dt * 4); L.dx += (L.x - L.dx) * k; L.dy += (L.y - L.dy) * k; }
+      const [x, y] = toS(L.dx, L.dy);
+      if (x < -40 || y < -20 || x > w + 40 || y > h + 20) continue;
+      const s = fmtT(L.a.troops);
+      ctx.globalAlpha = L.al;
+      ctx.lineWidth = 4; ctx.strokeStyle = 'rgba(12,16,28,.92)'; ctx.strokeText(s, x, y);
+      ctx.fillStyle = L.inc ? '#F87171' : '#3FA9F5'; ctx.fillText(s, x, y);
     }
     ctx.globalAlpha = 1;
   }
@@ -476,28 +702,38 @@ export class Renderer {
     const G = this.game, ctx = this.ctx, w = this.w, h = this.h, me = this.me;
     for (const b of G.boats) {
       const [bx, by] = G.boatPos(b), [x, y] = toS(bx, by);
-      const mine = b.owner === me, vsMe = b.target === me;
-      if ((mine || vsMe) && b.path.length > 1) { // пунктир пути
-        ctx.setLineDash([2, 5]); ctx.lineWidth = 1.6; ctx.strokeStyle = mine ? 'rgba(255,255,255,.85)' : 'rgba(255,110,130,.9)';
+      const mine = b.owner === me, vsMe = b.target === me, P = b.pts;
+      if ((mine || vsMe) && b.n > 1) { // точечная линия пути (вперёд — до берега высадки, при возврате — домой)
+        ctx.setLineDash([2, 5]); ctx.lineWidth = 1.6; ctx.lineCap = 'round'; ctx.strokeStyle = mine ? 'rgba(255,255,255,.85)' : 'rgba(255,110,130,.9)';
         ctx.beginPath(); ctx.moveTo(x, y);
-        const P = b.path, step = Math.max(1, Math.round(3 / Math.max(0.4, z)));
-        if (b.back) for (let i = Math.floor(b.i); i >= 0; i -= step) { const [px, py] = toS((P[i] % W) + 0.5, ((P[i] / W) | 0) + 0.5); ctx.lineTo(px, py); }
+        const step = Math.max(1, Math.round(4 / Math.max(0.4, z)));
+        if (b.back) for (let i = Math.floor(b.i); i >= 0; i -= step) { const [px, py] = toS(P[i * 2], P[i * 2 + 1]); ctx.lineTo(px, py); }
         else {
-          for (let i = Math.ceil(b.i); i < P.length; i += step) { const [px, py] = toS((P[i] % W) + 0.5, ((P[i] / W) | 0) + 0.5); ctx.lineTo(px, py); }
+          for (let i = Math.ceil(b.i); i < b.n; i += step) { const [px, py] = toS(P[i * 2], P[i * 2 + 1]); ctx.lineTo(px, py); }
+          const [ex, ey] = toS(P[b.n * 2 - 2], P[b.n * 2 - 1]); ctx.lineTo(ex, ey);
           const [lx, ly] = toS((b.land % W) + 0.5, ((b.land / W) | 0) + 0.5); ctx.lineTo(lx, ly);
         }
-        ctx.stroke(); ctx.setLineDash([]);
+        ctx.stroke(); ctx.setLineDash([]); ctx.lineCap = 'butt';
+        if (!b.back) { const [lx, ly] = toS((b.land % W) + 0.5, ((b.land / W) | 0) + 0.5); ctx.fillStyle = mine ? 'rgba(255,255,255,.9)' : 'rgba(255,110,130,.95)'; ctx.beginPath(); ctx.arc(lx, ly, 3, 0, 7); ctx.fill(); }
       }
       if (x < -20 || y < -20 || x > w + 20 || y > h + 20) continue;
-      const s = clamp(z * 1.7, 4.5, 10);
-      ctx.fillStyle = b.owner.col.dark; ctx.strokeStyle = '#fff'; ctx.lineWidth = 1.2;
-      ctx.beginPath(); ctx.moveTo(x - s, y - s * 0.15); ctx.lineTo(x + s, y - s * 0.15); ctx.lineTo(x + s * 0.6, y + s * 0.55); ctx.lineTo(x - s * 0.6, y + s * 0.55); ctx.closePath(); ctx.fill(); ctx.stroke();
-      ctx.fillStyle = '#fff'; ctx.fillRect(x - s * 0.1, y - s * 0.95, s * 0.2, s * 0.8);
-      ctx.beginPath(); ctx.moveTo(x + s * 0.1, y - s * 0.95); ctx.lineTo(x + s * 0.65, y - s * 0.35); ctx.lineTo(x + s * 0.1, y - s * 0.35); ctx.fill();
+      // корпус транспорта по курсу: острый нос, палуба, белая обводка и пенный след
+      const i0 = Math.max(0, Math.min(b.n - 2, Math.floor(b.i)));
+      let ang = Math.atan2(P[i0 * 2 + 3] - P[i0 * 2 + 1], P[i0 * 2 + 2] - P[i0 * 2]);
+      if (b.back) ang += Math.PI;
+      const s = clamp(z * 1.9, 6, 10.5);
+      ctx.save(); ctx.translate(x, y); ctx.rotate(ang);
+      ctx.strokeStyle = 'rgba(255,255,255,.55)'; ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(-s * 1.1, -s * 0.35); ctx.lineTo(-s * 2.3, -s * 0.9); ctx.moveTo(-s * 1.1, s * 0.35); ctx.lineTo(-s * 2.3, s * 0.9); ctx.stroke();
+      ctx.fillStyle = b.owner.col.dark; ctx.strokeStyle = '#fff'; ctx.lineWidth = 1.3;
+      ctx.beginPath(); ctx.moveTo(s * 1.25, 0); ctx.lineTo(s * 0.45, -s * 0.55); ctx.lineTo(-s * 1.1, -s * 0.55); ctx.lineTo(-s * 1.1, s * 0.55); ctx.lineTo(s * 0.45, s * 0.55); ctx.closePath();
+      ctx.fill(); ctx.stroke();
+      ctx.fillStyle = 'rgba(255,255,255,.85)'; ctx.fillRect(-s * 0.7, -s * 0.22, s * 1.1, s * 0.44);
+      ctx.restore();
       if (z >= 2.2) {
         ctx.font = '800 10px "Rubik",system-ui,sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-        ctx.lineWidth = 2.6; ctx.strokeStyle = 'rgba(15,20,35,.85)'; ctx.strokeText(fmtT(b.troops), x, y + s + 7);
-        ctx.fillStyle = mine ? '#3FA9F5' : vsMe ? '#F87171' : '#fff'; ctx.fillText(fmtT(b.troops), x, y + s + 7);
+        ctx.lineWidth = 2.6; ctx.strokeStyle = 'rgba(15,20,35,.85)'; ctx.strokeText(fmtT(b.troops), x, y + s + 8);
+        ctx.fillStyle = mine ? '#3FA9F5' : vsMe ? '#F87171' : '#fff'; ctx.fillText(fmtT(b.troops), x, y + s + 8);
       }
     }
     for (const s of G.ships) {
@@ -544,7 +780,7 @@ export class Renderer {
     } else this.icon(g.type, x, y, r, g.ok ? (this.me ? this.me.col.dark : '#555') : '#D93A3A', g.ok ? 'rgba(255,255,255,.95)' : '#ffb3b3', false, g.ok ? 0.92 : 0.55);
     if (g.up && g.ok) this.levelPill(x, y - r - 7, g.up.level + 1);
     ctx.font = '800 11px "Rubik",system-ui,sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    const label = g.ok ? (g.up ? `↑ ${fmt(g.cost)}` : fmt(g.cost)) : g.why || '✕';
+    const label = g.ok ? (g.up ? `↑ ${fmtC(g.cost)}` : fmtC(g.cost)) : g.why || '✕';
     ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(15,20,35,.9)'; ctx.strokeText(label, x, y + r + 10);
     ctx.fillStyle = g.ok ? (g.afford ? '#FBE99F' : '#E06A8C') : '#ff9a9a'; ctx.fillText(label, x, y + r + 10);
   }
@@ -571,7 +807,7 @@ export class Renderer {
         // метка цели: заливка 25% и пунктирное кольцо радиуса взрыва, вращается 20°/с
         const [tx, ty] = toS(n.tx, n.ty), R = NUKES[n.type].outer * z;
         if (tx > -R && ty > -R && tx < w + R && ty < h + R) {
-          ctx.globalAlpha = 0.22; ctx.fillStyle = col; ctx.beginPath(); ctx.arc(tx, ty, R, 0, 7); ctx.fill();
+          ctx.globalAlpha = 0.25; ctx.fillStyle = col; ctx.beginPath(); ctx.arc(tx, ty, R, 0, 7); ctx.fill();
           ctx.globalAlpha = 0.85 + 0.1 * Math.sin(time * 6);
           ctx.save(); ctx.translate(tx, ty); ctx.rotate(time * 0.349);
           ctx.setLineDash([12, 6]); ctx.lineWidth = 1.5; ctx.strokeStyle = col; ctx.beginPath(); ctx.arc(0, 0, Math.max(4, R), 0, 7); ctx.stroke();
@@ -611,21 +847,23 @@ export class Renderer {
     }
     ctx.globalAlpha = 1;
   }
-  // оставшаяся часть пути: штрих 8/4, где ракету может сбить ПВО, точки 2/6 — где не может; белая линия с серой обводкой
+  // оставшаяся часть пути: штрих 8/4, где ракету может сбить ПВО, точки 2/6 — где не может; белая линия 2.5 px
+  // с серой обводкой #8C8C8C; после точки, где её собьёт ПВО, — красная #FF5050 (обводка #965A5A)
   nukeTrail(n, toS, z) {
     const G = this.game, ctx = this.ctx, step = Math.max(3, 9 / Math.max(0.5, z));
-    const segs = [];
+    const segs = [], hit = n.dHit ?? 1e9;
     let cur = null;
     for (let d = n.d; ; d += step) {
-      const dd = Math.min(n.len, d), [x, y] = G.pathAt(n, dd), tg = G.targetable(n, x, y), [sx, sy] = toS(x, y);
-      if (!cur || cur.tg !== tg) { const c = { tg, pts: cur ? [cur.pts[cur.pts.length - 1]] : [] }; segs.push(c); cur = c; }
+      const dd = Math.min(n.len, d), [x, y] = G.pathAt(n, dd), tg = G.targetable(n, x, y), red = dd > hit, [sx, sy] = toS(x, y);
+      if (!cur || cur.tg !== tg || cur.red !== red) { const c = { tg, red, pts: cur ? [cur.pts[cur.pts.length - 1]] : [] }; segs.push(c); cur = c; }
       cur.pts.push([sx, sy]);
       if (dd >= n.len) break;
     }
     for (const pass of [0, 1]) {
-      ctx.lineWidth = pass ? 2.2 : 3.6; ctx.strokeStyle = pass ? 'rgba(255,255,255,.92)' : 'rgba(140,140,140,.75)';
+      ctx.lineWidth = pass ? 2.5 : 4;
       for (const c of segs) {
         if (c.pts.length < 2) continue;
+        ctx.strokeStyle = pass ? (c.red ? '#FF5050' : 'rgba(255,255,255,.95)') : c.red ? 'rgba(150,90,90,.85)' : 'rgba(140,140,140,.75)';
         ctx.setLineDash(c.tg ? [8, 4] : [2, 6]);
         ctx.beginPath(); ctx.moveTo(c.pts[0][0], c.pts[0][1]);
         for (let i = 1; i < c.pts.length; i++) ctx.lineTo(c.pts[i][0], c.pts[i][1]);
@@ -640,14 +878,14 @@ export class Renderer {
       const b = this.fx.booms[i]; b.t += dt;
       if (b.t >= b.dur) { this.fx.booms.splice(i, 1); continue; }
       const [x, y] = toS(b.x, b.y), R = Math.max(6, b.r * z);
-      if (b.t < 0.14) { ctx.globalAlpha = 1 - b.t / 0.14; ctx.fillStyle = '#ffffff'; ctx.beginPath(); ctx.arc(x, y, R * 1.05, 0, 7); ctx.fill(); }
+      if (b.t < 0.12) { ctx.globalAlpha = 1 - b.t / 0.12; ctx.fillStyle = '#ffffff'; ctx.beginPath(); ctx.arc(x, y, R * 1.05, 0, 7); ctx.fill(); }
       const q = b.t / b.dur;
       if (b.t < 0.5) { // раскалённое ядро
         const gr = ctx.createRadialGradient(x, y, 0, x, y, R * 0.8);
         gr.addColorStop(0, 'rgba(255,250,210,.95)'); gr.addColorStop(0.45, 'rgba(255,170,60,.7)'); gr.addColorStop(1, 'rgba(255,90,30,0)');
         ctx.globalAlpha = 1 - b.t / 0.5; ctx.fillStyle = gr; ctx.beginPath(); ctx.arc(x, y, R * 0.8, 0, 7); ctx.fill();
       }
-      ctx.globalAlpha = (1 - q) * 0.9; ctx.strokeStyle = '#ffffff'; ctx.lineWidth = Math.max(1.5, R * 0.04);
+      ctx.globalAlpha = (1 - q) * 0.9; ctx.strokeStyle = '#ffffff'; ctx.lineWidth = Math.max(2, R * 0.04);
       ctx.beginPath(); ctx.arc(x, y, R * 1.5 * (1 - Math.pow(1 - q, 2)), 0, 7); ctx.stroke();
     }
     ctx.globalAlpha = 1;
@@ -666,7 +904,7 @@ export class Renderer {
     ctx.strokeStyle = '#fff'; ctx.lineWidth = 1.6; // перекрестие
     ctx.beginPath(); ctx.moveTo(x - 7, y); ctx.lineTo(x + 7, y); ctx.moveTo(x, y - 7); ctx.lineTo(x, y + 7); ctx.stroke();
     ctx.font = '800 11px "Rubik",system-ui,sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    const label = g.ok ? fmt(g.cost) + (g.self ? ' ⚠' : '') : g.why || '✕', ly = y + Math.min(Ro + 12, 22);
+    const label = g.ok ? fmtC(g.cost) + (g.self ? ' ⚠' : '') : g.why || '✕', ly = y + Math.min(Ro + 12, 22);
     ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(15,20,35,.9)'; ctx.strokeText(label, x, ly);
     ctx.fillStyle = g.ok ? (g.self ? '#FFB347' : g.afford ? '#FBE99F' : '#E06A8C') : '#ff9a9a'; ctx.fillText(label, x, ly);
   }
@@ -716,7 +954,17 @@ export class Renderer {
       ctx.lineWidth = Math.max(2, fs2 * 0.2); ctx.strokeStyle = small ? '#ffffff' : p.col.css;
       ctx.strokeText(tr, cx, yy); ctx.fillStyle = '#3A3A3A'; ctx.fillText(tr, cx, yy);
       // корона лидера
-      if (p === lead && p.tiles > 300) this.crown(cx, ty - fs * 0.95, Math.max(10, fs * 0.75));
+      const crown = p === lead && p.tiles > 300;
+      if (crown) this.crown(cx, ty - fs * 0.95, Math.max(10, fs * 0.75));
+      // красная плашка «ПРЕДАТЕЛЬ» над именем (30 с после разрыва союза)
+      if (G.isTraitor(p)) {
+        const ts = clamp(fs * 0.42, 8.5, 15), py = ty - fs * (crown ? 1.55 : 0.92);
+        ctx.font = `900 ${ts.toFixed(1)}px "Rubik","Segoe UI",system-ui,sans-serif`;
+        const pw = ctx.measureText('ПРЕДАТЕЛЬ').width + ts * 1.1;
+        ctx.fillStyle = '#EE4062'; ctx.beginPath(); ctx.roundRect(cx - pw / 2, py - ts * 0.75, pw, ts * 1.5, ts * 0.5); ctx.fill();
+        ctx.lineWidth = 1; ctx.strokeStyle = 'rgba(255,255,255,.7)'; ctx.stroke();
+        ctx.fillStyle = '#fff'; ctx.fillText('ПРЕДАТЕЛЬ', cx, py + 0.5);
+      }
     }
     ctx.textAlign = 'center';
   }

@@ -48,7 +48,7 @@ export function setupBrain(g, me) {
   for (const p of g.P) {
     if (!p || p.isPlayer) continue;
     const ai = p.ai;
-    if (p.kind === KIND.NATION) Object.assign(ai, { trigger: rf(0.5, 0.6), reserve: rf(0.3, 0.4), expand: rf(0.1, 0.2), rate: ri(45, 60), step: 0, next: ri(1, 40), boatAt: -9999 });
+    if (p.kind === KIND.NATION) Object.assign(ai, { trigger: rf(0.5, 0.6), reserve: rf(0.3, 0.4), expand: rf(0.1, 0.2), rate: ri(45, 60), step: 0, next: ri(1, 40), boatAt: -9999, sly: Math.random() < 0.3 });
     else if (p.kind === KIND.TRIBE) Object.assign(ai, { reserve: rf(0.3, 0.4), next: ri(5, 60) });
     else {
       const skill = p.isClaude ? 0.8 : p.leader?.skill ?? 0.6; // «нубы» тапают реже и тратят войска неумело
@@ -273,6 +273,7 @@ export function setupBrain(g, me) {
     }
     if (step === 1) { // атака: порог triggerRatio, резерв reserveRatio
       if (tr < cap * ai.trigger) return;
+      if (aiBetray(p)) return;
       const q = chooseTarget(p, info, tr > cap * 0.85 ? 0 : 1);
       const send = tr - cap * ai.reserve;
       // по суше остались только огрызки — бьём крупного соперника десантом через море
@@ -300,6 +301,7 @@ export function setupBrain(g, me) {
   // боты-игроки и Клод: как люди — тап-тап по свободной земле, едят племена и слабых, строят города
   function human(p) {
     const ai = p.ai, cap = g.maxTroops(p), tr = p.troops, info = scan(p);
+    if (tr > cap * 0.5 && aiBetray(p)) return;
     if (info.free && tr > cap * 0.28) g.attack(p, null, tr * ai.ratio);
     else if (tr > cap * 0.42) {
       const q = chooseTarget(p, info, tr > cap * 0.75 ? 0 : 1);
@@ -320,10 +322,67 @@ export function setupBrain(g, me) {
     }
   }
 
+  // ---------- дипломатия ----------
+  // ответы ИИ на запросы союза (через 1–3.5 с «раздумий»), продление союзов, предложения союза игроку
+  // и редкое предательство союзника-игрока токсичными ботами и «хитрыми» нациями
+  let proposeAt = 700; // первое предложение игроку — не раньше чем через ~1 минуту
+  const isAI = (p) => !p.isPlayer;
+  function diplo(t) {
+    for (const r of g.requests.slice()) {
+      if (!isAI(r.to)) continue;
+      if (r.decideAt < 0) r.decideAt = t + ri(10, 35);
+      else if (t >= r.decideAt) g.answerAlly(r, aiAcceptAlly(g, r.to, r.from));
+    }
+    for (const pc of g.pacts.values()) {
+      if (!pc.renew) continue;
+      for (const [side, other, k] of [[pc.a, pc.b, 'a'], [pc.b, pc.a, 'b']]) {
+        if (!isAI(side) || pc.renew[k]) continue;
+        if (t - pc.renew.at < ri(15, 60)) continue;
+        g.renewAlly(side, other, aiRenew(side, other));
+        if (!g.pact(side, other)) break;
+      }
+    }
+    if (t >= proposeAt && me.alive && !g.isTraitor(me) && !g.requests.some((r) => r.to === me)) {
+      proposeAt = t + ri(450, 900); // проверка раз в 45–90 с
+      const early = t < 1800;
+      const cands = [];
+      for (let i = 1; i < g.P.length; i++) {
+        const q = g.P[i];
+        if (!q.alive || q.isPlayer || q.isClaude || q.kind === KIND.TRIBE || q.tiles < 60 || g.allied(q, me) || g.reqCooldown(q, me)) continue;
+        if (recentHit(q, me, 900) || recentHit(me, q, 900) || attacking(q, me) || attacking(me, q)) continue;
+        if (!g.borders(q, me)) continue;
+        cands.push(q);
+      }
+      // охотнее предлагают те, кто слабее игрока (ищут защиты), и в первые минуты
+      cands.sort((a, b) => a.troops - b.troops);
+      const q = cands[0];
+      if (q && Math.random() < (early ? 0.65 : 0.35) * (q.troops < me.troops * 1.5 ? 1 : 0.5)) g.requestAlly(q, me);
+    }
+  }
+  // продлить ли союз: с игроком — если он не бил нас и не стал опасно сильным; предателям — нет
+  function aiRenew(q, p) {
+    if (q.isClaude) return true;
+    if (g.isTraitor(p) || recentHit(q, p, 1200)) return false;
+    if (p.tiles > g.winLand * 0.35 && p.tiles > q.tiles * 3) return Math.random() < 0.35;
+    return Math.random() < (q.kind === KIND.NATION ? 0.8 : 0.85 - (q.ai.toxic ?? 0.4) * 0.4);
+  }
+  // предательство союзника-игрока: сильный токсичный бот или «хитрая» нация на общей границе
+  function aiBetray(p) {
+    if (!g.allied(p, me) || p.isClaude || !me.alive) return false;
+    const pc = g.pact(p, me);
+    if (!pc || g.tickN - pc.at < 1500 || pc.until - g.tickN < 400) return false;
+    const evil = p.kind === KIND.NATION ? p.ai.sly : (p.ai.toxic ?? 0) > 0.55;
+    if (!evil || p.troops < me.troops * 1.6 || Math.random() > 0.05 || !g.borders(p, me)) return false;
+    g.breakAlly(p, me);
+    g.attack(p, me, p.troops * 0.45);
+    return true;
+  }
+
   let lead = null;
   g.brain = () => {
     const t = g.tickN, P = g.P;
     if (t % 50 === 1) lead = g.leader();
+    if (t % 5 === 0) diplo(t);
     for (let i = 1; i < P.length; i++) {
       const p = P[i];
       if (!p.alive || p.isPlayer || p.ai.next > t) continue;
@@ -340,6 +399,7 @@ export function aiAcceptAlly(g, q, p) {
   if (g.isTraitor(p)) return Math.random() < 0.03;
   const hitT = q.hitBy.get(p.id);
   if (hitT !== undefined && g.tickN - hitT < 600) return false;
+  for (const a of p.attacks) if (!a.dead && a.target === q) return false;
   const early = g.tickN < 1800;
   if (q.kind === KIND.TRIBE) return Math.random() < 0.5;
   if (q.kind === KIND.NATION) return Math.random() < (early ? 0.8 : p.troops > q.troops * 1.5 ? 0.55 : 0.3);

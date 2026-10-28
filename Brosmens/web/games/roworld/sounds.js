@@ -95,3 +95,19 @@ export function siren() {
     os.connect(lp).connect(e).connect(g); os.start(t); os.stop(t + 0.9);
   }
 }
+
+// дипломатия: предложение союза — два мягких «динь» вверх; союз заключён — мажорное трезвучие;
+// отказ — две ноты вниз (как alliance-suggested / -accepted / -declined в оригинале, но свои)
+export function allyChime(kind) {
+  const o = out(0.22); if (!o) return;
+  const { ctx, g, t0 } = o;
+  const seq = kind === true ? [[523, 0], [659, 0.09], [784, 0.18], [1047, 0.27]] : kind === false ? [[587, 0], [440, 0.14]] : [[784, 0], [1175, 0.13]];
+  for (const [f, d] of seq) {
+    for (const [mul, vol] of [[1, 0.5], [2, 0.12]]) {
+      const os = ctx.createOscillator(), e = ctx.createGain();
+      os.type = 'sine'; os.frequency.value = f * mul;
+      e.gain.setValueAtTime(0.0001, t0 + d); e.gain.exponentialRampToValueAtTime(vol, t0 + d + 0.012); e.gain.exponentialRampToValueAtTime(0.0001, t0 + d + 0.55);
+      os.connect(e).connect(g); os.start(t0 + d); os.stop(t0 + d + 0.6);
+    }
+  }
+}

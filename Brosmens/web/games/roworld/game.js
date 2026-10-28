@@ -15,8 +15,12 @@ export const RETREAT_TICKS = 20;
 export const SPAWN_R = 4.6;                         // стартовый диск ≈9 клеток оригинала
 export const SPAWN_GAP = 15;                        // 30 клеток оригинала между игроками
 export const TRIBE_GAP = 10;                        // племена — плотнее, но диски не пересекаются
-export const BOAT_MAX = 3, BOAT_SPEED = 0.6;        // не больше 3 десантов сразу
+export const BOAT_MAX = 3, BOAT_SPEED = 0.5;        // не больше 3 десантов сразу; 1 клетка оригинала за тик
 export const TRAITOR_TICKS = 300, DONATE_CD = 100;
+// дипломатия (как в оригинале): запрос союза живёт 20 с, повторно просить — через 30 с; союз на 5 минут,
+// за 30 с до конца — предложение продлить (продлевается, только если согласны оба)
+export const ALLY_TICKS = 3000, ALLY_REQ_TICKS = 200, ALLY_REQ_CD = 300, ALLY_RENEW = 300;
+const pactKey = (a, b) => (a.id < b.id ? a.id * 4096 + b.id : b.id * 4096 + a.id);
 // нации — сложность «Hard» (как в матчах оригинала): старт 2.5K, лимит ×1, прирост ×1
 export const NATION_DIFF = { start: 25000, cap: 1, regen: 1 };
 // темп захвата: наша клетка вчетверо больше по площади, поэтому фронт продвигается вдвое медленнее в клетках —
@@ -36,10 +40,10 @@ export const SHIP = { hp: 1000, range: 65, patrol: 50, reload: 20, speed: 0.5, d
 // Ядерное оружие (радиусы и скорости — половина оригинальных: 12/30, 80/100, боеголовки MIRV 12/18; 10 и 22 клетки за тик).
 // Ракета летит по кубической кривой Безье, выгнутой к верху карты; ПВО может сбить её только рядом с шахтой или целью.
 export const NUKES = {
-  atom: { name: 'Атомная бомба', gen: 'атомную бомбу', cost: 750000, inner: 6, outer: 15, speed: 5 },
-  hydro: { name: 'Водородная бомба', gen: 'водородную бомбу', cost: 5e6, inner: 40, outer: 50, speed: 5 },
-  mirv: { name: 'MIRV', gen: 'MIRV', cost: 25e6, step: 15e6, speed: 7.5 },
-  warhead: { name: 'Боеголовка MIRV', gen: 'боеголовку MIRV', inner: 6, outer: 9, speed: 11 },
+  atom: { name: 'Атомная бомба', gen: 'атомную бомбу', acc: 'Атомную бомбу', cost: 750000, inner: 6, outer: 15, speed: 5 },
+  hydro: { name: 'Водородная бомба', gen: 'водородную бомбу', acc: 'Водородную бомбу', cost: 5e6, inner: 40, outer: 50, speed: 5 },
+  mirv: { name: 'MIRV', gen: 'MIRV', acc: 'MIRV', cost: 25e6, step: 15e6, speed: 7.5 },
+  warhead: { name: 'Боеголовка MIRV', gen: 'боеголовку MIRV', acc: 'Боеголовку MIRV', inner: 6, outer: 9, speed: 11 },
 };
 export const MIRV_WARHEADS = 110;              // 350 боеголовок оригинала на карте вчетверо меньшей площади
 export const SILO_RELOAD = 90, SAM_RELOAD = 90;  // 9 с на ракету (ракет = уровень)
@@ -66,6 +70,8 @@ export function fmt(v) {
   return String(Math.floor(v));
 }
 export const fmtT = (internal) => fmt(internal / 10); // войска: внутренние → экранные
+// цены — без лишних нулей, как на кнопках оригинала: 125K, 1M, 1.5M, 5M, 25M
+export const fmtC = (v) => fmt(v).replace(/\.0+([KMB])$/, '$1').replace(/(\.\d)0([KMB])$/, '$1$2');
 
 // мин-куча (приоритет, клетка), растёт по мере надобности
 class Heap {
@@ -113,6 +119,7 @@ export class Game {
     this.handlers = [];
     this.chg = new Int32Array(16384); this.chgN = 0;
     this.attackSeq = 1; this.structSeq = 1; this.boatSeq = 1;
+    this.pacts = new Map(); this.requests = []; this.reqSeq = 1; // союзы (со сроком) и запросы союза
     this.dirtyEnclave = false;
     this.brain = null; // ИИ: fn(game) каждый тик
     this.lab = null; this.stk = null;
@@ -130,7 +137,7 @@ export class Game {
       troops: o.kind === KIND.TRIBE ? 10000 : o.kind === KIND.NATION ? NATION_DIFF.start : 25000,
       gold: 0, tiles: 0, border: new Set(), alive: true, attacks: [], hitBy: new Map(), allies: new Set(),
       cityLevels: 0, posts: [], paid: { city: 0, port: 0, factory: 0, post: 0, sam: 0, silo: 0, warship: 0 },
-      peakTiles: 0, maxTroopsSeen: 0, kills: 0, killsN: 0, boats: [], traitorUntil: -1, donateAt: -1e9,
+      peakTiles: 0, maxTroopsSeen: 0, kills: 0, killsN: 0, boats: [], traitorUntil: -1, donateAt: -1e9, reqCd: new Map(),
       spawn: -1, spawnTiles: null, ai: {}, diedAt: 0,
     };
     this.P.push(p);
@@ -169,23 +176,90 @@ export class Game {
   breakAlly(p, q) {
     if (!this.allied(p, q)) return false;
     p.allies.delete(q.id); q.allies.delete(p.id);
+    this.pacts.delete(pactKey(p, q));
     p.traitorUntil = this.tickN + TRAITOR_TICKS;
     this.emit('betray', { p, q });
     return true;
   }
+  // подарок союзнику: войска (не больше, чем влезет в его лимит) или золото; общая перезарядка 10 с
+  donateCd(p) { return Math.max(0, DONATE_CD - (this.tickN - p.donateAt)); }
   donate(p, q, troops) {
-    if (!this.allied(p, q) || this.tickN - p.donateAt < DONATE_CD) return 0;
+    if (!this.allied(p, q) || this.donateCd(p)) return 0;
     troops = Math.floor(Math.min(troops, p.troops, Math.max(0, this.maxTroops(q) - q.troops)));
     if (troops < 1) return 0;
     p.troops -= troops; q.troops += troops; p.donateAt = this.tickN;
     this.emit('donate', { p, q, troops });
     return troops;
   }
+  donateGold(p, q, gold) {
+    if (!this.allied(p, q) || this.donateCd(p)) return 0;
+    gold = Math.floor(Math.min(gold, p.gold));
+    if (gold < 1) return 0;
+    p.gold -= gold; q.gold += gold; p.donateAt = this.tickN;
+    this.emit('donate', { p, q, gold });
+    return gold;
+  }
   allied(a, b) { return !!a && !!b && a !== b && a.allies.has(b.id); }
-  makeAlly(a, b) {
+  // союз: на 5 минут (permanent — навсегда, как у игрока с Клодом). Идущие атаки на нового союзника
+  // откатываются без потерь (stepAttack), десант в пути разворачивается и возвращает войска целиком.
+  makeAlly(a, b, permanent = false) {
     if (a === b || this.allied(a, b)) return;
     a.allies.add(b.id); b.allies.add(a.id);
+    this.pacts.set(pactKey(a, b), { a, b, at: this.tickN, until: permanent ? Infinity : this.tickN + ALLY_TICKS, renew: null });
+    this.requests = this.requests.filter((r) => !((r.from === a && r.to === b) || (r.from === b && r.to === a)));
+    for (const bt of this.boats) if (!bt.back && ((bt.owner === a && bt.target === b) || (bt.owner === b && bt.target === a))) { bt.back = true; bt.free = true; }
     this.emit('ally', { a, b });
+  }
+  pact(a, b) { return this.pacts.get(pactKey(a, b)) || null; }
+  pendingReq(from, to) { for (const r of this.requests) if (r.from === from && r.to === to) return r; return null; }
+  reqCooldown(p, q) { const cd = p.reqCd.get(q.id); return cd === undefined ? 0 : Math.max(0, cd - this.tickN); }
+  // запрос союза: встречный запрос — союз сразу; иначе ждём ответа 20 с
+  requestAlly(p, q) {
+    if (!p.alive || !q || !q.alive || p === q || this.over) return { ok: false, reason: 'bad' };
+    if (this.allied(p, q)) return { ok: false, reason: 'ally' };
+    const back = this.pendingReq(q, p);
+    if (back) { this.answerAlly(back, true); return { ok: true, instant: true }; }
+    if (this.pendingReq(p, q)) return { ok: false, reason: 'pending' };
+    const cd = this.reqCooldown(p, q);
+    if (cd) return { ok: false, reason: 'cd', left: cd };
+    const r = { id: this.reqSeq++, from: p, to: q, at: this.tickN, until: this.tickN + ALLY_REQ_TICKS, decideAt: -1 };
+    this.requests.push(r);
+    p.reqCd.set(q.id, this.tickN + ALLY_REQ_CD);
+    this.emit('allyRequest', { r });
+    return { ok: true, r };
+  }
+  answerAlly(r, yes) {
+    const i = this.requests.indexOf(r);
+    if (i < 0) return false;
+    this.requests.splice(i, 1);
+    const ok = yes && r.from.alive && r.to.alive && !this.allied(r.from, r.to);
+    if (ok) this.makeAlly(r.from, r.to);
+    this.emit('allyReply', { r, yes: ok });
+    return true;
+  }
+  // продление союза: каждая сторона отвечает «да/нет»; продлевается, когда согласны обе
+  renewAlly(p, q, yes) {
+    const pc = this.pact(p, q);
+    if (!pc || !pc.renew) return false;
+    pc.renew[pc.a === p ? 'a' : 'b'] = yes ? 1 : -1;
+    if (pc.renew.a === 1 && pc.renew.b === 1) { pc.until = this.tickN + ALLY_TICKS; pc.renew = null; this.emit('allyRenewed', { pc }); }
+    return true;
+  }
+  stepDiplo() {
+    const t = this.tickN;
+    for (let i = this.requests.length - 1; i >= 0; i--) {
+      const r = this.requests[i];
+      if (t >= r.until || !r.from.alive || !r.to.alive) { this.requests.splice(i, 1); this.emit('allyReqExpired', { r }); }
+    }
+    for (const [k, pc] of this.pacts) {
+      if (pc.until === Infinity) continue;
+      if (!pc.renew && t >= pc.until - ALLY_RENEW) { pc.renew = { a: 0, b: 0, at: t }; this.emit('allyRenewAsk', { pc }); }
+      if (t >= pc.until) {
+        this.pacts.delete(k);
+        pc.a.allies.delete(pc.b.id); pc.b.allies.delete(pc.a.id);
+        this.emit('allyExpired', { pc });
+      }
+    }
   }
   attackersOn(q) { let n = 0; for (const a of this.attacks) if (!a.dead && a.target === q) n++; return n; }
   // статус для карточки цели: союз / война (идёт атака в любую сторону) / нейтрал
@@ -286,14 +360,15 @@ export class Game {
 
   // ---------- атаки ----------
   // p атакует цель (игрок или null — ничья земля) отрядом troops (внутренние единицы).
-  attack(p, target, troops, landed = false) {
+  // landed — войска высадились с моря (уже не в запасе); src — клетка высадки: фронт начинается только от неё
+  attack(p, target, troops, landed = false, src = -1) {
     if (!p.alive || this.over) return { ok: false, reason: 'dead' };
     if (target && (target === p || !target.alive)) return { ok: false, reason: 'bad' };
     if (target && this.allied(p, target)) return { ok: false, reason: 'ally' };
     if (target && !this.canAttack(p, target)) return { ok: false, reason: 'immune' };
     troops = Math.floor(landed ? troops : Math.min(troops, p.troops));
     if (troops < 1) return { ok: false, reason: 'few' };
-    if (!this.borders(p, target)) return { ok: false, reason: 'far' };
+    if (src < 0 && !this.borders(p, target)) return { ok: false, reason: 'far' };
     if (!landed) p.troops -= troops;
     // встречные атаки гасят друг друга: большая остаётся с разницей
     if (target) {
@@ -319,8 +394,9 @@ export class Game {
       return { ok: true, attack: a, merged: true, troops };
     }
     const a = { id: this.attackSeq++, owner: p, target, troops, start: troops, heap: new Heap(), front: new Set(), retreatAt: -1, born: this.tickN, dead: false, boat: landed };
-    this.fillFront(a);
-    if (!a.front.size) { p.troops += troops; return { ok: false, reason: 'far' }; }
+    if (src >= 0) this.fillFrontAt(a, src); // десант: атака расходится от плацдарма
+    if (!a.front.size) this.fillFront(a);
+    if (!a.front.size) { if (!landed) p.troops += troops; return { ok: false, reason: 'far' }; }
     p.attacks.push(a); this.attacks.push(a);
     this.emit('attack', { a, merged: false, add: troops });
     return { ok: true, attack: a, troops };
@@ -334,6 +410,13 @@ export class Game {
       if (t >= W && o[t - W] === tid) this.addFront(a, t - W);
       if (t < N_TILES - W && o[t + W] === tid) this.addFront(a, t + W);
     }
+  }
+  fillFrontAt(a, t) {
+    const tid = a.target ? a.target.id : 0, o = this.owner, x = t % W;
+    if (x > 0 && o[t - 1] === tid) this.addFront(a, t - 1);
+    if (x < W - 1 && o[t + 1] === tid) this.addFront(a, t + 1);
+    if (t >= W && o[t - W] === tid) this.addFront(a, t - W);
+    if (t < N_TILES - W && o[t + W] === tid) this.addFront(a, t + W);
   }
   addFront(a, t) {
     if (!this.isLand(t)) return;
@@ -445,6 +528,9 @@ export class Game {
     }
     v.gold = 0; v.troops = 0;
     for (const id of v.allies) this.P[id].allies.delete(vid);
+    v.allies.clear();
+    for (const [k, pc] of this.pacts) if (pc.a === v || pc.b === v) this.pacts.delete(k);
+    this.requests = this.requests.filter((r) => r.from !== v && r.to !== v);
     this.emit('eliminated', { v, by, gold });
   }
 
@@ -691,31 +777,81 @@ export class Game {
     if (shore[t0]) return t0;
     return this.w.nearest(t0, 30, (t) => shore[t] && this.owner[t] === id && this.isLand(t));
   }
-  // маршрут десанта p к береговой клетке land: путь по воде от своего берега до цели
-  boatRoute(p, land) {
-    if (land < 0) return null;
-    const st = this.bfsInit(), prev = this.bPrev, seen = this.bSeen, Q = this.bQ, o = this.owner, id = p.id;
-    let h = 0, tl = 0;
-    const lx = land % W;
-    for (const nb of [lx > 0 ? land - 1 : -1, lx < W - 1 ? land + 1 : -1, land - W, land + W]) {
-      if (nb < 0 || nb >= N_TILES || !this.isWater(nb) || seen[nb] === st) continue;
-      seen[nb] = st; prev[nb] = -1; Q[tl++] = nb;
+  // водоём (связный кусок воды, разметка считается один раз), к которому выходит береговая клетка
+  seaOf(t) {
+    const wb = this.waterBody(), x = t % W;
+    if (x > 0 && this.isWater(t - 1)) return wb[t - 1];
+    if (x < W - 1 && this.isWater(t + 1)) return wb[t + 1];
+    if (t >= W && this.isWater(t - W)) return wb[t - W];
+    if (t < N_TILES - W && this.isWater(t + W)) return wb[t + W];
+    return 0;
+  }
+  waterNear(t, sea) {
+    const wb = this.waterBody(), x = t % W;
+    for (const nb of [x > 0 ? t - 1 : -1, x < W - 1 ? t + 1 : -1, t - W, t + W]) if (nb >= 0 && nb < N_TILES && this.isWater(nb) && wb[nb] === sea) return nb;
+    return -1;
+  }
+  // лучшая точка отплытия (как в оригинале): своя береговая клетка на том же водоёме, ближайшая к цели
+  launchTile(p, land, sea) {
+    const lx = land % W, ly = (land / W) | 0, shore = this.w.shore;
+    let best = -1, bd = 1e9;
+    for (const t of p.border) {
+      if (!shore[t]) continue;
+      const d = Math.abs((t % W) - lx) + Math.abs(((t / W) | 0) - ly);
+      if (d < bd && this.waterNear(t, sea) >= 0) { bd = d; best = t; }
     }
-    let goal = -1, src = -1;
-    while (h < tl && goal < 0) {
-      const t = Q[h++], x = t % W;
+    return best;
+  }
+  // A* по клеткам воды (4 соседа, эвристика — манхэттен с лёгким уклоном к цели): обычно обходит
+  // в десятки раз меньше клеток, чем BFS по всему океану; готовые маршруты кэшируются (вода не меняется)
+  waterPath(a, b) {
+    const key = a * N_TILES + b, cache = this.routeCache || (this.routeCache = new Map());
+    const hit = cache.get(key);
+    if (hit !== undefined) return hit;
+    if (!this.aG) { this.aG = new Float32Array(N_TILES); this.aSeen = new Uint32Array(N_TILES); this.aDone = new Uint32Array(N_TILES); this.aPrev = new Int32Array(N_TILES); this.aSt = 0; this.aHeap = new Heap(4096); }
+    const st = ++this.aSt, G = this.aG, seen = this.aSeen, done = this.aDone, prev = this.aPrev, hp = this.aHeap;
+    hp.n = 0;
+    const gx = b % W, gy = (b / W) | 0, hk = 1.002;
+    seen[a] = st; G[a] = 0; prev[a] = -1;
+    hp.push((Math.abs((a % W) - gx) + Math.abs(((a / W) | 0) - gy)) * hk, a);
+    let found = false, visits = 0;
+    while (hp.n) {
+      const t = hp.pop();
+      if (done[t] === st) continue;
+      done[t] = st;
+      if (t === b) { found = true; break; }
+      if (++visits > 400000) break;
+      const x = t % W, g1 = G[t] + 1;
       for (let k = 0; k < 4; k++) {
         let nb;
         if (k === 0) { if (x === 0) continue; nb = t - 1; } else if (k === 1) { if (x === W - 1) continue; nb = t + 1; } else if (k === 2) { if (t < W) continue; nb = t - W; } else { if (t >= N_TILES - W) continue; nb = t + W; }
-        if (o[nb] === id && this.isLand(nb)) { goal = t; src = nb; break; }
-        if (seen[nb] === st || !this.isWater(nb)) continue;
-        seen[nb] = st; prev[nb] = t; Q[tl++] = nb;
+        if (!this.isWater(nb) || done[nb] === st) continue;
+        if (seen[nb] !== st || g1 < G[nb]) {
+          seen[nb] = st; G[nb] = g1; prev[nb] = t;
+          hp.push(g1 + (Math.abs((nb % W) - gx) + Math.abs(((nb / W) | 0) - gy)) * hk, nb);
+        }
       }
     }
-    if (goal < 0) return null;
-    const path = [];
-    for (let t = goal; t >= 0; t = prev[t]) path.push(t);
-    return { path: Int32Array.from(path), land, src };
+    let path = null;
+    if (found) {
+      const L = [];
+      for (let t = b; t >= 0; t = prev[t]) L.push(t);
+      path = Int32Array.from(L.reverse());
+    }
+    if (cache.size > 96) cache.delete(cache.keys().next().value);
+    cache.set(key, path);
+    return path;
+  }
+  // маршрут десанта p к береговой клетке land: от лучшей своей береговой клетки того же водоёма
+  boatRoute(p, land) {
+    if (land < 0) return null;
+    const sea = this.seaOf(land);
+    if (!sea) return null;
+    const src = this.launchTile(p, land, sea);
+    if (src < 0) return null;
+    const a = this.waterNear(src, sea), b = this.waterNear(land, sea);
+    const path = a >= 0 && b >= 0 ? this.waterPath(a, b) : null;
+    return path ? { path, land, src } : null;
   }
   // разведка для ИИ: ближайший достижимый по воде берег, где ok(клетка суши) — от своего берега наружу
   boatScout(p, ok, maxVisit = 90000) {
@@ -746,7 +882,40 @@ export class Game {
     path.reverse();
     return { path: Int32Array.from(path), land };
   }
-  // отправить десант: troops — внутренние единицы, land — клетка высадки (береговая)
+  // прямая над водой между двумя точками (центрами клеток) — для сглаживания пути десанта
+  clearWater(x0, y0, x1, y1) {
+    const n = Math.ceil(Math.hypot(x1 - x0, y1 - y0) * 2);
+    for (let i = 1; i < n; i++) {
+      const f = i / n, x = Math.floor(x0 + (x1 - x0) * f), y = Math.floor(y0 + (y1 - y0) * f);
+      if (!this.isWater(y * W + x)) return false;
+    }
+    return true;
+  }
+  // путь BFS по клеткам идёт «лесенкой»; натягиваем его, как нитку (прямые участки над водой),
+  // и разбиваем на точки через 1 клетку — лодка плывёт ровно и с честной скоростью
+  smoothRoute(path) {
+    const n = path.length, cx = (t) => (t % W) + 0.5, cy = (t) => ((t / W) | 0) + 0.5;
+    const xs = [cx(path[0])], ys = [cy(path[0])];
+    for (let i = 0; i < n - 1;) {
+      let j = i + 1;
+      const lim = Math.min(n - 1, i + 48);
+      while (j < lim && this.clearWater(cx(path[i]), cy(path[i]), cx(path[j + 1]), cy(path[j + 1]))) j++;
+      xs.push(cx(path[j])); ys.push(cy(path[j])); i = j;
+    }
+    const out = [xs[0], ys[0]];
+    let acc = 0;
+    for (let k = 1; k < xs.length; k++) {
+      const ax = xs[k - 1], ay = ys[k - 1], bx = xs[k], by = ys[k], L = Math.hypot(bx - ax, by - ay);
+      if (L < 1e-6) continue;
+      let s = 1 - acc;
+      for (; s <= L; s += 1) out.push(ax + ((bx - ax) * s) / L, ay + ((by - ay) * s) / L);
+      acc = L - (s - 1);
+    }
+    if (acc > 0.05) out.push(xs[xs.length - 1], ys[ys.length - 1]);
+    return Float32Array.from(out);
+  }
+  // отправить десант (бесплатно, как в оригинале — только войска): troops — внутренние единицы,
+  // land — береговая клетка высадки; отплывает с ближайшего своего берега
   sendBoat(p, land, troops, route = null) {
     if (!p.alive || this.over) return { ok: false, reason: 'dead' };
     if (p.boats.length >= BOAT_MAX) return { ok: false, reason: 'boats' };
@@ -758,16 +927,16 @@ export class Game {
     const r = route || this.boatRoute(p, land);
     if (!r || r.path.length < 1) return { ok: false, reason: 'noroute' };
     p.troops -= troops;
-    const b = { id: this.boatSeq++, owner: p, target, land: r.land, path: r.path, i: 0, troops, back: false, born: this.tickN };
+    const pts = this.smoothRoute(r.path);
+    const b = { id: this.boatSeq++, owner: p, target, land: r.land, pts, n: pts.length >> 1, i: 0, troops, back: false, free: false, born: this.tickN };
     p.boats.push(b); this.boats.push(b);
     if (target) target.hitBy.set(p.id, this.tickN);
     this.emit('boat', { b });
     return { ok: true, b, troops };
   }
   boatPos(b) {
-    const P = b.path, i = Math.max(0, Math.min(P.length - 1, b.i)), k = Math.floor(i), f = i - k;
-    const a = P[k], c = P[Math.min(P.length - 1, k + 1)];
-    return [(a % W) + 0.5 + ((c % W) - (a % W)) * f, ((a / W) | 0) + 0.5 + (((c / W) | 0) - ((a / W) | 0)) * f];
+    const P = b.pts, i = Math.max(0, Math.min(b.n - 1, b.i)), k = Math.floor(i), f = i - k, k2 = Math.min(b.n - 1, k + 1);
+    return [P[k * 2] + (P[k2 * 2] - P[k * 2]) * f, P[k * 2 + 1] + (P[k2 * 2 + 1] - P[k * 2 + 1]) * f];
   }
   killBoat(b) {
     if (b.dead) return;
@@ -781,16 +950,16 @@ export class Game {
     if (!p.alive) { this.killBoat(b); return; }
     if (b.back) {
       b.i -= BOAT_SPEED;
-      if (b.i <= 0) { const back = b.troops * 0.75; p.troops += back; this.killBoat(b); this.emit('boatHome', { b, back }); }
+      if (b.i <= 0) { const back = b.troops * (b.free ? 1 : 0.75); p.troops += back; this.killBoat(b); this.emit('boatHome', { b, back }); }
       return;
     }
     b.i += BOAT_SPEED;
-    if (b.i < b.path.length - 1) return;
+    if (b.i < b.n - 1) return;
     const L = b.land, id = this.owner[L], q = id ? this.P[id] : null;
     this.killBoat(b);
     if (!this.isLand(L) || id === p.id || (q && !this.canAttack(p, q))) { p.troops += b.troops; this.emit('boatHome', { b, back: b.troops }); return; }
     this.setOwner(L, p.id); // плацдарм
-    const r = this.attack(p, q, b.troops, true);
+    const r = this.attack(p, q, b.troops, true, L);
     if (!r.ok) p.troops += b.troops;
     this.emit('boatLand', { b, target: q, attack: r.attack || null });
   }
@@ -1077,6 +1246,7 @@ export class Game {
       }
       if (!best) continue;
       best.claimed = true;
+      best.dHit = Math.min(best.len, best.d + best.speed * bk); // после этой точки путь рисуется красным
       sam.cd.push(this.tickN + SAM_RELOAD);
       this.samShots.push({ n: best, by: own, sam, fx: sx, fy: sy, x: bx, y: by, at: this.tickN, hit: this.tickN + bk });
       this.emit('samFire', { n: best, by: own, sam });
@@ -1115,6 +1285,12 @@ export class Game {
         this.fall[t] = HEAT_MAX;
         this.mark(t);
       }
+    }
+    // десант, чей берег высадки стёрт взрывом, сам разворачивается домой (без потерь)
+    for (const b of this.boats) {
+      if (b.back || !b.target || !this.fall[b.land] || this.owner[b.land]) continue;
+      b.back = true; b.free = true;
+      this.emit('boatAbort', { b });
     }
     // гибель войск: за каждую стёртую клетку 5 × войска / клетки (боеголовки MIRV бьют только то, что сверх 3% лимита)
     for (const [q, k] of hits) {
@@ -1169,6 +1345,7 @@ export class Game {
     for (let i = this.boats.length - 1; i >= 0; i--) { const b = this.boats[i]; if (b && !b.dead) this.stepBoat(b); }
     for (let i = this.ships.length - 1; i >= 0; i--) { const s = this.ships[i]; if (s && !s.dead) this.stepShip(s); }
     if (this.nukes.length || this.samShots.length) { this.stepSams(); this.stepNukes(); }
+    if (this.requests.length || this.pacts.size) this.stepDiplo();
     if (t % 5 === 0) this.coolFallout();
     for (const s of this.structs) {
       if (s.doneAt === t) {
