@@ -3,7 +3,8 @@
 import * as THREE from 'three';
 import { G } from './ctx.js';
 import { PX, POSE } from './anim.js';
-import { buildRika, buildRikaArm, buildShrine } from './rig.js';
+import { buildRika, buildRikaArm } from './rig.js';
+import { castDomain, resetDomains } from './domain.js';
 import { rand, clamp, tex, ease, angleDamp } from './util.js';
 import {
   shrineM1, steelJab, sCleave, sDismantle, sOpen, sRush, sFurnace, sIncant, sKai, sSovereign, sWCS,
@@ -133,7 +134,7 @@ const gLimitless = {
         if (tgt.dead) return;
         ff.chestPos(_a); glassBurst(_a);
         if (ff.isPlayer) G.hud.shatter();
-        G.sound('tp', ff.pos, 0.8); G.sound('block', ff.pos, 0.5);
+        G.sound('glass', ff.pos, 1.0);
         const gy = G.world.groundAt(tgt.pos.x, tgt.pos.z, tgt.pos.y);
         if (airAtCast || tgt.pos.y - gy > 3) {
           // цель в воздухе: появиться над ней и вбить в землю (8, истинный рэгдолл)
@@ -200,7 +201,7 @@ const gLapseBlue = {
     const vp = new V3();
     let freed = false;
     const free = () => { if (!freed) { freed = true; vx.free(); } };
-    G.sound('charge', f.pos, 0.45);
+    G.sound('blue', f.pos, 0.8);
     f.startAction({
       name: 'lblue', dur: 1.35, windup: 0.3, keepVel: false,
       frames: [[0, GJ], [0.12, P_POINT], [0.6, P_POINT], [0.68, KICK_WIND], [0.76, KICK_UP], [0.92, KICK_UP], [1, GJ]],
@@ -261,7 +262,7 @@ function redBlast(owner, p, R, o) {
   const gy = G.world.groundAt(p.x, p.z, p.y);
   if (p.y - gy < 6) { _a.set(p.x, gy + 0.3, p.z); G.fx.debris(_a, 10, ['#2b2b2b', '#3a3a40', '#d8d8d8']); G.fx.dust(_a, 10, 3.5); G.fx.crater(_a, R * 0.8, 5); }
   G.shake(0.65, p);
-  G.sound('boom', p, 0.9);
+  G.sound('red', p, 1.0);
   G.flashNear(p, '#ff3030', 0.3, 34);
 }
 const gRed = {
@@ -469,7 +470,7 @@ function spawnBlueMax(f, tgt, air) {
     if (near > 0.3 && Math.random() < 0.4) { const an = rand(0, 6.28), rr = rand(5, 9); _a.set(center.x + Math.cos(an) * rr, gy + 0.4, center.z + Math.sin(an) * rr); G.fx.norm.spawn(_a.x, _a.y, _a.z, -Math.cos(an) * 10, 6, -Math.sin(an) * 10, Math.random() < 0.5 ? '#2b2b2b' : '#d8d8d8', 1, 0.7, 0.4, 0.5, 0, 0); }
     for (const o of f.enemiesNear(center, 15, 12)) {
       o.chestPos(_a); _b.subVectors(center, _a); const d = _b.length();
-      if (d > 0.8) { _b.multiplyScalar(1 / d); const k = (o.rag ? 34 : 80) * dt; o.vel.x += _b.x * k; o.vel.z += _b.z * k; o.vel.y += _b.y * k * 0.6; if (d < 3) { o.vel.multiplyScalar(0.85); } }
+      if (d > 0.8) { _b.multiplyScalar(1 / d); const k = (o.rag ? 34 : 80) * dt; o.vel.x += _b.x * k; o.vel.z += _b.z * k; o.vel.y += _b.y * k * 1.45; if (d < 3) { o.vel.multiplyScalar(0.85); } }
     }
     if (tick <= 0 && ticks < 20 && t > 0.2) {
       tick = 0.14; ticks++;
@@ -630,73 +631,9 @@ const gPurple = {
   },
 };
 
-// ---------- Unlimited Void ----------
-let voidMeshes = [];
-function getVoid() {
-  let v = voidMeshes.find((x) => !x.busy);
-  if (!v) {
-    const mat = new THREE.MeshBasicMaterial({ map: tex('void'), side: THREE.DoubleSide, fog: false, transparent: true, depthWrite: true });
-    const dome = new THREE.Mesh(new THREE.SphereGeometry(1, 40, 24), mat);
-    const fmat = new THREE.MeshBasicMaterial({ map: tex('void'), fog: false, transparent: true });
-    const floor = new THREE.Mesh(new THREE.CircleGeometry(1, 48), fmat);
-    floor.rotation.x = -Math.PI / 2;
-    dome.renderOrder = 3; floor.renderOrder = 2;
-    G.scene.add(dome, floor);
-    v = { dome, floor, mat, fmat, busy: false };
-    voidMeshes.push(v);
-  }
-  v.busy = true; v.dome.visible = v.floor.visible = true;
-  return v;
-}
-function unlimitedVoid(f) {
-  f.startAction({
-    name: 'void', dur: 1.3, armor: true, iframes: 1.3,
-    frames: [[0, POSE.idle.gojo], [0.25, POSE.sign2], [1, POSE.sign2]],
-    events: [[0.55, (ff) => {
-      const center = ff.pos.clone(); center.y += 1;
-      const R = 26, v = getVoid();
-      const caught = new Set();
-      G.sound('boom', ff.pos, 0.8); G.sound('tp', ff.pos, 1);
-      G.flashNear(ff.pos, '#ffffff', 0.7, 40);
-      G.shake(0.6, ff.pos);
-      const catchAll = (stun) => {
-        for (const o of ff.enemiesNear(center, R, R)) {
-          if (caught.has(o)) continue;
-          caught.add(o);
-          o.interrupt(true); o.rag = false; o.down = 0;
-          o.stun = Math.max(o.stun, stun); o.broken = Math.max(o.broken, stun); o.blocking = false;
-          G.hit(ff, o, { dmg: 6, pierce: true, unblockable: true, noCounter: true, hitstop: 0.05, fx: 'energy', color: '#bfe6ff', shake: 0.3, sfx: 'hit' });
-          o.stun = Math.max(o.stun, stun);
-          o.chestPos(_a); G.hud.pop(_a, '∞', '#bfe6ff', 1.6);
-        }
-      };
-      let t = 0;
-      const L = 5.5;
-      G.addTask((dt) => {
-        t += dt;
-        const grow = ease.out3(Math.min(1, t / 0.5));
-        const fade = t > L - 0.6 ? Math.max(0, (L - t) / 0.6) : 1;
-        v.dome.position.copy(center); v.dome.scale.setScalar(R * grow);
-        v.floor.position.set(center.x, 0.25, center.z); v.floor.scale.setScalar(R * grow);
-        v.mat.opacity = fade; v.fmat.opacity = fade * 0.95;
-        v.dome.rotation.y += dt * 0.08;
-        if (t > 0.3 && t < 0.4) catchAll(4.2);
-        else if (t > 0.4 && t < L - 1) catchAll(2.2);
-        if (Math.random() < 0.8) {
-          _a.set(center.x + rand(-R, R) * 0.7, center.y + rand(0, R * 0.6), center.z + rand(-R, R) * 0.7);
-          G.fx.add.spawn(_a.x, _a.y, _a.z, 0, rand(-1, 1), 0, Math.random() < 0.5 ? '#ffffff' : '#9fd8ff', 1, 0.6, 0.1, 1.2);
-        }
-        G.voidZone = t < L ? { center, r: R * grow } : null;
-        if (t >= L) { v.busy = false; v.dome.visible = v.floor.visible = false; G.voidZone = null; return false; }
-        return true;
-      });
-    }]],
-  });
-  G.callout(f, 'Domain Expansion: Unlimited Void', '#9fd8ff');
-}
-
+// ---------- Unlimited (Infinite) Void — см. domain.js ----------
 // 4: Infinite Void — домен (слот 4 пробуждения, перезарядка 120 с)
-const gVoid = { id: 'void', label: 'Infinite Void', tip: 'DOMAIN', cd: 120, windup: 0.55, color: '#bfe6ff', ai: { kind: 'domain', min: 0, max: 22 }, cast: unlimitedVoid };
+const gVoid = { id: 'void', label: 'Infinite Void', tip: 'DOMAIN', cd: 120, windup: 0.3, color: '#bfe6ff', ai: { kind: 'domain', min: 0, max: 30 }, cast: (f) => castDomain(f, 'void') };
 
 // ======================= SUKUNA =======================
 // Cleave / Dismantle / Open / Rush / FURNACE / Incantation — в kits.js (общие для Strongest of History и King of Curses)
@@ -763,7 +700,7 @@ export const sStrongDismantle = {
       dir.y = clamp(dir.y, -0.2, 0.2); dir.normalize();
       const it = G.fx.pool('cres'); it.mat.color.set('#ffffff');
       const q = waveQuat(dir, roll);
-      G.sound('slash', ff.pos, 0.9);
+      G.sound('shing', ff.pos, 0.9);
       projectile({
         owner: ff, pos: origin.addScaledVector(dir, 1.5), dir, speed: 95, range: 60, radius: 2.2, pierce: true,
         onHit: (o, p) => G.hit(ff, o, { dmg: 10, unblockable: true, bullet: true, bypassRag: true, stun: 0.8, push: 10, hitstop: 0.07, fx: 'slash', color: '#ffffff', shake: 0.35, sfx: 'slash', from: p }),
@@ -816,73 +753,7 @@ export const sKamutoke = {
   },
 };
 
-// ---------- Malevolent Shrine ----------
-const shrines = [];
-function getShrine() {
-  let s = shrines.find((x) => !x.busy);
-  if (!s) {
-    const m = buildShrine();
-    const disc = new THREE.Mesh(new THREE.CircleGeometry(1, 48), new THREE.MeshBasicMaterial({ map: tex('shrine'), transparent: true, depthWrite: false, fog: false }));
-    disc.rotation.x = -Math.PI / 2; disc.renderOrder = 2;
-    G.scene.add(m.root, disc);
-    s = { m, disc, busy: false };
-    shrines.push(s);
-  }
-  s.busy = true; s.m.root.visible = s.disc.visible = true;
-  return s;
-}
-function malevolentShrine(f) {
-  f.startAction({
-    name: 'shrine', dur: 1.5, armor: true, iframes: 1.5,
-    frames: [[0, POSE.idle.sukuna], [0.25, POSE.sign], [1, POSE.sign]],
-    events: [[0.6, (ff) => {
-      const s = getShrine();
-      const center = ff.pos.clone();
-      ff.fwd(_b);
-      const base = center.clone().addScaledVector(_b, -9);
-      s.m.root.position.copy(base); s.m.root.rotation.y = ff.yaw;
-      const R = 30, L = 11;
-      G.sound('boom', ff.pos, 0.9);
-      G.flashNear(ff.pos, '#ff1030', 0.5, 50);
-      G.shake(0.7, ff.pos);
-      let t = 0, tick = 0;
-      G.addTask((dt) => {
-        t += dt; tick -= dt;
-        const rise = ease.out3(Math.min(1, t / 0.7));
-        const sink = t > L - 0.8 ? Math.max(0, (L - t) / 0.8) : 1;
-        s.m.root.position.y = base.y - 20 * (1 - rise) - 20 * (1 - sink);
-        const r = R * ease.out(Math.min(1, t / 0.6));
-        s.disc.position.set(center.x, 0.2, center.z); s.disc.scale.setScalar(r); s.disc.material.opacity = sink * 0.85;
-        if (t < 0.7 && Math.random() < 0.8) { _a.set(base.x + rand(-8, 8), 0.5, base.z + rand(-8, 8)); G.fx.debris(_a, 1, ['#2b2524', '#6a1818']); }
-        // визуальные разрезы по зоне
-        for (let i = 0; i < 2; i++) {
-          const ang = rand(0, Math.PI * 2), rr = Math.sqrt(Math.random()) * r;
-          _a.set(center.x + Math.cos(ang) * rr, rand(0.5, 7), center.z + Math.sin(ang) * rr);
-          _b.set(rand(-1, 1), rand(-0.6, 0.6), rand(-1, 1)).normalize();
-          _c.copy(_a).addScaledVector(_b, rand(3, 7));
-          G.fx.line(_a, _c, Math.random() < 0.3 ? '#ff5060' : '#ffffff', 0.12, 0.1);
-        }
-        if (tick <= 0 && t > 0.5 && !ff.dead) {
-          tick = 0.22;
-          let any = false;
-          for (const o of ff.enemiesNear(center, r, 12)) {
-            any = true;
-            G.hit(ff, o, { dmg: 1.2, pierce: true, unblockable: true, noCounter: true, hitstop: 0.0, fx: 'slash', color: '#ff2040', shake: 0.06, sfx: 'slash', vol: 0.25 });
-          }
-          if (any) G.sound('slash', center, 0.3);
-        }
-        G.shrineZone = { center, r, owner: ff };
-        if (t >= L || (ff.dead && t < L - 0.8)) {
-          if (ff.dead && t < L - 0.8) { t = L - 0.8; return true; }
-          s.busy = false; s.m.root.visible = s.disc.visible = false; G.shrineZone = null;
-          return false;
-        }
-        return true;
-      });
-    }]],
-  });
-  G.callout(f, 'Domain Expansion: Malevolent Shrine', '#ff3050');
-}
+// ---------- Malevolent Shrine — см. domain.js ----------
 
 // ======================= YUJI (Vessel) =======================
 const FS = POSE.idle.fist;
@@ -1117,7 +988,7 @@ const yCrushing = {
           free();
           const v = a.v;
           if (!v || v.dead || v.iframes > 0) return;
-          v.launch(Math.sin(ff.yaw) * 6, 46, Math.cos(ff.yaw) * 6, 1.2);
+          v.launch(Math.sin(ff.yaw) * 6, 71, Math.cos(ff.yaw) * 6, 1.2);
           v.chestPos(_a); G.fx.ring(_a, '#4fe0ff', 1, 7, 0.3, { a0: 0.9 }); G.fx.particles(_a, { n: 12, color: ['#4fe0ff', '#ffffff'], speed: 14, up: 10, size: 0.9, life: 0.4 });
           G.sound('heavy', v.pos, 0.6);
         }],
@@ -1223,7 +1094,7 @@ function blackFlash(f, v, a) {
     G.hud.pop(_a.set(c.x, c.y + 3.5, c.z), 'KOKUSEN!', '#ffe14a', 2.1);
     G.callout(f, 'KOKUSEN!', '#ffe14a');
   } else G.hud.pop(_a.set(c.x, c.y + 3, c.z), back ? `BLACK FLASH ×${n}` : 'BLACK FLASH!', '#ff2040', 1.7);
-  G.sound('heavy', v.pos, 1); G.sound('block', v.pos, 0.8);
+  G.sound('bflash', v.pos, 1.1);
   if (f.isPlayer || v.isPlayer || f.dist(G.player) < 40) G.hud.blackFlash();
 }
 
@@ -1296,13 +1167,11 @@ export function getRika() {
 
 // Сброс доменов/Рики между матчами
 export function resetSkills() {
-  for (const list of [voidMeshes, shrines, rikas, rikaArms]) for (const o of list) {
+  for (const list of [rikas, rikaArms]) for (const o of list) {
     o.busy = false;
-    if (o.dome) o.dome.visible = o.floor.visible = false;
-    if (o.m) o.m.root.visible = o.disc.visible = false;
     if (o.root) o.root.visible = false;
   }
-  G.shrineZone = G.voidZone = null;
+  resetDomains();
 }
 
 // ======================= Пробуждения =======================
@@ -1394,7 +1263,7 @@ const AW_YUTA = {
 };
 
 // Домен Сукуны как навык (слот 4 пробуждения)
-const sShrine = { id: 'shrine', label: 'Malevolent Shrine', tip: 'DOMAIN', cd: 120, windup: 0.6, color: '#ff3050', ai: { kind: 'domain', min: 0, max: 24 }, cast: malevolentShrine };
+const sShrine = { id: 'shrine', label: 'Malevolent Shrine', tip: 'DOMAIN', cd: 120, windup: 0.3, color: '#ff3050', ai: { kind: 'domain', min: 0, max: 30 }, cast: (f) => castDomain(f, 'shrine') };
 const aw = (sk, o) => ({ ...sk, ...o });
 
 // Heian, слот 1: Strong Dismantle; после 1/2/3 заклинаний — Dismantle Barrage / Disgraced Sovereign / World Cutting Slash

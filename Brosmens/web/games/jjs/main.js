@@ -3,8 +3,10 @@ import * as THREE from 'three';
 import { initGameUI, pixelRatio, graphicsLevel, shakeEnabled } from '../../shared/ui.js';
 import { createControls } from '../../shared/touch.js';
 import { createChat } from '../../shared/chat.js';
-import { makeBots, FRIENDS } from '../../shared/bots.js';
+import { makeBots, FRIENDS, botSay, typingDelay } from '../../shared/bots.js';
 import { sfx } from '../../shared/sfx.js';
+import { audio } from './audio.js';
+import { inDomainOf } from './domain.js';
 import { getProfile, addStat, addCoins } from '../../shared/profile.js';
 import { G } from './ctx.js';
 import { buildWorld } from './world.js';
@@ -41,11 +43,12 @@ renderer.shadowMap.type = THREE.PCFShadowMap;
 document.body.prepend(renderer.domElement);
 
 const scene = new THREE.Scene();
-scene.fog = new THREE.Fog(0xcfe6fb, 120, 360);
+scene.fog = new THREE.Fog(0xc6b9a3, 95, 330);
 const camera = new THREE.PerspectiveCamera(70, innerWidth / innerHeight, 0.3, 1400);
-const hemi = new THREE.HemisphereLight(0xe6f2ff, 0x5a7a48, 1.7);
+// тёплый туманный свет как в JJS: небо бежевое, «земля» серая, солнце чуть тёплое
+const hemi = new THREE.HemisphereLight(0xf3ead9, 0x77746e, 1.75);
 scene.add(hemi);
-const sunL = new THREE.DirectionalLight(0xfff3dd, 2.4);
+const sunL = new THREE.DirectionalLight(0xffeccc, 2.2);
 sunL.shadow.mapSize.set(1024, 1024);
 const sc = sunL.shadow.camera; sc.left = -42; sc.right = 42; sc.top = 42; sc.bottom = -42; sc.near = 10; sc.far = 260;
 sunL.shadow.bias = -0.0006; sunL.shadow.normalBias = 0.04;
@@ -58,12 +61,15 @@ G.hud = createHUD();
 G.gibs = [];
 G.hit = hit;
 
+let fogFar0 = 330;
+let domIn = null, domK = 0, domKind = 'void';
+function applyFogFar() { fogFar0 = 250 + graphicsLevel() * 20; if (!domK) scene.fog.far = fogFar0; }
 function applyGfx() {
   gfx = graphicsLevel();
   renderer.setPixelRatio(pixelRatio());
   renderer.setSize(innerWidth, innerHeight);
   sunL.castShadow = gfx >= 4;
-  scene.fog.far = 230 + gfx * 22;
+  applyFogFar();
   G.fx.k = gfx <= 3 ? 0.5 : gfx <= 7 ? 0.8 : 1;
 }
 applyGfx();
@@ -209,13 +215,90 @@ const pinchUp = (e) => { pinch.delete(e.pointerId); };
 addEventListener('pointerup', pinchUp);
 addEventListener('pointercancel', pinchUp);
 addEventListener('wheel', (e) => { if (state === 'play' && !ui.menuOpen()) camDist = clamp(camDist * (e.deltaY > 0 ? 1.1 : 0.9), 6, 25); }, { passive: true });
-let chatNext = 0, idleChat = rand(14, 24);
+// ---------- чат ботов: JJS-реплики + пузыри над головами ----------
+// Общий бюджет ≈ 1 сообщение в 4–8 с на весь сервер; «важные» события могут чуть опередить очередь.
+let chatNext = 0, idleChat = rand(8, 14);
+function canTalk(prio) {
+  const now = performance.now() / 1000;
+  if (now < chatNext && !(prio && now > chatNext - 3)) return false;
+  chatNext = now + rand(4, 7.5);
+  return true;
+}
+// реплика с «набором текста»: в чат и пузырём над головой (пузырь создаёт наблюдатель лога чата)
+function speak(f, text, delay) {
+  if (!text) return;
+  setTimeout(() => { if (state === 'select' || !G.fighters.includes(f)) return; chat.say(f.name, text); }, delay ?? typingDelay(text));
+}
+const JL = {
+  comboed: { nice: ['хватит м1 спамить', 'дай хоть встать', 'ну хватит комбить(', 'ай ай ай', 'блин опять комба'], toxic: ['хватит м1 спамить', 'блок абуз', 'дай хоть встать', 'м1 спамер', 'скилл ишью', 'только м1 и умеешь?'] },
+  teamed: { nice: ['тимеры!!', '2 на 1 серьёзно', 'эй вы чего вдвоём', 'меня тимят помогите'], toxic: ['тимеры!!', '2 на 1 серьёзно', 'без тимы слабо?', 'тимеры как всегда', 'ну и тимеры'] },
+  domainCaught: { nice: ['ДОМЕН ДИФ', 'ну всё мне конец', 'неееет домен', 'ой домен', 'всё я в домене'], toxic: ['ДОМЕН ДИФ', 'ну всё мне конец', 'домен абуз', 'опять домен', 'без домена слабо?'] },
+  domainCast: { nice: ['РАСШИРЕНИЕ ТЕРРИТОРИИ', 'domain expansion!', 'добро пожаловать в мой домен'], toxic: ['РАСШИРЕНИЕ ТЕРРИТОРИИ', 'ДОМЕН ДИФ ахах', 'всё вы в моём домене', 'бегите нубы'] },
+  lowhp: { nice: ['хп 10 помогите', 'я на лоу хп', 'отбегаю хилюсь', 'хил плз', 'дайте отрегениться'], toxic: ['хп 10 помогите', 'не трогайте я на лоу', 'отстаньте я хилюсь', 'вы где вообще'] },
+  revenge: { nice: ['{t} я иду за тобой', '{t} реванш!', 'ну всё {t} держись'], toxic: ['{t} я иду за тобой', '{t} ты труп', 'щас отомщу {t}', '{t} готовься'] },
+  taunt: { nice: ['гг', 'хороший бой', 'ахах', 'гг вп'], toxic: ['ez', 'сиди', 'изи', 'L', 'гг изи'] },
+  bf: { nice: ['ЧЁРНАЯ ВСПЫШКА!!', 'кокусен!!', 'ВСПЫШКА ахах'], toxic: ['ЧЁРНАЯ ВСПЫШКА изи', 'КОКУСЕН', 'вспышка в лицо'] },
+  awaken: { nice: ['ПРОБУЖДЕНИЕ!!', 'ну всё пробуждение', 'держитесь ахах', 'вот теперь серьёзно', 'ульта готова)', 'смотрите что умею'], toxic: ['ну всё вам конец', 'изи пробуждение', 'щас всех разнесу', 'бегите нубы', 'ДОМЕН НА ВСЕХ', 'вы уже проиграли'] },
+  idle: { nice: ['кто 1 на 1 у кафе?', 'го на крышу', 'у кого домен есть?', 'какой перс лучше?', 'годжо имба', 'сукуна топ', 'кто в тиму', 'кто знает как кокусен делать', 'я сегодня 3 часа тут'], toxic: ['кто 1 на 1?', 'тут одни нубы', 'годжо мейнеры...', 'м1 спамеры везде', 'я топ 1 сервера', 'скучно некого бить'] },
+};
+const CLAUDE = { playerKill: ['красава!', 'красиво!', 'вот это комбо', 'топ, гг', 'ахах красавчик'], playerDeath: ['держись, иду', 'ничего, отомстим', 'я рядом, отомщу', 'не сдавайся!'], playerLow: ['держись, иду', 'отходи, я прикрою', 'хилься, я тут'] };
+function typo(s) { if (s.length < 6 || Math.random() > 0.2) return s; const i = 1 + Math.floor(Math.random() * (s.length - 3)); return s.slice(0, i) + s[i + 1] + s[i] + s.slice(i + 2); }
+function lineFor(bot, pool, t) {
+  const L = JL[pool];
+  let s = pick(Math.random() < (bot.toxic ?? 0.4) ? L.toxic : L.nice).replace('{t}', t || 'бро');
+  if (bot.typo) s = typo(s);
+  if (Math.random() < 0.1) s = s.toUpperCase();
+  return s;
+}
+// JJS-реплика бота из пула: учитывает болтливость (chatty), токсичность (toxic) и общий бюджет
+G.botLine = (f, pool, { target = '', prio = false, chance = 1, delay } = {}) => {
+  if (!f || !f.bot || state !== 'play') return false;
+  if (Math.random() > chance * (0.5 + 0.5 * (f.bot.chatty ?? 0.6))) return false;
+  if (!canTalk(prio)) return false;
+  const text = f.isClaude && CLAUDE[pool] ? pick(CLAUDE[pool]) : lineFor(f.bot, pool, target);
+  speak(f, text, delay);
+  return true;
+};
+// Событийная реплика из общих заготовок/ИИ (start/kill/death/hit/help/thanks/win/lose/idle)
 G.botEvent = (f, event, opts = {}, prio = false) => {
   if (!f || !f.bot) return;
-  const now = performance.now() / 1000;
-  if (now < chatNext && !(prio && now > chatNext - 3)) return;
-  chatNext = now + rand(4.5, 8);
-  chat.botSay(f.bot, event, opts);
+  if (!canTalk(prio)) return;
+  botSay(f.bot, event, { ...opts, chatLog: chat.log }).then((text) => speak(f, text)).catch(() => {});
+};
+// пузыри: любая новая строка лога чата от бойца (боты, ответы ботов игроку, сам игрок)
+const seenLog = new WeakSet();
+function watchChat() {
+  const log = chat.log;
+  for (let i = log.length - 1; i >= 0; i--) {
+    const m = log[i];
+    if (seenLog.has(m)) break;
+    seenLog.add(m);
+    if (state === 'select') continue;
+    const f = G.fighters.find((o) => o.name === m.name);
+    if (f && !f.dead) G.hud.bubble(f, m.text);
+  }
+}
+// удары: наказание за заблокированный M1 и поводы для реплик (комбят, тимят, больно)
+G.onHit = (att, vic, res, o, dmg) => {
+  if (res === 'blocked') { if (o.m1 && vic.brain) vic.brain.onBlocked(att); return; }
+  if (!vic.bot || !att) return;
+  const now = G.time;
+  vic._cmb = vic._cmbBy === att && now - vic._cmbT < 1.3 ? vic._cmb + 1 : 1;
+  vic._cmbBy = att; vic._cmbT = now;
+  if (vic._cmb === 5 && !vic.dead) G.botLine(vic, 'comboed', { target: att.name, chance: 0.6 });
+  const atk = (vic._atk ||= new Map());
+  atk.set(att, now);
+  let n = 0; for (const [a, t] of atk) { if (now - t > 2) atk.delete(a); else n++; }
+  if (n >= 2 && now - (vic._teamSaid ?? -99) > 12 && !vic.dead) { vic._teamSaid = now; G.botLine(vic, 'teamed', { chance: 0.55 }); }
+  else if (dmg >= 9 && !vic.dead && Math.random() < 0.2) G.botEvent(vic, 'hit', { target: att.name, eventText: `тебя сильно ударил ${att.name}` });
+  if (o.numColor === '#ff3050' && att.bot && Math.random() < 0.35) G.botLine(att, 'bf', {});
+};
+let claudeLowT = 0;
+// домен: кастер кричит, пойманные паникуют
+G.onDomain = (D) => {
+  if (D.owner.bot && Math.random() < 0.6) { G.botLine(D.owner, 'domainCast', { prio: true, delay: 300 }); return; }
+  const v = [...D.caught].filter((o) => o !== D.owner && o.bot && !o.isClaude);
+  if (v.length) G.botLine(pick(v), 'domainCaught', { prio: true, chance: 0.9, delay: rand(900, 1800) });
 };
 
 // ---------- общие хуки ----------
@@ -240,46 +323,40 @@ G.sound = (name, pos, vol = 1) => {
   if (now - sndWindow > 100) { sndWindow = now; sndCount = 0; }
   if (++sndCount > 9) return;
   sndLast[name] = now;
-  sfx.play(name, { vol: v });
+  // свои синтезированные звуки JJS (audio.js), остальное — общий sfx
+  if (!audio.play(name, v)) sfx.play(name, { vol: v });
 };
 G.flashNear = (pos, color, alpha, range) => {
   const p = G.player; if (!p) return;
   const d = Math.hypot(pos.x - p.pos.x, pos.z - p.pos.z);
   if (d < range) G.hud.flash(color, alpha * (1 - d / range * 0.7), 2.5);
 };
-G.callout = (f, text, color, selfOnly = false) => {
+G.callout = (f, text, color, selfOnly = false, dur = 2) => {
   const p = G.player; if (!p) return;
-  if (f === p || (!selfOnly && f.dist(p) < 55)) G.hud.callout(text, f === p ? '' : f.name, color);
+  if (f === p || (!selfOnly && f.dist(p) < 55)) G.hud.callout(text, f === p ? '' : f.name, color, dur);
 };
 G.onAwaken = (f) => {
   const aw = f.ch.awaken;
   f.chestPos(_t);
   G.fx.ring(_t, aw.color, 1, 12, 0.5, { a0: 1 });
-  G.sound('charge', f.pos, 0.8);
+  G.sound('awaken', f.pos, 0.9);
   // манга-реплики рядом с персонажем
   aw.lines.forEach(([at, text], i) => {
     let t = 0;
     G.addTask((dt) => { t += dt; if (f.dead || G.matchOver) return false; if (t < at) return true; G.hud.manga(f, text, i); return false; });
   });
   if (f.isPlayer) { G.cine = { f, t: 0, dur: aw.cine || 3.2 }; G.hud.flash('#000000', 0.25, 2); }
-  else if (f.bot && Math.random() < 0.5) awakenLine(f);
+  else if (f.bot && Math.random() < 0.6) G.botLine(f, 'awaken', { prio: true, delay: 400 + rand(0, 500) });
 };
-const AW_NICE = ['ПРОБУЖДЕНИЕ!!', 'ну всё, пробуждение', 'держитесь ахах', 'вот теперь серьёзно', 'ульта готова)', 'смотрите что умею'];
-const AW_TOXIC = ['ну всё вам конец', 'изи, пробуждение', 'щас всех разнесу', 'бегите нубы', 'ДОМЕН НА ВСЕХ', 'вы уже проиграли'];
-function awakenLine(f) {
-  const now = performance.now() / 1000;
-  if (now < chatNext - 2) return;
-  chatNext = now + rand(4.5, 8);
-  if (Math.random() > (f.bot.chatty ?? 0.6)) return;
-  const line = pick(Math.random() < (f.bot.toxic ?? 0.4) ? AW_TOXIC : AW_NICE);
-  setTimeout(() => chat.say(f.name, line), 500 + line.length * 70);
-}
 G.kill = (vic, att) => {
   if (vic.dead) return;
   vic.hp = 0;
   let killer = att && att !== vic ? att : null;
   if (!killer && vic.lastHitBy && G.time - vic.lastHitT < 6 && !vic.lastHitBy.dead) killer = vic.lastHitBy;
+  // кто помогал «спасённому»: бот, которого бил погибший, благодарит убийцу
+  const saved = G.fighters.find((o) => o.bot && o !== killer && o !== vic && !o.dead && o.lastHitBy === vic && G.time - o.lastHitT < 3);
   vic.die(killer);
+  vic.lastKiller = killer;
   if (killer) {
     killer.kills++;
     killer.evasive = 100;
@@ -292,14 +369,16 @@ G.kill = (vic, att) => {
     addCoins(5); coins += 5; matchCoins += 5;
     topbar.setCoins(coins); topbar.coinPop('+$5');
   }
-  // боты иногда «флексят» эмоцией над поверженным (отменяется любым ударом)
+  // боты в 25 % случаев «флексят» эмоцией над поверженным или пишут дразнилку через 1–3 с (эмоцию отменяет любой удар)
   if (killer && killer.bot && Math.random() < 0.25) {
-    let et = rand(1, 2.5);
-    const k = killer;
+    let et = rand(1, 3);
+    const k = killer, emote = Math.random() < 0.65;
     G.addTask((dt) => {
       et -= dt;
       if (et > 0) return !G.matchOver && !k.dead;
-      if (!k.dead && !G.matchOver && k.canAct()) k.emote({ ...pick(EMOTES), dur: rand(2, 3.5) });
+      if (k.dead || G.matchOver) return false;
+      if (emote && k.canAct()) k.emote({ ...pick(EMOTES), dur: rand(2, 3.5) });
+      else G.botLine(k, 'taunt', { target: vic.name, delay: 200 });
       return false;
     });
   }
@@ -307,9 +386,13 @@ G.kill = (vic, att) => {
     G.hud.showDeath(killer ? killer.name : '', nextChar, profile.skin.skin, (id) => { nextChar = id; saveChar(id); topbar.setChar(id); });
     G.sound('lose', vic.pos, 0.4);
   }
-  // чат
-  if (killer && killer.bot && Math.random() < 0.55) G.botEvent(killer, 'kill', { target: vic.name, eventText: `ты победил игрока ${vic.name} в файтинге` }, true);
+  // чат: Клод реагирует на убийства и смерти игрока, остальные — на свои
+  const claude = G.fighters.find((o) => o.isClaude && !o.dead);
+  if (killer && killer.isPlayer && claude && Math.random() < 0.5) G.botLine(claude, 'playerKill', { prio: true, chance: 1.2 });
+  else if (vic.isPlayer && claude && Math.random() < 0.65) G.botLine(claude, 'playerDeath', { prio: true, chance: 1.2 });
+  else if (killer && killer.bot && Math.random() < 0.55) G.botEvent(killer, 'kill', { target: vic.name, eventText: `ты победил игрока ${vic.name} в файтинге` }, true);
   else if (vic.bot && Math.random() < 0.5) G.botEvent(vic, 'death', { target: killer ? killer.name : '', eventText: killer ? `тебя только что победил ${killer.name}` : 'ты упал и проиграл' }, true);
+  else if (saved && killer && Math.random() < 0.5) G.botEvent(saved, 'thanks', { target: killer.name, eventText: `${killer.name} победил того, кто тебя бил` });
   if (state === 'play' && killer && killer.kills >= KILL_LIMIT) endMatch();
 };
 const _t = new THREE.Vector3(), _u = new THREE.Vector3(), _w = new THREE.Vector3();
@@ -334,6 +417,7 @@ function clearMatch() {
   G.fx.clear();
   G.debugCam = null;
   G.cine = null;
+  audio.music(null); domIn = null;
 }
 
 function bestSpawn(f) {
@@ -383,6 +467,11 @@ function startMatch(charId) {
 function respawn(f) {
   const [x, z] = bestSpawn(f);
   f.spawn(x, z);
+  if (f.brain) {
+    f.brain.onRespawn(f.lastKiller);
+    // месть после возрождения
+    if (f.brain.revenge) G.botLine(f, 'revenge', { target: f.brain.revenge.name, chance: 0.7, delay: rand(600, 1600) });
+  }
 }
 
 function resetPlayer() {
@@ -396,6 +485,7 @@ function endMatch() {
   if (state !== 'play') return;
   state = 'end';
   G.matchOver = true;
+  audio.music(null); domIn = null;
   topbar.closeAll();
   const rows = G.fighters.slice().sort((a, b) => b.kills - a.kills || a.deaths - b.deaths);
   const p = G.player;
@@ -486,7 +576,7 @@ function updateCamera(dt) {
   if (G.debugCam) { camera.position.copy(G.debugCam.pos); camera.lookAt(G.debugCam.look); return; }
   if (state === 'select' || !p) {
     const t = performance.now() / 1000;
-    camPos.set(Math.cos(t * 0.08) * 55, 26, Math.sin(t * 0.08) * 55);
+    camPos.set(Math.cos(t * 0.08) * 24, 26, Math.sin(t * 0.08) * 24);
     camera.position.copy(camPos);
     camera.lookAt(0, 4, 0);
     return;
@@ -581,7 +671,6 @@ function updateButtons() {
 
 // ---------- кадр ----------
 let last = performance.now();
-let fountainT = 0;
 function frame(now) {
   requestAnimationFrame(frame);
   let dt = (now - last) / 1000; last = now;
@@ -620,15 +709,25 @@ function simulate(dt) {
     // болтовня
     idleChat -= dt;
     if (idleChat <= 0) {
-      idleChat = rand(16, 30);
+      idleChat = rand(7, 13);
       const b = pick(G.fighters.filter((f) => f.bot && !f.dead));
-      if (b) G.botEvent(b, 'idle', { eventText: 'идёт матч в аренном файтинге, просто болтаешь в чате' });
+      if (b) { if (Math.random() < 0.5) G.botLine(b, 'idle', { chance: 1.3 }); else G.botEvent(b, 'idle', { eventText: 'идёт матч в аренном файтинге Jujutsu, просто болтаешь в чате' }); }
     }
-    // зоны доменов
     const p = G.player;
-    if (p && !p.dead && G.shrineZone && Math.hypot(p.pos.x - G.shrineZone.center.x, p.pos.z - G.shrineZone.center.z) < G.shrineZone.r) G.hud.tint('radial-gradient(ellipse at center, rgba(120,0,0,.08), rgba(150,0,10,.4))');
-    else if (p && !p.dead && G.voidZone && p.pos.distanceTo(G.voidZone.center) < G.voidZone.r) G.hud.tint('radial-gradient(ellipse at center, rgba(0,0,0,0), rgba(20,30,90,.35))');
+    // Клод подбадривает, когда у игрока мало HP
+    if (p && !p.dead && p.hp < p.maxHp * 0.3 && G.time > claudeLowT) {
+      claudeLowT = G.time + 20;
+      const c = G.fighters.find((o) => o.isClaude && !o.dead && o.dist(p) < 45);
+      if (c) G.botLine(c, 'playerLow', { prio: true, chance: 1.2 });
+    }
+    // внутри домена: оттенок экрана, оверлей и музыка
+    const pd = p && !p.dead ? inDomainOf(p) : null;
+    domIn = pd && pd.t > 1.25 && !pd.closing ? pd.kind : null;
+    if (domIn === 'shrine') G.hud.tint('radial-gradient(ellipse at center, rgba(90,0,0,.06), rgba(140,0,8,.4))');
+    else if (domIn === 'void') G.hud.tint('radial-gradient(ellipse at center, rgba(0,0,0,0), rgba(10,16,70,.42))');
     else G.hud.tint(null);
+    G.hud.setDomainFx(pd ? pd.kind : null, pd ? pd.t : 0);
+    audio.music(domIn);
     updateButtons();
   }
   // куски тел
@@ -641,12 +740,6 @@ function simulate(dt) {
     gb.m.rotation.x += gb.w.x * dt; gb.m.rotation.y += gb.w.y * dt; gb.m.rotation.z += gb.w.z * dt;
     if (gb.t < 0.5) gb.m.scale.setScalar(Math.max(0.01, gb.t / 0.5));
     if (gb.t <= 0) { G.scene.remove(gb.m); G.gibs.splice(i, 1); }
-  }
-  // фонтан
-  fountainT += dt;
-  if (fountainT > 0.05) {
-    fountainT = 0;
-    for (let i = 0; i < 2; i++) { const a = rand(0, 6.28); G.fx.norm.spawn(Math.cos(a) * 0.3, 5.4, Math.sin(a) * 0.3, Math.cos(a) * rand(2, 4), rand(9, 13), Math.sin(a) * rand(2, 4), '#cfeaff', 0.7, 0.55, 0.3, 1.3, 26, 0.3); }
   }
   G.world.update(dt);
   G.fx.update(dt, camera);
@@ -662,14 +755,29 @@ function fadeNearCamera() {
     setModelFade(f.model, d < 4 ? clamp((d - 0.6) / 3.4, 0, 1) : 1);
   }
 }
+// атмосфера внутри домена: туман и свет плавно уходят в тёмно-синий (Пустота) или тёмно-красный (Гробница)
+const FOG0 = new THREE.Color(0xc6b9a3), HEMI0 = new THREE.Color(0xf3ead9);
+const DFOG = { void: new THREE.Color(0x070818), shrine: new THREE.Color(0x240405) }, DHEMI = { void: new THREE.Color(0x9aa8ff), shrine: new THREE.Color(0xffb4a8) };
+function domainAtmos(dt) {
+  if (domIn) domKind = domIn;
+  domK += ((domIn ? 1 : 0) - domK) * (1 - Math.exp(-4 * dt));
+  if (domK < 0.002 && !domIn) { if (domK !== 0) { domK = 0; scene.fog.color.copy(FOG0); hemi.color.copy(HEMI0); scene.fog.near = 95; applyFogFar(); } return; }
+  scene.fog.color.copy(FOG0).lerp(DFOG[domKind], domK);
+  hemi.color.copy(HEMI0).lerp(DHEMI[domKind], domK);
+  scene.fog.near = 95 + (22 - 95) * domK;
+  scene.fog.far = fogFar0 + (85 - fogFar0) * domK;
+}
 function render(dt) {
   updateCamera(dt);
   if (state !== 'select') fadeNearCamera();
+  watchChat();
+  domainAtmos(dt);
   G.hud.update(dt, camera, state === 'select' ? [] : G.fighters, state === 'select' ? null : G.player);
   // солнце/тень следуют за игроком
   const c = G.player && state !== 'select' ? G.player.pos : camLook;
-  sunL.target.position.set(c.x, 0, c.z);
-  sunL.position.set(c.x + G.world.sunDir.x * 120, G.world.sunDir.y * 120, c.z + G.world.sunDir.z * 120);
+  const cy = c.y > 100 ? c.y : 0; // в интерьере домена (высоко над городом) свет и тень едут вместе с игроком
+  sunL.target.position.set(c.x, cy, c.z);
+  sunL.position.set(c.x + G.world.sunDir.x * 120, cy + G.world.sunDir.y * 120, c.z + G.world.sunDir.z * 120);
   renderer.render(scene, camera);
   G.hud.afterRender(renderer.domElement);
 }

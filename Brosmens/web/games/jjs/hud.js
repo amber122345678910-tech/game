@@ -4,9 +4,13 @@ import { CHARS, CHAR_IDS } from './skills.js';
 import { drawPortrait, LOOKS } from './rig.js';
 import { AW_DUR } from './fighter.js';
 
+// Рукописный шрифт HUD (как Patrick Hand в JJS): Pangolin, OFL 1.1 (см. OFL-Pangolin.txt), латиница + кириллица, лежит рядом.
+const HAND = '"JJSHand","Comic Sans MS","Chalkboard SE",system-ui,sans-serif';
+
 const CSS = `
 .jh{position:fixed;z-index:30;pointer-events:none;font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;color:#fff}
-:root{--hand:"Patrick Hand","Comic Sans MS","Chalkboard SE","Comic Neue",casual,"Coming Soon",system-ui,sans-serif}
+@font-face{font-family:"JJSHand";src:url("./pangolin.woff2") format("woff2");font-display:swap}
+:root{--hand:${HAND}}
 #jh-over{position:fixed;left:0;top:0;width:100vw;height:100vh;z-index:29;pointer-events:none}
 .jh-bot{left:50%;bottom:6px;transform:translateX(-50%);width:300px;display:flex;flex-direction:column;align-items:center}
 .jh-awl{font:16px/1.05 var(--hand);color:#fff;letter-spacing:.3px;white-space:nowrap;margin-bottom:3px;text-shadow:1.5px 0 0 #1b1b1b,-1.5px 0 0 #1b1b1b,0 1.5px 0 #1b1b1b,0 -1.5px 0 #1b1b1b,1px 1px 0 #1b1b1b,-1px 1px 0 #1b1b1b,1px -1px 0 #1b1b1b,-1px -1px 0 #1b1b1b}
@@ -15,7 +19,7 @@ const CSS = `
 .jh-aw::after{content:'';position:absolute;left:0;right:0;top:0;height:2px;background:rgba(255,255,255,.78);pointer-events:none}
 .jh-aw .fl{position:absolute;inset:0;background:#fff;opacity:0;pointer-events:none}
 .jh-aw.flash .fl{animation:jhfl .3s ease-out}
-.jh-aw b{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font:800 11px/1 system-ui,sans-serif;color:#fff;letter-spacing:.2px;white-space:nowrap;text-shadow:1px 0 0 #234,-1px 0 0 #234,0 1px 0 #234,0 -1px 0 #234}
+.jh-aw b{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font:14px/1 var(--hand);color:#fff;letter-spacing:.3px;white-space:nowrap;text-shadow:1px 0 0 #234,-1px 0 0 #234,0 1px 0 #234,0 -1px 0 #234,1px 1px 0 #234,-1px -1px 0 #234}
 .jh-aw.on{filter:brightness(1.12)}
 .jh-subs{display:flex;justify-content:space-between;width:300px;margin-top:3px}
 .jh-sub{position:relative;width:49%;height:5px;box-sizing:border-box;border:1px solid rgba(25,25,25,.9);background:#d4d4d4;overflow:hidden}
@@ -38,9 +42,9 @@ const CSS = `
 @keyframes jhfl{0%{opacity:1}100%{opacity:0}}
 .jh-hpb{top:121px;right:8px;width:150px;height:8px;border-radius:4px;background:rgba(20,20,20,.6);border:1px solid rgba(0,0,0,.55);overflow:hidden;opacity:0;transition:opacity .3s}
 .jh-hpb i{position:absolute;left:0;top:0;bottom:0;width:100%;transform-origin:left;background:#3cd23c;transition:transform .12s}
-.jh-chant{position:fixed;left:0;top:0;z-index:45;pointer-events:none;background:#fff;border:2.5px solid #141414;border-radius:48% 52% 46% 54%/55% 45% 58% 42%;padding:7px 13px 8px;font:900 15px/1 var(--hand);color:#111;text-transform:uppercase;letter-spacing:.3px;white-space:nowrap;box-shadow:1.5px 1.5px 0 #141414,3px 3px 0 rgba(0,0,0,.18);will-change:transform,opacity}
+.jh-chant{position:fixed;left:0;top:0;z-index:45;pointer-events:none;background:#fff;border:2.5px solid #141414;border-radius:48% 52% 46% 54%/55% 45% 58% 42%;padding:7px 13px 8px;font:17px/1 var(--hand);-webkit-text-stroke:.45px #111;color:#111;text-transform:uppercase;letter-spacing:.3px;white-space:nowrap;box-shadow:1.5px 1.5px 0 #141414,3px 3px 0 rgba(0,0,0,.18);will-change:transform,opacity}
 .jh-chant::after{content:'';position:absolute;left:9px;bottom:-10px;width:13px;height:13px;background:#fff;border-left:2.5px solid #141414;border-bottom:2.5px solid #141414;transform:skewX(-28deg) rotate(-16deg)}
-.jh-manga{position:fixed;left:0;top:0;z-index:45;pointer-events:none;background:#fff;border:3px solid #000;padding:7px 8px 8px;width:min-content;min-width:88px;max-width:160px;box-sizing:border-box;font:italic 900 16px/1.02 "Arial Black","Impact",system-ui,sans-serif;color:#000;text-transform:uppercase;letter-spacing:.2px;box-shadow:4px 4px 0 rgba(0,0,0,.4);will-change:transform,opacity}
+.jh-manga{position:fixed;left:0;top:0;z-index:45;pointer-events:none;background:#fff;border:3px solid #000;padding:7px 8px 8px;width:min-content;min-width:88px;max-width:160px;box-sizing:border-box;font:italic 18px/1.02 var(--hand);-webkit-text-stroke:.7px #000;color:#000;text-transform:uppercase;letter-spacing:.3px;box-shadow:4px 4px 0 rgba(0,0,0,.4);will-change:transform,opacity}
 #jh-shatter{position:fixed;left:0;top:0;width:100vw;height:100vh;z-index:28;pointer-events:none;display:none}
 /* список игроков как в роблоксе: «Игроки | Убийства», своя строка подсвечена */
 .jh-sb{top:6px;right:8px;width:168px;background:rgba(28,28,30,.62);border-radius:8px;overflow:hidden;font:600 11px/1 "Builder Sans","Gotham SSm","Montserrat",system-ui,sans-serif}
@@ -58,8 +62,8 @@ const CSS = `
 .jh-kf div.me{background:rgba(60,60,60,.7)}
 /* счётчик урона JJS: красный «N DMG», над ним урон последнего удара */
 .jh-dmg{right:22%;top:24%;text-align:right;opacity:0;transition:opacity .35s;transform-origin:right center}
-.jh-dmg i{display:block;font:italic 800 13px/1 system-ui;color:#ffd9d9;text-shadow:1px 1px 0 #000,-1px -1px 0 #000,1px -1px 0 #000,-1px 1px 0 #000;margin-bottom:1px}
-.jh-dmg b{display:block;font:900 26px/1 system-ui;color:#ff2b2b;letter-spacing:.5px;text-shadow:2px 2px 0 #000,-1px -1px 0 #000,1px -1px 0 #000,-1px 1px 0 #000,0 0 8px rgba(255,0,0,.35)}
+.jh-dmg i{display:block;font:16px/1 var(--hand);color:#ffd9d9;text-shadow:1px 1px 0 #000,-1px -1px 0 #000,1px -1px 0 #000,-1px 1px 0 #000;margin-bottom:1px}
+.jh-dmg b{display:block;font:34px/1 var(--hand);color:#ff2b2b;letter-spacing:.5px;-webkit-text-stroke:.6px #7a0000;text-shadow:2px 2px 0 #000,-1px -1px 0 #000,1px -1px 0 #000,-1px 1px 0 #000,0 0 8px rgba(255,0,0,.35)}
 .jh-dmg.pop b{animation:jhpop .16s}
 @keyframes jhpop{0%{transform:scale(1.6)}100%{transform:scale(1)}}
 .jh-flash{inset:0;opacity:0;z-index:28}
@@ -93,6 +97,14 @@ const CSS = `
 .jh-mini div{width:96px;border-radius:9px;border:2px solid rgba(255,255,255,.25);background:rgba(0,0,0,.4);overflow:hidden;cursor:pointer;text-align:center;font:800 9.5px/1.2 system-ui;padding-bottom:3px}
 .jh-mini canvas{width:100%;display:block}
 .jh-mini div.sel{border-color:var(--c);box-shadow:0 0 12px var(--c)}
+.jh-res h1{font:min(9vw,44px)/1 var(--hand);letter-spacing:1px;text-shadow:3px 3px 0 #000,-1.5px -1.5px 0 #000,1.5px -1.5px 0 #000,-1.5px 1.5px 0 #000,0 0 18px rgba(200,120,255,.5)}
+.jh-res h1.win{color:#5EF0F5}
+.jh-res .sub{font:17px var(--hand);opacity:.9}
+/* баннер домена: диагональная полоса «DOMAIN | EXPANSION» с артом кастера, затем белая вспышка */
+.jh-dom{position:fixed;inset:0;z-index:47;pointer-events:none;display:none;overflow:hidden}
+.jh-dom canvas{position:absolute;left:0;top:0;width:100%;height:100%;will-change:transform,opacity}
+.jh-dom .w{position:absolute;left:0;top:0;font:var(--fs,80px)/1 var(--hand);color:#fff;letter-spacing:2px;white-space:nowrap;text-transform:uppercase;-webkit-text-stroke:1.5px #000;text-shadow:3px 0 0 #000,-3px 0 0 #000,0 3px 0 #000,0 -3px 0 #000,2px 2px 0 #000,-2px -2px 0 #000,2px -2px 0 #000,-2px 2px 0 #000,6px 7px 0 rgba(0,0,0,.85),0 0 22px var(--c);will-change:transform,opacity}
+.jh-white{inset:0;z-index:48;background:#fff;opacity:0}
 .jh-res table{border-collapse:collapse;margin:8px 0;font:700 13px system-ui;min-width:min(80vw,380px)}
 .jh-res td,.jh-res th{padding:3px 10px;text-align:left}
 .jh-res th{opacity:.6;font-size:11px}
@@ -121,6 +133,82 @@ function fitLabel(text) {
     if (ok && lines <= 2) return fs;
   }
   return 7.5;
+}
+
+const ease3 = (t) => 1 - Math.pow(1 - t, 3);
+function rrect(g, x, y, w, h, r) {
+  g.beginPath(); g.moveTo(x + r, y); g.lineTo(x + w - r, y); g.quadraticCurveTo(x + w, y, x + w, y + r); g.lineTo(x + w, y + h - r);
+  g.quadraticCurveTo(x + w, y + h, x + w - r, y + h); g.lineTo(x + r, y + h); g.quadraticCurveTo(x, y + h, x, y + h - r); g.lineTo(x, y + r); g.quadraticCurveTo(x, y, x + r, y); g.closePath();
+}
+// Арт баннера домена: диагональная чёрная полоса, манга-линии, портрет кастера (ч/б) со сложенной печатью рук,
+// подкрашено цветом домена. Возвращает геометрию полосы для раскладки слов.
+function drawDomainArt(g, portCv, W, H, f, kind) {
+  const slope = (H * 0.34) / W, ang = -Math.atan(slope);
+  const cy = (x) => H * 0.62 - x * slope, half = H * 0.21;
+  g.clearRect(0, 0, W, H);
+  const band = () => { g.beginPath(); g.moveTo(-20, cy(-20) - half); g.lineTo(W + 20, cy(W + 20) - half); g.lineTo(W + 20, cy(W + 20) + half); g.lineTo(-20, cy(-20) + half); g.closePath(); };
+  g.save();
+  band(); g.fillStyle = '#060608'; g.fill();
+  g.clip();
+  const mx = W / 2, my = cy(W / 2);
+  // радиальный «фокус» и манга-штрихи из центра
+  let gr = g.createRadialGradient(mx, my, 10, mx, my, W * 0.55);
+  gr.addColorStop(0, kind === 'void' ? 'rgba(160,210,255,.55)' : 'rgba(255,60,70,.5)'); gr.addColorStop(1, 'rgba(0,0,0,0)');
+  g.fillStyle = gr; g.fillRect(0, 0, W, H);
+  g.strokeStyle = 'rgba(255,255,255,.22)';
+  for (let i = 0; i < 120; i++) {
+    const a = Math.random() * Math.PI * 2, r0 = H * (0.18 + Math.random() * 0.25), r1 = W;
+    g.lineWidth = 0.6 + Math.random() * 1.6;
+    g.beginPath(); g.moveTo(mx + Math.cos(a) * r0, my + Math.sin(a) * r0); g.lineTo(mx + Math.cos(a) * r1, my + Math.sin(a) * r1); g.stroke();
+  }
+  // портрет кастера: голова в центре полосы
+  try {
+    drawPortrait(portCv, f.charId, f.skin?.skin || '#f2c9a0');
+    // убрать прямоугольный фон портрета: оставить голову с мягким краем
+    const pg = portCv.getContext('2d');
+    pg.globalCompositeOperation = 'destination-in';
+    const mg = pg.createRadialGradient(160, 96, 40, 160, 104, 118);
+    mg.addColorStop(0, 'rgba(0,0,0,1)'); mg.addColorStop(0.62, 'rgba(0,0,0,1)'); mg.addColorStop(1, 'rgba(0,0,0,0)');
+    pg.fillStyle = mg; pg.fillRect(0, 0, 320, 200);
+    pg.globalCompositeOperation = 'source-over';
+  } catch {}
+  const k = (half * 1.3) / 84, s = 84 * k;
+  g.save();
+  g.translate(mx, my); g.rotate(ang * 0.6); g.translate(-mx, -my);
+  g.filter = 'grayscale(1) contrast(1.8) brightness(1.08)';
+  g.drawImage(portCv, mx - 160 * k, my - 90 * k, 320 * k, 200 * k);
+  g.filter = 'none';
+  // руки: печать (Пустота — скрещённые пальцы у лица; Гробница — ладони вместе у груди)
+  const hand = (x, y, w, h, rot) => { g.save(); g.translate(x, y); g.rotate(rot); g.fillStyle = '#d8d8d8'; g.strokeStyle = '#000'; g.lineWidth = Math.max(2, s * 0.025); g.fillRect(-w / 2, -h / 2, w, h); g.strokeRect(-w / 2, -h / 2, w, h); g.restore(); };
+  g.globalAlpha = 0.9; g.fillStyle = '#fff';
+  gr = g.createRadialGradient(mx + s * 0.38, my + s * 0.34, 0, mx + s * 0.38, my + s * 0.34, s * 0.55);
+  gr.addColorStop(0, 'rgba(255,255,255,.85)'); gr.addColorStop(1, 'rgba(255,255,255,0)');
+  g.fillStyle = gr; g.fillRect(mx - s, my - s, s * 2.5, s * 2.5);
+  g.globalAlpha = 1;
+  if (kind === 'void') {
+    const hx = mx + s * 0.4, hy = my + s * 0.42;
+    hand(hx, hy + s * 0.08, s * 0.34, s * 0.36, 0.15);
+    hand(hx - s * 0.06, hy - s * 0.24, s * 0.09, s * 0.36, -0.32); // указательный
+    hand(hx + s * 0.06, hy - s * 0.24, s * 0.09, s * 0.36, 0.3);   // средний поверх — «скрещены»
+    hand(hx + s * 0.2, hy + s * 0.02, s * 0.1, s * 0.2, 0.9);      // большой
+  } else {
+    const hx = mx, hy = my + s * 0.62;
+    hand(hx - s * 0.15, hy, s * 0.26, s * 0.34, -0.12); hand(hx + s * 0.15, hy, s * 0.26, s * 0.34, 0.12);
+    hand(hx - s * 0.07, hy - s * 0.27, s * 0.08, s * 0.28, -0.08); hand(hx + s * 0.07, hy - s * 0.27, s * 0.08, s * 0.28, 0.08);
+    hand(hx - s * 0.2, hy - s * 0.16, s * 0.08, s * 0.22, -0.6); hand(hx + s * 0.2, hy - s * 0.16, s * 0.08, s * 0.22, 0.6);
+  }
+  g.restore();
+  // подкраска цветом домена
+  g.globalCompositeOperation = 'multiply';
+  g.fillStyle = kind === 'void' ? '#a8dcff' : '#ff5a64'; g.fillRect(0, 0, W, H);
+  g.globalCompositeOperation = 'source-over';
+  g.restore();
+  // кромки полосы
+  const edge = (o, w, c) => { g.strokeStyle = c; g.lineWidth = w; g.beginPath(); g.moveTo(-20, cy(-20) + o); g.lineTo(W + 20, cy(W + 20) + o); g.stroke(); };
+  edge(-half, 7, '#000'); edge(half, 7, '#000');
+  edge(-half, 3, kind === 'void' ? '#e8f6ff' : '#ff2040'); edge(half, 3, kind === 'void' ? '#e8f6ff' : '#ff2040');
+  edge(-half - 8, 1.5, 'rgba(255,255,255,.6)'); edge(half + 8, 1.5, 'rgba(255,255,255,.6)');
+  return { ang, cy, half };
 }
 
 export function createHUD() {
@@ -185,12 +273,129 @@ export function createHUD() {
   const vig = el('jh jh-vig');
   const tintEl = el('jh jh-tint');
   const callEl = el('jh jh-call', '<b></b><span></span>');
+  try { document.fonts?.load('20px JJSHand'); } catch {}
+
+  // ---------- баннер домена ----------
+  const domEl = el('jh-dom', '<canvas></canvas><div class="w">Domain</div><div class="w">Expansion</div>');
+  const domCv = domEl.querySelector('canvas'), domG = domCv.getContext('2d');
+  const [domW1, domW2] = domEl.querySelectorAll('.w');
+  const whiteEl = el('jh jh-white');
+  const portCv = document.createElement('canvas'); portCv.width = 320; portCv.height = 200;
+  let domT = -1, domGeo = null;
+  // оверлей интерьера домена: гиперпространство (Пустота) и белые разрезы по экрану (Гробница)
+  let domFx = null;
+  const warp = Array.from({ length: 90 }, () => ({ a: Math.random() * Math.PI * 2, v: 0.6 + Math.random() * 1.1, p: Math.random(), c: Math.random() < 0.45 ? '#ff5fe0' : Math.random() < 0.7 ? '#5fa8ff' : '#ffffff', w: 1 + Math.random() * 2.2 }));
+  const scrSlash = [];
+  // ---------- пузыри чата над головами (как в роблоксе) ----------
+  const bubbles = new Map();
+  const BFONT = '600 11px "Builder Sans","Gotham SSm","Montserrat",system-ui,sans-serif';
 
   const pops = [];
   let dmgSum = 0, dmgT = 0, callT = 0, flashA = 0, flashDecay = 3, hurtA = 0;
   const fmtD = (n) => String(Math.round(n * 100) / 100);
   const tags = [], placed = [];
   let lastSb = '';
+
+  function animBanner(dt) {
+    domT += dt;
+    const t = domT;
+    if (t < 0.92) {
+      // полоса раскрывается, слова влетают с краёв, лёгкий наезд; в конце — разлёт и затухание
+      const kin = Math.min(1, t / 0.12), kout = t > 0.74 ? Math.min(1, (t - 0.74) / 0.18) : 0;
+      const zoom = 1 + t * 0.07 + kout * 0.18;
+      domCv.style.opacity = (1 - kout).toFixed(3);
+      domCv.style.transform = `scale(${(zoom).toFixed(3)},${(kin * zoom).toFixed(3)})`;
+      const geo = domGeo;
+      const place = (el, cx, cy, from, maxW) => {
+        const wv = el.offsetWidth, hv = el.offsetHeight;
+        // «сжатые» буквы (scaleX 0.86); слово не должно вылезать за край экрана
+        const fit = Math.min(1, maxW / Math.max(1, wv * 0.86));
+        const sl = (1 - ease3(kin)) * from + kout * from * 0.25;
+        el.style.opacity = (1 - kout).toFixed(3);
+        el.style.transform = `translate(${(cx - wv / 2 + sl).toFixed(1)}px,${(cy - hv / 2).toFixed(1)}px) rotate(${geo.ang.toFixed(2)}rad) scale(${(0.86 * fit * zoom).toFixed(3)},${(fit * zoom).toFixed(3)})`;
+      };
+      place(domW1, W * 0.22, geo.cy(W * 0.22) - geo.half * 0.05, -W * 0.6, W * 0.4);
+      place(domW2, W * 0.74, geo.cy(W * 0.74) + geo.half * 0.05, W * 0.6, W * 0.46);
+    } else domEl.style.display = 'none';
+    // белая вспышка 0.5 с: быстро вверх, держится, тает
+    const wt = t - 0.8;
+    const wa = wt < 0 ? 0 : wt < 0.1 ? wt / 0.1 : wt < 0.3 ? 1 : Math.max(0, 1 - (wt - 0.3) / 0.32);
+    whiteEl.style.opacity = wa.toFixed(3);
+    if (t > 1.45) { domT = -1; whiteEl.style.opacity = 0; domEl.style.display = 'none'; }
+  }
+  function drawDomainFx(g, dt) {
+    const { kind, t } = domFx;
+    const cx = W / 2, cy = H / 2, D = Math.hypot(W, H) / 2;
+    if (kind === 'void') {
+      const tt = t - 1.3;
+      if (tt < 0 || tt > 1.5) return;
+      const fade = tt < 0.15 ? tt / 0.15 : tt > 1.1 ? Math.max(0, (1.5 - tt) / 0.4) : 1;
+      g.globalAlpha = 0.55 * fade; g.fillStyle = '#0a0018'; g.fillRect(0, 0, W, H);
+      g.globalCompositeOperation = 'lighter';
+      for (const s of warp) {
+        const r = ((tt * s.v * 1.6 + s.p) % 1);
+        const r0 = D * (0.04 + r * r * 1.1), r1 = r0 + D * (0.05 + r * 0.35);
+        const ca = Math.cos(s.a), sa = Math.sin(s.a);
+        g.globalAlpha = fade * Math.min(1, r * 3) * 0.9;
+        g.strokeStyle = s.c; g.lineWidth = s.w * (0.5 + r);
+        g.beginPath(); g.moveTo(cx + ca * r0, cy + sa * r0); g.lineTo(cx + ca * r1, cy + sa * r1); g.stroke();
+      }
+      g.globalCompositeOperation = 'source-over';
+      g.globalAlpha = 1;
+    } else if (kind === 'shrine') {
+      if (t > 1.4 && Math.random() < dt * 5) {
+        const a = Math.random() * Math.PI, L = W * (0.45 + Math.random() * 0.7);
+        const x = W * (0.15 + Math.random() * 0.7), y = H * (0.15 + Math.random() * 0.7);
+        scrSlash.push({ x0: x - Math.cos(a) * L / 2, y0: y - Math.sin(a) * L / 2, x1: x + Math.cos(a) * L / 2, y1: y + Math.sin(a) * L / 2, t: 0 });
+      }
+      for (let i = scrSlash.length - 1; i >= 0; i--) {
+        const sl = scrSlash[i];
+        sl.t += dt;
+        if (sl.t > 0.16) { scrSlash.splice(i, 1); continue; }
+        const k = sl.t / 0.16, grow = Math.min(1, sl.t / 0.05);
+        const x1 = sl.x0 + (sl.x1 - sl.x0) * grow, y1 = sl.y0 + (sl.y1 - sl.y0) * grow;
+        g.globalAlpha = 1 - k;
+        g.lineCap = 'round';
+        g.strokeStyle = '#000'; g.lineWidth = 5.5; g.beginPath(); g.moveTo(sl.x0, sl.y0); g.lineTo(x1, y1); g.stroke();
+        g.strokeStyle = '#fff'; g.lineWidth = 2.2; g.beginPath(); g.moveTo(sl.x0, sl.y0); g.lineTo(x1, y1); g.stroke();
+      }
+      g.globalAlpha = 1; g.lineCap = 'butt';
+    }
+  }
+  function drawBubbles(g, dt, camera, player) {
+    const cp = camera.position;
+    g.font = BFONT; g.textAlign = 'center'; g.textBaseline = 'middle';
+    for (const [f, list] of bubbles) {
+      for (let i = list.length - 1; i >= 0; i--) { list[i].t += dt; if (list[i].t > 6) list.splice(i, 1); }
+      if (!list.length || f.dead || G_hidden(f)) { if (!list.length || f.dead) bubbles.delete(f); continue; }
+      _v.set(f.pos.x, f.pos.y + 5.9 * f.scale + 1.1, f.pos.z);
+      const dist = _v.distanceTo(cp);
+      if (dist > 60) continue;
+      _v.project(camera);
+      if (_v.z > 1 || _v.x < -1.2 || _v.x > 1.2 || _v.y < -1.2 || _v.y > 1.4) continue;
+      const sc = f === player ? 1 : Math.max(0.62, Math.min(1, 18 / dist));
+      const x = (_v.x + 1) * 0.5 * W;
+      let y = (1 - _v.y) * 0.5 * H - (f === player ? 4 : 18) * sc;
+      g.save(); g.translate(x, y); g.scale(sc, sc);
+      let by = 0;
+      for (let i = list.length - 1; i >= 0; i--) {
+        const b = list[i];
+        const lh = 13, bh = b.lines.length * lh + 9, bw = b.w + 16;
+        const a = Math.min(1, b.t / 0.12) * (b.t > 5.4 ? Math.max(0, (6 - b.t) / 0.6) : 1) * (i === list.length - 1 ? 1 : 0.88);
+        const top = by - bh - (i === list.length - 1 ? 6 : 0);
+        g.globalAlpha = a;
+        g.fillStyle = 'rgba(0,0,0,.16)'; rrect(g, -bw / 2, top + 1.5, bw, bh, 9); g.fill();
+        g.fillStyle = '#ffffff'; rrect(g, -bw / 2, top, bw, bh, 9); g.fill();
+        if (i === list.length - 1) { g.beginPath(); g.moveTo(-5, top + bh - 0.5); g.lineTo(5, top + bh - 0.5); g.lineTo(0, top + bh + 6); g.closePath(); g.fill(); }
+        g.fillStyle = '#1e1e1e';
+        b.lines.forEach((l, j) => g.fillText(l, 0, top + 5 + lh * (j + 0.5) + 0.5));
+        by = top - 4;
+      }
+      g.restore();
+    }
+    g.globalAlpha = 1; g.textBaseline = 'alphabetic';
+  }
+  const G_hidden = (f) => f.vanish > 0;
 
   const api = {
     get W() { return W; }, get H() { return H; },
@@ -319,12 +524,12 @@ export function createHUD() {
       setTimeout(() => { invEl.style.display = 'none'; api.flash('#ff1030', 0.35, 4); }, 90);
     },
     tint(css) { if (css) { tintEl.style.background = css; tintEl.style.opacity = 1; } else tintEl.style.opacity = 0; },
-    callout(text, sub, color) {
+    callout(text, sub, color, dur = 2) {
       callEl.querySelector('b').textContent = text;
       callEl.querySelector('span').textContent = sub || '';
       callEl.style.setProperty('--c', color);
       callEl.querySelector('b').style.color = color;
-      callEl.style.opacity = 1; callT = 2.0;
+      callEl.style.opacity = 1; callT = dur;
     },
     killfeed(killer, victim, kc, vc) {
       const d = document.createElement('div');
@@ -341,9 +546,43 @@ export function createHUD() {
       timerEl.textContent = `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
       timerEl.style.color = s <= 20 ? '#ff6060' : '#fff';
     },
+    // Баннер «DOMAIN | EXPANSION» (~0.9 с) + белая вспышка 0.5 с — для всех, кто попал в радиус
+    domainBanner(f, kind) {
+      const dpr = Math.min(DPR, 1.5);
+      domCv.width = Math.round(W * dpr); domCv.height = Math.round(H * dpr);
+      domG.setTransform(dpr, 0, 0, dpr, 0, 0);
+      domGeo = drawDomainArt(domG, portCv, W, H, f, kind);
+      const c = kind === 'void' ? '#7fd0ff' : '#ff2040';
+      for (const w of [domW1, domW2]) { w.style.setProperty('--c', c); w.style.setProperty('--fs', Math.round(Math.min(H * 0.2, W * 0.1)) + 'px'); }
+      domEl.style.display = 'block';
+      domT = 0;
+      callT = 0; callEl.style.opacity = 0;
+    },
+    setDomainFx(kind, t) { domFx = kind ? { kind, t } : null; },
+    // Реплика бота (или игрока) пузырём над головой: до 3 в стопке, 6 с, максимум 2 строки
+    bubble(f, text) {
+      if (!f || !text) return;
+      let list = bubbles.get(f);
+      if (!list) { list = []; bubbles.set(f, list); }
+      g.font = BFONT;
+      const words = String(text).replace(/\s+/g, ' ').trim().split(' ');
+      const lines = [];
+      let cur = '';
+      for (const w of words) {
+        const tryS = cur ? cur + ' ' + w : w;
+        if (g.measureText(tryS).width <= 150) cur = tryS;
+        else { if (cur) lines.push(cur); cur = w; }
+      }
+      if (cur) lines.push(cur);
+      if (lines.length > 2) { let l2 = lines[1] + ' ' + lines.slice(2).join(' '); while (l2.length > 1 && g.measureText(l2 + '…').width > 150) l2 = l2.slice(0, -1); lines.length = 1; lines.push(l2 + '…'); }
+      for (let i = 0; i < lines.length; i++) while (lines[i].length > 1 && g.measureText(lines[i]).width > 150) lines[i] = lines[i].slice(0, -2) + '…';
+      const w = Math.max(...lines.map((l) => g.measureText(l).width));
+      list.push({ lines, w, t: 0 });
+      while (list.length > 3) list.shift();
+    },
     showHUD(on) {
       for (const e of [bot, sb, top, hpb, kfEl, dmgEl]) e.style.display = on ? '' : 'none';
-      if (!on) { for (const m of mangas) m.d.remove(); mangas.length = 0; for (const c of chants) c.d.remove(); chants.length = 0; dmgSum = 0; dmgT = 0; dmgEl.style.opacity = 0; }
+      if (!on) { for (const m of mangas) m.d.remove(); mangas.length = 0; for (const c of chants) c.d.remove(); chants.length = 0; dmgSum = 0; dmgT = 0; dmgEl.style.opacity = 0; bubbles.clear(); domFx = null; domT = -1; domEl.style.display = 'none'; whiteEl.style.opacity = 0; }
     },
 
     update(dt, camera, fighters, player) {
@@ -450,6 +689,12 @@ export function createHUD() {
         g.strokeText(p.text, x, y); g.fillStyle = p.color; g.fillText(p.text, x, y);
       }
       g.globalAlpha = 1;
+      // пузыри чата над головами
+      if (bubbles.size) drawBubbles(g, dt, camera, player);
+      // интерьер домена: гиперпространство / разрезы
+      if (domFx) drawDomainFx(g, dt);
+      // баннер домена и белая вспышка
+      if (domT >= 0) animBanner(dt);
       // пузыри заклинаний
       for (let i = chants.length - 1; i >= 0; i--) {
         const c = chants[i];
@@ -580,7 +825,7 @@ export function createHUD() {
       const scr = el('jh-scr jh-res');
       const esc = (s) => String(s).replace(/</g, '');
       const place = rows.indexOf(me) + 1;
-      scr.innerHTML = `<h1>${place === 1 ? 'ПОБЕДА!' : 'Матч окончен'}</h1><div class="sub">Твоё место: ${place} • +${coins} монет</div>
+      scr.innerHTML = `<h1 class="${place === 1 ? 'win' : ''}">${place === 1 ? 'ПОБЕДА!' : 'Матч окончен'}</h1><div class="sub">Твоё место: ${place} • +${coins} монет</div>
         <table><tr><th>#</th><th>Игрок</th><th>Боец</th><th>Убийства</th><th>Смерти</th></tr>
         ${rows.map((f, i) => `<tr class="${f === me ? 'me' : ''}"><td>${i + 1}</td><td style="color:${f.color}">${esc(f.name)}</td><td style="color:${f.look.color}">${CHARS[f.charId].name}</td><td>${f.kills}</td><td>${f.deaths}</td></tr>`).join('')}</table>
         <div class="btns"><button class="gray">В меню</button><button>Ещё матч</button></div>`;

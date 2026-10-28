@@ -82,6 +82,22 @@ export class Merger {
       this.vc += 4;
     }
   }
+  // Одна грань-квад (окна на фасадах): центр, ширина/высота, ось нормали 'x'|'z' и знак
+  quad(x, y, z, w, h, axis, sign, color) {
+    _c.set(color);
+    const base = this.vc;
+    const hw = w / 2, hh = h / 2;
+    const pts = axis === 'z'
+      ? [[-hw, -hh], [hw, -hh], [hw, hh], [-hw, hh]].map(([a, b]) => [x + a * sign, y + b, z])
+      : [[-hw, -hh], [hw, -hh], [hw, hh], [-hw, hh]].map(([a, b]) => [x, y + b, z - a * sign]);
+    const nx = axis === 'x' ? sign : 0, nz = axis === 'z' ? sign : 0;
+    for (const p of pts) {
+      this.p.push(p[0], p[1], p[2]); this.n.push(nx, 0, nz); this.c.push(_c.r, _c.g, _c.b);
+      if (this.uv) this.t.push(WHITE_UV[0], WHITE_UV[1]);
+    }
+    this.i.push(base, base + 1, base + 2, base, base + 2, base + 3);
+    this.vc += 4;
+  }
   // Произвольная геометрия (цилиндры и т.п.)
   geo(geometry, matrix, color) {
     const pa = geometry.attributes.position, na = geometry.attributes.normal;

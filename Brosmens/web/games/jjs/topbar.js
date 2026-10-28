@@ -23,8 +23,8 @@ const CSS = `
 .jt-ring{position:absolute;left:50%;top:46%;width:236px;height:236px;margin:-118px 0 0 -118px;border-radius:50%;box-sizing:border-box;border:56px solid rgba(58,58,58,.93);box-shadow:0 0 0 2px rgba(0,0,0,.35),inset 0 0 0 2px rgba(0,0,0,.35)}
 .jt-slot{position:absolute;width:60px;height:60px;margin:-30px 0 0 -30px;border-radius:50%;background:radial-gradient(circle at 50% 38%,#4a4a4a,#262626);border:2px solid #6a6a6a;display:flex;align-items:center;justify-content:center;font:30px/1 system-ui,"Noto Color Emoji",sans-serif;cursor:pointer;box-sizing:border-box}
 .jt-slot:active{transform:scale(.94);border-color:#fff}
-.jt-slot em{position:absolute;top:60px;left:50%;transform:translateX(-50%);font:400 14px/1 "Patrick Hand","Comic Sans MS","Chalkboard SE",system-ui,sans-serif;font-style:normal;color:#fff;white-space:nowrap;text-shadow:1.5px 0 0 #111,-1.5px 0 0 #111,0 1.5px 0 #111,0 -1.5px 0 #111}
-.jt-pg{position:absolute;left:50%;top:46%;transform:translate(-50%,-50%);display:flex;align-items:center;gap:4px;font:400 17px/1 "Patrick Hand","Comic Sans MS",system-ui,sans-serif;color:#fff;text-shadow:1px 1px 0 #000}
+.jt-slot em{position:absolute;top:60px;left:50%;transform:translateX(-50%);font:400 14px/1 "JJSHand","Comic Sans MS","Chalkboard SE",system-ui,sans-serif;font-style:normal;color:#fff;white-space:nowrap;text-shadow:1.5px 0 0 #111,-1.5px 0 0 #111,0 1.5px 0 #111,0 -1.5px 0 #111}
+.jt-pg{position:absolute;left:50%;top:46%;transform:translate(-50%,-50%);display:flex;align-items:center;gap:4px;font:400 17px/1 "JJSHand","Comic Sans MS","Chalkboard SE",system-ui,sans-serif;color:#fff;text-shadow:1px 1px 0 #000}
 .jt-pg button{width:26px;height:30px;border:0;border-radius:6px;background:rgba(255,255,255,.08);color:#fff;font:900 17px system-ui;padding:0;cursor:pointer}
 .jt-hint{position:absolute;left:50%;top:max(46px,calc(46% - 146px));transform:translateX(-50%);font:700 11px system-ui,sans-serif;color:#e8e8e8;background:rgba(20,20,20,.6);border-radius:12px;padding:5px 11px;white-space:nowrap}
 `;

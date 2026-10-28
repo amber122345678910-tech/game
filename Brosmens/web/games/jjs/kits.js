@@ -286,7 +286,7 @@ function dismantleWave(f) {
       return true;
     });
   }
-  G.sound('slash', f.pos, 0.9);
+  G.sound('shing', f.pos, 1.0);
   for (const o of G.fighters) {
     if (!f.isEnemy(o)) continue;
     const dx = o.pos.x - f.pos.x, dz = o.pos.z - f.pos.z, d = Math.hypot(dx, dz);
@@ -323,7 +323,7 @@ function dismantleAir(f) {
       const dir = aimDirOf(ff, origin, tgt, new V3(), 0.6);
       const it = G.fx.pool('cresN'); it.mat.color.set('#ffffff');
       const q = waveQuat(dir, 0.15);
-      G.sound('slash', ff.pos, 1); G.shake(0.35, ff.pos);
+      G.sound('shing', ff.pos, 1); G.shake(0.35, ff.pos);
       projectile({
         owner: ff, pos: origin.addScaledVector(dir, 1.5), dir, speed: 115, range: 60, radius: 2.4, pierce: true,
         onHit: (o, p) => G.hit(ff, o, { dmg: 25, unblockable: true, bypassRag: true, rag: 1.1, kb: { f: 30, up: 22 }, hitstop: 0.1, fx: 'slash', color: '#ffffff', shake: 0.55, sfx: 'heavy', from: p }),
@@ -839,7 +839,7 @@ export const yRLaunch = {
     if (l > 0.3) { dx /= l; dz /= l; } else { dx = f.aim.x; dz = f.aim.z; const k = Math.hypot(dx, dz) || 1; dx /= k; dz /= k; }
     _a.set(f.pos.x - dx * 2.5, f.pos.y + 2.5, f.pos.z - dz * 2.5);
     smokePuff(_a, 18, 2.4, 8);
-    if (air) { f.vel.y = 48; f.onGround = false; }
+    if (air) { f.vel.y = 74; f.onGround = false; }
     f.startAction({
       name: 'rkLaunch', dur: 0.36, keepVel: true, poseSpeed: 24, noFeint: true,
       pose: (ff, a2, out) => out.set(air ? POSE.air : POSE.dashF),

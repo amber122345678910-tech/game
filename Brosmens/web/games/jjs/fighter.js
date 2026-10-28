@@ -6,7 +6,13 @@ import { NK, K, kf, blendInto, applyPose, POSE, M1ANIM, m1Variant, runPose, PX }
 import { clamp, rand, angleDamp, wrapAngle } from './util.js';
 import { CHARS } from './skills.js';
 
-export const GRAV = 82;
+// Физика роблокса (спека §0): гравитация 196.2, прыжок 40 (вершина ≈4.1 стада, ≈0.41 с в воздухе).
+// Все вертикальные скорости отбрасывания масштабируются на VYK = √(196.2/82) ≈ 1.55 — та же высота полёта.
+export const GRAV = 196.2, JUMP_V = 40;
+export const VYK = Math.sqrt(196.2 / 82);
+// Ходьба 16, бег ≈26 при джойстике дальше ~90 % (Auto Run)
+export const WALK = 16, RUN = 26;
+const DI_MAX = 5; // «направленное влияние» в полёте: до ±5 стадов
 // Числа JJS (спека §5): M1 3+3+4+4, оглушение 0.75 с, 2 с простоя после 4-го удара, сброс цепочки через 1.2 с
 export const M1_DMG = [3, 3, 4, 4];
 const M1_STUN = 0.75, M1_DOWNTIME = 2.0, M1_RESET = 1.2, M1_WHIFF = 0.25, M1_BLOCKED = 0.5;
@@ -52,7 +58,7 @@ export class Fighter {
     this.aim = new THREE.Vector3(0, 0, 1);
     this.lastHitBy = null; this.lastHitT = -99; this.lastDamagedT = -99;
     this.ragSpin = new THREE.Vector3(); this.ragW = new THREE.Vector3();
-    this.runPhase = 0;
+    this.runPhase = 0; this.runK = 0; this.diLeft = 0;
     this.pose = new Float32Array(NK); this.tp = new Float32Array(NK);
     this.model = null;
     this.setChar(charId);
@@ -129,7 +135,7 @@ export class Fighter {
   mods() { return this.awakened > 0 ? this.ch.awaken.mods || {} : {}; }
   dmgMult() { return this.mods().dmg || 1; }
   cdMult() { return this.mods().cd || 1; }
-  walkSpeed() { return 17 * (this.mods().speed || 1); }
+  walkSpeed() { return WALK * (this.mods().speed || 1); }
 
   // Мягкий автоприцел: ближайший враг в конусе направления взгляда (или совсем рядом)
   autoTarget(maxDist = 16, minDot = 0.35) {
@@ -312,8 +318,8 @@ export class Fighter {
     // 4-й удар: вариант по вертикальной скорости (спека §5.1)
     let variant = 'neutral';
     if (last && !shrine) {
-      if (!this.onGround && this.vel.y < -1 && !this.input.jumpHeld) variant = 'slam';
-      else if (this.input.jumpHeld || (!this.onGround && this.vel.y > 1)) variant = 'up';
+      if (!this.onGround && this.vel.y < -1.5 && !this.input.jumpHeld) variant = 'slam';
+      else if (this.input.jumpHeld || (!this.onGround && this.vel.y > 1.5)) variant = 'up';
     }
     const frames = shrine ? M1ANIM.sukuna[3] : variant === 'neutral' ? M1ANIM[style][n - 1] : m1Variant(style, this.idlePose, variant);
     const hitAt = last ? 0.23 : 0.18;
@@ -328,9 +334,9 @@ export class Fighter {
       name: 'm1', kind: 'melee', dur, frames, hitAt, keepVel: true, poseSpeed: 30, n, variant, allowJump: true,
       events: [[hitAt, (f, a) => f.m1Hit(n, a)]],
       update: (f, dt, t, a) => {
-        if (t < hitAt) { f.vel.x = fx * lunge; f.vel.z = fz * lunge; if (variant === 'slam') f.vel.y = Math.min(f.vel.y, -24); }
+        if (t < hitAt) { f.vel.x = fx * lunge; f.vel.z = fz * lunge; if (variant === 'slam') f.vel.y = Math.min(f.vel.y, -37); }
         else f.friction(dt, 14);
-        if (!f.onGround && variant !== 'slam' && f.vel.y < -6) f.vel.y = -6;
+        if (!f.onGround && variant !== 'slam' && f.vel.y < -9) f.vel.y = -9;
         if (!last && !a.locked && t > dur * 0.78 && f.m1Buf > 0) f.endAction();
       },
       onEnd: (f) => { if (f.m1Buf > 0 && f.combo < 4 && f.canAct()) { f.m1Buf = 0; f.m1(); } },
@@ -374,14 +380,14 @@ export class Fighter {
     for (const o of hits) {
       let r;
       if (!last) {
-        r = G.hit(this, o, { dmg: M1_DMG[n - 1], melee: true, m1: true, stun: M1_STUN, push: 2.5, hitstop: 0.055, fx: katana ? 'slash' : 'hit', shake: 0.18, sfx: 'hit' });
+        r = G.hit(this, o, { dmg: M1_DMG[n - 1], melee: true, m1: true, stun: M1_STUN, push: 2.5, hitstop: 0.055, fx: katana ? 'slash' : 'hit', shake: 0.18, sfx: katana ? 'slash' : 'm1_' + n });
       } else if (v === 'slam') {
-        r = G.hit(this, o, { dmg: M1_DMG[3], melee: true, m1: true, unblockable: true, bypassRag: true, downslam: true, rag: 1.0, kb: { f: 6, up: -62 }, hitstop: 0.1, fx: 'heavy', shake: 0.5, sfx: 'heavy' });
+        r = G.hit(this, o, { dmg: M1_DMG[3], melee: true, m1: true, unblockable: true, bypassRag: true, downslam: true, rag: 1.0, kb: { f: 6, up: -62 }, hitstop: 0.1, fx: 'heavy', shake: 0.5, sfx: 'm1_4' });
         if (r === 'hit') { _v.set(o.pos.x, G.world.groundAt(o.pos.x, o.pos.z, o.pos.y) + 0.2, o.pos.z); G.fx.crater(_v, 6); G.fx.dust(_v, 12, 3); G.fx.debris(_v, 7); G.fx.ring(_v, '#ffffff', 1, 9, 0.3, { axis: 'y', a0: 0.9 }); }
       } else if (v === 'up') {
-        r = G.hit(this, o, { dmg: M1_DMG[3], melee: true, m1: true, rag: 1.1, kb: { f: 8, up: 36 }, hitstop: 0.09, fx: katana ? 'slash' : 'heavy', shake: 0.45, sfx: 'heavy' });
+        r = G.hit(this, o, { dmg: M1_DMG[3], melee: true, m1: true, rag: 1.1, kb: { f: 8, up: 36 }, hitstop: 0.09, fx: katana ? 'slash' : 'heavy', shake: 0.45, sfx: 'm1_4' });
       } else {
-        r = G.hit(this, o, { dmg: M1_DMG[3], melee: true, m1: true, rag: 0.9, kb: { f: 45, up: 12 }, hitstop: 0.085, fx: katana ? 'slash' : 'heavy', shake: 0.45, sfx: 'heavy' });
+        r = G.hit(this, o, { dmg: M1_DMG[3], melee: true, m1: true, rag: 0.9, kb: { f: 45, up: 12 }, hitstop: 0.085, fx: katana ? 'slash' : 'heavy', shake: 0.45, sfx: 'm1_4' });
       }
       if (r === 'hit' || r === 'break' || r === 'counter') landed = true;
       else if (r === 'blocked') blocked = true;
@@ -390,7 +396,7 @@ export class Fighter {
     }
     if (last) {
       this.m1Cd = M1_DOWNTIME;
-      if (v === 'up' && landed && this.onGround) { this.vel.y = 24; this.onGround = false; }
+      if (v === 'up' && landed && this.onGround) { this.vel.y = 37; this.onGround = false; }
     }
     if (this.action !== a) return;
     if (blocked && !landed) { a.dur = a.hitAt + M1_BLOCKED; a.locked = true; this.m1Buf = 0; }
@@ -521,7 +527,7 @@ export class Fighter {
       const src = this.lastHitBy && !this.lastHitBy.dead ? this.lastHitBy : null;
       if (src) { _d.set(this.pos.x - src.pos.x, 0, this.pos.z - src.pos.z).normalize(); const s = Math.random() < 0.5 ? 1 : -1; this.input.mx = _d.x * 0.6 - _d.z * 0.8 * s; this.input.mz = _d.z * 0.6 + _d.x * 0.8 * s; }
     }
-    if (!this.onGround) this.vel.y = Math.max(this.vel.y, 8);
+    if (!this.onGround) this.vel.y = Math.max(this.vel.y, 12);
     this.sideDash(true);
     this.chestPos(_v);
     _w.set(this.pos.x, this.pos.y + 0.3, this.pos.z);
@@ -671,6 +677,7 @@ export class Fighter {
     this.vel.set(vx, vy, vz);
     this.onGround = false;
     this.pos.y += 0.2;
+    this.diLeft = DI_MAX;
     // кувырок назад относительно направления полёта
     const lx = Math.sin(this.yaw), lz = Math.cos(this.yaw);
     const back = -(vx * lx + vz * lz);
@@ -753,7 +760,8 @@ export class Fighter {
       if (this.ch.awaken.tick) this.ch.awaken.tick(this, dt);
       if (this.awakened <= 0) this.endAwaken();
     }
-    if (G.time - this.lastDamagedT > 7 && this.hp < this.maxHp) this.hp = Math.min(this.maxHp, this.hp + 2.5 * dt);
+    // реген JJS: 1 HP/с через 1 с после последнего урона
+    if (G.time - this.lastDamagedT > 1 && this.hp < this.maxHp) this.hp = Math.min(this.maxHp, this.hp + dt);
     // шкала уклонения медленно копится вне боя
     if (this.evasive < 100 && G.time - Math.max(this.lastDamagedT, this.lastDealtT) > 5) this.evasive = Math.min(100, this.evasive + 2 * dt);
 
@@ -780,7 +788,7 @@ export class Fighter {
     if (this.jumpBuf > 0 && this.onGround && !this.blocking && !this.rag && this.down <= 0 && this.stun <= 0 && (!this.action || this.action.allowJump || this.action.name === 'land')) {
       if (this.action && this.action.name === 'land') this.action = null;
       this.jumpBuf = 0;
-      this.vel.y = 31; this.onGround = false;
+      this.vel.y = JUMP_V; this.onGround = false;
       G.sound('jump', this.pos, 0.3);
     }
     this.physics(dt);
@@ -791,8 +799,13 @@ export class Fighter {
   locomotion(dt) {
     const inp = this.input;
     this.blocking = inp.block;
-    let sp = this.walkSpeed() * (this.blocking ? (this.blockAbsorb > 0 ? 0.14 : 0.32) : 1) * (0.9 + 0.1 * clamp(this.hp / this.maxHp * 2, 0, 1));
     const m = inp.mx * inp.mx + inp.mz * inp.mz;
+    // Auto Run: джойстик почти до упора → бег (плавный разгон), в блоке/воздухе — не разгоняемся
+    const wantRun = m > 0.81 && !this.blocking ? 1 : 0;
+    this.runK += (wantRun - this.runK) * (1 - Math.exp(-(wantRun ? 5 : 9) * dt));
+    const base = this.walkSpeed() + (RUN - WALK) * (this.mods().speed || 1) * this.runK;
+    // блок и «критическое» HP замедляют (×0.9 при почти нулевом HP)
+    let sp = base * (this.blocking ? (this.blockAbsorb > 0 ? 0.14 : 0.32) : 1) * (0.9 + 0.1 * clamp(this.hp / this.maxHp * 2, 0, 1));
     // Shift-lock: персонаж смотрит по камере; назад — ×0.8 скорости
     if (this.lockYaw != null && !this.blocking) this.yaw = angleDamp(this.yaw, this.lockYaw, 30, dt);
     if (m > 0.01) { const dot = (inp.mx * Math.sin(this.yaw) + inp.mz * Math.cos(this.yaw)) / Math.sqrt(m); if (dot < 0) sp *= 1 + 0.2 * dot; }
@@ -807,19 +820,22 @@ export class Fighter {
 
   physics(dt) {
     const a = this.action;
+    const vy0 = this.vel.y;
     if (this.suspend > 0) {
       // подвешен в воздухе (Lapse Blue, Twofold Kick)
       this.suspend -= dt;
       this.vel.multiplyScalar(Math.exp(-9 * dt));
     } else if (!(a && a.noGrav)) this.vel.y -= GRAV * dt;
-    this.pos.addScaledVector(this.vel, dt);
+    // по вертикали — средняя скорость за шаг: точная парабола при любом FPS (вершина прыжка ≈4.1 стада)
+    this.pos.x += this.vel.x * dt; this.pos.z += this.vel.z * dt;
+    this.pos.y += (vy0 + this.vel.y) * 0.5 * dt;
     const gy = G.world.groundAt(this.pos.x, this.pos.z, this.pos.y);
     if (this.pos.y <= gy) {
-      if (!this.onGround && this.vel.y < -28) {
+      if (!this.onGround && this.vel.y < -43) {
         G.fx.dust(_v.copy(this.pos), this.rag ? 10 : 4, this.rag ? 3 : 2);
-        if (this.rag) { G.sound('hit', this.pos, 0.35); }
+        if (this.rag) { G.sound('thump', this.pos, 0.6); }
       }
-      if (this.rag && this.vel.y < -24) { this.vel.y = -this.vel.y * 0.3; this.pos.y = gy + 0.01; this.onGround = false; }
+      if (this.rag && this.vel.y < -37) { this.vel.y = -this.vel.y * 0.3; this.pos.y = gy + 0.01; this.onGround = false; }
       else { this.pos.y = gy; if (this.vel.y < 0) this.vel.y = 0; this.onGround = true; }
     } else if (this.pos.y > gy + 0.08) this.onGround = false;
     const sp2 = this.vel.x * this.vel.x + this.vel.z * this.vel.z;
@@ -838,6 +854,15 @@ export class Fighter {
   updateRag(dt) {
     // обычный рэгдолл: таймер идёт только после касания земли; «истинный» — сразу
     if (this.ragTrue || this.onGround) this.ragT -= dt;
+    // направленное влияние: удерживая направление в полёте, смещаешь траекторию (до ±5 стадов)
+    if (!this.onGround && this.diLeft > 0 && this.suspend <= 0) {
+      const mx = this.input.mx, mz = this.input.mz, l = Math.hypot(mx, mz);
+      if (l > 0.25) {
+        const st = Math.min(this.diLeft, 9 * dt);
+        this.pos.x += (mx / l) * st; this.pos.z += (mz / l) * st;
+        this.diLeft -= st;
+      }
+    }
     if (this.onGround) {
       this.friction(dt, 5);
       this.ragW.multiplyScalar(Math.exp(-7 * dt));
@@ -850,7 +875,7 @@ export class Fighter {
     }
     if (this.ragT <= 0 && this.onGround) {
       this.rag = false; this.ragTrue = false;
-      this.down = 0.55;
+      this.down = 0.38;
       this.pose[K.lean] = wrapAngle(this.pose[K.lean] + this.ragSpin.x);
       this.pose[K.roll] = wrapAngle(this.pose[K.roll] + this.ragSpin.z);
       this.ragSpin.set(0, 0, 0);
@@ -959,8 +984,9 @@ export function hit(att, vic, o) {
       if (cd > 0) { vic.hp -= cd; vic.lastDamagedT = G.time; att.lastDealtT = G.time; if (att.awakened <= 0) att.meter = Math.min(100, att.meter + cd * AW_FILL); }
       vic.blockAbsorb = 0.45;
       if (!o.noPush) vic.vel.addScaledVector(dir, o.melee ? 5 : 9);
-      vic.hitstop = Math.max(vic.hitstop, 0.04); if (o.melee) att.hitstop = Math.max(att.hitstop, 0.04);
-      if (vic.charId === 'gojo') {
+      if (!o.noStop) { vic.hitstop = Math.max(vic.hitstop, 0.04); if (o.melee) att.hitstop = Math.max(att.hitstop, 0.04); }
+      if (o.fx === 'none') { if (Math.random() < 0.35) G.fx.sparks(contact, _w.copy(dir).negate(), '#fff2c8', 2, 26); }
+      else if (vic.charId === 'gojo') {
         G.fx.ring(contact, '#cfeeff', 0.4, 2.8, 0.3, { a0: 0.9 });
         G.fx.particles(contact, { n: 6, color: ['#bfe6ff', '#ffffff'], speed: 5, size: 0.6, life: 0.3 });
       } else {
@@ -968,8 +994,9 @@ export function hit(att, vic, o) {
         G.fx.burst(contact, '#ffe9b0', 3.5, 0.12);
       }
       if (cd > 0 && att.isPlayer) G.hud.dmg(cd);
-      G.sound('block', vic.pos, 0.6);
+      if (o.sfx !== 'none') G.sound('block', vic.pos, o.fx === 'none' ? 0.25 : 0.6);
       o.onBlocked?.(att, vic);
+      G.onHit?.(att, vic, 'blocked', o, cd);
       if (cd > 0 && vic.hp <= 0) G.kill(vic, att);
       return 'blocked';
     }
@@ -995,14 +1022,15 @@ export function hit(att, vic, o) {
   vic.noteAttacker(att);
   const armor = vic.action && vic.action.armor;
   const stunImm = vic.wakeT > 0 && o.melee && !o.rag;
-  if (!armor) {
+  // noInterrupt: только урон (разрезы Гробницы не сбивают действия и не оглушают)
+  if (!armor && !o.noInterrupt) {
     vic.blocking = false;
     if (o.rag && !vic.rag) {
-      vic.launch(dir.x * o.kb.f, o.kb.up, dir.z * o.kb.f, o.rag, !!o.trueRag);
+      vic.launch(dir.x * o.kb.f, (o.kb.up || 0) * VYK, dir.z * o.kb.f, o.rag, !!o.trueRag);
       vic.yaw = Math.atan2(-dir.x, -dir.z);
     } else if (vic.rag) {
-      if (o.downslam) { vic.vel.set(dir.x * 4, -62, dir.z * 4); vic.ragT = Math.max(vic.ragT, 1.0); vic.onGround = false; }
-      else if (o.kb) { vic.vel.x += dir.x * o.kb.f * 0.5; vic.vel.z += dir.z * o.kb.f * 0.5; vic.vel.y = Math.max(vic.vel.y, (o.kb.up || 0) * 0.6); if (o.rag) vic.ragT = Math.max(vic.ragT, o.rag * 0.6); }
+      if (o.downslam) { vic.vel.set(dir.x * 4, -62 * VYK, dir.z * 4); vic.ragT = Math.max(vic.ragT, 1.0); vic.onGround = false; }
+      else if (o.kb) { vic.vel.x += dir.x * o.kb.f * 0.5; vic.vel.z += dir.z * o.kb.f * 0.5; vic.vel.y = Math.max(vic.vel.y, (o.kb.up || 0) * 0.6 * VYK); if (o.rag) vic.ragT = Math.max(vic.ragT, o.rag * 0.6); }
       if (o.trueRag) vic.ragTrue = true;
     } else if (!stunImm) {
       vic.interrupt();
@@ -1010,15 +1038,17 @@ export function hit(att, vic, o) {
       if (o.stun) vic.stun = Math.max(vic.stun, o.stun);
       else if (broke) vic.stun = Math.max(vic.stun, M1_STUN);
       if (broke) vic.broken = Math.max(vic.broken, 0.6);
-      if (o.kb) { vic.vel.x = dir.x * o.kb.f; vic.vel.z = dir.z * o.kb.f; if (o.kb.up) { vic.vel.y = o.kb.up; vic.onGround = false; } }
+      if (o.kb) { vic.vel.x = dir.x * o.kb.f; vic.vel.z = dir.z * o.kb.f; if (o.kb.up) { vic.vel.y = o.kb.up * VYK; vic.onGround = false; } }
       else if (o.push) { vic.vel.x = dir.x * o.push; vic.vel.z = dir.z * o.push; }
       if (vic.down <= 0) vic.yaw = Math.atan2(-dir.x, -dir.z);
     }
   }
   vic.hitFlash = 0.12; vic.hitVariant ^= 1;
   const hs = o.hitstop ?? 0.05;
-  vic.hitstop = Math.max(vic.hitstop, hs);
-  if (o.melee) att.hitstop = Math.max(att.hitstop, hs);
+  if (!o.noStop) {
+    vic.hitstop = Math.max(vic.hitstop, hs);
+    if (o.melee) att.hitstop = Math.max(att.hitstop, hs);
+  }
   // эффекты
   const col = o.color || '#ffffff';
   const fxType = o.fx || 'hit';
@@ -1044,11 +1074,12 @@ export function hit(att, vic, o) {
     G.fx.ring(contact, col, 0.5, 4, 0.25, { a0: 0.9 });
     G.fx.sparks(contact, dir, col, 8, 36);
   }
-  G.sound(o.sfx || 'hit', vic.pos, o.vol ?? 0.7);
+  if (o.sfx !== 'none') G.sound(o.sfx || 'hit', vic.pos, o.vol ?? 0.7);
   if (att.isPlayer || vic.isPlayer) G.shake(o.shake ?? 0.2, vic.pos);
   // счётчик урона JJS («N DMG») вместо цифр над головой
   if (att.isPlayer && dmg > 0) G.hud.dmg(dmg);
   if (vic.isPlayer) G.hud.hurt(dmg);
+  G.onHit?.(att, vic, broke ? 'break' : 'hit', o, dmg);
   if (vic.hp <= 0) G.kill(vic, att);
   return broke ? 'break' : 'hit';
 }
