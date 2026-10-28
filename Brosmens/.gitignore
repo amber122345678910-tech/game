@@ -1,0 +1,7 @@
+tools/node_modules/
+tools/package-lock.json
+android/.gradle/
+android/build/
+android/app/build/
+android/local.properties
+*.apk

@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp" android:height="108dp" android:viewportWidth="108" android:viewportHeight="108">
+    <!-- плечи -->
+    <path android:fillColor="#111111" android:pathData="M22,78h64v16h-64z" />
+    <!-- голова -->
+    <path android:fillColor="#F2C9A0" android:pathData="M32,34h44v44h-44z" />
+    <path android:fillColor="#D9A97C" android:pathData="M70,34h6v44h-6z" />
+    <!-- волосы -->
+    <path android:fillColor="#2B1D10" android:pathData="M30,28h48v10h-48z" />
+    <path android:fillColor="#2B1D10" android:pathData="M30,38h6v6h-6z" />
+    <!-- очки -->
+    <path android:fillColor="#111111" android:pathData="M30,48h48v4h-48z" />
+    <path android:fillColor="#111111" android:pathData="M35,50h16v9h-16z" />
+    <path android:fillColor="#111111" android:pathData="M57,50h16v9h-16z" />
+    <path android:fillColor="#FFFFFF" android:pathData="M38,52h5v2h-5z" />
+    <path android:fillColor="#FFFFFF" android:pathData="M60,52h5v2h-5z" />
+    <!-- ухмылка -->
+    <path android:fillColor="#111111" android:pathData="M44,67h22v3h-22z" />
+    <path android:fillColor="#111111" android:pathData="M63,63h3v4h-3z" />
+</vector>
