@@ -323,11 +323,12 @@ export class FX {
   dust(pos, n = 8, size = 2.5, color = '#d8cfbf') {
     this.particles(pos, { n, normal: true, color, speed: 8, up: 3, size: size * 0.6, size1: size * 1.6, life: 0.8, drag: 4, alpha: 0.55, radius: 0.8, flatY: true });
   }
-  debris(pos, n = 8, colors = ['#7d7468', '#5ea548', '#9a8f80'], speed = 22) {
+  debris(pos, n = 8, colors = ['#7d7468', '#5ea548', '#9a8f80'], speed = 22, size = null) {
     n = Math.max(1, Math.round(n * this.k));
+    const s0 = size ? size[0] : 0.35, s1 = size ? size[1] : 0.9;
     for (let i = 0; i < n; i++) {
       _d.set(rand(-1, 1), rand(0.6, 1.6), rand(-1, 1)).normalize().multiplyScalar(speed * rand(0.5, 1.1));
-      this.deb.add(pos, _d, colors[i % colors.length], rand(0.35, 0.9), rand(1.0, 1.8));
+      this.deb.add(pos, _d, colors[i % colors.length], rand(s0, s1), rand(1.0, 1.8));
     }
   }
   bolt(a, b, color, o = {}) {

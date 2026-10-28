@@ -1,128 +1,86 @@
-// Нации: названия из имён лидеров («Кирилстан», «Димония»), цвета, флаги (рисуются на canvas).
-const TR = [
-  ['shch', 'щ'], ['sch', 'щ'], ['yo', 'ё'], ['yu', 'ю'], ['ya', 'я'], ['zh', 'ж'], ['kh', 'х'], ['ch', 'ч'], ['sh', 'ш'], ['ts', 'ц'],
-  ['oo', 'у'], ['ee', 'и'], ['gh', 'г'], ['ph', 'ф'], ['th', 'т'], ['ck', 'к'], ['ey', 'ей'], ['iy', 'ий'], ['ay', 'ай'], ['oy', 'ой'],
-  ['a', 'а'], ['b', 'б'], ['c', 'к'], ['d', 'д'], ['e', 'е'], ['f', 'ф'], ['g', 'г'], ['h', 'х'], ['i', 'и'], ['j', 'дж'], ['k', 'к'], ['l', 'л'],
-  ['m', 'м'], ['n', 'н'], ['o', 'о'], ['p', 'п'], ['q', 'к'], ['r', 'р'], ['s', 'с'], ['t', 'т'], ['u', 'у'], ['v', 'в'], ['w', 'в'], ['x', 'кс'],
-  ['y', 'ы'], ['z', 'з'],
+// BroWorld — нации (реальные регионы Земли, ИИ), племена, цвета территорий (пастель как в оригинале).
+// NATIONS: [название, широта, долгота] — точка появления нации на карте.
+export const NATIONS = [
+  ['Аляска', 64.5, -152], ['Юкон', 63.5, -135.5], ['Канада', 54, -112], ['Квебек', 52, -72],
+  ['Калифорния', 37, -120], ['Техас', 31.5, -99], ['США', 39.5, -90], ['Мексика', 23.5, -102],
+  ['Куба', 21.8, -79], ['Гренландия', 73, -40], ['Колумбия', 4, -73.5], ['Венесуэла', 7.5, -65.5],
+  ['Перу', -9.5, -75], ['Бразилия', -10, -52], ['Аргентина', -36, -65], ['Исландия', 64.9, -18.5],
+  ['Великобритания', 53, -1.5], ['Испания', 40, -3.7], ['Франция', 46.6, 2.4], ['Италия', 43, 12.5],
+  ['Германия', 51, 10], ['Финляндия', 63, 26], ['Польша', 52, 19.5], ['Украина', 49, 32],
+  ['Турция', 39, 34], ['Россия', 57, 42], ['Сибирь', 63, 105], ['Казахстан', 48, 68],
+  ['Монголия', 46.5, 103], ['Китай', 33, 112], ['Япония', 36.5, 138.5], ['Индия', 22, 79],
+  ['Иран', 32, 54], ['Саудовская Аравия', 24, 45], ['Египет', 26.5, 30], ['Алжир', 28, 2],
+  ['Марокко', 32, -6], ['Нигерия', 9, 8], ['Эфиопия', 9, 39.5], ['Кения', 0.3, 38],
+  ['ДР Конго', -3, 23], ['Намибия', -22, 17], ['ЮАР', -30, 24.5], ['Мадагаскар', -19.5, 46.7],
+  ['Таиланд', 15, 101], ['Индонезия', -0.5, 114], ['Австралия', -25, 134], ['Новая Зеландия', -42, 172.5],
+  ['Западная Антарктида', -78, -100], ['Восточная Антарктида', -75, 80],
 ];
-function translit(s) {
-  s = s.toLowerCase();
-  let out = '';
-  for (let i = 0; i < s.length;) {
-    let hit = false;
-    for (const [a, b] of TR) if (s.startsWith(a, i)) { out += b; i += a.length; hit = true; break; }
-    if (!hit) { out += s[i]; i++; }
-  }
-  return out;
-}
-const SPECIAL = { noob: 'Нуб', gamer: 'Геймер', shadow: 'Шэдоу', ghost: 'Гост', pro: 'Про', dark: 'Дарк', sigma: 'Сигм', lol: 'Лол', zed: 'Зед' };
-const SUFFIX = ['ия', 'стан', 'ландия', 'овия', 'град', 'ония'];
-export const FALLBACK = ['Пинговия', 'Лагистан', 'Изиград', 'Нубляндия', 'Кринжония', 'Сигмария', 'Донатия', 'Респания', 'Читерстан', 'Тиммейтия', 'Афкландия', 'Бустония'];
 
-export function nationName(raw, salt = 0) {
-  let s = String(raw).replace(/^xX_|_Xx$/g, '');
-  s = (s.match(/[A-ZА-ЯЁ]?[a-zа-яё]+|[A-ZА-ЯЁ]+(?![a-zа-яё])/) || [''])[0];
-  if (!s) return null;
-  let root = /[А-Яа-яЁё]/.test(s) ? s.toLowerCase() : SPECIAL[s.toLowerCase()]?.toLowerCase() || translit(s);
-  root = root.replace(/(.)\1$/, '$1'); // Кирилл → Кирил
-  const V = /[аяоеёыиуюэ]/;
-  if (root.length < 2 || !V.test(root) || /(.)\1\1/.test(root)) return null;
-  let pool = SUFFIX;
-  if (/[аяоеёыиуюэь]$/.test(root)) {
-    const st = root.replace(/[аяоеёыиуюэь]+$/, '');
-    if (st.length >= 2 && V.test(st)) { root = st; pool = ['ландия', 'ия', 'стан', 'овия']; }
-    else pool = ['вия', 'стан', 'ландия'];
-  }
-  const h = [...root].reduce((a, c) => a + c.charCodeAt(0), 0);
-  let suf = pool[(h + salt) % pool.length];
-  if (/н$/.test(root) && suf === 'ония') suf = 'ия';
-  if (/[шщжчй]$/.test(root) && (suf === 'ия' || suf === 'ония')) suf = 'ландия';
-  if (/[кгх]$/.test(root) && suf === 'ия') suf = 'стан';
-  const name = root + suf;
-  return name[0].toUpperCase() + name.slice(1);
+const TRIBE_A = ['Серых', 'Быстрых', 'Горных', 'Северных', 'Тихих', 'Каменных', 'Ледяных', 'Степных', 'Лесных', 'Дальних', 'Песчаных', 'Красных', 'Солнечных', 'Лунных', 'Громовых', 'Речных', 'Ночных', 'Рыжих', 'Белых', 'Тёмных'];
+const TRIBE_B = ['Волков', 'Бизонов', 'Ястребов', 'Медведей', 'Лис', 'Коней', 'Орлов', 'Барсов', 'Сов', 'Туров', 'Рысей', 'Воронов', 'Буйволов', 'Оленей', 'Клыков', 'Когтей'];
+export function tribeNames(n, rand) {
+  const all = [];
+  for (const a of TRIBE_A) for (const b of TRIBE_B) all.push(`Племя ${a} ${b}`);
+  for (let i = all.length - 1; i > 0; i--) { const j = Math.floor(rand() * (i + 1)); const t = all[i]; all[i] = all[j]; all[j] = t; }
+  return all.slice(0, n);
 }
 
-export const PLAYER_COLOR = '#2f7bff';
-export const CLAUDE_COLOR = '#e07a4f';
-export const BOT_COLORS = ['#e53935', '#2ea043', '#9c27b0', '#f2c00f', '#00b3a4', '#ff5fa2', '#8d6e63', '#9ccc3a', '#8e1b3a', '#546e7a'];
-
+// ---------- цвета ----------
+export const PLAYER_COLOR = '#8AB4F8';
+export const CLAUDE_COLOR = '#F7B98B';
+export const TRIBE_COLOR = '#C9C6BF';
+const BASE = ['#F2A6C4', '#C7B5F0', '#A8E6C1', '#F3E08A', '#F59A8F', '#9FD3F0', '#7FD1C7', '#E7B7F2', '#B9E28C', '#F6C6A0', '#A6C8F2', '#F2D0A6'];
 export function hexToRgb(h) { const n = parseInt(h.slice(1), 16); return [(n >> 16) & 255, (n >> 8) & 255, n & 255]; }
-export function shade(h, k) { // k<0 темнее, k>0 светлее
-  const [r, g, b] = hexToRgb(h);
-  const f = (c) => Math.round(k < 0 ? c * (1 + k) : c + (255 - c) * k);
-  return `rgb(${f(r)},${f(g)},${f(b)})`;
+export function rgbHex([r, g, b]) { return '#' + ((1 << 24) | (r << 16) | (g << 8) | b).toString(16).slice(1); }
+function rgb2hsl([r, g, b]) {
+  r /= 255; g /= 255; b /= 255;
+  const mx = Math.max(r, g, b), mn = Math.min(r, g, b), l = (mx + mn) / 2;
+  if (mx === mn) return [0, 0, l];
+  const d = mx - mn, s = l > 0.5 ? d / (2 - mx - mn) : d / (mx + mn);
+  let h = mx === r ? (g - b) / d + (g < b ? 6 : 0) : mx === g ? (b - r) / d + 2 : (r - g) / d + 4;
+  return [h / 6, s, l];
+}
+function hsl2rgb([h, s, l]) {
+  if (!s) { const v = Math.round(l * 255); return [v, v, v]; }
+  const q = l < 0.5 ? l * (1 + s) : l + s - l * s, p = 2 * l - q;
+  const f = (t) => { t = (t + 1) % 1; return t < 1 / 6 ? p + (q - p) * 6 * t : t < 0.5 ? q : t < 2 / 3 ? p + (q - p) * (2 / 3 - t) * 6 : p; };
+  return [Math.round(f(h + 1 / 3) * 255), Math.round(f(h) * 255), Math.round(f(h - 1 / 3) * 255)];
+}
+const clamp01 = (v) => (v < 0 ? 0 : v > 1 ? 1 : v);
+export function brighten(rgb, k) { return rgb.map((c) => Math.min(255, Math.round(c + (255 - c) * k))); }
+export function darken(rgb, k) { return rgb.map((c) => Math.round(c * (1 - k))); }
+
+// пастельная палитра на любое число игроков
+export function pastel(i) {
+  if (i < BASE.length) return BASE[i];
+  const h = ((i * 137.508) % 360) / 360;
+  const s = 0.55 + ((i * 7) % 5) * 0.06, l = 0.74 + ((i * 3) % 4) * 0.025;
+  return rgbHex(hsl2rgb([h, s, l]));
 }
 
-// Флаг: полосы/крест/круг + эмблема. Возвращает canvas 48×32.
-const FLAG_EXTRA = ['#ffffff', '#ffd54a', '#111827', '#ffffff', '#e8e8e8'];
-export function makeFlag(color, rand) {
-  const c = document.createElement('canvas'); c.width = 48; c.height = 32;
-  const g = c.getContext('2d');
-  const extra = FLAG_EXTRA[Math.floor(rand() * FLAG_EXTRA.length)];
-  const dark = shade(color, -0.45);
-  const style = Math.floor(rand() * 6);
-  g.fillStyle = color; g.fillRect(0, 0, 48, 32);
-  if (style === 0) { g.fillStyle = extra; g.fillRect(0, 0, 48, 11); g.fillStyle = dark; g.fillRect(0, 21, 48, 11); }
-  else if (style === 1) { g.fillStyle = extra; g.fillRect(16, 0, 16, 32); g.fillStyle = dark; g.fillRect(32, 0, 16, 32); }
-  else if (style === 2) { g.fillStyle = extra; g.fillRect(13, 0, 7, 32); g.fillRect(0, 12, 48, 7); }
-  else if (style === 3) { g.fillStyle = extra; g.beginPath(); g.moveTo(0, 0); g.lineTo(22, 16); g.lineTo(0, 32); g.fill(); }
-  else if (style === 4) { g.fillStyle = dark; g.beginPath(); g.moveTo(48, 0); g.lineTo(48, 32); g.lineTo(0, 32); g.fill(); }
-  else { g.fillStyle = extra; g.fillRect(0, 13, 48, 6); }
-  // эмблема
-  const em = Math.floor(rand() * 4);
-  const ex = style === 3 ? 8 : style === 2 ? 16 : 24, ey = 16;
-  g.fillStyle = style === 0 || style === 5 ? '#ffd54a' : extra === '#ffd54a' ? '#ffffff' : '#ffd54a';
-  if (em === 0) star(g, ex, ey, 7, 3);
-  else if (em === 1) { g.beginPath(); g.arc(ex, ey, 6, 0, 7); g.fill(); }
-  else if (em === 2) { g.beginPath(); g.arc(ex, ey, 7, 0, 7); g.fill(); g.fillStyle = color; g.beginPath(); g.arc(ex + 3, ey - 1, 6, 0, 7); g.fill(); }
-  g.strokeStyle = 'rgba(0,0,0,.35)'; g.lineWidth = 2; g.strokeRect(1, 1, 46, 30);
-  return c;
-}
-export function star(g, x, y, R, r, n = 5) {
-  g.beginPath();
-  for (let i = 0; i < n * 2; i++) {
-    const a = -Math.PI / 2 + (i * Math.PI) / n, rr = i % 2 ? r : R;
-    g.lineTo(x + Math.cos(a) * rr, y + Math.sin(a) * rr);
-  }
-  g.closePath(); g.fill();
-}
-
-// Сборка списка наций. leaders: [{bot, isPlayer, isClaude}]
-export function buildNations({ playerName, claude, bots, rand }) {
-  const used = new Set(), stems = new Set();
-  const stem = (s) => s.slice(0, 3).toLowerCase();
-  const list = [];
-  const uniq = (n, i) => {
-    let name = n;
-    if (!name || used.has(name) || stems.has(stem(name))) name = FALLBACK.find((f) => !used.has(f) && !stems.has(stem(f))) || 'Нация ' + (i + 1);
-    used.add(name); stems.add(stem(name));
-    return name;
+// Все производные цвета владельца: заливка (насыщенность ×0.85), полоса границы (темнее и насыщеннее),
+// подсвеченные варианты (+15% / +25% яркости), тёмный — для значков построек.
+export function ownerColors(hex) {
+  const rgb = hexToRgb(hex);
+  const [h, s, l] = rgb2hsl(rgb);
+  const fill = hsl2rgb([h, s * 0.85, l]);
+  const border = hsl2rgb([h, s < 0.2 ? s * 1.2 : Math.min(0.58, s * 0.9 + 0.12), clamp01(l * 0.63)]);
+  return {
+    css: hex, rgb, fill, border,
+    fillHi: brighten(fill, 0.15), borderHi: brighten(border, 0.25),
+    dark: rgbHex(darken(rgb, 0.35)), deep: rgbHex(hsl2rgb([h, clamp01(s * 0.9), clamp01(l * 0.42)])),
+    borderCss: rgbHex(border),
   };
-  // игрок
-  const pn = playerName && playerName !== 'Игрок' ? nationName(playerName) : null;
-  list.push({ name: uniq(pn || 'Брославия', 0), color: PLAYER_COLOR, leader: { id: 'player', name: playerName || 'Игрок' }, isPlayer: true });
-  list.push({ name: uniq('Клодия', 1), color: CLAUDE_COLOR, leader: claude, isClaude: true });
-  bots.forEach((b, i) => {
-    const n = nationName(b.name, i);
-    list.push({ name: uniq(n, i + 2), color: BOT_COLORS[i % BOT_COLORS.length], leader: b });
-  });
-  list.forEach((n, i) => {
-    n.id = i;
-    n.flag = makeFlag(n.color, rand);
-    n.flagUrl = n.flag.toDataURL();
-    const [r, g, b] = hexToRgb(n.color);
-    n.rgb = [r, g, b];
-    n.fill = `rgba(${r},${g},${b},0.38)`;
-    n.fillHi = `rgba(${r},${g},${b},0.6)`;
-    n.dark = shade(n.color, -0.35);
-    n.light = shade(n.color, 0.35);
-  });
-  return list;
 }
 
-// падежи для названий наций (упрощённо): кому? (дательный), с кем? (творительный), род для глагола
-export const fem = (n) => /[ая]$/.test(n);
-export function dat(n) { return /ия$/.test(n) ? n.slice(0, -1) + 'и' : /а$/.test(n) ? n.slice(0, -1) + 'е' : /я$/.test(n) ? n.slice(0, -1) + 'е' : n + 'у'; }
-export function ins(n) { return /ия$/.test(n) ? n.slice(0, -1) + 'ей' : /а$/.test(n) ? n.slice(0, -1) + 'ой' : /я$/.test(n) ? n.slice(0, -1) + 'ей' : n + 'ом'; }
-export const va = (n, verb) => verb + (fem(n) ? 'а' : '');
+// винительный падеж для названий наций: «Ты уничтожил Украину / Саудовскую Аравию»; аббревиатуры и прочее — без изменений
+export function acc(name) {
+  if (!/[а-яё]/.test(name)) return name;
+  return name.split(' ').map((w) => {
+    if (/^[А-ЯЁ]{2,}$/.test(w) || !/[а-яё]$/.test(w)) return w;
+    if (/ая$/.test(w)) return w.slice(0, -2) + 'ую';
+    if (/[^аеиоуыэюя]а$/.test(w)) return w.slice(0, -1) + 'у';
+    if (/я$/.test(w)) return w.slice(0, -1) + 'ю';
+    return w;
+  }).join(' ');
+}

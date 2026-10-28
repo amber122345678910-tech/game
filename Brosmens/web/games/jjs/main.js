@@ -9,11 +9,11 @@ import { getProfile, addStat, addCoins } from '../../shared/profile.js';
 import { G } from './ctx.js';
 import { buildWorld } from './world.js';
 import { FX } from './fx.js';
-import { Fighter, hit } from './fighter.js';
+import { Fighter, hit, FDASH_CD, SDASH_CD } from './fighter.js';
 import { CHARS, CHAR_IDS, resetSkills } from './skills.js';
 import { Brain } from './bot.js';
 import { createHUD } from './hud.js';
-import { rand, clamp, pick, angleDamp, wrapAngle } from './util.js';
+import { rand, clamp, pick, angleDamp, wrapAngle, ease } from './util.js';
 
 const MATCH_TIME = 240, KILL_LIMIT = 15;
 const NAME_COLORS = ['#ff6b6b', '#ffd93d', '#6bcb77', '#4d96ff', '#c77dff', '#ff9f45', '#5ee6eb', '#ff7eb6'];
@@ -24,8 +24,8 @@ const ui = initGameUI({
   title: 'Jujutsu Brosmens',
   players: () => G.fighters.slice().sort((a, b) => b.kills - a.kills).map((f) => ({ name: f.name, skin: f.skin, score: `${f.kills} уб.` })),
   onReset: () => resetPlayer(),
-  controlsHelp: `<b>Телефон:</b> левая часть экрана — джойстик, свайп справа — камера. Большая кнопка — M1 (комбо из 4 ударов, 4-й отбрасывает; в прыжке — удар вниз). 🛡 — блок (держать), рывок, прыжок, ⚡ — пробуждение. Навыки — панель 1–4 внизу.<br>
-  <b>ПК:</b> WASD — ход, мышь (зажать) — камера, ЛКМ/F — M1, R — блок, Q — рывок, Space — прыжок, 1–4 — навыки, G — пробуждение. Держи Space на 4-м ударе — апперкот.`,
+  controlsHelp: `<b>Телефон:</b> левая часть экрана — джойстик, свайп справа — камера. Кулак — M1 (4 удара; 4-й в прыжке — апперкот, в падении — удар вниз). Щит — блок (держать), бегун — рывок (вперёд/на месте — рывок с ударом, вбок/назад — уклон; в рэгдолле при полной левой подшкале — уклонение), стрелка — прыжок, звезда — особый навык, замок — Shift-lock. Навыки — ячейки 1–4 внизу; когда шкала пробуждения полная — нажми на неё.<br>
+  <b>ПК:</b> WASD — ход, мышь (зажать) — камера, ЛКМ — M1, F — блок, Q — рывок, Space — прыжок, R — особый навык, 1–4 — навыки, G — пробуждение, Shift — Shift-lock. Держи Space на 4-м ударе — апперкот.`,
 });
 
 // ---------- рендер ----------
@@ -75,32 +75,69 @@ addEventListener('resize', onResize);
 onResize();
 
 // ---------- управление ----------
+// Кнопки в стиле JJS: чёрный круг, серое кольцо, плоский серый значок без текста.
+const SVG = (inner) => `<svg viewBox="0 0 64 64" aria-hidden="true">${inner}</svg>`;
+const ICON = {
+  fist: SVG(`<g fill="currentColor"><rect x="13" y="15" width="10" height="17" rx="4.5"/><rect x="23.5" y="12" width="10" height="20" rx="4.5"/><rect x="34" y="13" width="10" height="19" rx="4.5"/><rect x="44.5" y="17" width="8.5" height="16" rx="4.2"/><path d="M12 29h41v9c0 10-7 16-17 16h-7c-9 0-17-6-17-15z"/></g><path d="M23.3 17v13M33.8 15v15M44.3 19v12" stroke="#0e0e0e" stroke-width="1.6"/><path d="M11 36c0-4 3-6 6-6h13c3 0 5 2 5 4.5S33 39 30 39h-8" fill="currentColor" stroke="#0e0e0e" stroke-width="1.8" stroke-linejoin="round"/>`),
+  shield: SVG(`<path fill="currentColor" d="M32 7l21 6.5V30c0 13.5-9 21.5-21 27C20 51.5 11 43.5 11 30V13.5z"/><path fill="#0e0e0e" opacity=".35" d="M32 13l15 4.6V30c0 9.8-6.2 16-15 20.6z"/>`),
+  dash: SVG(`<circle cx="40" cy="11" r="5.6" fill="currentColor"/><path d="M36 21L29.5 35M29.5 35l8.5 6-2.5 13M29.5 35L21 45.5h-8M35 22l9.5 5 5.5-6M35 22l-9.5 3-5 6.5" stroke="currentColor" stroke-width="5.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/><path d="M3 23h11M1 31h9M5 39h7" stroke="currentColor" stroke-width="3" stroke-linecap="round"/>`),
+  jump: SVG(`<path fill="currentColor" d="M32 17l14 15.5h-8.6V46H26.6V32.5H18z"/>`),
+  star: SVG(`<path fill="currentColor" d="M32 5c2 19 8 25 27 27-19 2-25 8-27 27-2-19-8-25-27-27C24 30 30 24 32 5z"/>`),
+  lock: SVG(`<path d="M22 29v-8a10 10 0 0 1 20 0v8" stroke="currentColor" stroke-width="6" fill="none" stroke-linecap="round"/><rect x="15" y="28" width="34" height="27" rx="4.5" fill="currentColor"/><rect x="29.5" y="35" width="5" height="12" rx="2.5" fill="#0e0e0e"/>`),
+};
+document.body.classList.add('jjs');
+{
+  const st = document.createElement('style');
+  st.textContent = `
+body.jjs .tc-btn{background:rgba(14,14,14,.9);border:3px solid #5A5A5A;color:#878787;text-shadow:none}
+body.jjs .tc-btn.on{background:rgba(48,48,48,.95);transform:scale(.94)}
+body.jjs .tc-btn span{padding:0;width:60%;height:60%;display:flex;align-items:center;justify-content:center;line-height:0}
+body.jjs .tc-btn svg{width:100%;height:100%;display:block}
+body.jjs .tc-btn .cd{background:conic-gradient(rgba(150,150,150,.55) var(--a,0deg),transparent 0)}
+body.jjs .tc-btn.lockon{color:#4fa6ff;border-color:#3a7fd6}
+body.jjs .tc-btn.blk{border-color:#8a8a8a;color:#b4b4b4}
+body.jjs .tc-btn .k{color:#9a9a9a;font-size:8px;bottom:2px}
+@media (pointer:coarse){body.jjs .tc-btn .k{display:none}}`;
+  document.head.appendChild(st);
+}
+// Позиции — центры кнопок для ландшафта ≈915×412 (JJS/Roblox-раскладка), отсчёт от правого нижнего угла.
 const ctl = createControls({
   buttons: [
-    { id: 'm1', label: '<b style="font-size:22px">M1</b>', x: -88, y: -92, size: 100, key: 'KeyF' },
-    { id: 'block', label: '🛡<br><small style="font-size:10px">Блок</small>', x: -196, y: -64, size: 62, key: 'KeyR' },
-    { id: 'dash', label: '💨<br><small style="font-size:10px">Рывок</small>', x: -182, y: -156, size: 60, key: 'KeyQ' },
-    { id: 'jump', label: '⤒', x: -82, y: -202, size: 62, key: 'Space' },
-    { id: 'g', label: '⚡', x: -196, y: -240, size: 58, key: 'KeyG' },
+    { id: 'm1', label: ICON.fist, x: -192, y: -115, size: 78 },
+    { id: 'block', label: ICON.shield, x: -174, y: -206, size: 60, key: 'KeyF' },
+    { id: 'dash', label: ICON.dash, x: -73, y: -165, size: 60, key: 'KeyQ' },
+    { id: 'jump', label: ICON.jump, x: -60, y: -55, size: 70, key: 'Space' },
+    { id: 'special', label: ICON.star, x: -293, y: -198, size: 56, key: 'KeyR' },
+    { id: 'lock', label: ICON.lock, x: -73, y: -255, size: 46, key: 'ShiftLeft' },
   ],
-  keyMap: { Digit1: 's0', Digit2: 's1', Digit3: 's2', Digit4: 's3' },
+  keyMap: { Digit1: 's0', Digit2: 's1', Digit3: 's2', Digit4: 's3', ShiftRight: 'lock' },
 });
 G.ctl = ctl;
-ctl.el('jump').style.fontSize = '26px';
-ctl.el('g').style.fontSize = '22px';
 let jumpQueued = false;
-const P = () => (state === 'play' && G.player && !G.player.dead ? G.player : null);
+let shiftLock = false;
+try { shiftLock = localStorage.getItem('jjs.shiftlock') === '1'; } catch {}
+const P = () => (state === 'play' && G.player && !G.player.dead && !ui.menuOpen() ? G.player : null);
 ctl.onPress('m1', () => { const p = P(); if (p) { p.m1(); p.lastAttackT = G.time; } });
 ctl.onPress('dash', () => P()?.dash());
 ctl.onPress('jump', () => { jumpQueued = true; });
-ctl.onPress('g', () => P()?.awaken());
+ctl.onPress('special', () => { const p = P(); if (p) { p.special(); p.lastAttackT = G.time; } });
+ctl.onPress('lock', () => {
+  shiftLock = !shiftLock;
+  try { localStorage.setItem('jjs.shiftlock', shiftLock ? '1' : '0'); } catch {}
+  ui.toast(shiftLock ? 'Shift-lock: ВКЛ' : 'Shift-lock: ВЫКЛ', 900);
+});
 const skillPress = (i) => { const p = P(); if (p) { p.skill(i); p.lastAttackT = G.time; } };
-const skillRelease = (i) => P()?.release(i);
+const skillRelease = (i) => G.player?.release(i);
 for (let i = 0; i < 4; i++) { ctl.onPress('s' + i, () => skillPress(i)); ctl.onRelease('s' + i, () => skillRelease(i)); }
 G.hud.onSkill(skillPress, skillRelease);
+// пробуждение: тап по шкале (телефон) или G (ПК)
+G.hud.onAwakenTap(() => P()?.awaken());
+addEventListener('keydown', (e) => { if (e.code === 'KeyG' && !e.repeat) P()?.awaken(); });
 renderer.domElement.addEventListener('pointerdown', (e) => {
   if (e.pointerType === 'mouse' && e.button === 0) { const p = P(); if (p) { p.m1(); p.lastAttackT = G.time; } }
 });
+G.hud.setGL(renderer.domElement);
+{ const k = ctl.el('lock').querySelector('.k'); if (k) k.textContent = 'Shift'; }
 
 // ---------- чат ----------
 const chat = createChat({ bots: () => G.fighters.filter((f) => f.bot).map((f) => { f.bot.dead = f.dead; return f.bot; }) });
@@ -148,11 +185,16 @@ G.callout = (f, text, color, selfOnly = false) => {
   if (f === p || (!selfOnly && f.dist(p) < 55)) G.hud.callout(text, f === p ? '' : f.name, color);
 };
 G.onAwaken = (f) => {
+  const aw = f.ch.awaken;
   f.chestPos(_t);
-  G.fx.ring(_t, f.look.color, 1, 12, 0.5, { a0: 1 });
-  G.fx.burst(_t, '#ffffff', 12, 0.25);
+  G.fx.ring(_t, aw.color, 1, 12, 0.5, { a0: 1 });
   G.sound('charge', f.pos, 0.8);
-  if (f.isPlayer) { G.hud.flash(f.look.color, 0.35, 2); ui.toast('ПРОБУЖДЕНИЕ!', 1400); }
+  // манга-реплики рядом с персонажем
+  aw.lines.forEach(([at, text], i) => {
+    let t = 0;
+    G.addTask((dt) => { t += dt; if (f.dead || G.matchOver) return false; if (t < at) return true; G.hud.manga(f, text, i); return false; });
+  });
+  if (f.isPlayer) { G.cine = { f, t: 0, dur: aw.cine || 3.2 }; G.hud.flash('#000000', 0.25, 2); }
   else if (f.bot && Math.random() < 0.5) awakenLine(f);
 };
 const AW_NICE = ['ПРОБУЖДЕНИЕ!!', 'ну всё, пробуждение', 'держитесь ахах', 'вот теперь серьёзно', 'ульта готова)', 'смотрите что умею'];
@@ -173,7 +215,7 @@ G.kill = (vic, att) => {
   vic.die(killer);
   if (killer) {
     killer.kills++;
-    if (killer.awakened <= 0) killer.meter = Math.min(100, killer.meter + 15);
+    killer.evasive = 100;
   }
   G.hud.killfeed(killer ? killer.name : '', vic.name, killer ? killer.color : '#fff', vic.color);
   if (killer && killer.isPlayer) {
@@ -189,7 +231,7 @@ G.kill = (vic, att) => {
   else if (vic.bot && Math.random() < 0.5) G.botEvent(vic, 'death', { target: killer ? killer.name : '', eventText: killer ? `тебя только что победил ${killer.name}` : 'ты упал и проиграл' }, true);
   if (state === 'play' && killer && killer.kills >= KILL_LIMIT) endMatch();
 };
-const _t = new THREE.Vector3(), _u = new THREE.Vector3();
+const _t = new THREE.Vector3(), _u = new THREE.Vector3(), _w = new THREE.Vector3();
 
 // ---------- матч ----------
 let state = 'select';
@@ -210,6 +252,7 @@ function clearMatch() {
   resetSkills();
   G.fx.clear();
   G.debugCam = null;
+  G.cine = null;
 }
 
 function bestSpawn(f) {
@@ -322,6 +365,7 @@ function playerInput(dt) {
   inp.jumpHeld = ctl.down('jump');
   inp.block = ctl.down('block') && state === 'play';
   p.aim.set(fx, 0, fz);
+  p.lockYaw = shiftLock && state === 'play' ? camYaw : null;
 }
 
 function updateCamera(dt) {
@@ -349,7 +393,7 @@ function updateCamera(dt) {
   const cp = Math.cos(camPitch);
   const dx = Math.sin(camYaw) * cp, dy = Math.sin(camPitch), dz = Math.cos(camYaw) * cp;
   const rx = -Math.cos(camYaw), rz = Math.sin(camYaw);
-  const sh = 1.25;
+  const sh = shiftLock ? 1.75 : 1.25;
   const base = _u.set(camLook.x + rx * sh, camLook.y + 0.5, camLook.z + rz * sh);
   _t.set(-dx, -dy, -dz);
   let dist = G.world.rayDist(base, _t, camDist);
@@ -358,7 +402,25 @@ function updateCamera(dt) {
   dist = camCur;
   camera.position.set(base.x - dx * dist, base.y - dy * dist, base.z - dz * dist);
   if (camera.position.y < 0.8) camera.position.y = 0.8;
-  camera.lookAt(base.x + dx * 10, base.y + dy * 10, base.z + dz * 10);
+  _w.set(base.x + dx * 10, base.y + dy * 10, base.z + dz * 10);
+  // кинематика пробуждения: камера облетает к лицу (3/4 спереди) и возвращается
+  const cn = G.cine;
+  if (cn) {
+    cn.t += dt;
+    if (cn.t >= cn.dur || cn.f.dead) G.cine = null;
+    else {
+      const f = cn.f, s = f.scale;
+      const kin = Math.min(1, cn.t / 0.45), kout = Math.min(1, (cn.dur - cn.t) / 0.45);
+      const k = ease.smooth(Math.min(kin, kout));
+      const fx = Math.sin(f.yaw), fz = Math.cos(f.yaw);
+      const zoom = 1 - Math.min(1, cn.t / cn.dur) * 0.18;
+      f.headPos(_u); _u.y -= 0.55 * s;
+      const cx = _u.x + (fx * 5.4 - fz * 2.6) * s * zoom, cy = _u.y - 0.25 * s, cz = _u.z + (fz * 5.4 + fx * 2.6) * s * zoom;
+      camera.position.set(camera.position.x + (cx - camera.position.x) * k, camera.position.y + (cy - camera.position.y) * k, camera.position.z + (cz - camera.position.z) * k);
+      _w.lerp(_u, k);
+    }
+  }
+  camera.lookAt(_w);
   // тряска
   const s = shakeEnabled() ? trauma * trauma : 0;
   if (s > 0.001) {
@@ -371,27 +433,29 @@ function updateCamera(dt) {
   if (Math.abs(camera.fov - fov) > 0.05) { camera.fov = fov; camera.updateProjectionMatrix(); }
 }
 
-// ---------- кнопки: перезарядки ----------
-let lastG = '';
+// ---------- кнопки и панель: перезарядки, состояния ----------
+const btnC = {};
+const setBtn = (id, key, v, fn) => { const c = (btnC[id] ||= {}); if (c[key] !== v) { c[key] = v; fn(v); } };
 function updateButtons() {
   const p = G.player;
   if (!p) return;
-  const defs = [0, 1, 2, 3].map((i) => p.skillDef(i));
-  G.hud.setSkills(defs);
+  G.hud.setSkills([0, 1, 2, 3].map((i) => p.skillDef(i)));
   G.hud.setCooldowns(p.cd, p.cdMax);
-  ctl.setCooldown('dash', p.dashCd > 0 ? p.dashCd / 1.7 : 0);
-  ctl.setCooldown('m1', p.m1Cd > 0 ? p.m1Cd / 0.95 : 0);
-  const ready = p.meter >= 100 && p.awakened <= 0;
-  ctl.setCooldown('g', p.awakened > 0 ? 0 : 1 - p.meter / 100);
-  const gk = ready ? 'r' : p.awakened > 0 ? 'a' : 'n';
-  if (gk !== lastG) {
-    lastG = gk;
-    const el = ctl.el('g');
-    el.style.borderColor = ready || p.awakened > 0 ? p.look.color : 'rgba(255,255,255,.75)';
-    el.style.boxShadow = ready ? `0 0 14px ${p.look.color}, 0 0 4px #fff` : 'none';
-    ctl.setLabel('g', ready ? `⚡<br><small style="font-size:9px">${p.ch.awaken.label}</small>` : p.awakened > 0 ? '<small style="font-size:10px">ON</small>' : '⚡');
-  }
-  ctl.el('block').style.borderColor = p.blocking ? '#9fd8ff' : 'rgba(255,255,255,.75)';
+  // рывок: показываем перезарядку того рывка, который выйдет сейчас (вперёд — 6 с, вбок/назад — 2 с)
+  const front = p.dashKind() === 'front';
+  const dcd = front ? Math.max(0, p.fdashCd) / FDASH_CD : Math.max(0, p.sdashCd) / SDASH_CD;
+  setBtn('dash', 'cd', Math.round(dcd * 90), (v) => ctl.setCooldown('dash', v / 90));
+  const sp = p.specialDef();
+  setBtn('special', 'cd', sp && p.specCd > 0 ? Math.round((p.specCd / p.specCdMax) * 90) : 0, (v) => ctl.setCooldown('special', v / 90));
+  setBtn('special', 'has', !!sp, (v) => { ctl.el('special').style.opacity = v ? '' : '0.35'; });
+  // прыжок не гаснет от оглушения и M1 — тускнеет только когда прыгнуть нельзя
+  setBtn('jump', 'ok', p.dead || p.canJump() || p.stun > 0 || (p.action && p.onGround), (v) => { ctl.el('jump').style.opacity = v ? '' : '0.4'; });
+  setBtn('block', 'on', p.blocking, (v) => ctl.el('block').classList.toggle('blk', v));
+  setBtn('lock', 'on', shiftLock, (v) => ctl.el('lock').classList.toggle('lockon', v));
+  // ячейки скрыты во время кинематики пробуждения, в меню и на экране смерти; в меню скрыты и все кнопки
+  const menu = ui.menuOpen();
+  G.hud.setBoxesHidden(menu || p.dead || (G.cine && G.cine.f === p));
+  setBtn('all', 'vis', !menu, (v) => ctl.setVisible(v));
 }
 
 // ---------- кадр ----------
@@ -473,6 +537,7 @@ function render(dt) {
   sunL.target.position.set(c.x, 0, c.z);
   sunL.position.set(c.x + G.world.sunDir.x * 120, G.world.sunDir.y * 120, c.z + G.world.sunDir.z * 120);
   renderer.render(scene, camera);
+  G.hud.afterRender(renderer.domElement);
 }
 
 function separate() {

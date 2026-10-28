@@ -71,11 +71,12 @@ export function buildWorld(scene, { shadows = true } = {}) {
   M.box(0, 4.8, 0, 0.7, 1.2, 0.7, '#d2cfc8');
   solidCyl(0, 0, 7.6, 0, 1.5);
   solidCyl(0, 0, 1.6, 0, 4.4);
+  const camBlock = []; // только для камеры: стволы и кроны деревьев, колонна фонтана
+  camBlock.push({ t: 0, minX: -1.3, maxX: 1.3, minY: 0, maxY: 4.6, minZ: -1.3, maxZ: 1.3 });
 
   // ---------- Деревья ----------
   const trees = [];
   const LEAF = ['#3f8f3a', '#4ba043', '#348a3c', '#5aac48'];
-  const camBlock = []; // кроны деревьев: только для камеры
   const tree = (x, z) => {
     const h = r(6.6, 8.2);
     M.box(x, h / 2, z, 1.3, h, 1.3, '#6b4a2b');
@@ -87,6 +88,8 @@ export function buildWorld(scene, { shadows = true } = {}) {
     solidCyl(x, z, 0.95, 0, h);
     const hs = s * 0.62;
     camBlock.push({ t: 0, minX: x - hs, maxX: x + hs, minY: h - 0.2, maxY: h + 5, minZ: z - hs, maxZ: z + hs });
+    // ствол тоже загораживает камеру (иначе первый кадр — коричневая стена во весь экран)
+    camBlock.push({ t: 0, minX: x - 0.95, maxX: x + 0.95, minY: 0, maxY: h, minZ: z - 0.95, maxZ: z + 0.95 });
     trees.push({ x, z });
   };
   for (let tries = 0; tries < 400 && trees.length < 22; tries++) {

@@ -1,10 +1,11 @@
-// Мозг бота: выбор цели (ближайший/слабый/месть), сближение, комбо, блок, уклонение рывком,
-// навыки по дистанции и перезарядке, отступление на низком HP, пробуждение.
+// Мозг бота: выбор цели (ближайший/слабый/месть), сближение, комбо, блок, рывки (фронтальный/боковой),
+// уклонение из рэгдолла (новички сразу, сильные — копят для наказания), всплеск против толпы,
+// навыки и особый навык по дистанции и перезарядке, отступление на низком HP, пробуждение.
 import * as THREE from 'three';
 import { G } from './ctx.js';
 import { rand } from './util.js';
 
-const RANGED_THREATS = new Set(['purple', 'love', 'fuga', 'red', 'blue', 'rsmash']);
+const RANGED_THREATS = new Set(['purple', 'love', 'fuga', 'red', 'redmax', 'lblue', 'bluemax', 'rsmash', 'sdismantle', 'dismantle']);
 
 export class Brain {
   constructor(f) {
@@ -17,6 +18,9 @@ export class Brain {
     this.mode = 'hunt'; this.modeT = 0;
     this.m1T = 0;
     this.skillT = rand(0.8, 2);
+    this.specT = rand(1, 3);
+    this.evaT = -1;
+    this.tBlockT = 0;
     this.seen = new WeakSet();
     this.lastPos = new THREE.Vector3(); this.stuckT = 0; this.unstickT = 0; this.unstickX = 0; this.unstickZ = 0;
     this.reaction = 0.34 - this.skill * 0.24;
@@ -32,6 +36,15 @@ export class Brain {
     if (f.dead || G.matchOver) return;
     this.think -= dt;
     if (this.think <= 0) { this.think = rand(0.2, 0.4); this.choose(); }
+    // рэгдолл: уклонение (evasive) — новички сразу, сильные боты берегут для наказания
+    if (f.rag || f.down > 0) { this.evasive(dt); return; }
+    this.evaT = -1;
+    // всплеск: если зажали вдвоём — боковой рывок (+10 HP и полная шкала уклонения)
+    if (f.burst > 0 && f.burstCd <= 0 && Math.random() < dt * (2 + this.skill * 6)) {
+      const s = Math.random() < 0.5 ? 1 : -1;
+      inp.mx = -f.aim.z * s; inp.mz = f.aim.x * s;
+      if (f.dash()) return;
+    }
     if (this.blockT > 0) { this.blockT -= dt; inp.block = true; }
     const t = this.target;
     if (!t || t.dead) {
@@ -51,8 +64,7 @@ export class Brain {
     if (this.mode === 'retreat') {
       this.modeT -= dt;
       inp.mx = -nx * 0.9 + px * 0.4; inp.mz = -nz * 0.9 + pz * 0.4;
-      if (d < 9 && f.dashCd <= 0 && Math.random() < dt * 2) f.dash();
-      if (f.charId === 'gojo' && f.cd[2] <= 0 && d < 10) f.skill(2);
+      if (d < 9 && f.sdashCd <= 0 && Math.random() < dt * 2) f.dash();
       if (this.modeT <= 0 || d > 34 || f.hp > 55) this.mode = 'hunt';
       this.unstick(dt);
       return;
@@ -68,24 +80,38 @@ export class Brain {
       if (d > melee + 1.2) {
         const s = d > 12 ? 1 : 0.9;
         inp.mx = nx * s + px * 0.18; inp.mz = nz * s + pz * 0.18;
-        const dMin = f.ch.aiRush ? 8 : 18;
-        if (d > dMin && d < 45 && f.dashCd <= 0 && Math.random() < dt * (f.ch.aiRush ? 2.2 : 0.9) * this.skill) { f.input.mx = nx; f.input.mz = nz; f.dash(); }
+        // фронтальный рывок с джебом для сближения (12–25 стадов)
+        if (d > 11 && d < 25 && f.fdashCd <= 0 && Math.random() < dt * (f.ch.aiRush ? 1.2 : 0.6) * (0.4 + this.skill)) { f.input.mx = nx; f.input.mz = nz; f.dash(); }
       } else if (d < melee - 1.3) { inp.mx = -nx * 0.5; inp.mz = -nz * 0.5; }
       else { inp.mx = px * 0.35; inp.mz = pz * 0.35; }
     } else { inp.mx = nx * 0.3; inp.mz = nz * 0.3; }
     if (busyAttack) { inp.mx *= 0.3; inp.mz *= 0.3; }
 
+    // цель долго держит блок — обойти боковым рывком и бить в спину
+    if (t.blocking) this.tBlockT += dt; else this.tBlockT = 0;
+    if (this.tBlockT > 0.4 && d < 8 && f.sdashCd <= 0 && !f.action && Math.random() < dt * 4 * this.skill) {
+      inp.mx = -nz * this.strafe; inp.mz = nx * this.strafe;
+      if (f.dash()) { f.m1Buf = 0.35; this.tBlockT = 0; }
+    }
+    // финт (Combat Instincts): отменить замах, если цель блокирует или стоит в контратаке
+    const sp = f.specialDef();
+    if (sp && sp.instant && f.specCd <= 0 && f.action && f.action.slot != null && f.action.t < (f.action.windup ?? 0.25) && (t.blocking || t.counter > 0) && Math.random() < this.skill * 0.5) f.special();
+
     // M1
+    if (this.upper && f.action && f.action.name === 'm1' && f.action.n === 4) inp.jumpHeld = true;
+    else if (!f.action) this.upper = false;
     this.m1T -= dt;
     if (d < 6.5 && !inp.block && Math.abs(t.pos.y - f.pos.y) < 4) {
       // комбо-продолжение навыком после 3-го удара
       if (f.combo === 3 && f.comboT > 0 && !f.action && this.skill > 0.55 && Math.random() < this.skill * 0.5 && this.useSkill(d, true)) { /* навык */ }
       else if (this.m1T <= 0 && (!f.action || f.action.name === 'm1')) {
+        // 4-й удар: иногда апперкот (зажатый прыжок)
+        if (f.combo === 3 && f.comboT > 0) this.upper = Math.random() < 0.1 + 0.35 * this.skill;
+        inp.jumpHeld = !!this.upper && f.combo === 3;
         f.m1();
         this.m1T = 0.2 + rand(0, 0.3) * (1.2 - this.skill);
-        if (f.combo === 4 && Math.random() < 0.3 * this.skill) inp.jumpHeld = true;
       }
-    } else if (!f.onGround && d < 7 && t.pos.y < f.pos.y - 1 && Math.random() < 0.1) f.m1();
+    } else if (!f.onGround && d < 7 && t.pos.y < f.pos.y - 1 && f.vel.y < 0 && f.combo === 3 && Math.random() < 0.1) f.m1();
 
     // навыки
     this.skillT -= dt;
@@ -93,8 +119,11 @@ export class Brain {
       this.skillT = rand(0.35, 1.1) * (1.5 - this.skill);
       this.useSkill(d, false);
     }
-    // пробуждение
-    if (f.meter >= 100 && !f.busy() && d < f.ch.awaken.aiRange && Math.random() < dt * 3) f.awaken();
+    // особый навык (R)
+    this.specT -= dt;
+    if (this.specT <= 0 && !f.busy()) { this.specT = rand(0.6, 1.6) * (1.6 - this.skill); this.useSpecial(d); }
+    // пробуждение: как только шкала полная — если HP < 60 % или враг ближе 30
+    if (f.meter >= 100 && !f.busy() && (f.hp < f.maxHp * 0.6 || d < 30) && Math.random() < dt * 3) f.awaken();
 
     // прыжки для живости
     this.jumpT -= dt;
@@ -133,7 +162,7 @@ export class Brain {
         this.seen.add(a);
         if (Math.random() > this.skill * 0.8) continue;
         if (!f.action || f.action.name === 'm1') {
-          if (f.dashCd <= 0 && Math.random() < 0.25 + this.skill * 0.15) {
+          if (f.sdashCd <= 0 && Math.random() < 0.25 + this.skill * 0.15) {
             f.input.mx = -ez / ed * this.strafe || nx; f.input.mz = ex / ed * this.strafe || nz;
             f.dash();
           } else {
@@ -145,11 +174,11 @@ export class Brain {
       } else if (RANGED_THREATS.has(a.name) && ed < 60 && facing > 0.85) {
         if (a.t < this.reaction + 0.15) continue;
         this.seen.add(a);
-        if (Math.random() < this.skill * 0.75 && f.dashCd <= 0 && !f.action) {
+        if (Math.random() < this.skill * 0.75 && f.sdashCd <= 0 && !f.action) {
           const s = Math.random() < 0.5 ? 1 : -1;
           f.input.mx = (-ez / ed) * s; f.input.mz = (ex / ed) * s;
           f.dash();
-        } else if (f.charId === 'gojo' && f.cd[2] <= 0 && !f.action && Math.random() < this.skill) f.skill(2);
+        }
       }
     }
   }
@@ -167,7 +196,7 @@ export class Brain {
         case 'ranged': ok = !comboExt && d >= ai.min && d <= ai.max && Math.random() < (t.stun > 0 || t.down > 0 ? 0.9 : 0.5); break;
         case 'gap': ok = d >= ai.min && d <= ai.max && (comboExt ? ai.min === 0 : Math.random() < 0.55); break;
         case 'charge': ok = !comboExt && d >= ai.min && d <= ai.max && Math.random() < 0.45; break;
-        case 'buff': ok = (G.time - f.lastDamagedT < 1.0 && f.hp < 85) || (d < 6 && t.action && t.action.kind === 'melee'); break;
+        case 'domain': ok = d <= ai.max && (t.rag || t.stun > 0 || t.evasive < 100 || Math.random() < 0.3); break;
         case 'counter': ok = d < ai.max && t.action && t.action.kind === 'melee' && Math.random() < this.skill; break;
         case 'aoe': {
           let n = 0; for (const o of G.fighters) if (f.isEnemy(o) && f.dist(o) < ai.max) n++;
@@ -180,6 +209,39 @@ export class Brain {
       if (f.skill(i)) return true;
     }
     return false;
+  }
+
+  useSpecial(d) {
+    const f = this.f, t = this.target, sk = f.specialDef();
+    if (!sk || f.specCd > 0 || !t) return false;
+    // Limitless тратит 6 % пробуждения — бот бережёт шкалу, пока она почти пустая
+    if (sk.id === 'limitless' && f.awakened <= 0 && f.meter < 25) return false;
+    const ai = sk.ai || {};
+    let ok = false;
+    if (ai.kind === 'gap') ok = d >= ai.min && d <= ai.max && Math.random() < 0.5;
+    else if (ai.kind === 'melee') ok = d <= (ai.max ?? 7) && (t.stun > 0 || Math.random() < 0.4);
+    if (!ok) return false;
+    f.faceTo(t.pos);
+    return f.special();
+  }
+
+  // Уклонение из рэгдолла: слабые — сразу; сильные (skill > 0.7) — когда враг рядом и занят долгим действием или HP низкое
+  evasive(dt) {
+    const f = this.f;
+    if (f.evasive < 100 || f.ragTrue || !f.rag) return;
+    if (this.evaT < 0) this.evaT = this.reaction + rand(0.05, 0.25);
+    this.evaT -= dt;
+    if (this.evaT > 0) return;
+    const a = f.lastHitBy;
+    let go;
+    if (this.skill <= 0.7) go = true;
+    else go = f.hp < 35 || (a && !a.dead && f.dist(a) < 12 && a.action && a.action.dur - a.action.t > 0.35) || Math.random() < dt * 0.6;
+    if (!go) return;
+    if (a && !a.dead) {
+      const dx = f.pos.x - a.pos.x, dz = f.pos.z - a.pos.z, l = Math.hypot(dx, dz) || 1, s = Math.random() < 0.5 ? 1 : -1;
+      f.input.mx = (dx / l) * 0.5 - (dz / l) * 0.85 * s; f.input.mz = (dz / l) * 0.5 + (dx / l) * 0.85 * s;
+    }
+    if (f.dash()) { this.evaT = -1; if (this.skill > 0.7) f.m1Buf = 0.35; }
   }
 
   choose() {

@@ -1,6 +1,6 @@
 // Блочные модели персонажей (R6-стиль), лица, 2D-портреты, Рика, храм.
 import * as THREE from 'three';
-import { Merger, FACE_UV, SKIN_UV } from './util.js';
+import { Merger, FACE_UV, SKIN_UV, tex } from './util.js';
 
 export const LOOKS = {
   gojo: { shirt: '#1e2440', trim: '#323c66', pants: '#1e2440', shoe: '#131313', hair: '#f3f5ff', hair2: '#d6dcef', face: 'blind', color: '#5fb8ff' },
@@ -85,10 +85,7 @@ function hair(m, id, L) {
     const sp = [[-0.38, -0.35, 0.9], [0.02, -0.38, 1.0], [0.4, -0.32, 0.85], [-0.42, 0.05, 1.05], [0, 0.02, 1.2], [0.42, 0.06, 1.0], [-0.3, 0.42, 0.75], [0.08, 0.45, 0.85], [0.42, 0.4, 0.7]];
     for (const [x, z, h] of sp) m.box(x, 1.38 + h / 2, z, 0.4, h, 0.4, x * z > 0 ? H2 : H, { rx: z * 0.75, rz: -x * 0.75 });
     m.box(-0.32, 1.02, 0.61, 0.3, 0.48, 0.14, H); m.box(0.08, 1.05, 0.63, 0.34, 0.42, 0.14, H2); m.box(0.4, 1.0, 0.61, 0.26, 0.5, 0.14, H);
-    // повязка
-    m.box(0, 0.72, 0, 1.27, 0.32, 1.27, '#101116');
-    m.box(0, 0.74, -0.7, 0.3, 0.26, 0.16, '#101116');
-    m.box(0.12, 0.52, -0.72, 0.16, 0.42, 0.06, '#101116', { rz: 0.3 });
+    // повязка — отдельной деталью (снимается в пробуждении «Шесть глаз»), см. getGeos()
   } else if (id === 'sukuna') {
     m.box(0, 1.27, -0.04, 1.3, 0.3, 1.3, H);
     m.box(0, 0.95, -0.62, 1.28, 0.75, 0.14, H);
@@ -114,6 +111,9 @@ function hair(m, id, L) {
     m.box(0, 1.48, -0.45, 0.5, 0.3, 0.4, H2, { rx: -0.4 });
   }
 }
+
+// Положение катаны в ножнах (в системе груди): начало рукояти и наклон оси клинка
+const HOLSTER = { p: [1.2, 0.62, 0.62], rx: 2.72 };
 
 const geoCache = new Map();
 function getGeos(id, skin) {
@@ -146,7 +146,14 @@ function getGeos(id, skin) {
     t.box(0, 2.12, 0, 1.5, 0.42, 1.1, L.shirt);
     for (const y of [1.72, 1.32, 0.92, 0.52]) t.box(0, y, 0.52, 0.15, 0.15, 0.06, '#1b1b1b');
     t.box(0, 0.12, 0, 2.02, 0.22, 1.02, '#dcdcd6');
-    t.box(1.12, 0.55, -0.15, 0.22, 0.32, 3.0, '#1b1b1b', { rx: 0.55 });
+    // ножны на левом бедре: рукоять вперёд-вверх, клинок назад-вниз (катана убирается сюда через 8 с без боя)
+    const [hx, hy, hz] = HOLSTER.p, sn = Math.sin(HOLSTER.rx), cs = Math.cos(HOLSTER.rx);
+    const along = (k) => [hx, hy - k * sn, hz + k * cs]; // точка на оси катаны (локальная +Z) в ножнах
+    t.box(...along(3.55), 0.38, 0.44, 4.9, '#1b1b1b', { rx: HOLSTER.rx });
+    t.box(...along(1.15), 0.44, 0.5, 0.16, '#c9a43a', { rx: HOLSTER.rx });
+    // кольцо на цепочке (ожерелье)
+    t.box(0, 1.75, 0.53, 0.06, 0.5, 0.04, '#b9bcc4');
+    t.box(0, 1.46, 0.55, 0.2, 0.2, 0.06, '#d9dce4');
   }
   // руки
   const a = new Merger();
@@ -164,7 +171,19 @@ function getGeos(id, skin) {
   l.box(0, -0.8, 0, 1, 1.6, 1, L.pants);
   l.box(0, -1.8, 0.06, 1.02, 0.4, 1.12, L.shoe);
   if (id === 'yuji') l.box(0, -1.94, 0.06, 1.04, 0.14, 1.14, '#f0f0f0');
-  const out = { head: hm.build(), torso: t.build(), arm: a.build(), leg: l.build(), katana: null };
+  const out = { head: hm.build(), torso: t.build(), arm: a.build(), leg: l.build(), katana: null, blind: null, eyes: null };
+  if (id === 'gojo') {
+    const b = new Merger();
+    b.box(0, 0.72, 0, 1.27, 0.32, 1.27, '#101116');
+    b.box(0, 0.74, -0.7, 0.3, 0.26, 0.16, '#101116');
+    b.box(0.12, 0.52, -0.72, 0.16, 0.42, 0.06, '#101116', { rz: 0.3 });
+    out.blind = b.build();
+    // «Шесть глаз»: светящиеся голубые глаза
+    const e = new Merger();
+    for (const x of [-0.27, 0.27]) { e.box(x, 0.7, 0.612, 0.27, 0.15, 0.03, '#7ff3ff'); e.box(x + 0.05, 0.72, 0.628, 0.08, 0.06, 0.01, '#ffffff'); }
+    e.box(-0.27, 0.8, 0.615, 0.3, 0.04, 0.02, '#e9f7ff'); e.box(0.27, 0.8, 0.615, 0.3, 0.04, 0.02, '#e9f7ff');
+    out.eyes = e.build();
+  }
   if (id === 'yuta') {
     const k = new Merger();
     k.box(0, 0, 0.25, 0.26, 0.3, 1.3, '#1b1b1b');
@@ -173,6 +192,14 @@ function getGeos(id, skin) {
     k.box(0, 0.02, 3.4, 0.08, 0.3, 4.8, '#e9eef4');
     k.box(0, 0.13, 3.4, 0.1, 0.08, 4.8, '#9aa4ae');
     out.katana = k.build();
+    // «Стальная рука» (True Love): Рика оборачивает правую руку стальным панцирем
+    const s = new Merger();
+    s.box(0, -0.75, 0, 1.12, 1.95, 1.12, '#6f7884');
+    for (const y of [-0.15, -0.75, -1.35]) s.box(0, y, 0, 1.16, 0.14, 1.16, '#454c57');
+    s.box(0, -1.62, 0.05, 1.18, 0.5, 1.2, '#a4adb9');
+    for (const x of [-0.33, 0, 0.33]) s.box(x, -1.86, 0.42, 0.24, 0.16, 0.34, '#d6dde6');
+    s.box(0.58, -0.6, 0, 0.12, 1.3, 0.5, '#ff7bf0');
+    out.steel = s.build();
   }
   geoCache.set(key, out);
   return out;
@@ -199,65 +226,154 @@ export function buildModel(id, skin) {
   const handL = new THREE.Object3D(); handL.position.y = -1.5; armL.add(handL);
   const handR = new THREE.Object3D(); handR.position.y = -1.5; armR.add(handR);
   const footR = new THREE.Object3D(); footR.position.y = -2; legR.add(footR);
-  let katana = null;
+  let katana = null, steel = null;
   if (geos.katana) {
-    katana = new THREE.Group(); katana.position.y = -1.42; armR.add(katana);
+    katana = new THREE.Group();
     mk(geos.katana, bodyMat, katana);
   }
-  return { root, spin, pelvis, chest, neck, armL, armR, legL, legR, handL, handR, footR, katana, bodyMat, headMat, meshes };
+  // детали пробуждения (скрыты до пробуждения)
+  let blind = null, eyes = null, tattoo = null, arm2L = null, arm2R = null;
+  if (geos.steel) { steel = new THREE.Mesh(geos.steel, bodyMat); steel.castShadow = true; steel.visible = false; armR.add(steel); meshes.push(steel); }
+  if (geos.blind) {
+    blind = mk(geos.blind, bodyMat, neck);
+    eyes = new THREE.Mesh(geos.eyes, eyeMat()); eyes.visible = false; neck.add(eyes);
+    for (const x of [-0.27, 0.27]) {
+      const sp = new THREE.Sprite(eyeGlowMat()); sp.position.set(x, 0.7, 0.75); sp.scale.setScalar(0.85); eyes.add(sp);
+    }
+  }
+  if (id === 'yuji') {
+    tattoo = new THREE.Mesh(tattooGeo(), tattooMat()); tattoo.position.set(0, 0.6, 0.607); tattoo.visible = false; neck.add(tattoo);
+  }
+  if (id === 'sukuna') {
+    // вторая пара рук формы Хэйан
+    arm2L = new THREE.Group(); arm2L.position.set(1.42, 0.55, 0.1); arm2L.visible = false; chest.add(arm2L);
+    arm2R = new THREE.Group(); arm2R.position.set(-1.42, 0.55, 0.1); arm2R.visible = false; chest.add(arm2R);
+    const s2 = 0.86;
+    for (const g of [arm2L, arm2R]) { const me = new THREE.Mesh(geos.arm, bodyMat); me.scale.setScalar(s2); me.castShadow = true; g.add(me); }
+  }
+  const m = { root, spin, pelvis, chest, neck, armL, armR, legL, legR, handL, handR, footR, katana, katDrawn: false, steel, bodyMat, headMat, meshes, blind, eyes, tattoo, arm2L, arm2R, fade: 1 };
+  if (katana) setKatana(m, false);
+  return m;
+}
+
+// Катана: в руке (обнажена) или в ножнах на бедре
+export function setKatana(m, drawn) {
+  const k = m.katana;
+  if (!k || m.katDrawn === drawn && k.parent) return;
+  m.katDrawn = drawn;
+  if (drawn) { m.armR.add(k); k.position.set(0, -1.42, 0); k.rotation.set(0, 0, 0); }
+  else { m.chest.add(k); k.position.set(HOLSTER.p[0], HOLSTER.p[1], HOLSTER.p[2]); k.rotation.set(HOLSTER.rx, 0, 0); }
+}
+
+// Плавное «растворение» персонажа рядом с камерой (как в роблоксе)
+export function setModelFade(m, a) {
+  a = a > 0.97 ? 1 : Math.max(0.12, a);
+  if (Math.abs(a - m.fade) < 0.02 && (a === 1) === (m.fade === 1)) return;
+  const was = m.fade < 1, now = a < 1;
+  m.fade = a;
+  for (const mat of [m.bodyMat, m.headMat]) {
+    mat.opacity = a;
+    if (was !== now) { mat.transparent = now; mat.depthWrite = !now; mat.needsUpdate = true; }
+  }
+  for (const me of m.meshes) me.castShadow = !now;
+}
+
+// ---------- материалы деталей пробуждения (общие) ----------
+let _eyeMat = null, _eyeGlow = null, _tatGeo = null, _tatMat = null;
+function eyeMat() { return (_eyeMat ||= new THREE.MeshBasicMaterial({ vertexColors: true, fog: false })); }
+function eyeGlowMat() {
+  return (_eyeGlow ||= new THREE.SpriteMaterial({ map: tex('glow'), color: 0x6fe8ff, blending: THREE.AdditiveBlending, transparent: true, depthWrite: false, fog: false }));
+}
+function tattooGeo() { return (_tatGeo ||= new THREE.PlaneGeometry(1.2, 1.2)); }
+// Метки Короля проклятий на лице Сосуда: красные глаза, вторая пара глаз, полосы на щеках и лбу
+function tattooMat() {
+  if (_tatMat) return _tatMat;
+  const c = document.createElement('canvas'); c.width = c.height = 128;
+  const g = c.getContext('2d');
+  const R = (x, y, w, h, col) => { g.fillStyle = col; g.fillRect(x * 128, y * 128, w * 128, h * 128); };
+  const D = '#121212';
+  R(0.27, 0.37, 0.11, 0.12, '#b3101e'); R(0.62, 0.37, 0.11, 0.12, '#b3101e');
+  R(0.3, 0.4, 0.05, 0.06, D); R(0.65, 0.4, 0.05, 0.06, D);
+  // вторая пара глаз
+  R(0.16, 0.52, 0.2, 0.06, D); R(0.64, 0.52, 0.2, 0.06, D);
+  R(0.21, 0.53, 0.08, 0.04, '#d0303f'); R(0.71, 0.53, 0.08, 0.04, '#d0303f');
+  // полосы на щеках
+  R(0.04, 0.63, 0.24, 0.04, D); R(0.07, 0.7, 0.18, 0.04, D);
+  R(0.72, 0.63, 0.24, 0.04, D); R(0.75, 0.7, 0.18, 0.04, D);
+  // метка на лбу
+  R(0.42, 0.12, 0.16, 0.045, D); R(0.47, 0.16, 0.06, 0.09, D);
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace; t.generateMipmaps = false; t.minFilter = THREE.LinearFilter;
+  _tatMat = new THREE.MeshLambertMaterial({ map: t, transparent: true, depthWrite: false, alphaTest: 0.05 });
+  return _tatMat;
 }
 
 // ---------- Рика ----------
 let rikaGeo = null, rikaArmGeo = null, rikaBigArmGeo = null;
+// Рика — огромный бледно-серо-белый полупрозрачный блочный призрак (спека §7: #D9D2DE, ≈2.5 роста владельца).
 function rikaGeos() {
   if (rikaGeo) return;
-  const DK = '#26222c', DK2 = '#1a171f', PALE = '#d9d2de', BONE = '#efe9df';
+  const PALE = '#d9d2de', PALE2 = '#c4bccb', BONE = '#f4f0ea', HAIR = '#2a2630', DARK = '#1c1620';
   const b = new Merger();
-  b.box(0, 3.0, 0, 3.6, 2.6, 3.0, DK2); b.box(0, 1.2, -0.3, 2.4, 1.8, 2.0, DK2); b.box(0, 0.1, -0.6, 1.2, 1.2, 1.2, DK2);
-  b.box(0, 6.2, 0.2, 5.4, 4.6, 3.8, DK, { rx: 0.25 });
-  b.box(0, 7.9, 0.4, 6.6, 1.4, 3.4, DK, { rx: 0.2 });
-  // голова
-  b.box(0, 10.0, 1.4, 4.6, 3.8, 4.0, DK);
-  b.box(0, 9.3, 3.42, 3.6, 1.5, 0.2, '#4a0b14');
+  // «хвост» призрака вместо ног
+  b.box(0, 3.0, 0, 3.6, 2.6, 3.0, PALE2); b.box(0, 1.2, -0.3, 2.4, 1.8, 2.0, PALE2); b.box(0, 0.1, -0.6, 1.2, 1.2, 1.2, PALE2);
+  b.box(0, 6.2, 0.2, 5.4, 4.6, 3.8, PALE, { rx: 0.25 });
+  b.box(0, 7.9, 0.4, 6.6, 1.4, 3.4, PALE, { rx: 0.2 });
+  // голова: огромные глаза и зубастая улыбка
+  b.box(0, 10.0, 1.4, 4.6, 3.8, 4.0, PALE);
+  b.box(0, 9.3, 3.42, 3.6, 1.5, 0.2, '#5a1424');
   for (let i = 0; i < 6; i++) { b.box(-1.5 + i * 0.6, 9.9, 3.5, 0.34, 0.45, 0.2, BONE); b.box(-1.5 + i * 0.6, 8.7, 3.5, 0.34, 0.45, 0.2, BONE); }
-  b.box(-1.15, 11.0, 3.42, 0.95, 0.6, 0.2, '#ffffff'); b.box(1.15, 11.0, 3.42, 0.95, 0.6, 0.2, '#ffffff');
-  b.box(-1.15, 11.0, 3.5, 0.35, 0.4, 0.15, '#111'); b.box(1.15, 11.0, 3.5, 0.35, 0.4, 0.15, '#111');
-  b.box(0, 12.2, 1.2, 5.0, 0.8, 4.3, '#0e0d10');
-  for (let i = 0; i < 6; i++) b.box(-2.0 + i * 0.8, 9.6, -0.8, 0.6, 4.6, 0.6, '#0e0d10', { rx: -0.2 });
-  b.box(0, 11.6, 3.5, 4.6, 0.25, 0.1, PALE);
+  b.box(-1.15, 11.0, 3.42, 1.05, 0.7, 0.2, DARK); b.box(1.15, 11.0, 3.42, 1.05, 0.7, 0.2, DARK);
+  b.box(-1.0, 11.08, 3.53, 0.3, 0.3, 0.12, '#ffffff'); b.box(1.3, 11.08, 3.53, 0.3, 0.3, 0.12, '#ffffff');
+  // чёрные растрёпанные волосы
+  b.box(0, 12.2, 1.2, 5.0, 0.8, 4.3, HAIR);
+  for (let i = 0; i < 6; i++) b.box(-2.0 + i * 0.8, 9.6, -0.8, 0.6, 4.6, 0.6, HAIR, { rx: -0.2 });
+  b.box(-2.45, 10.6, 1.6, 0.4, 3.2, 2.6, HAIR); b.box(2.45, 10.6, 1.6, 0.4, 3.2, 2.6, HAIR);
   rikaGeo = b.build();
   const a = new Merger();
-  a.box(0, -2.0, 0, 1.7, 4.4, 1.7, DK);
-  a.box(0, -5.6, 0.2, 1.5, 3.6, 1.5, DK);
+  a.box(0, -2.0, 0, 1.7, 4.4, 1.7, PALE);
+  a.box(0, -5.6, 0.2, 1.5, 3.6, 1.5, PALE2);
   a.box(0, -8.0, 0.3, 2.2, 1.6, 2.2, PALE);
   for (const x of [-0.7, 0, 0.7]) a.box(x, -9.3, 0.6, 0.35, 1.4, 0.35, BONE, { rx: 0.35 });
   rikaArmGeo = a.build();
+  // базовые атаки: бледный кулак из чёрного дыма
   const g = new Merger();
-  g.box(0, 6, 0, 2.8, 12, 2.8, DK);
+  g.box(0, 6, 0, 2.8, 12, 2.8, PALE2);
   g.box(0, -0.3, 0.3, 4.2, 2.6, 4.2, PALE);
   for (const x of [-1.4, 0, 1.4]) g.box(x, -2.4, 0.7, 0.6, 2.4, 0.6, BONE, { rx: 0.3 });
-  g.box(0, 12.5, 0, 3.4, 1.6, 3.4, DK2);
+  g.box(0, 12.5, 0, 3.4, 1.6, 3.4, '#2a2630');
   rikaBigArmGeo = g.build();
 }
 
+// Полупрозрачный «призрак» без каши из внутренних граней: сначала только глубина, затем цвет поверх
+function ghostMat(opacity) {
+  const mat = new THREE.MeshLambertMaterial({ vertexColors: true, transparent: true, opacity, depthWrite: false, emissive: 0x5a5262, fog: true });
+  const depth = new THREE.MeshBasicMaterial({ colorWrite: false, depthWrite: true, transparent: true });
+  return { mat, depth };
+}
+function ghostMesh(geo, M, parent) {
+  const d = new THREE.Mesh(geo, M.depth); d.renderOrder = 8; parent.add(d);
+  const c = new THREE.Mesh(geo, M.mat); c.renderOrder = 9; parent.add(c);
+  return c;
+}
 export function buildRika() {
   rikaGeos();
-  const mat = new THREE.MeshLambertMaterial({ vertexColors: true, emissive: 0x150820 });
+  const M = ghostMat(0.5);
   const root = new THREE.Group();
   const body = new THREE.Group(); root.add(body);
-  const me = new THREE.Mesh(rikaGeo, mat); me.castShadow = true; body.add(me);
+  ghostMesh(rikaGeo, M, body);
   const armL = new THREE.Group(); armL.position.set(3.4, 7.4, 0.5); body.add(armL);
   const armR = new THREE.Group(); armR.position.set(-3.4, 7.4, 0.5); body.add(armR);
-  const al = new THREE.Mesh(rikaArmGeo, mat); al.castShadow = true; armL.add(al);
-  const ar = new THREE.Mesh(rikaArmGeo, mat); ar.castShadow = true; armR.add(ar);
-  return { root, body, armL, armR, mat };
+  ghostMesh(rikaArmGeo, M, armL);
+  ghostMesh(rikaArmGeo, M, armR);
+  return { root, body, armL, armR, mat: M.mat, base: 0.5 };
 }
 export function buildRikaArm() {
   rikaGeos();
-  const mat = new THREE.MeshLambertMaterial({ vertexColors: true, emissive: 0x150820 });
+  const M = ghostMat(0.85);
   const root = new THREE.Group();
-  const me = new THREE.Mesh(rikaBigArmGeo, mat); me.castShadow = true; root.add(me);
-  return { root, mat };
+  ghostMesh(rikaBigArmGeo, M, root);
+  return { root, mat: M.mat };
 }
 
 // ---------- Храм (Malevolent Shrine) ----------

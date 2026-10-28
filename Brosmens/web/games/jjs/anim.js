@@ -47,7 +47,11 @@ export function applyPose(m, a, extra) {
   m.armR.rotation.set(a[K.rax], a[K.ray], a[K.raz]);
   m.legL.rotation.set(a[K.llx], 0, a[K.llz]);
   m.legR.rotation.set(a[K.rlx], 0, a[K.rlz]);
-  if (m.katana) m.katana.rotation.x = a[K.kat];
+  if (m.katana && m.katDrawn) m.katana.rotation.x = a[K.kat];
+  if (m.arm2L && m.arm2L.visible) {
+    m.arm2L.rotation.set(a[K.lax] * 0.6 + 0.35, a[K.lay] * 0.5, a[K.laz] + 0.4);
+    m.arm2R.rotation.set(a[K.rax] * 0.6 + 0.35, a[K.ray] * 0.5, a[K.raz] - 0.4);
+  }
 }
 
 // ---------- Базовые позы ----------
@@ -57,6 +61,8 @@ export const POSE = {
     gojo: P({ hy: 0, twist: 0.12, hx: -0.1, lax: 0.18, laz: 0.12, rax: 0.18, raz: -0.12, llz: 0.05, rlz: -0.05 }),
     sukuna: P({ hy: -0.05, twist: 0.1, hx: -0.14, lax: -1.15, laz: -0.95, rax: -1.0, raz: 0.95, llz: 0.12, rlz: -0.12 }),
     katana: P({ hy: -0.18, twist: 0.35, cx: 0.08, rax: -0.55, raz: 0.18, ray: 0.2, kat: 0.3, lax: -0.6, laz: -0.45, llz: 0.12, rlz: -0.12, llx: -0.25, rlx: 0.2 }),
+    // катана в ножнах: спокойная стойка, левая рука придерживает ножны
+    katanaH: P({ hy: -0.06, twist: 0.12, cx: 0.04, hx: -0.04, lax: -0.32, laz: -0.12, lay: 0.2, rax: -0.2, raz: -0.12, llz: 0.08, rlz: -0.08 }),
   },
   air: P({ hy: 0.1, lax: -0.35, laz: 0.7, rax: -0.35, raz: -0.7, llx: -0.7, rlx: 0.35, cx: 0.05 }),
   fall: P({ hy: 0.1, lax: -1.9, laz: 0.4, rax: -1.9, raz: -0.4, llx: -0.25, rlx: 0.25, cx: -0.05 }),
@@ -75,6 +81,13 @@ export const POSE = {
   sign2: P({ hy: -0.05, rax: -2.2, raz: 0.25, ray: 0.3, lax: 0.1, laz: 0.15, hx: -0.12, twist: -0.2 }),
   taunt: P({ hy: 0, rax: -2.9, raz: -0.3, lax: 0.1, laz: 0.2, hx: -0.25 }),
   roar: P({ hy: -0.35, cx: -0.25, hx: -0.5, lax: -0.6, laz: 1.2, rax: -0.6, raz: -1.2, llz: 0.25, rlz: -0.25 }),
+  // «Бесконечность» — блок Сильнейшего сегодня: расслабленная стойка, одна рука в сторону, парит над землёй
+  inf: P({ hy: 0.3, twist: 0.18, hx: -0.06, cx: -0.04, lax: -0.75, laz: 0.75, lay: -0.3, rax: 0.12, raz: -0.12, llz: 0.06, rlz: -0.06, llx: -0.12, rlx: 0.1 }),
+  // пробуждения
+  faint: P({ hy: -0.55, cx: 0.55, hx: 0.6, lax: 0.15, laz: 0.1, rax: 0.15, raz: -0.1, llz: 0.12, rlz: -0.12, llx: -0.2, rlx: 0.15 }),
+  palm: P({ hy: -0.12, twist: 0.1, cx: 0.12, hx: -0.05, lax: -1.55, laz: -0.55, rax: -1.45, raz: 0.5, llz: 0.12, rlz: -0.12 }),
+  unveil: P({ hy: 0, twist: -0.1, hx: -0.25, rax: -2.85, raz: 0.55, ray: 0.4, lax: 0.15, laz: 0.2 }),
+  spread: P({ hy: -0.1, cx: -0.2, hx: -0.35, lax: -1.4, laz: 1.25, rax: -1.4, raz: -1.25, llz: 0.2, rlz: -0.2 }),
 };
 
 // ---------- M1 (4 удара) ----------
@@ -105,22 +118,58 @@ const M1_KATANA = [
 ];
 export const M1ANIM = { fist: M1_FIST, gojo: M1_GOJO, sukuna: M1_SUKUNA, katana: M1_KATANA };
 
-// Пробежка
-export function runPose(out, base, phase, speed01, katana) {
+// 4-й удар: апперкот (в прыжке/с зажатым прыжком) и удар вниз (в падении)
+const _m1v = {};
+export function m1Variant(style, base, kind) {
+  const key = style + kind;
+  if (_m1v[key]) return _m1v[key];
+  const kat = style === 'katana';
+  let fr;
+  if (kind === 'up') {
+    fr = [[0, base],
+      [0.3, PX(base, { hy: -0.45, cx: 0.3, twist: -0.5, rax: 0.4, raz: -0.3, lax: -0.6, laz: 0.4, kat: kat ? 1.2 : 0, llx: -0.4, rlx: 0.4 })],
+      [0.46, PX(base, { hy: 0.15, cx: -0.25, hx: -0.25, twist: 0.45, rax: -2.95, raz: 0.15, lax: -0.3, laz: 0.5, kat: kat ? 0.5 : 0, rlx: -0.6, llx: 0.2 })],
+      [1, base]];
+  } else {
+    fr = [[0, base],
+      [0.25, PX(base, { hy: 0.1, cx: -0.3, rax: -2.95, raz: -0.15, lax: -2.95, laz: 0.15, kat: kat ? 0.3 : 0, llx: -0.8, rlx: -0.3 })],
+      [0.45, PX(base, { hy: -0.3, cx: 0.55, rax: -0.55, raz: 0.3, lax: -0.55, laz: -0.3, kat: kat ? 1.5 : 0, llx: -0.9, rlx: 0.25 })],
+      [1, base]];
+  }
+  return (_m1v[key] = fr);
+}
+
+// Пробежка. lx/lz — направление движения в системе персонажа (вправо / вперёд):
+// с Shift-lock персонаж смотрит по камере, поэтому вбок — приставной шаг, назад — пятится.
+export function runPose(out, base, phase, speed01, katana, lx = 0, lz = 1) {
   out.set(base);
   const s = Math.sin(phase), c = Math.cos(phase);
-  out[K.llx] = -s * 0.95 * speed01; out[K.rlx] = s * 0.95 * speed01;
+  const al = Math.abs(lx), af = Math.abs(lz), tot = al + af || 1;
+  const wS = al / tot, wF = af / tot;
+  const back = lz < 0;
+  const amp = (back ? 0.7 : 0.95) * speed01;
+  out[K.llx] = -s * amp * wF; out[K.rlx] = s * amp * wF;
   out[K.llz] = 0; out[K.rlz] = 0;
-  if (katana) {
-    out[K.lax] = s * 0.8 * speed01; out[K.laz] = 0.1;
-    out[K.rax] = -0.35 - s * 0.3 * speed01; out[K.raz] = -0.1; out[K.ray] = 0; out[K.kat] = 0.25;
-  } else {
-    out[K.lax] = s * 0.9 * speed01; out[K.laz] = 0.08;
-    out[K.rax] = -s * 0.9 * speed01; out[K.raz] = -0.08; out[K.ray] = 0; out[K.lay] = 0;
+  if (wS > 0.05) {
+    // приставной шаг: ведущая нога в сторону движения, вторая подтягивается
+    const k = wS * Math.min(1.1, speed01 + 0.2), up = Math.max(0, s), dn = Math.max(0, -s);
+    if (lx > 0) { out[K.rlz] = -0.46 * up * k; out[K.llz] = -0.3 * dn * k; }
+    else { out[K.llz] = 0.46 * up * k; out[K.rlz] = 0.3 * dn * k; }
+    out[K.llx] -= s * 0.18 * k; out[K.rlx] += s * 0.18 * k;
+    out[K.roll] = (lx > 0 ? 1 : -1) * 0.07 * k * Math.abs(s);
   }
-  out[K.twist] = s * 0.12 * speed01;
-  out[K.cx] = 0.18 * speed01; out[K.lean] = 0;
-  out[K.hy] = Math.abs(c) * 0.22 * speed01 - 0.05;
-  out[K.hx] = 0;
+  const armK = speed01 * (back ? 0.55 : 1) * (0.35 + 0.65 * wF);
+  if (katana) {
+    out[K.lax] = s * 0.8 * armK; out[K.laz] = 0.1;
+    out[K.rax] = -0.35 - s * 0.3 * armK; out[K.raz] = -0.1; out[K.ray] = 0; out[K.kat] = 0.25;
+  } else {
+    out[K.lax] = s * 0.9 * armK; out[K.laz] = 0.08 + wS * 0.12;
+    out[K.rax] = -s * 0.9 * armK; out[K.raz] = -0.08 - wS * 0.12; out[K.ray] = 0; out[K.lay] = 0;
+  }
+  out[K.twist] = s * 0.12 * speed01 * wF;
+  out[K.cx] = (back ? -0.1 : 0.18) * speed01 * wF + 0.04 * wS;
+  out[K.lean] = 0;
+  out[K.hy] = Math.abs(c) * (back ? 0.14 : 0.22) * speed01 - 0.05;
+  out[K.hx] = back ? 0.06 * speed01 : 0;
   return out;
 }

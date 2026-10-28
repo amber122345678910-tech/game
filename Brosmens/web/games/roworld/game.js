@@ -1,538 +1,919 @@
-// BroWorld — симуляция: провинции, войска, золото, постройки, армии, бои, дипломатия и ИИ наций.
-// Чистая логика без DOM. События наружу через game.on(fn): fn(type, data).
-export const TERRAIN = {
-  plains: { name: 'Равнина', icon: '🌾', def: 1.0, gold: 1.2, prod: 1.2, color: '#a7c76a' },
-  forest: { name: 'Лес', icon: '🌲', def: 1.3, gold: 1.0, prod: 1.0, color: '#5f9a4c' },
-  mountains: { name: 'Горы', icon: '⛰️', def: 1.7, gold: 1.0, prod: 0.65, color: '#a99f8c' },
-  desert: { name: 'Пустыня', icon: '🏜️', def: 0.9, gold: 0.7, prod: 0.8, color: '#e3cb8c' },
-  snow: { name: 'Снега', icon: '❄️', def: 1.3, gold: 0.6, prod: 0.6, color: '#e9eff3' },
+// BroWorld — тайловый движок (как в оригинале): владелец каждой клетки, общий запас войск и золота у игрока,
+// атаки «ползут» по клеткам из очереди с приоритетом, тик 100 мс. Чистая логика без DOM.
+// Войска хранятся ×10 (на экране — делённые на 10). События: game.on(fn) → fn(type, data).
+import { W, H, N_TILES, T_PLAINS, T_HIGH, T_MTN, T_IMPASS } from './world.js';
+
+export const KIND = { HUMAN: 0, NATION: 1, TRIBE: 2 };
+export const TICK = 0.1;
+// Наша карта 1000×500 вдвое мельче оригинальной 2000×1000: расстояния в клетках ×0.5, площади ×0.25.
+export const WIN_SHARE = 0.8;                       // 80% суши вне радиации
+export const PROT_TICKS = 5 * 60 * 10;              // 5:00 защиты: люди не нападают на людей
+export const NATION_IMMUNE = 50;                    // у наций и племён иммунитет всего 5 с
+export const MATCH_TICKS = PROT_TICKS + 40 * 60 * 10; // после защиты — 40:00 до конца матча
+export const ELIM_TILES = 25;                       // гибель ниже 100 клеток оригинала (×0.25)
+export const RETREAT_TICKS = 20;
+export const SPAWN_R = 4.6;                         // стартовый диск ≈9 клеток оригинала
+export const SPAWN_GAP = 15;                        // 30 клеток оригинала между игроками
+export const TRIBE_GAP = 10;                        // племена — плотнее, но диски не пересекаются
+export const BOAT_MAX = 3, BOAT_SPEED = 0.6;        // не больше 3 десантов сразу
+export const TRAITOR_TICKS = 300, DONATE_CD = 100;
+// нации — сложность «Hard» (как в матчах оригинала): старт 2.5K, лимит ×1, прирост ×1
+export const NATION_DIFF = { start: 25000, cap: 1, regen: 1 };
+// темп захвата: наша клетка вчетверо больше по площади, поэтому фронт продвигается вдвое медленнее в клетках —
+// тогда по карте он идёт с той же скоростью, что в оригинале (мир делят минут за 5, матч — 10–25 минут)
+export const PACE = 0.5;
+// Постройки (клавиши 1–7). time — тики стройки; range — радиус действия в клетках.
+export const STRUCTS = {
+  city: { name: 'Город', key: '1', time: 20, upg: true },
+  port: { name: 'Порт', key: '2', time: 50, upg: true },
+  factory: { name: 'Завод', key: '3', time: 20, upg: true },
+  post: { name: 'Оборонный пост', key: '4', time: 50, upg: false, range: 15 },
+  sam: { name: 'ПВО', key: '5', time: 300, upg: true, range: 35 },
+  silo: { name: 'Ракетная шахта', key: '6', time: 100, upg: true },
 };
-export const BUILD = {
-  city: { name: 'Город', icon: '🏙️', cost: 80, desc: '+золото, +лимит войск' },
-  port: { name: 'Порт', icon: '⚓', cost: 50, desc: 'морские высадки' },
-  factory: { name: 'Завод', icon: '🏭', cost: 90, desc: '×1.9 войск в секунду' },
-  fort: { name: 'Форт', icon: '🏰', cost: 60, desc: '+60% защиты' },
-};
-export const BUILD_ORDER = ['city', 'port', 'factory', 'fort'];
-export const WIN_SHARE = 0.6;
-export const HIRE_COST = 25, HIRE_N = 10;
-const LAND_SPEED = 36, SEA_SPEED = 52;
-const rnd = (a, b) => a + Math.random() * (b - a);
-const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
+export const SNAP_R = 8, STRUCT_GAP = 8, PORT_R = 10; // 15 / 15 / 20 клеток оригинала
+export const SHIP = { hp: 1000, range: 65, patrol: 50, reload: 20, speed: 0.5, dmg: [200, 300] };
+const MAG = [0, 0, 80, 100, 120, 0];
+const COST = [0, 0, 16.5, 20, 25, 0];
+const TMAG = [0, 0, 1, 1.5, 2, 0];
+const LN_MID = Math.log(300000);
+const within = (v, a, b) => (v < a ? a : v > b ? b : v);
+const largeBonus = (tiles, depth) => 1 - depth / (1 + Math.exp(-2.5 * (Math.log(Math.max(1, tiles)) - LN_MID)));
+
+// Числа как в оригинале: <1000 целое, 1.23K, 12.3K, 123K, 1.23M, 12.3M, 1.23B (с округлением вниз)
+export function fmt(v) {
+  v = v > 0 ? v : 0;
+  if (v >= 1e10) return (Math.floor(v / 1e8) / 10).toFixed(1) + 'B';
+  if (v >= 1e9) return (Math.floor(v / 1e7) / 100).toFixed(2) + 'B';
+  if (v >= 1e7) return (Math.floor(v / 1e5) / 10).toFixed(1) + 'M';
+  if (v >= 1e6) return (Math.floor(v / 1e4) / 100).toFixed(2) + 'M';
+  if (v >= 1e5) return Math.floor(v / 1000) + 'K';
+  if (v >= 1e4) return (Math.floor(v / 100) / 10).toFixed(1) + 'K';
+  if (v >= 1000) return (Math.floor(v / 10) / 100).toFixed(2) + 'K';
+  return String(Math.floor(v));
+}
+export const fmtT = (internal) => fmt(internal / 10); // войска: внутренние → экранные
+
+// мин-куча (приоритет, клетка), растёт по мере надобности
+class Heap {
+  constructor(cap = 64) { this.k = new Float64Array(cap); this.v = new Int32Array(cap); this.n = 0; }
+  push(key, val) {
+    if (this.n === this.k.length) {
+      const k = new Float64Array(this.n * 2), v = new Int32Array(this.n * 2);
+      k.set(this.k); v.set(this.v); this.k = k; this.v = v;
+    }
+    let i = this.n++;
+    const K = this.k, V = this.v;
+    while (i > 0) { const p = (i - 1) >> 1; if (K[p] <= key) break; K[i] = K[p]; V[i] = V[p]; i = p; }
+    K[i] = key; V[i] = val;
+  }
+  pop() {
+    const K = this.k, V = this.v, top = V[0];
+    const key = K[--this.n], val = V[this.n];
+    let i = 0;
+    for (;;) {
+      let c = 2 * i + 1; if (c >= this.n) break;
+      if (c + 1 < this.n && K[c + 1] < K[c]) c++;
+      if (K[c] >= key) break;
+      K[i] = K[c]; V[i] = V[c]; i = c;
+    }
+    K[i] = key; V[i] = val;
+    return top;
+  }
+}
 
 export class Game {
-  constructor(world, nations) {
-    this.w = world; this.P = world.provinces; this.N = nations;
-    this.time = 0; this.running = false; this.over = false;
-    this.armies = []; this.armyId = 1; this.demands = {};
+  constructor(world) {
+    this.w = world;
+    this.terr = world.terr;
+    this.owner = new Uint16Array(N_TILES);
+    this.structAt = new Int32Array(N_TILES).fill(-1);
+    this.P = [null]; // по id (0 — ничья земля)
+    this.attacks = [];
+    this.structs = [];
+    this.boats = [];  // десант в пути
+    this.ships = [];  // военные корабли
+    this.fallout = 0; // клетки радиации (не считаются в 80%)
+    this.tickN = 0; this.running = false; this.over = false;
     this.handlers = [];
-    const n = nations.length;
-    const mk = (v) => Array.from({ length: n }, () => Array.from({ length: n }, () => (typeof v === 'function' ? v() : v)));
-    this.st = mk('neutral');
-    this.op = mk(() => rnd(-12, 14));
-    this.truce = mk(0);
-    this.warSince = mk(0);
-    this.lastOffer = mk(-999);
-    for (const p of this.P) {
-      const T = TERRAIN[p.terrain];
-      p.owner = -1; p.capital = false;
-      p.gar = Math.round((3 + Math.random() * 5) * T.def + Math.min(4, p.area / 90));
-      p.troops = p.gar;
-      p.b = { city: 0, port: 0, factory: 0, fort: 0 };
-      p.goldAcc = 0; p.hit = -99;
-    }
-    for (const N of nations) {
-      N.gold = 40; N.alive = true; N.capital = -1;
-      N.s = { count: 0, area: 0, troops: 0, income: 0, prod: 0, share: 0 };
-      N.captured = 0; N.lost = 0; N.battles = 0; N.peak = 0;
-      N.mul = N.isPlayer ? 1.12 : 1; // небольшая фора живому игроку
-      const L = N.leader || {};
-      N.ai = {
-        think: rnd(0.3, 1.2), diplo: rnd(6, 12),
-        skill: N.isClaude ? 0.8 : L.skill ?? 0.6,
-        toxic: N.isClaude ? 0.05 : L.toxic ?? 0.4,
-        stage: -1, stageUntil: 0,
-        aggr: N.isClaude ? 0.35 : clamp((L.toxic ?? 0.4) * 0.6 + rnd(0, 0.45), 0.1, 0.95),
-      };
-    }
-    this.recount();
+    this.chg = new Int32Array(16384); this.chgN = 0;
+    this.attackSeq = 1; this.structSeq = 1; this.boatSeq = 1;
+    this.dirtyEnclave = false;
+    this.brain = null; // ИИ: fn(game) каждый тик
+    this.lab = null; this.stk = null;
   }
-
   on(fn) { this.handlers.push(fn); }
   emit(type, d) { for (const h of this.handlers) try { h(type, d); } catch (e) { console.error(e); } }
+  get time() { return this.tickN * TICK; }
+  get landCount() { return this.w.landCount; }
+  get winLand() { return Math.max(1, this.w.landCount - this.fallout); } // суша вне радиации
 
-  // ---------- правила ----------
-  defMult(p) { return TERRAIN[p.terrain].def * (p.b.fort ? 1.6 : 1) * (p.capital ? 1.25 : 1); }
-  prodRate(p) {
-    if (p.owner < 0) return 0;
-    return (0.36 * TERRAIN[p.terrain].prod + (p.capital ? 0.55 : 0) + (p.b.city ? 0.35 : 0)) * (p.b.factory ? 1.9 : 1) * this.N[p.owner].mul;
+  addPlayer(o) {
+    const p = {
+      id: this.P.length, kind: o.kind, name: o.name, color: o.color, col: o.col,
+      isPlayer: !!o.isPlayer, isClaude: !!o.isClaude, leader: o.leader || null,
+      troops: o.kind === KIND.TRIBE ? 10000 : o.kind === KIND.NATION ? NATION_DIFF.start : 25000,
+      gold: 0, tiles: 0, border: new Set(), alive: true, attacks: [], hitBy: new Map(), allies: new Set(),
+      cityLevels: 0, posts: [], paid: { city: 0, port: 0, factory: 0, post: 0, sam: 0, silo: 0, warship: 0 },
+      peakTiles: 0, maxTroopsSeen: 0, kills: 0, killsN: 0, boats: [], traitorUntil: -1, donateAt: -1e9,
+      spawn: -1, spawnTiles: null, ai: {}, diedAt: 0,
+    };
+    this.P.push(p);
+    return p;
   }
-  capOf(p) { return 30 + (p.b.city ? 45 : 0) + (p.capital ? 40 : 0) + (p.b.fort ? 20 : 0) + (p.b.factory ? 15 : 0); }
-  goldRate(p) {
-    if (p.owner < 0) return 0;
-    return 0.24 * TERRAIN[p.terrain].gold + (p.b.city ? 1.0 : 0) + (p.b.port ? 0.35 : 0) + (p.capital ? 1.0 : 0);
-  }
-  count(n, type) { let c = 0; for (const p of this.P) if (p.owner === n && p.b[type]) c++; return c; }
-  cost(n, type) { return Math.round(BUILD[type].cost * (1 + 0.15 * this.count(n, type))); }
-  state(a, b) { return a === b ? 'self' : this.st[a][b]; }
-  S(n) { const s = this.N[n].s; return s.troops + s.count * 4 + 1; }
-  allies(n) { const o = []; for (let m = 0; m < this.N.length; m++) if (m !== n && this.N[m].alive && this.st[n][m] === 'ally') o.push(m); return o; }
-  wars(n) { const o = []; for (let m = 0; m < this.N.length; m++) if (m !== n && this.N[m].alive && this.st[n][m] === 'war') o.push(m); return o; }
+  alivePlayers() { const o = []; for (let i = 1; i < this.P.length; i++) if (this.P[i].alive) o.push(this.P[i]); return o; }
 
-  isTarget(from, to) {
-    const a = this.P[from];
-    if (a.neighbors.includes(to)) return { naval: false };
-    if (a.b.port) for (const r of this.w.seaReach(from)) if (r.id === to) return { naval: true };
-    return null;
+  // ---------- правила (формулы оригинала) ----------
+  maxTroops(p) {
+    const m = 2 * (Math.pow(p.tiles, 0.6) * 1000 + 50000) + 250000 * p.cityLevels;
+    if (p.kind === KIND.TRIBE) return m / 3;
+    if (p.kind === KIND.NATION) return m * NATION_DIFF.cap;
+    return m;
   }
-  targets(from) {
-    const a = this.P[from], out = new Map();
-    for (const q of a.neighbors) out.set(q, false);
-    if (a.b.port) for (const r of this.w.seaReach(from)) if (!out.has(r.id)) out.set(r.id, true);
-    return out; // id -> naval
+  regen(p) {
+    const max = this.maxTroops(p);
+    let add = (10 + Math.pow(Math.max(0, p.troops), 0.73) / 4) * (1 - p.troops / max);
+    if (p.kind === KIND.TRIBE) add *= 0.5;
+    else if (p.kind === KIND.NATION) add *= NATION_DIFF.regen;
+    return Math.min(p.troops + add, max) - p.troops;
   }
-  incoming(pid, n) { let s = 0; for (const a of this.armies) if (a.to === pid && a.owner === n) s += a.n; return s; }
-
-  // ---------- действия ----------
-  setCapital(n, pid, troops = 18) {
-    const p = this.P[pid], N = this.N[n];
-    p.owner = n; p.capital = true; p.troops = troops;
-    N.capital = pid;
-    this.recount();
+  // золото за тик: 1K/с у людей и наций, 500/с у племён; порты и заводы — доход от торговли и промышленности
+  goldRate(p) { return p.kind === KIND.TRIBE ? 50 : 100 + 50 * (p.portLevels || 0) + 40 * (p.factLevels || 0); }
+  troopsAtWar(p) { let s = 0; for (const a of p.attacks) if (!a.dead) s += a.troops; for (const b of p.boats) s += b.troops; return s; }
+  // защита: люди неуязвимы для людей первые 5:00, нации и племена — только 5 с
+  isImmune(q) { return !!q && this.tickN < (q.kind === KIND.HUMAN ? PROT_TICKS : NATION_IMMUNE); }
+  get protLeft() { return Math.max(0, PROT_TICKS - this.tickN); }
+  canAttack(p, q) {
+    if (!q) return true;
+    if (q === p || !q.alive || this.allied(p, q)) return false;
+    return !(p.kind === KIND.HUMAN && this.isImmune(q)); // нации и племена иммунитет людей не смотрят
   }
-
-  build(n, pid, type) {
-    const p = this.P[pid], N = this.N[n];
-    if (p.owner !== n) return 'not-own';
-    if (p.b[type]) return 'has';
-    if (type === 'port' && !p.coastal) return 'no-coast';
-    const c = this.cost(n, type);
-    if (N.gold < c) return 'gold';
-    N.gold -= c; p.b[type] = 1;
-    if (type === 'port') this.w.seaReach(pid);
-    this.emit('build', { n, pid, type });
-    return 'ok';
+  isTraitor(p) { return p.traitorUntil > this.tickN; }
+  // разорвать союз: предатель на 30 с (атаки на него дешевле вдвое и на 20% быстрее)
+  breakAlly(p, q) {
+    if (!this.allied(p, q)) return false;
+    p.allies.delete(q.id); q.allies.delete(p.id);
+    p.traitorUntil = this.tickN + TRAITOR_TICKS;
+    this.emit('betray', { p, q });
+    return true;
   }
-
-  order(n, from, to, frac) {
-    const a = this.P[from], b = this.P[to];
-    if (!a || !b || a.owner !== n || from === to) return 'bad';
-    const tg = this.isTarget(from, to);
-    if (!tg) return 'far';
-    if (b.owner >= 0 && b.owner !== n) {
-      const st = this.st[n][b.owner];
-      if (st === 'ally') return 'ally';
-      if (st !== 'war') this.declareWar(n, b.owner);
-    }
-    let k = Math.floor(a.troops * frac);
-    if (k > a.troops - 1) k = Math.floor(a.troops - 1);
-    if (k < 1) return 'few';
-    a.troops -= k;
-    const path = tg.naval ? this.w.seaPath(from, to) : [a.lx, a.ly, b.lx, b.ly];
-    const cum = [0];
-    for (let i = 2; i < path.length; i += 2) cum.push(cum[cum.length - 1] + Math.hypot(path[i] - path[i - 2], path[i + 1] - path[i - 1]));
-    const army = { id: this.armyId++, owner: n, from, to, n: k, path, cum, len: cum[cum.length - 1] || 1, d: 0, speed: tg.naval ? SEA_SPEED : LAND_SPEED, naval: tg.naval, born: this.time };
-    this.armies.push(army);
-    this.emit('send', army);
-    return 'ok';
+  donate(p, q, troops) {
+    if (!this.allied(p, q) || this.tickN - p.donateAt < DONATE_CD) return 0;
+    troops = Math.floor(Math.min(troops, p.troops, Math.max(0, this.maxTroops(q) - q.troops)));
+    if (troops < 1) return 0;
+    p.troops -= troops; q.troops += troops; p.donateAt = this.tickN;
+    this.emit('donate', { p, q, troops });
+    return troops;
   }
-
-  declareWar(a, b, why = '') {
-    if (a === b || this.st[a][b] === 'war') return;
-    if (this.st[a][b] === 'ally') this.breakAlly(a, b, true);
-    this.st[a][b] = this.st[b][a] = 'war';
-    this.warSince[a][b] = this.warSince[b][a] = this.time;
-    this.op[b][a] = clamp(this.op[b][a] - 30, -100, 100);
-    this.op[a][b] = clamp(this.op[a][b] - 10, -100, 100);
-    for (let x = 0; x < this.N.length; x++) if (x !== a && x !== b) this.op[x][a] -= 2;
-    this.emit('war', { a, b, why });
-  }
-  makePeace(a, b) {
-    this.st[a][b] = this.st[b][a] = 'peace';
-    this.truce[a][b] = this.truce[b][a] = this.time + 60;
-    this.op[a][b] += 12; this.op[b][a] += 12;
-    this.emit('peace', { a, b });
-  }
+  allied(a, b) { return !!a && !!b && a !== b && a.allies.has(b.id); }
   makeAlly(a, b) {
-    this.st[a][b] = this.st[b][a] = 'ally';
-    this.op[a][b] += 15; this.op[b][a] += 15;
+    if (a === b || this.allied(a, b)) return;
+    a.allies.add(b.id); b.allies.add(a.id);
     this.emit('ally', { a, b });
   }
-  breakAlly(a, b, silent = false) {
-    if (this.st[a][b] !== 'ally') return;
-    this.st[a][b] = this.st[b][a] = 'neutral';
-    this.op[b][a] = clamp(this.op[b][a] - 40, -100, 100);
-    this.emit('breakAlly', { a, b, silent });
+  attackersOn(q) { let n = 0; for (const a of this.attacks) if (!a.dead && a.target === q) n++; return n; }
+  // статус для карточки цели: союз / война (идёт атака в любую сторону) / нейтрал
+  relation(me, q) {
+    if (this.allied(me, q)) return 'ally';
+    for (const a of me.attacks) if (!a.dead && a.target === q) return 'war';
+    for (const a of q.attacks) if (!a.dead && a.target === me) return 'war';
+    for (const b of me.boats) if (b.target === q) return 'war';
+    for (const b of q.boats) if (b.target === me) return 'war';
+    const t = this.tickN, h1 = me.hitBy.get(q.id), h2 = q.hitBy.get(me.id);
+    if ((h1 !== undefined && t - h1 < 300) || (h2 !== undefined && t - h2 < 300)) return 'war';
+    return 'neutral';
   }
 
-  // предложение от a нации b (игрок → бот: ответ сразу; бот → игрок: событие offer)
-  propose(a, b, kind) {
-    const st = this.st[a][b];
-    if (kind === 'peace' && st !== 'war') return { ok: false, why: 'not-war' };
-    if (kind === 'ally' && (st === 'war' || st === 'ally')) return { ok: false, why: st };
-    if (this.time - this.lastOffer[a][b] < 15) return { ok: false, why: 'cooldown' };
-    this.lastOffer[a][b] = this.time;
-    const ok = this.aiAccept(b, a, kind);
-    if (ok) kind === 'peace' ? this.makePeace(a, b) : this.makeAlly(a, b);
-    else this.op[b][a] -= 2;
-    return { ok };
+  // ---------- клетки ----------
+  isLand(t) { const v = this.terr[t]; return v >= T_PLAINS && v !== T_IMPASS; }
+  isBorderTile(t, id) {
+    const o = this.owner, x = t % W;
+    return x === 0 || x === W - 1 || t < W || t >= N_TILES - W || o[t - 1] !== id || o[t + 1] !== id || o[t - W] !== id || o[t + W] !== id;
   }
-  aiAccept(m, a, kind) {
-    const M = this.N[m];
-    if (M.isClaude && this.N[a].isPlayer) return Math.random() < 0.97;
-    const r = this.S(a) / this.S(m);
-    if (kind === 'peace') {
-      if (this.st[m][a] !== 'war') return false;
-      const dur = this.time - this.warSince[m][a];
-      const p = 0.12 + (r - 1) * 0.45 + this.op[m][a] / 160 + Math.min(0.35, dur / 160) - M.ai.aggr * 0.3 + (M.lost > 2 ? 0.2 : 0);
-      return Math.random() < clamp(p, 0.04, 0.95);
-    }
-    if (this.st[m][a] === 'war') return false;
-    if (this.allies(m).length >= 2) return false;
-    const common = this.wars(m).some((e) => this.st[a][e] === 'war');
-    const p = -0.15 + this.op[m][a] / 70 + (common ? 0.35 : 0) + (r > 0.6 ? 0.15 : -0.1) - M.ai.toxic * 0.15 + (this.st[m][a] === 'peace' ? 0.1 : 0);
-    return Math.random() < clamp(p, 0.03, 0.9);
+  refreshBorder(t) {
+    const id = this.owner[t];
+    if (!id) return;
+    const b = this.P[id].border;
+    if (this.isBorderTile(t, id)) b.add(t); else b.delete(t);
   }
-  answerDemand(n, pay) {
-    const d = this.demands[n];
-    if (!d) return false;
-    delete this.demands[n];
-    const me = this.N.findIndex((x) => x.isPlayer);
-    if (!this.N[n].alive || this.st[n][me] === 'war') return false;
-    if (pay && this.N[me].gold >= d.gold) {
-      this.N[me].gold -= d.gold; this.N[n].gold += d.gold;
-      this.op[n][me] += 20;
-      this.makePeace(n, me);
-      this.truce[n][me] = this.truce[me][n] = this.time + 90;
-      return true;
+  mark(t) {
+    if (this.chgN === this.chg.length) { const c = new Int32Array(this.chg.length * 2); c.set(this.chg); this.chg = c; }
+    this.chg[this.chgN++] = t;
+  }
+  setOwner(t, id) {
+    const o = this.owner, prev = o[t];
+    if (prev === id) return;
+    if (prev) { const q = this.P[prev]; q.tiles--; q.border.delete(t); }
+    o[t] = id;
+    if (id) { const p = this.P[id]; p.tiles++; if (p.tiles > p.peakTiles) p.peakTiles = p.tiles; }
+    this.refreshBorder(t);
+    const x = t % W;
+    if (x > 0) this.refreshBorder(t - 1);
+    if (x < W - 1) this.refreshBorder(t + 1);
+    if (t >= W) this.refreshBorder(t - W);
+    if (t < N_TILES - W) this.refreshBorder(t + W);
+    this.mark(t);
+    this.dirtyEnclave = true;
+    const s = this.structAt[t];
+    if (s >= 0) this.captureStruct(this.structs[s], id, prev);
+  }
+  flush() { if (this.chgN) { this.emit('tiles', { buf: this.chg, n: this.chgN }); this.chgN = 0; } }
+
+  // граничит ли p с землёй цели (target — игрок или null для ничьей земли)
+  borders(p, target) {
+    const tid = target ? target.id : 0, o = this.owner;
+    for (const t of p.border) {
+      const x = t % W;
+      if (x > 0 && o[t - 1] === tid && this.isLand(t - 1)) return true;
+      if (x < W - 1 && o[t + 1] === tid && this.isLand(t + 1)) return true;
+      if (t >= W && o[t - W] === tid && this.isLand(t - W)) return true;
+      if (t < N_TILES - W && o[t + W] === tid && this.isLand(t + W)) return true;
     }
-    this.declareWar(n, me, 'refused');
     return false;
   }
-  offer(n, m, kind) {
-    if (this.time - this.lastOffer[n][m] < (this.N[m].isPlayer ? 45 : 20)) return;
-    this.lastOffer[n][m] = this.time;
-    if (this.N[m].isPlayer) { this.emit('offer', { from: n, kind }); return; }
-    if (this.aiAccept(m, n, kind)) kind === 'peace' ? this.makePeace(n, m) : this.makeAlly(n, m);
+
+  // ---------- появление ----------
+  spawnTilesAt(center) {
+    const out = [], cx = center % W, cy = (center / W) | 0, R = Math.ceil(SPAWN_R), R2 = SPAWN_R * SPAWN_R;
+    for (let dy = -R; dy <= R; dy++) for (let dx = -R; dx <= R; dx++) {
+      if (dx * dx + dy * dy > R2) continue;
+      const x = cx + dx, y = cy + dy;
+      if (x < 0 || y < 0 || x >= W || y >= H) continue;
+      const t = y * W + x;
+      if (this.isLand(t) && !this.owner[t]) out.push(t);
+    }
+    return out;
+  }
+  canSpawn(center) { return center >= 0 && this.isLand(center) && !this.owner[center] && this.spawnTilesAt(center).length >= 30; }
+  // этап выбора: только метка столицы; диски земли появляются, когда начинается война (spawnAll)
+  reserveSpawn(p, center) { p.spawn = center; }
+  spawnAll() {
+    for (let i = 1; i < this.P.length; i++) { const p = this.P[i]; if (p.alive && p.spawn >= 0 && !p.spawnTiles) this.spawn(p, p.spawn); }
+    for (let i = 1; i < this.P.length; i++) { const p = this.P[i]; if (p.alive && !p.tiles) p.alive = false; }
+  }
+  spawn(p, center) {
+    const tiles = this.spawnTilesAt(center);
+    for (const t of tiles) this.setOwner(t, p.id);
+    p.spawn = center; p.spawnTiles = tiles; p.alive = true;
+    this.flush();
+    this.emit('spawn', { p });
+  }
+  unspawn(p) {
+    if (!p.spawnTiles) return;
+    for (const t of p.spawnTiles) if (this.owner[t] === p.id) this.setOwner(t, 0);
+    p.spawnTiles = null; p.spawn = -1;
+    this.flush();
   }
 
-  // ---------- цикл ----------
-  update(dt) {
-    if (!this.running || this.over) return;
-    this.time += dt;
-    const P = this.P;
-    for (const p of P) {
-      if (p.owner < 0) {
-        if (p.troops < p.gar) p.troops = Math.min(p.gar, p.troops + 0.1 * dt);
-        continue;
+  // ---------- атаки ----------
+  // p атакует цель (игрок или null — ничья земля) отрядом troops (внутренние единицы).
+  attack(p, target, troops, landed = false) {
+    if (!p.alive || this.over) return { ok: false, reason: 'dead' };
+    if (target && (target === p || !target.alive)) return { ok: false, reason: 'bad' };
+    if (target && this.allied(p, target)) return { ok: false, reason: 'ally' };
+    if (target && !this.canAttack(p, target)) return { ok: false, reason: 'immune' };
+    troops = Math.floor(landed ? troops : Math.min(troops, p.troops));
+    if (troops < 1) return { ok: false, reason: 'few' };
+    if (!this.borders(p, target)) return { ok: false, reason: 'far' };
+    if (!landed) p.troops -= troops;
+    // встречные атаки гасят друг друга: большая остаётся с разницей
+    if (target) {
+      for (const a of target.attacks) {
+        if (a.dead || a.target !== p || a.boat || a.retreatAt >= 0) continue;
+        if (a.troops > troops) {
+          a.troops -= troops;
+          this.emit('clash', { p, target, troops, absorbed: true });
+          return { ok: true, absorbed: true, troops };
+        }
+        troops -= a.troops;
+        this.emit('clash', { p, target, troops: a.troops, absorbed: false });
+        this.killAttack(a);
       }
-      const cap = this.capOf(p);
-      if (p.troops < cap) p.troops = Math.min(cap, p.troops + this.prodRate(p) * dt);
-      else p.troops -= (p.troops - cap) * 0.03 * dt;
-      const g = this.goldRate(p) * dt;
-      this.N[p.owner].gold += g;
-      if (this.N[p.owner].isPlayer && (p.b.city || p.capital)) p.goldAcc += g;
+      target.hitBy.set(p.id, this.tickN);
     }
-    // армии
-    for (let i = this.armies.length - 1; i >= 0; i--) {
-      const a = this.armies[i];
-      a.d += a.speed * dt;
-      if (a.d >= a.len) { this.armies.splice(i, 1); this.arrive(a); }
+    // повторный тап по той же цели — добавить к идущей атаке (высадка с моря — отдельная атака)
+    for (const a of p.attacks) {
+      if (landed) break;
+      if (a.dead || a.target !== target || a.boat || a.retreatAt >= 0) continue;
+      a.troops += troops;
+      this.emit('attack', { a, merged: true, add: troops });
+      return { ok: true, attack: a, merged: true, troops };
     }
-    // ИИ
-    for (const N of this.N) {
-      if (!N.alive || N.isPlayer) continue;
-      N.ai.think -= dt;
-      if (N.ai.think <= 0) { N.ai.think = rnd(0.7, 1.5) / (0.6 + N.ai.skill * 0.5); this.think(N.id); }
-      N.ai.diplo -= dt;
-      if (N.ai.diplo <= 0) { N.ai.diplo = N.isClaude ? rnd(2, 4) : rnd(5, 10); this.diplo(N.id); }
-    }
-    // требования дани без ответа → война
-    for (const k in this.demands) if (this.time > this.demands[k].until) this.answerDemand(+k, false);
-    // мнения, доход-всплывашки, статистика
-    this._sec = (this._sec || 0) + dt;
-    if (this._sec >= 1) { this._sec -= 1; this.drift(); }
-    this._inc = (this._inc || 0) + dt;
-    if (this._inc >= 3) {
-      this._inc = 0;
-      for (const p of P) if (p.goldAcc >= 1) { this.emit('income', { pid: p.id, amount: Math.floor(p.goldAcc) }); p.goldAcc -= Math.floor(p.goldAcc); }
-    }
-    this._rc = (this._rc || 0) + dt;
-    if (this._rc >= 0.25) { this._rc = 0; this.recount(); this.checkEnd(); }
+    const a = { id: this.attackSeq++, owner: p, target, troops, start: troops, heap: new Heap(), front: new Set(), retreatAt: -1, born: this.tickN, dead: false, boat: landed };
+    this.fillFront(a);
+    if (!a.front.size) { p.troops += troops; return { ok: false, reason: 'far' }; }
+    p.attacks.push(a); this.attacks.push(a);
+    this.emit('attack', { a, merged: false, add: troops });
+    return { ok: true, attack: a, troops };
   }
-
-  arrive(a) {
-    const b = this.P[a.to], o = b.owner, A = this.N[a.owner];
-    if (!A.alive) return;
-    if (o === a.owner) { b.troops += a.n; this.emit('reinforce', a); return; }
-    if (o >= 0 && this.st[a.owner][o] !== 'war') {
-      // пока шли — заключили мир/союз: войска возвращаются домой
-      const f = this.P[a.from];
-      if (f.owner === a.owner) f.troops += a.n;
+  fillFront(a) {
+    const tid = a.target ? a.target.id : 0, o = this.owner;
+    for (const t of a.owner.border) {
+      const x = t % W;
+      if (x > 0 && o[t - 1] === tid) this.addFront(a, t - 1);
+      if (x < W - 1 && o[t + 1] === tid) this.addFront(a, t + 1);
+      if (t >= W && o[t - W] === tid) this.addFront(a, t - W);
+      if (t < N_TILES - W && o[t + W] === tid) this.addFront(a, t + W);
+    }
+  }
+  addFront(a, t) {
+    if (!this.isLand(t)) return;
+    const o = this.owner, id = a.owner.id, x = t % W;
+    let own = 0;
+    if (x > 0 && o[t - 1] === id) own++;
+    if (x < W - 1 && o[t + 1] === id) own++;
+    if (t >= W && o[t - W] === id) own++;
+    if (t < N_TILES - W && o[t + W] === id) own++;
+    const pr = (Math.floor(Math.random() * 7) + 10) * (1 - 0.5 * own + TMAG[this.terr[t]] / 2) + this.tickN;
+    a.heap.push(pr, t);
+    a.front.add(t);
+  }
+  hasPostNear(def, t) {
+    if (!def.posts.length) return false;
+    const x = t % W, y = (t / W) | 0, R2 = STRUCTS.post.range * STRUCTS.post.range;
+    for (const s of def.posts) {
+      if (!s.built) continue;
+      const dx = (s.tile % W) - x, dy = ((s.tile / W) | 0) - y;
+      if (dx * dx + dy * dy <= R2) return true;
+    }
+    return false;
+  }
+  stepAttack(a) {
+    const p = a.owner, def = a.target;
+    if (a.retreatAt >= 0) {
+      if (this.tickN >= a.retreatAt) {
+        const back = a.troops * (def ? 0.75 : 1);
+        this.endAttack(a, back, 'retreat');
+      }
       return;
     }
-    const mult = this.defMult(b), def = b.troops * mult;
-    b.hit = this.time;
-    if (a.n > def) {
-      const wasCap = b.capital;
-      b.owner = a.owner; b.troops = Math.max(1, a.n - def);
-      A.captured++; A.battles++;
-      if (o >= 0) { this.N[o].lost++; this.op[o][a.owner] -= 3; }
-      this.emit('battle', { pid: b.id, att: a.owner, def: o, won: true, n: a.n, naval: a.naval });
-      this.emit('capture', { pid: b.id, from: o, to: a.owner });
-      if (wasCap && o >= 0) {
-        b.capital = false;
-        const loot = Math.floor(this.N[o].gold * 0.4);
-        this.N[o].gold -= loot; A.gold += loot;
-        this.relocateCapital(o);
-        this.emit('capital', { pid: b.id, from: o, to: a.owner, loot });
+    if (def && (!def.alive || this.allied(p, def))) { this.endAttack(a, a.troops, def.alive ? 'ally' : 'done'); return; }
+    const trait = def && this.isTraitor(def);
+    const o = this.owner, terr = this.terr, tid = def ? def.id : 0, id = p.id;
+    const borderSize = a.front.size + Math.floor(Math.random() * 5);
+    let budget = PACE;
+    while (budget > 0) {
+      if (a.troops < 1) { this.endAttack(a, 0, 'wiped'); return; }
+      if (!a.heap.n) { this.endAttack(a, a.troops, 'done'); return; }
+      const t = a.heap.pop();
+      a.front.delete(t);
+      if (o[t] !== tid || !this.isLand(t)) continue;
+      const x = t % W;
+      if (!((x > 0 && o[t - 1] === id) || (x < W - 1 && o[t + 1] === id) || (t >= W && o[t - W] === id) || (t < N_TILES - W && o[t + W] === id))) continue;
+      const ter = terr[t];
+      let mag = MAG[ter], cost = COST[ter];
+      if (!def) {
+        budget -= within((2000 * cost) / Math.max(1, a.troops), 5, 100) / (2 * borderSize);
+        a.troops -= mag / (p.kind === KIND.TRIBE ? 10 : 5);
+      } else {
+        if (this.hasPostNear(def, t)) { mag *= 5; cost *= 3; }
+        if (p.kind !== KIND.TRIBE && def.kind === KIND.TRIBE) mag *= 0.7;
+        const dT = Math.max(1, def.troops), ratio = dT / Math.max(1, a.troops), dTiles = Math.max(1, def.tiles);
+        const defLoss = def.troops / dTiles;
+        const lbD = largeBonus(dTiles, 0.3);
+        a.troops -= mag * (trait ? 0.5 : 1) * within(ratio, 0.6, 2) * (0.463 * largeBonus(p.tiles, 0.7) * lbD + 0.0039 * defLoss);
+        const speed = (within(ratio, 0.82, 7.5) * within(ratio / 20, 1, 50)) / 8.55;
+        budget -= (speed * cost * largeBonus(p.tiles, 0.73) * lbD * (trait ? 0.8 : 1)) / borderSize;
+        def.troops = Math.max(0, def.troops - defLoss);
       }
-      if (o >= 0) this.checkAlive(o, a.owner);
-    } else {
-      b.troops = Math.max(0, (def - a.n) / mult);
-      if (o >= 0) this.N[o].battles++;
-      this.emit('battle', { pid: b.id, att: a.owner, def: o, won: false, n: a.n, naval: a.naval });
+      this.setOwner(t, id);
+      if (x > 0 && o[t - 1] === tid) this.addFront(a, t - 1);
+      if (x < W - 1 && o[t + 1] === tid) this.addFront(a, t + 1);
+      if (t >= W && o[t - W] === tid) this.addFront(a, t - W);
+      if (t < N_TILES - W && o[t + W] === tid) this.addFront(a, t + W);
+      if (def && def.tiles < ELIM_TILES) {
+        this.eliminate(def, p);
+        this.endAttack(a, Math.max(0, a.troops), 'done');
+        return;
+      }
+    }
+  }
+  retreat(a) {
+    if (a.dead || a.retreatAt >= 0) return;
+    a.retreatAt = this.tickN + RETREAT_TICKS;
+    this.emit('retreat', { a });
+  }
+  killAttack(a) {
+    if (a.dead) return;
+    a.dead = true;
+    const L = a.owner.attacks, i = L.indexOf(a);
+    if (i >= 0) L.splice(i, 1);
+  }
+  endAttack(a, back, why) {
+    if (a.dead) return;
+    if (back > 0 && a.owner.alive) a.owner.troops += back;
+    this.killAttack(a);
+    this.emit('attackEnd', { a, why, back });
+  }
+
+  // ---------- гибель игрока ----------
+  eliminate(v, by) {
+    if (!v.alive) return;
+    v.alive = false; v.diedAt = this.tickN;
+    // вся оставшаяся земля отходит победителю
+    const o = this.owner, vid = v.id;
+    if (v.tiles > 0) for (let t = 0; t < N_TILES; t++) if (o[t] === vid) this.setOwner(t, by ? by.id : 0);
+    for (const a of v.attacks.slice()) this.killAttack(a);
+    for (const a of this.attacks) if (!a.dead && a.target === v) this.endAttack(a, a.troops, 'done');
+    for (const b of v.boats.slice()) this.killBoat(b);
+    for (const s of this.ships.slice()) if (s.owner === v) this.killShip(s);
+    let gold = 0;
+    if (by) {
+      gold = Math.floor(v.kind === KIND.HUMAN ? v.gold * 0.5 : v.gold);
+      by.gold += gold; by.kills++;
+      if (v.kind !== KIND.TRIBE) by.killsN++;
+    }
+    v.gold = 0; v.troops = 0;
+    for (const id of v.allies) this.P[id].allies.delete(vid);
+    this.emit('eliminated', { v, by, gold });
+  }
+
+  // анклавы: кусок земли, со всех сторон (по суше, без выхода к морю) окружённый одним враждебным игроком, отходит ему
+  enclaves() {
+    if (!this.dirtyEnclave) return;
+    this.dirtyEnclave = false;
+    const n = N_TILES, o = this.owner;
+    if (!this.lab) { this.lab = new Int32Array(n); this.stk = new Int32Array(n); }
+    const lab = this.lab, stk = this.stk;
+    lab.fill(0);
+    const cSize = [0], cOwner = [0], cSur = [0], cStart = [0];
+    const best = new Int32Array(this.P.length), bestSize = new Int32Array(this.P.length);
+    for (let s = 0; s < n; s++) {
+      const id = o[s];
+      if (!id || lab[s]) continue;
+      const c = cSize.length;
+      let sp = 0, size = 0, sur = -2;
+      stk[sp++] = s; lab[s] = c;
+      while (sp) {
+        const t = stk[--sp]; size++;
+        const x = t % W;
+        for (let k = 0; k < 4; k++) {
+          let nb;
+          if (k === 0) { if (x === 0) continue; nb = t - 1; } else if (k === 1) { if (x === W - 1) continue; nb = t + 1; } else if (k === 2) { if (t < W) continue; nb = t - W; } else { if (t >= n - W) continue; nb = t + W; }
+          const on = o[nb];
+          if (on === id) { if (!lab[nb]) { lab[nb] = c; stk[sp++] = nb; } continue; }
+          if (on === 0) { sur = -1; continue; } // ничья земля или вода рядом — не окружён
+          if (sur === -2) sur = on; else if (sur !== on) sur = -1;
+        }
+      }
+      cSize.push(size); cOwner.push(id); cSur.push(sur); cStart.push(s);
+      if (size > bestSize[id]) { bestSize[id] = size; best[id] = c; }
+    }
+    for (let c = 1; c < cSize.length; c++) {
+      const id = cOwner[c], sur = cSur[c];
+      if (sur <= 0) continue;
+      const p = this.P[id], q = this.P[sur];
+      if (!p.alive || !q.alive || this.allied(p, q)) continue;
+      if (best[id] === c && p.tiles >= ELIM_TILES) continue; // основная земля не трогается
+      // перекрасить компоненту
+      let sp = 0; stk[sp++] = cStart[c]; lab[cStart[c]] = -1;
+      const list = [];
+      while (sp) {
+        const t = stk[--sp]; list.push(t);
+        const x = t % W;
+        if (x > 0 && lab[t - 1] === c) { lab[t - 1] = -1; stk[sp++] = t - 1; }
+        if (x < W - 1 && lab[t + 1] === c) { lab[t + 1] = -1; stk[sp++] = t + 1; }
+        if (t >= W && lab[t - W] === c) { lab[t - W] = -1; stk[sp++] = t - W; }
+        if (t < n - W && lab[t + W] === c) { lab[t + W] = -1; stk[sp++] = t + W; }
+      }
+      for (const t of list) this.setOwner(t, sur);
+      this.emit('enclave', { from: p, to: q, n: list.length });
+      if (p.tiles === 0) this.eliminate(p, q);
+      else if (p.tiles < ELIM_TILES && best[id] === c) this.eliminate(p, q);
     }
   }
 
-  relocateCapital(n) {
-    let best = null, bs = -1;
-    for (const p of this.P) if (p.owner === n) { const s = p.troops + (p.b.city ? 30 : 0) + p.area / 20; if (s > bs) { bs = s; best = p; } }
-    this.N[n].capital = best ? best.id : -1;
-    if (best) best.capital = true;
+  // ---------- постройки ----------
+  // цена (как в оригинале): n = min(Σ уровней в собственности, включая строящиеся; оплаченных построек) —
+  // захваченные постройки цену не поднимают. Порт и завод делят один счётчик.
+  levelsOf(p, types) { let s = 0; for (const x of this.structs) if (x.owner === p.id && types.includes(x.type)) s += x.level + (x.pending || 0); return s; }
+  shipsOf(p) { let n = 0; for (const s of this.ships) if (s.owner === p) n++; return n; }
+  countOf(p, type) {
+    if (type === 'warship') return this.shipsOf(p);
+    let n = 0; for (const s of this.structs) if (s.owner === p.id && s.type === type) n++; return n;
   }
-
-  checkAlive(n, by) {
-    const N = this.N[n];
-    if (!N.alive) return;
-    if (this.P.some((p) => p.owner === n)) return;
-    N.alive = false; N.capital = -1;
-    this.armies = this.armies.filter((a) => a.owner !== n);
-    for (let m = 0; m < this.N.length; m++) { this.st[n][m] = this.st[m][n] = 'neutral'; }
-    this.emit('eliminated', { n, by });
+  cost(p, type) {
+    if (type === 'silo') return 1e6;
+    if (type === 'warship') return Math.min(1e6, (Math.min(this.shipsOf(p), p.paid.warship) + 1) * 250000);
+    const pf = type === 'port' || type === 'factory';
+    const types = pf ? ['port', 'factory'] : [type];
+    const n = Math.min(this.levelsOf(p, types), pf ? p.paid.port + p.paid.factory : p.paid[type]);
+    if (type === 'city' || pf) return Math.min(1e6, Math.pow(2, n) * 125000);
+    if (type === 'post') return Math.min(250000, (n + 1) * 50000);
+    if (type === 'sam') return Math.min(3e6, (n + 1) * 1.5e6);
+    return 0;
   }
-
-  drift() {
-    const n = this.N.length;
-    for (let a = 0; a < n; a++) for (let b = 0; b < n; b++) {
-      if (a === b) continue;
-      const s = this.st[a][b];
-      let v = this.op[a][b];
-      if (s === 'ally') v += 0.35; else if (s === 'peace') v += 0.2; else if (s === 'war') v -= 0.05; else v *= 0.995;
-      if (s === 'peace' && this.time > this.truce[a][b] + 120 && Math.random() < 0.002) { this.st[a][b] = this.st[b][a] = 'neutral'; }
-      this.op[a][b] = clamp(v, -100, 100);
+  structNear(t, r, pred) {
+    const x = t % W, y = (t / W) | 0, R2 = r * r;
+    let best = null, bd = 1e9;
+    for (const s of this.structs) {
+      if (pred && !pred(s)) continue;
+      const dx = (s.tile % W) - x, dy = ((s.tile / W) | 0) - y, d = dx * dx + dy * dy;
+      if (d <= R2 && d < bd) { bd = d; best = s; }
     }
+    return best;
   }
-
-  recount() {
-    for (const N of this.N) { const s = N.s; s.count = s.area = s.troops = s.income = s.prod = 0; }
-    for (const p of this.P) {
-      if (p.owner < 0) continue;
-      const s = this.N[p.owner].s;
-      s.count++; s.area += p.area; s.troops += p.troops; s.income += this.goldRate(p); s.prod += this.prodRate(p);
+  // постройки любых владельцев рядом с тапом (для проверки отступа)
+  nearList(t0, r) {
+    const x0 = t0 % W, y0 = (t0 / W) | 0, out = [];
+    for (const s of this.structs) { const dx = (s.tile % W) - x0, dy = ((s.tile / W) | 0) - y0; if (dx * dx + dy * dy <= r * r) out.push(s); }
+    return out;
+  }
+  spaced(t, list) {
+    const x = t % W, y = (t / W) | 0, G2 = STRUCT_GAP * STRUCT_GAP;
+    for (const s of list) { const dx = (s.tile % W) - x, dy = ((s.tile / W) | 0) - y; if (dx * dx + dy * dy < G2) return false; }
+    return true;
+  }
+  // ближайшая своя клетка в радиусе SNAP_R от тапа, не ближе STRUCT_GAP к любой постройке
+  snapTile(p, t0) {
+    const o = this.owner, id = p.id, x0 = t0 % W, y0 = (t0 / W) | 0, R = SNAP_R;
+    const list = this.nearList(t0, R + STRUCT_GAP + 1);
+    let best = -1, bd = 1e9;
+    for (let dy = -R; dy <= R; dy++) for (let dx = -R; dx <= R; dx++) {
+      const d = dx * dx + dy * dy; if (d > R * R || d >= bd) continue;
+      const x = x0 + dx, y = y0 + dy; if (x < 0 || y < 0 || x >= W || y >= H) continue;
+      const t = y * W + x;
+      if (o[t] !== id || !this.isLand(t) || !this.spaced(t, list)) continue;
+      best = t; bd = d;
     }
-    for (const a of this.armies) this.N[a.owner].s.troops += a.n;
-    for (const N of this.N) { N.s.share = N.s.area / this.w.landCount; if (N.s.share > N.peak) N.peak = N.s.share; }
+    return best;
+  }
+  // порт: ближайшая своя береговая клетка в пределах PORT_R (манхэттен)
+  snapPort(p, t0) {
+    const o = this.owner, id = p.id, x0 = t0 % W, y0 = (t0 / W) | 0, R = PORT_R, shore = this.w.shore;
+    const list = this.nearList(t0, R + STRUCT_GAP + 1);
+    let best = -1, bd = 1e9;
+    for (let dy = -R; dy <= R; dy++) for (let dx = -R + Math.abs(dy); dx <= R - Math.abs(dy); dx++) {
+      const d = dx * dx + dy * dy; if (d >= bd) continue;
+      const x = x0 + dx, y = y0 + dy; if (x < 0 || y < 0 || x >= W || y >= H) continue;
+      const t = y * W + x;
+      if (o[t] !== id || !shore[t] || !this.spaced(t, list)) continue;
+      best = t; bd = d;
+    }
+    return best;
+  }
+  // куда встанет постройка при тапе в t0: { tile, up (улучшаемая постройка), ok, reason }
+  placement(p, type, t0) {
+    if (t0 < 0) return { tile: -1, up: null, ok: false, reason: 'far' };
+    if (type === 'warship') {
+      const port = this.shipPort(p, t0);
+      return port ? { tile: port.tile, up: null, ok: true, port } : { tile: t0, up: null, ok: false, reason: 'port' };
+    }
+    const S = STRUCTS[type];
+    if (S.upg) {
+      const up = this.structNear(t0, SNAP_R, (s) => s.owner === p.id && s.type === type);
+      if (up) return up.built && !up.pending ? { tile: up.tile, up, ok: true } : { tile: up.tile, up, ok: false, reason: 'busy' };
+    }
+    const t = type === 'port' ? this.snapPort(p, t0) : this.snapTile(p, t0);
+    if (t < 0) return { tile: t0, up: null, ok: false, reason: this.owner[t0] !== p.id ? 'own' : type === 'port' ? 'shore' : 'space' };
+    return { tile: t, up: null, ok: true };
+  }
+  build(p, type, t0) {
+    if (!p.alive || this.over) return { ok: false, reason: 'dead' };
+    const pl = this.placement(p, type, t0);
+    if (!pl.ok) return { ok: false, reason: pl.reason, tile: pl.tile };
+    const c = this.cost(p, type);
+    if (p.gold < c) return { ok: false, reason: 'gold', cost: c, tile: pl.tile };
+    p.gold -= c; p.paid[type]++;
+    if (type === 'warship') {
+      const s = this.addShip(p, pl.port, t0);
+      this.emit('build', { s, upgrade: false, p, ship: true });
+      return { ok: true, s, ship: true };
+    }
+    const S = STRUCTS[type];
+    if (pl.up) {
+      const up = pl.up;
+      up.pending = 1; up.startAt = this.tickN; up.doneAt = this.tickN + S.time;
+      this.emit('build', { s: up, upgrade: true, p });
+      return { ok: true, s: up, upgrade: true };
+    }
+    const s = { id: this.structSeq++, type, owner: p.id, builder: p.id, tile: pl.tile, level: 1, pending: 0, built: false, startAt: this.tickN, doneAt: this.tickN + S.time, born: this.tickN };
+    this.structAt[pl.tile] = this.structs.length;
+    this.structs.push(s);
+    if (type === 'post') p.posts.push(s);
+    this.emit('build', { s, upgrade: false, p });
+    return { ok: true, s };
+  }
+  // уровни достроенных городов (лимит войск), портов и заводов (доход)
+  recountCities(p) {
+    let c = 0, po = 0, f = 0;
+    for (const s of this.structs) {
+      if (s.owner !== p.id || !s.built) continue;
+      if (s.type === 'city') c += s.level; else if (s.type === 'port') po += s.level; else if (s.type === 'factory') f += s.level;
+    }
+    p.cityLevels = c; p.portLevels = po; p.factLevels = f;
+  }
+  removeStruct(s) {
+    const i = this.structs.indexOf(s);
+    if (i < 0) return;
+    this.structs.splice(i, 1);
+    this.structAt[s.tile] = -1;
+    for (let k = i; k < this.structs.length; k++) this.structAt[this.structs[k].tile] = k;
+    const P = this.P[s.owner];
+    if (P) { const j = P.posts.indexOf(s); if (j >= 0) P.posts.splice(j, 1); this.recountCities(P); }
+    if (s.type === 'post' && s.built) this.emit('defense', { s });
+  }
+  captureStruct(s, to, from) {
+    if (s.type === 'post' || !to) { this.removeStruct(s); this.emit('capture', { s, from: this.P[from], to: this.P[to], destroyed: true }); return; }
+    s.owner = to;
+    if (from) this.recountCities(this.P[from]);
+    this.recountCities(this.P[to]);
+    this.emit('capture', { s, from: this.P[from], to: this.P[to], destroyed: false });
+  }
+  // защищена ли клетка t владельца постом (для отрисовки «шахматки» на границе)
+  defended(id, t) { const p = this.P[id]; return !!p && p.posts.length > 0 && this.hasPostNear(p, t); }
+
+  // ---------- вода: поиск пути (BFS) для десанта и кораблей ----------
+  isWater(t) { return this.terr[t] < T_PLAINS; }
+  bfsInit() {
+    if (!this.bPrev) { this.bPrev = new Int32Array(N_TILES); this.bSeen = new Uint32Array(N_TILES); this.bQ = new Int32Array(N_TILES); this.bStamp = 0; }
+    return ++this.bStamp;
+  }
+  // водоёмы (связные куски воды) — корабль строится только в порту того же водоёма
+  waterBody() {
+    if (this.wb) return this.wb;
+    const wb = this.wb = new Int32Array(N_TILES), q = new Int32Array(N_TILES);
+    let id = 0;
+    for (let s = 0; s < N_TILES; s++) {
+      if (wb[s] || !this.isWater(s)) continue;
+      id++; let h = 0, tl = 0; q[tl++] = s; wb[s] = id;
+      while (h < tl) {
+        const t = q[h++], x = t % W;
+        if (x > 0 && !wb[t - 1] && this.isWater(t - 1)) { wb[t - 1] = id; q[tl++] = t - 1; }
+        if (x < W - 1 && !wb[t + 1] && this.isWater(t + 1)) { wb[t + 1] = id; q[tl++] = t + 1; }
+        if (t >= W && !wb[t - W] && this.isWater(t - W)) { wb[t - W] = id; q[tl++] = t - W; }
+        if (t < N_TILES - W && !wb[t + W] && this.isWater(t + W)) { wb[t + W] = id; q[tl++] = t + W; }
+      }
+    }
+    return wb;
+  }
+  // связана ли клетка t по суше (через земли того же владельца) с территорией p — иначе только десантом
+  landConnected(p, t0) {
+    if (t0 < 0 || !this.isLand(t0)) return false;
+    const st = this.bfsInit(), seen = this.bSeen, Q = this.bQ, o = this.owner, id = o[t0], pid = p.id;
+    let h = 0, tl = 0; seen[t0] = st; Q[tl++] = t0;
+    while (h < tl) {
+      const t = Q[h++], x = t % W;
+      for (let k = 0; k < 4; k++) {
+        let nb;
+        if (k === 0) { if (x === 0) continue; nb = t - 1; } else if (k === 1) { if (x === W - 1) continue; nb = t + 1; } else if (k === 2) { if (t < W) continue; nb = t - W; } else { if (t >= N_TILES - W) continue; nb = t + W; }
+        if (o[nb] === pid && this.isLand(nb)) return true;
+        if (seen[nb] === st || o[nb] !== id || !this.isLand(nb)) continue;
+        seen[nb] = st; Q[tl++] = nb;
+      }
+    }
+    return false;
+  }
+  // береговая клетка того же владельца рядом с тапом (куда высаживаться)
+  landingNear(t0) {
+    if (t0 < 0 || !this.isLand(t0)) return -1;
+    const id = this.owner[t0], shore = this.w.shore;
+    if (shore[t0]) return t0;
+    return this.w.nearest(t0, 30, (t) => shore[t] && this.owner[t] === id && this.isLand(t));
+  }
+  // маршрут десанта p к береговой клетке land: путь по воде от своего берега до цели
+  boatRoute(p, land) {
+    if (land < 0) return null;
+    const st = this.bfsInit(), prev = this.bPrev, seen = this.bSeen, Q = this.bQ, o = this.owner, id = p.id;
+    let h = 0, tl = 0;
+    const lx = land % W;
+    for (const nb of [lx > 0 ? land - 1 : -1, lx < W - 1 ? land + 1 : -1, land - W, land + W]) {
+      if (nb < 0 || nb >= N_TILES || !this.isWater(nb) || seen[nb] === st) continue;
+      seen[nb] = st; prev[nb] = -1; Q[tl++] = nb;
+    }
+    let goal = -1, src = -1;
+    while (h < tl && goal < 0) {
+      const t = Q[h++], x = t % W;
+      for (let k = 0; k < 4; k++) {
+        let nb;
+        if (k === 0) { if (x === 0) continue; nb = t - 1; } else if (k === 1) { if (x === W - 1) continue; nb = t + 1; } else if (k === 2) { if (t < W) continue; nb = t - W; } else { if (t >= N_TILES - W) continue; nb = t + W; }
+        if (o[nb] === id && this.isLand(nb)) { goal = t; src = nb; break; }
+        if (seen[nb] === st || !this.isWater(nb)) continue;
+        seen[nb] = st; prev[nb] = t; Q[tl++] = nb;
+      }
+    }
+    if (goal < 0) return null;
+    const path = [];
+    for (let t = goal; t >= 0; t = prev[t]) path.push(t);
+    return { path: Int32Array.from(path), land, src };
+  }
+  // разведка для ИИ: ближайший достижимый по воде берег, где ok(клетка суши) — от своего берега наружу
+  boatScout(p, ok, maxVisit = 90000) {
+    const st = this.bfsInit(), prev = this.bPrev, seen = this.bSeen, Q = this.bQ;
+    let h = 0, tl = 0;
+    for (const t of p.border) {
+      if (!this.w.shore[t]) continue;
+      const x = t % W;
+      for (const nb of [x > 0 ? t - 1 : -1, x < W - 1 ? t + 1 : -1, t - W, t + W]) {
+        if (nb < 0 || nb >= N_TILES || !this.isWater(nb) || seen[nb] === st) continue;
+        seen[nb] = st; prev[nb] = -1; Q[tl++] = nb;
+      }
+    }
+    let goal = -1, land = -1;
+    while (h < tl && goal < 0 && h < maxVisit) {
+      const t = Q[h++], x = t % W;
+      for (let k = 0; k < 4; k++) {
+        let nb;
+        if (k === 0) { if (x === 0) continue; nb = t - 1; } else if (k === 1) { if (x === W - 1) continue; nb = t + 1; } else if (k === 2) { if (t < W) continue; nb = t - W; } else { if (t >= N_TILES - W) continue; nb = t + W; }
+        if (seen[nb] === st) continue;
+        if (!this.isWater(nb)) { if (this.isLand(nb) && this.owner[nb] !== p.id && ok(nb)) { goal = t; land = nb; break; } continue; }
+        seen[nb] = st; prev[nb] = t; Q[tl++] = nb;
+      }
+    }
+    if (goal < 0) return null;
+    const path = [];
+    for (let t = goal; t >= 0; t = prev[t]) path.push(t);
+    path.reverse();
+    return { path: Int32Array.from(path), land };
+  }
+  // отправить десант: troops — внутренние единицы, land — клетка высадки (береговая)
+  sendBoat(p, land, troops, route = null) {
+    if (!p.alive || this.over) return { ok: false, reason: 'dead' };
+    if (p.boats.length >= BOAT_MAX) return { ok: false, reason: 'boats' };
+    const id = this.owner[land], target = id ? this.P[id] : null;
+    if (target === p) return { ok: false, reason: 'bad' };
+    if (target && !this.canAttack(p, target)) return { ok: false, reason: this.allied(p, target) ? 'ally' : 'immune' };
+    troops = Math.floor(Math.min(troops, p.troops));
+    if (troops < 1) return { ok: false, reason: 'few' };
+    const r = route || this.boatRoute(p, land);
+    if (!r || r.path.length < 1) return { ok: false, reason: 'noroute' };
+    p.troops -= troops;
+    const b = { id: this.boatSeq++, owner: p, target, land: r.land, path: r.path, i: 0, troops, back: false, born: this.tickN };
+    p.boats.push(b); this.boats.push(b);
+    if (target) target.hitBy.set(p.id, this.tickN);
+    this.emit('boat', { b });
+    return { ok: true, b, troops };
+  }
+  boatPos(b) {
+    const P = b.path, i = Math.max(0, Math.min(P.length - 1, b.i)), k = Math.floor(i), f = i - k;
+    const a = P[k], c = P[Math.min(P.length - 1, k + 1)];
+    return [(a % W) + 0.5 + ((c % W) - (a % W)) * f, ((a / W) | 0) + 0.5 + (((c / W) | 0) - ((a / W) | 0)) * f];
+  }
+  killBoat(b) {
+    if (b.dead) return;
+    b.dead = true;
+    let i = b.owner.boats.indexOf(b); if (i >= 0) b.owner.boats.splice(i, 1);
+    i = this.boats.indexOf(b); if (i >= 0) this.boats.splice(i, 1);
+  }
+  retreatBoat(b) { if (!b.dead && !b.back) { b.back = true; this.emit('retreat', { b }); } }
+  stepBoat(b) {
+    const p = b.owner;
+    if (!p.alive) { this.killBoat(b); return; }
+    if (b.back) {
+      b.i -= BOAT_SPEED;
+      if (b.i <= 0) { const back = b.troops * 0.75; p.troops += back; this.killBoat(b); this.emit('boatHome', { b, back }); }
+      return;
+    }
+    b.i += BOAT_SPEED;
+    if (b.i < b.path.length - 1) return;
+    const L = b.land, id = this.owner[L], q = id ? this.P[id] : null;
+    this.killBoat(b);
+    if (!this.isLand(L) || id === p.id || (q && !this.canAttack(p, q))) { p.troops += b.troops; this.emit('boatHome', { b, back: b.troops }); return; }
+    this.setOwner(L, p.id); // плацдарм
+    const r = this.attack(p, q, b.troops, true);
+    if (!r.ok) p.troops += b.troops;
+    this.emit('boatLand', { b, target: q, attack: r.attack || null });
   }
 
+  // ---------- военные корабли ----------
+  // ближайший достроенный свой порт в том же водоёме, что и вода у тапа
+  shipPort(p, t0) {
+    const wb = this.waterBody();
+    let w0 = -1;
+    if (this.isWater(t0)) w0 = wb[t0];
+    else { const t = this.w.nearest(t0, 6, (t) => this.isWater(t)); if (t >= 0) w0 = wb[t]; }
+    let best = null, bd = 1e18;
+    for (const s of this.structs) {
+      if (s.owner !== p.id || s.type !== 'port' || !s.built) continue;
+      const wt = this.portWater(s.tile); if (wt < 0 || (w0 >= 0 && wb[wt] !== w0)) continue;
+      const dx = (s.tile % W) - (t0 % W), dy = ((s.tile / W) | 0) - ((t0 / W) | 0), d = dx * dx + dy * dy;
+      if (d < bd) { bd = d; best = s; }
+    }
+    return best;
+  }
+  portWater(t) { const x = t % W; for (const nb of [x > 0 ? t - 1 : -1, x < W - 1 ? t + 1 : -1, t - W, t + W]) if (nb >= 0 && nb < N_TILES && this.isWater(nb)) return nb; return -1; }
+  addShip(p, port, tap) {
+    const w = this.portWater(port.tile);
+    const patrol = this.isWater(tap) ? tap : w;
+    const s = { id: this.boatSeq++, kind: 'warship', owner: p, tile: w, hp: SHIP.hp, patrol, goal: patrol, path: null, pi: 0, mv: 0, wait: 0, reload: 0, home: port.tile, born: this.tickN, shotAt: -99, shot: null };
+    this.ships.push(s);
+    return s;
+  }
+  killShip(s) { const i = this.ships.indexOf(s); if (i >= 0) this.ships.splice(i, 1); s.dead = true; }
+  moveShip(s, tile) { if (this.isWater(tile)) { s.patrol = tile; s.goal = tile; s.path = null; } }
+  // короткий путь по воде (BFS с ограничением) от s.tile к goal
+  shipPath(s, goal) {
+    const st = this.bfsInit(), prev = this.bPrev, seen = this.bSeen, Q = this.bQ;
+    let h = 0, tl = 0; seen[s.tile] = st; prev[s.tile] = -1; Q[tl++] = s.tile;
+    let found = -1;
+    while (h < tl && h < 60000) {
+      const t = Q[h++];
+      if (t === goal) { found = t; break; }
+      const x = t % W;
+      for (const nb of [x > 0 ? t - 1 : -1, x < W - 1 ? t + 1 : -1, t - W, t + W]) {
+        if (nb < 0 || nb >= N_TILES || seen[nb] === st || !this.isWater(nb)) continue;
+        seen[nb] = st; prev[nb] = t; Q[tl++] = nb;
+      }
+    }
+    if (found < 0) return null;
+    const path = [];
+    for (let t = found; t >= 0; t = prev[t]) path.push(t);
+    return path.reverse();
+  }
+  stepShip(s) {
+    const p = s.owner;
+    // огонь: вражеский десант (приоритет), затем вражеские корабли в радиусе
+    if (s.reload > 0) s.reload--;
+    if (!s.reload) {
+      const [sx, sy] = this.shipXY(s);
+      let tgt = null, td = SHIP.range * SHIP.range;
+      for (const b of this.boats) {
+        if (b.owner === p || this.allied(p, b.owner)) continue;
+        const [bx, by] = this.boatPos(b), d = (bx - sx) ** 2 + (by - sy) ** 2;
+        if (d < td) { td = d; tgt = b; }
+      }
+      if (!tgt) for (const o of this.ships) {
+        if (o === s || o.owner === p || this.allied(p, o.owner)) continue;
+        const [ox, oy] = this.shipXY(o), d = (ox - sx) ** 2 + (oy - sy) ** 2;
+        if (d < td) { td = d; tgt = o; }
+      }
+      if (tgt) {
+        s.reload = SHIP.reload; s.shotAt = this.tickN;
+        const dmg = SHIP.dmg[0] + Math.random() * (SHIP.dmg[1] - SHIP.dmg[0]);
+        if (tgt.kind === 'warship') {
+          s.shot = this.shipXY(tgt);
+          tgt.hp -= dmg;
+          if (tgt.hp <= 0) { this.killShip(tgt); this.emit('shipSunk', { s: tgt, by: p }); }
+        } else {
+          s.shot = this.boatPos(tgt);
+          this.killBoat(tgt); // транспорт тонет с одного попадания, войска гибнут
+          this.emit('boatSunk', { b: tgt, by: p });
+        }
+      }
+    }
+    // движение: к цели патруля; по прибытии — новая точка в радиусе патруля
+    if (s.wait > 0) { s.wait--; return; }
+    if (!s.path) {
+      if (s.tile === s.goal) {
+        const px = s.patrol % W, py = (s.patrol / W) | 0, R = SHIP.patrol * 0.5;
+        for (let k = 0; k < 12; k++) {
+          const x = px + Math.round((Math.random() * 2 - 1) * R), y = py + Math.round((Math.random() * 2 - 1) * R);
+          if (x < 0 || y < 0 || x >= W || y >= H) continue;
+          const t = y * W + x;
+          if (this.isWater(t)) { s.goal = t; break; }
+        }
+      }
+      s.path = s.goal !== s.tile ? this.shipPath(s, s.goal) : null; s.pi = 1;
+      if (!s.path) { s.goal = s.tile; s.wait = 30; return; }
+    }
+    s.mv = (s.mv || 0) + SHIP.speed;
+    while (s.mv >= 1 && s.pi < s.path.length) { s.mv -= 1; s.tile = s.path[s.pi++]; }
+    if (s.pi >= s.path.length) s.path = null;
+  }
+  shipXY(s) { return [(s.tile % W) + 0.5, ((s.tile / W) | 0) + 0.5]; }
+
+  // ---------- цикл ----------
+  tick() {
+    if (!this.running || this.over) return;
+    const t = ++this.tickN;
+    const P = this.P;
+    for (let i = 1; i < P.length; i++) {
+      const p = P[i];
+      if (!p.alive) continue;
+      p.troops += this.regen(p);
+      p.gold += this.goldRate(p);
+      const tot = p.troops + this.troopsAtWar(p);
+      if (tot > p.maxTroopsSeen) p.maxTroopsSeen = tot;
+    }
+    for (let i = 0; i < this.attacks.length; i++) { const a = this.attacks[i]; if (!a.dead) this.stepAttack(a); }
+    if (this.attacks.some((a) => a.dead)) this.attacks = this.attacks.filter((a) => !a.dead);
+    for (let i = this.boats.length - 1; i >= 0; i--) { const b = this.boats[i]; if (b && !b.dead) this.stepBoat(b); }
+    for (let i = this.ships.length - 1; i >= 0; i--) { const s = this.ships[i]; if (s && !s.dead) this.stepShip(s); }
+    for (const s of this.structs) {
+      if (s.doneAt === t) {
+        s.built = true;
+        if (s.pending) { s.level += s.pending; s.pending = 0; }
+        this.recountCities(P[s.owner]);
+        this.emit('built', { s });
+        if (s.type === 'post') this.emit('defense', { s });
+      }
+    }
+    if (this.brain) this.brain(this);
+    if (t % 20 === 0) this.enclaves();
+    this.flush();
+    if (t % 10 === 0) this.checkEnd();
+  }
+  leader() { let L = null; for (let i = 1; i < this.P.length; i++) { const p = this.P[i]; if (p.alive && (!L || p.tiles > L.tiles)) L = p; } return L; }
   checkEnd() {
     if (this.over) return;
-    const me = this.N.find((N) => N.isPlayer);
-    if (!me.alive || me.s.count === 0) { me.alive = false; this.finish(false, 'lost'); return; }
-    if (me.s.share >= WIN_SHARE) { this.finish(true, 'share'); return; }
-    const rivals = this.N.filter((N) => !N.isPlayer && N.alive);
-    if (!rivals.length) { this.finish(true, 'alone'); return; }
-    const big = rivals.find((N) => N.s.share >= WIN_SHARE);
-    if (big) this.finish(false, 'other', big.id);
+    const L = this.leader();
+    if (!L) return;
+    if (L.tiles >= WIN_SHARE * this.winLand) this.finish(L, 'share');
+    else if (this.tickN >= MATCH_TICKS) this.finish(L, 'time');
   }
-  finish(win, reason, who) {
+  finish(winner, reason) {
+    if (this.over) return;
     this.over = true;
-    this.emit('end', { win, reason, who });
-  }
-
-  // ---------- ИИ ----------
-  threat(p, n) {
-    let t = 0;
-    for (const q of p.neighbors) {
-      const o = this.P[q].owner;
-      if (o < 0 || o === n) continue;
-      const s = this.st[n][o];
-      const v = this.P[q].troops * (s === 'war' ? 1 : s === 'neutral' ? 0.3 : 0.05);
-      if (v > t) t = v;
-    }
-    return t;
-  }
-
-  think(n) {
-    const N = this.N[n], P = this.P, ai = N.ai;
-    const mine = P.filter((p) => p.owner === n);
-    if (!mine.length) return;
-    this.aiBuild(n, mine);
-    const used = new Set(), usedQ = new Set();
-    const cands = [];
-    const me = this.N.findIndex((x) => x.isPlayer);
-    for (const p of mine) {
-      if (p.troops < 4) continue;
-      const th = this.threat(p, n);
-      const avail = p.troops - 1 - Math.min(p.troops * 0.5, th * 0.7);
-      if (avail < 3) continue;
-      for (const [qid, naval] of this.targets(p.id)) {
-        const q = P[qid];
-        if (q.owner === n) continue;
-        let enemy = false;
-        if (q.owner >= 0) { if (this.st[n][q.owner] !== 'war') continue; enemy = true; }
-        const need = q.troops * this.defMult(q) + 1.5 - this.incoming(qid, n);
-        if (need <= 0) continue;
-        if (avail < need * 1.1) continue;
-        let val = 1 + (q.b.city ? 1.5 : 0) + (q.capital ? 2.5 : 0) + (q.b.factory ? 1 : 0) + TERRAIN[q.terrain].gold * 0.4;
-        if (!enemy) val *= 1.35;
-        else {
-          val *= 0.75 + ai.aggr;
-          if (q.owner === me) val *= N.isClaude ? 0 : 1 + ai.toxic * 0.25;
-        }
-        if (naval) val *= 0.55;
-        cands.push({ p, q, score: val / (need + 6), send: Math.min(avail, need * 1.35 + 3) });
-      }
-    }
-    cands.sort((a, b) => b.score - a.score);
-    const maxOrders = 1 + Math.round(ai.skill * 2) + (mine.length > 18 ? 1 : 0);
-    let orders = 0;
-    for (const c of cands) {
-      if (orders >= maxOrders) break;
-      if (used.has(c.p.id) || usedQ.has(c.q.id) || c.score <= 0) continue;
-      if (this.order(n, c.p.id, c.q.id, c.send / c.p.troops) === 'ok') { used.add(c.p.id); usedQ.add(c.q.id); orders++; }
-    }
-    // подтянуть войска: на войне — к «точке удара» (у самой слабой вражеской провинции), иначе — к фронту
-    const np = P.length, dist = new Int16Array(np).fill(-1), q = [];
-    const wars = this.wars(n);
-    let stage = -1;
-    if (wars.length) {
-      if (ai.stage >= 0 && P[ai.stage].owner === n && this.time < ai.stageUntil && P[ai.stage].neighbors.some((x) => P[x].owner >= 0 && this.st[n][P[x].owner] === 'war')) stage = ai.stage;
-      else {
-        let bs = 1e9;
-        for (const p of mine) for (const x of p.neighbors) {
-          const t = P[x];
-          if (t.owner < 0 || this.st[n][t.owner] !== 'war') continue;
-          const sc = (t.troops * this.defMult(t) + 5) / (1 + (t.capital ? 1 : 0) + (t.b.city ? 0.5 : 0)) - p.troops * 0.3;
-          if (sc < bs) { bs = sc; stage = p.id; }
-        }
-        ai.stage = stage; ai.stageUntil = this.time + rnd(15, 30);
-      }
-    }
-    if (stage >= 0) { dist[stage] = 0; q.push(stage); }
-    else for (const p of mine) {
-      let hot = false;
-      for (const x of p.neighbors) { const o = P[x].owner; if (o !== n && (o < 0 || this.st[n][o] !== 'ally')) { hot = true; break; } }
-      if (hot) { dist[p.id] = 0; q.push(p.id); }
-    }
-    for (let h = 0; h < q.length; h++) {
-      for (const x of P[q[h]].neighbors) if (P[x].owner === n && dist[x] < 0) { dist[x] = dist[q[h]] + 1; q.push(x); }
-    }
-    let moves = 0;
-    const maxMoves = stage >= 0 ? 3 : 2;
-    for (const p of mine) {
-      if (moves >= maxMoves || used.has(p.id) || p.troops < 10 || dist[p.id] <= 0) continue;
-      let best = -1;
-      for (const x of p.neighbors) if (P[x].owner === n && dist[x] >= 0 && dist[x] < dist[p.id] && (best < 0 || P[x].troops < P[best].troops)) best = x;
-      const th = this.threat(p, n);
-      const frac = th > p.troops * 0.5 ? 0.4 : 0.8;
-      if (best >= 0 && this.order(n, p.id, best, frac) === 'ok') { moves++; used.add(p.id); }
-    }
-    // лишнее золото — наёмники в точку удара
-    if (stage >= 0 && N.gold > 160) this.hire(n, stage);
-  }
-
-  hire(n, pid) {
-    const p = this.P[pid], N = this.N[n];
-    if (p.owner !== n) return 'not-own';
-    if (N.gold < HIRE_COST) return 'gold';
-    N.gold -= HIRE_COST; p.troops += HIRE_N;
-    this.emit('hire', { n, pid });
-    return 'ok';
-  }
-
-  aiBuild(n, mine) {
-    const N = this.N[n];
-    if (N.gold < 50) return;
-    const atWar = this.wars(n).length > 0;
-    let neutralAdj = 0, hasPort = false;
-    for (const p of mine) { if (p.b.port) hasPort = true; for (const x of p.neighbors) if (this.P[x].owner < 0) neutralAdj++; }
-    let best = null, bw = 0;
-    const consider = (p, t, w) => { w *= rnd(0.7, 1.3); if (w > bw && this.cost(n, t) <= N.gold) { bw = w; best = { p, t }; } };
-    for (const p of mine) {
-      const T = TERRAIN[p.terrain];
-      if (!p.b.city) consider(p, 'city', (p.capital ? 3 : 1) * T.gold * (mine.length > 3 ? 1 : 0.4));
-      if (!p.b.factory && (p.b.city || p.capital)) consider(p, 'factory', 1.6);
-      if (!p.b.fort && atWar) { const th = this.threat(p, n); if (th > p.troops * 0.5) consider(p, 'fort', 2 + (p.capital ? 1.2 : 0)); }
-      if (!p.b.port && p.coastal && !hasPort && neutralAdj < 2) consider(p, 'port', 2.2);
-    }
-    if (best) this.build(n, best.p.id, best.t);
-  }
-
-  diplo(n) {
-    const N = this.N[n], ai = N.ai;
-    const me = this.N.findIndex((x) => x.isPlayer);
-    const myS = this.S(n), wars = this.wars(n);
-    // 1. мир, если проигрываем
-    for (const m of wars) {
-      const dur = this.time - this.warSince[n][m];
-      if (dur > 25 && (this.S(m) > myS * 1.5 || N.lost > 3) && Math.random() < 0.35) this.offer(n, m, 'peace');
-    }
-    // 2. помочь союзникам
-    for (const a of this.allies(n)) {
-      for (const e of this.wars(a)) {
-        if (e === n || this.st[n][e] !== 'neutral') continue;
-        const pr = N.isClaude && a === me ? 0.85 : 0.2;
-        if (Math.random() < pr) this.declareWar(n, e, a === me ? 'ally-player' : 'ally');
-      }
-    }
-    // 3. новая война
-    const adj = new Set();
-    let neutralAdj = 0;
-    for (const p of this.P) {
-      if (p.owner !== n) continue;
-      for (const x of p.neighbors) { const o = this.P[x].owner; if (o < 0) neutralAdj++; else if (o !== n) adj.add(o); }
-    }
-    if (wars.length === 0 || (wars.length === 1 && Math.random() < 0.12)) {
-      if (neutralAdj <= 2 || this.time > 220 || Math.random() < 0.04) {
-        let best = -1, bs = -1e9;
-        for (const m of adj) {
-          const s = this.st[n][m];
-          if (s === 'ally' || s === 'war') continue;
-          if (s === 'peace' && !(this.time > this.truce[n][m] && ai.toxic > 0.6 && Math.random() < 0.3)) continue;
-          if (N.isClaude && me >= 0 && (m === me || this.st[me][m] === 'ally')) continue;
-          if (m === me && this.time < 75) continue; // первые минуты игрока не трогают
-          let sc = myS / this.S(m) - this.op[n][m] / 60 + rnd(0, 0.4);
-          if (m === me) { // не наваливаться на игрока всей толпой
-            const pw = this.wars(me).filter((x) => !this.N[x].isClaude).length;
-            sc += ai.toxic * 0.15 - pw * 0.9;
-            if (pw >= 3 || myS < this.S(me)) continue;
-          }
-          if (sc > bs) { bs = sc; best = m; }
-        }
-        if (best >= 0 && myS > this.S(best) * (1.15 - ai.aggr * 0.45) && Math.random() < 0.45 + ai.aggr * 0.4) {
-          // торг: иногда сначала требуют дань у игрока
-          if (best === me && !this.demands[n] && this.N[me].gold >= 25 && Math.random() < 0.45) {
-            const g = Math.round(clamp(this.N[me].gold * 0.5, 25, 150));
-            this.demands[n] = { gold: g, until: this.time + 16 };
-            this.emit('demand', { from: n, gold: g });
-          } else this.declareWar(n, best);
-        }
-      }
-    }
-    // 4. союзы
-    if (Math.random() < 0.3 && this.allies(n).length < 2) {
-      for (let m = 0; m < this.N.length; m++) {
-        if (m === n || !this.N[m].alive) continue;
-        const s = this.st[n][m];
-        if (s === 'war' || s === 'ally') continue;
-        const common = wars.some((e) => this.st[m][e] === 'war');
-        if (this.op[n][m] > 30 || (common && this.op[n][m] > 5)) { this.offer(n, m, 'ally'); break; }
-      }
-    }
-    // 5. предательство
-    if (!N.isClaude && ai.toxic > 0.7 && Math.random() < 0.04 && neutralAdj === 0) {
-      for (const m of this.allies(n)) if (adj.has(m) && this.S(m) < myS * 0.5) { this.breakAlly(n, m); break; }
-    }
+    this.emit('end', { winner, reason });
   }
 }
