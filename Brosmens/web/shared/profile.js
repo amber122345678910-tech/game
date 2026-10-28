@@ -2,12 +2,15 @@
 const KEY = 'brosmens.profile.v1';
 const API_KEY = 'brosmens.apikey';
 
+// Мощный телефон (флагман вроде Galaxy S26 Ultra) — сразу высокая графика
+const STRONG = (navigator.deviceMemory || 4) >= 8 && (navigator.hardwareConcurrency || 4) >= 8;
+
 const DEFAULT = {
   name: 'Игрок',
   skin: { skin: '#f2c9a0', shirt: '#2f6fed', pants: '#23262e', hair: '#2b1d10', hairStyle: 'short', face: 0 },
   coins: 0,
   stats: {},
-  settings: { sound: true, graphics: 6, volume: 7, sensitivity: 5, shake: true, toxicity: 0.5, aiDailyLimit: 150 },
+  settings: { sound: true, graphics: STRONG ? 8 : 6, volume: 7, sensitivity: 5, shake: true, toxicity: 0.5, aiDailyLimit: 150 },
 };
 
 function read() {
