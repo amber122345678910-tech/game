@@ -1,7 +1,7 @@
 // Звуки синтезируются на лету (WebAudio) — никаких файлов, работает офлайн.
 // sfx.play('hit'), sfx.play('beam', {vol: .5}). Имена: ui, hit, heavy, swing, slash, dash, jump,
 // beam, charge, boom, block, death, coin, spawn, win, lose, bone, tp, build, march.
-import { getProfile } from './profile.js';
+import { getSettings } from './profile.js';
 
 let ctx = null;
 let master = null;
@@ -87,8 +87,10 @@ const BANK = {
 
 export const sfx = {
   play(name, { vol = 1 } = {}) {
-    if (!getProfile().settings.sound) return;
+    const st = getSettings();
+    if (!st.sound || !st.volume) return;
     const f = BANK[name];
+    if (master) master.gain.value = 0.8 * (st.volume / 10);
     if (f) try { f(vol); } catch {}
   },
   unlock: ac,

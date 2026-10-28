@@ -35,7 +35,11 @@ export function createChat({ bots = () => [], me } = {}) {
   form.innerHTML = '<input maxlength="120" placeholder="Напиши в чат..." enterkeyhint="send"><button>➤</button>';
   wrap.append(logEl, form);
   const btn = document.createElement('button'); btn.className = 'bc-btn'; btn.textContent = '💬';
-  document.body.append(wrap, btn);
+  document.body.append(wrap);
+  // как в роблоксе: кнопка чата сразу после кнопки меню ☰
+  const topBar = document.querySelector('.ui-top');
+  if (topBar) topBar.insertBefore(btn, topBar.children[1] || null);
+  else document.body.append(btn);
   const input = form.querySelector('input');
 
   const log = [];

@@ -5,6 +5,8 @@
 // В цикле: ctl.move -> {x,y} (-1..1, y вверх = вперёд), ctl.consumeLook() -> {dx,dy} пикселей,
 // ctl.down(id) — зажата ли кнопка, ctl.onPress(id, fn), ctl.setCooldown(id, 0..1), ctl.setLabel(id, txt), ctl.show(id, bool)
 // x/y кнопки: отрицательные = от правого/нижнего края.
+import { getSettings } from './profile.js';
+
 const CSS = `
 .tc-stick{position:fixed;width:120px;height:120px;margin:-60px 0 0 -60px;border-radius:50%;background:rgba(255,255,255,.12);border:2px solid rgba(255,255,255,.35);z-index:40;pointer-events:none;display:none}
 .tc-knob{position:absolute;left:35px;top:35px;width:50px;height:50px;border-radius:50%;background:rgba(255,255,255,.55)}
@@ -122,7 +124,13 @@ export function createControls({ buttons = [], lookArea = 'right', keyMap = {} }
 
   return {
     move: state.move,
-    consumeLook() { const l = { dx: state.look.dx, dy: state.look.dy }; state.look.dx = state.look.dy = 0; return l; },
+    // чувствительность камеры — из меню настроек (1..10, 5 = как есть)
+    consumeLook() {
+      const k = 0.35 + (getSettings().sensitivity ?? 5) * 0.13;
+      const l = { dx: state.look.dx * k, dy: state.look.dy * k };
+      state.look.dx = state.look.dy = 0;
+      return l;
+    },
     down: (id) => state.held.has(id),
     key: (code) => state.keys.has(code),
     onPress(id, fn) { (state.press[id] ||= []).push(fn); },

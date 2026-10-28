@@ -7,7 +7,7 @@ const DEFAULT = {
   skin: { skin: '#f2c9a0', shirt: '#2f6fed', pants: '#23262e', hair: '#2b1d10', hairStyle: 'short', face: 0 },
   coins: 0,
   stats: {},
-  settings: { sound: true, quality: 'medium', toxicity: 0.5, aiDailyLimit: 150 },
+  settings: { sound: true, graphics: 6, volume: 7, sensitivity: 5, shake: true, toxicity: 0.5, aiDailyLimit: 150 },
 };
 
 function read() {
@@ -25,9 +25,18 @@ export function getProfile() {
   return read();
 }
 
+let settingsCache = null;
+
 export function saveProfile(p) {
   try { localStorage.setItem(KEY, JSON.stringify(p)); } catch {}
+  settingsCache = null;
+  window.dispatchEvent(new CustomEvent('brosmens:settings', { detail: p.settings }));
   return p;
+}
+
+// Быстрый доступ к настройкам (кэш) — для горячих мест: звук, камера, рендер
+export function getSettings() {
+  return (settingsCache ??= Object.freeze({ ...read().settings }));
 }
 
 export function updateProfile(fn) {
