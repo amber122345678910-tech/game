@@ -1,0 +1,154 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<title>BroWorld [World PvP]</title>
+<style>
+:root{--glass:rgba(12,20,38,.78);--glass2:rgba(22,32,56,.92);--line:rgba(255,255,255,.14);--acc:#2f7bff;--gold:#ffd54a;--red:#ff5252;--green:#3ddc84}
+body{background:#133d79}
+#map{position:fixed;inset:0;touch-action:none}
+.hidden{display:none!important}
+button{font-family:inherit;cursor:pointer}
+/* верхняя панель */
+#topbar{position:fixed;top:6px;left:104px;right:8px;z-index:30;display:flex;gap:5px;align-items:center;pointer-events:none}
+#topbar>*{pointer-events:auto}
+.chip{height:34px;display:flex;align-items:center;gap:5px;padding:0 9px;border-radius:10px;background:var(--glass);border:1px solid var(--line);font-weight:800;font-size:14px;white-space:nowrap;backdrop-filter:blur(4px)}
+.chip b{font-weight:900;font-variant-numeric:tabular-nums}
+.chip small{font-size:11px;color:#9fe39f;font-weight:800}
+.chip.gold b{color:var(--gold)}
+.chip.nat{color:#fff;font:900 14px system-ui;padding:0 8px 0 5px}
+.chip.nat img{width:30px;height:20px;border-radius:4px;box-shadow:0 0 0 1px rgba(0,0,0,.5)}
+.chip.nat b{max-width:120px;overflow:hidden;text-overflow:ellipsis}
+.chip .bar{width:46px;height:6px;border-radius:3px;background:rgba(255,255,255,.15);position:relative;overflow:hidden}
+.chip .bar i{position:absolute;left:0;top:0;bottom:0;background:linear-gradient(90deg,#4f9bff,#7dd3ff);border-radius:3px}
+.chip .bar em{position:absolute;left:60%;top:-2px;bottom:-2px;width:2px;background:var(--gold)}
+.sp{flex:1}
+.speed{display:flex;border-radius:10px;overflow:hidden;border:1px solid var(--line);background:var(--glass)}
+.speed button{height:34px;min-width:38px;border:0;background:transparent;color:#fff;font:900 14px system-ui}
+.speed button.on{background:var(--acc)}
+.tbtn{height:34px;min-width:38px;border-radius:10px;border:1px solid var(--line);background:var(--glass);color:#fff;font:900 14px system-ui;padding:0 9px;display:flex;align-items:center;gap:5px}
+.tbtn span{font-size:13px}
+.tbtn.alert{animation:blink 1s infinite}
+@keyframes blink{50%{background:#b3261e}}
+/* лидеры */
+#leaders{position:fixed;right:8px;top:46px;z-index:25;width:172px;background:var(--glass);border:1px solid var(--line);border-radius:10px;padding:4px 6px;font-size:12px;font-weight:800}
+#leaders .lh{display:flex;justify-content:space-between;align-items:center;opacity:.8;font-size:11px;padding:2px 0 3px;letter-spacing:.5px}
+#leaders.min .lr{display:none}
+#leaders .lr{display:flex;align-items:center;gap:5px;height:21px;border-radius:6px;padding:0 3px}
+#leaders .lr.me{background:rgba(47,123,255,.35)}
+#leaders .lr img{width:18px;height:12px;border-radius:2px;flex:none}
+#leaders .lr .nm{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#leaders .lr .pc{font-variant-numeric:tabular-nums}
+#leaders .lr .st{font-size:10px}
+/* панель провинции */
+#panel{position:fixed;left:50%;bottom:max(6px,env(safe-area-inset-bottom));transform:translateX(-50%);z-index:30;display:flex;gap:8px;align-items:stretch;background:var(--glass2);border:1px solid var(--line);border-radius:14px;padding:7px 8px;max-width:calc(100vw - 12px);box-shadow:0 6px 24px rgba(0,0,0,.45)}
+#panel.hidden{display:none}
+.pinfo{min-width:150px;max-width:210px;display:flex;flex-direction:column;justify-content:center;gap:2px}
+.pname{display:flex;align-items:center;gap:6px;font-weight:900;font-size:15px;white-space:nowrap;overflow:hidden}
+.pname img{width:24px;height:16px;border-radius:3px;box-shadow:0 0 0 1px rgba(0,0,0,.4)}
+.pname .nb{display:inline-block;width:12px;height:12px;border-radius:3px;background:#777}
+.psub{font-size:12px;font-weight:700;opacity:.85;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pst{font-size:12.5px;font-weight:800;white-space:nowrap}
+.pst b{color:#fff}
+.rel{display:inline-block;padding:0 6px;border-radius:6px;font-size:11px;font-weight:900;line-height:17px}
+.rel.war{background:#c62828}.rel.neutral{background:#546e7a}.rel.peace{background:#2e7d32}.rel.ally{background:#1565c0}.rel.self{background:#2f7bff}
+.pcol{display:flex;flex-direction:column;gap:4px;justify-content:center}
+.pcol label{font-size:11px;font-weight:800;opacity:.75;text-align:center}
+.seg{display:flex;border-radius:10px;overflow:hidden;border:1px solid var(--line)}
+.seg button{width:44px;height:40px;border:0;background:rgba(255,255,255,.08);color:#fff;font:900 13px system-ui;border-right:1px solid var(--line)}
+.seg button:last-child{border-right:0}
+.seg button.on{background:var(--acc)}
+.pbuild{display:flex;gap:5px}
+.bb{width:56px;height:62px;border-radius:11px;border:1px solid var(--line);background:rgba(255,255,255,.1);color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;padding:0;position:relative}
+.bb i{font-style:normal;font-size:21px;line-height:22px}
+.bb span{font-size:10.5px;font-weight:800}
+.bb em{font-style:normal;font-size:11px;font-weight:900;color:var(--gold)}
+.bb.has{background:rgba(61,220,132,.22);border-color:rgba(61,220,132,.6)}
+.bb.has em{color:#9fffc6}
+.bb.no{opacity:.4}
+.bb:active{transform:scale(.95)}
+.pbig{min-width:150px;height:62px;border-radius:12px;border:0;background:linear-gradient(180deg,#3d8bff,#1f5fd6);color:#fff;font:900 16px system-ui;padding:0 16px;box-shadow:0 3px 0 #123c8a}
+.pbig.red{background:linear-gradient(180deg,#ff5a4f,#c62828);box-shadow:0 3px 0 #7f1414}
+.pbig.green{background:linear-gradient(180deg,#43c76a,#25913f);box-shadow:0 3px 0 #145c25}
+.pbig.gray{background:#455a64;box-shadow:0 3px 0 #263238}
+.pbig small{display:block;font-size:11px;font-weight:700;opacity:.85}
+.pmsg{max-width:260px;font-size:12.5px;font-weight:700;opacity:.85;display:flex;align-items:center;line-height:1.3}
+.pclose{width:34px;border-radius:10px;border:0;background:rgba(255,255,255,.1);color:#fff;font:900 16px system-ui}
+.pacts{display:flex;gap:6px;align-items:center}
+.pacts .pbig{min-width:96px;font-size:14px;padding:0 10px}
+/* подсказка */
+#hint{position:fixed;left:50%;bottom:12px;transform:translateX(-50%);z-index:26;background:rgba(10,18,34,.72);border:1px solid rgba(255,213,74,.55);color:#fff;border-radius:10px;padding:5px 12px;font-weight:800;font-size:13px;pointer-events:none;text-align:center;max-width:min(680px,78vw);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;transition:bottom .2s}
+body.haspanel #hint{bottom:100px}
+#hint:empty{display:none}
+/* предложения */
+#offers{position:fixed;right:186px;top:46px;z-index:35;display:flex;flex-direction:column;gap:6px;width:min(290px,38vw)}
+.offer{background:var(--glass2);border:1px solid rgba(255,213,74,.7);border-radius:12px;padding:7px 8px;box-shadow:0 6px 20px rgba(0,0,0,.5);animation:pop .25s}
+@keyframes pop{from{transform:scale(.85);opacity:0}}
+.offer .ot{display:flex;gap:7px;align-items:center;font-weight:900;font-size:13px;line-height:1.2}
+.offer .ot img{width:24px;height:16px;border-radius:3px}
+.offer .ob{display:flex;gap:6px;margin-top:6px}
+.offer .ob button{flex:1;height:36px;border-radius:9px;border:0;font:900 14px system-ui;color:#fff;background:#2e7d32}
+.offer .ob button.no{background:#5d6b78}
+.offer.dem{border-color:#ff5252;background:rgba(60,12,16,.94)}
+.offer.dem .ob button.yes{background:#b8860b}
+.offer .tm{height:3px;background:var(--gold);border-radius:2px;margin-top:6px;transition:width linear}
+/* дипломатия */
+#diplo{position:fixed;right:0;top:0;bottom:0;z-index:55;width:min(470px,74vw);background:rgba(10,16,30,.96);border-left:1px solid var(--line);display:flex;flex-direction:column;box-shadow:-10px 0 30px rgba(0,0,0,.5)}
+#diplo .dh{display:flex;align-items:center;gap:8px;padding:8px 10px;border-bottom:1px solid var(--line);font-weight:900;font-size:17px}
+#diplo .dh button{margin-left:auto;width:40px;height:36px;border-radius:9px;border:0;background:rgba(255,255,255,.12);color:#fff;font:900 16px system-ui}
+#diplo .dl{overflow-y:auto;padding:6px 8px 12px;flex:1;touch-action:pan-y}
+.dr{display:flex;gap:8px;align-items:center;padding:7px 6px;border-bottom:1px solid rgba(255,255,255,.07)}
+.dr img{width:36px;height:24px;border-radius:4px;flex:none;box-shadow:0 0 0 1px rgba(0,0,0,.5)}
+.dr .di{flex:1;min-width:0}
+.dr .dn{font-weight:900;font-size:14.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dr .ds{font-size:11.5px;font-weight:700;opacity:.8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dr .da{display:flex;gap:5px;flex:none}
+.dr .da button{height:38px;min-width:44px;border-radius:9px;border:0;color:#fff;font:900 12.5px system-ui;padding:0 8px;background:#37474f}
+.dr .da button.g{background:#2e7d32}.dr .da button.b{background:#1565c0}.dr .da button.r{background:#c62828}
+.dr.dead{opacity:.4}
+/* титул и итоги */
+.over{position:fixed;inset:0;z-index:45;display:flex;align-items:center;justify-content:center;background:radial-gradient(ellipse at center,rgba(5,15,35,.35),rgba(5,12,28,.85))}
+.card{background:rgba(12,20,40,.92);border:1px solid var(--line);border-radius:18px;padding:16px 22px;text-align:center;box-shadow:0 10px 50px rgba(0,0,0,.6);max-width:min(560px,94vw);max-height:94vh;overflow:auto}
+.logo{font-size:44px;font-weight:900;letter-spacing:1px;line-height:1;background:linear-gradient(180deg,#fff 30%,#9cc8ff);-webkit-background-clip:text;background-clip:text;color:transparent;filter:drop-shadow(0 3px 0 #0b2d6b)}
+.logo small{display:inline-block;vertical-align:middle;margin-left:8px;font-size:15px;padding:3px 8px;border-radius:7px;background:#c62828;color:#fff;-webkit-text-fill-color:#fff;letter-spacing:0;transform:translateY(-6px)}
+.sub{font-size:17px;font-weight:800;opacity:.9;margin:6px 0 10px}
+.feats{display:grid;grid-template-columns:1fr 1fr;gap:6px 14px;text-align:left;font-size:13px;font-weight:700;opacity:.92;margin:8px 0 12px}
+.you{display:flex;gap:8px;align-items:center;justify-content:center;font-weight:900;font-size:15px;margin:4px 0 12px}
+.you img{width:36px;height:24px;border-radius:4px}
+.btns{display:flex;gap:10px;justify-content:center;flex-wrap:wrap}
+.btns button{height:48px;min-width:150px;border-radius:13px;border:0;font:900 17px system-ui;color:#fff;background:linear-gradient(180deg,#3d8bff,#1f5fd6);box-shadow:0 4px 0 #123c8a}
+.btns button.gray{background:#455a64;box-shadow:0 4px 0 #263238}
+.res{font-size:40px;font-weight:900;margin:0}
+.stats{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin:10px 0 14px;font-weight:800;font-size:14px}
+.stats div{background:rgba(255,255,255,.07);border-radius:10px;padding:7px}
+.stats b{display:block;font-size:19px}
+@media (max-width:920px){.tbtn span{display:none}.chip.nat b{display:none}}
+@media (max-width:760px){#leaders{width:150px}#offers{right:164px}.chip{padding:0 7px;font-size:13px}.chip .bar{display:none}.pinfo{min-width:130px}}
+@media (max-height:420px){.logo{font-size:36px}.feats{font-size:12px;margin:4px 0 8px}.sub{margin:4px 0 6px;font-size:15px}.card{padding:12px 18px}}
+</style>
+</head>
+<body>
+<canvas id="map"></canvas>
+<div id="hud" class="hidden">
+  <div id="topbar">
+    <button class="chip nat" id="hNat" title="К столице"><img id="hFlag"><b id="hName"></b></button>
+    <div class="chip gold" title="Золото"><span>💰</span><b id="hGold">0</b><small id="hInc">+0/с</small></div>
+    <div class="chip" title="Войска"><span>⚔️</span><b id="hTroops">0</b></div>
+    <div class="chip" title="Территория (для победы — 60%)"><span>🗺️</span><b id="hShare">0%</b><div class="bar"><i id="hShareBar"></i><em></em></div></div>
+    <div class="chip" title="Время"><span>⏱</span><b id="hTime">0:00</b></div>
+    <div class="sp"></div>
+    <div class="speed" id="speed"><button data-s="0" title="Пауза"><svg width="14" height="14" viewBox="0 0 14 14"><rect x="2" y="1" width="3.6" height="12" rx="1" fill="#fff"/><rect x="8.4" y="1" width="3.6" height="12" rx="1" fill="#fff"/></svg></button><button data-s="1" class="on">×1</button><button data-s="2">×2</button></div>
+    <button class="tbtn" id="bDiplo" title="Дипломатия">🤝<span>Дипломатия</span></button>
+  </div>
+  <div id="leaders"><div class="lh"><span>🏆 ЛИДЕРЫ</span><span id="lToggle">▾</span></div><div id="lRows"></div></div>
+  <div id="offers"></div>
+</div>
+<div id="hint"></div>
+<div id="panel" class="hidden"></div>
+<div id="diplo" class="hidden"><div class="dh">🤝 Дипломатия<button id="dClose">✕</button></div><div class="dl" id="dList"></div></div>
+<div id="title" class="over hidden"></div>
+<div id="endscr" class="over hidden"></div>
+<script type="module" src="./main.js"></script>
+</body>
+</html>
