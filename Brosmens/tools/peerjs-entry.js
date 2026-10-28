@@ -1,0 +1,1 @@
+export { Peer } from 'peerjs';

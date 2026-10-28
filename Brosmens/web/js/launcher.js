@@ -4,6 +4,7 @@ import { FRIENDS, pick, rand } from '../shared/bots.js';
 import { aiEnabled, aiReply, aiUsedToday, personaPrompt } from '../shared/ai.js';
 import { getProfile, saveProfile, getApiKey, setApiKey } from '../shared/profile.js';
 import { sfx } from '../shared/sfx.js';
+import { hostRoom, joinRoom, makeCode, netQuery } from '../shared/net.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -33,12 +34,28 @@ function renderGames() {
   }
 }
 
+// игры, где уже есть онлайн с другом (остальные запускаются как обычно)
+const ONLINE_GAMES = new Set([]);
+
 function launch(g, withFriend) {
+  if (net.room && net.room.connected()) {
+    if (!net.room.isHost) return toastNet('Игру выбирает тот, кто создал комнату');
+    if (!ONLINE_GAMES.has(g.id)) {
+      const ready = [...ONLINE_GAMES].map((id) => GAMES.find((x) => x.id === id).short);
+      return toastNet(ready.length ? `В «${g.short}» онлайна пока нет. Уже можно: ${ready.join(', ')}` : 'Онлайн в играх появится в следующей версии — первым будет Jujutsu');
+    }
+    net.room.send('start', { game: g.id });
+    return go(g, netQuery('host', net.code));
+  }
+  go(g, withFriend ? '?with=' + withFriend : '');
+}
+
+function go(g, query) {
   sfx.play('ui');
   try {
     sessionStorage.setItem('brosmens.lastGame', JSON.stringify({ id: g.id, title: g.title, stats: getProfile().stats[g.id] || {}, coins: getProfile().coins }));
   } catch {}
-  location.href = g.href + (withFriend ? '?with=' + withFriend : '');
+  location.href = g.href + query;
 }
 
 // ---------- друзья ----------
@@ -46,7 +63,7 @@ const friendEls = {};
 function renderFriends() {
   const box = $('friends');
   box.innerHTML = '';
-  for (const f of FRIENDS) {
+  for (const f of [FRIENDS[0], ...realFriends(), ...FRIENDS.slice(1)]) {
     const b = document.createElement('button');
     b.className = 'friend';
     b.innerHTML = '<div class="sq"><canvas width="168" height="168"></canvas><i class="dot"></i></div><span class="badge"></span><span class="nm"></span><span class="st"></span>';
@@ -68,7 +85,7 @@ function updateFriend(f) {
   const n = unread[f.id] || 0;
   el.classList.toggle('unread', n > 0);
   el.querySelector('.badge').textContent = n;
-  $('online-count').textContent = FRIENDS.filter((x) => x.status !== 'не в сети').length + ' в сети';
+  $('online-count').textContent = FRIENDS.filter((x) => x.status !== 'не в сети').length + realFriends().filter((x) => x.status !== 'не в сети').length + ' в сети';
 }
 
 // друзья «живут»: заходят в игры, выходят
@@ -110,7 +127,7 @@ function addMsg(friend, role, text) {
   const list = loadDM(friend.id);
   list.push({ role, text, at: Date.now() });
   saveDM(friend.id, list);
-  if (dmFriend === friend) renderDMLog();
+  if (dmFriend && dmFriend.id === friend.id) renderDMLog();
   else if (role === 'them') { unread[friend.id] = (unread[friend.id] || 0) + 1; updateFriend(friend); notify(friend, text); }
 }
 
@@ -135,7 +152,8 @@ function openDM(f) {
   updateFriend(f);
   drawAvatar($('dm-ava'), f.skin, { headOnly: true });
   $('dm-name').textContent = f.name;
-  $('dm-status').textContent = f.status + (f.ai ? ' · ИИ-друг' : '');
+  $('dm-status').textContent = f.status + (f.ai ? ' · ИИ-друг' : f.real ? ' · настоящий друг' : '');
+  $('dm-play').hidden = !!f.real;
   $('dm').hidden = false;
   renderDMLog();
   sfx.play('ui');
@@ -164,6 +182,11 @@ $('dm-form').onsubmit = (e) => {
   if (!text || !dmFriend) return;
   input.value = '';
   addMsg(dmFriend, 'me', text);
+  if (dmFriend.real) {
+    if (net.room && net.room.connected()) net.room.send('dm', { text });
+    else toastNet('Друг сейчас не в комнате — сообщение не доставлено');
+    return;
+  }
   respond(dmFriend);
 };
 
@@ -438,6 +461,141 @@ function thumbWorld(g, w, h) {
   }
   title(g, w, h, 'BroWorld', '[World PvP]', '#ffe08a');
 }
+
+// ---------- онлайн с другом (комната по коду) ----------
+const net = { room: null, code: '', mode: '' };
+const NETF_KEY = 'brosmens.netfriends';
+
+function realFriends() {
+  try { return JSON.parse(localStorage.getItem(NETF_KEY)) || []; } catch { return []; }
+}
+function saveRealFriend(p) {
+  const list = realFriends().filter((f) => f.name !== p.name);
+  list.unshift({ id: 'net_' + p.name, name: p.name, skin: p.skin, real: true, status: 'в комнате' });
+  try { localStorage.setItem(NETF_KEY, JSON.stringify(list.slice(0, 8))); } catch {}
+}
+function setRealStatus(name, status) {
+  const list = realFriends();
+  const f = list.find((x) => x.name === name);
+  if (f) { f.status = status; try { localStorage.setItem(NETF_KEY, JSON.stringify(list)); } catch {} }
+}
+function toastNet(text) {
+  notify({ name: '🌐 Онлайн', skin: getProfile().skin }, text, true);
+  $('notify').onclick = () => $('notify').classList.remove('show');
+}
+
+function attachRoom(room) {
+  net.room = room;
+  room.onPeer((p) => {
+    saveRealFriend(p);
+    renderFriends();
+    renderNet();
+    sfx.play('spawn');
+    toastNet(`${p.name} в комнате ${net.code}!`);
+  });
+  room.onLeave((p) => {
+    if (p.name) setRealStatus(p.name, 'не в сети');
+    renderFriends();
+    renderNet();
+  });
+  room.on('dm', (d, from) => {
+    const p = room.peers.get(from);
+    const f = p && realFriends().find((x) => x.name === p.name);
+    if (f) addMsg(f, 'them', String(d.text).slice(0, 300));
+  });
+  room.on('start', (d) => {
+    const g = GAMES.find((x) => x.id === d.game);
+    if (g) go(g, netQuery('guest', net.code));
+  });
+}
+
+async function createRoom(code = makeCode()) {
+  net.code = code; net.mode = 'host';
+  renderNet('Создаю комнату…');
+  try {
+    attachRoom(await hostRoom(code, 'lobby'));
+    saveNet();
+    renderNet();
+  } catch (e) {
+    console.warn(e);
+    net.room = null;
+    renderNet(e?.type === 'unavailable-id' ? 'Комната с таким кодом уже занята — создай новую' : 'Нет связи с сервером онлайна. Проверь интернет');
+  }
+}
+
+async function enterRoom(code) {
+  code = code.trim().toUpperCase();
+  if (code.length !== 4) return renderNet('Код — 4 символа');
+  net.code = code; net.mode = 'guest';
+  renderNet('Подключаюсь к ' + code + '…');
+  try {
+    attachRoom(await joinRoom(code, 'lobby', { timeoutMs: 20000 }));
+    saveNet();
+    renderNet();
+  } catch (e) {
+    console.warn(e);
+    net.room = null;
+    renderNet('Не получилось подключиться. Проверь код и что друг в меню с открытой комнатой');
+  }
+}
+
+function leaveRoom() {
+  net.room?.close();
+  net.room = null; net.code = ''; net.mode = '';
+  try { sessionStorage.removeItem('brosmens.net'); } catch {}
+  renderNet();
+}
+function saveNet() {
+  try { sessionStorage.setItem('brosmens.net', JSON.stringify({ code: net.code, mode: net.mode })); } catch {}
+}
+
+let netPanel = null;
+function renderNet(status = '') {
+  $('btn-net').classList.toggle('on', !!(net.room && net.room.connected()));
+  if (!netPanel || netPanel.hidden) return;
+  const body = netPanel.querySelector('.net-body');
+  const peers = net.room ? [...net.room.peers.values()] : [];
+  if (!net.room) {
+    body.innerHTML = `<p class="hint">Играй с братом или другом: у обоих должно быть установлено «Бросменс». Лучше всего — в одном Wi-Fi.</p>
+      <button class="btn" id="net-create">Создать комнату</button>
+      <div class="net-join"><input id="net-code" maxlength="4" placeholder="КОД" autocomplete="off"><button class="btn" id="net-enter">Войти</button></div>
+      ${status ? `<p class="net-status">${status}</p>` : ''}`;
+    body.querySelector('#net-create').onclick = () => createRoom();
+    body.querySelector('#net-enter').onclick = () => enterRoom(body.querySelector('#net-code').value);
+    body.querySelector('#net-code').onkeydown = (e) => { if (e.key === 'Enter') enterRoom(e.target.value); };
+    return;
+  }
+  const who = peers.map((p) => `<span class="net-peer"><canvas width="64" height="64" data-skin='${JSON.stringify(p.skin || {}).replace(/'/g, '')}'></canvas>${(p.name || '').replace(/[<>&]/g, '')}</span>`).join('');
+  body.innerHTML = `<div class="net-code">${net.code}</div>
+    <p class="net-status">${status || (net.room.isHost
+      ? (peers.length ? 'Друг в комнате! Нажми на игру — вы зайдёте вместе' : 'Скажи другу этот код и жди…')
+      : (peers.length ? 'Ты в комнате. Игру выбирает создатель комнаты' : 'Связь потеряна, ждём…'))}</p>
+    <div class="net-peers">${who}</div>
+    <p class="hint">Пинг: ${net.room.ping || '—'} мс · Онлайн пока работает в: ${[...ONLINE_GAMES].map((id) => GAMES.find((g) => g.id === id).short).join(', ') || 'скоро'}</p>
+    <button class="btn gray" id="net-leave">Выйти из комнаты</button>`;
+  body.querySelectorAll('canvas[data-skin]').forEach((c) => { try { drawAvatar(c, JSON.parse(c.dataset.skin), { headOnly: true }); } catch {} });
+  body.querySelector('#net-leave').onclick = leaveRoom;
+}
+
+function openNet() {
+  if (!netPanel) {
+    netPanel = document.createElement('div');
+    netPanel.className = 'panel';
+    netPanel.innerHTML = `<div class="card"><div class="card-head"><b>🌐 Онлайн с другом</b><button class="icon-btn">✕</button></div><div class="net-body"></div></div>`;
+    netPanel.querySelector('.icon-btn').onclick = () => (netPanel.hidden = true);
+    document.body.appendChild(netPanel);
+  }
+  netPanel.hidden = false;
+  renderNet();
+}
+$('btn-net').onclick = openNet;
+setInterval(() => netPanel && !netPanel.hidden && net.room && renderNet(), 2500);
+
+// вернулись из игры — восстанавливаем комнату
+try {
+  const saved = JSON.parse(sessionStorage.getItem('brosmens.net'));
+  if (saved?.code) (saved.mode === 'host' ? createRoom(saved.code) : enterRoom(saved.code));
+} catch {}
 
 // ---------- старт ----------
 renderMe();

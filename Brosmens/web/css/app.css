@@ -84,3 +84,13 @@ h2 small { font-weight: 600; color: #16a34a; font-size: 13px; margin-left: 6px; 
 
 .pick-game { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
 .pick-game button { border: 2px solid #e5e7eb; background: #fff; border-radius: 12px; padding: 10px 6px; font-weight: 800; font-size: 13px; }
+
+.net-btn.on { background: #dcfce7; color: #166534; }
+.btn.gray { background: #e5e7eb; color: #111; }
+.net-join { display: flex; gap: 8px; }
+.net-join input { flex: 1; min-width: 0; border: 2px solid #e5e7eb; border-radius: 10px; padding: 9px 10px; font: 900 20px system-ui; letter-spacing: 6px; text-transform: uppercase; text-align: center; }
+.net-code { font: 900 46px system-ui; letter-spacing: 12px; text-align: center; background: #111; color: #fff; border-radius: 14px; padding: 8px 0 8px 12px; }
+.net-status { margin: 0; font-weight: 800; text-align: center; }
+.net-peers { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
+.net-peer { display: flex; flex-direction: column; align-items: center; font-weight: 800; font-size: 13px; gap: 4px; }
+.net-peer canvas { width: 52px; height: 52px; border-radius: 12px; background: #eef1f6; }
