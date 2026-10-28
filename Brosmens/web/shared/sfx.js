@@ -8,6 +8,8 @@ let master = null;
 let noiseBuf = null;
 
 function ac() {
+  // до первого касания браузер не даёт запустить звук — не создаём контекст зря
+  if (!ctx && navigator.userActivation && !navigator.userActivation.hasBeenActive) return null;
   if (!ctx) {
     const C = window.AudioContext || window.webkitAudioContext;
     if (!C) return null;
