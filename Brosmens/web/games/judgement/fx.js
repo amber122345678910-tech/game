@@ -2,6 +2,7 @@
 // послеобразы, лучи лечения, всплывающие цифры (DOM), вспышки экрана и тряска камеры.
 import * as THREE from 'three';
 import { shakeEnabled } from '../../shared/ui.js';
+import { pixTexture, PIX } from './pixfont.js';
 
 export function canvasTex(w, h, draw, srgb = true) {
   const c = document.createElement('canvas');
@@ -173,7 +174,7 @@ function arcGeometry(r0, r1, ang, seg = 18) {
 }
 
 const tmpC = new THREE.Color();
-const V1 = new THREE.Vector3();
+const V1 = new THREE.Vector3(), V2 = new THREE.Vector3(), V3 = new THREE.Vector3();
 
 export class FX {
   constructor(scene, camera) {
@@ -216,6 +217,14 @@ export class FX {
       const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTex(), transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, fog: false }));
       s.visible = false; s.renderOrder = 6; scene.add(s); this.flares.push({ s, t: 0, life: 0, size: 1 });
     }
+    // «MISS» — спрайты пиксельным шрифтом (чёрные буквы на толстой светлой обводке), без дрейфа
+    const missTex = pixTexture('MISS', 10, PIX.miss);
+    this.misses = [];
+    for (let i = 0; i < 5; i++) {
+      const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: missTex, transparent: true, depthTest: false, depthWrite: false, fog: false }));
+      const h = 1.9; s.scale.set(h * missTex.userData.aspect, h, 1);
+      s.visible = false; s.renderOrder = 9; scene.add(s); this.misses.push({ s, t: 0, life: 0 });
+    }
     // DOM
     this.layer = document.createElement('div'); this.layer.className = 'jd-ftext';
     document.body.appendChild(this.layer);
@@ -251,6 +260,11 @@ export class FX {
       const a = Math.random() * Math.PI * 2, sp = speed * (0.3 + Math.random() * 0.7);
       this.dust.emit(p.x + Math.cos(a) * 0.5, p.y + Math.random() * 0.4, p.z + Math.sin(a) * 0.5, Math.cos(a) * sp, Math.random() * 2, Math.sin(a) * sp, life * (0.7 + Math.random() * 0.5), size * (0.6 + Math.random() * 0.6), tmpC, -1, 2.5, 1.2);
     }
+  }
+  // Пыль, которая сыплется вниз (Судья рассыпается): обычное смешивание, падает под тяжестью
+  fall(p, color = 0x9a9aa4, size = 0.6, life = 1.2) {
+    tmpC.set(color);
+    this.dust.emit(p.x, p.y, p.z, (Math.random() - 0.5) * 0.8, -0.5 - Math.random(), (Math.random() - 0.5) * 0.8, life * (0.7 + Math.random() * 0.5), size, tmpC, 7, 1.5, 0.3);
   }
   spark(x, y, z, vx, vy, vz, life, size, color, g = 0, drag = 0, grow = 0) {
     if (this.q < 1 && Math.random() > this.q) return;
@@ -293,6 +307,16 @@ export class FX {
     t.pos.set(pos.x + (Math.random() - 0.5) * 1.2, pos.y, pos.z + (Math.random() - 0.5) * 1.2);
     t.t = 0; t.life = life; t.el.className = 'ft ' + cls; t.el.textContent = str; t.el.style.display = 'block';
   }
+  // «MISS» сбоку от Судьи на уровне головы/плеч, со стороны камеры; несколько подряд — стопкой
+  miss(m, camera) {
+    const alive = this.misses.filter((o) => o.life > 0);
+    const o = this.misses.find((x) => x.life <= 0) || this.misses[0];
+    V2.setFromMatrixColumn(camera.matrixWorld, 0).setY(0).normalize();             // вправо на экране
+    V3.set(camera.position.x - m.pos.x, 0, camera.position.z - m.pos.z).normalize(); // к камере
+    const side = (m.sideDir.x * V2.x + m.sideDir.z * V2.z) > 0 ? -1 : 1;             // с противоположной шагу стороны
+    o.s.position.set(m.pos.x + V2.x * side * 2.9 + V3.x * 1.2, m.pos.y + 5.3 + alive.length * 1.15, m.pos.z + V2.z * side * 2.9 + V3.z * 1.2);
+    o.s.visible = true; o.t = 0; o.life = 0.9;
+  }
   flash(color = '#fff', a = 0.5) { this.flashEl.style.background = color; this.flashA = Math.max(this.flashA, a); }
   hurt(a = 0.5) { this.vigA = Math.max(this.vigA, a); }
   shake(a) { if (this.shakeOn) this.trauma = Math.min(1, this.trauma + a); }
@@ -301,7 +325,7 @@ export class FX {
 
   clear() {
     this.glow.clear(); this.dust.clear();
-    for (const arr of [this.slashes, this.rings, this.afters, this.lines, this.flares, this.texts]) for (const o of arr) { o.life = 0; if (o.m) o.m.visible = false; if (o.s) o.s.visible = false; if (o.el) o.el.style.display = 'none'; }
+    for (const arr of [this.slashes, this.rings, this.afters, this.lines, this.flares, this.texts, this.misses]) for (const o of arr) { o.life = 0; if (o.m) o.m.visible = false; if (o.s) o.s.visible = false; if (o.el) o.el.style.display = 'none'; }
     this.trauma = 0; this.darkTarget = 0;
   }
 
@@ -328,6 +352,7 @@ export class FX {
       if (k >= 1) { l.life = 0; l.m.visible = false; continue; }
       l.m.material.opacity = 1 - k; const w = l.w * (1 - k * 0.7); l.m.scale.x = l.m.scale.z = w;
     }
+    for (const o of this.misses) if (o.life > 0) { o.t += dt; if (o.t >= o.life) { o.life = 0; o.s.visible = false; } }
     for (const f of this.flares) if (f.life > 0) {
       f.t += dt; const k = f.t / f.life;
       if (k >= 1) { f.life = 0; f.s.visible = false; continue; }
