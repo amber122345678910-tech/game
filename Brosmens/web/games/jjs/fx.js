@@ -199,6 +199,8 @@ export class FX {
     this.k = 1; // множитель количества частиц (качество графики)
     this.geo = {
       ring: new THREE.RingGeometry(0.82, 1, 48),
+      hex: new THREE.RingGeometry(0.7, 1, 6),
+      disc: new THREE.CircleGeometry(1, 40),
       sphere: new THREE.SphereGeometry(1, 24, 16),
       cres: crescentGeo(),
       cyl: new THREE.CylinderGeometry(1, 1, 1, 20, 1, true),
@@ -219,9 +221,13 @@ export class FX {
       if (kind === 'glow' || kind === 'burst') {
         mat = new THREE.SpriteMaterial({ map: tex(kind), ...add });
         obj = new THREE.Sprite(mat);
-      } else if (kind === 'ring') {
+      } else if (kind === 'ring' || kind === 'hex') {
         mat = new THREE.MeshBasicMaterial({ side: THREE.DoubleSide, ...add });
-        obj = new THREE.Mesh(this.geo.ring, mat);
+        obj = new THREE.Mesh(this.geo[kind], mat);
+      } else if (kind === 'disc') {
+        // плоский непрозрачный «стёртый» круг на земле (Lapse Blue MAX)
+        mat = new THREE.MeshBasicMaterial({ transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -3, polygonOffsetUnits: -3 });
+        obj = new THREE.Mesh(this.geo.disc, mat);
       } else if (kind === 'sphere') {
         mat = new THREE.MeshBasicMaterial(add);
         obj = new THREE.Mesh(this.geo.sphere, mat);
@@ -243,7 +249,7 @@ export class FX {
         obj = new THREE.Mesh(this.geo.cyl, mat);
       }
       obj.frustumCulled = false;
-      obj.renderOrder = kind === 'crater' ? 1 : 7;
+      obj.renderOrder = kind === 'crater' || kind === 'disc' ? 1 : 7;
       this.scene.add(obj);
       it = { obj, mat, active: false };
       list.push(it);
@@ -254,6 +260,7 @@ export class FX {
     it.obj.rotation.set(0, 0, 0);
     it.mat.opacity = 1;
     if (kind !== 'crater' && it.mat.color) it.mat.color.set(0xffffff);
+    if (kind === 'disc') it.obj.rotation.set(-Math.PI / 2, 0, 0);
     return it;
   }
   release(it) { it.active = false; it.obj.visible = false; }
@@ -285,6 +292,7 @@ export class FX {
   glow(pos, color, size, life, o = {}) { return this.animate('glow', pos, color, o.s0 ?? size * 0.6, size, life, o); }
   burst(pos, color, size, life = 0.18, o = {}) { return this.animate('burst', pos, color, size * 0.35, size, life, { ease: 4, ...o }); }
   ring(pos, color, r0, r1, life, o = {}) { return this.animate('ring', pos, color, r0, r1, life, { axis: o.axis ?? 'cam', ...o }); }
+  hex(pos, color, r0, r1, life, o = {}) { return this.animate('hex', pos, color, r0, r1, life, { axis: o.axis ?? 'cam', spin: 6, ...o }); }
   sphere(pos, color, r0, r1, life, o = {}) { return this.animate(o.normal ? 'sphereN' : 'sphere', pos, color, r0, r1, life, o); }
   crescent(pos, quat, color, s0, s1, life, o = {}) { return this.animate(o.normal ? 'cresN' : 'cres', pos, color, s0, s1, life, { quat, ...o }); }
 

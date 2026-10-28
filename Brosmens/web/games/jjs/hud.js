@@ -57,7 +57,7 @@ const CSS = `
 .jh-kf div{font:700 11px/1 system-ui;color:#fff;background:rgba(20,20,20,.5);border-radius:5px;padding:3px 7px;transition:opacity .6s;white-space:nowrap;text-shadow:0 1px 1px rgba(0,0,0,.6)}
 .jh-kf div.me{background:rgba(60,60,60,.7)}
 /* счётчик урона JJS: красный «N DMG», над ним урон последнего удара */
-.jh-dmg{right:20%;top:23%;text-align:right;opacity:0;transition:opacity .35s}
+.jh-dmg{right:22%;top:24%;text-align:right;opacity:0;transition:opacity .35s;transform-origin:right center}
 .jh-dmg i{display:block;font:italic 800 13px/1 system-ui;color:#ffd9d9;text-shadow:1px 1px 0 #000,-1px -1px 0 #000,1px -1px 0 #000,-1px 1px 0 #000;margin-bottom:1px}
 .jh-dmg b{display:block;font:900 26px/1 system-ui;color:#ff2b2b;letter-spacing:.5px;text-shadow:2px 2px 0 #000,-1px -1px 0 #000,1px -1px 0 #000,-1px 1px 0 #000,0 0 8px rgba(255,0,0,.35)}
 .jh-dmg.pop b{animation:jhpop .16s}
@@ -103,21 +103,24 @@ const CSS = `
 `;
 
 const _v = new THREE.Vector3();
-// Размер шрифта названия навыка: не больше 2 строк в ячейке 54 px
+// Размер шрифта названия навыка: не больше 2 строк в ячейке 54 px, слова не рвутся (меряем настоящую ширину текста)
+const _mc = document.createElement('canvas').getContext('2d');
 function fitLabel(text) {
   const words = text.split(' ');
-  for (let fs = 11.5; fs > 8; fs -= 0.5) {
-    const cw = fs * 0.54, maxC = Math.floor(54 / cw);
+  for (let fs = 11.5; fs >= 7.5; fs -= 0.5) {
+    _mc.font = `600 ${fs}px "Source Sans Pro","Segoe UI",system-ui,sans-serif`;
+    const sp = _mc.measureText(' ').width;
     let lines = 1, cur = 0, ok = true;
     for (const w of words) {
-      if (w.length > maxC) { ok = false; break; }
-      if (cur === 0) cur = w.length;
-      else if (cur + 1 + w.length <= maxC) cur += 1 + w.length;
-      else { lines++; cur = w.length; }
+      const ww = _mc.measureText(w).width;
+      if (ww > 53) { ok = false; break; }
+      if (cur === 0) cur = ww;
+      else if (cur + sp + ww <= 53) cur += sp + ww;
+      else { lines++; cur = ww; }
     }
     if (ok && lines <= 2) return fs;
   }
-  return 8.5;
+  return 7.5;
 }
 
 export function createHUD() {
@@ -421,11 +424,11 @@ export function createHUD() {
           const x = (_v.x + 1) * 0.5 * W + 34, y = (1 - _v.y) * 0.5 * H + 22, st = player.charge.stage, k = player.charge.k;
           g.globalAlpha = 1;
           for (let i = 0; i < 3; i++) {
-            const yy = y - (i + 1) * 15;
-            g.fillStyle = 'rgba(20,10,22,.7)'; g.fillRect(x - 1, yy - 1, 11, 14);
+            const yy = y - (i + 1) * 19;
+            g.fillStyle = 'rgba(20,10,22,.72)'; g.fillRect(x - 1.5, yy - 1.5, 15, 18);
             const fill = i < st ? 1 : i === st ? k : 0;
-            if (fill > 0) { g.fillStyle = i < st ? '#ff5fd8' : '#ffb3ef'; g.fillRect(x, yy + 12 * (1 - fill), 9, 12 * fill); }
-            g.strokeStyle = '#ffffff'; g.lineWidth = 1; g.strokeRect(x - 0.5, yy - 0.5, 10, 13);
+            if (fill > 0) { g.fillStyle = i < st ? '#ff5fd8' : '#ffb3ef'; g.fillRect(x, yy + 15 * (1 - fill), 12, 15 * fill); }
+            g.strokeStyle = '#ffffff'; g.lineWidth = 1.5; g.strokeRect(x - 0.75, yy - 0.75, 13.5, 16.5);
           }
           g.lineWidth = 2.5; g.strokeStyle = 'rgba(20,20,20,.9)';
         }

@@ -5,7 +5,7 @@ import * as THREE from 'three';
 import { G } from './ctx.js';
 import { rand } from './util.js';
 
-const RANGED_THREATS = new Set(['purple', 'love', 'fuga', 'red', 'redmax', 'lblue', 'bluemax', 'rsmash', 'sdismantle', 'dismantle']);
+const RANGED_THREATS = new Set(['purple', 'love', 'open', 'furnace', 'red', 'redmax', 'lblue', 'bluemax', 'sdismantle', 'dismantle', 'dismantleAir', 'wcs', 'kai', 'rush', 'elbow']);
 
 export class Brain {
   constructor(f) {
@@ -20,7 +20,7 @@ export class Brain {
     this.skillT = rand(0.8, 2);
     this.specT = rand(1, 3);
     this.evaT = -1;
-    this.tBlockT = 0;
+    this.tBlockT = 0; this.rikaT = 0;
     this.seen = new WeakSet();
     this.lastPos = new THREE.Vector3(); this.stuckT = 0; this.unstickT = 0; this.unstickX = 0; this.unstickZ = 0;
     this.reaction = 0.34 - this.skill * 0.24;
@@ -34,6 +34,8 @@ export class Brain {
     const f = this.f, inp = f.input;
     inp.mx = 0; inp.mz = 0; inp.jump = false; inp.jumpHeld = false; inp.block = false;
     if (f.dead || G.matchOver) return;
+    // эмоция после убийства: стоим, пока рядом нет врага (любое движение отменит её)
+    if (f.action && f.action.name === 'emote') { const t = this.target; if (!t || t.dead || f.dist(t) > 12) return; }
     this.think -= dt;
     if (this.think <= 0) { this.think = rand(0.2, 0.4); this.choose(); }
     // рэгдолл: уклонение (evasive) — новички сразу, сильные боты берегут для наказания
@@ -189,7 +191,8 @@ export class Brain {
     for (const i of order) {
       if (f.cd[i] > 0) continue;
       const sk = f.skillDef(i);
-      const ai = sk.ai;
+      if (!sk) continue;
+      const ai = sk.ai || {};
       let ok = false;
       switch (ai.kind) {
         case 'melee': ok = d <= ai.max && (comboExt || t.stun > 0 || Math.random() < 0.45); break;
@@ -214,6 +217,19 @@ export class Brain {
   useSpecial(d) {
     const f = this.f, t = this.target, sk = f.specialDef();
     if (!sk || f.specCd > 0 || !t) return false;
+    const kind = sk.ai && sk.ai.kind;
+    // Проклятый напарник: призвать Рику, переключиться на её приёмы рядом с целью, вернуть свой набор, если затянулось
+    if (kind === 'rika') {
+      if (f.rikaMode === 0) return f.special();
+      if (f.rikaMode === 1) { if (d < 24 && f.cdRk.every((c) => c <= 0) && Math.random() < 0.45) { this.rikaT = 0; return f.special(); } return false; }
+      if ((this.rikaT += 1) > 3) return f.special();
+      return false;
+    }
+    // Heian: заклинания, пока есть запас пробуждения
+    if (kind === 'chant') {
+      if (f.chant >= 3 || f.awakenPct() < 22 || (d < 9 && Math.random() < 0.7)) return false;
+      return f.special();
+    }
     // Limitless тратит 6 % пробуждения — бот бережёт шкалу, пока она почти пустая
     if (sk.id === 'limitless' && f.awakened <= 0 && f.meter < 25) return false;
     const ai = sk.ai || {};

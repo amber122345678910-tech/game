@@ -2,16 +2,21 @@
 // У персонажа: special (кнопка R / звезда), skills[4], пробуждение awaken{…} с набором awakenSkills[4] и awakenSpecial.
 import * as THREE from 'three';
 import { G } from './ctx.js';
-import { P, PX, POSE, M1ANIM } from './anim.js';
+import { PX, POSE } from './anim.js';
 import { buildRika, buildRikaArm, buildShrine } from './rig.js';
 import { rand, clamp, tex, ease, angleDamp } from './util.js';
+import {
+  shrineM1, steelJab, sCleave, sDismantle, sOpen, sRush, sFurnace, sIncant, sKai, sSovereign, sWCS,
+  yRika, yRSmash, yRLaunch, yRHaymaker, ySevering, yResolute, yOutburst, ySecondWind, outburstParry,
+  yutaRika, yTLDownslam, yElbowRush, yCopySpeech, yEnergyRipple, yTLBeam, waveQuat,
+} from './kits.js';
 
 const V3 = THREE.Vector3;
-const _a = new V3(), _b = new V3(), _c = new V3(), _q = new THREE.Quaternion(), _q2 = new THREE.Quaternion();
+const _a = new V3(), _b = new V3(), _c = new V3(), _d = new V3(), _q = new THREE.Quaternion(), _q2 = new THREE.Quaternion();
 const ZV = new V3(0, 0, 1), YV = new V3(0, 1, 0);
 
 // ---------- общие помощники ----------
-function aimFrom(f, origin, tgt, out, flat = false) {
+export function aimFrom(f, origin, tgt, out, flat = false) {
   if (tgt) { tgt.chestPos(out).sub(origin); if (flat) out.y = 0; }
   else { f.fwd(out); }
   if (out.lengthSq() < 1e-4) f.fwd(out);
@@ -19,7 +24,7 @@ function aimFrom(f, origin, tgt, out, flat = false) {
 }
 
 // Снаряд: o = {owner, pos, dir, speed, range, radius, pierce, ghost (сквозь препятствия), onHit(f,p), onWorld(p), onStep(p,dt,t), onEnd(p)}
-function projectile(o) {
+export function projectile(o) {
   const p = o.pos.clone(), d = o.dir.clone().normalize();
   const hitSet = new Set();
   let trav = 0, t = 0, done = false;
@@ -47,7 +52,7 @@ function projectile(o) {
   });
 }
 
-function beamHits(owner, origin, dir, len, radius) {
+export function beamHits(owner, origin, dir, len, radius) {
   const out = [];
   for (const f of G.fighters) {
     if (!owner.isEnemy(f)) continue;
@@ -59,7 +64,7 @@ function beamHits(owner, origin, dir, len, radius) {
   return out;
 }
 
-function beamFX(origin, dir, len, radius, outer, core, life) {
+export function beamFX(origin, dir, len, radius, outer, core, life) {
   const A = G.fx.pool('beam'), B = G.fx.pool('beam');
   A.mat.color.set(outer); B.mat.color.set(core);
   _q.setFromUnitVectors(YV, dir);
@@ -79,38 +84,10 @@ function beamFX(origin, dir, len, radius, outer, core, life) {
   });
 }
 
-function explosion(owner, p, R, color, o) {
-  for (const f of owner.enemiesNear(p, R, R + 2)) {
-    G.hit(owner, f, { from: p, ...o });
-  }
-  G.fx.burst(p, '#ffffff', R * 1.6, 0.2);
-  G.fx.sphere(p, color, 1, R, 0.35, { a0: 0.8 });
-  G.fx.ring(p, color, 1, R * 1.8, 0.4, { axis: 'y', a0: 0.9 });
-  G.fx.ring(p, '#ffffff', 1, R * 1.4, 0.3, { a0: 0.7 });
-  G.fx.sparks(p, null, color, 16, 55, { spread: 1 });
-  G.fx.particles(p, { n: 22, color: [color, '#ffffff'], speed: R * 3.2, size: 1.4, life: 0.5 });
-  G.fx.particles(p, { n: 10, normal: true, color: '#3a3a40', speed: 7, up: 5, size: 2.2, size1: 5, life: 1.1, alpha: 0.5 });
-  const gy = G.world.groundAt(p.x, p.z, p.y);
-  if (p.y - gy < 5) { _a.set(p.x, gy + 0.3, p.z); G.fx.debris(_a, 10); G.fx.dust(_a, 10, 3.5); G.fx.crater(_a, R * 0.9, 5); }
-  G.shake(0.6, p);
-  G.sound('boom', p, 0.8);
-  G.flashNear(p, color, 0.25, 30);
-}
-
-function lungeTo(f, tgt, maxD, stop = 3) {
+export function lungeTo(f, tgt, maxD, stop = 3) {
   if (!tgt) return 0;
   const d = f.dist(tgt);
   return d < maxD ? Math.max(0, d - stop) : 0;
-}
-
-// Аура пробуждения
-function aura(colors, dark) {
-  return (f, dt) => {
-    if (Math.random() < dt * 22) {
-      _a.set(f.pos.x + rand(-1.3, 1.3), f.pos.y + rand(0.3, 5), f.pos.z + rand(-1.3, 1.3));
-      G.fx.particles(_a, { n: 1, color: colors, speed: 1, up: 6, size: 1.1, size1: 0.2, life: 0.6, normal: !!dark });
-    }
-  };
 }
 
 // ======================= GOJO (The Strongest of Today) =======================
@@ -318,7 +295,7 @@ const gRed = {
         ff.handPos('R', _a);
         const origin = _a.clone();
         const dir = aimFrom(ff, origin, tgt && !tgt.dead ? tgt : null, new V3());
-        if (!tgt) { dir.y = 0; dir.normalize(); }
+        if (!tgt) { if (ff.isPlayer) ff.aimDir(origin, dir); else { dir.y = 0; dir.normalize(); } }
         const ball = G.fx.pool('sphere'), bg = G.fx.pool('glow');
         ball.mat.color.set('#ff2a2a'); bg.mat.color.set('#ff5a3a');
         ff.vel.addScaledVector(dir, -10);
@@ -421,46 +398,84 @@ const gTwofold = {
 };
 
 // ======================= Six Eyes (пробуждение Сильнейшего) =======================
-// 1: Lapse Blue MAX — управляемый вихрь, 20 тиков по 2.2
+// 1: Lapse Blue MAX — тёмно-синий шар под управлением (идёшь/поворачиваешь камеру — шар следует), 20 тиков по 2.2;
+// под шаром — белый круг «стёртой» земли. В воздухе заклинатель зависает, пока шар жив.
 const gBlueMax = {
-  id: 'bluemax', label: 'Lapse Blue MAX', cd: 17, windup: 0.2, color: '#2d5dff', ai: { kind: 'ranged', min: 2, max: 28 },
+  id: 'bluemax', label: 'Lapse Blue MAX', cd: 17, windup: 0.2, color: '#2d3dff', ai: { kind: 'ranged', min: 2, max: 28 },
   cast(f) {
     const tgt = f.camTarget(30);
     if (tgt) f.faceTo(tgt.pos);
-    const center = new V3();
-    if (tgt) tgt.chestPos(center); else { f.chestPos(center); f.fwd(_a); center.addScaledVector(_a, 11); }
+    const air = f.airborne();
     f.startAction({
-      name: 'bluemax', dur: 0.45, frames: [[0, GJ], [0.4, P_POINT], [1, P_POINT]],
-      events: [[0.2, (ff) => spawnBlueMax(ff, center, tgt)]],
+      name: 'bluemax', dur: 0.45, noGrav: air, frames: [[0, GJ], [0.4, P_POINT], [1, P_POINT]],
+      update: (ff) => { if (air) ff.vel.y *= 0.8; },
+      events: [[0.2, (ff) => spawnBlueMax(ff, tgt, air)]],
     });
     G.sound('charge', f.pos, 0.5);
   },
 };
-function spawnBlueMax(f, center, tgt) {
-  const vx = blueVortex('#3b6dff');
-  const disc = G.fx.pool('ring'); disc.mat.color.set('#ffffff'); disc.obj.rotation.set(-Math.PI / 2, 0, 0);
+function navyOrb() {
+  const core = G.fx.pool('sphereN'), shell = G.fx.pool('sphere'), glow = G.fx.pool('glow'), r1 = G.fx.pool('ring'), r2 = G.fx.pool('ring');
+  core.mat.color.set('#0c1458'); shell.mat.color.set('#2a46ff'); glow.mat.color.set('#2f45ff'); r1.mat.color.set('#a8b8ff'); r2.mat.color.set('#3a56ff');
+  return {
+    t: 0,
+    set(p, s, dt) {
+      this.t += dt;
+      const t = this.t, pulse = 1 + Math.sin(t * 26) * 0.06;
+      core.obj.position.copy(p); core.obj.scale.setScalar(2.4 * s * pulse); core.mat.opacity = 0.93;
+      shell.obj.position.copy(p); shell.obj.scale.setScalar(3.1 * s * pulse); shell.mat.opacity = 0.35;
+      glow.obj.position.copy(p); glow.obj.scale.setScalar(13 * s);
+      r1.obj.position.copy(p); r1.obj.scale.setScalar(4.6 * s); r1.obj.rotation.set(t * 4, t * 3, 0); r1.mat.opacity = 0.65;
+      r2.obj.position.copy(p); r2.obj.scale.setScalar(6 * s); r2.obj.rotation.set(-t * 3, 0, t * 5); r2.mat.opacity = 0.45;
+      // искры, тёмно-синие «щупальца» и ветер, засасываемый к центру
+      for (let i = 0; i < 2; i++) {
+        _c.set(rand(-1, 1), rand(-1, 1), rand(-1, 1)).normalize();
+        _b.copy(p).addScaledVector(_c, rand(6, 10) * s);
+        _c.multiplyScalar(-rand(18, 28) * s);
+        G.fx.add.spawn(_b.x, _b.y, _b.z, _c.x, _c.y, _c.z, i ? '#9fd8ff' : '#ffffff', 1, 0.7, 0.1, 0.32);
+      }
+      if (Math.random() < 0.35) { _c.set(rand(-1, 1), rand(-1, 1), rand(-1, 1)).normalize(); _b.copy(p).addScaledVector(_c, rand(4, 7) * s); G.fx.bolt(p, _b, '#0a1250', { dark: true, segs: 3, jag: 0.6, life: 0.12, w: 0.18 }); }
+      if (Math.random() < 0.5) { _c.set(rand(-1, 1), rand(-0.3, 0.6), rand(-1, 1)).normalize(); _b.copy(p).addScaledVector(_c, rand(8, 12) * s); G.fx.str.add(_b, _c.multiplyScalar(-40 * s), '#dff4ff', 0.25, 0.08, 3, { drag: 2 }); }
+    },
+    free() { for (const it of [core, shell, glow, r1, r2]) G.fx.release(it); },
+  };
+}
+function spawnBlueMax(f, tgt, air) {
+  const orb = navyOrb();
+  const disc = G.fx.pool('disc'); disc.mat.color.set('#f2f4fa');
+  const center = new V3();
+  let dist = 12;
+  if (tgt && !tgt.dead) { tgt.chestPos(center); dist = clamp(f.dist(tgt), 6, 26); }
+  else { f.chestPos(center); f.fwd(_a); center.addScaledVector(_a, dist); }
   let t = 0, tick = 0, ticks = 0;
-  const L = 3.2;
+  const L = 3.4;
   G.addTask((dt) => {
     t += dt; tick -= dt;
-    if (G.matchOver || f.dead) { vx.free(); G.fx.release(disc); return false; }
-    // управление: вихрь следует за целью или за прицелом заклинателя
-    if (tgt && !tgt.dead && f.dist(tgt) < 40) tgt.chestPos(_a);
-    else { f.chestPos(_a); _a.x += f.aim.x * 12; _a.z += f.aim.z * 12; _a.y += 1; }
-    center.lerp(_a, 1 - Math.exp(-4 * dt));
+    if (G.matchOver || f.dead) { orb.free(); G.fx.release(disc); return false; }
+    // управление: у игрока — точка по лучу камеры на прежней дистанции, у бота — его цель
+    if (!f.isPlayer && tgt && !tgt.dead && f.dist(tgt) < 40) tgt.chestPos(_a);
+    else {
+      f.chestPos(_a); f.aimDir(_a, _b); _a.addScaledVector(_b, dist);
+      const g = G.world.groundAt(_a.x, _a.z, _a.y);
+      if (_a.y < g + 2.5) _a.y = g + 2.5;
+    }
+    center.lerp(_a, 1 - Math.exp(-3.5 * dt));
+    if (air && !f.rag && t < L) f.suspend = Math.max(f.suspend, 0.1);
     const grow = Math.min(1, t / 0.25), fade = t > L - 0.25 ? Math.max(0, (L - t) / 0.25) : 1;
-    vx.set(center, 1.25 * grow * fade, dt);
+    orb.set(center, grow * fade, dt);
     const gy = G.world.groundAt(center.x, center.z, center.y);
-    disc.obj.position.set(center.x, gy + 0.12, center.z); disc.obj.scale.setScalar(6 * grow * fade); disc.mat.opacity = 0.35;
+    const near = 1 - clamp((center.y - gy - 3) / 10, 0, 1);
+    disc.obj.position.set(center.x, gy + 0.14, center.z); disc.obj.scale.setScalar(6.5 * grow * fade * (0.5 + 0.5 * near)); disc.mat.opacity = 0.9 * near;
+    if (near > 0.3 && Math.random() < 0.4) { const an = rand(0, 6.28), rr = rand(5, 9); _a.set(center.x + Math.cos(an) * rr, gy + 0.4, center.z + Math.sin(an) * rr); G.fx.norm.spawn(_a.x, _a.y, _a.z, -Math.cos(an) * 10, 6, -Math.sin(an) * 10, Math.random() < 0.5 ? '#2b2b2b' : '#d8d8d8', 1, 0.7, 0.4, 0.5, 0, 0); }
     for (const o of f.enemiesNear(center, 15, 12)) {
       o.chestPos(_a); _b.subVectors(center, _a); const d = _b.length();
       if (d > 0.8) { _b.multiplyScalar(1 / d); const k = (o.rag ? 34 : 80) * dt; o.vel.x += _b.x * k; o.vel.z += _b.z * k; o.vel.y += _b.y * k * 0.6; if (d < 3) { o.vel.multiplyScalar(0.85); } }
     }
     if (tick <= 0 && ticks < 20 && t > 0.2) {
       tick = 0.14; ticks++;
-      for (const o of f.enemiesNear(center, 6.5, 7)) G.hit(f, o, { dmg: 2.2, unblockable: true, bypassRag: true, stun: 0.4, hitstop: 0.015, fx: 'energy', color: '#5f8cff', shake: 0.06, sfx: 'hit', vol: 0.3, from: center, noPush: true });
+      for (const o of f.enemiesNear(center, 6.5, 7)) G.hit(f, o, { dmg: 2.2, unblockable: true, bypassRag: true, stun: 0.4, hitstop: 0.015, fx: 'energy', color: '#4a64ff', shake: 0.06, sfx: 'hit', vol: 0.3, from: center, noPush: true });
     }
-    if (t >= L) { vx.free(); G.fx.release(disc); return false; }
+    if (t >= L) { orb.free(); G.fx.release(disc); return false; }
     return true;
   });
 }
@@ -496,7 +511,7 @@ const gRedMax = {
         ff.handPos('R', _a);
         const origin = _a.clone();
         const dir = aimFrom(ff, origin, tgt, new V3());
-        if (!tgt) { dir.y = 0; dir.normalize(); }
+        if (!tgt) { if (ff.isPlayer) ff.aimDir(origin, dir); else { dir.y = 0; dir.normalize(); } }
         const ball = G.fx.pool('sphere'), bg = G.fx.pool('glow');
         ball.mat.color.set('#ff2050'); bg.mat.color.set('#ff6a8a');
         ff.vel.addScaledVector(dir, -16);
@@ -528,71 +543,87 @@ const gRedMax = {
   },
 };
 
-// 3: Hollow Purple — слияние синего и красного, пробивающая масса (70)
+// 3: Hollow Purple — ≈3 с подготовки: синий и красный в руках, слияние (≈0.7 с видно), затем огромная
+// пурпурная масса несётся вперёд, стирая всё (неблокируемо; 45 для баланса FFA, в JJS — 70)
 const gPurple = {
-  id: 'purple', label: 'Hollow Purple', cd: 40, windup: 1.25, color: '#b04dff', ai: { kind: 'ranged', min: 6, max: 70 },
+  id: 'purple', label: 'Hollow Purple', cd: 40, windup: 3.0, color: '#b04dff', ai: { kind: 'ranged', min: 6, max: 70 },
   cast(f) {
-    let tgt = f.autoTarget(60, 0.55);
+    let tgt = f.camTarget(80);
     if (tgt) f.faceTo(tgt.pos);
-    const bl = G.fx.pool('glow'), rd = G.fx.pool('glow'), pu = G.fx.pool('sphere'), pg = G.fx.pool('glow');
-    bl.mat.color.set('#3f8cff'); rd.mat.color.set('#ff3030'); pu.mat.color.set('#a040ff'); pg.mat.color.set('#c070ff');
+    const bl = G.fx.pool('glow'), rd = G.fx.pool('glow'), blc = G.fx.pool('sphere'), rdc = G.fx.pool('sphere'), pu = G.fx.pool('sphere'), pg = G.fx.pool('glow');
+    bl.mat.color.set('#3f8cff'); rd.mat.color.set('#ff3030'); blc.mat.color.set('#5aa8ff'); rdc.mat.color.set('#ff4a3a'); pu.mat.color.set('#a040ff'); pg.mat.color.set('#c070ff');
     pu.obj.visible = pg.obj.visible = false;
-    const cleanup = () => { G.fx.release(bl); G.fx.release(rd); G.fx.release(pu); G.fx.release(pg); };
+    let freed = false;
+    const cleanup = () => { if (!freed) { freed = true; for (const it of [bl, rd, blc, rdc, pu, pg]) G.fx.release(it); } };
     const SPREAD = PX(GJ, { lax: -1.3, laz: 1.1, rax: -1.3, raz: -1.1, hy: -0.2, hx: -0.1 });
     const JOIN = PX(GJ, { lax: -1.6, laz: -0.35, rax: -1.6, raz: 0.35, hy: -0.3, cx: 0.15 });
     const FIRE = PX(GJ, { rax: -1.7, raz: 0.1, lax: 0.2, laz: 0.3, twist: 0.55, cx: 0.25, hy: -0.35, llx: -0.4, rlx: 0.4 });
     const front = new V3();
+    const T1 = 1.4, T2 = 2.1, T3 = 3.0, D = 3.55;
     G.sound('charge', f.pos, 0.7);
-    G.callout(f, 'Hollow Purple', '#c070ff', true);
+    G.callout(f, 'Hollow Purple', '#c070ff');
     f.startAction({
-      name: 'purple', dur: 2.0, armor: true,
-      frames: [[0, POSE.idle.gojo], [0.15, SPREAD], [0.45, SPREAD], [0.58, JOIN], [0.62, FIRE], [0.9, FIRE], [1, POSE.idle.gojo]],
+      name: 'purple', dur: D, armor: true, windup: T3,
+      frames: [[0, POSE.idle.gojo], [0.08, SPREAD], [0.38, SPREAD], [0.5, JOIN], [0.8, JOIN], [0.85, FIRE], [1, FIRE]],
       update: (ff, dt, t) => {
-        if (tgt && (tgt.dead || ff.dist(tgt) > 70)) tgt = null;
-        if (t < 1.2 && tgt) { _a.set(tgt.pos.x - ff.pos.x, 0, tgt.pos.z - ff.pos.z); ff.yaw += Math.atan2(Math.sin(Math.atan2(_a.x, _a.z) - ff.yaw), Math.cos(Math.atan2(_a.x, _a.z) - ff.yaw)) * Math.min(1, dt * 4); }
-        ff.chestPos(front); ff.fwd(_b); front.addScaledVector(_b, 3); front.y += 0.6;
-        if (t < 1.0) {
-          const k = Math.min(1, t / 0.9);
-          ff.handPos('L', _a); bl.obj.position.copy(_a); bl.obj.scale.setScalar(2 + k * 5);
-          ff.handPos('R', _c); rd.obj.position.copy(_c); rd.obj.scale.setScalar(2 + k * 5);
-          if (t > 0.75) { const m = (t - 0.75) / 0.25; bl.obj.position.lerp(front, m); rd.obj.position.lerp(front, m); }
+        if (tgt && (tgt.dead || ff.dist(tgt) > 90)) tgt = null;
+        if (t < T3) {
+          if (tgt) ff.yaw = angleDamp(ff.yaw, Math.atan2(tgt.pos.x - ff.pos.x, tgt.pos.z - ff.pos.z), 4, dt);
+          else if (ff.isPlayer) ff.yaw = angleDamp(ff.yaw, Math.atan2(ff.aim.x, ff.aim.z), 8, dt);
+        }
+        ff.chestPos(front); ff.fwd(_b); front.addScaledVector(_b, 3.2); front.y += 0.8;
+        if (t < T2) {
+          const k = Math.min(1, t / T1);
+          ff.handPos('L', _a); ff.handPos('R', _c);
+          if (t > T1) { const m = ease.smooth((t - T1) / (T2 - T1)); _a.lerp(front, m); _c.lerp(front, m); }
+          bl.obj.position.copy(_a); bl.obj.scale.setScalar(2 + k * 5); blc.obj.position.copy(_a); blc.obj.scale.setScalar(0.3 + k * 0.5);
+          rd.obj.position.copy(_c); rd.obj.scale.setScalar(2 + k * 5); rdc.obj.position.copy(_c); rdc.obj.scale.setScalar(0.3 + k * 0.5);
           for (const [p, col] of [[_a, '#7cc8ff'], [_c, '#ff6a5a']]) {
-            _b.set(rand(-1, 1), rand(-1, 1), rand(-1, 1)).normalize();
-            const sx = p.x + _b.x * 3, sy = p.y + _b.y * 3, sz = p.z + _b.z * 3;
-            G.fx.add.spawn(sx, sy, sz, -_b.x * 12, -_b.y * 12, -_b.z * 12, col, 1, 0.6, 0.1, 0.25);
+            _d.set(rand(-1, 1), rand(-1, 1), rand(-1, 1)).normalize();
+            G.fx.add.spawn(p.x + _d.x * 3, p.y + _d.y * 3, p.z + _d.z * 3, -_d.x * 12, -_d.y * 12, -_d.z * 12, col, 1, 0.6, 0.1, 0.25);
           }
-        } else if (t < 1.25) {
-          bl.obj.visible = rd.obj.visible = false;
-          pu.obj.visible = pg.obj.visible = true;
-          const k = (t - 1.0) / 0.25;
-          pu.obj.position.copy(front); pu.obj.scale.setScalar(0.5 + k * 2.6); pu.mat.opacity = 0.9;
-          pg.obj.position.copy(front); pg.obj.scale.setScalar(4 + k * 10);
-          G.fx.particles(front, { n: 3, color: ['#c070ff', '#ffffff'], speed: 14, size: 0.8, life: 0.3 });
+        } else if (t < T3) {
+          if (bl.obj.visible) { bl.obj.visible = rd.obj.visible = blc.obj.visible = rdc.obj.visible = false; pu.obj.visible = pg.obj.visible = true; G.fx.burst(front, '#e0b0ff', 12, 0.25); G.sound('tp', ff.pos, 0.6); }
+          const k = (t - T2) / (T3 - T2);
+          pu.obj.position.copy(front); pu.obj.scale.setScalar(0.6 + k * 2.4 + Math.sin(t * 40) * 0.08); pu.mat.opacity = 0.9;
+          pg.obj.position.copy(front); pg.obj.scale.setScalar(5 + k * 12);
+          if (Math.random() < 0.6) { _d.set(rand(-1, 1), rand(-1, 1), rand(-1, 1)).normalize(); _a.copy(front).addScaledVector(_d, rand(2.5, 5)); G.fx.bolt(front, _a, Math.random() < 0.5 ? '#c070ff' : '#ffffff', { segs: 3, jag: 0.5, life: 0.08, w: 0.12 }); }
+          G.fx.particles(front, { n: 2, color: ['#c070ff', '#ffffff'], speed: 12, size: 0.8, life: 0.3 });
         }
       },
-      events: [[1.25, (ff) => {
-        G.fx.release(pu); G.fx.release(pg); G.fx.release(bl); G.fx.release(rd);
+      events: [[T3, (ff) => {
+        cleanup();
         const dir = new V3();
-        if (tgt && !tgt.dead) { tgt.chestPos(dir).sub(front); dir.y = clamp(dir.y, -dir.length() * 0.3, dir.length() * 0.3); dir.normalize(); }
-        else { ff.fwd(dir); }
-        const len = 85, R = 5;
-        beamFX(front, dir, len, R, '#9a3cff', '#ffe8ff', 0.75);
-        G.fx.burst(front, '#e0b0ff', 22, 0.3);
-        G.fx.ring(front, '#c070ff', 2, 16, 0.4, { axis: dir.clone() });
-        G.fx.ring(front, '#ffffff', 1, 10, 0.3, { axis: dir.clone() });
-        for (let i = 0; i < 20; i++) {
-          _a.copy(front).addScaledVector(dir, rand(4, len));
-          G.fx.add.spawn(_a.x + rand(-4, 4), _a.y + rand(-4, 4), _a.z + rand(-4, 4), dir.x * 30, dir.y * 30, dir.z * 30, i % 2 ? '#c070ff' : '#ffffff', 1, 2, 0.3, 0.5);
-        }
-        for (const o of beamHits(ff, front, dir, len, R)) {
-          G.hit(ff, o, { dmg: 70, rag: 1.6, kb: { f: 80, up: 26 }, pierce: true, unblockable: true, bypassRag: true, noCounter: true, hitstop: 0.12, fx: 'energy', color: '#c070ff', shake: 0.9, sfx: 'boom', from: ff.pos });
-        }
-        // борозда по земле
-        for (let d = 6; d < len; d += 9) { _a.copy(front).addScaledVector(dir, d); if (_a.y < 6) { _a.y = 0.4; G.fx.debris(_a, 2, ['#5a4a6a', '#7d7468'], 16); } }
+        if (tgt && !tgt.dead) tgt.chestPos(dir).sub(front);
+        else if (ff.isPlayer) ff.aimDir(front, dir);
+        else ff.fwd(dir);
+        const hl = Math.hypot(dir.x, dir.z) || 1;
+        dir.y = clamp(dir.y, -hl * 0.3, hl * 0.3);
+        dir.normalize();
+        const ball = G.fx.pool('sphere'), core = G.fx.pool('sphere'), halo = G.fx.pool('glow');
+        ball.mat.color.set('#9a2cff'); core.mat.color.set('#ffe8ff'); halo.mat.color.set('#c070ff');
+        G.fx.burst(front, '#e0b0ff', 26, 0.3);
+        G.fx.ring(front, '#c070ff', 2, 18, 0.45, { axis: dir.clone() });
+        G.fx.ring(front, '#ffffff', 1, 11, 0.32, { axis: dir.clone() });
         G.shake(0.8, ff.pos);
         G.sound('beam', ff.pos, 1.0); G.sound('boom', ff.pos, 0.6);
         G.flashNear(ff.pos, '#b060ff', 0.45, 60);
         ff.vel.addScaledVector(dir, -18);
+        projectile({
+          owner: ff, pos: front.clone().addScaledVector(dir, 2), dir, speed: 78, range: 90, radius: 6, pierce: true, ghost: true,
+          onHit: (o) => G.hit(ff, o, { dmg: 45, rag: 1.6, kb: { f: 80, up: 26 }, pierce: true, unblockable: true, bypassRag: true, noCounter: true, hitstop: 0.12, fx: 'energy', color: '#c070ff', shake: 0.9, sfx: 'boom', from: ff.pos }),
+          onStep: (p, dt2, tt) => {
+            const g = Math.min(1, tt / 0.15);
+            ball.obj.position.copy(p); ball.obj.scale.setScalar(5.5 * g + Math.sin(tt * 50) * 0.2); ball.mat.opacity = 0.75;
+            core.obj.position.copy(p); core.obj.scale.setScalar(2.6 * g); core.mat.opacity = 0.9;
+            halo.obj.position.copy(p); halo.obj.scale.setScalar(26 * g);
+            for (let i = 0; i < 2; i++) { _d.set(rand(-1, 1), rand(-1, 1), rand(-1, 1)).normalize(); _a.copy(p).addScaledVector(_d, rand(5, 9)); G.fx.bolt(p, _a, i ? '#ffffff' : '#c070ff', { segs: 4, jag: 0.8, life: 0.1, w: 0.2 }); }
+            G.fx.add.spawn(p.x + rand(-5, 5), p.y + rand(-5, 5), p.z + rand(-5, 5), -dir.x * 20, -dir.y * 20, -dir.z * 20, Math.random() < 0.5 ? '#c070ff' : '#ffffff', 1, 2.2, 0.3, 0.4);
+            const gy = G.world.groundAt(p.x, p.z, p.y);
+            if (p.y - gy < 8 && Math.random() < 0.6) { _a.set(p.x + rand(-4, 4), gy + 0.4, p.z + rand(-4, 4)); G.fx.debris(_a, 2, ['#5a4a6a', '#2b2b2b', '#d8d8d8'], 22); }
+          },
+          onEnd: (p) => { G.fx.release(ball); G.fx.release(core); G.fx.release(halo); G.fx.burst(p, '#e0b0ff', 22, 0.3); G.fx.sphere(p, '#c070ff', 3, 12, 0.35, { a0: 0.6 }); },
+        });
       }]],
       onCancel: cleanup,
     });
@@ -668,195 +699,10 @@ function unlimitedVoid(f) {
 const gVoid = { id: 'void', label: 'Infinite Void', tip: 'DOMAIN', cd: 120, windup: 0.55, color: '#bfe6ff', ai: { kind: 'domain', min: 0, max: 22 }, cast: unlimitedVoid };
 
 // ======================= SUKUNA =======================
-const SWIPE = M1ANIM.sukuna[3];
-const sDismantle = {
-  id: 'dismantle', label: 'Dismantle', cd: 6, windup: 0.18, color: '#ff4d6a', ai: { kind: 'ranged', min: 3, max: 34 },
-  cast(f) {
-    const tgt = f.autoTarget(45, 0.45);
-    if (tgt) f.faceTo(tgt.pos);
-    f.startAction({
-      name: 'dismantle', dur: 0.48, frames: SWIPE,
-      events: [[0.18, (ff) => {
-        ff.chestPos(_a); _a.y += 0.4;
-        const origin = _a.clone();
-        const base = aimFrom(ff, origin, tgt && !tgt.dead ? tgt : null, new V3());
-        base.y = clamp(base.y, -0.25, 0.25); base.normalize();
-        G.sound('slash', ff.pos, 0.8);
-        for (const ang of [-0.24, 0, 0.24]) {
-          const dir = base.clone().applyAxisAngle(YV, ang);
-          const roll = rand(-0.45, 0.45);
-          const it = G.fx.pool('cres');
-          it.mat.color.set('#ffd6dc');
-          const q = new THREE.Quaternion().setFromUnitVectors(ZV, dir).multiply(_q2.setFromAxisAngle(ZV, roll));
-          projectile({
-            owner: ff, pos: origin.clone().addScaledVector(dir, 1.5), dir, speed: 82, range: 48, radius: 1.6, pierce: true,
-            onHit: (o, p) => G.hit(ff, o, { dmg: 4.5, bullet: true, stun: 0.45, push: 7, hitstop: 0.04, fx: 'slash', color: '#ff4d6a', shake: 0.15, sfx: 'slash', vol: 0.5, from: p }),
-            onStep: (p, dt, t) => {
-              it.obj.position.copy(p); it.obj.quaternion.copy(q);
-              const s = Math.min(1, t / 0.08) * 4.2;
-              it.obj.scale.set(s, s, s * 0.8); it.mat.opacity = 1;
-              if (Math.random() < 0.5) G.fx.add.spawn(p.x + rand(-1.5, 1.5), p.y, p.z + rand(-1.5, 1.5), 0, 0, 0, '#ff4d6a', 0.8, 0.7, 0.1, 0.2);
-            },
-            onWorld: (p) => { G.fx.sparks(p, null, '#ffd0d0', 6, 25); },
-            onEnd: () => G.fx.release(it),
-          });
-        }
-      }]],
-    });
-  },
-};
+// Cleave / Dismantle / Open / Rush / FURNACE / Incantation — в kits.js (общие для Strongest of History и King of Curses)
 
-const CLEAVE_HOLD = PX(POSE.idle.fist, { rax: -1.6, raz: 0.1, twist: 0.6, cx: 0.25, hy: -0.3, lax: -0.4, laz: 0.4, llx: -0.4, rlx: 0.4 });
-const sCleave = {
-  id: 'cleave', label: 'Cleave', cd: 12, windup: 0.2, color: '#ff2d4a', ai: { kind: 'melee', min: 0, max: 8 },
-  cast(f) {
-    const tgt = f.autoTarget(12, 0.35);
-    if (tgt) f.faceTo(tgt.pos);
-    const lunge = lungeTo(f, tgt, 12, 2.6) / 0.18;
-    f.fwd(_b); const dx = _b.x, dz = _b.z;
-    f.startAction({
-      name: 'cleave', dur: 0.82, keepVel: true,
-      frames: [[0, POSE.idle.fist], [0.15, PX(CLEAVE_HOLD, { rax: -0.6, twist: -0.4 })], [0.25, CLEAVE_HOLD], [1, CLEAVE_HOLD]],
-      update: (ff, dt, t, a) => {
-        if (t < 0.18) { ff.vel.x = dx * Math.max(10, lunge); ff.vel.z = dz * Math.max(10, lunge); }
-        else ff.friction(dt, 16);
-        if (a.victim && !a.victim.dead) { a.victim.stun = Math.max(a.victim.stun, 0.3); }
-      },
-      events: [
-        [0.2, (ff, a) => {
-          const v = ff.meleeTargets(5.6, 0.3)[0];
-          if (!v) { a.dur = 0.5; return; }
-          a.victim = v;
-          const r = G.hit(ff, v, { dmg: 2, melee: true, stun: 1.0, guardBreak: true, hitstop: 0.06, fx: 'slash', color: '#ff2d4a', shake: 0.25, sfx: 'slash' });
-          if (r !== 'hit' && r !== 'break') { a.victim = null; a.dur = 0.5; }
-        }],
-        ...[0.28, 0.35, 0.42, 0.49, 0.56].map((tt) => [tt, (ff, a) => {
-          const v = a.victim; if (!v || v.dead) return;
-          G.hit(ff, v, { dmg: 2, melee: true, stun: 0.6, hitstop: 0.025, fx: 'slash', color: '#ff2d4a', shake: 0.12, sfx: 'slash', vol: 0.45, guardBreak: true });
-          v.chestPos(_a);
-          _b.set(rand(-1, 1), rand(-1, 1), rand(-1, 1)).normalize();
-          _c.copy(_a).addScaledVector(_b, 3); _a.addScaledVector(_b, -3);
-          G.fx.line(_a, _c, '#ffffff', 0.15, 0.12);
-        }]),
-        [0.66, (ff, a) => {
-          const v = a.victim; if (!v || v.dead) return;
-          G.hit(ff, v, { dmg: 6, melee: true, rag: 0.9, kb: { f: 34, up: 14 }, hitstop: 0.1, fx: 'slash', color: '#ff2d4a', shake: 0.5, sfx: 'heavy', guardBreak: true });
-          v.chestPos(_a);
-          _q.setFromUnitVectors(ZV, _b.set(Math.sin(ff.yaw), 0, Math.cos(ff.yaw)));
-          G.fx.crescent(_a, _q, '#ff3050', 3, 8, 0.25);
-        }],
-      ],
-    });
-    G.sound('swing', f.pos, 0.6);
-  },
-};
-
-const BOW = PX(POSE.idle.fist, { twist: -0.35, lax: -1.6, laz: -0.05, rax: -1.45, raz: 0.8, cx: 0.0, hy: -0.2, hx: 0.05, llx: -0.3, rlx: 0.35 });
-const sFuga = {
-  id: 'fuga', label: 'Open', tip: 'HOLD', cd: 14, color: '#ff8a2a', ai: { kind: 'charge', min: 6, max: 50 },
-  cast(f) {
-    let tgt = f.autoTarget(55, 0.5);
-    if (tgt) f.faceTo(tgt.pos);
-    const arrowGlow = G.fx.pool('glow');
-    arrowGlow.mat.color.set('#ff8a2a');
-    const chargeTime = f.bot ? rand(0.55, 1.3) : 99;
-    G.sound('charge', f.pos, 0.5);
-    G.callout(f, 'Fuga', '#ff8a2a', true);
-    const fire = (ff, a) => {
-      if (a.fired) return;
-      a.fired = true;
-      G.fx.release(arrowGlow);
-      const c = clamp((a.t - 0.1) / 1.2, 0, 1);
-      ff.handPos('L', _a); const origin = _a.clone();
-      if (tgt && tgt.dead) tgt = null;
-      const dir = aimFrom(ff, origin, tgt, new V3());
-      if (!tgt) dir.y = 0, dir.normalize();
-      const g = G.fx.pool('glow'); g.mat.color.set('#ffb040');
-      G.sound('beam', ff.pos, 0.6);
-      G.fx.burst(origin, '#ffb040', 8, 0.18);
-      ff.vel.addScaledVector(dir, -10);
-      projectile({
-        owner: ff, pos: origin, dir, speed: 105, range: 75, radius: 1.4,
-        onHit: () => {},
-        onStep: (p, dt) => {
-          g.obj.position.copy(p); g.obj.scale.setScalar(5 + c * 3);
-          _b.copy(p).addScaledVector(dir, -3.5);
-          G.fx.line(_b, p, '#ffcf6a', 0.05, 0.45 + c * 0.3);
-          for (let i = 0; i < 3; i++) G.fx.add.spawn(p.x + rand(-0.6, 0.6), p.y + rand(-0.6, 0.6), p.z + rand(-0.6, 0.6), rand(-3, 3), rand(1, 5), rand(-3, 3), i ? '#ff6a1a' : '#ffd040', 1, 1.6, 0.2, 0.35);
-        },
-        onEnd: (p) => {
-          G.fx.release(g);
-          const R = 6 + c * 5;
-          explosion(ff, p, R, '#ff7a1a', { dmg: 9 + 13 * c, rag: 1.2, kb: { f: 45 + 20 * c, up: 22 }, fx: 'fire', hitstop: 0.1, shake: 0.7, sfx: 'heavy' });
-          // остаточное пламя
-          let ft = 0;
-          G.addTask((dt) => {
-            ft += dt;
-            if (Math.random() < 0.9) G.fx.add.spawn(p.x + rand(-R, R) * 0.5, Math.max(0.3, p.y - 1) + rand(0, 1), p.z + rand(-R, R) * 0.5, 0, rand(4, 9), 0, Math.random() < 0.5 ? '#ff6a1a' : '#ffc040', 1, 1.8, 0.2, 0.6);
-            return ft < 1.4;
-          });
-        },
-      });
-      a.dur = a.t + 0.35;
-    };
-    f.startAction({
-      name: 'fuga', dur: 99, move: 0.15, windup: 0.35,
-      frames: [[0, POSE.idle.fist], [1, BOW]],
-      pose: null,
-      update: (ff, dt, t, a) => {
-        if (!a.fired) {
-          if (tgt && !tgt.dead) ff.faceTo(tgt.pos);
-          else if (ff.isPlayer) { ff.yaw = Math.atan2(ff.aim.x, ff.aim.z); }
-          const c = clamp(t / 1.2, 0, 1);
-          ff.handPos('L', _a); ff.handPos('R', _c);
-          G.fx.line(_c, _a, '#ffd070', 0.05, 0.2 + c * 0.3);
-          arrowGlow.obj.position.copy(_a); arrowGlow.obj.scale.setScalar(3 + c * 6);
-          for (let i = 0; i < 2; i++) {
-            const ang = rand(-1.3, 1.3);
-            _b.set(_a.x + Math.cos(ang) * 0.3, _a.y + Math.sin(ang) * 2.4, _a.z);
-            G.fx.add.spawn(_b.x, _b.y, _b.z, rand(-1, 1), rand(1, 4), rand(-1, 1), i ? '#ff6a1a' : '#ffd040', 1, 1.1 + c, 0.2, 0.3);
-          }
-          const minOk = t > 0.35;
-          if (minOk && (a.released || t >= chargeTime || t >= 1.6)) fire(ff, a);
-        }
-      },
-      onCancel: () => G.fx.release(arrowGlow),
-    });
-    // для анимации используем позу лука
-    f.action.frames = null;
-    f.action.pose = (ff, a, out) => out.set(a.fired ? PX(BOW, { cx: -0.15, rax: -0.9, raz: 0.3 }) : BOW);
-  },
-};
-
-const RUSH_POSE = PX(POSE.dashF, { rax: -1.2, raz: 0.2, lax: -1.2, laz: -0.2 });
-const sRush = {
-  id: 'rush', label: 'Rush', cd: 12, windup: 0.1, color: '#ff6a8a', ai: { kind: 'gap', min: 4, max: 26 },
-  cast(f) {
-    const tgt = f.autoTarget(30, 0.4);
-    if (tgt) f.faceTo(tgt.pos);
-    f.fwd(_b); const dx = _b.x, dz = _b.z;
-    G.sound('dash', f.pos, 0.8);
-    f.startAction({
-      name: 'rush', dur: 0.45, keepVel: true, poseSpeed: 26,
-      pose: (ff, a, out) => out.set(RUSH_POSE),
-      update: (ff, dt, t) => {
-        if (tgt && !tgt.dead) ff.faceTo(tgt.pos);
-        ff.fwd(_b);
-        ff.vel.x = _b.x * 72; ff.vel.z = _b.z * 72;
-        if (Math.random() < 0.8) { _a.set(ff.pos.x + rand(-1, 1), ff.pos.y + rand(0.5, 5), ff.pos.z + rand(-1, 1)); _c.set(-_b.x * 40, 0, -_b.z * 40); G.fx.str.add(_a, _c, '#ffd0dc', 0.15, 0.09, 3, { drag: 6 }); }
-        const v = ff.meleeTargets(3.4, 0.5)[0];
-        if (v) {
-          ff.vel.set(0, ff.vel.y, 0);
-          rushBarrage(ff, v);
-        }
-      },
-    });
-    void dx; void dz;
-  },
-};
-const SUKUNA_BARRAGE = { n: 7, gap: 0.085, dmg: 1.4, heavies: 0, finalGap: 0.25, finalDmg: 5, finalRag: 1.0, finalKb: { f: 28, up: 34 }, arcs: null, color: '#ff8aa0' };
 // Шквал ударов по захваченной цели (Rush Сукуны, Rapid Punches Годжо)
-function rushBarrage(f, v, o = SUKUNA_BARRAGE) {
+export function rushBarrage(f, v, o) {
   f.action = null;
   const base = f.idlePose;
   const L = PX(base, { lax: -1.65, laz: -0.1, rax: -0.6, twist: -0.6, cx: 0.25, hy: -0.3 });
@@ -904,7 +750,7 @@ function rushBarrage(f, v, o = SUKUNA_BARRAGE) {
 
 // 4 (база) / 1 (Хэйан): Strong Dismantle — два длинных разреза, срывающих дорогу
 const SWIPE_L = [[0, POSE.idle.fist], [0.2, PX(POSE.idle.fist, { twist: 0.7, lax: -0.1, laz: 1.4, lay: 0.4, hy: -0.15 })], [0.38, PX(POSE.idle.fist, { twist: -0.8, lax: -0.1, laz: 1.4, lay: -2.4, cx: 0.25, hy: -0.3, rax: -0.3, raz: -0.6 })], [0.55, PX(POSE.idle.fist, { twist: 0.6, lax: -0.1, laz: 1.4, lay: 0.6, hy: -0.15 })], [0.72, PX(POSE.idle.fist, { twist: -0.8, lax: -0.1, laz: 1.4, lay: -2.4, cx: 0.25, hy: -0.3 })], [1, POSE.idle.fist]];
-const sStrongDismantle = {
+export const sStrongDismantle = {
   id: 'sdismantle', label: 'Strong Dismantle', tip: 'TARGET', cd: 10, windup: 0.22, color: '#ffffff', ai: { kind: 'ranged', min: 3, max: 45 },
   cast(f) {
     const tgt = f.camTarget(60);
@@ -913,9 +759,10 @@ const sStrongDismantle = {
       ff.chestPos(_a); _a.y += 0.2;
       const origin = _a.clone();
       const dir = aimFrom(ff, origin, tgt && !tgt.dead ? tgt : null, new V3());
+      if (!(tgt && !tgt.dead) && ff.isPlayer) ff.aimDir(origin, dir);
       dir.y = clamp(dir.y, -0.2, 0.2); dir.normalize();
       const it = G.fx.pool('cres'); it.mat.color.set('#ffffff');
-      const q = new THREE.Quaternion().setFromUnitVectors(ZV, dir).multiply(_q2.setFromAxisAngle(ZV, roll));
+      const q = waveQuat(dir, roll);
       G.sound('slash', ff.pos, 0.9);
       projectile({
         owner: ff, pos: origin.addScaledVector(dir, 1.5), dir, speed: 95, range: 60, radius: 2.2, pierce: true,
@@ -923,7 +770,7 @@ const sStrongDismantle = {
         onStep: (p, dt, t) => {
           it.obj.position.copy(p); it.obj.quaternion.copy(q);
           const s = Math.min(1, t / 0.06) * 7.5;
-          it.obj.scale.set(s, s, s * 0.9); it.mat.opacity = 1;
+          it.obj.scale.set(s, s, s * 0.8); it.mat.opacity = 1;
           _a.copy(p).addScaledVector(dir, -6); G.fx.line(_a, p, '#ffffff', 0.12, 0.1);
           if (p.y < 6 && Math.random() < 0.6) { _a.set(p.x + rand(-1.2, 1.2), 0.4, p.z + rand(-1.2, 1.2)); G.fx.debris(_a, 1, ['#1e1e22', '#2b2b2b', '#d8d8d8'], 18); G.fx.dust(_a, 1, 2.5, '#f0f0f0'); }
         },
@@ -937,7 +784,7 @@ const sStrongDismantle = {
 
 // 3 (Хэйан): Kamutoke — ваджра вверх, молнии бьют по области вокруг
 const VAJRA = PX(POSE.idle.fist, { rax: -2.95, raz: 0.15, hx: -0.3, lax: -0.4, laz: 0.5, cx: -0.1 });
-const sKamutoke = {
+export const sKamutoke = {
   id: 'kamutoke', label: 'Kamutoke', cd: 12, windup: 0.4, color: '#ffe680', ai: { kind: 'aoe', min: 0, max: 16 },
   cast(f) {
     G.sound('charge', f.pos, 0.6);
@@ -1431,267 +1278,21 @@ function manjiCounter(f, att, bullet) {
 const KT = POSE.idle.katana;
 const POINT_UP = PX(KT, { rax: -2.7, raz: 0.1, kat: 0.2, lax: -0.4, laz: 0.4, hx: -0.15, hy: -0.1 });
 const rikaArms = [];
-function getRikaArm() {
+export function getRikaArm() {
   let a = rikaArms.find((x) => !x.busy);
   if (!a) { a = buildRikaArm(); a.busy = false; G.scene.add(a.root); rikaArms.push(a); }
   a.busy = true; a.root.visible = true;
   return a;
 }
 const rikas = [];
-function getRika() {
+export function getRika() {
   let r = rikas.find((x) => !x.busy);
   if (!r) { r = buildRika(); r.busy = false; G.scene.add(r.root); rikas.push(r); }
   r.busy = true; r.root.visible = true;
   return r;
 }
 
-const ySmash = {
-  id: 'rsmash', label: 'Rika Smash', cd: 10, color: '#8a5cff', ai: { kind: 'ranged', min: 3, max: 18 },
-  cast(f) {
-    const tgt = f.autoTarget(20, 0.35);
-    if (tgt) f.faceTo(tgt.pos);
-    const pt = new V3();
-    if (tgt) pt.copy(tgt.pos); else { f.fwd(_b); pt.copy(f.pos).addScaledVector(_b, 10); }
-    pt.y = G.world.groundAt(pt.x, pt.z, pt.y + 2);
-    G.sound('charge', f.pos, 0.4);
-    f.startAction({
-      name: 'rsmash', dur: 0.75, frames: [[0, KT], [0.25, POINT_UP], [0.5, PX(KT, { rax: -1.2, kat: 0.9, cx: 0.2, hy: -0.3 })], [1, KT]],
-      events: [[0.1, (ff) => {
-        const arm = getRikaArm();
-        const yaw = ff.yaw;
-        let t = 0, hit = false;
-        G.fx.particles(_a.set(pt.x, pt.y + 14, pt.z), { n: 20, normal: true, color: '#1a1020', speed: 8, size: 2, size1: 4, life: 0.6, alpha: 0.7 });
-        G.addTask((dt) => {
-          t += dt;
-          if (tgt && !tgt.dead && t < 0.15) { pt.x += (tgt.pos.x - pt.x) * 0.2; pt.z += (tgt.pos.z - pt.z) * 0.2; }
-          const fall = ease.in(Math.min(1, t / 0.3));
-          arm.root.position.set(pt.x, pt.y + 2.2 + 16 * (1 - fall), pt.z);
-          arm.root.rotation.set(-0.7 * (1 - fall), yaw, 0);
-          const sink = t > 0.85 ? Math.min(1, (t - 0.85) / 0.3) : 0;
-          arm.root.position.y -= sink * 14;
-          arm.root.scale.setScalar(1 - sink * 0.3);
-          if (!hit && t >= 0.3) {
-            hit = true;
-            _a.set(pt.x, pt.y + 1.5, pt.z);
-            for (const o of ff.enemiesNear(_a, 7.5)) G.hit(ff, o, { dmg: 11, rag: 1.0, kb: { f: 22, up: 28 }, from: pt, hitstop: 0.1, fx: 'heavy', color: '#b080ff', shake: 0.6, sfx: 'heavy' });
-            _a.y = pt.y + 0.3;
-            G.fx.ring(_a, '#c0a0ff', 1, 13, 0.45, { axis: 'y' });
-            G.fx.ring(_a, '#ffffff', 1, 8, 0.3, { axis: 'y' });
-            G.fx.debris(_a, 14, ['#7d7468', '#5ea548', '#3a3c42'], 26);
-            G.fx.crater(_a, 8, 5);
-            G.fx.dust(_a, 16, 4);
-            G.fx.particles(_a, { n: 14, normal: true, color: '#1a1020', speed: 12, up: 6, size: 2, size1: 5, life: 0.8, alpha: 0.6 });
-            G.shake(0.55, pt);
-            G.sound('boom', pt, 0.8);
-          }
-          if (t >= 1.15) { arm.busy = false; arm.root.visible = false; return false; }
-          return true;
-        });
-      }]],
-    });
-  },
-};
-
-const DASH_SLASH = PX(KT, { lean: 0.45, rax: 0.7, raz: -0.3, kat: 1.4, lax: 0.6, laz: 0.3, hy: -0.35, llx: -0.6, rlx: 0.7 });
-const SHEATH = PX(KT, { rax: -0.3, raz: 0.6, kat: 1.5, twist: 0.6, cx: 0.25, hy: -0.4, lax: -0.6, laz: -0.6 });
-const yKDash = {
-  id: 'kdash', label: 'Katana Dash', cd: 7, color: '#e8f0ff', ai: { kind: 'gap', min: 4, max: 22 },
-  cast(f) {
-    const tgt = f.autoTarget(26, 0.4);
-    if (tgt) f.faceTo(tgt.pos);
-    f.fwd(_b); const dx = _b.x, dz = _b.z;
-    const start = f.pos.clone();
-    const victims = new Set();
-    G.sound('dash', f.pos, 0.8);
-    f.startAction({
-      name: 'kdash', dur: 0.3, keepVel: true, iframes: 0.32, poseSpeed: 30,
-      pose: (ff, a, out) => out.set(DASH_SLASH),
-      update: (ff) => {
-        ff.vel.x = dx * 78; ff.vel.z = dz * 78;
-        for (const o of G.fighters) if (ff.isEnemy(o) && ff.dist(o) < 3.6 && Math.abs(o.pos.y - ff.pos.y) < 5) victims.add(o);
-      },
-      onEnd: (ff) => {
-        ff.vel.x *= 0.15; ff.vel.z *= 0.15;
-        const end = ff.pos.clone();
-        _a.copy(start); _a.y += 3; _c.copy(end); _c.y += 3;
-        G.fx.line(_a, _c, '#ffffff', 0.45, 0.35);
-        G.fx.line(_a, _c, '#c7a0ff', 0.6, 0.7);
-        ff.startAction({ name: 'sheath', dur: 0.35, frames: [[0, DASH_SLASH], [0.4, SHEATH], [1, SHEATH]] });
-        let t = 0;
-        G.addTask((dt) => {
-          t += dt;
-          if (t < 0.18) return true;
-          for (const v of victims) {
-            if (v.dead) continue;
-            G.hit(ff, v, { dmg: 9, stun: 0.7, kb: { f: 10, up: 8 }, from: start, hitstop: 0.08, fx: 'slash', color: '#e8f0ff', shake: 0.4, sfx: 'slash', ignoreIframes: true });
-            v.chestPos(_a);
-            for (let i = 0; i < 2; i++) {
-              _q.setFromUnitVectors(ZV, _b.set(dx, 0, dz)); _q.multiply(_q2.setFromAxisAngle(ZV, rand(0, 3.14)));
-              G.fx.crescent(_a, _q, '#ffffff', 2, 5, 0.22);
-            }
-          }
-          if (victims.size) G.sound('slash', end, 0.8);
-          return false;
-        });
-      },
-    });
-  },
-};
-
-const SPEECH = PX(KT, { lax: -2.3, laz: -0.75, hx: 0.1, cx: 0.15, hy: -0.15 });
-const ySpeech = {
-  id: 'speech', label: '«Стой!»', cd: 15, color: '#c77dff', ai: { kind: 'aoe', min: 0, max: 14 },
-  cast(f) {
-    f.startAction({
-      name: 'speech', dur: 0.65, frames: [[0, KT], [0.25, SPEECH], [0.8, SPEECH], [1, KT]],
-      events: [[0.22, (ff) => {
-        ff.headPos(_a);
-        G.hud.pop(_a.set(_a.x, _a.y + 1, _a.z), 'СТОЙ!', '#d9a0ff', 2.2);
-        ff.chestPos(_a);
-        for (let i = 0; i < 3; i++) {
-          G.fx.ring(_a, '#c77dff', 1, 18, 0.5, { axis: 'y', delay: i * 0.08, a0: 0.9 });
-          G.fx.ring(_a, '#ffffff', 1, 12, 0.35, { delay: i * 0.1, a0: 0.6 });
-        }
-        G.fx.particles(_a, { n: 20, color: ['#c77dff', '#ffffff'], speed: 18, size: 1, life: 0.5 });
-        for (const o of ff.enemiesNear(_a, 15)) {
-          G.hit(ff, o, { dmg: 3, stun: 1.4, pierce: true, noCounter: true, unblockable: true, hitstop: 0.05, fx: 'energy', color: '#c77dff', shake: 0.3, sfx: 'hit' });
-          if (!o.dead && !o.rag && o.prot <= 0) { o.stun = Math.max(o.stun, 1.4); o.broken = Math.max(o.broken, 1.4); o.interrupt(true); }
-        }
-        G.sound('tp', ff.pos, 0.8); G.sound('heavy', ff.pos, 0.5);
-        G.shake(0.3, ff.pos);
-      }]],
-    });
-  },
-};
-
-const BEAM_POSE = PX(KT, { rax: -1.6, raz: 0.1, kat: 1.45, twist: 0.4, cx: 0.15, hy: -0.3, lax: -0.6, laz: 0.4, llx: -0.4, rlx: 0.4 });
-const yLoveBeam = {
-  id: 'love', label: 'Love Beam', cd: 16, color: '#ff6ad5', ai: { kind: 'ranged', min: 5, max: 48 },
-  cast(f) {
-    let tgt = f.camTarget(60);
-    if (tgt) f.faceTo(tgt.pos);
-    const own = !f.rika;
-    const rika = f.rika || getRika();
-    if (own) rika.root.scale.setScalar(0.85);
-    f.rikaBeam = true;
-    const glow = G.fx.pool('glow'); glow.mat.color.set('#ff8ae0');
-    const mouth = new V3();
-    const cleanup = () => { G.fx.release(glow); };
-    G.sound('charge', f.pos, 0.6);
-    G.callout(f, 'Pure Love Beam', '#ff6ad5', true);
-    let gone = false;
-    const R = rika;
-    const placeRika = (ff, t) => {
-      ff.fwd(_b);
-      if (!own) { const k = R.root.scale.x; mouth.set(0, 9.3 * k, 3.8 * k).applyAxisAngle(YV, R.root.rotation.y).add(R.root.position); return; }
-      const rise = ease.out3(Math.min(1, t / 0.4));
-      const sink = t > 1.6 ? Math.min(1, (t - 1.6) / 0.4) : 0;
-      R.root.position.set(ff.pos.x - _b.x * 4.5, ff.pos.y - 12 * (1 - rise) - 14 * sink, ff.pos.z - _b.z * 4.5);
-      R.root.rotation.y = ff.yaw;
-      R.armL.rotation.x = -1.2; R.armR.rotation.x = -1.2;
-      mouth.set(0, 9.3 * 0.85, 3.8 * 0.85).applyAxisAngle(YV, ff.yaw).add(R.root.position);
-    };
-    let rt = 0;
-    G.addTask((dt) => {
-      rt += dt;
-      placeRika(f, rt);
-      if (rt > 1.6 || f.dead) f.rikaBeam = false;
-      if (rt > 2.0 || (f.dead && rt > 0.1)) { if (own) { R.busy = false; R.root.visible = false; } gone = true; return false; }
-      return true;
-    });
-    f.startAction({
-      name: 'love', dur: 1.55, armor: true,
-      frames: [[0, KT], [0.2, BEAM_POSE], [1, BEAM_POSE]],
-      update: (ff, dt, t) => {
-        if (tgt && tgt.dead) tgt = null;
-        if (t < 0.85) {
-          if (tgt) ff.faceTo(tgt.pos);
-          const k = t / 0.85;
-          glow.obj.position.copy(mouth); glow.obj.scale.setScalar(2 + k * 8);
-          _b.set(rand(-1, 1), rand(-1, 1), rand(-1, 1)).normalize();
-          G.fx.add.spawn(mouth.x + _b.x * 5, mouth.y + _b.y * 5, mouth.z + _b.z * 5, -_b.x * 18, -_b.y * 18, -_b.z * 18, Math.random() < 0.5 ? '#ff8ae0' : '#ffffff', 1, 0.9, 0.1, 0.28);
-        }
-      },
-      events: [[0.85, (ff) => {
-        cleanup();
-        const origin = mouth.clone();
-        const dir = new V3();
-        if (tgt) { tgt.chestPos(dir).sub(origin).normalize(); } else { ff.fwd(dir); dir.y = -0.12; dir.normalize(); }
-        const len = 62, Rr = 3.4;
-        beamFX(origin, dir, len, Rr, '#ff4fc8', '#ffffff', 0.65);
-        G.fx.burst(origin, '#ffb0ee', 16, 0.25);
-        G.fx.ring(origin, '#ff6ad5', 1, 10, 0.35, { axis: dir.clone() });
-        for (const o of beamHits(ff, origin, dir, len, Rr)) G.hit(ff, o, { dmg: 20, rag: 1.4, kb: { f: 66, up: 22 }, pierce: true, hitstop: 0.12, fx: 'energy', color: '#ff6ad5', shake: 0.75, sfx: 'boom', from: ff.pos });
-        for (let d = 6; d < len; d += 10) { _a.copy(origin).addScaledVector(dir, d); if (_a.y < 5) { _a.y = 0.4; G.fx.debris(_a, 2, ['#5a4a6a', '#7d7468'], 16); G.fx.dust(_a, 2, 3); } }
-        G.sound('beam', ff.pos, 1);
-        G.shake(0.6, ff.pos);
-        G.flashNear(ff.pos, '#ff6ad5', 0.35, 50);
-      }]],
-      onCancel: cleanup,
-    });
-  },
-};
-
-// Пробуждение Юты («True Love»): Рика полностью проявляется и сражается рядом до конца пробуждения
-function yutaRika(f) {
-  if (f.rika) return;
-  const R = getRika();
-  R.root.scale.setScalar(1);
-  f.rika = R;
-  f.chestPos(_a);
-  G.fx.particles(_a, { n: 30, normal: true, color: '#1a1020', speed: 16, up: 4, size: 2, size1: 5, life: 0.9, alpha: 0.7 });
-  G.callout(f, 'Rika: Full Manifestation', '#c77dff');
-  const pos = f.pos.clone(); pos.y -= 14;
-  let t = 0, atk = 1.0, swing = 0, target = null, yaw = f.yaw;
-  G.addTask((dt) => {
-    t += dt; atk -= dt;
-    const alive = !f.dead && f.awakened > 0 && !G.matchOver;
-    // точка: за плечом у Юты, или у цели при атаке
-    f.fwd(_b);
-    const side = new V3(-_b.z, 0, _b.x);
-    _a.copy(f.pos).addScaledVector(_b, -4.5).addScaledVector(side, -3.5);
-    if (swing > 0 && target && !target.dead) { _a.copy(target.pos); _c.set(f.pos.x - target.pos.x, 0, f.pos.z - target.pos.z).normalize(); _a.addScaledVector(_c, 5.5); }
-    _a.y = (alive ? f.pos.y : f.pos.y - 16) + Math.sin(t * 2) * 0.5;
-    if (t < 0.6) _a.y -= 14 * (1 - ease.out3(t / 0.6));
-    pos.lerp(_a, 1 - Math.exp(-(swing > 0 ? 12 : 5) * dt));
-    R.root.position.copy(pos);
-    if (target && !target.dead && swing > 0) yaw = Math.atan2(target.pos.x - pos.x, target.pos.z - pos.z);
-    else yaw = f.yaw;
-    R.root.rotation.y += Math.atan2(Math.sin(yaw - R.root.rotation.y), Math.cos(yaw - R.root.rotation.y)) * Math.min(1, dt * 6);
-    // руки
-    if (f.rikaBeam) { R.armL.rotation.x = -1.2; R.armR.rotation.x = -1.2; }
-    else if (swing > 0) {
-      swing -= dt;
-      const k = 1 - swing / 0.55;
-      R.armR.rotation.x = k < 0.5 ? -2.8 * (k / 0.5) : -2.8 + 2.6 * ((k - 0.5) / 0.5);
-      R.armL.rotation.x = -0.6;
-      if (k >= 0.6 && !R.didHit) {
-        R.didHit = true;
-        if (target && !target.dead) {
-          target.chestPos(_c);
-          for (const o of f.enemiesNear(_c, 5.5)) G.hit(f, o, { dmg: 6, rag: 0.8, kb: { f: 32, up: 16 }, from: pos, hitstop: 0.08, fx: 'heavy', color: '#b080ff', shake: 0.4, sfx: 'heavy' });
-          _c.y = target.pos.y + 0.3;
-          G.fx.ring(_c, '#c0a0ff', 1, 8, 0.3, { axis: 'y' });
-          G.fx.dust(_c, 6, 3);
-        }
-      }
-    } else {
-      R.armR.rotation.x = -0.5 + Math.sin(t * 2.2) * 0.2; R.armL.rotation.x = -0.5 - Math.sin(t * 2.2) * 0.2;
-      if (alive && atk <= 0) {
-        target = null; let bd = 17;
-        for (const o of G.fighters) if (f.isEnemy(o)) { const d = f.dist(o); if (d < bd) { bd = d; target = o; } }
-        if (target) { swing = 0.55; R.didHit = false; atk = 1.7; G.sound('swing', pos, 0.6); } else atk = 0.3;
-      }
-    }
-    if (Math.random() < 0.3) { _c.set(pos.x + rand(-3, 3), pos.y + rand(0, 4), pos.z + rand(-3, 3)); G.fx.norm.spawn(_c.x, _c.y, _c.z, 0, rand(1, 3), 0, '#1a1020', 0.5, 1.5, 3, 0.8); }
-    if (!alive) {
-      if (!R.sinkT) R.sinkT = 0;
-      R.sinkT += dt;
-      if (R.sinkT > 0.8) { R.busy = false; R.root.visible = false; R.sinkT = 0; f.rika = null; return false; }
-    }
-    return true;
-  });
-}
+// Приёмы Проклятого напарника и True Love — в kits.js
 
 // Сброс доменов/Рики между матчами
 export function resetSkills() {
@@ -1748,6 +1349,7 @@ const AW_YUJI = {
   lines: [[1.35, 'YOU’RE SUCH AN ANNOYING BRAT']],
   frames: [[0, POSE.idle.fist], [0.12, POSE.faint], [0.3, POSE.faint], [0.37, PX(POSE.roar, { hy: -0.15 })], [0.75, POSE.roar], [0.86, PX(POSE.idle.fist, { twist: 0.05, hx: -0.15, lax: -0.25, laz: 0.25, rax: -0.25, raz: -0.25 })], [1, POSE.idle.fist]],
   events: [[1.0, (f) => { awakenSmoke(f, true); f.setAwakenLook(true); }]],
+  shrineM1,
   // тёмно-красный дым-аура вокруг силуэта
   tick: (f, dt) => {
     if (Math.random() < dt * 26) {
@@ -1773,16 +1375,19 @@ const AW_SUKUNA = {
       return t < 0.5;
     });
   }]],
+  shrineM1,
   tick: (f, dt) => {
     if (Math.random() < dt * 14) { _a.set(f.pos.x + rand(-1.6, 1.6), f.pos.y + rand(0.3, 7), f.pos.z + rand(-1.6, 1.6)); G.fx.add.spawn(_a.x, _a.y, _a.z, 0, rand(2, 5), 0, Math.random() < 0.5 ? '#ff6a20' : '#ffc080', 0.8, 0.7, 0.1, 0.6); }
   },
+  end: (f) => { f.chant = 0; },
 };
 const RING_POSE = PX(POSE.idle.katana, { lax: -1.9, laz: -0.95, hx: 0.3, cx: 0.1, rax: -0.4 });
 const AW_YUTA = {
   label: 'True Love', heal: 25, color: '#F76BFF', grad: ['#ffc8ff', '#F76BFF'], rim: '#ff6bff', cine: 3.3, mods: { dmg: 1.15 },
   lines: [[0.35, 'COME, RIKA.'], [1.7, 'GIVE ME EVERYTHING.']],
   frames: [[0, POSE.idle.katana], [0.1, RING_POSE], [0.32, RING_POSE], [0.42, POINT_UP], [0.85, POINT_UP], [1, POSE.idle.katana]],
-  events: [[1.0, (f) => { awakenSmoke(f, false); f.setAwakenLook(true); yutaRika(f); G.callout(f, 'Rika: Full Manifestation', '#F76BFF', true); }]],
+  events: [[1.0, (f) => { awakenSmoke(f, false); f.setAwakenLook(true); yutaRika(f); }]],
+  steelJab,
   tick: (f, dt) => {
     if (Math.random() < dt * 10) { _a.set(f.pos.x + rand(-1.3, 1.3), f.pos.y + rand(0.3, 5), f.pos.z + rand(-1.3, 1.3)); G.fx.add.spawn(_a.x, _a.y, _a.z, 0, rand(2, 4), 0, Math.random() < 0.5 ? '#ff8aff' : '#ffffff', 0.8, 0.6, 0.1, 0.6); }
   },
@@ -1792,12 +1397,16 @@ const AW_YUTA = {
 const sShrine = { id: 'shrine', label: 'Malevolent Shrine', tip: 'DOMAIN', cd: 120, windup: 0.6, color: '#ff3050', ai: { kind: 'domain', min: 0, max: 24 }, cast: malevolentShrine };
 const aw = (sk, o) => ({ ...sk, ...o });
 
+// Heian, слот 1: Strong Dismantle; после 1/2/3 заклинаний — Dismantle Barrage / Disgraced Sovereign / World Cutting Slash
+const heianOne = aw(sStrongDismantle, { id: 'sdismantleH', cd: 8 });
+heianOne.pick = (f) => (f.chant >= 3 ? sWCS : f.chant === 2 ? sSovereign : f.chant === 1 ? sKai : heianOne);
+
 // ======================= Таблица персонажей =======================
 export const CHARS = {
   gojo: {
     id: 'gojo', name: 'The Strongest of Today', ru: 'Сильнейший сегодня', stance: 'gojo', m1: 'gojo', hp: 100,
     desc: 'Limitless — телепорт к цели, Lapse Blue притягивает, Reversal Red взрывает, шквал ударов и двойной пинок.',
-    awakenDesc: 'Six Eyes: Blue/Red MAX, Hollow Purple, Infinite Void',
+    awakenDesc: 'Six Eyes: Blue MAX, Red MAX, Hollow Purple, Infinite Void',
     special: gLimitless,
     skills: [gLapseBlue, gRed, gRapid, gTwofold],
     awakenSpecial: gLimitless,
@@ -1805,35 +1414,39 @@ export const CHARS = {
     awaken: AW_GOJO,
   },
   sukuna: {
-    id: 'sukuna', name: 'Strongest of History', ru: 'Сильнейший в истории', stance: 'sukuna', m1: 'sukuna', hp: 100,
-    desc: 'Cleave в упор, режущие волны Dismantle, огненная стрела Open, натиск Rush и мощный разрез.',
-    awakenDesc: 'Heian Form: 4 руки, Kamutoke, Open FURNACE, Гробница Зла',
+    id: 'sukuna', name: 'Strongest of History', ru: 'Сильнейший в истории', stance: 'sukuna', m1: 'fist', hp: 100,
+    desc: 'R Cleave — захват и шквал (40 % HP цели), Dismantle — разрезы на 30 стадов, Open — огненная стрела, Rush — натиск с коленом, Strong Dismantle.',
+    awakenDesc: 'Heian Form: 4 руки и рост 1.4×, заклинания (R), Open FURNACE, Kamutoke, Гробница Зла',
     special: sCleave,
-    skills: [sDismantle, sFuga, sRush, sStrongDismantle],
-    awakenSpecial: sCleave,
-    awakenSkills: [aw(sStrongDismantle, { id: 'sdismantleH', cd: 6 }), aw(sFuga, { id: 'furnace', label: 'Open FURNACE', cd: 16 }), sKamutoke, sShrine],
+    skills: [sDismantle, sOpen, sRush, sStrongDismantle],
+    awakenSpecial: sIncant,
+    awakenSkills: [heianOne, sFurnace, sKamutoke, sShrine],
     awaken: AW_SUKUNA,
   },
   yuji: {
     id: 'yuji', name: 'Vessel', ru: 'Сосуд', stance: 'fist', m1: 'fist', hp: 85,
     desc: 'Финт Combat Instincts, Cursed Strikes, Crushing Blow, Divergent Fist с Чёрной вспышкой и контр-кик Manji.',
-    awakenDesc: 'King Of Curses: Cleave, Dismantle, Open, Rush, Гробница Зла',
+    awakenDesc: 'King Of Curses: разрезы Shrine, Cleave, Dismantle, Open, Rush, Гробница Зла',
     special: yInstincts,
     skills: [yCursedStrikes, yCrushing, yDivergent, yManji],
     awakenSpecial: sCleave,
-    awakenSkills: [sDismantle, aw(sFuga, { id: 'openK', cd: 30 }), sRush, sShrine],
+    awakenSkills: [sDismantle, sOpen, sRush, sShrine],
     awaken: AW_YUJI,
     aiRush: true,
     onCounter: manjiCounter,
   },
   yuta: {
     id: 'yuta', name: 'Cursed Partner', ru: 'Проклятый напарник', stance: 'katana', m1: 'katana', hp: 90,
-    desc: 'Катана и Рика: удар лапой, рывок с разрезом, «Стой!» и луч Чистой Любви.',
-    awakenDesc: 'True Love: Рика полностью появляется и дерётся рядом',
-    special: null,
-    skills: [ySmash, yKDash, ySpeech, yLoveBeam],
-    awakenSkills: [aw(ySmash, { id: 'rdown', label: 'Rika Downslam', cd: 13 }), aw(yKDash, { id: 'elbow', label: 'Elbow Rush', cd: 15 }), aw(ySpeech, { id: 'copy', label: 'Copy: Speech', cd: 15 }), aw(yLoveBeam, { id: 'tlbeam', label: 'True Love Beam', cd: 40 })],
+    desc: 'R — Рика у плеча, ещё раз — её удары. Severing Path (назад — Veilstep), Resolute Slash с Чёрной вспышкой, Outburst с парированием, Second Wind.',
+    awakenDesc: 'True Love: Рика-гигант, стальная рука, Elbow Rush, «Не двигайся!», Energy Ripple, луч',
+    special: yRika,
+    skills: [ySevering, yResolute, yOutburst, ySecondWind],
+    rikaSkills: [yRSmash, yRLaunch, yRHaymaker, null],
+    awakenSpecial: yTLDownslam,
+    awakenSkills: [yElbowRush, yCopySpeech, yEnergyRipple, yTLBeam],
     awaken: AW_YUTA,
+    onCounter: outburstParry,
+    reset: (f) => { f.rikaGhost = null; f.swRetry = 0; },
   },
 };
 export const CHAR_IDS = ['gojo', 'sukuna', 'yuji', 'yuta'];

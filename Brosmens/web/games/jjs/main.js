@@ -13,6 +13,9 @@ import { Fighter, hit, FDASH_CD, SDASH_CD } from './fighter.js';
 import { CHARS, CHAR_IDS, resetSkills } from './skills.js';
 import { Brain } from './bot.js';
 import { createHUD } from './hud.js';
+import { createTopBar } from './topbar.js';
+import { EMOTES } from './emotes.js';
+import { LOOKS, setModelFade } from './rig.js';
 import { rand, clamp, pick, angleDamp, wrapAngle, ease } from './util.js';
 
 const MATCH_TIME = 240, KILL_LIMIT = 15;
@@ -24,8 +27,8 @@ const ui = initGameUI({
   title: 'Jujutsu Brosmens',
   players: () => G.fighters.slice().sort((a, b) => b.kills - a.kills).map((f) => ({ name: f.name, skin: f.skin, score: `${f.kills} уб.` })),
   onReset: () => resetPlayer(),
-  controlsHelp: `<b>Телефон:</b> левая часть экрана — джойстик, свайп справа — камера. Кулак — M1 (4 удара; 4-й в прыжке — апперкот, в падении — удар вниз). Щит — блок (держать), бегун — рывок (вперёд/на месте — рывок с ударом, вбок/назад — уклон; в рэгдолле при полной левой подшкале — уклонение), стрелка — прыжок, звезда — особый навык, замок — Shift-lock. Навыки — ячейки 1–4 внизу; когда шкала пробуждения полная — нажми на неё.<br>
-  <b>ПК:</b> WASD — ход, мышь (зажать) — камера, ЛКМ — M1, F — блок, Q — рывок, Space — прыжок, R — особый навык, 1–4 — навыки, G — пробуждение, Shift — Shift-lock. Держи Space на 4-м ударе — апперкот.`,
+  controlsHelp: `<b>Телефон:</b> левая часть экрана — джойстик, свайп справа — камера, щипок двумя пальцами справа — приблизить/отдалить. Кулак — M1 (4 удара; 4-й в прыжке — апперкот, в падении — удар вниз). Щит — блок (держать), бегун — рывок (вперёд/на месте — рывок с ударом, вбок/назад — уклон; в рэгдолле при полной левой подшкале — уклонение), стрелка — прыжок, звезда — особый навык, замок — Shift-lock (включён: боец смотрит туда же, куда камера; навыки с TARGET бьют того, кто ближе к центру экрана). Навыки — ячейки 1–4 внизу; когда шкала пробуждения полная — нажми на неё. Вверху: «Персонажи» — сменить бойца прямо в бою (пробуждение сбросится), $ — монеты (+$5 за убийство), 🕺 — колесо эмоций.<br>
+  <b>ПК:</b> WASD — ход, мышь (зажать) — камера, колесо/I/O — зум, ЛКМ — M1, F — блок, Q — рывок, Space — прыжок, R — особый навык, 1–4 — навыки, G — пробуждение, Shift — Shift-lock, B — эмоции. Держи Space на 4-м ударе — апперкот.`,
 });
 
 // ---------- рендер ----------
@@ -114,8 +117,9 @@ const ctl = createControls({
 });
 G.ctl = ctl;
 let jumpQueued = false;
-let shiftLock = false;
-try { shiftLock = localStorage.getItem('jjs.shiftlock') === '1'; } catch {}
+// Shift-lock в JJS включён по умолчанию («держите включённым всегда»); выбор игрока запоминается
+let shiftLock = true;
+try { shiftLock = localStorage.getItem('jjs.shiftlock') !== '0'; } catch {}
 const P = () => (state === 'play' && G.player && !G.player.dead && !ui.menuOpen() ? G.player : null);
 ctl.onPress('m1', () => { const p = P(); if (p) { p.m1(); p.lastAttackT = G.time; } });
 ctl.onPress('dash', () => P()?.dash());
@@ -142,6 +146,69 @@ G.hud.setGL(renderer.domElement);
 // ---------- чат ----------
 const chat = createChat({ bots: () => G.fighters.filter((f) => f.bot).map((f) => { f.bot.dead = f.dead; return f.bot; }) });
 G.chat = chat;
+
+// ---------- верхняя панель JJS: Персонажи / $ / эмоции ----------
+let coins = getProfile().coins || 0;
+const topbar = createTopBar({
+  ui,
+  chars: CHAR_IDS.map((id) => ({ id, name: CHARS[id].name, ru: CHARS[id].ru, color: LOOKS[id].color })),
+  emotes: EMOTES,
+  onChar: (id) => switchChar(id),
+  onEmote: (def) => { const p = P(); if (p && !p.emote(def)) ui.toast('Сейчас нельзя', 800); },
+});
+topbar.setCoins(coins);
+topbar.setVisible(false);
+addEventListener('keydown', (e) => {
+  if (e.repeat || e.target.closest?.('input,textarea')) return;
+  if (e.code === 'KeyB' && state === 'play') topbar.toggleWheel();
+  else if (e.code === 'KeyI') camDist = clamp(camDist - 2, 6, 25);
+  else if (e.code === 'KeyO') camDist = clamp(camDist + 2, 6, 25);
+});
+// Смена бойца посреди матча (как в JJS: прогресс пробуждения теряется); раз в 8 с
+let switchT = 0;
+function switchChar(id) {
+  nextChar = id; saveChar(id);
+  topbar.setChar(id);
+  const p = G.player;
+  if (state !== 'play' || !p) return;
+  if (p.dead) { ui.toast(`Возродишься за: ${CHARS[id].name}`, 1400); return; }
+  if (p.charId === id) return;
+  if (G.time < switchT) { ui.toast(`Сменить бойца можно через ${Math.ceil(switchT - G.time)} с`, 1100); return; }
+  if (p.rag || p.down > 0) { ui.toast('Сначала встань на ноги', 1000); return; }
+  const k = p.hp / p.maxHp;
+  p.interrupt(true); p.action = null; p.blocking = false; p.charge = null; p.counter = 0; p.vanish = 0;
+  p.setChar(id);
+  p.hp = Math.max(1, Math.round(p.maxHp * k));
+  p.pose.set(p.idlePose);
+  p.syncModel(0);
+  G.hud.setChar(p);
+  p.chestPos(_t);
+  G.fx.ring(_t, p.look.color, 1, 9, 0.45, { a0: 0.9 });
+  G.fx.particles(_t, { n: 22, normal: true, color: ['#0c0a0e', '#2a2430'], speed: 10, up: 3, size: 2, size1: 4.5, life: 0.7, alpha: 0.8 });
+  G.sound('spawn', p.pos, 0.6);
+  switchT = G.time + 8;
+  ui.toast(`Боец: ${CHARS[id].name} • пробуждение сброшено`, 1600);
+}
+
+// ---------- зум камеры: щипок двумя пальцами на правой половине (свои слушатели, touch.js не трогаем), колесо мыши ----------
+const pinch = new Map();
+let pinchD0 = 1, pinchC0 = 13;
+const isUI = (el) => !!(el && el.closest && el.closest('.tc-btn,.jh-slot,.jh-aw,.ui-top,.bc-wrap,.bc-btn,.rm,.ui-panel,.jt-ew,.jh-scr,.jh-death,button,input'));
+addEventListener('pointerdown', (e) => {
+  if (e.pointerType !== 'touch' || e.clientX < innerWidth * 0.42 || isUI(e.target)) return;
+  pinch.set(e.pointerId, { x: e.clientX, y: e.clientY });
+  if (pinch.size === 2) { const [a, b] = [...pinch.values()]; pinchD0 = Math.max(20, Math.hypot(a.x - b.x, a.y - b.y)); pinchC0 = camDist; }
+});
+addEventListener('pointermove', (e) => {
+  const q = pinch.get(e.pointerId);
+  if (!q) return;
+  q.x = e.clientX; q.y = e.clientY;
+  if (pinch.size >= 2) { const [a, b] = [...pinch.values()]; camDist = clamp(pinchC0 * pinchD0 / Math.max(20, Math.hypot(a.x - b.x, a.y - b.y)), 6, 25); }
+});
+const pinchUp = (e) => { pinch.delete(e.pointerId); };
+addEventListener('pointerup', pinchUp);
+addEventListener('pointercancel', pinchUp);
+addEventListener('wheel', (e) => { if (state === 'play' && !ui.menuOpen()) camDist = clamp(camDist * (e.deltaY > 0 ? 1.1 : 0.9), 6, 25); }, { passive: true });
 let chatNext = 0, idleChat = rand(14, 24);
 G.botEvent = (f, event, opts = {}, prio = false) => {
   if (!f || !f.bot) return;
@@ -221,9 +288,23 @@ G.kill = (vic, att) => {
   if (killer && killer.isPlayer) {
     vic.headPos(_t); G.hud.pop(_t, 'K.O.!', '#ffd23f', 2);
     G.sound('coin', killer.pos, 0.8);
+    // как в JJS: +$5 за каждое убийство
+    addCoins(5); coins += 5; matchCoins += 5;
+    topbar.setCoins(coins); topbar.coinPop('+$5');
+  }
+  // боты иногда «флексят» эмоцией над поверженным (отменяется любым ударом)
+  if (killer && killer.bot && Math.random() < 0.25) {
+    let et = rand(1, 2.5);
+    const k = killer;
+    G.addTask((dt) => {
+      et -= dt;
+      if (et > 0) return !G.matchOver && !k.dead;
+      if (!k.dead && !G.matchOver && k.canAct()) k.emote({ ...pick(EMOTES), dur: rand(2, 3.5) });
+      return false;
+    });
   }
   if (vic.isPlayer) {
-    G.hud.showDeath(killer ? killer.name : '', nextChar, profile.skin.skin, (id) => { nextChar = id; saveChar(id); });
+    G.hud.showDeath(killer ? killer.name : '', nextChar, profile.skin.skin, (id) => { nextChar = id; saveChar(id); topbar.setChar(id); });
     G.sound('lose', vic.pos, 0.4);
   }
   // чат
@@ -235,7 +316,7 @@ const _t = new THREE.Vector3(), _u = new THREE.Vector3(), _w = new THREE.Vector3
 
 // ---------- матч ----------
 let state = 'select';
-let matchTime = MATCH_TIME;
+let matchTime = MATCH_TIME, matchCoins = 0;
 let nextChar = loadChar();
 function loadChar() { try { const c = localStorage.getItem('jjs.char'); return CHARS[c] ? c : 'gojo'; } catch { return 'gojo'; } }
 function saveChar(c) { try { localStorage.setItem('jjs.char', c); } catch {} }
@@ -286,8 +367,9 @@ function startMatch(charId) {
     G.fighters.push(f);
   }
   for (const f of G.fighters) { const [x, z] = bestSpawn(f); f.spawn(x, z); }
-  camYaw = player.yaw; camPitch = -0.2;
-  matchTime = MATCH_TIME;
+  resetCam(player);
+  matchTime = MATCH_TIME; matchCoins = 0; switchT = 0;
+  topbar.setChar(charId); topbar.setVisible(true);
   state = 'play';
   G.hud.showHUD(true);
   G.hud.setChar(player);
@@ -314,11 +396,14 @@ function endMatch() {
   if (state !== 'play') return;
   state = 'end';
   G.matchOver = true;
+  topbar.closeAll();
   const rows = G.fighters.slice().sort((a, b) => b.kills - a.kills || a.deaths - b.deaths);
   const p = G.player;
   const place = rows.indexOf(p) + 1;
-  const coins = 5 + p.kills * 4 + (place === 1 ? 30 : place <= 3 ? 12 : 0);
-  addCoins(coins);
+  // +$5 за убийство уже начислены по ходу матча; в конце — бонус за участие и место
+  const bonus = 5 + (place === 1 ? 30 : place <= 3 ? 12 : 0);
+  addCoins(bonus); coins += bonus; topbar.setCoins(coins);
+  const earned = matchCoins + bonus;
   addStat('jjs', 'matches', 1);
   addStat('jjs', 'kills', p.kills);
   addStat('jjs', 'deaths', p.deaths);
@@ -331,12 +416,14 @@ function endMatch() {
   const loser = rows.slice(1).find((f) => f.bot);
   if (loser) setTimeout(() => chat.botSay(loser.bot, 'lose', { target: winner.name, eventText: `матч закончился, победил ${winner.name}` }), 2600);
   setTimeout(() => {
-    G.hud.showResults(rows, p, coins, () => showSelect(), () => ui.goHome());
+    topbar.setVisible(false);
+    G.hud.showResults(rows, p, earned, () => showSelect(), () => ui.goHome());
   }, 2800);
 }
 
 function showSelect() {
   state = 'select';
+  topbar.setVisible(false);
   G.hud.showHUD(false);
   G.hud.hideDeath();
   G.hud.showSelect(nextChar, profile.skin.skin, (id) => startMatch(id));
@@ -345,9 +432,35 @@ function showSelect() {
 // ---------- игрок и камера ----------
 let camYaw = 0, camPitch = -0.2, camDist = 13, camCur = 13;
 const camPos = new THREE.Vector3(30, 20, 30), camLook = new THREE.Vector3();
+G.camRay = null; // луч из центра экрана: прицел навыков TARGET (не точка касания пальца)
+// Направление камеры, при котором «штанга» (camDist) свободна от стволов, домов и т.п. — при появлении/возрождении
+function clearYaw(p, prefer) {
+  const R = shiftLock ? 1.75 : 1.25, pc = Math.cos(-0.2), ps = Math.sin(-0.2);
+  let best = prefer, bs = -1e9;
+  for (let i = 0; i < 24; i++) {
+    const yaw = prefer + (i / 24) * Math.PI * 2;
+    const dx = Math.sin(yaw) * pc, dz = Math.cos(yaw) * pc;
+    _u.set(p.pos.x - Math.cos(yaw) * R, p.pos.y + 4.1, p.pos.z + Math.sin(yaw) * R);
+    _t.set(-dx, -ps, -dz);
+    const d = Math.min(G.world.rayDist(_u, _t, camDist + 1), camDist + 1);
+    const sc = d - (1 - Math.cos(wrapAngle(yaw - prefer))) * 1.2;
+    if (sc > bs) { bs = sc; best = yaw; }
+  }
+  return wrapAngle(best);
+}
+// Камера при появлении: свободный обзор, FOV 70, без тряски (как в JJS)
+function resetCam(p) {
+  camYaw = clearYaw(p, p.yaw); camPitch = -0.2;
+  p.yaw = camYaw;
+  camLook.set(p.pos.x, p.pos.y + 3.6, p.pos.z);
+  camCur = camDist;
+  fovKick = 0; trauma = 0;
+  if (camera.fov !== 70) { camera.fov = 70; camera.updateProjectionMatrix(); }
+}
 function playerInput(dt) {
   const p = G.player;
   const look = ctl.consumeLook();
+  if (pinch.size >= 2) look.dx = look.dy = 0; // щипок — только зум
   if (state === 'play') {
     camYaw -= look.dx * 0.0058;
     camPitch = clamp(camPitch - look.dy * 0.0045, -1.05, 0.6);
@@ -403,6 +516,8 @@ function updateCamera(dt) {
   camera.position.set(base.x - dx * dist, base.y - dy * dist, base.z - dz * dist);
   if (camera.position.y < 0.8) camera.position.y = 0.8;
   _w.set(base.x + dx * 10, base.y + dy * 10, base.z + dz * 10);
+  const cr = (G.camRay ||= { origin: new THREE.Vector3(), dir: new THREE.Vector3() });
+  cr.origin.copy(camera.position); cr.dir.subVectors(_w, camera.position).normalize();
   // кинематика пробуждения: камера облетает к лицу (3/4 спереди) и возвращается
   const cn = G.cine;
   if (cn) {
@@ -415,7 +530,13 @@ function updateCamera(dt) {
       const fx = Math.sin(f.yaw), fz = Math.cos(f.yaw);
       const zoom = 1 - Math.min(1, cn.t / cn.dur) * 0.18;
       f.headPos(_u); _u.y -= 0.55 * s;
-      const cx = _u.x + (fx * 5.4 - fz * 2.6) * s * zoom, cy = _u.y - 0.25 * s, cz = _u.z + (fz * 5.4 + fx * 2.6) * s * zoom;
+      let cx = _u.x + (fx * 5.4 - fz * 2.6) * s * zoom, cy = _u.y - 0.25 * s, cz = _u.z + (fz * 5.4 + fx * 2.6) * s * zoom;
+      // не залезать в стволы/стены: укорачиваем «штангу» до препятствия
+      _t.set(cx - _u.x, cy - _u.y, cz - _u.z);
+      const cl = _t.length() || 1;
+      _t.multiplyScalar(1 / cl);
+      const free = Math.max(1.4, G.world.rayDist(_u, _t, cl) - 0.5);
+      if (free < cl) { const kk = free / cl; cx = _u.x + (cx - _u.x) * kk; cy = _u.y + (cy - _u.y) * kk; cz = _u.z + (cz - _u.z) * kk; }
       camera.position.set(camera.position.x + (cx - camera.position.x) * k, camera.position.y + (cy - camera.position.y) * k, camera.position.z + (cz - camera.position.z) * k);
       _w.lerp(_u, k);
     }
@@ -453,7 +574,7 @@ function updateButtons() {
   setBtn('block', 'on', p.blocking, (v) => ctl.el('block').classList.toggle('blk', v));
   setBtn('lock', 'on', shiftLock, (v) => ctl.el('lock').classList.toggle('lockon', v));
   // ячейки скрыты во время кинематики пробуждения, в меню и на экране смерти; в меню скрыты и все кнопки
-  const menu = ui.menuOpen();
+  const menu = ui.menuOpen() || topbar.isOpen();
   G.hud.setBoxesHidden(menu || p.dead || (G.cine && G.cine.f === p));
   setBtn('all', 'vis', !menu, (v) => ctl.setVisible(v));
 }
@@ -493,6 +614,7 @@ function simulate(dt) {
         if (f.isPlayer) { if (nextChar !== f.charId) f.setChar(nextChar); G.hud.hideDeath(); G.hud.setChar(f); }
         else if (Math.random() < 0.3) f.setChar(pick(CHAR_IDS));
         respawn(f);
+        if (f.isPlayer) resetCam(f);
       }
     }
     // болтовня
@@ -529,8 +651,20 @@ function simulate(dt) {
   G.world.update(dt);
   G.fx.update(dt, camera);
 }
+// Бойцы ближе ~4 стадов к камере плавно растворяются (как в роблоксе), чтобы не закрывать обзор
+function fadeNearCamera() {
+  const cp = camera.position;
+  for (const f of G.fighters) {
+    if (f.dead) continue;
+    const y0 = f.pos.y, y1 = f.pos.y + 6 * f.scale;
+    const cy = cp.y < y0 ? y0 : cp.y > y1 ? y1 : cp.y;
+    const d = Math.hypot(cp.x - f.pos.x, cp.y - cy, cp.z - f.pos.z) - 1.2;
+    setModelFade(f.model, d < 4 ? clamp((d - 0.6) / 3.4, 0, 1) : 1);
+  }
+}
 function render(dt) {
   updateCamera(dt);
+  if (state !== 'select') fadeNearCamera();
   G.hud.update(dt, camera, state === 'select' ? [] : G.fighters, state === 'select' ? null : G.player);
   // солнце/тень следуют за игроком
   const c = G.player && state !== 'select' ? G.player.pos : camLook;
@@ -562,4 +696,4 @@ showSelect();
 requestAnimationFrame((t) => { last = t; frame(t); });
 
 // для автотестов (не влияет на игру)
-window.__jjs = { G, renderer, startMatch, endMatch, get state() { return state; } };
+window.__jjs = { G, renderer, startMatch, endMatch, switchChar, topbar, get state() { return state; }, get cam() { return { yaw: camYaw, pitch: camPitch, dist: camDist, cur: camCur, shiftLock, fov: camera.fov }; }, setCam(y, p) { camYaw = y; if (p != null) camPitch = p; } };

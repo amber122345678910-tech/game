@@ -303,11 +303,11 @@ export class Fighter {
     if (this.comboT <= 0 || this.combo >= 4) this.combo = 0;
     const n = ++this.combo;
     const last = n === 4;
-    const tgt = this.autoTarget(12, 0.3);
-    if (tgt) this.faceTo(tgt.pos);
-    const style = this.ch.m1;
     // пассив «Shrine» (King of Curses / Heian): M1 — разрезы на 24 стада, без апперкота и удара вниз
     const shrine = this.awakened > 0 && this.ch.awaken.shrineM1;
+    const tgt = this.autoTarget(shrine ? 24 : 12, 0.3);
+    if (tgt) this.faceTo(tgt.pos);
+    const style = this.ch.m1;
     if (style === 'katana') this.drawKatana();
     // 4-й удар: вариант по вертикальной скорости (спека §5.1)
     let variant = 'neutral';
@@ -562,9 +562,12 @@ export class Fighter {
 
   // ---------- навыки ----------
   skillDef(i) {
-    if (this.awakened > 0 && this.ch.awakenSkills && this.ch.awakenSkills[i]) return this.ch.awakenSkills[i];
-    if (this.rikaMode === 2 && this.awakened <= 0 && this.ch.rikaSkills) return this.ch.rikaSkills[i] || null;
-    return this.ch.skills[i];
+    let sk;
+    if (this.awakened > 0 && this.ch.awakenSkills && this.ch.awakenSkills[i]) sk = this.ch.awakenSkills[i];
+    else if (this.rikaMode === 2 && this.awakened <= 0 && this.ch.rikaSkills) sk = this.ch.rikaSkills[i] || null;
+    else sk = this.ch.skills[i];
+    // варианты по состоянию (Heian: число заклинаний меняет приём слота 1)
+    return sk && sk.pick ? sk.pick(this) : sk;
   }
   specialDef() { return this.awakened > 0 && this.ch.awakenSpecial ? this.ch.awakenSpecial : this.ch.special || null; }
   clearM1Recovery() {
