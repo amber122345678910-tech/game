@@ -35,3 +35,63 @@ export function horn() {
     }
   }
 }
+
+// общий выход с громкостью из настроек; null — звук выключен или ещё не разрешён
+function out(gain) {
+  const st = getSettings();
+  if (!st.sound || !st.volume) return null;
+  const ctx = sfx.unlock && sfx.unlock();
+  if (!ctx) return null;
+  const g = ctx.createGain();
+  g.gain.value = gain * (st.volume / 10);
+  g.connect(ctx.destination);
+  return { ctx, g, t0: ctx.currentTime + 0.01 };
+}
+let noiseBuf = null;
+function noiseSrc(ctx) {
+  if (!noiseBuf) {
+    noiseBuf = ctx.createBuffer(1, ctx.sampleRate * 2, ctx.sampleRate);
+    const d = noiseBuf.getChannelData(0);
+    for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+  }
+  const s = ctx.createBufferSource(); s.buffer = noiseBuf; return s;
+}
+
+// запуск ракеты: нарастающий рёв двигателя (шум через полосовой фильтр, частота вверх)
+export function nukeLaunch(big = false) {
+  const o = out(big ? 0.4 : 0.3); if (!o) return;
+  const { ctx, g, t0 } = o, dur = big ? 1.6 : 1.1;
+  const s = noiseSrc(ctx), f = ctx.createBiquadFilter(), e = ctx.createGain();
+  f.type = 'bandpass'; f.Q.value = 1.4;
+  f.frequency.setValueAtTime(260, t0); f.frequency.exponentialRampToValueAtTime(2400, t0 + dur);
+  e.gain.setValueAtTime(0.0001, t0); e.gain.exponentialRampToValueAtTime(0.9, t0 + 0.12); e.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+  s.connect(f).connect(e).connect(g); s.start(t0, Math.random()); s.stop(t0 + dur + 0.05);
+}
+
+// взрыв: глухой удар (синус вниз) и долгий низкочастотный рокот; far — тише и глуше
+export function nukeBoom(big = false, far = false) {
+  const o = out((big ? 0.75 : 0.55) * (far ? 0.35 : 1)); if (!o) return;
+  const { ctx, g, t0 } = o, dur = big ? 3.2 : 2.0;
+  const os = ctx.createOscillator(), oe = ctx.createGain();
+  os.type = 'sine'; os.frequency.setValueAtTime(95, t0); os.frequency.exponentialRampToValueAtTime(24, t0 + dur * 0.7);
+  oe.gain.setValueAtTime(0.0001, t0); oe.gain.exponentialRampToValueAtTime(1, t0 + 0.02); oe.gain.exponentialRampToValueAtTime(0.0001, t0 + dur * 0.75);
+  os.connect(oe).connect(g); os.start(t0); os.stop(t0 + dur);
+  const s = noiseSrc(ctx), f = ctx.createBiquadFilter(), e = ctx.createGain();
+  f.type = 'lowpass'; f.frequency.setValueAtTime(far ? 500 : 1500, t0); f.frequency.exponentialRampToValueAtTime(60, t0 + dur);
+  e.gain.setValueAtTime(0.0001, t0); e.gain.exponentialRampToValueAtTime(1, t0 + 0.015); e.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+  s.connect(f).connect(e).connect(g); s.start(t0, Math.random()); s.stop(t0 + dur + 0.05);
+}
+
+// тревога «ядерная угроза»: два коротких воя сирены
+export function siren() {
+  const o = out(0.16); if (!o) return;
+  const { ctx, g, t0 } = o;
+  for (let k = 0; k < 2; k++) {
+    const os = ctx.createOscillator(), e = ctx.createGain(), t = t0 + k * 0.9;
+    os.type = 'square';
+    os.frequency.setValueAtTime(520, t); os.frequency.linearRampToValueAtTime(880, t + 0.42); os.frequency.linearRampToValueAtTime(520, t + 0.84);
+    e.gain.setValueAtTime(0.0001, t); e.gain.exponentialRampToValueAtTime(0.6, t + 0.05); e.gain.setValueAtTime(0.6, t + 0.7); e.gain.exponentialRampToValueAtTime(0.0001, t + 0.86);
+    const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 1800;
+    os.connect(lp).connect(e).connect(g); os.start(t); os.stop(t + 0.9);
+  }
+}

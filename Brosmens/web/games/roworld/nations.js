@@ -84,3 +84,38 @@ export function acc(name) {
     return w;
   }).join(' ');
 }
+
+// род для согласования глаголов: «Аргентина захватила», «Иран захватил», «Перу захватило», «США захватили»
+const GENDER = { 'США': 'pl', 'Перу': 'n', 'Марокко': 'n', 'Сибирь': 'f', 'ЮАР': 'f', 'ДР Конго': 'f' };
+export function gender(name, kind) {
+  if (kind === 2) return 'n';            // племя
+  if (kind === 0) return 'm';            // игрок (ник)
+  if (GENDER[name]) return GENDER[name];
+  return /[ая]$/.test(name) ? 'f' : 'm';
+}
+// прошедшее время / краткое причастие мужского рода → нужный род: past('захватил', 'f') = 'захватила'
+export function past(word, g) { return g === 'f' ? word + 'а' : g === 'n' ? word + 'о' : g === 'pl' ? word + (/н$/.test(word) ? 'ы' : 'и') : word; }
+
+// родительный и дательный падежи для названий: «от Монголии», «ПВО Ирана», «близко к Канаде».
+// Ники игроков и аббревиатуры не склоняются; у племени склоняется только слово «Племя».
+const NODECL = /^(США|ЮАР|Перу|Марокко|ДР Конго)$/;
+function declWord(w, gen) {
+  if (!/[а-яё]$/.test(w) || /^[А-ЯЁ]{2,}$/.test(w)) return w;
+  if (w === 'Египет') return gen ? 'Египта' : 'Египту';
+  if (/ая$/.test(w)) return w.slice(0, -2) + 'ой';                 // Саудовская → Саудовской
+  if (/ия$/.test(w)) return w.slice(0, -2) + 'ии';                 // Монголия → Монголии
+  if (/[гкхжшщч]а$/.test(w)) return w.slice(0, -1) + (gen ? 'и' : 'е'); // Аляска → Аляски / Аляске
+  if (/а$/.test(w)) return w.slice(0, -1) + (gen ? 'ы' : 'е');       // Канада → Канады / Канаде
+  if (/я$/.test(w)) return w.slice(0, -1) + (gen ? 'и' : 'е');
+  if (/ь$/.test(w)) return w.slice(0, -1) + 'и';                    // Сибирь → Сибири
+  if (/й$/.test(w)) return w.slice(0, -1) + (gen ? 'я' : 'ю');       // Китай → Китая / Китаю
+  if (/[оуеиюэы]$/.test(w)) return w;
+  return w + (gen ? 'а' : 'у');                                     // Иран → Ирана / Ирану
+}
+function decl(name, kind, gen) {
+  if (kind === 0 || NODECL.test(name) || !/[а-яё]/.test(name)) return name;
+  if (kind === 2) return name.replace(/^Племя/, gen ? 'Племени' : 'Племени');
+  return name.split(' ').map((w) => declWord(w, gen)).join(' ');
+}
+export const genName = (p) => decl(p.name, p.kind, true);
+export const datName = (p) => decl(p.name, p.kind, false);

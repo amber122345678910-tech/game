@@ -1,19 +1,19 @@
 // BroWorld [World PvP] — точка входа: интерфейс как у оригинала на телефоне (круглые кнопки слева сверху,
 // плашка таймера и места справа, нижняя панель, карточка цели, радиальное меню, лист построек),
 // этап выбора столицы, «НАЧАЛАСЬ ВОЙНА», 5:00 защиты, 40:00 матча, выбывание с наблюдением и экран итогов.
-import { initGameUI, pixelRatio } from '../../shared/ui.js';
+import { initGameUI, pixelRatio, shakeEnabled } from '../../shared/ui.js';
 import { createChat } from '../../shared/chat.js';
 import { makeBots, FRIENDS, pick, rand, typingDelay } from '../../shared/bots.js';
 import { sfx } from '../../shared/sfx.js';
 import { getProfile, addCoins, addStat } from '../../shared/profile.js';
 import { aiEnabled, aiBotLine } from '../../shared/ai.js';
 import { buildWorld, W } from './world.js';
-import { NATIONS, tribeNames, pastel, ownerColors, acc as accName, PLAYER_COLOR, CLAUDE_COLOR, TRIBE_COLOR } from './nations.js';
-import { Game, KIND, fmt, fmtT, TICK, MATCH_TICKS, PROT_TICKS, WIN_SHARE, STRUCTS, SPAWN_GAP, TRIBE_GAP, BOAT_MAX } from './game.js';
+import { NATIONS, tribeNames, pastel, ownerColors, acc as accName, gender, past, genName, datName, PLAYER_COLOR, CLAUDE_COLOR, TRIBE_COLOR } from './nations.js';
+import { Game, KIND, fmt, fmtT, TICK, MATCH_TICKS, PROT_TICKS, WIN_SHARE, STRUCTS, SPAWN_GAP, TRIBE_GAP, BOAT_MAX, NUKES } from './game.js';
 import { setupBrain, aiAcceptAlly, spawnOk, pickSpawnTile } from './brains.js';
 import { Renderer } from './render.js';
 import { openRadial, closeRadial, radialOpen, hover as radialHover, release as radialRelease } from './radial.js';
-import { horn } from './sounds.js';
+import { horn, nukeLaunch, nukeBoom, siren } from './sounds.js';
 
 const N_BOTS = 12, N_NATIONS = 42, N_TRIBES = 190;
 const RATIOS = [0.1, 0.25, 0.35, 0.5, 0.75];
@@ -26,8 +26,9 @@ const HELP = `<b>Цель:</b> захвати 80% суши мира (вне ра
 <b>Атака:</b> тапни соседа — откроется карточка цели, жми «⚔ Атаковать». Повторная атака добавляет войска к идущей.<br>
 <b>Своя земля или долгое нажатие</b> — радиальное меню: атака, десант, союз, постройки, камера.<br>
 <b>Войска</b> растут сами, быстрее всего — около 40% от лимита. <b>Золото</b> (+1K/с) — на постройки: кнопка «Строить» или клавиши 1–7.<br>
+<b>Ядерка:</b> построй ракетную шахту (6) — и бей атомной (8), водородной (9) или MIRV (0): «Строить» или «Ядерка» в радиальном меню. Воронки становятся радиацией. ПВО (5) сбивает ракеты рядом с собой.<br>
 <b>Карта:</b> перетаскивай пальцем, щипок — зум, двойной тап — приблизить. 🌐 — вид «свои / союзники / враги».<br>
-<b>ПК:</b> Q/E — доля войск, B — постройки, 1–7 — выбрать постройку, Esc/X — отмена, +/− — зум.<br>
+<b>ПК:</b> Q/E — доля войск, B — постройки, 1–0 — постройка или ядерка, Esc/X — отмена, +/− — зум, пробел — 🌐.<br>
 <small>Карта: Natural Earth (public domain), рельеф: NASA Visible Earth / GEBCO.</small>`;
 const profile = getProfile();
 const ui = initGameUI({ title: 'BroWorld [World PvP]', players: () => playersList(), controlsHelp: HELP });
@@ -39,7 +40,8 @@ const mmss = (s) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart
 const canvas = $('map');
 const R = new Renderer(canvas, pixelRatio);
 addEventListener('resize', () => R.resize());
-ui.onSettings(() => R.resize());
+ui.onSettings(() => { R.resize(); R.shakeOn = shakeEnabled(); });
+R.shakeOn = shakeEnabled();
 
 let world = null, game = null, me = null, claude = null;
 let phase = 'load'; // load | title | pick | play | out | spectate | over
@@ -66,6 +68,8 @@ const CUSTOM = {
   refuseAlly: { nice: ['не, я сам по себе', 'может позже', 'хм, нет пока'], toxic: ['с тобой? не', 'союз с нубом? нет', 'ты мне не нужен'] },
   eaten: { nice: ['эх, меня съели', 'ну всё, я всё', 'гг, я выбыл'], toxic: ['ЛАГИ', 'это нечестно, у тебя войск в 10 раз больше', 'ну и ладно, скучная игра', 'репорт'] },
   betrayed: { nice: ['ты чего?? мы же были в союзе', 'вот так, значит…', 'эй, предатель!'], toxic: ['ПРЕДАТЕЛЬ', 'ну всё, тебе конец', 'запомню это', 'крыса'] },
+  nuked: { nice: ['ядерка?? серьёзно?', 'моя столица… 😭', 'за что?!', 'ну и радиация теперь у меня'], toxic: ['ЗА ЧТО ЯДЕРКА', 'ну ты и токсик', 'репорт за ядерку', 'всё, ты мой враг навсегда'] },
+  nukeAt: { nice: ['прости, так надо ☢', 'ничего личного, это стратегия'], toxic: ['лови подарок ☢', 'бум 💥', 'попробуй теперь выжить', 'изи, ядерка решает'] },
 };
 const CLAUDE_LINES = {
   start: ['привет! я рядом — вместе захватим мир 🌍', 'Клод на связи! прикрою твой фланг', 'погнали! сначала тапай по свободной земле — растём, пока она ничья'],
@@ -294,7 +298,7 @@ function pickSpawn(sx, sy) {
   const t = world.nearest(t0, 6, playerSpawnOk);
   if (t < 0) {
     const q = nearestFoe(t0);
-    tapToast(sx, sy, q ? `ⓘ Слишком близко к ${q.kind === KIND.NATION ? accName(q.name) : q.name}` : 'ⓘ Здесь нельзя — выбери другое место', true);
+    tapToast(sx, sy, q ? `ⓘ Слишком близко к ${nd(q)}` : 'ⓘ Здесь нельзя — выбери другое место', true);
     sfx.play('block', { vol: 0.4 });
     return;
   }
@@ -372,6 +376,8 @@ function sys(text, force = false) { const t = nowS(); if (!force && t < sysNext)
 const lastHitTalk = {};
 const SNAME = { city: 'город', port: 'порт', factory: 'завод', post: 'оборонный пост', sam: 'ПВО', silo: 'ракетную шахту' };
 const nm = (p) => esc(p.kind === KIND.NATION ? accName(p.name) : p.name); // винительный падеж для наций
+const vb = (p, word) => past(word, gender(p.name, p.kind)); // «Аргентина захватила», «Иран захватил»
+const ng = (p) => esc(genName(p)), nd = (p) => esc(datName(p)); // «от Монголии», «к Канаде»
 function onEvent(type, d) {
   switch (type) {
     case 'tiles': R.onTiles(d.buf, d.n); break;
@@ -398,28 +404,28 @@ function onEvent(type, d) {
       if (d.a.owner === me && d.why === 'retreat') feed(`Войска вернулись домой (+${fmtT(d.back)})`, 'faded', 'ⓘ', 3500);
       break;
     case 'boat':
-      if (d.b.target === me) { feed(`${esc(d.b.owner.name)} отправил десант к твоему берегу`, 'bad', '⊕', 7000); sfx.play('heavy', { vol: 0.25 }); }
+      if (d.b.target === me) { feed(`${esc(d.b.owner.name)} ${vb(d.b.owner, 'отправил')} десант к твоему берегу`, 'bad', '⊕', 7000); sfx.play('heavy', { vol: 0.25 }); }
       break;
     case 'boatLand':
-      if (d.b.owner === me) feed(d.target ? `Твой десант высадился на землю ${esc(d.target.name)}` : 'Твой десант высадился', 'good', '⛵', 4000);
-      else if (d.target === me) { feed(`${esc(d.b.owner.name)} высадил войска на твоём берегу!`, 'bad', '⊕', 7000); sfx.play('heavy', { vol: 0.3 }); }
+      if (d.b.owner === me) feed(d.target ? `Твой десант высадился на землю ${ng(d.target)}` : 'Твой десант высадился', 'good', '⛵', 4000);
+      else if (d.target === me) { feed(`${esc(d.b.owner.name)} ${vb(d.b.owner, 'высадил')} войска на твоём берегу!`, 'bad', '⊕', 7000); sfx.play('heavy', { vol: 0.3 }); }
       break;
     case 'boatHome':
       if (d.b.owner === me) feed('Твой десант вернул войска домой', 'faded', 'ⓘ', 3500);
       break;
     case 'boatSunk':
-      if (d.b.owner === me) feed(`Корабль ${esc(d.by.name)} потопил твой десант`, 'loss', '✕', 5000);
-      else if (d.by === me) feed(`Твой корабль потопил десант ${esc(d.b.owner.name)}`, 'good', '⚓', 4000);
+      if (d.b.owner === me) feed(`Корабль ${ng(d.by)} потопил твой десант`, 'loss', '✕', 5000);
+      else if (d.by === me) feed(`Твой корабль потопил десант ${ng(d.b.owner)}`, 'good', '⚓', 4000);
       break;
     case 'shipSunk':
-      if (d.s.owner === me) feed(`${esc(d.by.name)} потопил твой военный корабль`, 'loss', '✕', 5000);
-      else if (d.by === me) feed(`Твой корабль потопил корабль ${esc(d.s.owner.name)}`, 'good', '⚓', 4000);
+      if (d.s.owner === me) feed(`${esc(d.by.name)} ${vb(d.by, 'потопил')} твой военный корабль`, 'loss', '✕', 5000);
+      else if (d.by === me) feed(`Твой корабль потопил корабль ${ng(d.s.owner)}`, 'good', '⚓', 4000);
       break;
     case 'eliminated': onEliminated(d); break;
     case 'capture': {
       const s = d.s;
-      if (d.to === me && d.from && !d.destroyed) feed(`Ты захватил ${SNAME[s.type]} у ${esc(d.from.name)}`, 'good', '♛', 4000);
-      else if (d.from === me && d.to) feed(d.destroyed ? `${esc(d.to.name)} разрушил твой ${SNAME[s.type]}` : `${esc(d.to.name)} захватил твой ${SNAME[s.type]}`, 'loss', '✕', 6000);
+      if (d.to === me && d.from && !d.destroyed) feed(`Ты захватил ${SNAME[s.type]} у ${ng(d.from)}`, 'good', '♛', 4000);
+      else if (d.from === me && d.to) feed(d.destroyed ? `${esc(d.to.name)} ${vb(d.to, 'разрушил')} твой ${SNAME[s.type]}` : `${esc(d.to.name)} ${vb(d.to, 'захватил')} твой ${SNAME[s.type]}`, 'loss', '✕', 6000);
       break;
     }
     case 'build':
@@ -434,22 +440,80 @@ function onEvent(type, d) {
       break;
     case 'defense': R.repaintArea(d.s.tile, STRUCTS.post.range + 1); break;
     case 'ally':
-      if (d.a === me || d.b === me) { const o = d.a === me ? d.b : d.a; if (phase === 'play') feed(`Теперь ты в союзе с ${esc(o.name)}`, 'good', '🤝', 4500); }
+      if (d.a === me || d.b === me) { const o = d.a === me ? d.b : d.a; if (phase === 'play') feed(`Союз заключён: ${esc(o.name)}`, 'good', '🤝', 4500); }
       break;
     case 'betray':
-      if (d.p === me) feed(`Ты разорвал союз с ${esc(d.q.name)}. 30 с ты предатель: атаки на тебя стоят вдвое меньше войск.`, 'info', 'ⓘ', 7000);
-      else if (d.q === me) feed(`${esc(d.p.name)} предал тебя!`, 'bad', '✕', 7000);
+      if (d.p === me) feed(`Ты разорвал союз (${esc(d.q.name)}). 30 с ты предатель: атаки на тебя стоят вдвое меньше войск.`, 'info', 'ⓘ', 7000);
+      else if (d.q === me) feed(`${esc(d.p.name)} ${vb(d.p, 'предал')} тебя!`, 'bad', '✕', 7000);
       break;
     case 'donate':
-      if (d.p === me) feed(`Ты отдал ${fmtT(d.troops)} войск ${esc(d.q.name)}`, 'info', '🎁', 3500);
-      else if (d.q === me) feed(`${esc(d.p.name)} прислал тебе ${fmtT(d.troops)} войск`, 'good', '🎁', 4000);
+      if (d.p === me) feed(`Ты отдал ${fmtT(d.troops)} войск ${nd(d.q)}`, 'info', '🎁', 3500);
+      else if (d.q === me) feed(`${esc(d.p.name)} ${vb(d.p, 'прислал')} тебе ${fmtT(d.troops)} войск`, 'good', '🎁', 4000);
       break;
     case 'enclave':
-      if (d.to === me) feed(`Окружённая земля ${esc(d.from.name)} теперь твоя`, 'good', '♛', 3500);
-      else if (d.from === me) feed(`${esc(d.to.name)} забрал твою окружённую землю`, 'loss', '✕', 4500);
+      if (d.to === me) feed(`Окружённая земля ${ng(d.from)} теперь твоя`, 'good', '♛', 3500);
+      else if (d.from === me) feed(`${esc(d.to.name)} ${vb(d.to, 'забрал')} твою окружённую землю`, 'loss', '✕', 4500);
       break;
+    case 'heat': R.onHeat(d.list); break;
+    case 'nuke': onNuke(d.n); break;
+    case 'mirvSplit':
+      if (d.n.target === me) { feed(`MIRV ${ng(d.n.owner)} разделился: ${d.k} боеголовок летят на тебя!`, 'bad', '☢', 8000); siren(); }
+      else if (d.n.owner === me && d.n.target) feed(`Твой MIRV разделился над землёй ${ng(d.n.target)}: ${d.k} боеголовок`, 'good', '☢', 5000);
+      break;
+    case 'intercept': {
+      const n = d.n, N = NUKES[n.type];
+      R.ring(d.x, d.y, '#ffffff', 40, 0.8);
+      if (n.owner === me) feed(n.type === 'warhead' ? `ПВО ${ng(d.by)} сбивает твои боеголовки` : `ПВО ${ng(d.by)} сбила твою ${N.gen}`, 'loss', '✕', 5000);
+      else if (d.by === me) { feed(n.type === 'warhead' ? 'Твоя ПВО сбивает боеголовки MIRV' : `Твоя ПВО сбила ${N.gen} ${ng(n.owner)}`, 'good', '🛡', 5000); sfx.play('coin', { vol: 0.3 }); }
+      break;
+    }
+    case 'nukeHit': onNukeHit(d); break;
     case 'end': endGame(d); break;
   }
+}
+// ---------------- ядерные удары: ленты, звук, тряска ----------------
+function onNuke(n) {
+  const N = NUKES[n.type], p = n.owner, q = n.target;
+  if (p === me) { nukeLaunch(n.type !== 'atom'); return; }
+  if (q === me || game.owner[n.tile] === me.id) {
+    feed(`${esc(p.name)} ${vb(p, 'запустил')} ${N.gen} по тебе!`, 'bad', '☢', 8000);
+    siren();
+    if (p.leader && !p.isClaude) talk(p, 'nukeAt', `ты запустил ядерную бомбу по стране игрока ${profile.name}`, true);
+    if (claude.alive && Math.random() < 0.5) setTimeout(() => talk(claude, 'help', `по игроку летит ядерная бомба от ${p.name}, поддержи его`, true), 3000);
+  } else if (n.type !== 'atom') feed(`${esc(p.name)} ${vb(p, 'запустил')} ${N.gen}${q ? ` · цель: ${esc(q.name)}` : ''}`, 'faded', 'ⓘ', 4500);
+}
+function onNukeHit({ n, hits, lost }) {
+  const N = NUKES[n.type], big = n.type === 'hydro', head = n.type === 'warhead';
+  R.boom(n.tx, n.ty, N.outer, !head);
+  const [sx, sy] = R.w2s(n.tx, n.ty), vis = sx > -80 && sy > -80 && sx < R.w + 80 && sy < R.h + 80;
+  if (!head || Math.random() < 0.1) nukeBoom(big, !vis);
+  if (vis) R.shake(big ? 10 : head ? 1.5 : 6);
+  const myHit = hits.get(me) || 0, myLost = lost.get(me) || 0;
+  if ((myHit || myLost) && n.owner !== me) {
+    if (head) feed(`Боеголовки MIRV ${ng(n.owner)} падают на твою землю`, 'bad', '☢', 6000);
+    else { feed(`${N.name} от ${ng(n.owner)} упала на твою землю${myLost ? ` · −${myLost} ${myLost === 1 ? 'постройка' : myLost < 5 ? 'постройки' : 'построек'}` : ''}`, 'bad', '☢', 7000); sfx.play('heavy', { vol: 0.4 }); }
+  } else if (n.owner === me && !head) {
+    const vict = [...hits.keys()].filter((q) => q !== me && q.kind !== KIND.TRIBE);
+    feed(`${N.name} попала: ${vict.length ? vict.slice(0, 2).map((q) => esc(q.name)).join(', ') : 'ничья земля'}`, 'good', '☢', 4500);
+    for (const q of vict) if (q.leader && !q.isClaude) { talk(q, 'nuked', `игрок ${profile.name} сбросил ядерную бомбу на твою страну`, true); break; }
+  }
+}
+const NUKE_WHY = { silo: 'ⓘ Требуется ракетная шахта', reload: 'ⓘ Шахта перезаряжается', friend: 'ⓘ Клод — твой друг, его не трогаем', immune: '🛡 Цель под защитой', mirv: 'ⓘ MIRV — только по чужой стране', far: 'ⓘ Выбери цель на карте', dead: '' };
+const nukeWhy = (r, cost) => (r === 'gold' ? `ⓘ Нужно ${fmt(cost)} золота` : NUKE_WHY[r] || 'ⓘ Сейчас нельзя');
+function launchAt(type, t, sx, sy) {
+  const r = game.launchNuke(me, type, t);
+  if (!r.ok) { tapToast(sx, sy, nukeWhy(r.reason, r.cost), true); sfx.play('block', { vol: 0.35 }); return false; }
+  const q = r.n.target;
+  tapToast(sx, sy, `☢ ${NUKES[type].name} → ${q ? esc(q.name) : game.isLand(t) ? 'ничья земля' : 'море'}`);
+  return true;
+}
+function openNukeRadial(t, sx, sy) {
+  const L = { atom: 'Атомная', hydro: 'Водородная', mirv: 'MIRV' };
+  const items = ['atom', 'hydro', 'mirv'].map((type) => {
+    const why = game.canNuke(me, type, t), c = game.nukeCost(type), self = game.selfHit(me, type, t) >= 20;
+    return { id: type, icon: SVG[type].replace(/width="\d+" height="\d+"/, 'width="20" height="20"'), label: L[type], off: !!why, salmon: true, hint: why ? nukeWhy(why, c) : `${NUKES[type].name} • ${fmt(c)}${self ? ' • ⚠ заденет тебя' : ''}` };
+  });
+  openRadial(sx, sy, { title: '☢ Ядерный удар', color: '#F2727F', items, hint: 'Выбери оружие', onPick: (type) => { sfx.play('ui', { vol: 0.35 }); launchAt(type, t, sx, sy); } });
 }
 function onEliminated(d) {
   const { v, by, gold } = d;
@@ -462,7 +526,7 @@ function onEliminated(d) {
     if (gold > 0 && L) R.text(L.x, L.y + 8, `+${fmt(gold)}`, '#FBE99F', 15, 2.5);
     if (v.leader && !v.isClaude) talk(v, 'eaten', `игрок ${profile.name} уничтожил твою страну`, true);
   } else if (v.kind !== KIND.TRIBE) {
-    feed(`${esc(v.name)} уничтожена · ${by ? esc(by.name) : '…'}`, 'faded', 'ⓘ', 4000);
+    feed(`${esc(v.name)} ${vb(v, 'уничтожен')}${by ? ` · ${esc(by.name)}` : ''}`, 'faded', 'ⓘ', 4000);
     if (v === claude) talk(claude, 'lose', 'твою страну уничтожили, но игрок ещё в игре', true);
     else if (v.leader && Math.random() < 0.5) talk(v, 'lose', `твою страну уничтожил ${by ? by.name : 'кто-то'}`);
   }
@@ -472,7 +536,7 @@ function onEliminated(d) {
 function playerFell(by) {
   if (phase !== 'play') return;
   phase = 'out';
-  closeCard(); closeSheet(); cancelPlacing(); closeRadial(); setHint('');
+  closeCard(); closeSheet(); cancelPlacing(); closeRadial(); setHint(''); hideNukeAlert();
   sfx.play('death', { vol: 0.7 });
   if (by && by.leader && !by.isClaude) talk(by, 'kill', `ты уничтожил страну игрока ${profile.name}`, true);
   if (claude.alive) setTimeout(() => talk(claude, 'fallen', 'страну игрока уничтожили, подбодри его', true), 3000);
@@ -483,7 +547,7 @@ function playerFell(by) {
     if (phase !== 'out') return;
     f.classList.remove('go');
     f.innerHTML = `<div class="ocard pnl"><div class="mc">ТЫ ВЫБЫЛ ИЗ МАТЧА</div><div class="res def">ВЫБЫЛ</div>
-      <div class="sub">${by ? `Твою страну захватил <b>${esc(by.name)}</b>.` : 'Твоя страна пала.'} Пик: ${pct(me.peakTiles)} суши.</div>
+      <div class="sub">${by ? `Твою страну ${vb(by, 'захватил')} <b>${esc(by.name)}</b>.` : 'Твоя страна пала.'} Пик: ${pct(me.peakTiles)} суши.</div>
       <div class="btns"><button id="fWatch">👁 Смотреть</button><button class="gray" id="fMenu">↪ В меню</button></div></div>`;
     $('fWatch').onclick = () => { sfx.play('ui'); f.classList.add('hidden'); spectate(); };
     $('fMenu').onclick = () => { sfx.play('ui'); f.classList.add('hidden'); leaveMatch(); };
@@ -569,7 +633,7 @@ function sendBoatTo(t, sx, sy) {
 }
 function failToast(reason, target, sx, sy) {
   const msg = reason === 'immune' ? `🛡 ${target ? esc(target.name) : 'Цель'} под защитой ещё ${mmss(Math.max(1, (target && target.kind !== KIND.HUMAN ? 50 : game.protLeft) * TICK))}`
-    : reason === 'far' ? (target ? `ⓘ Нет общей границы с ${esc(target.name)}` : 'ⓘ Рядом нет свободной земли')
+    : reason === 'far' ? (target ? `ⓘ ${esc(target.name)} не граничит с тобой` : 'ⓘ Рядом нет свободной земли')
     : reason === 'ally' ? 'ⓘ Это твой союзник' : reason === 'boats' ? `ⓘ Уже ${BOAT_MAX} десанта в пути`
     : reason === 'noroute' ? 'ⓘ Туда не доплыть — нет выхода к морю' : 'ⓘ Мало войск. Дай им вырасти';
   tapToast(sx, sy, msg, true); sfx.play('block', { vol: 0.35 });
@@ -663,7 +727,7 @@ function askAlly(q, x, y) {
 function doDonate(q, x, y) {
   const n = game.donate(me, q, me.troops / 3);
   if (n > 0) { tapToast(x, y, `🎁 ${esc(q.name)}: +${fmtT(n)} войск`); sfx.play('coin', { vol: 0.35 }); }
-  else tapToast(x, y, game.tickN - me.donateAt < 100 ? 'ⓘ Подожди немного перед новой помощью' : `ⓘ У ${esc(q.name)} и так полно войск`, true);
+  else tapToast(x, y, game.tickN - me.donateAt < 100 ? 'ⓘ Подожди немного перед новой помощью' : `ⓘ У ${ng(q)} и так полно войск`, true);
 }
 
 // ---------------- радиальное меню (тап по своей земле или долгое нажатие) ----------------
@@ -683,8 +747,8 @@ const RI = {
 function openRadialAt(t, sx, sy) {
   if (phase !== 'play') return;
   const id = t >= 0 && game.isLand(t) ? game.owner[t] : -1, q = id > 0 ? game.P[id] : null, n = fmtT(sendN()), pr = Math.round(ratio * 100);
-  const hasSilo = game.countOf(me, 'silo') > 0;
-  const nuke = { id: 'nuke', icon: RI.nuke, label: 'Ядерка', off: true, salmon: true, hint: hasSilo ? 'Ядерные удары — скоро' : 'ⓘ Требуется ракетная шахта' };
+  const hasSilo = game.silosOf(me) > 0;
+  const nuke = { id: 'nuke', icon: RI.nuke, label: 'Ядерка', off: !hasSilo || (q && game.nukeSpares(me, q)), salmon: true, hint: !hasSilo ? 'ⓘ Требуется ракетная шахта' : q && game.nukeSpares(me, q) ? (q.isClaude ? 'ⓘ Клод — твой друг' : '🛡 Под защитой') : 'Ядерный удар' };
   const focus = { id: 'focus', icon: RI.focus, label: 'Камера', hint: 'Камера сюда' };
   let items, title, color = '#fff';
   if (q === me) {
@@ -728,6 +792,7 @@ function radialPick(k, q, t, sx, sy) {
   sfx.play('ui', { vol: 0.35 });
   if (k.startsWith('b:')) { const type = k.slice(2); const r = game.build(me, type, t); buildResult(r, type, sx, sy); return; }
   if (k === 'sheet') { openSheet(); return; }
+  if (k === 'nuke') { setTimeout(() => openNukeRadial(t, sx, sy), 30); return; }
   if (k === 'focus') { const [x, y] = R.s2w(sx, sy); R.flyTo(x, y, Math.max(R.cam.z * 1.6, 5), 0.3); return; }
   if (k === 'info' && q) { openCard(q, t); return; }
   if (k === 'attack' && q) { sendAttack(q, sx, sy, t); return; }
@@ -775,12 +840,30 @@ function updateHUD(force) {
   $('sSq').style.background = me.color;
   setT('sRank', me.alive ? `#${rankOf(me)} • ${pct(me.tiles)}` : 'ВЫБЫЛ');
   renderRight();
+  updateNukeAlert();
   if (cardQ) renderCard();
   if (sheetOpen) renderSheet();
   if (placing) updateGhostInfo();
   refreshAlt();
 }
-function rankOf(p) { let r = 1; for (const q of game.P) if (q && q !== p && q.alive && q.tiles > p.tiles) r++; return r; }
+// баннер «ЯДЕРНАЯ УГРОЗА»: ближайшая ракета, летящая на твою землю, и обратный отсчёт до удара
+function updateNukeAlert() {
+  let first = null, ft = 1e9, heads = 0;
+  for (const n of game.nukes) {
+    if (n.dead || n.owner === me || !(n.target === me || game.owner[n.tile] === me.id)) continue;
+    if (n.type === 'warhead') heads++;
+    const left = (n.len - n.d) / n.speed + n.wait;
+    if (left < ft) { ft = left; first = n; }
+  }
+  const on = !!first && phase === 'play';
+  $('nukeAlert').classList.toggle('hidden', !on);
+  document.body.classList.toggle('nuke-alert', on);
+  if (!on) return;
+  const sec = Math.max(0, Math.ceil(ft * TICK)), who = ng(first.owner);
+  setH('naSub', first.type === 'mirv' ? `MIRV от ${who} — разделение через ${sec} с` : heads ? `${heads} боеголовок MIRV от ${who} — удар через ${sec} с` : `${NUKES[first.type].name} от ${who} — удар через ${sec} с`);
+}
+function hideNukeAlert() { $('nukeAlert').classList.add('hidden'); document.body.classList.remove('nuke-alert'); }
+function rankOf(p) { let r = 1; for (const q of game.P) if (q && q !== p && q.alive && q.kind !== KIND.TRIBE && q.tiles > p.tiles) r++; return r; }
 setInterval(() => updateHUD(), 200);
 
 // ---------------- атаки и лидеры (справа) ----------------
@@ -839,16 +922,19 @@ function focusOn(p) {
 }
 let lastLB = '';
 function renderLB() {
-  const alive = game.P.filter((p) => p && p.alive && p.tiles > 0).sort((a, b) => b.tiles - a.tiles);
+  const alive = game.P.filter((p) => p && p.alive && p.tiles > 0 && p.kind !== KIND.TRIBE).sort((a, b) => b.tiles - a.tiles);
   const rows = alive.slice(0, 10);
   if (!rows.includes(me) && me.alive) rows.push(me);
-  const nAlive = alive.filter((p) => p.kind !== KIND.TRIBE).length;
+  const nAlive = alive.length;
+  const hitting = new Set();
+  for (const a of game.attacks) if (!a.dead && a.target === me) hitting.add(a.owner);
+  for (const b of game.boats) if (b.target === me) hitting.add(b.owner);
   let h = `<div class="ph"><span style="margin:0;color:#F3B647;letter-spacing:0">🏆</span><b>ЛИДЕРЫ</b><span>${nAlive} в живых</span><button data-x="1">✕</button></div>
     <div class="lr lh"><span class="rk">#</span><span class="nmc">НАЦИЯ</span><span class="ld">ЗЕМЛЯ</span><span class="tp">ВОЙСКА</span></div>`;
   for (const p of rows) {
     const rk = alive.indexOf(p) + 1;
     const av = p.kind === KIND.HUMAN && p.skin ? `<img src="${avatarUrl(p)}" alt="">` : '';
-    h += `<div class="lr ${p === me ? 'me' : ''}" data-f="${p.id}"><span class="rk">${rk}</span><span class="nmc"><i class="sq" style="background:${p.color}"></i>${av}<span class="nn">${esc(p.name)}</span></span><span class="ld">${pct(p.tiles)}</span><span class="tp">${fmtT(p.troops)}</span></div>`;
+    h += `<div class="lr ${p === me ? 'me' : ''}" data-f="${p.id}"><span class="rk">${rk}</span><span class="nmc"><i class="sq" style="background:${p.color}"></i>${av}<span class="nn">${esc(p.name)}</span></span><span class="ld">${pct(p.tiles)}</span><span class="tp${hitting.has(p) ? ' hit' : ''}">${fmtT(p.troops)}</span></div>`;
   }
   if (h === lastLB) return;
   lastLB = h;
@@ -903,27 +989,27 @@ const SVG = {
 };
 const ITEMS = [
   { k: '1', type: 'city', name: 'Город', desc: 'Лимит войск +25K за каждый уровень. Поставь рядом с городом ещё один — он улучшится.' },
-  { k: '2', type: 'port', name: 'Порт', desc: 'Ставится на своём берегу. Торговля: +500 золота/с за уровень. Нужен для военных кораблей.' },
-  { k: '3', type: 'factory', name: 'Завод', desc: 'Промышленность: +400 золота/с за уровень. Порт и завод дорожают вместе.' },
+  { k: '2', type: 'port', name: 'Порт', desc: 'Ставится на своём берегу. Торговля: +2.5K золота/с за уровень. Нужен для военных кораблей.' },
+  { k: '3', type: 'factory', name: 'Завод', desc: 'Поезда и промышленность: +1.5K золота/с за уровень. Порт и завод дорожают вместе.' },
   { k: '4', type: 'post', name: 'Оборона', full: 'Оборонный пост', desc: 'Атаки на твою землю рядом с постом: враг теряет ×5 войск и идёт ×3 медленнее. Не улучшается.' },
   { k: '5', type: 'sam', name: 'ПВО', full: 'Зенитный комплекс (ПВО)', desc: 'Сбивает вражеские ядерные ракеты в радиусе действия. Строится 30 с.' },
   { k: '6', type: 'silo', name: 'Шахта', full: 'Ракетная шахта', desc: 'Нужна для запуска ядерных ракет. Строится 10 с.' },
   { k: '7', type: 'warship', name: 'Корабль', full: 'Военный корабль', desc: 'Тапни по воде — выйдет из ближайшего порта и будет патрулировать. Топит вражеский десант и корабли.' },
-  { k: '8', type: 'atom', name: 'Атомная', full: 'Атомная бомба', cost: 750000, nuke: true, desc: 'Взрыв радиусом 30 клеток (12 — полное уничтожение).' },
-  { k: '9', type: 'hydro', name: 'Водородная', full: 'Водородная бомба', cost: 5e6, nuke: true, desc: 'Огромный взрыв: всё внутри стирается.' },
-  { k: '0', type: 'mirv', name: 'MIRV', full: 'MIRV', cost: 25e6, nuke: true, desc: 'Раскалывается на сотни боеголовок над землёй цели.' },
+  { k: '8', type: 'atom', name: 'Атомная', full: 'Атомная бомба', nuke: true, blast: 'Радиус взрыва 30 клеток (12 — полное уничтожение)', desc: 'Земля в воронке становится радиацией, войска цели гибнут.' },
+  { k: '9', type: 'hydro', name: 'Водородная', full: 'Водородная бомба', nuke: true, blast: 'Радиус взрыва 100 клеток (80 — полное уничтожение)', desc: 'Огромный взрыв: всё внутри стирается.' },
+  { k: '0', type: 'mirv', name: 'MIRV', full: 'MIRV', nuke: true, blast: 'Сотни боеголовок по всей земле цели', desc: 'Тапни по чужой стране. Каждый MIRV в матче дорожает на 15M. Запуск по союзнику рвёт союз.' },
 ];
 const itemOf = (type) => ITEMS.find((x) => x.type === type);
-const costOf = (it) => (it.nuke ? it.cost : game.cost(me, it.type));
+const costOf = (it) => (it.nuke ? game.nukeCost(it.type) : game.cost(me, it.type));
 let lastSheet = '';
 function renderSheet() {
   let h = '';
-  const silo = game.countOf(me, 'silo') > 0;
+  const silo = game.silosOf(me) > 0;
   for (const it of ITEMS) {
     const cost = costOf(it), lock = it.nuke && !silo;
     const ok = me.gold >= cost;
-    const own = it.nuke ? 0 : game.countOf(me, it.type);
-    h += `<button class="bi ${lock ? 'lock' : ''} ${placing === it.type ? 'sel' : ''}" data-t="${it.type}"><span class="k">${it.k}</span><span class="o">×${own}</span>${SVG[it.type]}<span class="nm">${it.name}</span><span class="c ${ok ? '' : 'no'}">${fmt(cost)}</span></button>`;
+    const own = it.nuke ? '' : '×' + game.countOf(me, it.type);
+    h += `<button class="bi ${lock ? 'lock' : ''} ${placing === it.type ? 'sel' : ''}" data-t="${it.type}"><span class="k">${it.k}</span><span class="o">${own}</span>${SVG[it.type]}<span class="nm">${it.name}</span><span class="c ${ok ? '' : 'no'}">${fmt(cost)}</span></button>`;
   }
   if (h === lastSheet) return;
   lastSheet = h;
@@ -939,12 +1025,11 @@ function renderSheet() {
   });
 }
 function showTip(type, btn) {
-  const it = itemOf(type), cost = costOf(it), silo = game.countOf(me, 'silo') > 0;
-  const own = it.nuke ? 0 : game.countOf(me, type);
+  const it = itemOf(type), cost = costOf(it), silo = game.silosOf(me) > 0;
   const el = $('tip');
   el.innerHTML = `<div class="tt1"><b>${it.full || it.name}</b><kbd>${it.k}</kbd></div>
-    <div class="tt2">Цена <b class="${me.gold >= cost ? '' : 'no'}">${fmt(cost)}</b> золота</div><div class="tt2">Есть ${own}</div>
-    <div class="tt3">${it.desc}</div>${it.nuke && !silo ? '<div class="tt4">ⓘ Требуется ракетная шахта</div>' : it.nuke ? '<div class="tt4 dim">ⓘ Ядерные удары — в следующем обновлении</div>' : ''}`;
+    <div class="tt2">Цена <b class="${me.gold >= cost ? '' : 'no'}">${fmt(cost)}</b> золота</div>${it.nuke ? `<div class="tt2">${it.blast}</div>` : `<div class="tt2">Есть ${game.countOf(me, type)}</div>`}
+    <div class="tt3">${it.desc}</div>${it.nuke && !silo ? '<div class="tt4">ⓘ Требуется ракетная шахта</div>' : ''}`;
   el.classList.remove('hidden');
   const r = btn.getBoundingClientRect(), tw = el.offsetWidth, th = el.offsetHeight;
   el.style.left = Math.max(8, Math.min(innerWidth - tw - 8, r.left + r.width / 2 - tw / 2)) + 'px';
@@ -957,9 +1042,8 @@ $('bBuild').onclick = () => { sfx.play('ui', { vol: 0.35 }); if (sheetOpen) clos
 function selectBuild(type) {
   const it = itemOf(type);
   if (!it || phase !== 'play') return;
-  if (it.nuke) {
-    if (!game.countOf(me, 'silo')) ui.toast('ⓘ Требуется ракетная шахта (6)', 1700);
-    else ui.toast(`${it.full} — ядерные удары появятся в следующем обновлении`, 1900);
+  if (it.nuke && !game.silosOf(me)) {
+    ui.toast(game.countOf(me, 'silo') ? 'ⓘ Ракетная шахта ещё строится' : 'ⓘ Требуется ракетная шахта (6)', 1700);
     sfx.play('block', { vol: 0.3 });
     return;
   }
@@ -968,27 +1052,44 @@ function selectBuild(type) {
   closeSheet(); closeCard();
   $('bBuild').classList.add('on');
   $('placing').classList.remove('hidden');
+  document.body.classList.add('placing');
   // призрак — сразу в центре экрана, дальше следует за пальцем
   setGhost(R.tileAt(R.w / 2, R.h / 2));
   updateGhostInfo();
 }
 function setGhost(t0) {
   if (!placing) return;
+  if (NUKES[placing]) { // прицел ядерного удара: круги взрыва под пальцем, цель и прикрытие ПВО
+    const why = game.canNuke(me, placing, t0), cost = game.nukeCost(placing);
+    const id = t0 >= 0 ? game.owner[t0] : 0, q = id ? game.P[id] : null;
+    const ok = !why || why === 'gold' || why === 'reload';
+    R.ghost = { nuke: true, type: placing, tile: t0, ok, cost, afford: me.gold >= cost, why: ok ? '' : '✕', q, sam: t0 >= 0 ? game.samCover(me, t0) : 0, self: ok && game.selfHit(me, placing, t0) >= 20 };
+    if (placing === 'mirv') R.setHighlight(q && q !== me && ok ? q.id : 0);
+    return;
+  }
   const pl = game.placement(me, placing, t0), cost = game.cost(me, placing);
   const why = { own: 'не твоя земля', space: 'тесно', shore: 'нужен берег', busy: 'строится', port: 'нет порта', far: '' }[pl.reason] || '';
   R.ghost = { type: placing, tile: placing === 'warship' && pl.ok ? pl.tile : pl.tile, ok: pl.ok, up: pl.up, cost, afford: me.gold >= cost, why: pl.ok ? '' : `✕ ${why}`, tap: t0 };
 }
 function updateGhostInfo() {
-  const it = itemOf(placing), cost = game.cost(me, placing);
+  const it = itemOf(placing);
+  if (NUKES[placing]) {
+    const g = R.ghost, cost = game.nukeCost(placing);
+    const tgt = !g || g.tile < 0 ? 'тапни по цели' : g.q ? `цель: ${esc(g.q.name)}` : game.isLand(g.tile) ? 'ничья земля' : 'море';
+    setH('plTxt', `☢ ${it.full} · <b class="${me.gold >= cost ? '' : 'no'}">${fmt(cost)}</b> · ${tgt}${g && g.sam ? ` · <em>ПВО ×${g.sam}</em>` : ''}${g && g.self ? ' · <em>⚠ заденет тебя</em>' : ''}`);
+    return;
+  }
+  const cost = game.cost(me, placing);
   if (R.ghost) { R.ghost.cost = cost; R.ghost.afford = me.gold >= cost; }
   const hint = placing === 'warship' ? 'тапни по воде у своего порта' : placing === 'port' ? 'тапни у своего берега' : R.ghost && R.ghost.up ? 'улучшение' : 'веди пальцем, отпусти — построить';
   setH('plTxt', `${it.full || it.name} · <b class="${me.gold >= cost ? '' : 'no'}">${fmt(cost)}</b> · ${hint}`);
 }
-function cancelPlacing() { placing = null; R.ghost = null; $('placing').classList.add('hidden'); $('bBuild').classList.toggle('on', sheetOpen); }
+function cancelPlacing() { if (placing === 'mirv') R.setHighlight(cardQ ? cardQ.id : 0); placing = null; R.ghost = null; document.body.classList.remove('placing'); $('placing').classList.add('hidden'); $('bBuild').classList.toggle('on', sheetOpen); }
 $('plX').onclick = () => { sfx.play('ui', { vol: 0.3 }); cancelPlacing(); };
 function tryBuild(sx, sy) {
   const t = R.tileAt(sx, sy);
   setGhost(t);
+  if (NUKES[placing]) { if (launchAt(placing, t, sx, sy)) cancelPlacing(); return; }
   const r = game.build(me, placing, t);
   if (!r.ok) {
     const msg = r.reason === 'gold' ? `ⓘ Нужно ${fmt(r.cost)} золота` : r.reason === 'space' ? 'ⓘ Слишком близко к другой постройке'
@@ -1037,7 +1138,7 @@ function endGame(d) {
   if (phase === 'over') return;
   const wasOut = phase === 'out' || phase === 'spectate';
   phase = 'over';
-  closeCard(); closeSheet(); cancelPlacing(); closeRadial(); setHint('');
+  closeCard(); closeSheet(); cancelPlacing(); closeRadial(); setHint(''); hideNukeAlert();
   $('fallen').classList.add('hidden'); $('spect').classList.add('hidden');
   const win = d.winner === me && me.alive;
   const { stars, coins } = awardMatch(win, d.winner);
@@ -1046,7 +1147,7 @@ function endGame(d) {
   const wname = d.winner ? esc(d.winner.name) : '—';
   const land = d.winner ? share(d.winner.tiles).toFixed(1) : '0';
   const why = win ? (d.reason === 'share' ? `Ты захватил мир: ${land}% суши вне радиации.` : `Время вышло — ты крупнейшая страна: ${land}% суши вне радиации.`)
-    : d.reason === 'share' ? `${wname} захватил мир (${land}% суши вне радиации).` : `Время вышло. Победил ${wname} (${land}% суши вне радиации).`;
+    : d.reason === 'share' ? `${wname} ${d.winner ? vb(d.winner, 'захватил') : 'захватил'} мир (${land}% суши вне радиации).` : `Время вышло. Победитель — ${wname} (${land}% суши вне радиации).`;
   if (!win && d.winner && d.winner.leader && !d.winner.isClaude) setTimeout(() => talk(d.winner, 'win', 'ты победил в стратегии про захват мира', true), 2500);
   const dur = game.time;
   const IC = {
@@ -1087,7 +1188,7 @@ function closeAll() {
   clearInterval(endTimer);
   for (const id of ['endscr', 'title', 'spawn', 'hud', 'fallen', 'spect', 'help', 'warBegins']) $(id).classList.add('hidden');
   $('feed').innerHTML = ''; $('taps').innerHTML = '';
-  document.body.classList.remove('spect', 'card-open');
+  document.body.classList.remove('spect', 'card-open', 'nuke-alert', 'placing');
   closeCard(); closeRadial(); hideTip(); sheetOpen = false; $('sheet').classList.add('hidden'); placing = null; R.ghost = null; $('placing').classList.add('hidden');
   atkOpen = lbOpen = false; lastRight = lastLB = lastSheet = ''; pillKey = ''; R.spawnMark = -1; R.pickMode = false; setHint('');
   awarded = false;
@@ -1209,6 +1310,7 @@ function frame(now) {
   }
   if (phase === 'pick' && !ui.menuOpen()) { runSpawnQueue(); if (now - pillT > 150) { pillT = now; updateSpawnPill(); } }
   if (!drag && (Math.abs(vel.x) > 5 || Math.abs(vel.y) > 5)) { R.pan(vel.x * dt, vel.y * dt); const k = Math.exp(-dt * 5); vel.x *= k; vel.y *= k; }
+  R.sub = live ? Math.min(1, acc / TICK) : 0;
   R.draw(now / 1000, dt);
   requestAnimationFrame(frame);
 }

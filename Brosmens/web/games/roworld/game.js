@@ -33,6 +33,19 @@ export const STRUCTS = {
 };
 export const SNAP_R = 8, STRUCT_GAP = 8, PORT_R = 10; // 15 / 15 / 20 клеток оригинала
 export const SHIP = { hp: 1000, range: 65, patrol: 50, reload: 20, speed: 0.5, dmg: [200, 300] };
+// Ядерное оружие (радиусы и скорости — половина оригинальных: 12/30, 80/100, боеголовки MIRV 12/18; 10 и 22 клетки за тик).
+// Ракета летит по кубической кривой Безье, выгнутой к верху карты; ПВО может сбить её только рядом с шахтой или целью.
+export const NUKES = {
+  atom: { name: 'Атомная бомба', gen: 'атомную бомбу', cost: 750000, inner: 6, outer: 15, speed: 5 },
+  hydro: { name: 'Водородная бомба', gen: 'водородную бомбу', cost: 5e6, inner: 40, outer: 50, speed: 5 },
+  mirv: { name: 'MIRV', gen: 'MIRV', cost: 25e6, step: 15e6, speed: 7.5 },
+  warhead: { name: 'Боеголовка MIRV', gen: 'боеголовку MIRV', inner: 6, outer: 9, speed: 11 },
+};
+export const MIRV_WARHEADS = 110;              // 350 боеголовок оригинала на карте вчетверо меньшей площади
+export const SILO_RELOAD = 90, SAM_RELOAD = 90;  // 9 с на ракету (ракет = уровень)
+export const SAM_SPEED = 6, NUKE_TARGETABLE = 75, SAM_SCAN = 300;
+export const samRange = (lv) => (150 - 480 / (lv + 5)) * 0.5; // L1 35 клеток (70 в оригинале)
+const HEAT_MAX = 255;
 const MAG = [0, 0, 80, 100, 120, 0];
 const COST = [0, 0, 16.5, 20, 25, 0];
 const TMAG = [0, 0, 1, 1.5, 2, 0];
@@ -94,6 +107,8 @@ export class Game {
     this.boats = [];  // десант в пути
     this.ships = [];  // военные корабли
     this.fallout = 0; // клетки радиации (не считаются в 80%)
+    this.fall = new Uint8Array(N_TILES); // 0 — чисто, 1..255 — радиация (жар: свежая воронка светится и остывает)
+    this.hot = []; this.nukes = []; this.samShots = []; this.mirvCount = 0; this.nukeSeq = 1;
     this.tickN = 0; this.running = false; this.over = false;
     this.handlers = [];
     this.chg = new Int32Array(16384); this.chgN = 0;
@@ -137,8 +152,9 @@ export class Game {
     else if (p.kind === KIND.NATION) add *= NATION_DIFF.regen;
     return Math.min(p.troops + add, max) - p.troops;
   }
-  // золото за тик: 1K/с у людей и наций, 500/с у племён; порты и заводы — доход от торговли и промышленности
-  goldRate(p) { return p.kind === KIND.TRIBE ? 50 : 100 + 50 * (p.portLevels || 0) + 40 * (p.factLevels || 0); }
+  // золото за тик: 1K/с у людей и наций, 500/с у племён; порты и заводы — доход от торговли и поездов
+  // (в оригинале торговые корабли и поезда к середине матча дают десятки и сотни тысяч в секунду)
+  goldRate(p) { return p.kind === KIND.TRIBE ? 50 : 100 + 250 * (p.portLevels || 0) + 150 * (p.factLevels || 0); }
   troopsAtWar(p) { let s = 0; for (const a of p.attacks) if (!a.dead) s += a.troops; for (const b of p.boats) s += b.troops; return s; }
   // защита: люди неуязвимы для людей первые 5:00, нации и племена — только 5 с
   isImmune(q) { return !!q && this.tickN < (q.kind === KIND.HUMAN ? PROT_TICKS : NATION_IMMUNE); }
@@ -205,7 +221,10 @@ export class Game {
     if (prev === id) return;
     if (prev) { const q = this.P[prev]; q.tiles--; q.border.delete(t); }
     o[t] = id;
-    if (id) { const p = this.P[id]; p.tiles++; if (p.tiles > p.peakTiles) p.peakTiles = p.tiles; }
+    if (id) {
+      const p = this.P[id]; p.tiles++; if (p.tiles > p.peakTiles) p.peakTiles = p.tiles;
+      if (this.fall[t]) { this.fall[t] = 0; this.fallout--; } // захваченная радиация снова обычная земля
+    }
     this.refreshBorder(t);
     const x = t % W;
     if (x > 0) this.refreshBorder(t - 1);
@@ -363,6 +382,7 @@ export class Game {
       const ter = terr[t];
       let mag = MAG[ter], cost = COST[ter];
       if (!def) {
+        if (this.fall[t]) { const f = 5 - (2 * this.fallout) / this.landCount; mag *= f; cost *= f; } // радиация: в 3–5 раз дороже
         budget -= within((2000 * cost) / Math.max(1, a.troops), 5, 100) / (2 * borderSize);
         a.troops -= mag / (p.kind === KIND.TRIBE ? 10 : 5);
       } else {
@@ -587,7 +607,7 @@ export class Game {
       this.emit('build', { s: up, upgrade: true, p });
       return { ok: true, s: up, upgrade: true };
     }
-    const s = { id: this.structSeq++, type, owner: p.id, builder: p.id, tile: pl.tile, level: 1, pending: 0, built: false, startAt: this.tickN, doneAt: this.tickN + S.time, born: this.tickN };
+    const s = { id: this.structSeq++, type, owner: p.id, builder: p.id, tile: pl.tile, level: 1, pending: 0, built: false, startAt: this.tickN, doneAt: this.tickN + S.time, born: this.tickN, cd: [] };
     this.structAt[pl.tile] = this.structs.length;
     this.structs.push(s);
     if (type === 'post') p.posts.push(s);
@@ -872,6 +892,265 @@ export class Game {
   }
   shipXY(s) { return [(s.tile % W) + 0.5, ((s.tile / W) | 0) + 0.5]; }
 
+  // ---------- ядерное оружие ----------
+  nukeCost(type) { const N = NUKES[type]; return type === 'mirv' ? N.cost + N.step * this.mirvCount : N.cost; }
+  // свободные ракеты шахты или ПВО: уровень минус те, что ещё перезаряжаются
+  ammo(s) {
+    const t = this.tickN, cd = s.cd;
+    for (let i = cd.length - 1; i >= 0; i--) if (cd[i] <= t) cd.splice(i, 1);
+    return s.built ? Math.max(0, s.level - cd.length) : 0;
+  }
+  // ближайшая (по манхэттену) шахта игрока с готовой ракетой
+  readySilo(p, t0) {
+    const x0 = t0 % W, y0 = (t0 / W) | 0;
+    let best = null, bd = 1e9;
+    for (const s of this.structs) {
+      if (s.owner !== p.id || s.type !== 'silo' || !this.ammo(s)) continue;
+      const d = Math.abs((s.tile % W) - x0) + Math.abs(((s.tile / W) | 0) - y0);
+      if (d < bd) { bd = d; best = s; }
+    }
+    return best;
+  }
+  silosOf(p) { let n = 0; for (const s of this.structs) if (s.owner === p.id && s.type === 'silo' && s.built) n++; return n; }
+  // сколько чужих (не своих и не союзных) ПВО прикрывают клетку
+  samCover(p, t0) {
+    const x0 = t0 % W, y0 = (t0 / W) | 0;
+    let n = 0;
+    for (const s of this.structs) {
+      if (s.type !== 'sam' || !s.built || s.owner === p.id || this.allied(p, this.P[s.owner])) continue;
+      const r = samRange(s.level), dx = (s.tile % W) - x0, dy = ((s.tile / W) | 0) - y0;
+      if (dx * dx + dy * dy <= r * r) n++;
+    }
+    return n;
+  }
+  // кого взрыв p не задевает: игрок и Клод друг друга не трогают; люди под защитой неуязвимы для людей
+  nukeSpares(p, q) {
+    if (!q || q === p) return false;
+    if ((p.isPlayer && q.isClaude) || (p.isClaude && q.isPlayer)) return true;
+    return p.kind === KIND.HUMAN && q.kind === KIND.HUMAN && this.isImmune(q);
+  }
+  // примерно сколько своих клеток (и построек ×50) заденет взрыв — для предупреждения в прицеле
+  selfHit(p, type, t0) {
+    if (t0 < 0 || !NUKES[type] || type === 'mirv') return 0;
+    const R = Math.ceil(NUKES[type].outer), R2 = NUKES[type].outer ** 2, x0 = t0 % W, y0 = (t0 / W) | 0, o = this.owner;
+    let n = 0;
+    for (const s of this.structs) if (s.owner === p.id) { const dx = (s.tile % W) - x0, dy = ((s.tile / W) | 0) - y0; if (dx * dx + dy * dy <= R2) n += 50; }
+    for (let dy = -R; dy <= R; dy += 2) for (let dx = -R; dx <= R; dx += 2) {
+      if (dx * dx + dy * dy > R2) continue;
+      const x = x0 + dx, y = y0 + dy;
+      if (x >= 0 && y >= 0 && x < W && y < H && o[y * W + x] === p.id) n += 4;
+    }
+    return n;
+  }
+  // причина, по которой запуск невозможен ('' — можно)
+  canNuke(p, type, t0) {
+    if (!p.alive || this.over) return 'dead';
+    if (t0 < 0) return 'far';
+    if (!this.silosOf(p)) return 'silo';
+    const id = this.owner[t0], q = id ? this.P[id] : null;
+    if (type === 'mirv' && (!q || q === p)) return 'mirv';
+    if (q && this.nukeSpares(p, q)) return q.isClaude || q.isPlayer ? 'friend' : 'immune';
+    if (!this.readySilo(p, t0)) return 'reload';
+    if (p.gold < this.nukeCost(type)) return 'gold';
+    return '';
+  }
+  // траектория: кубическая кривая Безье от шахты к цели, опорные точки на ¼ и ¾ пути подняты к верху карты на max(d/3, 25)
+  nukePath(x0, y0, x1, y1) {
+    const d = Math.hypot(x1 - x0, y1 - y0), h = Math.max(d / 3, 25);
+    const c1x = x0 + (x1 - x0) * 0.25, c1y = Math.max(0, y0 + (y1 - y0) * 0.25 - h);
+    const c2x = x0 + (x1 - x0) * 0.75, c2y = Math.max(0, y0 + (y1 - y0) * 0.75 - h);
+    const N = 48, pts = new Float32Array((N + 1) * 2), cum = new Float32Array(N + 1);
+    for (let i = 0; i <= N; i++) {
+      const u = i / N, v = 1 - u, a = v * v * v, b = 3 * v * v * u, c = 3 * v * u * u, e = u * u * u;
+      pts[i * 2] = a * x0 + b * c1x + c * c2x + e * x1;
+      pts[i * 2 + 1] = a * y0 + b * c1y + c * c2y + e * y1;
+      if (i) cum[i] = cum[i - 1] + Math.hypot(pts[i * 2] - pts[i * 2 - 2], pts[i * 2 + 1] - pts[i * 2 - 1]);
+    }
+    return { pts, cum, len: Math.max(1, cum[N]) };
+  }
+  // точка на пути ракеты, пролетевшей d клеток
+  pathAt(n, d) {
+    const { pts, cum } = n, N = cum.length - 1;
+    if (d <= 0) return [pts[0], pts[1]];
+    if (d >= n.len) return [pts[N * 2], pts[N * 2 + 1]];
+    let lo = 0, hi = N;
+    while (hi - lo > 1) { const m = (lo + hi) >> 1; if (cum[m] < d) lo = m; else hi = m; }
+    const f = (d - cum[lo]) / Math.max(1e-6, cum[hi] - cum[lo]);
+    return [pts[lo * 2] + (pts[hi * 2] - pts[lo * 2]) * f, pts[lo * 2 + 1] + (pts[hi * 2 + 1] - pts[lo * 2 + 1]) * f];
+  }
+  nukePos(n) { return this.pathAt(n, n.d); }
+  // ПВО достаёт ракету только недалеко от места запуска или от цели (на середине пути она недосягаема)
+  targetable(n, x, y) {
+    const R2 = NUKE_TARGETABLE * NUKE_TARGETABLE;
+    if ((x - n.tx) ** 2 + (y - n.ty) ** 2 <= R2) return true;
+    return n.type !== 'warhead' && (x - n.sx) ** 2 + (y - n.sy) ** 2 <= R2;
+  }
+  addNuke(p, type, sx, sy, t0, target, delay = 0) {
+    const tx = (t0 % W) + 0.5, ty = ((t0 / W) | 0) + 0.5;
+    const n = { id: this.nukeSeq++, type, owner: p, sx, sy, tx, ty, tile: t0, target, d: 0, speed: NUKES[type].speed, ...this.nukePath(sx, sy, tx, ty), born: this.tickN, wait: delay, claimed: false, dead: false };
+    this.nukes.push(n);
+    return n;
+  }
+  launchNuke(p, type, t0) {
+    const why = this.canNuke(p, type, t0);
+    if (why) return { ok: false, reason: why, cost: this.nukeCost(type) };
+    const silo = this.readySilo(p, t0), cost = this.nukeCost(type);
+    p.gold -= cost;
+    silo.cd.push(this.tickN + SILO_RELOAD);
+    const id = this.owner[t0], q = id ? this.P[id] : null;
+    const sx = (silo.tile % W) + 0.5, sy = ((silo.tile / W) | 0) + 0.5;
+    let n;
+    if (type === 'mirv') {
+      // «автобус» летит к точке разделения высоко над серединой пути и там выпускает боеголовки
+      this.mirvCount++;
+      const tx = (t0 % W) + 0.5, sepX = (sx + tx) / 2, sepY = Math.max(0, sy - 250) + 25;
+      n = this.addNuke(p, 'mirv', sx, sy, Math.floor(sepY) * W + Math.floor(sepX), q);
+      n.aim = t0;
+      if (q && this.allied(p, q)) this.breakAlly(p, q); // MIRV по союзнику — союз рвётся сразу при запуске
+    } else n = this.addNuke(p, type, sx, sy, t0, q);
+    if (q && q !== p) q.hitBy.set(p.id, this.tickN);
+    this.emit('nuke', { n, silo });
+    return { ok: true, n, cost };
+  }
+  // разделение MIRV: боеголовки на случайные клетки цели, пятью волнами со случайной задержкой 0–15 тиков
+  splitMirv(n) {
+    const q = n.target;
+    if (!q || !q.alive || !q.tiles) return;
+    const o = this.owner, tiles = [];
+    for (let t = 0; t < N_TILES; t++) if (o[t] === q.id) tiles.push(t);
+    const k = Math.min(MIRV_WARHEADS, tiles.length), wave = Math.max(1, Math.ceil(k / 5));
+    for (let i = 0; i < k; i++) {
+      const t = tiles[Math.floor(Math.random() * tiles.length)];
+      const w = this.addNuke(n.owner, 'warhead', n.tx, n.ty, t, q, Math.floor(i / wave) * 5 + Math.floor(Math.random() * 16));
+      w.speed *= 0.85 + Math.random() * 0.3;
+    }
+    this.emit('mirvSplit', { n, k });
+  }
+  stepNukes() {
+    for (let i = this.nukes.length - 1; i >= 0; i--) {
+      const n = this.nukes[i];
+      if (n.dead) { this.nukes.splice(i, 1); continue; }
+      if (n.wait > 0) { n.wait--; continue; }
+      n.d += n.speed;
+      if (n.d < n.len) continue;
+      n.dead = true; this.nukes.splice(i, 1);
+      if (n.type === 'mirv') this.splitMirv(n);
+      else this.detonate(n);
+    }
+  }
+  // ПВО: попадание без промаха; каждую ракету берёт одна ПВО; сначала водородные, потом падающие ближе к ПВО
+  stepSams() {
+    for (let i = this.samShots.length - 1; i >= 0; i--) {
+      const s = this.samShots[i];
+      if (this.tickN < s.hit) continue;
+      this.samShots.splice(i, 1);
+      if (!s.n.dead) {
+        s.n.dead = true;
+        const k = this.nukes.indexOf(s.n); if (k >= 0) this.nukes.splice(k, 1);
+        this.emit('intercept', { n: s.n, by: s.by, x: s.x, y: s.y });
+      }
+    }
+    if (!this.nukes.length) return;
+    for (const sam of this.structs) {
+      if (sam.type !== 'sam' || !sam.built) continue;
+      const own = this.P[sam.owner];
+      if (!own || !own.alive || !this.ammo(sam)) continue;
+      const sx = (sam.tile % W) + 0.5, sy = ((sam.tile / W) | 0) + 0.5, R = samRange(sam.level);
+      let best = null, bs = -1e18, bk = 0, bx = 0, by = 0;
+      for (const n of this.nukes) {
+        if (n.dead || n.claimed || n.wait > 0 || n.type === 'mirv' || n.owner === own || this.allied(n.owner, own)) continue;
+        if ((n.tx - sx) ** 2 + (n.ty - sy) ** 2 > SAM_SCAN * SAM_SCAN) continue;
+        // ближайший тик k, когда ракета в зоне перехвата и в радиусе ПВО, а ракета ПВО успевает долететь;
+        // стреляем в последний момент (полёт ракеты ПВО ≈ k тиков), иначе ждём
+        for (let k = 1; k <= 50; k++) {
+          const d = Math.min(n.len, n.d + n.speed * k);
+          const [x, y] = this.pathAt(n, d);
+          const dist = Math.hypot(x - sx, y - sy), need = Math.max(1, Math.ceil(dist / SAM_SPEED));
+          if (dist <= R && need <= k && this.targetable(n, x, y)) {
+            if (k - need > 1) break; // рано: ракета ПВО долетит быстрее — подождём
+            const score = (n.type === 'hydro' ? 1e6 : 0) - Math.hypot(n.tx - sx, n.ty - sy) * 1000 - (n.len - n.d) / n.speed;
+            if (score > bs) { bs = score; best = n; bk = k; bx = x; by = y; }
+            break;
+          }
+          if (d >= n.len) break;
+        }
+      }
+      if (!best) continue;
+      best.claimed = true;
+      sam.cd.push(this.tickN + SAM_RELOAD);
+      this.samShots.push({ n: best, by: own, sam, fx: sx, fy: sy, x: bx, y: by, at: this.tickN, hit: this.tickN + bk });
+      this.emit('samFire', { n: best, by: own, sam });
+    }
+  }
+  // взрыв: в малом радиусе стирается всё, между радиусами — каждая клетка с вероятностью 50%; земля становится ничьей радиацией
+  detonate(n) {
+    const N = NUKES[n.type], p = n.owner, o = this.owner;
+    const cx = Math.floor(n.tx), cy = Math.floor(n.ty), Ro = N.outer, Ri = N.inner, R = Math.ceil(Ro);
+    const hits = new Map(), weight = new Map(), lost = new Map();
+    // постройки, корабли и десант в радиусе взрыва уничтожаются
+    for (let i = this.structs.length - 1; i >= 0; i--) {
+      const s = this.structs[i], dx = (s.tile % W) - cx, dy = ((s.tile / W) | 0) - cy;
+      if (dx * dx + dy * dy > Ro * Ro) continue;
+      const q = this.P[s.owner];
+      if (q && this.nukeSpares(p, q)) continue;
+      if (q) lost.set(q, (lost.get(q) || 0) + 1);
+      this.removeStruct(s);
+    }
+    for (const b of this.boats.slice()) { const [bx, by] = this.boatPos(b); if ((bx - n.tx) ** 2 + (by - n.ty) ** 2 <= Ro * Ro && !this.nukeSpares(p, b.owner)) this.killBoat(b); }
+    for (const s of this.ships.slice()) { const [sx, sy] = this.shipXY(s); if ((sx - n.tx) ** 2 + (sy - n.ty) ** 2 <= Ro * Ro && !this.nukeSpares(p, s.owner)) { this.killShip(s); this.emit('shipSunk', { s, by: p }); } }
+    for (let dy = -R; dy <= R; dy++) {
+      const y = cy + dy; if (y < 0 || y >= H) continue;
+      for (let dx = -R; dx <= R; dx++) {
+        const x = cx + dx; if (x < 0 || x >= W) continue;
+        const d2 = dx * dx + dy * dy; if (d2 > Ro * Ro) continue;
+        const t = y * W + x;
+        if (!this.isLand(t)) continue;
+        const id = o[t], q = id ? this.P[id] : null;
+        if (q && this.nukeSpares(p, q)) continue;
+        const inner = d2 <= Ri * Ri;
+        if (q) weight.set(q, (weight.get(q) || 0) + (inner ? 1 : 0.5));
+        if (!inner && Math.random() < 0.5) continue;
+        if (q) { hits.set(q, (hits.get(q) || 0) + 1); this.setOwner(t, 0); }
+        if (!this.fall[t]) { this.fallout++; this.hot.push(t); }
+        this.fall[t] = HEAT_MAX;
+        this.mark(t);
+      }
+    }
+    // гибель войск: за каждую стёртую клетку 5 × войска / клетки (боеголовки MIRV бьют только то, что сверх 3% лимита)
+    for (const [q, k] of hits) {
+      const max = this.maxTroops(q), before = q.tiles + k;
+      const death = (tr, left) => (n.type === 'warhead' ? 500 * (1 - Math.exp((-2 * Math.max(0, tr - 0.03 * max)) / max)) : (5 * tr) / Math.max(1, left));
+      for (let i = 0; i < k; i++) {
+        const left = before - i;
+        q.troops = Math.max(0, q.troops - death(q.troops, left));
+        for (const a of q.attacks) if (!a.dead) a.troops = Math.max(0, a.troops - death(a.troops, left));
+        for (const b of q.boats) b.troops = Math.max(0, b.troops - death(b.troops, left));
+      }
+      if (q !== p) { q.hitBy.set(p.id, this.tickN); q.nukedAt = this.tickN; q.nukedBy = p; }
+    }
+    // удар по союзнику (от 25 взвешенных клеток или по его постройке) рвёт союз
+    for (const [q, wgt] of weight) if (q !== p && this.allied(p, q) && (wgt >= 25 || lost.get(q))) this.breakAlly(p, q);
+    for (const q of lost.keys()) if (q !== p && this.allied(p, q)) this.breakAlly(p, q);
+    for (const q of hits.keys()) if (q.alive && q.tiles === 0) this.eliminate(q, q !== p ? p : null);
+    this.flush();
+    this.emit('nukeHit', { n, hits, lost });
+  }
+  // свежая воронка светится и за ~10 с остывает до ровной радиации
+  coolFallout() {
+    if (!this.hot.length) return;
+    const f = this.fall, out = [];
+    let j = 0;
+    for (let i = 0; i < this.hot.length; i++) {
+      const t = this.hot[i];
+      if (!f[t]) continue; // эту клетку уже захватили
+      f[t] = Math.max(1, f[t] - 12);
+      out.push(t);
+      if (f[t] > 1) this.hot[j++] = t;
+    }
+    this.hot.length = j;
+    if (out.length) this.emit('heat', { list: out });
+  }
+
   // ---------- цикл ----------
   tick() {
     if (!this.running || this.over) return;
@@ -889,6 +1168,8 @@ export class Game {
     if (this.attacks.some((a) => a.dead)) this.attacks = this.attacks.filter((a) => !a.dead);
     for (let i = this.boats.length - 1; i >= 0; i--) { const b = this.boats[i]; if (b && !b.dead) this.stepBoat(b); }
     for (let i = this.ships.length - 1; i >= 0; i--) { const s = this.ships[i]; if (s && !s.dead) this.stepShip(s); }
+    if (this.nukes.length || this.samShots.length) { this.stepSams(); this.stepNukes(); }
+    if (t % 5 === 0) this.coolFallout();
     for (const s of this.structs) {
       if (s.doneAt === t) {
         s.built = true;

@@ -3,7 +3,7 @@
 // и полоса границы в 1 клетку (темнее и насыщеннее). Подписи наций — в самом «толстом» месте территории
 // (максимум карты расстояний), тёмный текст с обводкой цветом владельца, войска под именем, аватар у игроков.
 import { W, H, N_TILES, T_LAKE, T_PLAINS, T_HIGH, T_MTN } from './world.js';
-import { KIND, fmt, fmtT, SPAWN_R, STRUCTS, SHIP } from './game.js';
+import { KIND, fmt, fmtT, SPAWN_R, STRUCTS, SHIP, NUKES } from './game.js';
 import { drawAvatar } from '../../shared/avatar.js';
 
 const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
@@ -16,6 +16,8 @@ const C = {
 const u32 = (rgb, a) => ((a << 24) | (rgb[2] << 16) | (rgb[1] << 8) | rgb[0]) >>> 0;
 const mix = (a, b, k) => [a[0] + (b[0] - a[0]) * k, a[1] + (b[1] - a[1]) * k, a[2] + (b[2] - a[2]) * k];
 const FILL_A = 150, BORDER_A = 235; // 0.588 и почти непрозрачная граница
+// радиация: яркие зелёные пятна с пиксельной «рябью» (#1DDE0D), свежая воронка раскалена до бледно-салатового
+const FALL = [hex('#17B70C'), hex('#1DDE0D'), hex('#22D612'), hex('#3BEA2A')], FALL_HOT = hex('#D9FFB8'), FALL_EDGE = hex('#11960A');
 
 export class Renderer {
   constructor(canvas, dprFn) {
@@ -23,7 +25,8 @@ export class Renderer {
     this.dprFn = dprFn;
     this.cam = { x: W / 2, y: H / 2, z: 1 };
     this.fly = null;
-    this.fx = { rings: [], texts: [] };
+    this.fx = { rings: [], texts: [], booms: [] };
+    this.shk = 0; this.shakeOn = true; this.sub = 0; // тряска камеры от взрывов; доля тика для плавного полёта ракет
     this.hl = 0; // подсвеченный игрок (цель)
     this.labels = []; this.labelT = -9;
     this.avatars = new Map();
@@ -72,7 +75,7 @@ export class Renderer {
     }
     this.alt = false;
     this.hl = 0;
-    this.fx = { rings: [], texts: [] };
+    this.fx = { rings: [], texts: [], booms: [] };
     this.labels = []; this.labelT = -9;
     this.avatars.clear();
     this.paintAll();
@@ -118,10 +121,19 @@ export class Renderer {
       else if (hl) v = edge ? this.cBorderHi[id] : this.cFillHi[id];
       else if (G.P[id].posts.length && G.defended(id, t)) v = edge ? ((((t % W) + ((t / W) | 0)) & 1) ? this.cBorderDef[id] : this.cBorder[id]) : this.cFillDef[id];
       else v = edge ? this.cBorder[id] : this.cFill[id];
-    }
+    } else if (G.fall[t]) v = this.falloutColor(t, G.fall[t]);
     this.pol32[t] = v;
     this.dirty[(((t / W) | 0) / CH | 0) * CWN + ((t % W) / CH | 0)] = 1;
   }
+  falloutColor(t, heat) {
+    const f = this.game.fall, x = t % W;
+    const edge = (x > 0 && !f[t - 1] && this.game.isLand(t - 1)) || (x < W - 1 && !f[t + 1] && this.game.isLand(t + 1)) || (t >= W && !f[t - W] && this.game.isLand(t - W)) || (t < N_TILES - W && !f[t + W] && this.game.isLand(t + W));
+    const k = heat > 1 ? Math.pow(heat / 255, 1.6) : 0;
+    const base = edge ? FALL_EDGE : FALL[(Math.imul(t, 2654435761) >>> 27) & 3];
+    return u32(k ? mix(base, FALL_HOT, k * 0.85) : base, edge ? 240 : Math.round(205 + 50 * k));
+  }
+  // остывание воронок: перекрасить только эти клетки
+  onHeat(list) { for (const t of list) this.paint(t); }
   paintAll() {
     for (let t = 0; t < N_TILES; t++) this.paint(t);
   }
@@ -265,6 +277,9 @@ export class Renderer {
   // ---------- эффекты ----------
   ring(x, y, color = '#fff', r1 = 30, dur = 0.5) { if (this.fx.rings.length < 40) this.fx.rings.push({ x, y, color, r1, dur, t: 0 }); }
   text(x, y, s, color = '#fff', size = 14, dur = 1.4) { if (this.fx.texts.length < 30) this.fx.texts.push({ x, y, s, color, size, dur, t: 0 }); }
+  // ядерный взрыв: белая вспышка ~120 мс, оранжевое ядро и ударная волна до 1.5× радиуса за 1.5 с
+  boom(x, y, r, big = true) { if (this.fx.booms.length < 70) this.fx.booms.push({ x, y, r, big, t: 0, dur: big ? 1.6 : 0.9 }); }
+  shake(a) { if (this.shakeOn) this.shk = Math.max(this.shk, a); }
 
   // ---------- кадр ----------
   draw(time, dt) {
@@ -287,7 +302,9 @@ export class Renderer {
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.fillStyle = '#3C3C3C'; ctx.fillRect(0, 0, this.cv.width, this.cv.height);
     const k = z * dpr;
-    ctx.setTransform(k, 0, 0, k, (w / 2 - cam.x * z) * dpr, (h / 2 - cam.y * z) * dpr);
+    let ox = 0, oy = 0;
+    if (this.shk > 0.3) { ox = (Math.random() - 0.5) * this.shk; oy = (Math.random() - 0.5) * this.shk; this.shk *= Math.exp(-dt * 7); } else this.shk = 0;
+    ctx.setTransform(k, 0, 0, k, (w / 2 - cam.x * z + ox) * dpr, (h / 2 - cam.y * z + oy) * dpr);
     ctx.imageSmoothingEnabled = z < 1.5;
     ctx.imageSmoothingQuality = 'low';
     const x0 = Math.max(0, Math.floor(cam.x - w / 2 / z)), x1 = Math.min(W, Math.ceil(cam.x + w / 2 / z) + 1);
@@ -299,13 +316,15 @@ export class Renderer {
     ctx.imageSmoothingEnabled = true;
 
     // ---------- экранные слои ----------
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.setTransform(dpr, 0, 0, dpr, ox * dpr, oy * dpr);
     const toS = (x, y) => [(x - cam.x) * z + w / 2, (y - cam.y) * z + h / 2];
     if (G) {
       if (this.pickMode) this.drawSpawnMarks(toS, z, time);
-      this.drawStructs(toS, z, time);
-      this.drawUnits(toS, z, time);
       this.drawLabels(toS, z, time, dt);
+      this.drawStructs(toS, z, time); // значки построек поверх подписей — иначе столицу закрывает имя
+      this.drawUnits(toS, z, time);
+      if (G.nukes.length || G.samShots.length) this.drawNukes(toS, z, time);
+      if (this.fx.booms.length) this.drawBooms(toS, z, dt);
       if (this.ghost) this.drawGhost(toS, z, time);
     }
     // кольца
@@ -511,6 +530,7 @@ export class Renderer {
   drawGhost(toS, z, time) {
     const g = this.ghost, ctx = this.ctx;
     if (g.tile < 0) return;
+    if (g.nuke) { this.drawNukeGhost(g, toS, z, time); return; }
     const [x, y] = toS((g.tile % W) + 0.5, ((g.tile / W) | 0) + 0.5);
     const rng = g.type === 'post' || g.type === 'sam' ? STRUCTS[g.type].range : 0;
     if (rng) {
@@ -518,7 +538,7 @@ export class Renderer {
       ctx.setLineDash([12, 6]); ctx.lineWidth = 1.5; ctx.strokeStyle = g.ok ? 'rgba(255,255,255,.8)' : 'rgba(255,90,90,.8)';
       ctx.beginPath(); ctx.arc(0, 0, rng * z, 0, 7); ctx.stroke(); ctx.setLineDash([]); ctx.restore();
     }
-    const r = clamp(z * 1.45, 9, 14) * (g.type === 'sam' ? 1.25 : g.type === 'silo' ? 1.35 : 1);
+    const r = clamp(z * 1.6, 12, 17) * (g.type === 'sam' ? 1.2 : g.type === 'silo' ? 1.3 : 1);
     if (g.type === 'warship') {
       ctx.globalAlpha = 0.85; ctx.fillStyle = g.ok ? '#5d6472' : '#c0392b'; ctx.beginPath(); ctx.arc(x, y, r, 0, 7); ctx.fill(); ctx.globalAlpha = 1;
     } else this.icon(g.type, x, y, r, g.ok ? (this.me ? this.me.col.dark : '#555') : '#D93A3A', g.ok ? 'rgba(255,255,255,.95)' : '#ffb3b3', false, g.ok ? 0.92 : 0.55);
@@ -527,6 +547,128 @@ export class Renderer {
     const label = g.ok ? (g.up ? `↑ ${fmt(g.cost)}` : fmt(g.cost)) : g.why || '✕';
     ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(15,20,35,.9)'; ctx.strokeText(label, x, y + r + 10);
     ctx.fillStyle = g.ok ? (g.afford ? '#FBE99F' : '#E06A8C') : '#ff9a9a'; ctx.fillText(label, x, y + r + 10);
+  }
+
+  // ---------- ядерные ракеты: траектория, метка цели, перехват ПВО ----------
+  drawNukes(toS, z, time) {
+    const G = this.game, ctx = this.ctx, me = this.me, w = this.w, h = this.h, sub = this.sub;
+    // ракеты ПВО: белый след от ПВО к точке встречи
+    for (const s of G.samShots) {
+      const f = clamp((G.tickN + sub - s.at) / Math.max(1, s.hit - s.at), 0, 1);
+      const [ax, ay] = toS(s.fx, s.fy), [bx, by] = toS(s.x, s.y);
+      const hx = ax + (bx - ax) * f, hy = ay + (by - ay) * f, f0 = Math.max(0, f - 0.35);
+      ctx.strokeStyle = 'rgba(255,255,255,.9)'; ctx.lineWidth = 1.8; ctx.lineCap = 'round';
+      ctx.beginPath(); ctx.moveTo(ax + (bx - ax) * f0, ay + (by - ay) * f0); ctx.lineTo(hx, hy); ctx.stroke();
+      ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(hx, hy, 2.4, 0, 7); ctx.fill();
+    }
+    ctx.lineCap = 'butt';
+    for (const n of G.nukes) {
+      if (n.dead) continue;
+      const own = n.owner === me, ally = !own && me && G.allied(me, n.owner);
+      const col = own ? '#00FF00' : ally ? '#FFFF00' : '#FF0000';
+      const big = n.type === 'atom' || n.type === 'hydro';
+      if (big) {
+        // метка цели: заливка 25% и пунктирное кольцо радиуса взрыва, вращается 20°/с
+        const [tx, ty] = toS(n.tx, n.ty), R = NUKES[n.type].outer * z;
+        if (tx > -R && ty > -R && tx < w + R && ty < h + R) {
+          ctx.globalAlpha = 0.22; ctx.fillStyle = col; ctx.beginPath(); ctx.arc(tx, ty, R, 0, 7); ctx.fill();
+          ctx.globalAlpha = 0.85 + 0.1 * Math.sin(time * 6);
+          ctx.save(); ctx.translate(tx, ty); ctx.rotate(time * 0.349);
+          ctx.setLineDash([12, 6]); ctx.lineWidth = 1.5; ctx.strokeStyle = col; ctx.beginPath(); ctx.arc(0, 0, Math.max(4, R), 0, 7); ctx.stroke();
+          ctx.restore(); ctx.setLineDash([]); ctx.globalAlpha = 1;
+        }
+      }
+      if (n.type !== 'warhead' && !n.wait) this.nukeTrail(n, toS, z);
+    }
+    for (const n of G.nukes) {
+      if (n.dead || n.wait > 0) continue;
+      const d = Math.min(n.len, n.d + n.speed * sub);
+      const [px, py] = G.pathAt(n, d), [qx, qy] = G.pathAt(n, Math.min(n.len, d + 2));
+      const [x, y] = toS(px, py);
+      if (x < -30 || y < -30 || x > w + 30 || y > h + 30) continue;
+      const a = Math.atan2(qy - py, qx - px), tgt = G.targetable(n, px, py);
+      if (n.type === 'warhead' && z < 2.5) { // издалека боеголовки — огненные чёрточки с хвостом
+        const L = 9, ex = x - Math.cos(a) * L, ey = y - Math.sin(a) * L;
+        const gr = ctx.createLinearGradient(ex, ey, x, y);
+        gr.addColorStop(0, 'rgba(255,120,40,0)'); gr.addColorStop(1, 'rgba(255,220,120,.95)');
+        ctx.strokeStyle = gr; ctx.lineWidth = 2.2; ctx.beginPath(); ctx.moveTo(ex, ey); ctx.lineTo(x, y); ctx.stroke();
+        ctx.fillStyle = '#fff4c8'; ctx.beginPath(); ctx.arc(x, y, 1.6, 0, 7); ctx.fill();
+        continue;
+      }
+      const s = n.type === 'warhead' ? 5 : n.type === 'mirv' ? 9 : 7.5;
+      ctx.globalAlpha = tgt ? 1 : 0.6;
+      if (n.type === 'hydro' || n.type === 'mirv') { // оранжевое свечение 2.2× размера
+        const gr = ctx.createRadialGradient(x, y, 0, x, y, s * 2.2);
+        gr.addColorStop(0, 'rgba(255,184,38,.85)'); gr.addColorStop(1, 'rgba(255,184,38,0)');
+        ctx.fillStyle = gr; ctx.beginPath(); ctx.arc(x, y, s * 2.2, 0, 7); ctx.fill();
+      }
+      ctx.save(); ctx.translate(x, y); ctx.rotate(a);
+      ctx.fillStyle = n.owner.col.dark; ctx.strokeStyle = '#fff'; ctx.lineWidth = 1.2;
+      ctx.beginPath(); ctx.moveTo(s, 0); ctx.lineTo(s * 0.35, -s * 0.38); ctx.lineTo(-s * 0.8, -s * 0.38); ctx.lineTo(-s, -s * 0.75); ctx.lineTo(-s, s * 0.75); ctx.lineTo(-s * 0.8, s * 0.38); ctx.lineTo(s * 0.35, s * 0.38); ctx.closePath();
+      ctx.fill(); ctx.stroke();
+      if (n.type !== 'warhead') { ctx.fillStyle = 'rgba(255,190,90,.9)'; ctx.beginPath(); ctx.moveTo(-s, -s * 0.3); ctx.lineTo(-s * (1.6 + 0.3 * Math.random()), 0); ctx.lineTo(-s, s * 0.3); ctx.fill(); }
+      ctx.restore();
+    }
+    ctx.globalAlpha = 1;
+  }
+  // оставшаяся часть пути: штрих 8/4, где ракету может сбить ПВО, точки 2/6 — где не может; белая линия с серой обводкой
+  nukeTrail(n, toS, z) {
+    const G = this.game, ctx = this.ctx, step = Math.max(3, 9 / Math.max(0.5, z));
+    const segs = [];
+    let cur = null;
+    for (let d = n.d; ; d += step) {
+      const dd = Math.min(n.len, d), [x, y] = G.pathAt(n, dd), tg = G.targetable(n, x, y), [sx, sy] = toS(x, y);
+      if (!cur || cur.tg !== tg) { const c = { tg, pts: cur ? [cur.pts[cur.pts.length - 1]] : [] }; segs.push(c); cur = c; }
+      cur.pts.push([sx, sy]);
+      if (dd >= n.len) break;
+    }
+    for (const pass of [0, 1]) {
+      ctx.lineWidth = pass ? 2.2 : 3.6; ctx.strokeStyle = pass ? 'rgba(255,255,255,.92)' : 'rgba(140,140,140,.75)';
+      for (const c of segs) {
+        if (c.pts.length < 2) continue;
+        ctx.setLineDash(c.tg ? [8, 4] : [2, 6]);
+        ctx.beginPath(); ctx.moveTo(c.pts[0][0], c.pts[0][1]);
+        for (let i = 1; i < c.pts.length; i++) ctx.lineTo(c.pts[i][0], c.pts[i][1]);
+        ctx.stroke();
+      }
+    }
+    ctx.setLineDash([]);
+  }
+  drawBooms(toS, z, dt) {
+    const ctx = this.ctx;
+    for (let i = this.fx.booms.length - 1; i >= 0; i--) {
+      const b = this.fx.booms[i]; b.t += dt;
+      if (b.t >= b.dur) { this.fx.booms.splice(i, 1); continue; }
+      const [x, y] = toS(b.x, b.y), R = Math.max(6, b.r * z);
+      if (b.t < 0.14) { ctx.globalAlpha = 1 - b.t / 0.14; ctx.fillStyle = '#ffffff'; ctx.beginPath(); ctx.arc(x, y, R * 1.05, 0, 7); ctx.fill(); }
+      const q = b.t / b.dur;
+      if (b.t < 0.5) { // раскалённое ядро
+        const gr = ctx.createRadialGradient(x, y, 0, x, y, R * 0.8);
+        gr.addColorStop(0, 'rgba(255,250,210,.95)'); gr.addColorStop(0.45, 'rgba(255,170,60,.7)'); gr.addColorStop(1, 'rgba(255,90,30,0)');
+        ctx.globalAlpha = 1 - b.t / 0.5; ctx.fillStyle = gr; ctx.beginPath(); ctx.arc(x, y, R * 0.8, 0, 7); ctx.fill();
+      }
+      ctx.globalAlpha = (1 - q) * 0.9; ctx.strokeStyle = '#ffffff'; ctx.lineWidth = Math.max(1.5, R * 0.04);
+      ctx.beginPath(); ctx.arc(x, y, R * 1.5 * (1 - Math.pow(1 - q, 2)), 0, 7); ctx.stroke();
+    }
+    ctx.globalAlpha = 1;
+  }
+  // прицел ядерного удара: два полупрозрачных красных круга (радиус взрыва и полного уничтожения)
+  drawNukeGhost(g, toS, z, time) {
+    const ctx = this.ctx, N = NUKES[g.type === 'mirv' ? 'warhead' : g.type];
+    const [x, y] = toS((g.tile % W) + 0.5, ((g.tile / W) | 0) + 0.5);
+    const Ro = Math.max(5, N.outer * z), Ri = Math.max(3, N.inner * z);
+    ctx.globalAlpha = g.ok ? 0.3 : 0.18;
+    ctx.fillStyle = '#E05050'; ctx.beginPath(); ctx.arc(x, y, Ro, 0, 7); ctx.fill();
+    ctx.fillStyle = '#B81E2E'; ctx.beginPath(); ctx.arc(x, y, Ri, 0, 7); ctx.fill();
+    ctx.globalAlpha = g.ok ? 0.95 : 0.5; ctx.lineWidth = 1; ctx.strokeStyle = '#FF3B3B';
+    ctx.beginPath(); ctx.arc(x, y, Ro, 0, 7); ctx.stroke(); ctx.beginPath(); ctx.arc(x, y, Ri, 0, 7); ctx.stroke();
+    ctx.globalAlpha = 1;
+    ctx.strokeStyle = '#fff'; ctx.lineWidth = 1.6; // перекрестие
+    ctx.beginPath(); ctx.moveTo(x - 7, y); ctx.lineTo(x + 7, y); ctx.moveTo(x, y - 7); ctx.lineTo(x, y + 7); ctx.stroke();
+    ctx.font = '800 11px "Rubik",system-ui,sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    const label = g.ok ? fmt(g.cost) + (g.self ? ' ⚠' : '') : g.why || '✕', ly = y + Math.min(Ro + 12, 22);
+    ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(15,20,35,.9)'; ctx.strokeText(label, x, ly);
+    ctx.fillStyle = g.ok ? (g.self ? '#FFB347' : g.afford ? '#FBE99F' : '#E06A8C') : '#ff9a9a'; ctx.fillText(label, x, ly);
   }
 
   drawLabels(toS, z, time, dt) {
