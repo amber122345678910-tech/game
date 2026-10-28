@@ -3,7 +3,7 @@
 //
 // const ctl = createControls({ buttons: [{ id:'m1', label:'👊', x:-90, y:-90, size:80, key:'KeyF' }, ...] });
 // В цикле: ctl.move -> {x,y} (-1..1, y вверх = вперёд), ctl.consumeLook() -> {dx,dy} пикселей,
-// ctl.down(id) — зажата ли кнопка, ctl.onPress(id, fn), ctl.setCooldown(id, 0..1), ctl.setLabel(id, txt), ctl.show(id, bool)
+// ctl.down(id) — зажата ли кнопка, ctl.onPress(id, fn), ctl.setCooldown(id, 0..1), ctl.setLabel(id, txt), ctl.show(id, bool), ctl.setVisible(bool)
 // x/y кнопки: отрицательные = от правого/нижнего края.
 import { getSettings } from './profile.js';
 
@@ -141,6 +141,8 @@ export function createControls({ buttons = [], lookArea = 'right', keyMap = {} }
     },
     setLabel(id, html) { const el = btnEls[id]; if (el) el.querySelector('span').innerHTML = html; },
     show(id, v) { const el = btnEls[id]; if (el) el.style.display = v ? 'flex' : 'none'; },
+    // спрятать/показать всю панель кнопок (например, на экране выбора или в наблюдении)
+    setVisible(v) { for (const el of Object.values(btnEls)) el.style.visibility = v ? '' : 'hidden'; if (!v) stick.style.display = 'none'; },
     el: (id) => btnEls[id],
   };
 }
