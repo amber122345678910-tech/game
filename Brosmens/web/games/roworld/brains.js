@@ -42,6 +42,35 @@ export function pickSpawnTile(g, world, p, coord) {
   return -1;
 }
 
+// столица Клода: в 30–46 клетках от игрока, там, где вокруг много свободной земли, которая ближе к Клоду, чем
+// к игроку (чтобы друзья не делили одну поляну). Возвращает клетку или -1.
+export const CLAUDE_ZONE_R = 26, CLAUDE_ZONE_TICKS = 2400;
+export function placeClaudeTile(g, world, me, claude) {
+  if (me.spawn < 0) return -1;
+  const cx = me.spawn % W, cy = (me.spawn / W) | 0;
+  let best = -1, bs = -1e9;
+  for (let k = 0; k < 500; k++) {
+    const a = Math.random() * 6.283, r = 30 + Math.random() * 16;
+    const x = Math.round(cx + Math.cos(a) * r), y = Math.round(cy + Math.sin(a) * r);
+    if (x < 0 || y < 0 || x >= W || y >= H) continue;
+    const t = y * W + x;
+    if (!spawnOk(g, t, claude)) continue;
+    let room = 0; // свободная суша вокруг, которая ближе к кандидату, чем к игроку
+    for (let i = 0; i < 24; i++) {
+      const b = (i / 24) * 6.283, rr = i & 1 ? 22 : 12;
+      const sx = Math.round(x + Math.cos(b) * rr), sy = Math.round(y + Math.sin(b) * rr);
+      if (sx < 0 || sy < 0 || sx >= W || sy >= H) continue;
+      const st = sy * W + sx;
+      if (!g.isLand(st) || g.owner[st]) continue;
+      if ((sx - cx) ** 2 + (sy - cy) ** 2 > (sx - x) ** 2 + (sy - y) ** 2) room++;
+    }
+    const sc = room * 3 + g.spawnTilesAt(t).length * 0.3 + Math.random() * 6 - (world.terr[t] === T_MTN ? 12 : 0);
+    if (sc > bs) { bs = sc; best = t; }
+  }
+  if (best < 0) best = world.nearest(me.spawn, 90, (t) => spawnOk(g, t, claude));
+  return best;
+}
+
 export function setupBrain(g, me) {
   const cnt = new Int32Array(g.P.length + 1);
   const touched = [];
@@ -64,7 +93,7 @@ export function setupBrain(g, me) {
     const see = (nb) => {
       const q = o[nb];
       if (q === id) return;
-      if (q === 0) { if (g.isLand(nb) && !g.fall[nb]) free++; return; } // радиацию ИИ не считает свободной землёй
+      if (q === 0) { if (g.isLand(nb) && !g.fall[nb] && !(p.isClaude && g.claudeSkip(nb))) free++; return; } // радиацию ИИ не считает свободной землёй
       if (!cnt[q]) touched.push(q);
       cnt[q]++;
     };
@@ -92,6 +121,8 @@ export function setupBrain(g, me) {
       if (!g.canAttack(p, q)) continue;
       if (p.isClaude && (q.isPlayer || g.allied(q, me))) continue;
       const hit = recentHit(p, q);
+      // Клод в первые минуты не задирает нации и ботов — ест племена и защищает игрока
+      if (p.isClaude && t < PROT_TICKS && q.kind !== KIND.TRIBE && !hit && !attacking(q, me)) continue;
       const friend = q.isPlayer || q.isClaude; // игрок и его друг Клод: без повода их не травят
       if (friend && !hit) {
         if (t < (p.kind === KIND.NATION ? 2400 : PROT_TICKS + 600)) continue; // в первые минуты игрока не травят
@@ -112,7 +143,9 @@ export function setupBrain(g, me) {
       if (info.free && q.kind !== KIND.TRIBE && !hit) s *= 0.2;
       if (q.isPlayer) s *= p.kind === KIND.HUMAN ? 0.4 + p.ai.toxic : 0.8;
       if (p.isClaude && attacking(q, me)) s *= 6; // Клод бьёт тех, кто напал на игрока
-      if (q === lead && q.tiles > g.winLand * 0.3) s *= 2.5; // лидера к концу матча «заваливают» толпой
+      if (q === lead && q.tiles > g.winLand * 0.35) s *= 1.8; // лидера к концу матча «заваливают» толпой
+      if (q.kind !== KIND.TRIBE && !friend && q.troops < p.troops * 0.35) s *= 2; // добить слабого — меньше игроков, быстрее развязка
+      if (p === lead && p.tiles > g.winLand * 0.2) s *= 1 + p.tiles / g.winLand; // лидер давит к победе
       if (s > bs) { bs = s; best = q; }
     }
     return best;
@@ -120,17 +153,64 @@ export function setupBrain(g, me) {
 
   // десант: ближайший по воде берег (свободный или враждебный) — когда на суше расти некуда;
   // prefer — высадка именно к этому сопернику (крупная страна за морем)
+  let scoutTick = -1;
+  // десант против того, кто в разы сильнее, бессмысленен (и только спамит ленту событий)
+  const worthBoat = (p, q, troops) => !q || q.kind === KIND.TRIBE || (troops >= q.troops * 0.25 && q.troops < p.troops * 1.2);
+  // берег цели, ближайший к нашей столице (куда плыть десанту)
+  function coastOf(q, p) {
+    const shore = g.w.shore, base = p.spawn >= 0 ? p.spawn : p.border.values().next().value;
+    if (base === undefined) return -1;
+    const bx = base % W, by = (base / W) | 0;
+    let best = -1, bd = 1e9, k = 0;
+    for (const t of q.border) {
+      if (!shore[t]) continue;
+      const d = Math.abs((t % W) - bx) + Math.abs(((t / W) | 0) - by);
+      if (d < bd) { bd = d; best = t; }
+      if (++k > 5000) break;
+    }
+    return best;
+  }
+  // большой стране некуда расти по суше: самая выгодная цель за морем (слабее нас и не слишком далеко)
+  function overseasTarget(p, troops) {
+    const base = p.spawn >= 0 ? p.spawn : p.border.values().next().value;
+    if (base === undefined) return null;
+    const bx = base % W, by = (base / W) | 0;
+    let best = null, bs = 0;
+    for (let i = 1; i < g.P.length; i++) {
+      const q = g.P[i];
+      if (!q.alive || q === p || !q.tiles || !g.canAttack(p, q) || !worthBoat(p, q, troops)) continue;
+      if (p.isClaude && (q.isPlayer || g.allied(q, me))) continue;
+      if ((q.isPlayer || q.isClaude) && g.tickN < PROT_TICKS + 600 && !recentHit(p, q)) continue;
+      const qb = q.spawn >= 0 && g.owner[q.spawn] === q.id ? q.spawn : q.border.values().next().value;
+      if (qb === undefined) continue;
+      const d = Math.hypot((qb % W) - bx, ((qb / W) | 0) - by);
+      const s = ((p.troops + 1) / (q.troops + 1)) * (1 + Math.log10(1 + q.tiles / 200)) / (1 + d / 250) * (q.kind === KIND.TRIBE ? 0.6 : 1) * rf(0.8, 1.2);
+      if (s > bs) { bs = s; best = q; }
+    }
+    return best;
+  }
   function tryBoat(p, troops, prefer = null) {
-    if (p.boats.length >= (p.kind === KIND.NATION ? 3 : 1) || p.boats.length >= BOAT_MAX || g.tickN - p.ai.boatAt < (prefer ? 120 : 250)) return false;
+    const big = p.tiles > 2500;
+    if (p.boats.length >= (p.kind === KIND.NATION || big ? 3 : 1) || p.boats.length >= BOAT_MAX || g.tickN - p.ai.boatAt < (prefer || big ? 120 : 250)) return false;
+    if (prefer && !worthBoat(p, prefer, troops)) return false;
+    if (scoutTick === g.tickN) return false; // поиск пути по воде — не больше одного за тик на весь сервер
+    scoutTick = g.tickN;
     p.ai.boatAt = g.tickN - (p.kind === KIND.NATION ? 100 : 0);
+    // выбранный соперник или большая страна: путь A* к ближайшему берегу цели (кэшируется), а не обход всего океана
+    const q = prefer || (big ? overseasTarget(p, troops) : null);
+    if (q) {
+      const land = coastOf(q, p);
+      const r = land >= 0 ? g.boatRoute(p, land, 90000) : null;
+      return !!r && g.sendBoat(p, land, troops, r).ok;
+    }
     const o = g.owner;
-    const r = g.boatScout(p, prefer ? (L) => o[L] === prefer.id : (L) => {
+    const r = g.boatScout(p, (L) => {
       const id = o[L];
       if (!id) return !g.fall[L];
       const q = g.P[id];
       if (!g.canAttack(p, q) || (p.isClaude && (q.isPlayer || g.allied(q, me)))) return false;
-      return q.kind === KIND.TRIBE || density(q) < density(p) * 1.2;
-    });
+      return q.kind === KIND.TRIBE || (density(q) < density(p) * 1.2 && worthBoat(p, q, troops));
+    }, 20000);
     if (!r) return false;
     return g.sendBoat(p, r.land, troops, r).ok;
   }
@@ -141,9 +221,14 @@ export function setupBrain(g, me) {
     const o = g.owner;
     let base = p.spawn;
     if (base < 0 || o[base] !== p.id) { const it = p.border.values().next(); if (it.done) return false; base = it.value; }
-    if (type === 'port') {
-      let k = 0;
-      for (const t of p.border) { if (g.w.shore[t] && Math.random() < 0.08 && g.build(p, 'port', t).ok) return true; if (++k > 4000) break; }
+    if (type === 'port') { // несколько случайных своих береговых клеток (каждая попытка — поиск места с отступом)
+      let k = 0, tries = 0;
+      for (const t of p.border) {
+        if (++k > 6000 || tries >= 6) break;
+        if (!g.w.shore[t] || Math.random() > 0.08) continue;
+        tries++;
+        if (g.build(p, 'port', t).ok) return true;
+      }
       return false;
     }
     if (type === 'warship') {
@@ -174,20 +259,26 @@ export function setupBrain(g, me) {
     }
     return false;
   }
+  // нужна ли ПВО: по нам недавно били ядеркой, или середина матча, шахта уже есть, а ПВО мало
+  function samWanted(p) {
+    const t = g.tickN, sams = g.countOf(p, 'sam');
+    if (p.nukedAt !== undefined && t - p.nukedAt < 3000 && sams < 1 + Math.floor(p.tiles / 6000)) return true;
+    return t > 7000 && p.tiles > 1500 && g.countOf(p, 'silo') > 0 && sams < 1 + Math.floor(p.tiles / 15000);
+  }
   // порядок построек наций: города → порты и заводы → посты на горячих границах → шахта и ПВО к середине
   function buildOrder(p) {
     const c = (t) => g.countOf(p, t), tiles = p.tiles, t = g.tickN;
     if (aiPost(p)) return;
-    // по нам били ядеркой — срочно ПВО
-    if (p.nukedAt !== undefined && t - p.nukedAt < 3000 && c('sam') < 1 + Math.floor(tiles / 6000) && p.gold >= g.cost(p, 'sam')) { if (aiBuild(p, 'sam')) return; }
-    // к середине матча — ракетная шахта (пока копим на неё, мелочь не строим), потом ПВО
+    // ПВО: копим на неё (1.5M), мелочь не строим, ядерку не тратим
+    if (samWanted(p)) { if (p.gold >= g.cost(p, 'sam') && aiBuild(p, 'sam')) return; if (p.gold < g.cost(p, 'sam')) return; }
+    // к середине матча — ракетная шахта (пока копим на неё, мелочь не строим)
     if (t > 6000 && !c('silo')) { if (p.gold >= g.cost(p, 'silo') && aiBuild(p, 'silo')) return; if (c('city') >= 2) return; }
-    if (t > 7000 && c('silo') && c('sam') < 1 && p.gold >= g.cost(p, 'sam') + 300000) { if (aiBuild(p, 'sam')) return; }
     // когда шахта есть — держим запас на атомную бомбу
     const reserve = t > 7200 && g.silosOf(p) ? NUKES.atom.cost + 300000 : 0;
     const can = (type) => p.gold - g.cost(p, type) >= reserve;
     if (c('city') < 1 + Math.min(3, Math.floor(tiles / 1500))) { if (can('city')) aiBuild(p, 'city'); return; }
-    const coastal = [...p.border].some((x) => g.w.shore[x]);
+    let coastal = false;
+    for (const x of p.border) if (g.w.shore[x]) { coastal = true; break; }
     if (coastal && c('port') < 1 + Math.min(6, Math.floor(tiles / 3000))) { if (can('port') && aiBuild(p, 'port')) return; }
     if (c('factory') < Math.min(5, Math.floor(tiles / 3000))) { if (can('factory') && aiBuild(p, 'factory')) return; }
     if (t > 3600 && coastal && c('port') && g.shipsOf(p) < 1 && p.gold > 600000 + reserve) { if (aiBuild(p, 'warship')) return; }
@@ -206,6 +297,8 @@ export function setupBrain(g, me) {
     if (base === undefined || !g.readySilo(p, base)) return false;
     ai.nukeAt = t + ri(350, 800);
     if (p.gold < NUKES.atom.cost + 300000) return false;
+    const revenge = p.nukedAt !== undefined && t - p.nukedAt < 1200;
+    if (!revenge && samWanted(p) && p.gold < g.cost(p, 'sam') + NUKES.atom.cost) return false; // сначала ПВО
     let best = null, bs = 0;
     for (let i = 1; i < g.P.length; i++) {
       const q = g.P[i];
@@ -250,7 +343,7 @@ export function setupBrain(g, me) {
     let best = null;
     for (let i = 1; i < g.P.length; i++) {
       const q = g.P[i];
-      if (!q.alive || q === p || q.kind === KIND.TRIBE || q.tiles < p.tiles * 0.25 || q.tiles < 800 || !g.canAttack(p, q)) continue;
+      if (!q.alive || q === p || q.kind === KIND.TRIBE || q.tiles < p.tiles * 0.25 || q.tiles < 800 || !g.canAttack(p, q) || q.troops > p.troops * 1.2) continue;
       if (p.isClaude && (q.isPlayer || g.allied(q, me))) continue;
       if (q.isPlayer && g.tickN < PROT_TICKS + 1200) continue;
       if (!best || q.tiles > best.tiles) best = q;
@@ -271,11 +364,13 @@ export function setupBrain(g, me) {
       }
       return;
     }
-    if (step === 1) { // атака: порог triggerRatio, резерв reserveRatio
-      if (tr < cap * ai.trigger) return;
+    if (step === 1) { // атака: порог triggerRatio, резерв reserveRatio; к середине матча — смелее, лидер давит
+      const late = g.tickN > PROT_TICKS + 1800, isLead = p === lead && p.tiles > g.winLand * 0.15;
+      const trig = isLead ? 0.4 : late ? Math.min(ai.trigger, 0.46) : ai.trigger;
+      if (tr < cap * trig) return;
       if (aiBetray(p)) return;
-      const q = chooseTarget(p, info, tr > cap * 0.85 ? 0 : 1);
-      const send = tr - cap * ai.reserve;
+      const q = chooseTarget(p, info, tr > cap * (late ? 0.62 : 0.85) ? 0 : 1);
+      const send = tr - cap * (isLead ? 0.22 : late ? Math.min(ai.reserve, 0.3) : ai.reserve);
       // по суше остались только огрызки — бьём крупного соперника десантом через море
       if (send > 1 && g.tickN > PROT_TICKS && (!q || q.tiles < p.tiles * 0.03) && Math.random() < 0.45) {
         const big = rival(p);
@@ -302,9 +397,10 @@ export function setupBrain(g, me) {
   function human(p) {
     const ai = p.ai, cap = g.maxTroops(p), tr = p.troops, info = scan(p);
     if (tr > cap * 0.5 && aiBetray(p)) return;
-    if (info.free && tr > cap * 0.28) g.attack(p, null, tr * ai.ratio);
+    const calm = p.isClaude && g.tickN < 1800; // Клод первые 3 минуты растёт спокойно — землю у игрока не отбивает
+    if (info.free && tr > cap * (calm ? 0.4 : 0.28)) g.attack(p, null, tr * (calm ? 0.12 : ai.ratio));
     else if (tr > cap * 0.42) {
-      const q = chooseTarget(p, info, tr > cap * 0.75 ? 0 : 1);
+      const q = chooseTarget(p, info, tr > cap * (g.tickN > PROT_TICKS + 1800 ? 0.6 : 0.75) ? 0 : 1);
       if (q) g.attack(p, q, tr * Math.min(0.75, ai.ratio + 0.15));
       else if (!info.free && tr > cap * 0.6) tryBoat(p, tr * (p.tiles > g.winLand * 0.15 ? 0.5 : ai.ratio));
     }
@@ -313,6 +409,7 @@ export function setupBrain(g, me) {
     if (ai.step === 0) {
       if (aiPost(p)) return;
       if (g.tickN > 7200 && !p.isClaude && ai.toxic > 0.3 && !g.countOf(p, 'silo') && p.gold > 1.6e6 && aiBuild(p, 'silo')) return;
+      if (samWanted(p) && p.gold >= g.cost(p, 'sam') && aiBuild(p, 'sam')) return;
       if (p.gold > 3e6) { aiBuild(p, 'city') || aiBuild(p, 'factory') || aiBuild(p, 'port'); return; } // богатый бот не копит без дела
       const r = Math.random();
       if (r < 0.65) aiBuild(p, 'city');

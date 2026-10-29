@@ -120,9 +120,9 @@ export class Game {
     this.chg = new Int32Array(16384); this.chgN = 0;
     this.attackSeq = 1; this.structSeq = 1; this.boatSeq = 1;
     this.pacts = new Map(); this.requests = []; this.reqSeq = 1; // союзы (со сроком) и запросы союза
-    this.dirtyEnclave = false;
+    this.encSeed = new Int32Array(8192); this.encSeedB = new Int32Array(8192); this.encN = 0; // смены владельца для проверки анклавов
     this.brain = null; // ИИ: fn(game) каждый тик
-    this.lab = null; this.stk = null;
+    this.claudeZone = null; // { pid, cx, cy, r2, until } — земля игрока, которую Клод не занимает (см. claudeSkip)
   }
   on(fn) { this.handlers.push(fn); }
   emit(type, d) { for (const h of this.handlers) try { h(type, d); } catch (e) { console.error(e); } }
@@ -177,6 +177,7 @@ export class Game {
     if (!this.allied(p, q)) return false;
     p.allies.delete(q.id); q.allies.delete(p.id);
     this.pacts.delete(pactKey(p, q));
+    this.encBorders(p); this.encBorders(q);
     p.traitorUntil = this.tickN + TRAITOR_TICKS;
     this.emit('betray', { p, q });
     return true;
@@ -257,6 +258,7 @@ export class Game {
       if (t >= pc.until) {
         this.pacts.delete(k);
         pc.a.allies.delete(pc.b.id); pc.b.allies.delete(pc.a.id);
+        this.encBorders(pc.a); this.encBorders(pc.b);
         this.emit('allyExpired', { pc });
       }
     }
@@ -306,7 +308,7 @@ export class Game {
     if (t >= W) this.refreshBorder(t - W);
     if (t < N_TILES - W) this.refreshBorder(t + W);
     this.mark(t);
-    this.dirtyEnclave = true;
+    this.encPush(t);
     const s = this.structAt[t];
     if (s >= 0) this.captureStruct(this.structs[s], id, prev);
   }
@@ -430,6 +432,17 @@ export class Game {
     a.heap.push(pr, t);
     a.front.add(t);
   }
+  // Клод (союзник игрока навсегда) не занимает свободные клетки вплотную к стране игрока, а первые минуты —
+  // и круг вокруг его столицы: иначе быстрый ИИ-друг «запирает» игрока, и эту землю уже не отнять
+  claudeSkip(t) {
+    const z = this.claudeZone;
+    if (!z) return false;
+    const o = this.owner, pid = z.pid, x = t % W;
+    if ((x > 0 && o[t - 1] === pid) || (x < W - 1 && o[t + 1] === pid) || (t >= W && o[t - W] === pid) || (t < N_TILES - W && o[t + W] === pid)) return true;
+    if (this.tickN >= z.until) return false;
+    const dx = x - z.cx, dy = ((t / W) | 0) - z.cy;
+    return dx * dx + dy * dy < z.r2;
+  }
   hasPostNear(def, t) {
     if (!def.posts.length) return false;
     const x = t % W, y = (t / W) | 0, R2 = STRUCTS.post.range * STRUCTS.post.range;
@@ -465,6 +478,7 @@ export class Game {
       const ter = terr[t];
       let mag = MAG[ter], cost = COST[ter];
       if (!def) {
+        if (p.isClaude && this.claudeSkip(t)) continue; // союзник не отбивает у игрока свободную землю
         if (this.fall[t]) { const f = 5 - (2 * this.fallout) / this.landCount; mag *= f; cost *= f; } // радиация: в 3–5 раз дороже
         budget -= within((2000 * cost) / Math.max(1, a.troops), 5, 100) / (2 * borderSize);
         a.troops -= mag / (p.kind === KIND.TRIBE ? 10 : 5);
@@ -514,8 +528,22 @@ export class Game {
     if (!v.alive) return;
     v.alive = false; v.diedAt = this.tickN;
     // вся оставшаяся земля отходит победителю
-    const o = this.owner, vid = v.id;
-    if (v.tiles > 0) for (let t = 0; t < N_TILES; t++) if (o[t] === vid) this.setOwner(t, by ? by.id : 0);
+    // заливка от граничных клеток (каждый кусок земли касается своей границы) — O(земли игрока), без обхода всей карты
+    const o = this.owner, vid = v.id, nid = by ? by.id : 0;
+    if (v.tiles > 0) {
+      if (!this.elStk) this.elStk = new Int32Array(N_TILES);
+      const stk = this.elStk;
+      let sp = 0;
+      for (const t of [...v.border]) if (o[t] === vid) { this.setOwner(t, nid); stk[sp++] = t; }
+      while (sp) {
+        const t = stk[--sp], x = t % W;
+        if (x > 0 && o[t - 1] === vid) { this.setOwner(t - 1, nid); stk[sp++] = t - 1; }
+        if (x < W - 1 && o[t + 1] === vid) { this.setOwner(t + 1, nid); stk[sp++] = t + 1; }
+        if (t >= W && o[t - W] === vid) { this.setOwner(t - W, nid); stk[sp++] = t - W; }
+        if (t < N_TILES - W && o[t + W] === vid) { this.setOwner(t + W, nid); stk[sp++] = t + W; }
+      }
+      if (v.tiles > 0) for (let t = 0; t < N_TILES; t++) if (o[t] === vid) this.setOwner(t, nid); // страховка (не должно случаться)
+    }
     for (const a of v.attacks.slice()) this.killAttack(a);
     for (const a of this.attacks) if (!a.dead && a.target === v) this.endAttack(a, a.troops, 'done');
     for (const b of v.boats.slice()) this.killBoat(b);
@@ -534,59 +562,65 @@ export class Game {
     this.emit('eliminated', { v, by, gold });
   }
 
-  // анклавы: кусок земли, со всех сторон (по суше, без выхода к морю) окружённый одним враждебным игроком, отходит ему
+  // анклавы: кусок земли, со всех сторон (по суше, без выхода к морю) окружённый одним враждебным игроком, отходит ему.
+  // Проверяются только куски у клеток, сменивших владельца с прошлой проверки (encSeed), с ранним выходом:
+  // кусок у воды/ничьей земли/третьего игрока — не анклав; кусок больше половины земли игрока (или >12K клеток) — основная
+  // земля, не трогается. Так проверка стоит сотни клеток, а не полный обход карты (раньше — до 50 мс на тик).
+  encPush(t) {
+    if (this.encN === this.encSeed.length) { const c = new Int32Array(this.encSeed.length * 2); c.set(this.encSeed); this.encSeed = c; }
+    this.encSeed[this.encN++] = t;
+  }
+  encBorders(p) { for (const t of p.border) this.encPush(t); } // союз кончился — окружённые куски перепроверить
   enclaves() {
-    if (!this.dirtyEnclave) return;
-    this.dirtyEnclave = false;
-    const n = N_TILES, o = this.owner;
-    if (!this.lab) { this.lab = new Int32Array(n); this.stk = new Int32Array(n); }
-    const lab = this.lab, stk = this.stk;
-    lab.fill(0);
-    const cSize = [0], cOwner = [0], cSur = [0], cStart = [0];
-    const best = new Int32Array(this.P.length), bestSize = new Int32Array(this.P.length);
-    for (let s = 0; s < n; s++) {
-      const id = o[s];
-      if (!id || lab[s]) continue;
-      const c = cSize.length;
-      let sp = 0, size = 0, sur = -2;
-      stk[sp++] = s; lab[s] = c;
-      while (sp) {
-        const t = stk[--sp]; size++;
-        const x = t % W;
-        for (let k = 0; k < 4; k++) {
-          let nb;
-          if (k === 0) { if (x === 0) continue; nb = t - 1; } else if (k === 1) { if (x === W - 1) continue; nb = t + 1; } else if (k === 2) { if (t < W) continue; nb = t - W; } else { if (t >= n - W) continue; nb = t + W; }
-          const on = o[nb];
-          if (on === id) { if (!lab[nb]) { lab[nb] = c; stk[sp++] = nb; } continue; }
-          if (on === 0) { sur = -1; continue; } // ничья земля или вода рядом — не окружён
-          if (sur === -2) sur = on; else if (sur !== on) sur = -1;
+    const N = this.encN;
+    if (!N) return;
+    const S = this.encSeed; // снимок; новые смены владельца (в т.ч. от перекраски) пишутся во второй буфер
+    this.encSeed = this.encSeedB; this.encSeedB = S; this.encN = 0;
+    if (!this.encMark) { this.encMark = new Uint32Array(N_TILES); this.encList = new Int32Array(N_TILES); this.encGen = 0; }
+    if (this.encGen > 4e9) { this.encMark.fill(0); this.encGen = 0; }
+    const o = this.owner, mk = this.encMark, g0 = this.encGen;
+    for (let i = 0; i < N; i++) {
+      const t0 = S[i], x = t0 % W;
+      for (let k = 0; k < 5; k++) {
+        let s;
+        if (k === 0) s = t0; else if (k === 1) { if (x === 0) continue; s = t0 - 1; } else if (k === 2) { if (x === W - 1) continue; s = t0 + 1; } else if (k === 3) { if (t0 < W) continue; s = t0 - W; } else { if (t0 >= N_TILES - W) continue; s = t0 + W; }
+        if (!o[s] || mk[s] > g0) continue;
+        this.encCheck(s, g0);
+      }
+    }
+  }
+  encCheck(s, g0) {
+    const o = this.owner, mk = this.encMark, L = this.encList, id = o[s], p = this.P[id];
+    const g = ++this.encGen;
+    mk[s] = g;
+    if (!p || !p.alive) return;
+    const small = p.tiles < ELIM_TILES, cap = small ? N_TILES : Math.min(12000, p.tiles >> 1);
+    let sp = 0, size = 0, sur = -2;
+    L[size++] = s; // список клеток куска, он же очередь обхода в ширину
+    while (sp < size) {
+      const t = L[sp++], x = t % W;
+      for (let k = 0; k < 4; k++) {
+        let nb;
+        if (k === 0) { if (x === 0) continue; nb = t - 1; } else if (k === 1) { if (x === W - 1) continue; nb = t + 1; } else if (k === 2) { if (t < W) continue; nb = t - W; } else { if (t >= N_TILES - W) continue; nb = t + W; }
+        const on = o[nb];
+        if (on === id) {
+          const m = mk[nb];
+          if (m === g) continue;
+          if (m > g0) return; // этот кусок уже проверен в эту проверку
+          mk[nb] = g; L[size++] = nb;
+          if (size > cap) return; // основная земля
+          continue;
         }
+        if (on === 0) return; // вода или ничья земля рядом — не окружён
+        if (sur === -2) sur = on; else if (sur !== on) return;
       }
-      cSize.push(size); cOwner.push(id); cSur.push(sur); cStart.push(s);
-      if (size > bestSize[id]) { bestSize[id] = size; best[id] = c; }
     }
-    for (let c = 1; c < cSize.length; c++) {
-      const id = cOwner[c], sur = cSur[c];
-      if (sur <= 0) continue;
-      const p = this.P[id], q = this.P[sur];
-      if (!p.alive || !q.alive || this.allied(p, q)) continue;
-      if (best[id] === c && p.tiles >= ELIM_TILES) continue; // основная земля не трогается
-      // перекрасить компоненту
-      let sp = 0; stk[sp++] = cStart[c]; lab[cStart[c]] = -1;
-      const list = [];
-      while (sp) {
-        const t = stk[--sp]; list.push(t);
-        const x = t % W;
-        if (x > 0 && lab[t - 1] === c) { lab[t - 1] = -1; stk[sp++] = t - 1; }
-        if (x < W - 1 && lab[t + 1] === c) { lab[t + 1] = -1; stk[sp++] = t + 1; }
-        if (t >= W && lab[t - W] === c) { lab[t - W] = -1; stk[sp++] = t - W; }
-        if (t < n - W && lab[t + W] === c) { lab[t + W] = -1; stk[sp++] = t + W; }
-      }
-      for (const t of list) this.setOwner(t, sur);
-      this.emit('enclave', { from: p, to: q, n: list.length });
-      if (p.tiles === 0) this.eliminate(p, q);
-      else if (p.tiles < ELIM_TILES && best[id] === c) this.eliminate(p, q);
-    }
+    if (sur <= 0) return;
+    const q = this.P[sur];
+    if (!q.alive || this.allied(p, q)) return;
+    for (let i = 0; i < size; i++) this.setOwner(L[i], sur);
+    this.emit('enclave', { from: p, to: q, n: size });
+    if (p.alive && p.tiles < ELIM_TILES) this.eliminate(p, q);
   }
 
   // ---------- постройки ----------
@@ -804,7 +838,7 @@ export class Game {
   }
   // A* по клеткам воды (4 соседа, эвристика — манхэттен с лёгким уклоном к цели): обычно обходит
   // в десятки раз меньше клеток, чем BFS по всему океану; готовые маршруты кэшируются (вода не меняется)
-  waterPath(a, b) {
+  waterPath(a, b, cap = 400000) {
     const key = a * N_TILES + b, cache = this.routeCache || (this.routeCache = new Map());
     const hit = cache.get(key);
     if (hit !== undefined) return hit;
@@ -820,7 +854,7 @@ export class Game {
       if (done[t] === st) continue;
       done[t] = st;
       if (t === b) { found = true; break; }
-      if (++visits > 400000) break;
+      if (++visits > cap) break;
       const x = t % W, g1 = G[t] + 1;
       for (let k = 0; k < 4; k++) {
         let nb;
@@ -843,18 +877,18 @@ export class Game {
     return path;
   }
   // маршрут десанта p к береговой клетке land: от лучшей своей береговой клетки того же водоёма
-  boatRoute(p, land) {
+  boatRoute(p, land, cap = 400000) {
     if (land < 0) return null;
     const sea = this.seaOf(land);
     if (!sea) return null;
     const src = this.launchTile(p, land, sea);
     if (src < 0) return null;
     const a = this.waterNear(src, sea), b = this.waterNear(land, sea);
-    const path = a >= 0 && b >= 0 ? this.waterPath(a, b) : null;
+    const path = a >= 0 && b >= 0 ? this.waterPath(a, b, cap) : null;
     return path ? { path, land, src } : null;
   }
   // разведка для ИИ: ближайший достижимый по воде берег, где ok(клетка суши) — от своего берега наружу
-  boatScout(p, ok, maxVisit = 90000) {
+  boatScout(p, ok, maxVisit = 36000) {
     const st = this.bfsInit(), prev = this.bPrev, seen = this.bSeen, Q = this.bQ;
     let h = 0, tl = 0;
     for (const t of p.border) {

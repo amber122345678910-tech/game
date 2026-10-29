@@ -410,9 +410,9 @@ function thumbJJS(g, w, h) {
   orb(w * 0.3, h * 0.36, w * 0.24, '#3aa0ff');
   orb(w * 0.72, h * 0.4, w * 0.2, '#ff3355');
   g.fillStyle = '#4a4a55'; g.fillRect(0, h * 0.72, w, h * 0.28);
-  blocky(g, w * 0.3, h * 0.33, w * 0.07, { skin: '#f2c9a0', shirt: '#1d2340', pants: '#1d2340', hair: '#f5f5f5', band: '#111' }, -0.4);
+  blocky(g, w * 0.3, h * 0.33, w * 0.07, { skin: '#e0ac7e', shirt: '#0f766e', pants: '#1f2937', hair: '#1b1b1b', band: '#f59e0b' }, -0.4);
   g.save(); g.scale(-1, 1);
-  blocky(g, -w * 0.72, h * 0.33, w * 0.07, { skin: '#f2c9a0', shirt: '#f1efe8', pants: '#2a2a2a', hair: '#ff8fb1' }, -0.6);
+  blocky(g, -w * 0.72, h * 0.33, w * 0.07, { skin: '#f2c9a0', shirt: '#7c2d12', pants: '#2a2a2a', hair: '#facc15' }, -0.6);
   g.restore();
   // разрезы
   g.strokeStyle = 'rgba(255,255,255,.85)'; g.lineWidth = 3;
