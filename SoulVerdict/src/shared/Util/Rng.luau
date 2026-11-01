@@ -149,11 +149,14 @@ local function integer(s: State, min: number, max: number): number
 	return min + math.floor(unit(s) * range)
 end
 
-local function make(s0: number, s1: number, s2: number, s3: number): Rng
+local function make(s0: number, s1: number, s2: number, s3: number, warmup: number): Rng
 	if s0 == 0 and s1 == 0 and s2 == 0 and s3 == 0 then
 		s0 = 0x9E3779B9 -- the all-zero state is the only invalid xoshiro state
 	end
 	local state: State = { s0 = s0, s1 = s1, s2 = s2, s3 = s3 }
+	for _ = 1, warmup do
+		next32(state) -- decorrelate the first outputs from the seeding
+	end
 	return (setmetatable(state, Rng) :: any) :: Rng
 end
 
@@ -165,7 +168,7 @@ function Rng.new(seed: (number | string)?): Rng
 		x = (x + 0x9E3779B9) % TWO32 -- splitmix-style counter, then avalanche
 		words[i] = fmix32(bxor(x, mul32(base, 2 * i + 1)))
 	end
-	return make(words[1], words[2], words[3], words[4])
+	return make(words[1], words[2], words[3], words[4], 4)
 end
 
 function Rng.fromState(state: { number }): Rng
@@ -174,7 +177,7 @@ function Rng.fromState(state: { number }): Rng
 	for i = 1, 4 do
 		w[i] = math.floor(state[i]) % TWO32
 	end
-	return make(w[1], w[2], w[3], w[4])
+	return make(w[1], w[2], w[3], w[4], 0)
 end
 
 -- Methods (self is the internal State table; the public type is Rng) -----------------------------
@@ -255,7 +258,7 @@ function Rng.InCircle(self: State, radius: number): (number, number)
 end
 
 function Rng.Clone(self: State): Rng
-	return make(self.s0, self.s1, self.s2, self.s3)
+	return make(self.s0, self.s1, self.s2, self.s3, 0)
 end
 
 function Rng.State(self: State): { number }

@@ -106,15 +106,19 @@ export type HazardPacket = {
 }
 
 export type Volume = {
-	Shape: "Box" | "Ball" | "Capsule",
+	-- Cylinder: axis = CFrame.UpVector, Size.X = diameter, Size.Y = height.
+	-- Ring: annulus like Cylinder (Size.X = outer diameter), Size.Z = band thickness. See Combat/HitTest.luau.
+	Shape: "Box" | "Ball" | "Capsule" | "Cylinder" | "Ring",
 	CFrame: CFrame,
 	Size: Vector3,
+	Key: number?, -- sub-element index (e.g. a Rain drop) used by HitPolicy.PerKey
 }
 
 export type HazardDef = {
 	Duration: (params: { [string]: any }) -> number,
 	Volumes: (params: { [string]: any }, t: number) -> { Volume },
-	HitPolicy: (params: { [string]: any }) -> { Once: boolean, Interval: number? },
+	-- PerKey: Once/Interval are tracked per (target, Volume.Key) instead of per target
+	HitPolicy: (params: { [string]: any }) -> { Once: boolean, Interval: number?, PerKey: boolean? },
 }
 
 export type DamageKind = "Melee" | "Projectile" | "Beam" | "Area" | "True" | "Box"
@@ -134,6 +138,7 @@ export type DamageInfo = {
 	Undodgeable: boolean?,
 	Position: Vector3?,
 	Silent: boolean?,
+	AttackerTeam: string?, -- team of the source when Attacker is nil/gone (hazards); defaults to Attacker's team
 }
 
 export type DamageResult = {
@@ -144,6 +149,10 @@ export type DamageResult = {
 	Killed: boolean,
 	Downed: boolean,
 	Absorbed: number,
+	-- why nothing was applied: "Invalid" | "Team" | "Immune" | "Color" | "Cancelled" (nil = processed)
+	Reason: string?,
+	KR: number?, -- KR added to the target
+	GuardBroken: boolean?,
 }
 
 export type DamageFxPacket = {
@@ -158,6 +167,13 @@ export type DamageFxPacket = {
 	crit: boolean?,
 	pos: Vector3,
 	kr: number?,
+	-- optional extras (DamageService): kind = "Heal" for heals
+	ability: string?,
+	absorbed: number?,
+	killed: boolean?,
+	downed: boolean?,
+	guardBreak: boolean?,
+	negated: string?, -- a kit hook negated the hit (e.g. "Afterimage", "Pirouette")
 }
 
 export type MeleeSpec = {
@@ -256,6 +272,8 @@ export type GraphicsPreset = {
 	ColorGrading: { [string]: any }?,
 	Clouds: { [string]: any }?,
 	Ambient: { Particles: string?, Density: number? }?, -- ambient weather id
+	Desc: Localized?, -- short mood description (Style Lab / settings tooltip)
+	GlobalWind: Vector3?, -- Workspace.GlobalWind while this preset is active (clouds, particles)
 }
 
 -- Profile (persistent data)
