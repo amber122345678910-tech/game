@@ -31,6 +31,7 @@ function IntroSplash.Create(theme: any, deps: any): any
 	local phone = layout.Phone
 	local live = type(deps) == "table" and deps.Live == true
 	local k = if phone then 0.56 else 1 -- size factor
+	local kt = if phone then 0.8 else 1 -- text factor (phones keep text readable)
 
 	local backdrop = Style.Frame({
 		Name = "Backdrop",
@@ -105,7 +106,7 @@ function IntroSplash.Create(theme: any, deps: any): any
 	local monsterTitle = Style.Text(skin, {
 		Name = "Title",
 		Text = "",
-		TextSize = math.floor((if battle then 16 else 20) * k),
+		TextSize = math.floor((if battle then 16 else 20) * kt),
 		X = "Center",
 		Position = UDim2.fromOffset(0, math.floor(440 * k)),
 		Size = UDim2.new(1, 0, 0, math.floor(26 * k)),
@@ -114,7 +115,7 @@ function IntroSplash.Create(theme: any, deps: any): any
 	local monsterPlayer = Style.Text(skin, {
 		Name = "Player",
 		Text = "",
-		TextSize = math.floor((if battle then 11 else 14) * k),
+		TextSize = math.floor((if battle then 11 else 14) * kt),
 		Color = C.Dim,
 		X = "Center",
 		Position = UDim2.fromOffset(0, math.floor(486 * k)),
@@ -195,7 +196,7 @@ function IntroSplash.Create(theme: any, deps: any): any
 	local harmonyLabel = Style.Text(skin, {
 		Name = "Harmony",
 		Text = "",
-		TextSize = math.floor((if battle then 11 else 14) * k),
+		TextSize = math.floor((if battle then 11 else 14) * kt),
 		Color = C.Good,
 		Size = UDim2.new(1, 0, 0, 22),
 		LayoutOrder = 1000,
@@ -215,7 +216,7 @@ function IntroSplash.Create(theme: any, deps: any): any
 	Style.Text(skin, {
 		Name = "Ready",
 		Text = Style.L("hud.intro.ready"),
-		TextSize = math.floor((if battle then 11 else 13) * k),
+		TextSize = math.floor((if battle then 11 else 13) * kt),
 		Color = C.Dim,
 		X = "Center",
 		Stroke = false,
@@ -359,7 +360,7 @@ function IntroSplash.Create(theme: any, deps: any): any
 				Text = if battle then Style.Upper(skin, tostring(u.Name)) else tostring(u.Name),
 				Upper = false,
 				Role = "Title",
-				TextSize = math.floor((if battle then 16 else 22) * k),
+				TextSize = math.floor((if battle then 16 else 22) * kt),
 				Scaled = true,
 				Position = UDim2.new(0, cardH, 0, math.floor(cardH * 0.16)),
 				Size = UDim2.new(1, -cardH - math.floor(90 * k), 0, math.floor(cardH * 0.36)),
@@ -368,7 +369,7 @@ function IntroSplash.Create(theme: any, deps: any): any
 			Style.Text(skin, {
 				Name = "Class",
 				Text = (if hk then Style.Pick(hk.Name) .. "  ·  " .. Style.Pick(hk.Title) else ""),
-				TextSize = math.floor((if battle then 10 else 14) * k),
+				TextSize = math.floor((if battle then 10 else 14) * kt),
 				Color = color,
 				Position = UDim2.new(0, cardH, 0, math.floor(cardH * 0.56)),
 				Size = UDim2.new(1, -cardH - math.floor(90 * k), 0, math.floor(cardH * 0.28)),
@@ -377,7 +378,7 @@ function IntroSplash.Create(theme: any, deps: any): any
 			Style.Text(skin, {
 				Name = "LV",
 				Text = Style.L("hud.lv", u.Level or 1) .. (if u.IsBot then "  " .. Style.L("hud.bot") else ""),
-				TextSize = math.floor((if battle then 11 else 14) * k),
+				TextSize = math.floor((if battle then 11 else 14) * kt),
 				Color = C.Dim,
 				X = "Right",
 				AnchorPoint = Vector2.new(1, 0.5),

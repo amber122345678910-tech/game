@@ -117,7 +117,7 @@ local function boneSwing(fx: any, comboIndex: number)
 				Duration = 0.24,
 			})
 		end
-		fx.Sound(if last then "SwingHeavy" else "Swing", fx.Root(char))
+		fx.Sound("Whoosh", fx.Root(char), { Pitch = if last then 0.85 else 1.05 })
 	end)
 end
 

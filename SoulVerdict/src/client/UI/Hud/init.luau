@@ -489,6 +489,7 @@ function Hud.Mount(screenGui: Instance, deps: any?): any
 
 	rebuild()
 	refresh()
+	local phaseSeen: string = snap.Phase or "Waiting"
 
 	-- events --------------------------------------------------------------------------------------------
 	local function isLocalModel(model: any): boolean
@@ -521,7 +522,7 @@ function Hud.Mount(screenGui: Instance, deps: any?): any
 				pcall(pieces.IntroSplash.Play, data, source)
 			end
 		elseif name == "PhaseChanged" then
-			if data.phase == "Round" and snap.Phase == "Intro" then
+			if data.phase == "Round" and phaseSeen ~= "Round" and phaseSeen ~= "Collapse" and snap.Role ~= "Lobby" then
 				announce("Fight", { Monster = monsterSide })
 			elseif data.phase == "Intermission" or data.phase == "Waiting" then
 				source:SetMyVote(nil)
@@ -542,6 +543,9 @@ function Hud.Mount(screenGui: Instance, deps: any?): any
 			if isLocalModel(data.victim) then
 				source:SetKiller(nameOf(data.killer, data.killerName))
 			end
+		end
+		if name == "PhaseChanged" and type(data.phase) == "string" then
+			phaseSeen = data.phase
 		end
 		local entry = Hud.FeedFromEvent(name, data, now, function(model: any)
 			return source:UnitOf(model, now)
@@ -721,6 +725,8 @@ function Hud.Mount(screenGui: Instance, deps: any?): any
 		container.Visible = on
 		if on then
 			refresh()
+		else
+			applyVisibility(snap) -- hides every piece (SetActive(false): touch bindings, nameplates)
 		end
 	end
 	handle.Refresh = refresh

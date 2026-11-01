@@ -4,8 +4,21 @@
 -- pure helpers (visibility rules, feed conversion, slot order, radial wipe, formatting, touch layout).
 local HUD = "src/client/UI/Hud"
 local PIECES = {
-	"TopStrip", "BossBar", "RoundHud", "AbilityBar", "TeamPanel", "Objectives", "KillFeed", "Notifications",
-	"Announcements", "IntroSplash", "SpectateHud", "DeathScreen", "MobileControls", "Nameplates", "LobbyHud",
+	"TopStrip",
+	"BossBar",
+	"RoundHud",
+	"AbilityBar",
+	"TeamPanel",
+	"Objectives",
+	"KillFeed",
+	"Notifications",
+	"Announcements",
+	"IntroSplash",
+	"SpectateHud",
+	"DeathScreen",
+	"MobileControls",
+	"Nameplates",
+	"LobbyHud",
 }
 local THEMES = { "Classic", "Royal", "Void", "Fell" }
 local STYLES = { "Battle", "Modern" }
@@ -46,13 +59,22 @@ return {
 			for _, themeId in THEMES do
 				for _, hud in STYLES do
 					for _, layout in { desktop, phone } do
-						T.noerror(function()
-							local h = module.Create(Themes.Get(themeId), { Hud = hud, Layout = layout })
-							assert(h and h.Root, "no Root")
-							assert(type(h.Destroy) == "function", "no Destroy")
-							assert(countDescendants(h.Root) > 0 or name == "Nameplates", "empty root")
-							h.Destroy()
-						end, string.format("%s %s/%s %s", name, themeId, hud, if layout.Phone then "phone" else "desktop"))
+						T.noerror(
+							function()
+								local h = module.Create(Themes.Get(themeId), { Hud = hud, Layout = layout })
+								assert(h and h.Root, "no Root")
+								assert(type(h.Destroy) == "function", "no Destroy")
+								assert(countDescendants(h.Root) > 0 or name == "Nameplates", "empty root")
+								h.Destroy()
+							end,
+							string.format(
+								"%s %s/%s %s",
+								name,
+								themeId,
+								hud,
+								if layout.Phone then "phone" else "desktop"
+							)
+						)
 					end
 				end
 			end
@@ -80,7 +102,11 @@ return {
 		for _, scenario in Mock.Names do
 			for _, hud in STYLES do
 				T.noerror(function()
-					local h = Hud.Create(Themes.Get("Void"), { Scenario = scenario, Hud = hud, Layout = if string.find(scenario, "Touch") then phone else desktop })
+					local h = Hud.Create(Themes.Get("Void"), {
+						Scenario = scenario,
+						Hud = hud,
+						Layout = if string.find(scenario, "Touch") then phone else desktop,
+					})
 					assert(h.Root and h.Pieces, "no handle")
 					local s = Mock.Scenario(scenario)
 					for _, entry in Hud.PIECES do
@@ -99,17 +125,31 @@ return {
 		local Hud = Loader.requirePath(HUD)
 		local Mock = Loader.requirePath(HUD .. "/Mock")
 		local human = Mock.Scenario("HumanRound")
-		T.ok(Hud.Visible("RoundHud", human) and Hud.Visible("AbilityBar", human) and Hud.Visible("BossBar", human), "round pieces in a round")
+		T.ok(
+			Hud.Visible("RoundHud", human) and Hud.Visible("AbilityBar", human) and Hud.Visible("BossBar", human),
+			"round pieces in a round"
+		)
 		T.ok(not Hud.Visible("LobbyHud", human) and not Hud.Visible("IntroSplash", human), "no lobby/intro in a round")
 		T.ok(not Hud.Visible("MobileControls", human), "no touch controls on keyboard")
 		local touch = Mock.Scenario("Touch")
-		T.ok(Hud.Visible("MobileControls", touch) and not Hud.Visible("AbilityBar", touch), "touch swaps the ability bar")
+		T.ok(
+			Hud.Visible("MobileControls", touch) and not Hud.Visible("AbilityBar", touch),
+			"touch swaps the ability bar"
+		)
 		local lobby = Mock.Scenario("Lobby")
-		T.ok(Hud.Visible("LobbyHud", lobby) and not Hud.Visible("BossBar", lobby) and not Hud.Visible("RoundHud", lobby), "lobby")
+		T.ok(
+			Hud.Visible("LobbyHud", lobby) and not Hud.Visible("BossBar", lobby) and not Hud.Visible("RoundHud", lobby),
+			"lobby"
+		)
 		local intro = Mock.Scenario("Intro")
 		T.ok(Hud.Visible("IntroSplash", intro) and not Hud.Visible("AbilityBar", intro), "intro")
 		local dead = Mock.Scenario("Dead")
-		T.ok(Hud.Visible("DeathScreen", dead) and not Hud.Visible("SpectateHud", dead) and not Hud.Visible("RoundHud", dead), "death screen first")
+		T.ok(
+			Hud.Visible("DeathScreen", dead)
+				and not Hud.Visible("SpectateHud", dead)
+				and not Hud.Visible("RoundHud", dead),
+			"death screen first"
+		)
 		dead.Now = dead.DeathAt + 10
 		T.ok(not Hud.Visible("DeathScreen", dead) and Hud.Visible("SpectateHud", dead), "then spectate")
 		local spectator = Mock.Scenario("Spectate")
@@ -125,7 +165,11 @@ return {
 		killer:SetAttribute("KitId", "ClassicSans")
 		local victim = roblox.Instance.new("Model")
 		victim:SetAttribute("KitId", "Determination")
-		local e = Hud.FeedFromEvent("Kill", { victim = victim, killer = killer, ability = "GasterBlaster", victimName = "Frisk", killerName = "Sans" }, 5)
+		local e = Hud.FeedFromEvent(
+			"Kill",
+			{ victim = victim, killer = killer, ability = "GasterBlaster", victimName = "Frisk", killerName = "Sans" },
+			5
+		)
 		T.eq(e.Kind, "Kill")
 		T.eq(e.Icon, "Blaster", "ability icon from kit data")
 		T.eq(e.A, "Sans")
@@ -133,7 +177,10 @@ return {
 		T.eq(e.Time, 5)
 		local void = Hud.FeedFromEvent("Kill", { victim = victim, ability = "Void", victimName = "Frisk" }, 1)
 		T.ok(void.Text and string.find(void.Text, "Frisk", 1, true), "void kill text")
-		T.eq(Hud.FeedFromEvent("Revived", { victim = victim, by = killer, name = "Frisk", byName = "Kris" }, 1).Kind, "Revived")
+		T.eq(
+			Hud.FeedFromEvent("Revived", { victim = victim, by = killer, name = "Frisk", byName = "Kris" }, 1).Kind,
+			"Revived"
+		)
 		T.eq(Hud.FeedFromEvent("SaveLit", { index = 2, by = { killer } }, 1).B, "2")
 		T.eq(Hud.FeedFromEvent("PhaseChanged", { phase = "Round" }, 1), nil, "not a feed event")
 		T.noerror(function()
@@ -154,7 +201,12 @@ return {
 		end
 		local human = order("Determination")
 		T.ok(string.find(human, "^M1:KnifeCombo,Q:") ~= nil, "human starts with M1 " .. human)
-		T.ok(string.find(human, "F:Block") and string.find(human, "Shift:Dash") and string.find(human, "R:DeterminationUlt$"), "human built-ins + ult last " .. human)
+		T.ok(
+			string.find(human, "F:Block")
+				and string.find(human, "Shift:Dash")
+				and string.find(human, "R:DeterminationUlt$"),
+			"human built-ins + ult last " .. human
+		)
 		local monster = order("ClassicSans")
 		T.ok(string.find(monster, "F:VerdictBox") ~= nil, "monster has the Verdict Box " .. monster)
 		T.ok(string.find(monster, "G:BadTime$") ~= nil, "monster ult last " .. monster)
@@ -256,7 +308,16 @@ return {
 
 	stringsExist = function(T, Loader)
 		local _, _, _, Strings = setup(Loader)
-		for _, key in { "hud.downed.hint", "hud.death.title", "hud.slot.verdict", "lobby.chance.title", "lobby.vote.mine", "hud.intro.vs" } do
+		for _, key in
+			{
+				"hud.downed.hint",
+				"hud.death.title",
+				"hud.slot.verdict",
+				"lobby.chance.title",
+				"lobby.vote.mine",
+				"hud.intro.vs",
+			}
+		do
 			T.ok(Strings.L(key) ~= key, "string " .. key)
 		end
 		Strings.SetLanguage("ru")

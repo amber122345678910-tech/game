@@ -594,6 +594,16 @@ local function onAbilityFx(packet: Map)
 	if phase == "Start" then
 		if abilityId == "Dash" then
 			FxController.PlayDash(char, packet.dir)
+		elseif abilityId == "VerdictBox" then
+			if not wasPredicted then
+				AnimProxy.Play(char, "Point", { FadeIn = 0.05 })
+			end
+			local target = data.target
+			local pos = if typeof(target) == "Instance" and target:IsA("Model") then chestPos(target) else nil
+			if pos then
+				Lib.EmitBurst(pos, 6, Color3.new(1, 1, 1), 0.3)
+				Lib.Ring(CFrame.new(pos), 3.5, Color3.new(1, 1, 1), 0.35, 0.16)
+			end
 		elseif not wasPredicted then
 			local ability = Kits.Ability(kitId, abilityId)
 			if ability then
@@ -744,6 +754,9 @@ local function krTick()
 			if pos then
 				DamageNumbers.KRTick(model, s.Acc, pos)
 				Lib.Emit("Mote", pos - Vector3.new(0, 1, 0), 2, { Color = Lib.Colors.KR })
+				if model == FxController.LocalCharacter() then
+					FxController.Sound("KR", nil, { Force2D = true, Volume = 0.5 })
+				end
 			end
 			s.Acc = 0
 		end
@@ -844,7 +857,7 @@ local function onDamageFx(packet: Map)
 			Lib.EmitBurst(pos, 3.4, guard, 0.18)
 			FxController.Sound("Block", pos)
 		else
-			FxController.Sound(if kind == "Beam" then "HitBeam" elseif kind == "Melee" then "Hit" else "HitArea", pos)
+			FxController.Sound(if packet.crit then "Crit" elseif heavy then "HitHeavy" else "Hit", pos)
 		end
 		if packet.guardBreak then
 			Lib.Shatter(
@@ -867,6 +880,10 @@ local function onDamageFx(packet: Map)
 		end
 		if type(packet.absorbed) == "number" and packet.absorbed > 0 then
 			Lib.EmitBurst(pos, 4, Color3.fromRGB(127, 232, 255), 0.25)
+			FxController.Sound("Shield", pos)
+		end
+		if packet.killed then
+			FxController.Sound("Kill", pos)
 		end
 		if amount > 0 then
 			flinch(target, packet)
@@ -888,6 +905,7 @@ local function onDamageFx(packet: Map)
 			local k = math.clamp(amount / maxHp * 5, 0.25, 1.2)
 			ScreenFX.Pulse(if heavy then "Heavy" else "Hit", k)
 			FxController.Shake(0.12 + 0.35 * k, if heavy then 0.35 else 0.2)
+			FxController.Sound("Hurt", nil, { Force2D = true })
 			if type(packet.kr) == "number" and packet.kr > 0 then
 				ScreenFX.Pulse("KR", math.clamp(packet.kr / 8, 0.3, 1))
 			end
@@ -1165,6 +1183,7 @@ local function statusStep()
 				local dead = m:GetAttribute("Dead") == true
 				local stunned = not dead and statusActive(m, "Stunned") and m:GetAttribute("Downed") ~= true
 				if stunned and st.Stars == nil then
+					FxController.Sound("Stun", rootOf(m))
 					st.Stars = {}
 					for k = 1, 3 do
 						(st.Stars :: any)[k] =
@@ -1212,6 +1231,7 @@ local function statusStep()
 				local exhausted = not dead
 					and ((type(ex) == "number" and ex > Lib.Now()) or statusActive(m, "Exhausted"))
 				if exhausted and st.Sweat == nil then
+					FxController.Sound("Exhausted", rootOf(m))
 					local head = attachment(m, "HeadTop") or attachment(m, "LeftEye")
 					if head then
 						st.Sweat = Lib.Emitter(
@@ -1379,7 +1399,7 @@ local function track(model: Model)
 			local pos = chestPos(model)
 			if pos then
 				Lib.Flash(pos, Lib.KitColor(model) or Lib.Colors.Red, 2.5, 0.2)
-				FxController.Sound("SoulCrack", pos)
+				FxController.Sound("Downed", pos)
 			end
 		end
 		wasDowned = downed

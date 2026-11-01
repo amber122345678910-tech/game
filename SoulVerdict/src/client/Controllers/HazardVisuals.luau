@@ -2340,9 +2340,19 @@ function HazardVisuals.Snapshot(hazardType: string, params: Params, t: number): 
 	local model = Instance.new("Model")
 	model.Name = "Snapshot_" .. hazardType
 	local color = Lib.Color(p.color)
-	local function part(shape: string, size: Vector3, cf: CFrame, c: Color3, mat: Enum.Material, transp: number): BasePart
+	local function part(
+		shape: string,
+		size: Vector3,
+		cf: CFrame,
+		c: Color3,
+		mat: Enum.Material,
+		transp: number
+	): BasePart
 		local q = Instance.new("Part")
-		q.Shape = if shape == "Ball" then Enum.PartType.Ball elseif shape == "Cylinder" then Enum.PartType.Cylinder else Enum.PartType.Block
+		q.Shape = if shape == "Ball"
+			then Enum.PartType.Ball
+			elseif shape == "Cylinder" then Enum.PartType.Cylinder
+			else Enum.PartType.Block
 		q.Size = size
 		q.CFrame = cf
 		q.Color = c
@@ -2362,10 +2372,31 @@ function HazardVisuals.Snapshot(hazardType: string, params: Params, t: number): 
 			local c: Vector3 = d.Center
 			local r: number = d.Radius
 			local flat = CFrame.new(c + Vector3.new(0, 0.05, 0)) * CFrame.Angles(0, 0, math.pi / 2)
-			part("Cylinder", Vector3.new(0.06, r * 2 + 0.4, r * 2 + 0.4), flat, Color3.new(0, 0, 0), Enum.Material.SmoothPlastic, 0.5)
-			part("Cylinder", Vector3.new(0.1, r * 2, r * 2), flat * CFrame.new(0.03, 0, 0), color, Enum.Material.Neon, 0.25)
+			part(
+				"Cylinder",
+				Vector3.new(0.06, r * 2 + 0.4, r * 2 + 0.4),
+				flat,
+				Color3.new(0, 0, 0),
+				Enum.Material.SmoothPlastic,
+				0.5
+			)
+			part(
+				"Cylinder",
+				Vector3.new(0.1, r * 2, r * 2),
+				flat * CFrame.new(0.03, 0, 0),
+				color,
+				Enum.Material.Neon,
+				0.25
+			)
 			local fill = (if d.Kind == "Ring" then (d.InnerRadius or 0) + (r - (d.InnerRadius or 0)) * k else r * k)
-			part("Cylinder", Vector3.new(0.12, fill * 2, fill * 2), flat * CFrame.new(0.05, 0, 0), color, Enum.Material.Neon, 0.6)
+			part(
+				"Cylinder",
+				Vector3.new(0.12, fill * 2, fill * 2),
+				flat * CFrame.new(0.05, 0, 0),
+				color,
+				Enum.Material.Neon,
+				0.6
+			)
 		elseif phase == "Warn" and d.Kind == "Beam" and d.CFrame then
 			local len = d.Length or 10
 			local axis = d.CFrame * CFrame.new(0, 0, -len / 2) * CFrame.Angles(0, math.pi / 2, 0)
@@ -2373,19 +2404,54 @@ function HazardVisuals.Snapshot(hazardType: string, params: Params, t: number): 
 			part("Cylinder", Vector3.new(len, d.Width or 1, d.Width or 1), axis, color, Enum.Material.Neon, 0.9)
 		elseif phase == "Warn" and d.Kind == "Lane" and d.CFrame then
 			local len, w = d.Length or 10, d.Width or 2
-			part("Block", Vector3.new(w, 0.1, len * k), d.CFrame * CFrame.new(0, 0.05, -len * k / 2), color, Enum.Material.Neon, 0.6)
-			part("Block", Vector3.new(0.3, 0.2, len), d.CFrame * CFrame.new(-w / 2, 0.1, -len / 2), color, Enum.Material.Neon, 0.1)
-			part("Block", Vector3.new(0.3, 0.2, len), d.CFrame * CFrame.new(w / 2, 0.1, -len / 2), color, Enum.Material.Neon, 0.1)
+			part(
+				"Block",
+				Vector3.new(w, 0.1, len * k),
+				d.CFrame * CFrame.new(0, 0.05, -len * k / 2),
+				color,
+				Enum.Material.Neon,
+				0.6
+			)
+			part(
+				"Block",
+				Vector3.new(0.3, 0.2, len),
+				d.CFrame * CFrame.new(-w / 2, 0.1, -len / 2),
+				color,
+				Enum.Material.Neon,
+				0.1
+			)
+			part(
+				"Block",
+				Vector3.new(0.3, 0.2, len),
+				d.CFrame * CFrame.new(w / 2, 0.1, -len / 2),
+				color,
+				Enum.Material.Neon,
+				0.1
+			)
 		end
 	end
 	local BoneProp = Lib.Prop("Bone")
 	local function bone(len: number, thick: number, cf: CFrame)
 		if BoneProp and type(BoneProp.Build) == "function" then
 			local b = BoneProp.Build(len, thick, color, Enum.Material.Neon)
-			b:PivotTo(cf)
+			-- move part by part (Model:PivotTo does not exist offline); Bone.Frame = the bone's own frame
+			local frame = if type(BoneProp.Frame) == "function" then BoneProp.Frame(b) else CFrame.identity
+			local delta = cf * frame:Inverse()
+			for _, q in b:GetDescendants() do
+				if q:IsA("BasePart") then
+					q.CFrame = delta * q.CFrame
+				end
+			end
 			b.Parent = model
 		else
-			part("Cylinder", Vector3.new(len, thick, thick), cf * CFrame.Angles(0, 0, math.pi / 2), color, Enum.Material.Neon, 0)
+			part(
+				"Cylinder",
+				Vector3.new(len, thick, thick),
+				cf * CFrame.Angles(0, 0, math.pi / 2),
+				color,
+				Enum.Material.Neon,
+				0
+			)
 		end
 	end
 	if hazardType == "BlasterBeam" then

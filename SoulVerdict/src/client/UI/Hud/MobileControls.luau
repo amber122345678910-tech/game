@@ -115,7 +115,7 @@ function MobileControls.Create(theme: any, deps: any): any
 		if jump then
 			bind("Jump", plainButton("Jump", "ArrowUp", jump.Size, jump.X, jump.Y))
 		end
-		bind("CameraLock", plainButton("CameraLock", "Target", 46, canvas.X - 46, math.floor(canvas.Y * 0.36)))
+		bind("CameraLock", plainButton("CameraLock", "Target", 46, canvas.X - 40, math.floor(canvas.Y * 0.27)))
 	end
 
 	local function tick(now: number)

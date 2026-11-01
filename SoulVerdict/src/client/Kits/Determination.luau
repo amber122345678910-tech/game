@@ -60,25 +60,22 @@ local function knifeSwing(fx: any, combo: number)
 				{ Radius = 3.8, From = 70, To = -70, Width = 0.75, Color = RED, Core = PALE, Duration = 0.18 }
 			)
 		else
-			Lib.Slash(
-				base,
-				{
-					Radius = 4.6,
-					From = 150,
-					To = -150,
-					Width = 1.2,
-					Color = RED,
-					Core = WHITE,
-					Duration = 0.26,
-					Segments = 18,
-				}
-			)
+			Lib.Slash(base, {
+				Radius = 4.6,
+				From = 150,
+				To = -150,
+				Width = 1.2,
+				Color = RED,
+				Core = WHITE,
+				Duration = 0.26,
+				Segments = 18,
+			})
 		end
 		local hand = fx.Part(fx.Character, "RightHand")
 		if hand then
 			Lib.Emit("Mote", hand.Position, 3, { Color = RED })
 		end
-		fx.Sound(if i == 4 then "KnifeHeavy" else "Knife", fx.Root(fx.Character))
+		fx.Sound("Slash", fx.Root(fx.Character), { Pitch = if i == 4 then 0.88 else 1 + 0.04 * i })
 	end)
 end
 

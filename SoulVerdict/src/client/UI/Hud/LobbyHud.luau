@@ -418,6 +418,7 @@ function LobbyHud.Create(theme: any, deps: any): any
 					Tone = "Dim",
 					Wrap = true,
 					Truncate = true,
+					YAlign = "Top",
 					Position = UDim2.fromOffset(x0, 36),
 					Size = UDim2.new(1, -x0 - 10, 0, 34),
 					Parent = button,

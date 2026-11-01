@@ -73,20 +73,31 @@ function Rift.Build(color: Color3?, radius: number?): Model
 		Transparency = 0.55,
 		CastShadow = false,
 	})
-	-- faint spiral inside the void (three arcs at decreasing radii)
-	local swirl = { Role = "Glow", Material = NEON, Transparency = 0.35, CastShadow = false }
+	-- vortex inside the void: three continuous log-spiral arms (joined box segments)
+	local swirl = { Role = "Glow", Material = NEON, Transparency = 0.3, CastShadow = false }
+	local function spiral(arm: number, t: number): Vector3
+		local a = arm * math.pi * 2 / 3 + t * 3.4
+		local r = R * (0.8 - 0.62 * t)
+		return Vector3.new(math.cos(a) * r * 0.78, math.sin(a) * r * 1.12, -0.06)
+	end
 	local k = 0
 	for arm = 0, 2 do
-		for j = 0, 2 do
+		for j = 0, 3 do
 			k += 1
-			local t = j / 3
-			local a = arm * math.pi * 2 / 3 + t * 1.6
-			local r = R * (0.72 - t * 0.42)
-			local p = Vector3.new(math.cos(a) * r * 0.78, math.sin(a) * r * 1.12, -0.06)
-			local tangent = Vector3.new(-math.sin(a) * 0.78, math.cos(a) * 1.12, 0).Unit
-			local y = Vector3.new(0, 0, 1):Cross(tangent)
-			local cf = CFrame.fromMatrix(p, tangent, y, Vector3.new(0, 0, 1))
-			kit.Box(model, "Swirl" .. k, Vector3.new(R * (0.42 - t * 0.18), 0.07, 0.04), cf, c:Lerp(hot, 0.3), swirl)
+			local p0, p1 = spiral(arm, j / 4), spiral(arm, (j + 1) / 4)
+			local dir = p1 - p0
+			local x = dir.Unit
+			local z = Vector3.new(0, 0, 1)
+			local y = z:Cross(x)
+			local width = 0.12 - j * 0.02
+			kit.Box(
+				model,
+				"Swirl" .. k,
+				Vector3.new(dir.Magnitude + width * 0.8, width, 0.04),
+				CFrame.fromMatrix((p0 + p1) / 2, x, y, z),
+				c:Lerp(hot, 0.2 + j * 0.15),
+				swirl
+			)
 		end
 	end
 	-- crystalline shards drifting around the tear

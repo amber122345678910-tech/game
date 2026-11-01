@@ -155,6 +155,7 @@ function Nameplates.Create(theme: any, deps: any): any
 	end
 	type Entry = { Gui: BillboardGui, Plate: any, Model: Model }
 	local entries: { [Model]: Entry } = {}
+	local active = true
 
 	local function units(s: { [string]: any }): { any }
 		local out = {}
@@ -211,7 +212,7 @@ function Nameplates.Create(theme: any, deps: any): any
 					local mate = isTeammate(u, viewer)
 					entry.Gui.AlwaysOnTop = mate
 					entry.Gui.MaxDistance = if mate then 260 else 90
-					entry.Gui.Enabled = not (u.Invisible and not mate)
+					entry.Gui.Enabled = active and not (u.Invisible and not mate)
 					entry.Plate.Set(u, viewer, s.Now or 0)
 				end
 			end
@@ -272,6 +273,15 @@ function Nameplates.Create(theme: any, deps: any): any
 	return {
 		Root = root,
 		Update = update,
+		SetActive = function(on: boolean)
+			if folder then
+				for _, entry in entries do
+					entry.Gui.Enabled = on and entry.Gui.Enabled
+				end
+				folder:SetAttribute("Active", on)
+			end
+			active = on
+		end,
 		Destroy = function()
 			for _, entry in entries do
 				entry.Gui:Destroy()

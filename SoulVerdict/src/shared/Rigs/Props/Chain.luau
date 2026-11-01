@@ -79,11 +79,11 @@ function Chain.Build(links: number?, color: Color3?, scale: number?): Model
 	local p0 = Vector3.new(0, 0, zEnd + 0.02)
 	local p1 = Vector3.new(0, 0, zEnd - 0.42)
 	local tip = Vector3.new(0, 0, zEnd - 0.95)
-	seg("HookShank", p0, p1, 0.16)
-	seg("HookPoint", p1 + Vector3.new(0, 0, 0.12), tip, 0.2)
+	seg("HookShank", p0, p1, 0.12)
+	seg("HookPoint", p1 + Vector3.new(0, 0, 0.1), tip, 0.15)
 	for i, sx in { -1, 1 } do
-		local root = Vector3.new(sx * 0.05, 0, zEnd - 0.62)
-		seg("HookBarb" .. i, root, root + Vector3.new(sx * 0.3, 0, 0.32), 0.07)
+		local root = Vector3.new(sx * 0.04, 0, zEnd - 0.66)
+		seg("HookBarb" .. i, root, root + Vector3.new(sx * 0.34, 0, 0.4), 0.075)
 	end
 	kit.Ball(model, "HookKnobL", 0.2, CFrame.new(-0.07, 0, zEnd + 0.02), c:Lerp(DARK, 0.12), hook)
 	kit.Ball(model, "HookKnobR", 0.2, CFrame.new(0.07, 0, zEnd + 0.02), c:Lerp(DARK, 0.12), hook)
