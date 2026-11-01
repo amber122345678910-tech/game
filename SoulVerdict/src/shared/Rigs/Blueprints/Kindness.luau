@@ -30,7 +30,7 @@ local function build(rig: RigContext)
 		Legs = "Pants",
 		Shoes = "Sneakers",
 		Weapon = "BurntPan",
-		WeaponTilt = -34,
+		WeaponTilt = -58,
 	})
 
 	local apron = P.Apron

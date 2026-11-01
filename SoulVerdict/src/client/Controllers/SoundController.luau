@@ -387,6 +387,13 @@ local function playNow(name: string, at: any?, opts: PlayOpts?): Sound?
 	local o: PlayOpts = opts or {}
 	if def.Spatial and at ~= nil and not o.Force2D then
 		local kind = typeof(at)
+		if kind == "CFrame" then
+			at = (at :: CFrame).Position
+			kind = "Vector3"
+		elseif kind == "Instance" and (at :: Instance):IsA("Model") then
+			at = (at :: Model).PrimaryPart
+			kind = if at ~= nil then "Instance" else "nil"
+		end
 		if kind == "Vector3" then
 			parent = emitterFor(voice, at :: Vector3) or poolFolder
 		elseif kind == "Instance" and ((at :: Instance):IsA("BasePart") or (at :: Instance):IsA("Attachment")) then
