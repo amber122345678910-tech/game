@@ -1,0 +1,7 @@
+.tools/
+sourcemap.json
+*.rbxl.lock
+*.rbxlx.lock
+node_modules/
+tools/preview/out/
+/build/

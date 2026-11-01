@@ -1,0 +1,3 @@
+--!strict
+-- Intentionally empty: overrides Roblox's default "Animate" script.
+-- All character animation is procedural (Client/Controllers/AnimController).

@@ -1,0 +1,116 @@
+--!strict
+-- Kit data: Determination (red SOUL) — "The Fallen". Knife skirmisher / DPS. Lune-safe.
+local Types = require(script.Parent.Parent.Parent.Types)
+
+local kit: Types.KitDef = {
+	Id = "Determination",
+	Role = "Human",
+	Rig = "Determination",
+	Family = "Human",
+	Order = 1,
+	Name = { en = "Determination", ru = "Решимость" },
+	Title = { en = "The Fallen", ru = "Павший" },
+	Lore = {
+		en = "A child in a green-and-yellow sweater with a knife and a smile that doesn't reach the eyes. They refuse to give up.",
+		ru = "Ребёнок в зелёно-жёлтом свитере с ножом и улыбкой, которая не касается глаз. Он не сдаётся.",
+	},
+	Playstyle = {
+		en = "Fast knife combos. Pressure the monster's dodges, then go all-in with your ultimate.",
+		ru = "Быстрые комбо ножом. Сбивай уклонения монстра, затем выкладывайся ультой.",
+	},
+	Color = Color3.fromRGB(255, 30, 40),
+	Difficulty = 1,
+	Stats = { MaxHP = 110, WalkSpeed = 17, JumpPower = 50, MaxGuard = 100 },
+	Passives = {
+		{
+			Id = "Hope",
+			Icon = "Heart",
+			Name = { en = "Stay Determined", ru = "Сохраняй решимость" },
+			Desc = { en = "+12% damage while below 35% HP.", ru = "+12% урона, пока HP ниже 35%." },
+		},
+	},
+	Abilities = {
+		{
+			Id = "KnifeCombo",
+			Slot = "M1",
+			Icon = "Knife",
+			Name = { en = "Real Knife", ru = "Настоящий нож" },
+			Desc = { en = "A swift four-hit knife combo.", ru = "Быстрое комбо ножом из четырёх ударов." },
+			Cooldown = 0.32,
+			Combo = 4,
+			Aim = "Direction",
+			Clip = "Slash1",
+			Windup = 0.08,
+			Tags = { "Melee" },
+			Numbers = { Damage1 = 7, Damage2 = 7, Damage3 = 8, Damage4 = 12, Range = 6, Knockback = 20, ComboWindow = 0.9 },
+		},
+		{
+			Id = "LungingStrike",
+			Slot = "Q",
+			Icon = "Dash",
+			Name = { en = "Lunging Strike", ru = "Выпад" },
+			Desc = { en = "Dash 18 studs forward, slashing everything in your path.", ru = "Рывок на 18 стадов с разрезом всего на пути." },
+			Cooldown = 7,
+			Range = 18,
+			Aim = "Direction",
+			Clip = "Charge",
+			Windup = 0.12,
+			Tags = { "Mobility", "Melee" },
+			Numbers = { Damage = 16, Distance = 18 },
+		},
+		{
+			Id = "Afterimage",
+			Slot = "E",
+			Icon = "Afterimage",
+			Name = { en = "Afterimage", ru = "Остаточный образ" },
+			Desc = {
+				en = "Step aside leaving an afterimage. If you would be hit during the step, you counter-slash automatically.",
+				ru = "Шаг в сторону с остаточным образом. Если в этот момент тебя ударят — автоматическая контратака.",
+			},
+			Cooldown = 10,
+			Aim = "Direction",
+			Clip = "Dodge",
+			Windup = 0.0,
+			Tags = { "Mobility" },
+			Numbers = { Window = 0.5, CounterDamage = 20, CounterStun = 0.8, Distance = 8 },
+		},
+		{
+			Id = "DeterminationUlt",
+			Slot = "R",
+			Icon = "Heart",
+			Ult = true,
+			Name = { en = "DETERMINATION", ru = "РЕШИМОСТЬ" },
+			Desc = {
+				en = "Ultimate. For 8s your hits cannot be dodged, deal +20% damage, and you cannot drop below 1 HP.",
+				ru = "Ультимейт. На 8с твои удары нельзя уклонить, +20% урона и HP не опускается ниже 1.",
+			},
+			Cooldown = 3,
+			Aim = "Self",
+			Clip = "Taunt",
+			Windup = 0.3,
+			Tags = { "Ultimate", "Buff" },
+			Numbers = { Duration = 8, DamageMult = 1.2 },
+		},
+	},
+	Unlock = { Gold = 0 },
+	Skins = {
+		{ Id = "Default", Name = { en = "Striped Sweater", ru = "Полосатый свитер" }, Price = 0, Rarity = "Common", Palette = {} },
+		{
+			Id = "Storyshift",
+			Name = { en = "Royal Cape", ru = "Королевский плащ" },
+			Price = 900,
+			Rarity = "Rare",
+			Palette = { Sweater = Color3.fromRGB(120, 40, 160), Stripe = Color3.fromRGB(240, 200, 80), Pants = Color3.fromRGB(40, 30, 60) },
+		},
+		{
+			Id = "Crimson",
+			Name = { en = "Crimson Resolve", ru = "Багровая воля" },
+			Price = 0,
+			Rarity = "Legendary",
+			Mastery = 10,
+			Palette = { Sweater = Color3.fromRGB(30, 10, 12), Stripe = Color3.fromRGB(220, 20, 40), Accent = Color3.fromRGB(255, 40, 60) },
+		},
+	},
+}
+
+return kit

@@ -1,0 +1,55 @@
+# selene (0.31, built with the Luau/Roblox feature) config for SoulVerdict.
+# Run from the project root:  selene src        (tools/check.sh does this)
+#
+# Standard library chain:  sv.yml (project rules: banned wait/spawn/delay ...)
+#                       -> roblox.yml (generated OFFLINE from .tools/API-Dump.json by
+#                          tools/checks/gen_selene_std.py; `selene generate-roblox-std` cannot pass the
+#                          sandbox TLS proxy) -> selene's built-in luau std.
+# roblox.yml is pinned in the repo, so selene never tries to download anything.
+std = "sv"
+exclude = []
+
+[lints]
+# ---- correctness: errors -------------------------------------------------------------------------
+undefined_variable = "deny"
+incorrect_standard_library_use = "deny"      # bad std calls; unknown GetService / Instance.new names
+unscoped_variables = "deny"                  # assignment to an undeclared global (missing `local`)
+global_usage = "deny"                        # _G
+duplicate_keys = "deny"
+bad_string_escape = "deny"
+compare_nan = "deny"
+constant_table_comparison = "deny"
+almost_swapped = "deny"
+suspicious_reverse_loop = "deny"
+type_check_inside_call = "deny"
+mismatched_arg_count = "deny"
+roblox_incorrect_color3_new_bounds = "deny"  # Color3.new(255, 0, 0) instead of fromRGB
+# ---- likely bugs / hygiene: warnings ---------------------------------------------------------------
+unused_variable = "warn"
+deprecated = "warn"                          # deprecated Roblox members/enums + sv.yml bans
+unbalanced_assignments = "warn"
+must_use = "warn"
+divide_by_zero = "warn"
+empty_if = "warn"
+empty_loop = "warn"
+if_same_then_else = "warn"
+ifs_same_cond = "warn"
+manual_table_clone = "warn"
+parenthese_conditions = "warn"
+roblox_suspicious_udim2_new = "warn"
+# ---- disabled on purpose ---------------------------------------------------------------------------
+# shadowing: `local x = x or default` / re-declared loop locals are idiomatic Luau here; no bug signal.
+shadowing = "allow"
+# multiple_statements: compact one-liners in data tables / tests are allowed by our style.
+multiple_statements = "allow"
+# mixed_table: kit/clip data legitimately mixes array keys and named fields in a few places.
+mixed_table = "allow"
+# roblox_manual_fromscale_or_fromoffset: UDim2.new(0, x, 0, y) is fine and common; style only.
+roblox_manual_fromscale_or_fromoffset = "allow"
+# roblox_incorrect_roact_usage: the project does not use Roact.
+roblox_incorrect_roact_usage = "allow"
+# high_cyclomatic_complexity: selene default is allow; big state machines are reviewed by humans.
+high_cyclomatic_complexity = "allow"
+
+[config]
+unused_variable = { allow_unused_self = true, ignore_pattern = "^_" }

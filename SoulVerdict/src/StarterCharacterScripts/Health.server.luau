@@ -1,0 +1,3 @@
+--!strict
+-- Intentionally empty: overrides Roblox's default "Health" regeneration script.
+-- Health is fully server-authoritative (Server/Services/DamageService + StatusService).

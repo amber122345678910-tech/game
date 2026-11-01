@@ -1,0 +1,107 @@
+--!strict
+-- Kit data: Justice (yellow SOUL) — Empty Gun & Cowboy Hat. Ranged DPS. Lune-safe.
+local Types = require(script.Parent.Parent.Parent.Types)
+
+local kit: Types.KitDef = {
+	Id = "Justice",
+	Role = "Human",
+	Rig = "Justice",
+	Family = "Human",
+	Order = 7,
+	Name = { en = "Justice", ru = "Справедливость" },
+	Title = { en = "The Gunslinger", ru = "Стрелок" },
+	Lore = {
+		en = "A kid in a cowboy hat with an old revolver that somehow still fires bullets of pure resolve.",
+		ru = "Ребёнок в ковбойской шляпе со старым револьвером, который почему-то всё ещё стреляет пулями чистой воли.",
+	},
+	Playstyle = {
+		en = "Keep distance and keep shooting. Long-range shots hit harder. Your ultimate erases all dodges.",
+		ru = "Держи дистанцию и стреляй. Дальние выстрелы сильнее. Ульта стирает все уклонения.",
+	},
+	Color = Color3.fromRGB(255, 230, 40),
+	Difficulty = 2,
+	Stats = { MaxHP = 95, WalkSpeed = 17, JumpPower = 50, MaxGuard = 80 },
+	Passives = {
+		{
+			Id = "SharpEye",
+			Icon = "Target",
+			Name = { en = "Sharp Eye", ru = "Меткий глаз" },
+			Desc = { en = "Shots from more than 30 studs away deal +15% damage.", ru = "Выстрелы с дистанции больше 30 стадов наносят +15% урона." },
+		},
+	},
+	Abilities = {
+		{
+			Id = "Revolver",
+			Slot = "M1",
+			Icon = "Gun",
+			Name = { en = "Revolver", ru = "Револьвер" },
+			Desc = { en = "Hitscan shots, 6 rounds. Reloads automatically when empty.", ru = "Мгновенные выстрелы, 6 патронов. Перезарядка автоматически." },
+			Cooldown = 0.35,
+			Range = 120,
+			Aim = "Direction",
+			Clip = "Shoot",
+			Windup = 0.0,
+			Tags = { "Projectile" },
+			Numbers = { Damage = 8, Ammo = 6, Reload = 1.6, Spread = 0.6, LongRange = 30, LongRangeMult = 1.15 },
+		},
+		{
+			Id = "FanTheHammer",
+			Slot = "Q",
+			Icon = "Bullet",
+			Name = { en = "Fan the Hammer", ru = "Веер выстрелов" },
+			Desc = { en = "Empty the cylinder in a rapid cone.", ru = "Опустошаешь барабан быстрым веером." },
+			Cooldown = 8,
+			Range = 60,
+			Aim = "Direction",
+			Clip = "Shoot",
+			Windup = 0.05,
+			Tags = { "Projectile" },
+			Numbers = { DamagePerShot = 8, Interval = 0.07, ConeDegrees = 12 },
+		},
+		{
+			Id = "QuickRoll",
+			Slot = "E",
+			Icon = "Dash",
+			Name = { en = "Quick Roll", ru = "Перекат" },
+			Desc = { en = "Roll, reload instantly; your next shot deals +50% damage.", ru = "Перекат с мгновенной перезарядкой; следующий выстрел +50% урона." },
+			Cooldown = 7,
+			Range = 12,
+			Aim = "Direction",
+			Clip = "Dodge",
+			Windup = 0.0,
+			Tags = { "Mobility" },
+			Numbers = { Distance = 12, NextShotMult = 1.5 },
+		},
+		{
+			Id = "FinalVerdict",
+			Slot = "R",
+			Icon = "Target",
+			Ult = true,
+			Name = { en = "Final Verdict", ru = "Последний вердикт" },
+			Desc = {
+				en = "Ultimate. Aim for 1.2s, then fire a piercing golden beam: big damage, undodgeable, drains ALL dodges.",
+				ru = "Ультимейт. Прицеливание 1.2с, затем пронзающий золотой луч: много урона, без уклонения, снимает ВСЕ уклонения.",
+			},
+			Cooldown = 3,
+			Range = 120,
+			Aim = "Direction",
+			Clip = "Shoot",
+			Windup = 1.2,
+			Tags = { "Ultimate", "Beam" },
+			Numbers = { Damage = 45, Width = 3, Length = 120, AimTime = 1.2 },
+		},
+	},
+	Unlock = { Gold = 800 },
+	Skins = {
+		{ Id = "Default", Name = { en = "Cowboy Hat", ru = "Ковбойская шляпа" }, Price = 0, Rarity = "Common", Palette = {} },
+		{
+			Id = "Sheriff",
+			Name = { en = "Sheriff", ru = "Шериф" },
+			Price = 1000,
+			Rarity = "Epic",
+			Palette = { Hat = Color3.fromRGB(30, 24, 20), Sweater = Color3.fromRGB(240, 220, 120), Accent = Color3.fromRGB(230, 200, 60) },
+		},
+	},
+}
+
+return kit

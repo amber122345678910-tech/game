@@ -1,0 +1,45 @@
+# selene standard library for SoulVerdict (selene.toml: std = "sv").
+# Extends roblox.yml (generated offline by tools/checks/gen_selene_std.py — do not edit that one).
+# Globals defined here OVERRIDE roblox.yml (selene: a library's own globals win over its base's).
+# Purpose: turn the project's banned legacy globals (docs/AGENT_GUIDE.md "No deprecated APIs") into
+# `deprecated` lint hits with the modern replacement in the message.
+---
+base: roblox
+# `name` must stay "roblox": selene enables its roblox_* lints only when the std is named roblox.
+name: roblox
+globals:
+  wait:
+    deprecated:
+      message: "banned in SoulVerdict (AGENT_GUIDE): use task.wait"
+      replace:
+        - "task.wait(%...)"
+    args:
+      - required: false
+        type: number
+  spawn:
+    deprecated:
+      message: "banned in SoulVerdict (AGENT_GUIDE): use task.spawn"
+      replace:
+        - "task.spawn(%...)"
+    args:
+      - type: function
+  delay:
+    deprecated:
+      message: "banned in SoulVerdict (AGENT_GUIDE): use task.delay"
+      replace:
+        - "task.delay(%...)"
+    args:
+      - type: number
+      - type: function
+  elapsedTime:
+    deprecated:
+      message: "legacy global: use os.clock() or workspace:GetServerTimeNow()"
+      replace: []
+    args: []
+  # selene's lua51 std REQUIRES an assert message. In Luau `assert(x)` is the idiomatic way to refine
+  # an optional type under --!strict, so the message is optional here.
+  assert:
+    args:
+      - type: any
+      - required: false
+        type: string
