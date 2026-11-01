@@ -15,8 +15,10 @@
 --   Props.NewModel(name: string, propId: string) -> Model
 --   Props.Finish(model, primary: BasePart) -> Model   PrimaryPart, safety flags, PartCount
 --   Props.Triangle(kit, parent, name, a, b, c, thickness, color, props?) -> {BasePart}
---        a solid triangle (two WedgeParts split along the altitude) extruded by `thickness`
---        symmetrically about the plane of a, b, c. Degenerate halves are skipped.
+--        a solid triangle (two WedgeParts split along the altitude; one for a right triangle)
+--        extruded by `thickness` symmetrically about the plane of a, b, c. Degenerate halves skipped.
+--   Props.RightWedge(kit, parent, name, p, f, b, thickness, color, props?) -> BasePart?
+--        one WedgePart = right triangle with the right angle at f (legs f->p and f->b)
 --   Props.Polygon(kit, parent, name, points: {Vector2}, frame: CFrame, thickness, color, props?)
 --        -> {BasePart}   simple polygon (any winding) in frame's local XY plane, ear-clipped
 --   Props.StarOutline(points: number, outer: number, inner: number, rotDeg: number?) -> {Vector2}
@@ -166,6 +168,8 @@ local function rightWedge(
 	return kit.Wedge(parent, name, Vector3.new(thickness, h, d), cf, color, props)
 end
 
+Props.RightWedge = rightWedge
+
 function Props.Triangle(
 	kit: PartKit.Kit,
 	parent: Instance?,
@@ -185,9 +189,21 @@ function Props.Triangle(
 	elseif ca >= ab and ca >= bc then
 		apex, b1, b2 = b, c, a
 	end
+	local out: { BasePart } = {}
+	-- a right angle at any vertex: one wedge is enough
+	for _, v in { { a, b, c }, { b, c, a }, { c, a, b } } do
+		local e1, e2 = v[2] - v[1], v[3] - v[1]
+		local m1, m2 = e1.Magnitude, e2.Magnitude
+		if m1 > 1e-6 and m2 > 1e-6 and math.abs(e1:Dot(e2)) < 1e-5 * m1 * m2 then
+			local w = rightWedge(kit, parent, name, v[2], v[1], v[3], thickness, color, props)
+			if w then
+				table.insert(out, w)
+			end
+			return out
+		end
+	end
 	local base = b2 - b1
 	local len2 = base:Dot(base)
-	local out: { BasePart } = {}
 	if len2 < 1e-8 then
 		return out
 	end
