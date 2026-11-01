@@ -19,9 +19,9 @@ No Robux monetisation of any kind. No ripped sprites/music.
    UIGradient/UICorner/CanvasGroup/Path2D).
 2. **Animations are procedural**: client code writes `Motor6D.Transform` every frame from data-defined
    keyframe clips (see §8). No `Animation` assets, no `Animator`, no `Humanoid:LoadAnimation`.
-3. **Lighting**: `Lighting.Technology` is deprecated & not scriptable. Use `Lighting.LightingStyle`
-   (`Enum.LightingStyle.Realistic`/`Soft`) and `Lighting.PrioritizeLightingQuality` (both scriptable).
-   The Rojo project also sets `Technology = "Future"` in the place file for older clients.
+3. **Lighting**: `Lighting.Technology` is deprecated & not scriptable. `Lighting.LightingStyle` (Realistic) and
+   `Lighting.PrioritizeLightingQuality` (true) are set in the place file (default.project.json); game scripts can
+   READ them but cannot WRITE them (capability PluginOrOpenCloud). Graphics presets never touch them.
 4. **Offline verifiability**: shared "builder" modules (rigs, props, maps, graphics presets, UI
    themes, kit data, hazard geometry, animation clips) MUST be runnable under **Lune** (no engine
    services). Rules for those modules:
@@ -485,7 +485,7 @@ HazardDefs[type] = {
   Volumes: (params, t: number) -> {Volume},           -- active damaging volumes at time t (t = now - t0)
   HitPolicy: (params) -> { Once: boolean, Interval: number? },
 }
-Volume = { Shape: "Box"|"Ball"|"Capsule", CFrame: CFrame, Size: Vector3 }   -- Ball uses Size.X as diameter; Capsule: Size.X diameter, Size.Y length (along CFrame.UpVector)
+Volume = { Shape: "Box"|"Ball"|"Capsule"|"Cylinder"|"Ring", CFrame: CFrame, Size: Vector3, Key: number? }   -- Ball: Size.X diameter; Capsule: Size.X diameter, Size.Y TOTAL length tip-to-tip incl. caps (axis = CFrame.UpVector); Cylinder/Ring: see Combat/HitTest.luau
 -- (added by the combat core) Shape also "Cylinder" (Size.X diameter, Size.Y height, axis UpVector) and "Ring"
 -- (annulus: Size.X outer diameter, Size.Y height, Size.Z band thickness); Capsule Size.Y is tip-to-tip.
 -- Volume.Key + HitPolicy.PerKey: Once/Interval tracked per (target, Key) (Rain drops). Every param, default and

@@ -27,6 +27,30 @@ rojo build default.project.json -o /tmp/x.rbxl    # builds the place
   needs no options). Node 22. npm registry reachable. View your PNG renders with the Read tool and iterate.
 - The machine has 4 CPU cores shared by several agents: avoid needless heavy work in loops.
 
+## Verification commands (run before you finish)
+```
+tools/check.sh -q          # compile + selene + apicheck (Roblox API dump) + conventions + contracts + Lune tests + place build
+lune run tools/lune/dump_model.luau list                       # blueprints, props, maps, poses available
+lune run tools/lune/dump_model.luau rig <BlueprintId> --pose Ready --out /tmp/x.json   # also: prop|map|module|skeleton
+node tools/preview/render.mjs --in /tmp/x.json --out /tmp/x.png --view threeQuarter [--env env.json] [--sheet 4] [--outline]
+lune run tools/lune/dump_env.luau <PresetId> --out /tmp/env.json   # lighting env for the renderer from a game preset
+```
+Read the header comments of tools/preview/render.mjs and tools/lune/dump_model.luau for all options (poses: Rest, APose,
+TPose, Wave, Walk, Action, Pockets, Shrug, Ready; clips "Clip@0.35" once Anim clips exist). Silence a justified checker
+hit with `-- check:ignore(rule)` on that line.
+
+## Known offline pitfalls
+- Lune rejects `number * Vector3` — always write `vector * number` in shared (Lune-safe) code.
+- Lune 0.10.4 `CFrame.lookAt` returns a MIRRORED orientation: in Lune-safe code use `HazardDefs.LookAlong(pos, dir)`
+  (src/shared/Combat/HazardDefs.luau) or build the CFrame from basis vectors (`CFrame.fromMatrix`).
+- `Util/Geometry.luau` yaw convention: yaw 0 = front (-Z), positive yaw turns RIGHT (+X) — opposite to CFrame.Angles.
+
+## Budget (important)
+The whole team shares a limited token budget per 5-hour window; a previous wave was cut off mid-task by the limit.
+Work efficiently: read only the SPEC sections and file HEADERS you need (don't read 3000-line files end to end),
+avoid re-rendering the same image many times, write files early and incrementally (partial progress must survive an
+interruption), and keep your final report concise.
+
 ## Coding rules (Luau)
 - First line of every .luau file in `src/`: `--!strict`. Tabs for indentation. Clear names. Short header comment
   explaining the module's purpose and public API.
