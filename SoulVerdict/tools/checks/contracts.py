@@ -20,7 +20,7 @@
                    not exist, ERROR once they do. Family clip files must provide every clip SPEC §8 requires (ERROR).
   [icons]          every kit `Icon = "X"` and Kits.IconNames entry exists in src/client/UI/Icons.luau (WARNING).
   [service-shape]  modules in src/server/Services and src/client/Controllers export Init and Start (WARNING).
-Usage: python3 tools/checks/contracts.py [--quiet-warnings]
+Usage: python3 tools/checks/contracts.py [--quiet-warnings] [--stats]
 """
 
 from __future__ import annotations
@@ -29,10 +29,11 @@ import json
 import os
 import sys
 
+sys.dont_write_bytecode = True  # keep tools/checks free of __pycache__
 sys.path.insert(0, os.path.dirname(__file__))
 
 from report import ROOT, Reporter, load, luau_files, main_wrapper  # noqa: E402
-from luau_lex import matching, split_args  # noqa: E402
+from luau_lex import closes_block, matching, opens_block, skip_type, split_args  # noqa: E402
 
 REQUIRED_FAMILY_CLIPS = [
     "Idle", "Walk", "Run", "Jump", "Fall", "Land", "Dash", "Stunned", "Downed", "Block", "Parry", "Dodge", "Hit",
@@ -42,8 +43,6 @@ REQUIRED_FAMILY_CLIPS = [
     "Shoot", "Reload", "Heal", "Guard", "Taunt",
 ]
 SCRIPT_SUFFIXES = (".server.luau", ".client.luau", ".server.lua", ".client.lua", ".luau", ".lua")
-BLOCK_OPEN = {"function", "if", "do", "repeat"}
-BLOCK_CLOSE = {"end", "until"}
 NET_EVENT_FNS = {"On", "Fire", "FireAll", "FireExcept", "FireList"}
 NET_FUNCTION_FNS = {"OnInvoke", "Invoke"}
 
@@ -178,9 +177,9 @@ def expr_end(toks, start):
             if t.value == "function":
                 depth = 0
                 while k < n:
-                    if toks[k].kind == "keyword" and toks[k].value in BLOCK_OPEN:
+                    if opens_block(toks[k]):
                         depth += 1
-                    elif toks[k].kind == "keyword" and toks[k].value in BLOCK_CLOSE:
+                    elif closes_block(toks[k]):
                         depth -= 1
                         if depth == 0:
                             break
@@ -211,9 +210,7 @@ def expr_end(toks, start):
             if t.value in (";", ",", ")", "]", "}", "=", "`end"):
                 break
             if t.value == "::":
-                k += 1
-                while k < n and (toks[k].kind == "name" or toks[k].is_op(".", "?")):
-                    k += 1
+                k = skip_type(toks, k + 1)  # type assertion
                 continue
             ends_operand = False
             prev_line = t.line
@@ -244,9 +241,9 @@ def table_literal_keys(toks, open_idx, depth=0):
             if te.kind == "keyword" and te.value == "function":
                 bd = 0
                 while e < close:
-                    if toks[e].kind == "keyword" and toks[e].value in BLOCK_OPEN:
+                    if opens_block(toks[e]):
                         bd += 1
-                    elif toks[e].kind == "keyword" and toks[e].value in BLOCK_CLOSE:
+                    elif closes_block(toks[e]):
                         bd -= 1
                         if bd == 0:
                             break
@@ -297,10 +294,10 @@ def block_depths(toks):
     depths = []
     d = 0
     for t in toks:
-        if t.kind == "keyword" and t.value in BLOCK_CLOSE:
+        if closes_block(t):
             d -= 1
         depths.append(d)
-        if t.kind == "keyword" and t.value in BLOCK_OPEN:
+        if opens_block(t):
             d += 1
     return depths
 
@@ -320,6 +317,9 @@ def module_exports(path: str) -> Exports:
         if toks[k].kind == "name" and toks[k].value == "export" and toks[k + 1].kind == "name" and toks[k + 1].value == "type":
             ex.types.add(toks[k + 2].value)
     depths = block_depths(toks)
+    if depths and (depths[-1] != 0 or min(depths) < 0):
+        ex.open = True  # block structure not understood (or invalid code: compile.luau reports it)
+        return ex
     ret = None
     for k in range(n):
         if toks[k].is_kw("return") and depths[k] == 0:
@@ -433,16 +433,40 @@ class FileInfo:
         self.bindings: dict[str, tuple] = {}  # local name -> (module file, line)
         self.missing: list = []  # (line, instance path)
         self.declared_count: dict[str, int] = {}
-        self.assigned: set = set()
+        self.assign_count: dict[str, int] = {}
+        self.lazy: set = set()
         env: dict[str, tuple] = {}
         toks = self.toks
         n = len(toks)
+        brackets = []
         for k in range(n):
             t = toks[k]
-            if t.kind == "name" and k + 1 < n and toks[k + 1].is_op("=") and not (k > 0 and toks[k - 1].is_op(".", ":", ",")) and not (k > 0 and toks[k - 1].is_kw("local")):
-                self.assigned.add(t.value)
-            if t.is_kw("local", "for") or (t.is_kw("function") and k + 1 < n):
-                pass
+            if t.kind == "op" and t.value in ("(", "[", "{"):
+                brackets.append(t.value)
+            elif t.kind == "op" and t.value in (")", "]", "}") and brackets:
+                brackets.pop()
+            if (
+                t.kind == "name"
+                and k + 1 < n
+                and toks[k + 1].is_op("=")
+                and not (k > 0 and toks[k - 1].is_op(".", ":", ","))
+                and not (k > 0 and toks[k - 1].is_kw("local"))
+                and (not brackets or brackets[-1] != "{")
+            ):
+                self.assign_count[t.value] = self.assign_count.get(t.value, 0) + 1
+                v = k + 2
+                # lazy require into a forward-declared local: `Name = require(path) :: any`
+                if v + 1 < n and toks[v].kind == "name" and toks[v].value == "require" and toks[v + 1].is_op("("):
+                    close = matching(toks, v + 1)
+                    ip = eval_path(toks, v + 2, close, env, self.self_path) if self.self_path is not None else None
+                    if ip is not None:
+                        file = index.file_for(ip)
+                        if file is not None:
+                            self.bindings[t.value] = (file, t.line)
+                            self.lazy.add(t.value)
+                        elif index.under_mount(ip):
+                            kind = "a Folder (no init.luau)" if ip in index.folders else "missing"
+                            self.missing.append((t.line, ".".join(ip), kind))
             if t.is_kw("local") and toks[k + 1].kind == "name":
                 name = toks[k + 1].value
                 self.declared_count[name] = self.declared_count.get(name, 0) + 1
@@ -492,9 +516,10 @@ class FileInfo:
                     j += 1
 
     def stable_bindings(self):
-        """Bindings whose local is declared once and never reassigned (safe to check)."""
+        """Bindings whose local is declared once and assigned only by the require (safe to check)."""
         for name, (file, line) in self.bindings.items():
-            if self.declared_count.get(name, 0) == 1 and name not in self.assigned:
+            expected_assignments = 1 if name in self.lazy else 0
+            if self.declared_count.get(name, 0) == 1 and self.assign_count.get(name, 0) == expected_assignments:
                 yield name, file, line
 
 
@@ -506,8 +531,12 @@ def module_label(index: ModuleIndex, file: str) -> str:
     return ip[-1] if ip else file
 
 
+STATS = {"requires_resolved": 0, "member_uses_checked": 0}
+
+
 def check_requires_and_exports(infos, index, rep):
     for info in infos:
+        STATS["requires_resolved"] += len(info.bindings)
         for line, ip, kind in info.missing:
             rep.error(info.path, line, f"require target {ip} is {kind} in the Rojo tree", "require")
         toks = info.toks
@@ -525,6 +554,7 @@ def check_requires_and_exports(infos, index, rep):
                 if toks[k + 1].is_op(":") and not (toks[k + 3].is_op("(", "{") or toks[k + 3].kind == "string"):
                     continue  # `Name: type` field in a type/table definition, not a method call
                 key = toks[k + 2].value
+                STATS["member_uses_checked"] += 1
                 if key not in ex.keys and key not in ex.types:
                     rep.error(info.path, toks[k + 2].line, f"{label} has no member '{key}' (not exported by {file})", "export")
                     continue
@@ -776,6 +806,8 @@ def main() -> int:
     check_clips(infos, index, rep)
     check_icons(index, rep)
     check_service_shape(rep)
+    if "--stats" in sys.argv:
+        print("contracts stats: " + ", ".join(f"{k}={v}" for k, v in STATS.items()))
     return rep.finish(len(files), quiet)
 
 

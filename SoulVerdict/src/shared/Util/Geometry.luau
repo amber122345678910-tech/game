@@ -133,7 +133,12 @@ end
 
 -- Closest points c1 = p1 + (q1-p1)*s and c2 = p2 + (q2-p2)*t between two segments (s, t in [0, 1]).
 -- Degenerate (zero-length) segments and parallel segments are handled.
-function Geometry.closestPointsSegmentSegment(p1: Vector3, q1: Vector3, p2: Vector3, q2: Vector3): (Vector3, Vector3, number, number)
+function Geometry.closestPointsSegmentSegment(
+	p1: Vector3,
+	q1: Vector3,
+	p2: Vector3,
+	q2: Vector3
+): (Vector3, Vector3, number, number)
 	local d1 = q1 - p1
 	local d2 = q2 - p2
 	local r = p1 - p2
@@ -294,7 +299,17 @@ end
 local function segmentBoxDistSq(a: Vector3, b: Vector3, boxCF: CFrame, boxSize: Vector3): number
 	local la = boxCF:PointToObjectSpace(a)
 	local lb = boxCF:PointToObjectSpace(b)
-	return segmentAabbDistSq(la.X, la.Y, la.Z, lb.X - la.X, lb.Y - la.Y, lb.Z - la.Z, boxSize.X / 2, boxSize.Y / 2, boxSize.Z / 2)
+	return segmentAabbDistSq(
+		la.X,
+		la.Y,
+		la.Z,
+		lb.X - la.X,
+		lb.Y - la.Y,
+		lb.Z - la.Z,
+		boxSize.X / 2,
+		boxSize.Y / 2,
+		boxSize.Z / 2
+	)
 end
 
 function Geometry.segmentBoxDistance(a: Vector3, b: Vector3, boxCF: CFrame, boxSize: Vector3): number
@@ -312,7 +327,13 @@ function Geometry.flatDistance(a: Vector3, b: Vector3): number
 	return math.sqrt(Geometry.flatDistanceSq(a, b))
 end
 
-function Geometry.pointInConeDot(point: Vector3, apex: Vector3, direction: Vector3, minDot: number, range: number?): boolean
+function Geometry.pointInConeDot(
+	point: Vector3,
+	apex: Vector3,
+	direction: Vector3,
+	minDot: number,
+	range: number?
+): boolean
 	local v = point - apex
 	local dist = v.Magnitude
 	if range ~= nil and dist > range then
@@ -328,7 +349,13 @@ function Geometry.pointInConeDot(point: Vector3, apex: Vector3, direction: Vecto
 	return v:Dot(direction) / (dist * dirLen) >= minDot
 end
 
-function Geometry.pointInCone(point: Vector3, apex: Vector3, direction: Vector3, halfAngleDeg: number, range: number?): boolean
+function Geometry.pointInCone(
+	point: Vector3,
+	apex: Vector3,
+	direction: Vector3,
+	halfAngleDeg: number,
+	range: number?
+): boolean
 	return Geometry.pointInConeDot(point, apex, direction, math.cos(halfAngleDeg * RAD), range)
 end
 

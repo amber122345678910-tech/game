@@ -30,6 +30,8 @@
 --   HazardService.Spawn(owner: Model?, team: string?, hazardType: string, params, hooks?) -> number
 --   HazardService.Remove(id: number)        HazardService.Clear()
 --   HazardService.Get(id) -> record?         HazardService.Count() -> number
+--   HazardService.GetActive() -> {record}    live records, oldest first (read-only; bots use them to dodge)
+--     record = { Id, Type, Def, Params, T0, Owner, Team, Duration, ActiveEnd, Policy, ... }
 --   HazardService.HazardHit: Signal(id, target, result?)   HazardService.Ended: Signal(id)
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -142,7 +144,13 @@ local function stripNonPlain(params: { [string]: any })
 	end
 end
 
-function HazardService.Spawn(owner: Model?, team: string?, hazardType: string, params: { [string]: any }, hooks: Hooks?): number
+function HazardService.Spawn(
+	owner: Model?,
+	team: string?,
+	hazardType: string,
+	params: { [string]: any },
+	hooks: Hooks?
+): number
 	local def = HazardDefs.Get(hazardType)
 	if def == nil then
 		warn("[HazardService] unknown hazard type " .. tostring(hazardType))
@@ -230,6 +238,17 @@ end
 
 function HazardService.Count(): number
 	return #order
+end
+
+function HazardService.GetActive(): { Record }
+	local out: { Record } = {}
+	for _, id in order do
+		local rec = active[id]
+		if rec then
+			table.insert(out, rec)
+		end
+	end
+	return out
 end
 
 ---------------------------------------------------------------------------------------------------

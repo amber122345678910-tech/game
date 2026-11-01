@@ -16,7 +16,7 @@ const TABLE = {
   DiamondPlate: { r: 0.34, m: 0.9, env: 1.0, tex: 'diamond', tile: 1.6, depth: 0.02, albedo: 0.1, rough: 0.2 },
   Foil: { r: 0.22, m: 1.0, env: 1.2, tex: 'crinkle', tile: 2.0, depth: 0.01, albedo: 0.12, rough: 0.3 },
   CorrodedMetal: { r: 0.72, m: 0.55, env: 0.6, tex: 'rust', tile: 4.0, depth: 0.012, albedo: 0.38, rough: 0.35 },
-  Fabric: { r: 0.94, m: 0, env: 0.15, tex: 'weave', tile: 0.9, depth: 0.007, albedo: 0.2, rough: 0.08 },
+  Fabric: { r: 0.94, m: 0, env: 0.15, tex: 'weave', tile: 0.7, depth: 0.0035, albedo: 0.13, rough: 0.08 },
   Carpet: { r: 1.0, m: 0, env: 0.1, tex: 'fuzz', tile: 1.0, depth: 0.006, albedo: 0.18, rough: 0.0 },
   Leather: { r: 0.58, m: 0, env: 0.35, tex: 'leather', tile: 1.5, depth: 0.004, albedo: 0.1, rough: 0.2 },
   Wood: { r: 0.72, m: 0, env: 0.25, tex: 'wood', tile: 4.0, depth: 0.006, albedo: 0.3, rough: 0.15 },
@@ -52,7 +52,7 @@ const TABLE = {
   RoofShingles: { r: 0.85, m: 0, env: 0.15, tex: 'brick', tile: 3.0, depth: 0.04, albedo: 0.32, rough: 0.1 },
 };
 
-export const NEON_GAIN = 2.6; // Neon renders unlit at ~2.6x its colour (HDR) before tone mapping
+export const NEON_GAIN = 1.65; // Neon renders unlit at ~1.65x its colour (HDR) before tone mapping
 
 // ------------------------------------------------------------------------------------------------
 // Procedural tileable height textures (512^2, values 0..1)
@@ -220,8 +220,13 @@ const GENERATORS = {
   },
   slate() {
     const n = makeFbm(3, 5, 73);
-    const layers = makeNoise(9, 79);
-    return (u, v) => clamp01(Math.floor((n(u, v) + layers(u, v) * 0.6) * 7) / 7 * 0.8 + n(u * 4, v * 4) * 0.25);
+    const flakes = makeVoronoi(7, 79);
+    const fine = makeFbm(24, 2, 81);
+    return (u, v) => {
+      const [f1, f2] = flakes(u * 0.6 + n(u, v) * 0.3, v);
+      const plate = smooth(0, 0.035, f2 - f1);
+      return clamp01(0.25 + n(u, v) * 0.45 + plate * 0.25 + (fine(u, v) - 0.5) * 0.2);
+    };
   },
   concrete() {
     const n = makeFbm(8, 5, 83);
@@ -456,9 +461,9 @@ export function makeMaterial(part, partScale, opts = {}) {
   }
   if (spec.forcefield) {
     const m = new THREE.MeshBasicMaterial({
-      color: color.clone().multiplyScalar(1.4),
+      color: color.clone().multiplyScalar(0.9),
       transparent: true,
-      opacity: 0.55 * (1 - transparency * 0.6),
+      opacity: 0.45 * (1 - transparency * 0.6),
       blending: THREE.AdditiveBlending,
       depthWrite: false,
       side: THREE.DoubleSide,

@@ -166,7 +166,7 @@ local function applyServer(model: Model, packet: { [string]: any })
 	lv.Parent = root
 
 	movers[model] = { Token = token, Velocity = lv, Attachment = att }
-	task.delay(duration, function()
+	Validation.Delay(duration, function()
 		local m = movers[model]
 		if m and m.Token == token then
 			MovementService.Stop(model)

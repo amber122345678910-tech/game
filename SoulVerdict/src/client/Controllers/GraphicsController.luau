@@ -57,7 +57,6 @@ type Quality = "Low" | "Medium" | "High" | "Ultra"
 
 type OverrideEntry = { Key: string, PresetId: string, Priority: number, Order: number }
 
-type Connection = { Disconnect: (self: any) -> () }
 type SignalLike = {
 	Connect: (self: any, fn: (...any) -> ()) -> any,
 	Fire: (self: any, ...any) -> (),
@@ -416,7 +415,8 @@ local function readRoundState()
 	finalPhase = rs:GetAttribute("FinalPhase") == true
 end
 
-local function bindRoundState(rs: Instance)
+-- `quiet` = only read the attributes (Start applies the first preset itself).
+local function bindRoundState(rs: Instance, quiet: boolean?)
 	if roundState == rs then
 		return
 	end
@@ -428,13 +428,15 @@ local function bindRoundState(rs: Instance)
 		end)
 	end
 	readRoundState()
-	retarget(false)
+	if not quiet then
+		retarget(false)
+	end
 end
 
 local function watchRoundState()
 	local existing = ReplicatedStorage:FindFirstChild("RoundState")
 	if existing then
-		bindRoundState(existing)
+		bindRoundState(existing, true)
 		return
 	end
 	local connection: RBXScriptConnection? = nil
@@ -531,9 +533,8 @@ function GraphicsController.Start()
 	if okSnapshot then
 		displayed = Apply.Copy(snapshot)
 	end
+	watchRoundState() -- reads RoundState (if it already exists) before the first preset is chosen
 	retarget(true, FIRST_TRANSITION)
-
-	watchRoundState()
 	task.spawn(hookSavedSettings)
 
 	RunService.Heartbeat:Connect(onHeartbeat)

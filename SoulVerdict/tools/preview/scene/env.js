@@ -27,7 +27,7 @@ export const DEFAULT_ENV = {
   sun: { dir: [0.5, 0.78, -0.62], color: [1.0, 0.96, 0.9], intensity: 1.15 },
   ambient: { sky: [0.66, 0.71, 0.8], ground: [0.42, 0.39, 0.36], intensity: 0.62 },
   fog: null,
-  bloom: { strength: 0.85, radius: 0.5, threshold: 0.05 },
+  bloom: { strength: 0.7, radius: 0.35, threshold: 0.12 },
   exposure: 1.0,
   saturation: 0.06,
   contrast: 0.06,

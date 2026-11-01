@@ -59,7 +59,7 @@ local function pointBoxDist(p, cf, size)
 	return math.sqrt(dx * dx + dy * dy + dz * dz)
 end
 
-return {
+local tests = {
 	---------------------------------------------------------------------------------------------
 	-- Teams
 	teams_rules = function(T, Loader)
@@ -73,11 +73,17 @@ return {
 		T.ok(Teams.AreEnemies(h1, mon) and Teams.AreEnemies(mon, h1), "humans vs monster")
 		T.ok(not Teams.AreEnemies(h1, h2), "same team never")
 		T.ok(not Teams.AreEnemies(h1, h1), "self never")
-		T.ok(Teams.AreEnemies(h1, dummy) and Teams.AreEnemies(mon, dummy) and Teams.AreEnemies(dummy, mon), "dummy enemy of all")
+		T.ok(
+			Teams.AreEnemies(h1, dummy) and Teams.AreEnemies(mon, dummy) and Teams.AreEnemies(dummy, mon),
+			"dummy enemy of all"
+		)
 		T.ok(not Teams.AreEnemies(dummy, dummyNoTeam), "dummy vs dummy")
 		T.eq(Teams.TeamOf(dummyNoTeam), "Dummy", "KitId Dummy -> Dummy team")
 		T.ok(Teams.AreEnemies(lobby, dummy), "lobby hits dummies")
-		T.ok(not Teams.AreEnemies(lobby, h1) and not Teams.AreEnemies(lobby, mon) and not Teams.AreEnemies(mon, lobby), "lobby only hits dummies")
+		T.ok(
+			not Teams.AreEnemies(lobby, h1) and not Teams.AreEnemies(lobby, mon) and not Teams.AreEnemies(mon, lobby),
+			"lobby only hits dummies"
+		)
 		T.ok(not Teams.AreEnemies(lobby, lobby2), "lobby vs lobby")
 		T.ok(not Teams.AreEnemies(nobody, mon) and not Teams.AreEnemies(nobody, dummy), "no team = nobody's enemy")
 		T.ok(not Teams.AreEnemies(nil, mon), "nil")
@@ -107,7 +113,10 @@ return {
 		local cap = charAt(HitTest, 0, 0)
 		T.ok(not HitTest.CapsuleVsBox(cap, CFrame.new(2.5, 2, 0), Vector3.new(2, 2, 2)), "face at x=1.5 misses (R=1.1)")
 		T.ok(HitTest.CapsuleVsBox(cap, CFrame.new(2.5, 2, 0), Vector3.new(3, 2, 2)), "face at x=1.0 hits")
-		T.ok(not HitTest.CapsuleVsBox(cap, CFrame.new(0, 6.2, 0), Vector3.new(4, 2, 4)), "box above head misses (bottom 5.2 > top 5.0)")
+		T.ok(
+			not HitTest.CapsuleVsBox(cap, CFrame.new(0, 6.2, 0), Vector3.new(4, 2, 4)),
+			"box above head misses (bottom 5.2 > top 5.0)"
+		)
 		T.ok(HitTest.CapsuleVsBox(cap, CFrame.new(0, 5.8, 0), Vector3.new(4, 2, 4)), "box touching head hits")
 		T.ok(HitTest.CapsuleVsBox(cap, CFrame.new(0, 2, 0), Vector3.new(0.2, 0.2, 0.2)), "tiny box inside the body")
 		-- rotated box: 45 deg about Y, corner points at the capsule
@@ -148,13 +157,25 @@ return {
 		T.ok(not HitTest.CapsuleVsBall(cap, Vector3.new(0, 6.2, 0), 1.1), "ball above head")
 		-- capsule vs capsule: horizontal bar crossing the body
 		T.ok(HitTest.CapsuleVsCapsule(cap, Vector3.new(-5, 2, 1.5), Vector3.new(5, 2, 1.5), 0.5), "crossing bar")
-		T.ok(not HitTest.CapsuleVsCapsule(cap, Vector3.new(-5, 2, 1.7), Vector3.new(5, 2, 1.7), 0.5), "bar just in front")
+		T.ok(
+			not HitTest.CapsuleVsCapsule(cap, Vector3.new(-5, 2, 1.7), Vector3.new(5, 2, 1.7), 0.5),
+			"bar just in front"
+		)
 		T.ok(not HitTest.CapsuleVsCapsule(cap, Vector3.new(2, 2, 0), Vector3.new(8, 2, 0), 0.8), "segment ends 2 away")
 		T.ok(HitTest.CapsuleVsCapsule(cap, Vector3.new(1.8, 2, 0), Vector3.new(8, 2, 0), 0.8), "segment ends 1.8 away")
-		local d2 = HitTest.ClosestSegmentPoints(Vector3.new(0, 0, 0), Vector3.new(0, 0, 0), Vector3.new(3, 4, 0), Vector3.new(3, 4, 0))
+		local d2 = HitTest.ClosestSegmentPoints(
+			Vector3.new(0, 0, 0),
+			Vector3.new(0, 0, 0),
+			Vector3.new(3, 4, 0),
+			Vector3.new(3, 4, 0)
+		)
 		T.near(d2, 25, 1e-9, "degenerate segments")
 		-- capsule volume shape uses Size.Y as tip-to-tip length
-		local vol = { Shape = "Capsule", CFrame = CFrame.new(0, 2, -5) * CFrame.Angles(math.rad(90), 0, 0), Size = Vector3.new(1, 6, 1) }
+		local vol = {
+			Shape = "Capsule",
+			CFrame = CFrame.new(0, 2, -5) * CFrame.Angles(math.rad(90), 0, 0),
+			Size = Vector3.new(1, 6, 1),
+		}
 		-- axis along Z: sphere centres at z = -7.5 and -2.5 (radius 0.5), tips at -8 and -2
 		T.near(HitTest.PointDistance(Vector3.new(0, 2, -1), vol), 1.0, 1e-6, "capsule tip distance")
 	end,
@@ -179,7 +200,8 @@ return {
 		for _ = 1, 40 do
 			local vol = {
 				Shape = if rng:Bool() then "Cylinder" else "Ring",
-				CFrame = CFrame.new(rng:Number(-3, 3), rng:Number(-3, 3), rng:Number(-3, 3)) * CFrame.Angles(rng:Number(0, 6), rng:Number(0, 6), 0),
+				CFrame = CFrame.new(rng:Number(-3, 3), rng:Number(-3, 3), rng:Number(-3, 3))
+					* CFrame.Angles(rng:Number(0, 6), rng:Number(0, 6), 0),
 				Size = Vector3.new(rng:Number(2, 8), rng:Number(0.5, 4), rng:Number(0.5, 2)),
 			}
 			local a = Vector3.new(rng:Number(-6, 6), rng:Number(-6, 6), rng:Number(-6, 6))
@@ -211,16 +233,35 @@ return {
 		local edge = { Shape = "Box", CFrame = CFrame.new(2.6, 2, 0), Size = Vector3.new(3, 2, 2) } -- face at 1.1
 		T.ok(HitTest.Hits(cap, edge), "exact touch")
 		T.ok(not HitTest.Hits(cap, edge, 0.85), "forgiveness favours the dodger")
-		T.ok(HitTest.ContainsPoint(edge, Vector3.new(2.6, 2, 0)) and not HitTest.ContainsPoint(edge, Vector3.new(0, 2, 0)), "contains")
+		T.ok(
+			HitTest.ContainsPoint(edge, Vector3.new(2.6, 2, 0))
+				and not HitTest.ContainsPoint(edge, Vector3.new(0, 2, 0)),
+			"contains"
+		)
 		T.ok(HitTest.MayOverlap(cap, edge), "broadphase near")
-		T.ok(not HitTest.MayOverlap(cap, { Shape = "Ball", CFrame = CFrame.new(50, 0, 0), Size = Vector3.new(2, 2, 2) }), "broadphase far")
+		T.ok(
+			not HitTest.MayOverlap(cap, { Shape = "Ball", CFrame = CFrame.new(50, 0, 0), Size = Vector3.new(2, 2, 2) }),
+			"broadphase far"
+		)
 	end,
 
 	---------------------------------------------------------------------------------------------
 	-- HazardDefs
 	hazard_registry = function(T, Loader)
 		local H = load(Loader, "HazardDefs")
-		for _, name in { "BlasterBeam", "BoneLine", "BoneSpikes", "BoneProjectile", "Projectile", "Shockwave", "Orb", "Zone", "Rain" } do
+		for _, name in
+			{
+				"BlasterBeam",
+				"BoneLine",
+				"BoneSpikes",
+				"BoneProjectile",
+				"Projectile",
+				"Shockwave",
+				"Orb",
+				"Zone",
+				"Rain",
+			}
+		do
 			local def = H.Get(name)
 			T.ok(def ~= nil and H[name] == def, "registered " .. name)
 			T.ok(table.find(H.Types, name) ~= nil, "listed " .. name)
@@ -238,7 +279,16 @@ return {
 	hazard_blaster_beam = function(T, Loader)
 		local H = load(Loader, "HazardDefs")
 		local HitTest = load(Loader, "HitTest")
-		local p = H.Normalize("BlasterBeam", { origin = H.LookAlong(Vector3.new(0, 3, 0), Vector3.new(0, 0, -1)), length = 60, width = 4, delay = 0.6, duration = 0.5 })
+		local p = H.Normalize(
+			"BlasterBeam",
+			{
+				origin = H.LookAlong(Vector3.new(0, 3, 0), Vector3.new(0, 0, -1)),
+				length = 60,
+				width = 4,
+				delay = 0.6,
+				duration = 0.5,
+			}
+		)
 		T.ok(H.Validate("BlasterBeam", p), "valid")
 		local def = H.BlasterBeam
 		T.near(def.Duration(p), 0.6 + 0.5 + 0.35, 1e-9, "duration")
@@ -269,7 +319,19 @@ return {
 	hazard_bone_line = function(T, Loader)
 		local H = load(Loader, "HazardDefs")
 		local HitTest = load(Loader, "HitTest")
-		local p = H.Normalize("BoneLine", { origin = CFrame.new(0, 0, 0), count = 9, spacing = 2.5, height = 5, speed = 30, distance = 60, delay = 0.5, color = "Blue" })
+		local p = H.Normalize(
+			"BoneLine",
+			{
+				origin = CFrame.new(0, 0, 0),
+				count = 9,
+				spacing = 2.5,
+				height = 5,
+				speed = 30,
+				distance = 60,
+				delay = 0.5,
+				color = "Blue",
+			}
+		)
 		local def = H.BoneLine
 		T.near(def.Duration(p), 0.5 + 2 + 0.25, 1e-9, "duration")
 		T.eq(#def.Volumes(p, 0.4), 0, "waiting")
@@ -291,14 +353,20 @@ return {
 		local travel = 30
 		T.ok(not anyHit(HitTest, charAt(HitTest, 0, -travel), gv, 0.85), "character in the gap is safe")
 		local tg = H.Telegraph("BoneLine", p)
-		T.ok(tg.Kind == "Lane" and tg.Length == 60 and math.abs(tg.Width - 20.8) < 1e-9 and tg.Color == "Blue", "lane telegraph")
+		T.ok(
+			tg.Kind == "Lane" and tg.Length == 60 and math.abs(tg.Width - 20.8) < 1e-9 and tg.Color == "Blue",
+			"lane telegraph"
+		)
 		T.eq(H.DamageKind("BoneLine", p), "Area", "kind")
 	end,
 
 	hazard_bone_spikes = function(T, Loader)
 		local H = load(Loader, "HazardDefs")
 		local HitTest = load(Loader, "HitTest")
-		local p = H.Normalize("BoneSpikes", { center = Vector3.new(0, 0, 0), radius = 8, delay = 0.6, rise = 0.12, hold = 0.45 })
+		local p = H.Normalize(
+			"BoneSpikes",
+			{ center = Vector3.new(0, 0, 0), radius = 8, delay = 0.6, rise = 0.12, hold = 0.45 }
+		)
 		local def = H.BoneSpikes
 		T.near(def.Duration(p), 0.6 + 0.12 + 0.45 + 0.2, 1e-9, "duration")
 		T.eq(#def.Volumes(p, 0.5), 0, "telegraph only")
@@ -308,16 +376,23 @@ return {
 		T.ok(anyHit(HitTest, charAt(HitTest, 5, 0), vols, 0.85), "inside")
 		T.ok(not anyHit(HitTest, charAt(HitTest, 10.5, 0), vols, 0.85), "outside")
 		T.eq(#def.Volumes(p, 1.3), 0, "retracting does not hurt")
-		local ring = H.Normalize("BoneSpikes", { center = Vector3.new(0, 0, 0), radius = 10, ring = true, ringWidth = 3, delay = 1.4, color = "Orange" })
+		local ring = H.Normalize(
+			"BoneSpikes",
+			{ center = Vector3.new(0, 0, 0), radius = 10, ring = true, ringWidth = 3, delay = 1.4, color = "Orange" }
+		)
 		local rv = def.Volumes(ring, 1.5)
 		T.eq(rv[1].Shape, "Ring", "ring")
 		T.ok(not anyHit(HitTest, charAt(HitTest, 0, 0), rv, 0.85), "centre of ring safe")
 		T.ok(anyHit(HitTest, charAt(HitTest, 10, 0), rv, 0.85), "on the ring")
 		T.ok(not anyHit(HitTest, charAt(HitTest, 14, 0), rv, 0.85), "outside the ring")
 		local tg = H.Telegraph("BoneSpikes", ring)
-		T.ok(tg.Kind == "Ring" and tg.Radius == 11.5 and tg.InnerRadius == 8.5 and tg.Color == "Orange", "ring telegraph")
+		T.ok(
+			tg.Kind == "Ring" and tg.Radius == 11.5 and tg.InnerRadius == 8.5 and tg.Color == "Orange",
+			"ring telegraph"
+		)
 		T.near(tg.Start, 0, 1e-9, "full delay telegraph by default")
-		local warned = H.Telegraph("BoneSpikes", H.Normalize("BoneSpikes", { center = Vector3.zero, delay = 1.4, warn = 0.6 }))
+		local warned =
+			H.Telegraph("BoneSpikes", H.Normalize("BoneSpikes", { center = Vector3.zero, delay = 1.4, warn = 0.6 }))
 		T.near(warned.Start, 0.8, 1e-9, "warn shortens the telegraph")
 		local layout = H.SpikeLayout(p)
 		T.eq(#layout, 14, "layout count")
@@ -331,7 +406,10 @@ return {
 	hazard_projectiles = function(T, Loader)
 		local H = load(Loader, "HazardDefs")
 		local HitTest = load(Loader, "HitTest")
-		local bp = H.Normalize("BoneProjectile", { origin = CFrame.new(0, 3, 0), speed = 60, maxDist = 60, delay = 0.15, length = 3.5 })
+		local bp = H.Normalize(
+			"BoneProjectile",
+			{ origin = CFrame.new(0, 3, 0), speed = 60, maxDist = 60, delay = 0.15, length = 3.5 }
+		)
 		local def = H.BoneProjectile
 		T.near(def.Duration(bp), 1.15, 1e-9, "flight duration")
 		T.eq(#def.Volumes(bp, 0.1), 0, "held")
@@ -344,9 +422,15 @@ return {
 		local f = H.ProjectileFrame("BoneProjectile", spun, 1)
 		T.ok(f.UpVector:FuzzyEq(Vector3.new(0, 1, 0), 1e-5), "spin rotates the bone axis")
 		T.eq(def.HitPolicy(bp).Once, true, "once")
-		T.ok(H.IsProjectile("BoneProjectile") and H.IsProjectile("Projectile") and not H.IsProjectile("Zone"), "IsProjectile")
+		T.ok(
+			H.IsProjectile("BoneProjectile") and H.IsProjectile("Projectile") and not H.IsProjectile("Zone"),
+			"IsProjectile"
+		)
 		-- generic projectile with gravity
-		local pp = H.Normalize("Projectile", { origin = CFrame.new(0, 10, 0), speed = 40, gravity = 20, maxDist = 80, radius = 0.6 })
+		local pp = H.Normalize(
+			"Projectile",
+			{ origin = CFrame.new(0, 10, 0), speed = 40, gravity = 20, maxDist = 80, radius = 0.6 }
+		)
 		local frame, traveled = H.ProjectileFrame("Projectile", pp, 1)
 		T.ok(frame.Position:FuzzyEq(Vector3.new(0, 0, -40), 1e-5), "ballistic position")
 		T.near(traveled, 40, 1e-9, "traveled")
@@ -362,7 +446,10 @@ return {
 	hazard_shockwave = function(T, Loader)
 		local H = load(Loader, "HazardDefs")
 		local HitTest = load(Loader, "HitTest")
-		local p = H.Normalize("Shockwave", { center = Vector3.zero, maxRadius = 14, speed = 28, height = 2.5, thickness = 2, delay = 0.3 })
+		local p = H.Normalize(
+			"Shockwave",
+			{ center = Vector3.zero, maxRadius = 14, speed = 28, height = 2.5, thickness = 2, delay = 0.3 }
+		)
 		local def = H.Shockwave
 		T.near(def.Duration(p), 0.3 + 0.5 + 0.15, 1e-9, "duration")
 		local vols = def.Volumes(p, 0.55) -- R = 7, band [5, 7]
@@ -380,7 +467,10 @@ return {
 	hazard_orb = function(T, Loader)
 		local H = load(Loader, "HazardDefs")
 		local HitTest = load(Loader, "HitTest")
-		local p = H.Normalize("Orb", { center = Vector3.new(0, 3, 0), radius = 12, delay = 0.4, duration = 2.5, pullStrength = 14, damage = 18 })
+		local p = H.Normalize(
+			"Orb",
+			{ center = Vector3.new(0, 3, 0), radius = 12, delay = 0.4, duration = 2.5, pullStrength = 14, damage = 18 }
+		)
 		T.eq(p.implodeDamage, 18, "implodeDamage defaults to damage")
 		T.eq(p.implodeRadius, 12, "implodeRadius defaults to radius")
 		local def = H.Orb
@@ -402,7 +492,10 @@ return {
 	hazard_zone = function(T, Loader)
 		local H = load(Loader, "HazardDefs")
 		local HitTest = load(Loader, "HitTest")
-		local p = H.Normalize("Zone", { center = Vector3.zero, radius = 9, delay = 0.3, duration = 5, tick = 0.5, effect = "Heal" })
+		local p = H.Normalize(
+			"Zone",
+			{ center = Vector3.zero, radius = 9, delay = 0.3, duration = 5, tick = 0.5, effect = "Heal" }
+		)
 		T.eq(p.amount, 5, "heal amount default")
 		T.eq(p.affects, "Allies", "heal affects allies")
 		local dz = H.Normalize("Zone", { center = Vector3.zero, damage = 7 })
@@ -421,9 +514,42 @@ return {
 	hazard_rain_determinism = function(T, Loader)
 		local H = load(Loader, "HazardDefs")
 		local HitTest = load(Loader, "HitTest")
-		local p1 = H.Normalize("Rain", { center = Vector3.new(10, 0, 5), radius = 14, count = 10, interval = 0.15, delay = 0.6, size = 3, seed = 1234 })
-		local p2 = H.Normalize("Rain", { center = Vector3.new(10, 0, 5), radius = 14, count = 10, interval = 0.15, delay = 0.6, size = 3, seed = 1234 })
-		local p3 = H.Normalize("Rain", { center = Vector3.new(10, 0, 5), radius = 14, count = 10, interval = 0.15, delay = 0.6, size = 3, seed = 99 })
+		local p1 = H.Normalize(
+			"Rain",
+			{
+				center = Vector3.new(10, 0, 5),
+				radius = 14,
+				count = 10,
+				interval = 0.15,
+				delay = 0.6,
+				size = 3,
+				seed = 1234,
+			}
+		)
+		local p2 = H.Normalize(
+			"Rain",
+			{
+				center = Vector3.new(10, 0, 5),
+				radius = 14,
+				count = 10,
+				interval = 0.15,
+				delay = 0.6,
+				size = 3,
+				seed = 1234,
+			}
+		)
+		local p3 = H.Normalize(
+			"Rain",
+			{
+				center = Vector3.new(10, 0, 5),
+				radius = 14,
+				count = 10,
+				interval = 0.15,
+				delay = 0.6,
+				size = 3,
+				seed = 99,
+			}
+		)
 		local d1, d2, d3 = H.RainDrops(p1), H.RainDrops(p2), H.RainDrops(p3)
 		T.eq(#d1, 10, "count")
 		local same, differs = true, false
@@ -458,7 +584,10 @@ return {
 		local raw = { origin = CFrame.new(), damage = 20 }
 		local n = H.Normalize("BlasterBeam", raw)
 		T.ok(n ~= raw and raw.length == nil, "normalize copies")
-		T.ok(n.length == 60 and n.color == "White" and n.kr == 0 and n.warn == 0.6 and n.damage == 20, "defaults filled")
+		T.ok(
+			n.length == 60 and n.color == "White" and n.kr == 0 and n.warn == 0.6 and n.damage == 20,
+			"defaults filled"
+		)
 		T.ok(H.Validate("BlasterBeam", n), "valid")
 		T.ok(not H.Validate("BlasterBeam", { damage = 5 }), "missing origin")
 		T.ok(not H.Validate("BlasterBeam", { origin = CFrame.new(), length = "long" }), "bad type")
@@ -671,7 +800,14 @@ return {
 		T.eq(D.ClampCharge(5, 0, 100, 1.2), 1, "clamped to 1")
 		T.ok(D.ClampAim(Vector3.zero, Vector3.new(0, 0, -100), 40):FuzzyEq(Vector3.new(0, 0, -40), 1e-6), "aim clamp")
 		T.ok(D.ClampAim(Vector3.zero, Vector3.new(3, 0, 0), 40) == Vector3.new(3, 0, 0), "aim inside range")
-		local cfg = { HumanPerDamage = 0.3, MonsterPerDamage = 0.22, HumanOnHitTaken = 0.1, HumanPerHeal = 0.4, HumanPerSecond = 0.2, MonsterPerSecond = 0.3 }
+		local cfg = {
+			HumanPerDamage = 0.3,
+			MonsterPerDamage = 0.22,
+			HumanOnHitTaken = 0.1,
+			HumanPerHeal = 0.4,
+			HumanPerSecond = 0.2,
+			MonsterPerSecond = 0.3,
+		}
 		T.near(D.UltForDamageDealt("Human", 10, cfg), 3, 1e-9, "human ult per damage")
 		T.near(D.UltForDamageDealt("Monster", 10, cfg), 2.2, 1e-9, "monster ult per damage")
 		T.near(D.UltForDamageTaken("Human", 10, cfg), 1, 1e-9, "human ult when hit")
@@ -684,3 +820,977 @@ return {
 		T.eq(D.RoleOfTeam("Lobby"), "Human", "lobby counts as human")
 	end,
 }
+
+-------------------------------------------------------------------------------------------------
+-- Service integration harness: real combat services on Lune instances with a simulated clock,
+-- a fake CharacterService / Net / workspace (flat ground at y = 0). No physics: movement is checked
+-- through the packets / server movers it produces.
+
+local function harness(Loader)
+	local H = {}
+	local clock = 1000
+	local timers = {}
+	H.sent = {}
+	H.models = {}
+	H.kills = {}
+	H.downs = {}
+	H.round = { Phase = "Round", TeamRevives = 2, FinalPhase = false, Harmony = 1 }
+	H.speeds = {}
+	H.handlers = {}
+
+	local function runDue()
+		while true do
+			table.sort(timers, function(a, b)
+				return a.at < b.at
+			end)
+			local first = timers[1]
+			if first == nil or first.at > clock then
+				return
+			end
+			table.remove(timers, 1)
+			first.fn()
+		end
+	end
+	function H.now()
+		return clock
+	end
+	function H.advance(seconds)
+		local target = clock + seconds
+		while true do
+			table.sort(timers, function(a, b)
+				return a.at < b.at
+			end)
+			local first = timers[1]
+			if first == nil or first.at > target then
+				break
+			end
+			clock = math.max(clock, first.at)
+			table.remove(timers, 1)
+			first.fn()
+		end
+		clock = target
+	end
+
+	-- module globals come from the loader's environment (Lune isolates each script's _G)
+	local G = getfenv(Loader.requirePath)
+	H.G = G
+	G.workspace = {
+		GetServerTimeNow = function()
+			return clock
+		end,
+		Raycast = function(_, origin, dir)
+			local y1 = origin.Y + dir.Y
+			if origin.Y >= 0 and y1 <= 0 and dir.Y < 0 and not (H.pitX and origin.X > H.pitX) then
+				local t = origin.Y / -dir.Y
+				return { Position = origin + dir * t, Normal = Vector3.yAxis, Distance = dir.Magnitude * t }
+			end
+			if H.wallX and (origin.X - H.wallX) * (origin.X + dir.X - H.wallX) < 0 then
+				local t = (H.wallX - origin.X) / dir.X
+				return { Position = origin + dir * t, Normal = Vector3.xAxis, Distance = dir.Magnitude * t }
+			end
+			return nil
+		end,
+		FindFirstChild = function()
+			return nil
+		end,
+	}
+	G.RaycastParams = {
+		new = function()
+			return {}
+		end,
+	}
+
+	local Validation = Loader.requirePath("src/server/Combat/Validation")
+	H.Validation = Validation
+	Validation.SetScheduler({
+		wait = function(s)
+			H.advance(s or 0)
+			return s or 0
+		end,
+		delay = function(s, fn)
+			table.insert(timers, { at = clock + s, fn = fn })
+		end,
+		defer = function(fn)
+			table.insert(timers, { at = clock, fn = fn })
+		end,
+	})
+	H.runDue = runDue
+	Validation.RoundAttr = function(name)
+		return H.round[name]
+	end
+	Validation.HorizontalSpeed = function(m)
+		return H.speeds[m] or 0
+	end
+
+	local Signal = Loader.require("ReplicatedStorage.Shared.Util.Signal")
+	local CS = {
+		Spawned = Signal.new(),
+		Died = Signal.new(),
+		Downed = Signal.new(),
+		Revived = Signal.new(),
+		Despawning = Signal.new(),
+	}
+	function CS.GetAll()
+		local out = {}
+		for _, m in H.models do
+			if m:GetAttribute("Dead") ~= true and m.Parent ~= nil then
+				table.insert(out, m)
+			end
+		end
+		return out
+	end
+	function CS.GetPlayer(m)
+		return H.playerOf and H.playerOf[m] or nil
+	end
+	function CS.GetModel(p)
+		return H.modelOf and H.modelOf[p] or nil
+	end
+	function CS.Kill(m, attacker, ability)
+		m:SetAttribute("Dead", true)
+		table.insert(H.kills, { model = m, attacker = attacker, ability = ability })
+	end
+	function CS.SetDowned(m, attacker)
+		m:SetAttribute("Downed", true)
+		table.insert(H.downs, { model = m, attacker = attacker })
+	end
+	H.CS = CS
+	Validation.SetService("CharacterService", CS)
+	H.stats = {}
+	Validation.SetService("StatsService", {
+		Add = function(m, stat, amount)
+			table.insert(H.stats, { model = m, stat = stat, amount = amount })
+		end,
+	})
+	H.finalPhase = 0
+	Validation.SetService("RoundService", {
+		TriggerFinalPhase = function()
+			H.finalPhase += 1
+			return true
+		end,
+	})
+	H.boxes = {}
+	Validation.SetService("VerdictBoxService", {
+		Start = function(monster, victim)
+			table.insert(H.boxes, { monster = monster, victim = victim })
+			return true
+		end,
+	})
+
+	local Net = Loader.require("ReplicatedStorage.Shared.Net")
+	Net.Server.FireAll = function(name, ...)
+		table.insert(H.sent, { name = name, args = table.pack(...) })
+	end
+	Net.Server.Fire = function(name, player, ...)
+		table.insert(H.sent, { name = name, player = player, args = table.pack(...) })
+	end
+	Net.Server.On = function(name, fn)
+		H.handlers[name] = fn
+		return { Disconnect = function() end }
+	end
+
+	H.S = {}
+	for _, n in { "StatusService", "MovementService", "DamageService", "HazardService", "AbilityService" } do
+		H.S[n] = Loader.requirePath("src/server/Services/" .. n)
+	end
+	for _, n in { "StatusService", "MovementService", "DamageService", "HazardService", "AbilityService" } do
+		H.S[n].Init()
+	end
+	H.HazardDefs = Loader.require("ReplicatedStorage.Shared.Combat.HazardDefs")
+	H.Kits = Loader.require("ReplicatedStorage.Shared.Kits")
+
+	local world = Instance.new("Folder")
+	world.Name = "World"
+
+	-- Spawns a character standing on the ground at `pos`, facing `look` (default -Z).
+	function H.spawn(kitId, team, pos, opts)
+		opts = opts or {}
+		local kit = H.Kits.Get(kitId)
+		local m = Instance.new("Model")
+		m.Name = (opts.name or kitId) .. "_" .. tostring(#H.models + 1)
+		local root = Instance.new("Part")
+		root.Name = "HumanoidRootPart"
+		root.Size = Vector3.new(2, 2, 1)
+		root.CFrame = H.HazardDefs.LookAlong(pos + Vector3.new(0, 3, 0), opts.look or Vector3.new(0, 0, -1))
+		root.Parent = m
+		m.PrimaryPart = root
+		local hum = Instance.new("Humanoid")
+		hum.HipHeight = 2
+		local hp = opts.hp or (kit and kit.Stats.MaxHP) or 100
+		hum.MaxHealth = hp
+		hum.Health = hp
+		hum.WalkSpeed = kit and kit.Stats.WalkSpeed or 0
+		hum.JumpPower = kit and kit.Stats.JumpPower or 0
+		hum.Parent = m
+		m:SetAttribute("KitId", kitId)
+		m:SetAttribute("Team", team)
+		m:SetAttribute("Ult", opts.ult or 0)
+		m:SetAttribute("Blocking", false)
+		m:SetAttribute("Downed", false)
+		m:SetAttribute("Dead", false)
+		if kit and kit.Role == "Monster" then
+			local d = opts.dodges or kit.Stats.MaxDodges
+			m:SetAttribute("Dodges", d)
+			m:SetAttribute("MaxDodges", opts.maxDodges or d)
+			m:SetAttribute("Exhausted", 0)
+		else
+			m:SetAttribute("KR", 0)
+			local g = kit and kit.Stats.MaxGuard or 100
+			m:SetAttribute("Guard", g)
+			m:SetAttribute("MaxGuard", g)
+			m:SetAttribute("DashCharges", 2)
+		end
+		m.Parent = world
+		table.insert(H.models, m)
+		H.S.StatusService.Track(m)
+		return m
+	end
+
+	function H.hp(m)
+		return m:FindFirstChildOfClass("Humanoid").Health
+	end
+	function H.count(name)
+		local n = 0
+		for _, s in H.sent do
+			if s.name == name then
+				n += 1
+			end
+		end
+		return n
+	end
+	function H.last(name)
+		for i = #H.sent, 1, -1 do
+			if H.sent[i].name == name then
+				return H.sent[i].args[1], H.sent[i]
+			end
+		end
+		return nil
+	end
+	function H.cleanup()
+		Validation.SetScheduler(nil)
+		G.workspace = nil
+		G.RaycastParams = nil
+	end
+	return H
+end
+
+local function withHarness(Loader, fn)
+	local H = harness(Loader)
+	local ok, err = pcall(fn, H)
+	H.cleanup()
+	if not ok then
+		error(err, 0)
+	end
+end
+
+local integration = {
+	services_teleport_validation = function(T, Loader)
+		withHarness(Loader, function(H)
+			local AS = H.S.AbilityService
+			local moved = {}
+			H.S.MovementService.Teleport = function(_m, cf)
+				table.insert(moved, cf)
+			end
+			local sans = H.spawn("ClassicSans", "Monster", Vector3.zero, { dodges = 0, maxDodges = 0 })
+			T.ok(AS.CastAs(sans, "Shortcut", { aim = Vector3.new(0, 0, -20) }), "cast")
+			T.ok(
+				moved[1] and moved[1].Position:FuzzyEq(Vector3.new(0, 3.05, -20), 1e-3),
+				"lands on the ground at the aim"
+			)
+			T.ok(moved[1].LookVector.Z < -0.99, "faces the aim")
+			local fx = H.last("AbilityFx")
+			T.ok(fx.phase == "Teleport" and fx.data.to ~= nil, "Teleport fx broadcast")
+			AS.ResetCooldowns(sans)
+			AS.CastAs(sans, "Shortcut", { aim = Vector3.new(0, 0, -100) })
+			T.ok(moved[2] and math.abs(moved[2].Position.Z + 32) < 0.05, "clamped to Distance 32")
+			AS.ResetCooldowns(sans)
+			H.wallX = 10
+			AS.CastAs(sans, "Shortcut", { aim = Vector3.new(20, 0, 0) })
+			T.ok(moved[3] and math.abs(moved[3].Position.X - 8.5) < 0.05, "stops 1.5 studs before a wall")
+			AS.ResetCooldowns(sans)
+			H.wallX = nil
+			H.pitX = 5
+			AS.CastAs(sans, "Shortcut", { aim = Vector3.new(20, 0, 0) })
+			T.ok(
+				moved[4] and moved[4].Position.X <= 5 and moved[4].Position.X > 3,
+				"walks back from a pit to solid ground"
+			)
+			AS.ResetCooldowns(sans)
+			H.pitX = -100
+			AS.CastAs(sans, "Shortcut", { aim = Vector3.new(20, 0, 0) })
+			T.eq(#moved, 4, "no ground anywhere: no teleport")
+		end)
+	end,
+
+	services_dodge_exhaust = function(T, Loader)
+		withHarness(Loader, function(H)
+			local DS, SS = H.S.DamageService, H.S.StatusService
+			local monster = H.spawn("ClassicSans", "Monster", Vector3.new(0, 0, -6), { dodges = 3, hp = 1000 })
+			local human = H.spawn("Determination", "Humans", Vector3.zero)
+			local dodgedSignals = 0
+			DS.Dodged:Connect(function()
+				dodgedSignals += 1
+			end)
+			for i = 1, 3 do
+				local r = DS.Apply({ Attacker = human, Target = monster, Amount = 10, Kind = "Melee" })
+				T.ok(r.Dodged and r.Applied == 0, "hit " .. i .. " dodged")
+				H.advance(0.2)
+			end
+			T.eq(monster:GetAttribute("Dodges"), 0, "dodges used up")
+			T.ok(SS.Has(monster, "Exhausted"), "exhausted at 0 dodges")
+			T.ok(
+				monster:GetAttribute("Status_Exhausted") ~= nil and monster:GetAttribute("Exhausted") > H.now(),
+				"exhausted attributes"
+			)
+			T.eq(H.hp(monster), 1000, "no damage while dodging")
+			local fx = H.last("DamageFx")
+			T.ok(fx and fx.dodged == true, "MISS fx")
+			local r = DS.Apply({ Attacker = human, Target = monster, Amount = 10, Kind = "Melee" })
+			T.ok(not r.Dodged, "exhausted cannot dodge")
+			T.near(r.Applied, 11.5, 1e-6, "exhausted takes x1.15")
+			H.advance(5.1)
+			T.ok(not SS.Has(monster, "Exhausted"), "exhaustion over")
+			T.eq(monster:GetAttribute("Dodges"), 3, "dodges refilled")
+			T.eq(monster:GetAttribute("Exhausted"), 0, "Exhausted attribute reset")
+			-- stunned monsters, ultimates and Undodgeable hits ignore dodges
+			SS.Apply(monster, "Stunned", 0.5)
+			T.ok(
+				not DS.Apply({ Attacker = human, Target = monster, Amount = 5, Kind = "Melee" }).Dodged,
+				"stunned: no dodge"
+			)
+			H.advance(0.6)
+			T.ok(
+				not DS.Apply({
+					Attacker = human,
+					Target = monster,
+					Amount = 5,
+					Kind = "Melee",
+					Ability = "DeterminationUlt",
+				}).Dodged,
+				"ultimate: no dodge"
+			)
+			T.ok(
+				not DS.Apply({ Attacker = human, Target = monster, Amount = 5, Kind = "Melee", Undodgeable = true }).Dodged,
+				"Undodgeable"
+			)
+			SS.Apply(human, "Undodgeable", 1)
+			T.ok(
+				not DS.Apply({ Attacker = human, Target = monster, Amount = 5, Kind = "Melee" }).Dodged,
+				"attacker status Undodgeable"
+			)
+			SS.Remove(human, "Undodgeable")
+			T.ok(DS.Apply({ Attacker = human, Target = monster, Amount = 5, Kind = "Melee" }).Dodged, "dodges again")
+			H.runDue()
+			T.eq(dodgedSignals, 4, "Dodged signal per dodge")
+			-- dodge regen through the 10 Hz tick
+			local before = monster:GetAttribute("Dodges")
+			for _ = 1, 60 do
+				H.advance(0.1)
+				SS._Step(0.1)
+			end
+			T.eq(monster:GetAttribute("Dodges"), math.min(3, before + 1), "regen +1 after delay+interval")
+			T.ok(#H.stats > 0, "stats recorded")
+		end)
+	end,
+
+	services_block_parry_guard = function(T, Loader)
+		withHarness(Loader, function(H)
+			local DS, SS = H.S.DamageService, H.S.StatusService
+			local monster = H.spawn("ClassicSans", "Monster", Vector3.new(0, 0, -5), { dodges = 0, maxDodges = 0 })
+			local human = H.spawn("Determination", "Humans", Vector3.zero) -- faces -Z (toward the monster)
+			local parried = 0
+			DS.Parried:Connect(function()
+				parried += 1
+			end)
+			human:SetAttribute("Blocking", true)
+			human:SetAttribute("BlockStart", H.now() - 0.05)
+			human:SetAttribute("Guard", 50)
+			local r = DS.Apply({ Attacker = monster, Target = human, Amount = 20, Kind = "Melee", KR = 5 })
+			T.ok(r.Parried and r.Applied == 0, "perfect parry")
+			T.ok(SS.Has(monster, "Stunned"), "melee attacker stunned")
+			T.eq(human:GetAttribute("Guard"), 65, "parry +guard")
+			T.eq(human:GetAttribute("Ult"), 8, "parry +ult")
+			T.eq(human:GetAttribute("KR"), 0, "no KR on parry")
+			H.runDue()
+			T.eq(parried, 1, "Parried signal")
+			-- beam during the window: blocked, not parried
+			local rb = DS.Apply({ Attacker = monster, Target = human, Amount = 20, Kind = "Beam", KR = 10 })
+			T.ok(rb.Blocked and not rb.Parried, "beams are blocked, not parried")
+			T.near(rb.Applied, 6, 1e-6, "70 % reduced")
+			T.near(human:GetAttribute("Guard"), 51, 1e-6, "guard drained by the blocked amount")
+			T.near(human:GetAttribute("KR"), 3, 1e-6, "KR reduced when blocked")
+			-- outside the parry window
+			human:SetAttribute("BlockStart", H.now() - 1)
+			local r2 = DS.Apply({ Attacker = monster, Target = human, Amount = 10, Kind = "Melee" })
+			T.ok(r2.Blocked and not r2.Parried, "late block")
+			-- from behind: not blocked
+			local behind = H.spawn("FellSans", "Monster", Vector3.new(0, 0, 6), { dodges = 0, maxDodges = 0 })
+			local r3 = DS.Apply({ Attacker = behind, Target = human, Amount = 10, Kind = "Melee" })
+			T.ok(not r3.Blocked and r3.Applied == 10, "attack from behind ignores block")
+			-- area damage is not blockable by default
+			local r4 = DS.Apply({ Attacker = monster, Target = human, Amount = 10, Kind = "Area" })
+			T.ok(not r4.Blocked, "area not blockable")
+			-- guard break
+			human:SetAttribute("Guard", 5)
+			local r5 = DS.Apply({ Attacker = monster, Target = human, Amount = 40, Kind = "Melee", Stun = 2 })
+			T.ok(r5.Blocked and r5.GuardBroken, "guard break")
+			T.eq(human:GetAttribute("Blocking"), false, "block dropped")
+			T.ok(SS.Has(human, "Stunned"), "guard break stun")
+			local hum = human:FindFirstChildOfClass("Humanoid")
+			T.eq(hum.WalkSpeed, 0, "stunned cannot walk")
+		end)
+	end,
+
+	services_kr_downed_kill = function(T, Loader)
+		withHarness(Loader, function(H)
+			local DS, SS = H.S.DamageService, H.S.StatusService
+			local monster =
+				H.spawn("ClassicSans", "Monster", Vector3.new(0, 0, -5), { dodges = 0, maxDodges = 0, hp = 2000 })
+			local human = H.spawn("Determination", "Humans", Vector3.zero)
+			local ally = H.spawn("Bravery", "Humans", Vector3.new(4, 0, 0))
+			local r = DS.Apply({ Attacker = monster, Target = human, Amount = 10, Kind = "Melee", KR = 6 })
+			T.eq(r.Applied, 10, "damage")
+			T.eq(human:GetAttribute("KR"), 6, "KR added")
+			T.ok(human:GetAttribute("Ult") > 0 and monster:GetAttribute("Ult") > 0, "ult gained both sides")
+			-- KR drain never kills
+			DS.AddKR(human, 100)
+			T.eq(human:GetAttribute("KR"), 40, "KR cap")
+			local hum = human:FindFirstChildOfClass("Humanoid")
+			hum.Health = 5
+			for _ = 1, 100 do
+				H.advance(0.1)
+				SS._Step(0.1)
+			end
+			T.near(H.hp(human), 1, 1e-6, "KR drained to 1 HP, not 0")
+			T.ok(human:GetAttribute("KR") < 40, "KR decays")
+			-- human hit cleanses KR
+			human:SetAttribute("KR", 10)
+			DS.Apply({ Attacker = human, Target = monster, Amount = 5, Kind = "Melee" })
+			T.eq(human:GetAttribute("KR"), 7, "landing a hit cleanses 3 KR")
+			-- lethal hit -> downed (revives left, round phase)
+			local rd = DS.Apply({ Attacker = monster, Target = human, Amount = 50, Kind = "Melee", KR = 5 })
+			T.ok(rd.Downed and not rd.Killed, "downed")
+			T.eq(H.hp(human), 1, "downed humans keep 1 HP (Humanoid stays alive)")
+			T.eq(#H.downs, 1, "SetDowned called")
+			-- allies cannot hurt, monster damage kills a downed human
+			local rf = DS.Apply({ Attacker = ally, Target = human, Amount = 5, Kind = "Melee" })
+			T.eq(rf.Reason, "Team", "no friendly fire")
+			local rk = DS.Apply({ Attacker = monster, Target = human, Amount = 1, Kind = "Area" })
+			T.ok(rk.Killed, "monster damage kills the downed")
+			T.eq(H.kills[1].model, human, "Kill called")
+			T.eq(H.kills[1].attacker, monster, "killer attributed")
+			-- no revives left -> straight kill
+			H.round.TeamRevives = 0
+			local r2 = DS.Apply({ Attacker = monster, Target = ally, Amount = 500, Kind = "Melee" })
+			T.ok(r2.Killed and not r2.Downed, "no revives: killed")
+			-- Determined keeps 1 HP
+			local det = H.spawn("Determination", "Humans", Vector3.new(-4, 0, 0))
+			SS.Apply(det, "Determined", 5)
+			local r3 = DS.Apply({ Attacker = monster, Target = det, Amount = 999, Kind = "Melee" })
+			T.ok(not r3.Killed and H.hp(det) == 1, "Determined floor")
+			-- monster cannot die before its final phase; crossing 30 % triggers it
+			local mh = monster:FindFirstChildOfClass("Humanoid")
+			DS.Apply({ Attacker = det, Target = monster, Amount = 1500, Kind = "Melee" })
+			H.runDue()
+			T.ok(H.finalPhase >= 1, "final phase triggered below 30 %")
+			DS.Apply({ Attacker = det, Target = monster, Amount = 5000, Kind = "Melee" })
+			T.ok(mh.Health >= 1 and monster:GetAttribute("Dead") ~= true, "no death before the final phase")
+			H.round.FinalPhase = true
+			local rk2 = DS.Apply({ Attacker = det, Target = monster, Amount = 5000, Kind = "Melee" })
+			T.ok(rk2.Killed, "monster dies after its final phase")
+			-- environment True damage passes IFrames, not Invulnerable
+			local h3 = H.spawn("Kindness", "Humans", Vector3.new(8, 0, 0))
+			SS.Apply(h3, "IFrames", 1)
+			T.eq(DS.Apply({ Target = h3, Amount = 5, Kind = "True" }).Applied, 5, "collapse damage passes i-frames")
+			T.eq(DS.Apply({ Attacker = monster, Target = h3, Amount = 5, Kind = "Melee" }).Reason, "Immune", "i-frames")
+			SS.Apply(h3, "Invulnerable", 1)
+			T.eq(DS.Apply({ Target = h3, Amount = 5, Kind = "True" }).Reason, "Immune", "invulnerable")
+			-- boxed targets only take Box damage, floor 1
+			local h4 = H.spawn("Justice", "Humans", Vector3.new(12, 0, 0), { hp = 20 })
+			SS.Apply(h4, "Boxed", 3)
+			SS.Apply(h4, "Invulnerable", 3)
+			T.eq(DS.Apply({ Attacker = monster, Target = h4, Amount = 5, Kind = "Melee" }).Reason, "Immune", "boxed")
+			local rb = DS.Apply({ Attacker = monster, Target = h4, Amount = 50, Kind = "Box", KR = 3 })
+			T.ok(rb.Applied == 19 and not rb.Killed, "box damage floors at 1 HP")
+			-- training dummies refill instead of dying
+			local dummy = H.spawn("Dummy", "Dummy", Vector3.new(0, 0, 10), { hp = 50 })
+			local rdm = DS.Apply({ Attacker = human, Target = dummy, Amount = 60, Kind = "Melee" })
+			T.ok(rdm.Killed and H.hp(dummy) == 50, "dummy refilled")
+		end)
+	end,
+
+	services_colors_shield_hooks_mults = function(T, Loader)
+		withHarness(Loader, function(H)
+			local DS, SS = H.S.DamageService, H.S.StatusService
+			local monster =
+				H.spawn("ClassicSans", "Monster", Vector3.new(0, 0, -5), { dodges = 0, maxDodges = 0, hp = 5000 })
+			local human = H.spawn("Determination", "Humans", Vector3.zero)
+			T.eq(
+				DS.Apply({ Attacker = monster, Target = human, Amount = 10, Kind = "Area", Color = "Blue" }).Reason,
+				"Color",
+				"blue spares the still"
+			)
+			H.speeds[human] = 6
+			T.eq(
+				DS.Apply({ Attacker = monster, Target = human, Amount = 10, Kind = "Area", Color = "Blue" }).Applied,
+				10,
+				"blue hurts movers"
+			)
+			T.eq(
+				DS.Apply({ Attacker = monster, Target = human, Amount = 10, Kind = "Area", Color = "Orange" }).Reason,
+				"Color",
+				"orange spares movers"
+			)
+			H.speeds[human] = 0
+			T.eq(
+				DS.Apply({ Attacker = monster, Target = human, Amount = 10, Kind = "Area", Color = "Orange" }).Applied,
+				10,
+				"orange hurts the still"
+			)
+			local hum = human:FindFirstChildOfClass("Humanoid")
+			hum.Health = hum.MaxHealth
+			-- shield
+			SS.Apply(human, "Shielded", 5, { amount = 40 })
+			T.eq(human:GetAttribute("Shield"), 40, "shield attribute")
+			local rs = DS.Apply({ Attacker = monster, Target = human, Amount = 30, Kind = "Beam", KR = 6 })
+			T.ok(rs.Absorbed == 30 and rs.Applied == 0, "absorbed")
+			T.eq(human:GetAttribute("KR"), 0, "fully absorbed: no KR")
+			T.eq(human:GetAttribute("Shield"), 10, "shield left")
+			local rs2 = DS.Apply({ Attacker = monster, Target = human, Amount = 30, Kind = "Beam" })
+			T.ok(rs2.Absorbed == 10 and rs2.Applied == 20, "shield breaks")
+			T.ok(not SS.Has(human, "Shielded"), "shield removed")
+			hum.Health = hum.MaxHealth
+			-- multipliers: buffs add, reductions multiply
+			SS.Apply(human, "DamageUp", 5, { mult = 1.2 })
+			SS.Apply(human, "Rage", 5, { damage = 1.3, speed = 1 })
+			T.near(human:GetAttribute("Buff_DamageMult"), 1.5, 1e-6, "Buff_DamageMult attribute")
+			T.near(
+				DS.Apply({ Attacker = human, Target = monster, Amount = 10, Kind = "Melee" }).Applied,
+				15,
+				1e-6,
+				"x1.5"
+			)
+			SS.Apply(monster, "DamageDown", 5, { mult = 0.5 })
+			T.near(
+				DS.Apply({ Attacker = human, Target = monster, Amount = 10, Kind = "Melee" }).Applied,
+				7.5,
+				1e-6,
+				"target reduction"
+			)
+			SS.Remove(monster, "DamageDown")
+			H.round.Harmony = 1.12
+			T.near(
+				DS.Apply({ Attacker = human, Target = monster, Amount = 10, Kind = "Melee" }).Applied,
+				16.2,
+				1e-6,
+				"Harmony adds for humans"
+			)
+			H.round.Harmony = 1
+			SS.Remove(human, "Rage")
+			SS.Remove(human, "DamageUp")
+			-- StealthStrike: x mult, undodgeable, consumed
+			monster:SetAttribute("Dodges", 2)
+			monster:SetAttribute("MaxDodges", 2)
+			SS.Apply(human, "StealthStrike", 6, { mult = 1.6 })
+			local rst = DS.Apply({ Attacker = human, Target = monster, Amount = 10, Kind = "Melee" })
+			T.ok(not rst.Dodged and math.abs(rst.Applied - 16) < 1e-6, "stealth strike")
+			T.ok(not SS.Has(human, "StealthStrike"), "consumed")
+			T.ok(
+				DS.Apply({ Attacker = human, Target = monster, Amount = 10, Kind = "Melee" }).Dodged,
+				"next hit dodgeable"
+			)
+			monster:SetAttribute("Dodges", 0)
+			monster:SetAttribute("MaxDodges", 0)
+			-- hooks
+			local remove = DS.AddHook("Before", function(info, _result, state)
+				if info.Ability == "Nope" then
+					state.CancelReason = "TestShield"
+					return true
+				end
+				if info.Ability == "Double" then
+					state.Mult = 2
+				end
+				return nil
+			end)
+			local seen = 0
+			local removeAfter = DS.AddHook("After", function(_info, result)
+				seen += 1
+				return nil
+			end)
+			local rc = DS.Apply({ Attacker = human, Target = monster, Amount = 10, Kind = "Melee", Ability = "Nope" })
+			T.eq(rc.Reason, "Cancelled", "hook cancel")
+			local fx = H.last("DamageFx")
+			T.eq(fx.negated, "TestShield", "negated fx")
+			T.near(
+				DS.Apply({ Attacker = human, Target = monster, Amount = 10, Kind = "Melee", Ability = "Double" }).Applied,
+				20,
+				1e-6,
+				"hook mult"
+			)
+			T.ok(seen >= 2, "after hooks run")
+			remove()
+			removeAfter()
+			T.near(
+				DS.Apply({ Attacker = human, Target = monster, Amount = 10, Kind = "Melee", Ability = "Double" }).Applied,
+				10,
+				1e-6,
+				"hook removed"
+			)
+			-- KRBoost doubles KR
+			SS.Apply(monster, "KRBoost", 5, { mult = 2 })
+			human:SetAttribute("KR", 0)
+			DS.Apply({ Attacker = monster, Target = human, Amount = 1, Kind = "Melee", KR = 4 })
+			T.eq(human:GetAttribute("KR"), 8, "KRBoost")
+			-- heal
+			hum.Health = 50
+			local healed = DS.Heal(human, 1000, monster)
+			T.eq(healed, hum.MaxHealth - 50, "heal capped at max")
+			-- drain dodges -> exhausted
+			monster:SetAttribute("Dodges", 2)
+			monster:SetAttribute("MaxDodges", 4)
+			T.eq(DS.DrainDodges(monster, 5, human), 2, "drained what was left")
+			T.ok(SS.Has(monster, "Exhausted"), "drained to 0 exhausts")
+		end)
+	end,
+
+	services_status_movement = function(T, Loader)
+		withHarness(Loader, function(H)
+			local SS = H.S.StatusService
+			local human = H.spawn("Determination", "Humans", Vector3.zero) -- WalkSpeed 17, JumpPower 50
+			local hum = human:FindFirstChildOfClass("Humanoid")
+			T.eq(hum.WalkSpeed, 17, "base walk")
+			SS.Apply(human, "Slowed", 2, { mult = 0.5 })
+			T.near(hum.WalkSpeed, 8.5, 1e-6, "slowed")
+			T.ok(type(human:GetAttribute("Status_Slowed")) == "number", "status attribute")
+			SS.Apply(human, "Hasted", 1, { mult = 1.2 })
+			T.near(hum.WalkSpeed, 17 * 0.5 * 1.2, 1e-6, "modifiers multiply")
+			H.advance(1.05)
+			T.near(hum.WalkSpeed, 8.5, 1e-6, "haste expired (exact timer)")
+			T.eq(human:GetAttribute("Status_Hasted"), nil, "attribute cleared")
+			SS.Apply(human, "Stunned", 0.5)
+			T.eq(hum.WalkSpeed, 0, "stunned")
+			T.eq(hum.JumpPower, 0, "stunned no jump")
+			T.ok(not SS.CanAct(human), "cannot act")
+			H.advance(0.6)
+			T.ok(SS.CanAct(human), "can act again")
+			H.advance(1)
+			T.eq(hum.WalkSpeed, 17, "all expired")
+			human:SetAttribute("Blocking", true)
+			SS.RecomputeMovement(human)
+			T.near(hum.WalkSpeed, 17 * 0.55, 1e-6, "blocking slows")
+			human:SetAttribute("Blocking", false)
+			SS.Apply(human, "Blue", 1)
+			SS.RecomputeMovement(human)
+			T.near(hum.JumpPower, 50 * 0.35, 1e-6, "blue gravity")
+			T.eq(human:GetAttribute("SoulMode"), "Blue", "soul mode blue")
+			SS.Apply(human, "Boxed", 1)
+			T.eq(human:GetAttribute("SoulMode"), "Boxed", "boxed wins")
+			SS.Remove(human, "Boxed")
+			T.eq(human:GetAttribute("SoulMode"), "Blue", "back to blue")
+			H.advance(1.1)
+			T.eq(human:GetAttribute("SoulMode"), "Red", "red again")
+			human:SetAttribute("Downed", true)
+			SS.RecomputeMovement(human)
+			T.eq(hum.WalkSpeed, 4, "downed crawl speed")
+			human:SetAttribute("Downed", false)
+			-- refresh keeps the later end time and replaces data
+			SS.Apply(human, "Slowed", 3, { mult = 0.9 })
+			SS.Apply(human, "Slowed", 1, { mult = 0.7 })
+			local endsAt, data = SS.Get(human, "Slowed")
+			T.ok(endsAt and math.abs(endsAt - (H.now() + 3)) < 1e-6 and data.mult == 0.7, "refresh semantics")
+			T.eq(SS.Cleanse(human), 1, "cleanse removes debuffs")
+			-- ult passive (round phase) and dash/guard regen
+			human:SetAttribute("Ult", 0)
+			human:SetAttribute("DashCharges", 0)
+			human:SetAttribute("Guard", 50)
+			for _ = 1, 30 do
+				H.advance(0.1)
+				SS._Step(0.1)
+			end
+			T.near(human:GetAttribute("Ult"), 0.6, 0.11, "human ult per second")
+			T.eq(human:GetAttribute("DashCharges"), 1, "dash charge regen 2.8 s")
+			T.ok(human:GetAttribute("Guard") > 70, "guard regen")
+			local unhook = SS.OnTick(function() end)
+			T.ok(type(unhook) == "function", "OnTick returns a disconnect")
+			unhook()
+		end)
+	end,
+
+	services_hazards = function(T, Loader)
+		withHarness(Loader, function(H)
+			local HS = H.S.HazardService
+			local monster = H.spawn("ClassicSans", "Monster", Vector3.new(0, 0, -20), { dodges = 0, maxDodges = 0 })
+			local human = H.spawn("Determination", "Humans", Vector3.zero)
+			local friend = H.spawn("Kindness", "Humans", Vector3.new(30, 0, 0))
+			local hits = 0
+			HS.HazardHit:Connect(function()
+				hits += 1
+			end)
+			local id = HS.Spawn(
+				monster,
+				"Monster",
+				"BoneSpikes",
+				{ center = Vector3.zero, radius = 5, delay = 0.6, damage = 12, kr = 4 }
+			)
+			T.ok(id > 0, "spawned")
+			local pkt = H.last("Hazard")
+			T.ok(
+				pkt and pkt.id == id and pkt.type == "BoneSpikes" and pkt.t0 == H.now() and pkt.team == "Monster",
+				"Hazard packet"
+			)
+			T.eq(pkt.params.rise, 0.12, "normalized params broadcast")
+			HS._Step(1 / 60)
+			T.eq(H.hp(human), 110, "telegraph: no damage")
+			H.advance(0.7)
+			HS._Step(1 / 60)
+			T.eq(H.hp(human), 98, "spikes hit")
+			T.eq(human:GetAttribute("KR"), 4, "hazard KR")
+			H.advance(0.1)
+			HS._Step(1 / 60)
+			T.eq(H.hp(human), 98, "Once policy")
+			H.runDue()
+			T.eq(hits, 1, "HazardHit")
+			-- blue line: the still human is spared and hit once moving
+			local line = HS.Spawn(monster, "Monster", "BoneLine", {
+				origin = H.HazardDefs.LookAlong(Vector3.new(0, 0, -10), Vector3.new(0, 0, 1)),
+				count = 5,
+				spacing = 2,
+				speed = 20,
+				distance = 30,
+				delay = 0,
+				damage = 7,
+				color = "Blue",
+			})
+			H.advance(0.5)
+			HS._Step(1 / 60) -- row at z = 0
+			T.eq(H.hp(human), 98, "blue spares the still")
+			H.speeds[human] = 5
+			H.advance(0.02)
+			HS._Step(1 / 60)
+			T.eq(H.hp(human), 91, "blue hits the mover")
+			H.speeds[human] = 0
+			HS.Remove(line)
+			T.eq(H.last("HazardEnd"), line, "HazardEnd on removal")
+			-- projectile ends on its first hit; fast projectile cannot tunnel on a slow frame
+			local before = H.count("HazardEnd")
+			local proj = HS.Spawn(monster, "Monster", "Projectile", {
+				origin = H.HazardDefs.LookAlong(Vector3.new(0, 3, -20), Vector3.new(0, 0, 1)),
+				speed = 120,
+				radius = 0.5,
+				maxDist = 60,
+				damage = 5,
+			})
+			HS._Step(0)
+			H.advance(1 / 6) -- 20 studs in one (slow) frame: sub-stepping must catch the body at z = 0
+			HS._Step(1 / 6)
+			T.eq(H.hp(human), 86, "projectile hit (sub-stepped)")
+			T.eq(HS.Get(proj), nil, "projectile ended")
+			T.eq(H.count("HazardEnd"), before + 1, "HazardEnd for the projectile")
+			-- rain: two drops can hit the same target (PerKey)
+			local rain = HS.Spawn(
+				monster,
+				"Monster",
+				"Rain",
+				{ center = Vector3.zero, radius = 0.01, count = 2, interval = 0.3, delay = 0.2, size = 3, damage = 3 }
+			)
+			for _ = 1, 50 do
+				H.advance(0.02)
+				HS._Step(0.02)
+			end
+			T.eq(H.hp(human), 80, "two rain drops")
+			T.eq(HS.Get(rain), nil, "rain expired naturally")
+			-- heal zone for allies only
+			local hum = human:FindFirstChildOfClass("Humanoid")
+			hum.Health = 50
+			local zone = HS.Spawn(
+				friend,
+				"Humans",
+				"Zone",
+				{
+					center = Vector3.zero,
+					radius = 6,
+					delay = 0,
+					duration = 2,
+					tick = 0.5,
+					effect = "Heal",
+					amount = 6,
+					cleanseKR = 2,
+				}
+			)
+			for _ = 1, 30 do
+				H.advance(0.05)
+				HS._Step(0.05)
+			end
+			T.eq(H.hp(human), 68, "heal ticks (t = 0, 0.5, 1.0)")
+			T.eq(human:GetAttribute("KR"), 0, "KR cleansed")
+			HS.Remove(zone)
+			-- orb pulls enemies (server-applied mover for bots)
+			HS.Spawn(
+				monster,
+				"Monster",
+				"Orb",
+				{ center = Vector3.new(0, 3, -6), radius = 12, delay = 0, duration = 1, pullStrength = 14, damage = 9 }
+			)
+			H.advance(0.05)
+			HS._Step(0.05)
+			local root = human.PrimaryPart
+			local mover = root:FindFirstChild("SV_Mover")
+			T.ok(mover ~= nil and mover.VectorVelocity.Z < -10, "pulled toward the orb")
+			H.advance(1.1)
+			HS._Step(0.05)
+			T.eq(H.hp(human), 59, "implosion")
+			T.eq(root:FindFirstChild("SV_Mover"), nil, "mover cleaned up")
+			-- invalid params are rejected, the cap holds (expected warnings silenced)
+			Loader.quietWarnings = true
+			T.eq(HS.Spawn(monster, "Monster", "BlasterBeam", { length = 5 }), 0, "missing origin rejected")
+			for _ = 1, 45 do
+				HS.Spawn(monster, "Monster", "Zone", { center = Vector3.new(500, 0, 0), duration = 30 })
+			end
+			Loader.quietWarnings = false
+			T.ok(HS.Count() <= 40, "hazard cap")
+			T.eq(#HS.GetActive(), HS.Count(), "GetActive lists live records")
+			T.ok(HS.GetActive()[1].Def ~= nil and HS.GetActive()[1].Params ~= nil, "records expose Def/Params")
+			HS.Clear()
+			T.eq(HS.Count(), 0, "cleared")
+		end)
+	end,
+
+	services_ability_casts = function(T, Loader)
+		withHarness(Loader, function(H)
+			local AS, SS, HS = H.S.AbilityService, H.S.StatusService, H.S.HazardService
+			local sans = H.spawn("ClassicSans", "Monster", Vector3.zero, { dodges = 0, maxDodges = 0 })
+			local human = H.spawn("Determination", "Humans", Vector3.new(0, 0, -5), { look = Vector3.new(0, 0, 1) })
+			local far = H.spawn("Patience", "Humans", Vector3.new(0, 0, -30), { look = Vector3.new(0, 0, 1) })
+			-- M1 combo
+			local ok = AS.CastAs(sans, "BoneJab", { aim = Vector3.new(0, 3, -5), castId = 7 })
+			T.ok(ok, "BoneJab cast")
+			local fx = H.last("AbilityFx")
+			T.ok(fx ~= nil, "fx")
+			T.eq(H.hp(human), 103, "combo hit 1 (7 dmg)")
+			T.eq(human:GetAttribute("KR"), 3, "BoneJab KR")
+			T.ok(type(sans:GetAttribute("Cooldown_BoneJab")) == "number", "cooldown attribute")
+			local ok2, why = AS.CastAs(sans, "BoneJab", { aim = Vector3.new(0, 3, -5) })
+			T.ok(not ok2 and why == "cooldown", "cooldown enforced")
+			H.advance(0.45)
+			AS.CastAs(sans, "BoneJab", { aim = Vector3.new(0, 3, -5) })
+			H.advance(0.45)
+			AS.CastAs(sans, "BoneJab", { aim = Vector3.new(0, 3, -5) })
+			T.eq(H.hp(human), 110 - 7 - 7 - 12, "three-hit combo damage")
+			local root = human.PrimaryPart
+			T.ok(root:FindFirstChild("SV_Mover") ~= nil, "last hit knocks back (bot mover)")
+			H.advance(1.2)
+			AS.CastAs(sans, "BoneJab", { aim = Vector3.new(0, 3, -5) })
+			H.runDue()
+			-- Gaster Blaster: full charge after holding long enough
+			H.advance(2)
+			local hazardsBefore = H.count("Hazard")
+			AS.CastAs(sans, "GasterBlaster", { aim = Vector3.new(0, 0, -30), charge = 1 })
+			T.eq(H.count("Hazard") - hazardsBefore, 3, "3 blasters at full charge")
+			local beam = H.last("Hazard")
+			T.eq(beam.type, "BlasterBeam", "beam hazard")
+			T.ok(beam.params.origin.Position.Y > 3, "blasters float above Sans")
+			T.ok(beam.params.origin.LookVector.Z < -0.9, "aimed at the target")
+			T.ok(beam.params.delay > 0.75, "staggered")
+			-- cheated charge is clamped (just came off cooldown)
+			AS.SetCooldown(sans, "GasterBlaster", 0)
+			hazardsBefore = H.count("Hazard")
+			AS.CastAs(sans, "GasterBlaster", { aim = Vector3.new(0, 0, -30), charge = 1 })
+			T.eq(H.count("Hazard") - hazardsBefore, 1, "charge clamped to the real hold time")
+			-- Blue Soul on a target
+			local hpBefore = H.hp(far)
+			T.ok(AS.CastAs(sans, "BlueSoul", { aim = Vector3.new(0, 3, -30), target = far }), "BlueSoul")
+			T.ok(SS.Has(far, "Blue"), "blue soul applied")
+			T.eq(H.hp(far), hpBefore - 14, "slam damage")
+			T.ok(SS.Has(far, "Stunned"), "stunned after the slam")
+			-- Bone Zone / Bone Wall / Bad Time
+			T.ok(AS.CastAs(sans, "BoneZone", { aim = Vector3.new(0, 0, -20) }), "BoneZone")
+			local zoneHazard = H.last("Hazard")
+			T.ok(zoneHazard.params.ring == true and zoneHazard.params.color == "Orange", "orange ring")
+			T.ok(AS.CastAs(sans, "BoneWall", { aim = Vector3.new(0, 0, -20), dir = Vector3.new(0, 0, -1) }), "BoneWall")
+			T.eq(H.last("Hazard").params.color, "Blue", "blue wall")
+			local okUlt, whyUlt = AS.CastAs(sans, "BadTime", { aim = Vector3.new(0, 0, -20) })
+			T.ok(not okUlt and whyUlt == "ult", "ult needs 100")
+			sans:SetAttribute("Ult", 100)
+			hazardsBefore = H.count("Hazard")
+			T.ok(AS.CastAs(sans, "BadTime", { aim = Vector3.new(0, 0, -20) }), "BadTime")
+			T.eq(sans:GetAttribute("Ult"), 0, "ult consumed")
+			T.eq(H.count("Hazard") - hazardsBefore, 7, "6 blasters + rain")
+			T.ok(SS.Has(sans, "KRBoost"), "KR boost")
+			HS.Clear()
+			-- Determination kit: afterimage counter, ultimate, lunge
+			local det = H.spawn("Determination", "Humans", Vector3.new(12, 0, 0), { look = Vector3.new(-1, 0, 0) })
+			H.S.AbilityService.GetServerKit("Determination").OnSpawn(det, nil)
+			T.ok(AS.CastAs(det, "Afterimage", { dir = Vector3.new(0, 0, 1) }), "Afterimage cast")
+			T.ok(SS.Has(det, "Afterimage"), "afterimage window")
+			local sansHp = H.hp(sans)
+			local rr = H.S.DamageService.Apply({ Attacker = sans, Target = det, Amount = 30, Kind = "Melee" })
+			T.eq(rr.Reason, "Cancelled", "hit negated by Afterimage")
+			H.runDue()
+			T.eq(H.hp(sans), sansHp - 20, "counter-slash damage")
+			T.ok(SS.Has(sans, "Stunned"), "counter stun")
+			det:SetAttribute("Ult", 100)
+			T.ok(AS.CastAs(det, "DeterminationUlt", {}), "ult cast")
+			T.ok(SS.Has(det, "Undodgeable") and SS.Has(det, "Determined") and SS.Has(det, "DamageUp"), "ult statuses")
+			sans:SetAttribute("Dodges", 3)
+			sans:SetAttribute("MaxDodges", 3)
+			SS.Remove(sans, "Stunned")
+			local ru = H.S.DamageService.Apply({ Attacker = det, Target = sans, Amount = 10, Kind = "Melee" })
+			T.ok(not ru.Dodged and math.abs(ru.Applied - 12) < 1e-6, "undodgeable +20 %")
+			-- Hope: below 35 % HP -> +12 %
+			det:FindFirstChildOfClass("Humanoid").Health = 20
+			SS.Remove(det, "DamageUp")
+			local rh = H.S.DamageService.Apply({ Attacker = det, Target = sans, Amount = 10, Kind = "Melee" })
+			T.near(rh.Applied, 11.2, 1e-6, "Hope passive")
+			-- Lunging strike hits along the path
+			local victim = H.spawn("FellSans", "Monster", Vector3.new(5, 0, 0), { dodges = 0, maxDodges = 0 })
+			local vhp = H.hp(victim)
+			T.ok(AS.CastAs(det, "LungingStrike", { aim = Vector3.new(0, 3, 0), dir = Vector3.new(-1, 0, 0) }), "lunge")
+			T.ok(H.hp(victim) < vhp, "lunge hit the monster on the path")
+			-- player-facing net handlers
+			local player = Instance.new("Player")
+			player.Name = "P"
+			player.Parent = Instance.new("Folder")
+			H.playerOf = { [human] = player }
+			H.modelOf = { [player] = human }
+			AS.Start()
+			human:SetAttribute("Blocking", false)
+			H.handlers.Block(player, true)
+			T.eq(human:GetAttribute("Blocking"), true, "Block handler")
+			T.ok(human:GetAttribute("BlockStart") > 0, "parry window open")
+			H.handlers.Block(player, false)
+			H.handlers.Block(player, "yes")
+			T.eq(human:GetAttribute("Blocking"), false, "garbage ignored")
+			local charges = human:GetAttribute("DashCharges")
+			SS.Remove(human, "Stunned")
+			SS.Remove(human, "Blue")
+			H.handlers.Dash(player, Vector3.new(1, 0, 0))
+			T.eq(human:GetAttribute("DashCharges"), charges - 1, "dash consumed a charge")
+			T.ok(SS.Has(human, "IFrames"), "dash i-frames")
+			local fm = H.last("ForceMove")
+			T.ok(fm and fm.kind == "Dash" and fm.echo == true, "dash echo packet to the owner")
+			H.handlers.Cast(player, "KnifeCombo", { aim = Vector3.new(0, 3, 5), castId = 3 })
+			local cd = H.last("Cooldown")
+			T.eq(cd, "KnifeCombo", "cooldown sent to caster")
+			H.handlers.Cast(player, string.rep("x", 100), {})
+			H.handlers.Cast(player, "KnifeCombo", "garbage")
+			-- Verdict Box (monster, F)
+			SS.Remove(sans, "Stunned")
+			local box = AS.CastAs(sans, "VerdictBox", { dir = Vector3.new(0, 0, -1) })
+			T.ok(box and #H.boxes == 1, "verdict box started")
+			T.ok(H.boxes[1].victim == far or H.boxes[1].victim == human, "victim in the cone")
+			T.ok(not AS.CastAs(sans, "VerdictBox", { dir = Vector3.new(0, 0, -1) }), "verdict box cooldown")
+			-- cooldown scaling (Patience field)
+			AS.SetCooldown(sans, "BoneZone", 4)
+			local before = AS.GetCooldowns(sans).BoneZone
+			AS.ScaleCooldowns(sans, 0.5, 6)
+			T.near(AS.GetCooldowns(sans).BoneZone - before, 3, 1e-6, "half-speed cooldowns")
+			AS.ResetCooldowns(sans)
+			T.eq(next(AS.GetCooldowns(sans)), nil, "reset")
+		end)
+	end,
+}
+
+for name, fn in integration do
+	tests[name] = fn
+end
+
+return tests

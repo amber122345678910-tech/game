@@ -486,6 +486,10 @@ HazardDefs[type] = {
   HitPolicy: (params) -> { Once: boolean, Interval: number? },
 }
 Volume = { Shape: "Box"|"Ball"|"Capsule", CFrame: CFrame, Size: Vector3 }   -- Ball uses Size.X as diameter; Capsule: Size.X diameter, Size.Y length (along CFrame.UpVector)
+-- (added by the combat core) Shape also "Cylinder" (Size.X diameter, Size.Y height, axis UpVector) and "Ring"
+-- (annulus: Size.X outer diameter, Size.Y height, Size.Z band thickness); Capsule Size.Y is tip-to-tip.
+-- Volume.Key + HitPolicy.PerKey: Once/Interval tracked per (target, Key) (Rain drops). Every param, default and
+-- the exact geometry per type: header of src/shared/Combat/HazardDefs.luau (authoritative for client visuals).
 ```
 Core hazard types (all have `delay` = telegraph time before damage, `color`, `damage`, `kr`):
 | type | params |

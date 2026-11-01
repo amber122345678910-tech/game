@@ -80,6 +80,7 @@ local MapService: any = nil
 local DataService: any = nil
 local StatusService: any = nil
 local RequestService: any = nil
+local DamageService: any = nil
 
 local records: { [Model]: Record } = {}
 local byPlayer: { [Player]: Model } = {}
@@ -123,6 +124,14 @@ local function call(service: any, method: string, ...: any): (boolean, any)
 		warn(("[CharacterService] %s failed: %s"):format(method, tostring(result)))
 	end
 	return ok, result
+end
+
+-- DamageService is the single writer of Health during play; use its helper when it exists.
+local function setHealth(model: Model, humanoid: Humanoid, hp: number)
+	local ok = call(DamageService, "SetHealth", model, hp)
+	if not ok then
+		humanoid.Health = math.clamp(hp, 0, humanoid.MaxHealth)
+	end
 end
 
 local function notify(player: Player?, key: string, args: { any }?, style: string?)
@@ -234,7 +243,12 @@ local function buildModel(blueprintId: string, name: string, skin: string?, scal
 		if ok and validRig(model) then
 			return model
 		end
-		warn(("[CharacterService] RigBuilder.Build(%s) failed (%s); falling back to Dummy"):format(blueprintId, tostring(model)))
+		warn(
+			("[CharacterService] RigBuilder.Build(%s) failed (%s); falling back to Dummy"):format(
+				blueprintId,
+				tostring(model)
+			)
+		)
 		if ok and typeof(model) == "Instance" then
 			model:Destroy()
 		end
@@ -295,7 +309,15 @@ local function displayNameFor(kit: any, kitId: string, opts: SpawnOpts, player: 
 	return kitId
 end
 
-local function setAttributes(model: Model, kit: any, kitId: string, team: string, skin: string, player: Player?, displayName: string)
+local function setAttributes(
+	model: Model,
+	kit: any,
+	kitId: string,
+	team: string,
+	skin: string,
+	player: Player?,
+	displayName: string
+)
 	model:SetAttribute("KitId", kitId)
 	model:SetAttribute("Team", team)
 	model:SetAttribute("RigFamily", if kit then kit.Family else (model:GetAttribute("RigFamily") or "Human"))
@@ -600,7 +622,12 @@ end
 function CharacterService.EquippedSkin(player: Player, kitId: string): string
 	if DataService then
 		local ok, profile = call(DataService, "Get", player)
-		if ok and type(profile) == "table" and type(profile.Equipped) == "table" and type(profile.Equipped.Skins) == "table" then
+		if
+			ok
+			and type(profile) == "table"
+			and type(profile.Equipped) == "table"
+			and type(profile.Equipped.Skins) == "table"
+		then
 			local skin = profile.Equipped.Skins[kitId]
 			if type(skin) == "string" and skin ~= "" and Kits.Skin(kitId, skin) ~= nil then
 				return skin
@@ -803,7 +830,7 @@ function CharacterService.SetDowned(model: Model, attacker: Model?)
 	model:SetAttribute("Blocking", false)
 	model:SetAttribute("KR", 0)
 	model:SetAttribute("DownedEndsAt", now() + downedTime)
-	rec.Humanoid.Health = 1
+	setHealth(model, rec.Humanoid, 1)
 	call(StatusService, "Apply", model, "Silenced", downedTime + 1)
 	call(StatusService, "RecomputeMovement", model)
 	createPrompt(rec)
@@ -836,7 +863,7 @@ function CharacterService.Revive(model: Model, by: Model?): boolean
 	model:SetAttribute("Downed", false)
 	model:SetAttribute("DownedEndsAt", 0)
 	local humanoid = rec.Humanoid
-	humanoid.Health = math.max(humanoid.Health, humanoid.MaxHealth * Config.Human.ReviveHealthFraction)
+	setHealth(model, humanoid, math.max(humanoid.Health, humanoid.MaxHealth * Config.Human.ReviveHealthFraction))
 	call(StatusService, "Remove", model, "Silenced")
 	call(StatusService, "Apply", model, "IFrames", REVIVE_IFRAMES)
 	call(StatusService, "RecomputeMovement", model)
@@ -860,7 +887,7 @@ function CharacterService.Kill(model: Model, attacker: Model?, ability: string?)
 	call(StatusService, "Apply", model, "Stunned", DEATH_BODY_TIME + 1)
 	local humanoid = rec.Humanoid
 	if humanoid.Health > 0 then
-		humanoid.Health = 0
+		setHealth(model, humanoid, 0)
 	end
 	local root = rec.Root
 	if root.Parent ~= nil then
@@ -1039,6 +1066,7 @@ function CharacterService.Init()
 	DataService = tryService("DataService")
 	StatusService = tryService("StatusService")
 	RequestService = tryService("RequestService")
+	DamageService = tryService("DamageService")
 	setupCollisionGroups()
 	if RequestService and type(RequestService.Register) == "function" then
 		local ok, err = pcall(RequestService.Register, "TryKit", onTryKit)

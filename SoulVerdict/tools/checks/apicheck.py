@@ -29,7 +29,7 @@ What it catches (rule ids in brackets):
                    CFrame.Angles(90, ...) with degree-looking literals (warning), Vector3.new with > 3 args
 Unknown variable types are skipped (no type inference) to keep false positives low; reads like `x.Foo` are not
 checked because they may be children. Silence a justified hit with `-- check:ignore(rule)`.
-Usage: python3 tools/checks/apicheck.py [--quiet-warnings] [paths...]      (default: src)
+Usage: python3 tools/checks/apicheck.py [--quiet-warnings] [--stats] [paths...]      (default: src)
 """
 
 from __future__ import annotations
@@ -38,10 +38,11 @@ import json
 import os
 import sys
 
+sys.dont_write_bytecode = True  # keep tools/checks free of __pycache__
 sys.path.insert(0, os.path.dirname(__file__))
 
 from report import ROOT, Reporter, load, luau_files, main_wrapper  # noqa: E402
-from luau_lex import matching, split_args  # noqa: E402
+from luau_lex import closes_block, matching, opens_block, skip_type, split_args  # noqa: E402
 
 DUMP = os.path.join(ROOT, ".tools", "API-Dump.json")
 UNAVAILABLE_CAPABILITIES = {"PluginOrOpenCloud", "InternalTest"}
@@ -102,6 +103,22 @@ class Api:
             self.enums[e["Name"]] = {"items": items, "legacy": legacy, "deprecated": deprecated, "tags": str_tags(e.get("Tags"))}
         self.services = {n for n, c in self.classes.items() if "Service" in c["tags"]}
         self.all_member_names = {m for c in self.classes.values() for m in c["members"]}
+        self._children: dict[str, list] = {}
+        for name, c in self.classes.items():
+            self._children.setdefault(c["super"], []).append(name)
+        self._desc_members: dict[str, set] = {}
+
+    def subclass_member_names(self, cls: str) -> set:
+        """Member names defined by any class deriving from cls (cls itself included)."""
+        if cls not in self._desc_members:
+            out: set = set()
+            stack = [cls]
+            while stack:
+                c = stack.pop()
+                out |= set(self.classes.get(c, {}).get("members", {}))
+                stack.extend(self._children.get(c, []))
+            self._desc_members[cls] = out
+        return self._desc_members[cls]
 
     def member(self, cls: str, name: str):
         seen = 0
@@ -143,10 +160,12 @@ def write_problem(member) -> str | None:
 
 
 class Scope:
-    """Name -> stack of (depth, class or None)."""
+    """Name -> stack of (depth, ClassInfo or None). ClassInfo = (class name, exact: bool):
+    exact = the runtime class is exactly that (Instance.new, GetService...); otherwise it is a declared /
+    base class (type annotation, cast, IsA refinement, Class-typed property) and may be a subclass."""
 
     def __init__(self):
-        self.vars: dict[str, list] = {"workspace": [(0, "Workspace")], "game": [(0, "DataModel")]}
+        self.vars: dict[str, list] = {"workspace": [(0, ("Workspace", True))], "game": [(0, ("DataModel", True))]}
 
     def bind(self, name: str, depth: int, cls):
         self.vars.setdefault(name, []).append((depth, cls))
@@ -181,11 +200,31 @@ def number_value(tok):
         return None
 
 
+STATS = {"tracked": 0, "writes": 0, "calls": 0, "enums": 0, "instance_new": 0}
+
+
 class FileChecker:
     def __init__(self, api: Api, path: str, rep: Reporter):
         self.api, self.path, self.rep = api, path, rep
         _, self.lx = load(path)
         self.toks = self.lx.tokens
+        # names declared as Luau types in this file shadow Roblox class names in annotations
+        self.local_types = {
+            self.toks[k + 1].value
+            for k in range(len(self.toks) - 1)
+            if self.toks[k].kind == "name" and self.toks[k].value == "type" and self.toks[k + 1].kind == "name"
+        }
+
+    def annotation_class(self, start: int, end: int):
+        """Roblox class named by a simple type annotation toks[start:end] (`Part`, `Part?`), else None."""
+        t = self.toks
+        if end - start == 2 and t[start + 1].is_op("?"):
+            end -= 1
+        if end - start == 1 and t[start].kind == "name":
+            name = t[start].value
+            if name in self.api.classes and name not in self.local_types:
+                return (name, False)
+        return None
 
     def err(self, tok, msg, rule):
         self.rep.error(self.path, tok.line, msg, rule)
@@ -231,11 +270,22 @@ class FileChecker:
         end = min(end, len(t) - 1)
         if end - start <= 0:
             return None
-        # strip a trailing type assertion `:: T`
+        # strip a trailing type assertion `:: T` (remember T if it is a Roblox class)
+        cast = None
         for k in range(start, end):
             if t[k].is_op("::"):
+                cast = self.annotation_class(k + 1, end)
                 end = k
                 break
+        inner = self._expr_class(start, end, scope)
+        if inner is not None and (inner[1] or cast is None):
+            return inner  # an exact class beats a cast
+        return cast if cast is not None else inner
+
+    def _expr_class(self, start, end, scope: Scope):
+        t = self.toks
+        if end - start <= 0:
+            return None
         a = t[start]
         # Instance.new("C")
         if a.kind == "name" and a.value == "Instance" and end - start >= 4 and t[start + 1].is_op(".") and t[start + 2].value == "new" and t[start + 3].is_op("("):
@@ -243,20 +293,20 @@ class FileChecker:
             if close == end - 1:
                 name, _ = self.string_arg(start + 3)
                 if name in self.api.classes:
-                    return name
+                    return (name, True)
             return None
         if a.kind == "name" and not self.is_field(start):
-            base = scope.get(a.value)
+            info = scope.get(a.value)
             k = start + 1
             # chain of `.Prop` / `:Method(...)`
-            cls = base
-            while k < end and cls is not None:
+            while k < end and info is not None:
+                cls, exact = info
                 if t[k].is_op(".") and k + 1 < end and t[k + 1].kind == "name":
                     member, _ = self.api.member(cls, t[k + 1].value)
                     if cls == "DataModel" and member is None and t[k + 1].value in self.api.services:
-                        cls = t[k + 1].value
+                        info = (t[k + 1].value, True)
                     elif member is not None and member.get("MemberType") == "Property" and (member.get("ValueType") or {}).get("Category") == "Class":
-                        cls = member["ValueType"]["Name"]
+                        info = (member["ValueType"]["Name"], False)
                     else:
                         return None
                     k += 2
@@ -265,10 +315,11 @@ class FileChecker:
                     close = matching(t, k + 2)
                     if method in ("GetService", "FindService") and cls == "DataModel":
                         name, _ = self.string_arg(k + 2)
-                        cls = name if name in self.api.services else None
+                        info = (name, True) if name in self.api.services else None
                     elif method in TYPED_LOOKUP_METHODS:
                         name, _ = self.string_arg(k + 2)
-                        cls = name if name in self.api.classes else None
+                        # ...OfClass returns exactly that class, ...WhichIsA a subclass of it
+                        info = (name, method.endswith("OfClass")) if name in self.api.classes else None
                     elif method == "Clone":
                         pass
                     else:
@@ -276,8 +327,27 @@ class FileChecker:
                     k = close + 1
                 else:
                     return None
-            return cls if k == end else None
+            return info if k == end else None
         return None
+
+    def missing_member_is_error(self, info, name: str) -> bool:
+        """A member missing on a DECLARED class may exist on a refined subclass (IsA guards Luau understands)."""
+        cls, exact = info
+        return exact or name not in self.api.subclass_member_names(cls)
+
+    def refine_condition(self, if_idx: int, depth: int, scope: Scope) -> None:
+        """`if x:IsA("C") [and ...] then` -> x is a C inside the branch (unknown if the test uses or/not)."""
+        t = self.toks
+        k = if_idx + 1
+        while k < len(t) and not (t[k].is_kw("then") and not t[k].expr):
+            k += 1
+        cond = range(if_idx + 1, k)
+        negated = any(t[c].is_kw("or", "not") for c in cond)
+        for c in cond:
+            if t[c].kind == "name" and not self.is_field(c) and t[c + 1].is_op(":") and t[c + 2].value == "IsA" and t[c + 3].is_op("("):
+                name, _ = self.string_arg(c + 3)
+                if name in self.api.classes and scope.get(t[c].value) is not None:
+                    scope.bind(t[c].value, depth, None if negated else (name, False))
 
     # -- main pass ---------------------------------------------------------------------------------------
     def run(self):
@@ -305,25 +375,32 @@ class FileChecker:
                     while k < n and not t[k].is_op("("):
                         k += 1
                     close = matching(t, k) if k < n else k
-                    params = [t[p].value for p in range(k + 1, close) if t[p].kind == "name" and (t[p - 1].is_op("(", ","))]
                     depth += 1
-                    for p in params:
-                        scope.bind(p, depth, None)
+                    for a, b in split_args(t, k) if k < n else []:
+                        if t[a].kind != "name":
+                            continue
+                        pcls = None
+                        if b - a >= 3 and t[a + 1].is_op(":"):
+                            pcls = self.annotation_class(a + 2, b)
+                        scope.bind(t[a].value, depth, pcls)
                     i = close + 1
                     continue
-                if v in ("then", "do", "repeat"):
+                if tk.expr:
+                    pass  # if-expression keywords do not open/close blocks
+                elif v in ("if", "do", "repeat"):
                     depth += 1
                     for p in pending_params:
                         scope.bind(p, depth, None)
                     pending_params = []
+                    if v == "if":
+                        self.refine_condition(i, depth, scope)
                 elif v in ("end", "until"):
                     depth = max(depth - 1, 0)
                     scope.pop_to(depth)
-                elif v == "elseif":
-                    depth = max(depth - 1, 0)
-                    scope.pop_to(depth)
-                elif v == "else":
-                    scope.pop_at(depth)
+                elif v in ("elseif", "else"):
+                    scope.pop_at(depth)  # bindings made in the previous branch end here
+                    if v == "elseif":
+                        self.refine_condition(i, depth, scope)
                 elif v == "for":
                     k = i + 1
                     while k < n and not (t[k].is_op("=") or t[k].is_kw("in")):
@@ -361,9 +438,9 @@ class FileChecker:
                 # skip a function literal
                 d, k2 = 0, k
                 while k2 < n:
-                    if t[k2].kind == "keyword" and t[k2].value in ("function", "if", "do", "repeat"):
+                    if opens_block(t[k2]):
                         d += 1
-                    elif t[k2].kind == "keyword" and t[k2].value in ("end", "until"):
+                    elif closes_block(t[k2]):
                         d -= 1
                         if d == 0:
                             break
@@ -385,10 +462,7 @@ class FileChecker:
             # expecting an operator
             if tk.kind == "op" and tk.value in (".", ":", "..", "+", "-", "*", "/", "//", "%", "^", "==", "~=", "<", ">", "<=", ">=", "::"):
                 if tk.value == "::":
-                    # skip a simple type annotation
-                    k += 1
-                    while k < n and (t[k].kind == "name" or t[k].is_op(".", "?")):
-                        k += 1
+                    k = skip_type(t, k + 1)  # type assertion
                     continue
                 expect_operand = True
                 last_line = tk.line
@@ -409,11 +483,13 @@ class FileChecker:
                 scope.bind(t[k + 1].value, depth, None)
             return
         names = []
+        ann_class = None
         while k < len(t) and t[k].kind == "name":
             names.append(t[k].value)
             k += 1
             if t[k].is_op(":"):  # type annotation
                 k += 1
+                ann_start = k
                 bd = 0
                 while k < len(t):
                     if t[k].is_op("(", "{", "[", "<"):
@@ -423,6 +499,7 @@ class FileChecker:
                     elif bd == 0 and (t[k].is_op(",", "=") or t[k].kind == "keyword"):
                         break
                     k += 1
+                ann_class = self.annotation_class(ann_start, k)
             if t[k].is_op(","):
                 k += 1
                 continue
@@ -430,7 +507,9 @@ class FileChecker:
         cls = None
         if len(names) == 1 and t[k].is_op("="):
             end = self.statement_end(k + 1)
-            cls = self.expr_class(k + 1, end, scope)
+            cls = self.expr_class(k + 1, end, scope) or ann_class
+        if cls is not None and len(names) == 1:
+            STATS["tracked"] += 1
         for nm in names:
             scope.bind(nm, depth, cls if len(names) == 1 else None)
 
@@ -445,6 +524,7 @@ class FileChecker:
         if not field and tk.value == "Instance" and nxt.is_op(".") and self.tok(i + 2).value == "new" and self.tok(i + 3).is_op("("):
             name, stok = self.string_arg(i + 3)
             if name is not None:
+                STATS["instance_new"] += 1
                 self.check_class_name(name, stok, "instance-new", creatable=True)
         if not field and tk.value == "Enum" and nxt.is_op("."):
             self.check_enum(i)
@@ -477,20 +557,27 @@ class FileChecker:
             return
         if cls is None:
             return
+        info = cls
+        cls = info[0]
         if nxt.is_op(".") and self.tok(i + 2).kind == "name":
             prop_tok = self.tok(i + 2)
             after = self.tok(i + 3)
             member, owner = api.member(cls, prop_tok.value)
             is_write = after.is_op("=", "+=", "-=", "*=", "/=", "//=", "%=", "^=", "..=") and (not brackets or brackets[-1] != "{")
             if is_write:
+                STATS["writes"] += 1
+                if member is None and not self.missing_member_is_error(info, prop_tok.value):
+                    return
                 self.check_write(cls, prop_tok, member, owner, i + 4)
             elif member is not None and "Deprecated" in str_tags(member.get("Tags")):
                 self.warn(prop_tok, f"{owner}.{prop_tok.value} is deprecated", "deprecated")
         elif nxt.is_op(":") and self.tok(i + 2).kind == "name" and self.tok(i + 3).is_op("(", "{") or (nxt.is_op(":") and self.tok(i + 3).kind == "string"):
             mtok = self.tok(i + 2)
+            STATS["calls"] += 1
             member, owner = api.member(cls, mtok.value)
             if member is None:
-                self.err(mtok, f"{mtok.value} is not a valid method of {cls}", "member")
+                if self.missing_member_is_error(info, mtok.value):
+                    self.err(mtok, f"{mtok.value} is not a valid method of {cls}", "member")
             elif member.get("MemberType") != "Function":
                 kind = member.get("MemberType")
                 self.err(mtok, f"{cls}.{mtok.value} is {'an' if kind == 'Event' else 'a'} {kind}, not a method (use '.')", "member")
@@ -506,7 +593,7 @@ class FileChecker:
                     pname, ptok = self.string_arg(i + 3)
                     if pname is not None:
                         pm, _ = api.member(cls, pname)
-                        if pm is None or pm.get("MemberType") != "Property":
+                        if (pm is None and self.missing_member_is_error(info, pname)) or (pm is not None and pm.get("MemberType") != "Property"):
                             self.err(ptok, f"GetPropertyChangedSignal: {cls} has no property \"{pname}\"", "member")
 
     def check_write(self, cls, prop_tok, member, owner, value_idx):
@@ -580,6 +667,7 @@ class FileChecker:
         a = self.tok(i + 2)
         if a.kind != "name":
             return
+        STATS["enums"] += 1
         enum = self.api.enums.get(a.value)
         if enum is None:
             if a.value not in ("GetEnums",):
@@ -658,6 +746,8 @@ def main() -> int:
     files = luau_files(*(args or ["src"]))
     for path in files:
         FileChecker(api, path, rep).run()
+    if "--stats" in sys.argv:
+        print("apicheck stats: " + ", ".join(f"{k}={v}" for k, v in STATS.items()))
     return rep.finish(len(files), quiet)
 
 

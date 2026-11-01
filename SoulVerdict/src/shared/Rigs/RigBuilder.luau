@@ -16,7 +16,10 @@
 --     * palette = blueprint.Palette <- skin palette (Rigs/Skins.Get if present, else Kits skin data)
 --       <- opts.Palette.
 --     * attributes: RigFamily, BlueprintId, RigScale, SkinId (+ RigStyle when opts.Style is given).
---     * result: rest pose, HumanoidRootPart at CFrame.new(0, HipHeight + 1*scale, 0) facing -Z, Parent nil.
+--     * result: rest pose, HumanoidRootPart at CFrame.new(0, HipHeight + 1*scale, 0) facing -Z, Parent nil;
+--       the lowest point is y = 0 (feet, or the blueprint's own base when it sets GroundOffset).
+--   RigBuilder.BuildFromBlueprint(blueprint, opts?) -> Model   same, from a blueprint table (WIP
+--                                               blueprints, tests, previews of bare skeletons)
 --   RigBuilder.Blueprints() -> {string}         available blueprint ids
 --   RigBuilder.GetJointNames() -> {string}      the 15 Motor6D names (SPEC order)
 --   RigBuilder.GetLimbNames() -> {string}       the 16 physics part names
@@ -145,10 +148,7 @@ local function skinPalette(blueprintId: string, skinId: string?): { [string]: Co
 end
 
 local function mergePalette(bp: Blueprint, opts: BuildOptions): { [string]: Color3 }
-	local out: { [string]: Color3 } = {}
-	for k, v in bp.Palette do
-		out[k] = v
-	end
+	local out: { [string]: Color3 } = table.clone(bp.Palette)
 	local skin = skinPalette(bp.Id, opts.Skin)
 	if skin then
 		for k, v in skin do
@@ -232,14 +232,24 @@ local function countParts(model: Model): number
 end
 
 function RigBuilder.Build(blueprintId: string, options: BuildOptions?): Model
-	local opts: BuildOptions = options or {}
 	local bp = Blueprints.Get(blueprintId)
 	if bp == nil then
-		error(("RigBuilder.Build: unknown blueprint '%s' (available: %s)"):format(blueprintId, table.concat(Blueprints.List(), ", ")), 2)
+		error(
+			("RigBuilder.Build: unknown blueprint '%s' (available: %s)"):format(
+				blueprintId,
+				table.concat(Blueprints.List(), ", ")
+			),
+			2
+		)
 	end
-	local blueprint = bp :: Blueprint
+	return RigBuilder.BuildFromBlueprint(bp :: Blueprint, options)
+end
+
+function RigBuilder.BuildFromBlueprint(blueprint: Blueprint, options: BuildOptions?): Model
+	Blueprints.Validate(blueprint.Id, blueprint)
+	local opts: BuildOptions = options or {}
 	local skeletonId = blueprint.Skeleton or blueprint.Family
-	local sk = Skeletons.Resolve(skeletonId, blueprint.Overrides)
+	local sk = Skeletons.Resolve(skeletonId, blueprint.Overrides, blueprint.GroundOffset)
 	local scale = (blueprint.Scale or 1) * (opts.Scale or 1)
 	assert(scale > 0, "RigBuilder.Build: scale must be positive")
 	local skinId = opts.Skin or "Default"
@@ -452,6 +462,15 @@ function RigBuilder.Build(blueprintId: string, options: BuildOptions?): Model
 	for _, inst in model:GetDescendants() do
 		if inst:IsA("BasePart") and not isPhysicsPart(model, inst) then
 			local part = inst :: BasePart
+			if anchors[part.Name] ~= nil or LIMB_SET[part.Name] or part.Name == "Humanoid" then
+				error(
+					("RigBuilder: blueprint %s names a visual part '%s', which is reserved (limb/attachment name)"):format(
+						blueprint.Id,
+						part:GetFullName()
+					),
+					2
+				)
+			end
 			if not contains(endpoints, part) then
 				weldTo(resolveLimb(part, 1), part)
 			end
@@ -463,7 +482,13 @@ function RigBuilder.Build(blueprintId: string, options: BuildOptions?): Model
 			local role = part:GetAttribute("Role")
 			if type(role) ~= "string" or table.find(PartKit.ROLES, role) == nil then
 				if role ~= nil then
-					warn(("RigBuilder: %s.%s has invalid Role %s -> Detail"):format(blueprint.Id, part.Name, tostring(role)))
+					warn(
+						("RigBuilder: %s.%s has invalid Role %s -> Detail"):format(
+							blueprint.Id,
+							part.Name,
+							tostring(role)
+						)
+					)
 				end
 				part:SetAttribute("Role", "Detail")
 			end

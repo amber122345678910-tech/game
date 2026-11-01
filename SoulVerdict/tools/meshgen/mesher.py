@@ -38,6 +38,7 @@ class ModelSpec:
     resolution: int = 200
     min_component_frac: float = 0.002
     taubin_iters: int = 6
+    color_weight: float = 6.0  # decimation error amplification on colour boundaries
 
 
 @dataclass
@@ -183,19 +184,24 @@ def quantize_palette(colors: np.ndarray, max_colors: int = 255, seed: int = 7):
     return palette, idx.astype(np.uint8)
 
 
-def decimate(V, F, target: int):
+def decimate(V, F, target: int, weights=None):
     """Quadric edge-collapse decimation to <= target faces. Prefers MeshLab (better triangle quality,
-    normal-flip protection); falls back to fast_simplification when pymeshlab is unavailable."""
+    normal-flip protection, per-vertex error weights so colour boundaries keep their vertices); falls
+    back to fast_simplification when pymeshlab is unavailable."""
     try:
         import pymeshlab  # needs the system libOpenGL.so.0 (apt: libopengl0)
 
         ms = pymeshlab.MeshSet()
-        ms.add_mesh(pymeshlab.Mesh(vertex_matrix=np.asarray(V, dtype=np.float64), face_matrix=np.asarray(F)))
+        kw = dict(vertex_matrix=np.asarray(V, dtype=np.float64), face_matrix=np.asarray(F, dtype=np.int32))
+        if weights is not None:
+            kw["v_scalar_array"] = np.asarray(weights, dtype=np.float64)
+        ms.add_mesh(pymeshlab.Mesh(**kw))
         goal = int(target)
         for _ in range(6):
             ms.meshing_decimation_quadric_edge_collapse(targetfacenum=goal, qualitythr=0.55, preservenormal=True,
                                                         preservetopology=True, optimalplacement=True,
-                                                        planarquadric=True, planarweight=0.0015, autoclean=True)
+                                                        planarquadric=True, planarweight=0.0015, autoclean=True,
+                                                        qualityweight=weights is not None)
             if ms.current_mesh().face_number() <= target:
                 break
             goal = int(goal * 0.985)
@@ -260,8 +266,18 @@ def build(spec: ModelSpec, res: int | None = None, verbose: bool = True) -> Mesh
         trimesh.smoothing.filter_taubin(mesh, lamb=0.5, nu=0.53, iterations=spec.taubin_iters)
     mesh.vertices = project_to_surface(fn, np.asarray(mesh.vertices), iters=2, max_step=h)
     t2 = time.time()
+    # colour-contrast weights: vertices where the region colours change get a larger error weight so
+    # the decimator keeps eye rims, grin lines, cracks and teeth gaps crisp
+    MV, MF = np.asarray(mesh.vertices), np.asarray(mesh.faces)
+    mc_rgb = spec.colorize(MV, np.asarray(mesh.vertex_normals), spec.field(MV))
+    e = np.concatenate([MF[:, [0, 1]], MF[:, [1, 2]], MF[:, [2, 0]]])
+    diff = np.abs(mc_rgb[e[:, 0]] - mc_rgb[e[:, 1]]).max(axis=1)
+    contrast = np.zeros(len(MV))
+    np.maximum.at(contrast, e[:, 0], diff)
+    np.maximum.at(contrast, e[:, 1], diff)
+    weights = 1.0 + spec.color_weight * np.clip(contrast / 0.25, 0.0, 1.0)
     # decimate to budget
-    v, f, decimator = decimate(np.asarray(mesh.vertices), np.asarray(mesh.faces), spec.budget)
+    v, f, decimator = decimate(MV, MF, spec.budget, weights)
     dm = trimesh.Trimesh(v, f, process=True)
     dm.remove_unreferenced_vertices()
     nondeg = dm.nondegenerate_faces(height=1e-7)

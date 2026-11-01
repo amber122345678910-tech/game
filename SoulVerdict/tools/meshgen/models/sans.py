@@ -48,7 +48,7 @@ def head_shape(p, fell=False):
     cheek = ellipsoid(q, (0.66, -0.13, -0.70), (0.25, 0.13, 0.22), euler(0, -0.35, 0.25))
     d = smin(d, cheek, 0.14)
     # flat face plane; the lower face sits slightly proud (jaw line), flattened skull base
-    zf = -0.975 - 0.035 * clamp(-(p[:, 1] + 0.12) / 0.55, 0.0, 1.0)
+    zf = -0.975 - 0.035 * smoothstep(-0.12, -0.67, p[:, 1])
     d = smax(d, zf - p[:, 2], 0.22)
     d = smax(d, -(p[:, 1] + 0.86), 0.22)
     if fell:
@@ -111,7 +111,7 @@ def sans_field(variant: str, cracks=None, chip=None):
         # --- eye sockets & nose
         eye = bounded(p, (-0.80, -0.25, -1.30), (0.80, 0.42, -0.45), lambda x: eye_cutter(x, fell), 0.08)
         nose = bounded(p, (-0.16, -0.36, -1.30), (0.16, -0.08, -0.65), nose_cutter, 0.06)
-        d = smax(head, -eye, 0.028)
+        d = smax(head, -eye, 0.034)
         d = smax(d, -nose, 0.03)
         pre_mouth = d
         # --- grin (cylindrical projection onto the face)
@@ -162,14 +162,14 @@ def sans_colorize(variant: str, cracks=None, gold=None):
         rgb = rgb * (0.965 + 0.035 * np.clip(N[:, 1], -1, 1))[:, None]
         # eye sockets & nose: dark by depth below the head surface
         depth = np.maximum(-f["head"], 0.0)
-        in_eye = f["eye"] < 0.03
-        in_nose = f["nose"] < 0.03
+        in_eye = f["eye"] < 0.012
+        in_nose = f["nose"] < 0.012
         socket_col = C.FELL_DARK * 0.35 + C.SOCKET * 0.65 if fell else C.SOCKET
-        rgb = np.where((in_eye | in_nose)[:, None], C.depth_tint(rgb, depth, socket_col, 0.004, 0.065), rgb)
+        rgb = np.where((in_eye | in_nose)[:, None], C.depth_tint(rgb, depth, socket_col, 0.02, 0.075), rgb)
         # grin grooves
         gdepth = np.maximum(-f["pre_mouth"], 0.0)
         groove = (f["line"] < 0.06) | (f["teeth"] < 0.05)
-        rgb = np.where(groove[:, None], C.depth_tint(rgb, gdepth, C.GROOVE, 0.004, 0.03), rgb)
+        rgb = np.where(groove[:, None], C.depth_tint(rgb, gdepth, C.GROOVE, 0.006, 0.035), rgb)
         if gold is not None:
             u, v = C.cyl_uv(P, AXIS_Z, CYL_R)
             g = gold(u, v) & (gdepth < 0.012) & (P[:, 2] < -0.4)
@@ -219,6 +219,7 @@ def _anchors():
 
 
 BOUNDS = ((-1.16, -1.02, -1.14), (1.16, 1.08, 1.12))
+SANS_RES = 160  # grid cells along the longest axis (finer grids decimate into noisier 6k meshes)
 
 
 def classic() -> ModelSpec:
@@ -226,7 +227,7 @@ def classic() -> ModelSpec:
         name="SansSkullClassic", lo=BOUNDS[0], hi=BOUNDS[1], field=sans_field("Classic"),
         colorize=sans_colorize("Classic"), budget=6000, anchors=_anchors(),
         description="Classic Sans skull: wide round cranium, deep eye sockets, nasal cavity, permanent grin.",
-        ao_strength=0.5, ao_scale=0.9,
+        ao_strength=0.5, ao_scale=0.9, resolution=SANS_RES,
     )
 
 
@@ -238,11 +239,8 @@ def _surface_for_cracks(variant):
 def fell() -> ModelSpec:
     surf = _surface_for_cracks("Fell")
     # vertical scar through the skull's right eye (+X, viewer's left): forehead -> socket -> cheek
-    pts = []
-    rng = np.random.default_rng(11)
-    for i, e in enumerate(np.linspace(0.62, -0.42, 15)):
-        az = 0.40 + 0.035 * math.sin(i * 1.7) + rng.normal(0, 0.012)
-        pts.append((az, e))
+    pts = [(0.40, 0.64), (0.435, 0.55), (0.395, 0.47), (0.43, 0.38), (0.40, 0.28), (0.42, 0.16), (0.40, 0.02),
+           (0.415, -0.10), (0.385, -0.20), (0.425, -0.30), (0.395, -0.40)]
     paths = [(np.array(pts), 1.0)]
     # two short side splinters near the brow
     paths.append((np.array([(0.405, 0.42), (0.47, 0.50), (0.52, 0.53)]), 0.5))
@@ -252,16 +250,19 @@ def fell() -> ModelSpec:
     uc = corner_u()
 
     def gold(u, v):
-        # second upper tooth on the skull's left side (-X, viewer's right)
+        # one upper fang on the skull's left side (-X, viewer's right): the zig-zag triangle whose tip
+        # points down at us[3]; only the part above the zig-zag (upper teeth) is gold
         us = np.linspace(-uc * 0.93, uc * 0.93, 11)
-        a, b = us[2], us[4]
-        return (u > a) & (u < b) & (v < upper_v(u) + 0.002) & (v > lower_v(u) + 0.01)
+        zz = np.array([upper_v(x) + (lower_v(x) - upper_v(x)) * (0.18 if i % 2 == 0 else 0.86)
+                       for i, x in enumerate(us)])
+        line = np.interp(u, us, zz)
+        return (u > us[2] + 0.01) & (u < us[4] - 0.01) & (v < upper_v(u) - 0.012) & (v > line + 0.016)
 
     return ModelSpec(
         name="SansSkullFell", lo=BOUNDS[0], hi=BOUNDS[1], field=sans_field("Fell", cracks=cracks),
         colorize=sans_colorize("Fell", cracks=cracks, gold=gold), budget=6000, anchors=_anchors(),
         description="Fell Sans skull: heavy angry brow, cracked right eye socket, jagged grin with one gold tooth.",
-        ao_strength=0.6, ao_scale=0.9,
+        ao_strength=0.6, ao_scale=0.9, resolution=SANS_RES,
     )
 
 
@@ -290,5 +291,5 @@ def eclipse() -> ModelSpec:
         name="SansSkullEclipse", lo=BOUNDS[0], hi=BOUNDS[1], field=sans_field("Classic", cracks=cracks, chip=chip),
         colorize=sans_colorize("Classic", cracks=cracks), budget=6000, anchors=_anchors(),
         description="Eclipse Sans skull (original AU): Classic base with glowing violet/cyan branching cracks and a chipped crown.",
-        ao_strength=0.5, ao_scale=0.9,
+        ao_strength=0.5, ao_scale=0.9, resolution=SANS_RES,
     )

@@ -49,7 +49,7 @@ const DilateH = {
   fragmentShader: `
     uniform sampler2D tMask; uniform vec2 uTexel; uniform float uRadius; varying vec2 vUv;
     void main(){
-      float best = 1e5; float id = 0.0;
+      float best = 64.0; float id = 0.0;
       for (int i = -16; i <= 16; i++) {
         float fi = float(i);
         if (abs(fi) > uRadius + 1.0) continue;
@@ -66,7 +66,7 @@ const DilateV = {
   fragmentShader: `
     uniform sampler2D tH; uniform vec2 uTexel; uniform float uRadius; varying vec2 vUv;
     void main(){
-      float best = 1e10; float id = 0.0;
+      float best = 4096.0; float id = 0.0;
       for (int j = -16; j <= 16; j++) {
         float fj = float(j);
         if (abs(fj) > uRadius + 1.0) continue;
@@ -139,9 +139,11 @@ export class Post {
     this.bloomComposer.setSize(width, height);
     this.bloomComposer.renderToScreen = false;
 
-    this.maskRT = new THREE.WebGLRenderTarget(width, height, { type: THREE.UnsignedByteType, samples: 0 });
-    this.hRT = new THREE.WebGLRenderTarget(width, height, { type: THREE.FloatType, samples: 0 });
-    this.dRT = new THREE.WebGLRenderTarget(width, height, { type: THREE.FloatType, samples: 0 });
+    // id / distance buffers must not be filtered (ids and the "no hit" sentinel would blend)
+    const exact = { samples: 0, minFilter: THREE.NearestFilter, magFilter: THREE.NearestFilter, generateMipmaps: false };
+    this.maskRT = new THREE.WebGLRenderTarget(width, height, { ...exact, type: THREE.UnsignedByteType });
+    this.hRT = new THREE.WebGLRenderTarget(width, height, { ...exact, type: THREE.FloatType });
+    this.dRT = new THREE.WebGLRenderTarget(width, height, { ...exact, type: THREE.FloatType });
     this.fsQuadScene = new THREE.Scene();
     this.fsCam = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
     this.quad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2));

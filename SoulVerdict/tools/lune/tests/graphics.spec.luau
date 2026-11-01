@@ -3,7 +3,9 @@
 -- Lerp between all pairs, quality adjustments, preset resolution, EnvExport ranges + JSON, RigStyles
 -- apply/revert, Ambient weather builder, strings, client modules require cleanly.
 local fs = require("@lune/fs")
+local luau = require("@lune/luau")
 local serde = require("@lune/serde")
+local task = require("@lune/task")
 
 local PRESETS = "ReplicatedStorage.Shared.Graphics.Presets"
 local APPLY = "ReplicatedStorage.Shared.Graphics.Apply"
@@ -150,6 +152,186 @@ local function allPresets(Loader)
 	return Loader.require(PRESETS).All()
 end
 
+-- Mock signal with a handler count (RBXScriptSignal-like: Connect/Fire).
+local function makeSignal()
+	local handlers = {}
+	local signal = {}
+	function signal:Connect(fn)
+		local entry = { fn = fn }
+		table.insert(handlers, entry)
+		return {
+			Connected = true,
+			Disconnect = function()
+				for i, e in handlers do
+					if e == entry then
+						table.remove(handlers, i)
+						break
+					end
+				end
+			end,
+		}
+	end
+	function signal:Fire(...)
+		for _, e in table.clone(handlers) do
+			e.fn(...)
+		end
+	end
+	function signal:Count()
+		return #handlers
+	end
+	return signal
+end
+
+-- Loads src/client/Controllers/GraphicsController.luau with mocked engine services so its runtime logic
+-- (RoundState binding, transitions, overrides, quality, reduced motion, ambient) can run under Lune.
+local function loadControllerWithMocks(Loader)
+	local roblox = Loader.roblox
+	local world = { warnings = {}, ambientCalls = {} }
+	world.lighting = roblox.Instance.new("Lighting")
+	world.terrain = roblox.Instance.new("Terrain")
+	local wsInstance = roblox.Instance.new("Workspace")
+	world.workspace = setmetatable({ Terrain = world.terrain }, {
+		__index = function(_, k)
+			return wsInstance[k]
+		end,
+		__newindex = function(_, k, v)
+			wsInstance[k] = v
+		end,
+	})
+	-- RoundState: attributes + per-attribute changed signals
+	local attrs = { GraphicsPreset = "GoldenHall", MapId = "HallOfVerdicts", FinalPhase = false }
+	local attrSignals = {}
+	world.roundState = {
+		Name = "RoundState",
+		GetAttribute = function(_, k)
+			return attrs[k]
+		end,
+		GetAttributeChangedSignal = function(_, k)
+			attrSignals[k] = attrSignals[k] or makeSignal()
+			return attrSignals[k]
+		end,
+	}
+	function world.setAttribute(k, v)
+		attrs[k] = v
+		if attrSignals[k] then
+			attrSignals[k]:Fire()
+		end
+	end
+	local function marker(path)
+		return {
+			__module = path,
+			IsA = function(_, c)
+				return c == "ModuleScript"
+			end,
+		}
+	end
+	local function folder(children)
+		return {
+			WaitForChild = function(_, n)
+				return children[n] or error("mock: missing child " .. n)
+			end,
+			FindFirstChild = function(_, n)
+				return children[n]
+			end,
+		}
+	end
+	local shared = folder({
+		Types = marker("ReplicatedStorage.Shared.Types"),
+		Config = marker("ReplicatedStorage.Shared.Config"),
+		Graphics = folder({ Presets = marker(PRESETS), Apply = marker(APPLY) }),
+	})
+	local replicatedStorage = {
+		WaitForChild = function(_, n)
+			return if n == "Shared" then shared else error("mock: missing " .. n)
+		end,
+		FindFirstChild = function(_, n)
+			return if n == "RoundState" then world.roundState else nil
+		end,
+		ChildAdded = makeSignal(),
+	}
+	world.runService = { PreRender = makeSignal(), Heartbeat = makeSignal() }
+	local guiSignals = {}
+	world.guiService = { ReducedMotionEnabled = false }
+	function world.guiService:GetPropertyChangedSignal(name)
+		guiSignals[name] = guiSignals[name] or makeSignal()
+		return guiSignals[name]
+	end
+	world.guiSignals = guiSignals
+	local uis = {
+		TouchEnabled = false,
+		KeyboardEnabled = true,
+		WindowFocused = makeSignal(),
+		WindowFocusReleased = makeSignal(),
+	}
+	local userGameSettings = { SavedQualityLevel = roblox.Enum.SavedQualitySetting.QualityLevel7 }
+	function userGameSettings:GetPropertyChangedSignal()
+		return makeSignal()
+	end
+	local services = {
+		Lighting = world.lighting,
+		ReplicatedStorage = replicatedStorage,
+		RunService = world.runService,
+		GuiService = world.guiService,
+		UserInputService = uis,
+	}
+	local fakeAmbient = {}
+	function fakeAmbient.Set(id, density, opts)
+		table.insert(world.ambientCalls, { id = id, density = density, timeScale = opts and opts.TimeScale })
+	end
+	local ambientMarker = {
+		__fake = fakeAmbient,
+		IsA = function(_, c)
+			return c == "ModuleScript"
+		end,
+	}
+	local controllersFolder = folder({})
+	controllersFolder.Parent = folder({ VFX = folder({ Ambient = ambientMarker }) })
+	local env = setmetatable({
+		game = {
+			GetService = function(_, n)
+				return services[n] or error("mock: no service " .. n)
+			end,
+		},
+		workspace = world.workspace,
+		script = { Name = "GraphicsController", Parent = controllersFolder },
+		require = function(target)
+			if type(target) == "table" and target.__module then
+				return Loader.require(target.__module)
+			elseif type(target) == "table" and target.__fake then
+				return target.__fake
+			end
+			error("mock: unexpected require")
+		end,
+		UserSettings = function()
+			return {
+				GetService = function()
+					return userGameSettings
+				end,
+			}
+		end,
+		warn = function(...)
+			table.insert(world.warnings, table.concat({ ... }, " "))
+		end,
+		task = task,
+		Instance = roblox.Instance,
+		Color3 = roblox.Color3,
+		Vector3 = roblox.Vector3,
+		Enum = roblox.Enum,
+	}, { __index = _G })
+	local source = fs.readFile("src/client/Controllers/GraphicsController.luau")
+	local chunk = luau.load(source, { debugName = "GraphicsController(mock)", environment = env, injectGlobals = true })
+	world.controller = chunk()
+	-- drive frames
+	function world.frames(seconds, dt)
+		dt = dt or 0.1
+		local steps = math.floor(seconds / dt + 0.5)
+		for _ = 1, steps do
+			world.runService.PreRender:Fire(dt)
+		end
+	end
+	return world
+end
+
 return {
 	presets_registry_and_data = function(T, Loader)
 		local Presets = Loader.require(PRESETS)
@@ -218,6 +400,12 @@ return {
 				)
 			end
 			T.ok(p.GlobalWind == nil or typeof(p.GlobalWind) == "Vector3", label .. " GlobalWind")
+			-- the blue/orange attack colour rules must stay readable in every look
+			local cc = p.ColorCorrection
+			T.ok(
+				cc == nil or cc.Saturation == nil or cc.Saturation >= -0.85,
+				label .. " keeps enough colour for attack rules"
+			)
 		end
 		-- performance stays cheap
 		local perf = Presets.Get("Performance")
@@ -861,5 +1049,229 @@ return {
 			T.eq(controller.Quality(), "High", "default tier before Init")
 		end
 		Loader.isServer = true
+	end,
+	controller_runtime_with_mocks = function(T, Loader)
+		local world = loadControllerWithMocks(Loader)
+		local G = world.controller
+		local lighting = world.lighting
+		local presetEvents, qualityEvents = {}, {}
+		G.PresetChanged:Connect(function(id, source)
+			table.insert(presetEvents, id .. "@" .. source)
+		end)
+		G.Changed:Connect(function(q)
+			table.insert(qualityEvents, q)
+		end)
+		G.Init()
+		T.eq(G.Quality(), "High", "hint QualityLevel7 -> High")
+		G.Start()
+		T.eq(G.Current(), "GoldenHall", "map preset from RoundState")
+		T.eq(presetEvents[1], "GoldenHall@Map", "PresetChanged fired")
+		T.eq(world.runService.PreRender:Count(), 1, "a transition is running")
+		T.eq(world.ambientCalls[#world.ambientCalls].id, "Dust", "weather follows the preset")
+		world.frames(0.3)
+		local mid = lighting.ClockTime
+		T.ok(mid > 14.05 and mid < 17.3, "fading from the place lighting (14) toward 17.35, got " .. mid)
+		world.frames(0.4)
+		T.eq(world.runService.PreRender:Count(), 0, "PreRender disconnected after the fade")
+		T.near(lighting.ClockTime, 17.35, 1e-3, "GoldenHall applied")
+		T.near(lighting:FindFirstChild("SV_Bloom").Intensity, 0.6, 1e-4, "bloom applied")
+		T.ok(world.terrain:FindFirstChild("SV_Clouds") ~= nil, "clouds under Terrain")
+		T.ok(world.workspace.GlobalWind.X > 0, "wind applied")
+
+		world.setAttribute("FinalPhase", true)
+		T.eq(G.Current(), "GoldenHallFinal", "final phase variant")
+		world.frames(1.6)
+		T.near(lighting.ClockTime, 17.85, 1e-3, "final applied")
+
+		T.eq(G.PushOverride("EclipseUlt", "EclipseDark", G.PRIORITY.Gameplay, 0.5), true)
+		T.eq(G.Current(), "EclipseDark", "override wins")
+		T.eq(G.ActiveSource(), "Override:EclipseUlt")
+		world.frames(0.3)
+		T.ok(
+			lighting.ClockTime > 17.85 and lighting.ClockTime < 24,
+			"eclipse fades through sunset, got " .. lighting.ClockTime
+		)
+		world.frames(0.3)
+		T.ok(lighting.ClockTime < 1e-3 or lighting.ClockTime > 24 - 1e-3, "eclipse at midnight")
+		T.eq(G.PushOverride("Nope", "NotAPreset"), false, "unknown preset refused")
+		T.eq(#world.warnings, 1, "refusal is reported once")
+		table.clear(world.warnings)
+		G.SetOverride("Monochrome")
+		T.eq(G.Current(), "EclipseDark", "user choice does not beat a gameplay override")
+		G.PopOverride("EclipseUlt", 0.2)
+		T.eq(G.Current(), "MonochromeFinal", "back to the user's choice, final variant")
+		world.frames(0.3)
+		T.near(lighting:FindFirstChild("SV_ColorCorrection").Saturation, -0.8, 1e-3, "monochrome final applied")
+		G.SetOverride("MapDefault")
+		T.eq(G.Current(), "GoldenHallFinal", "MapDefault follows the map again")
+		world.frames(1.6)
+
+		G.SetQualityOverride("Low")
+		T.eq(G.Quality(), "Low")
+		T.eq(qualityEvents[#qualityEvents], "Low", "Changed fired")
+		world.frames(0.7)
+		T.eq(lighting:FindFirstChild("SV_DOF").Enabled, false, "Low: DOF off")
+		T.eq(lighting:FindFirstChild("SV_SunRays").Enabled, false, "Low: SunRays off")
+		T.eq(world.terrain:FindFirstChild("SV_Clouds").Enabled, false, "Low: clouds off")
+		T.near(world.ambientCalls[#world.ambientCalls].density, 1.4 * 0.35, 1e-6, "Low particle scale")
+		T.near(G.ParticleScale(), 0.35, 1e-6)
+
+		G.SetQualityOverride("Auto")
+		T.eq(G.Quality(), "High", "Auto returns to the hint")
+		world.frames(0.7)
+		for _ = 1, 160 do
+			world.runService.Heartbeat:Fire(0.05) -- 20 FPS for 8 s
+		end
+		T.eq(G.Quality(), "Medium", "sustained low FPS steps down one tier")
+		world.frames(0.7)
+		T.eq(lighting:FindFirstChild("SV_DOF").Enabled, false, "Medium: DOF off")
+
+		G.SetParticleDensity(2)
+		T.near(G.ParticleScale(), 0.65 * 2, 1e-6, "density multiplier")
+		world.guiService.ReducedMotionEnabled = true
+		world.guiSignals.ReducedMotionEnabled:Fire()
+		T.eq(G.ReducedMotion(), true)
+		local last = world.ambientCalls[#world.ambientCalls]
+		T.eq(last.timeScale, 0.6, "reduced motion slows weather")
+		T.near(last.density, 1.4 * 0.65 * 2 * 0.7, 1e-6, "reduced motion thins weather")
+
+		G.Refresh()
+		T.eq(world.runService.PreRender:Count(), 0, "Refresh() applies instantly")
+		T.eq(#world.warnings, 0, "no warnings: " .. table.concat(world.warnings, " | "))
+	end,
+	ambient_runtime_with_mocks = function(T, Loader)
+		local roblox = Loader.roblox
+		local cam = roblox.Instance.new("Camera")
+		cam.CFrame = roblox.CFrame.new(0, 10, 0)
+		local delayed = {}
+		local preRender = makeSignal()
+		local env = setmetatable({
+			game = {
+				GetService = function(_, n)
+					if n == "RunService" then
+						return { PreRender = preRender }
+					elseif n == "Players" then
+						return { LocalPlayer = nil }
+					end
+					error("mock: no service " .. n)
+				end,
+			},
+			workspace = {
+				CurrentCamera = cam,
+				Raycast = function(_, origin)
+					return { Position = roblox.Vector3.new(origin.X, 2, origin.Z) } -- floor at y = 2
+				end,
+			},
+			RaycastParams = {
+				new = function()
+					return {}
+				end,
+			},
+			task = {
+				delay = function(_, fn)
+					table.insert(delayed, fn)
+				end,
+				spawn = task.spawn,
+			},
+			Instance = roblox.Instance,
+			Color3 = roblox.Color3,
+			Vector3 = roblox.Vector3,
+			Vector2 = roblox.Vector2,
+			CFrame = roblox.CFrame,
+			Enum = roblox.Enum,
+			NumberRange = roblox.NumberRange,
+			NumberSequence = roblox.NumberSequence,
+			NumberSequenceKeypoint = roblox.NumberSequenceKeypoint,
+			ColorSequence = roblox.ColorSequence,
+			ColorSequenceKeypoint = roblox.ColorSequenceKeypoint,
+		}, { __index = _G })
+		local source = fs.readFile("src/client/VFX/Ambient.luau")
+		local Ambient = luau.load(source, { debugName = "Ambient(mock)", environment = env, injectGlobals = true })()
+
+		Ambient.Set("Snow", 1)
+		local folder = cam:FindFirstChild("SV_Ambient_Snow")
+		T.ok(folder ~= nil, "weather parented to the camera")
+		T.eq(preRender:Count(), 1, "following the camera")
+		local id, density = Ambient.Current()
+		T.eq(id, "Snow")
+		T.eq(density, 1)
+		local mist = folder:FindFirstChild("Volume_Mist")
+		local flakes = folder:FindFirstChild("Volume_Flakes")
+		T.near(mist.CFrame.Position.Y, 3, 1e-3, "mist sits on the floor under the camera")
+		T.near(flakes.CFrame.Position.Y, 24, 1e-3, "flake volume centred above the camera")
+
+		cam.CFrame = roblox.CFrame.new(500, 40, 0) * roblox.CFrame.Angles(0, math.rad(90), 0) -- teleport, look -X
+		preRender:Fire(1 / 60)
+		local p = flakes.CFrame.Position
+		T.ok((p - roblox.Vector3.new(500, 54, 0)).Magnitude < 30, "volumes follow the camera")
+		T.ok(p.X < 499, "volumes are pushed along the view direction")
+
+		local emitter = flakes:FindFirstChildOfClass("ParticleEmitter")
+		Ambient.Set("Snow", 0.5, { TimeScale = 0.6 })
+		T.eq(cam:FindFirstChild("SV_Ambient_Snow"), folder, "same weather updated in place")
+		T.near(emitter.Rate, 80, 1e-3, "rate scaled by density")
+		T.near(emitter.TimeScale, 0.6, 1e-4, "time scale for reduced motion")
+
+		Ambient.Set("Embers", 1)
+		T.eq(emitter.Enabled, false, "old emitters stop emitting")
+		T.ok(cam:FindFirstChild("SV_Ambient_Embers") ~= nil, "new weather built")
+		T.eq(#delayed, 1, "old weather cleanup scheduled after its particles die")
+		delayed[1]()
+		T.eq(folder.Parent, nil, "old weather destroyed")
+
+		Ambient.Stop()
+		T.eq(preRender:Count(), 0, "no per-frame work when idle")
+		T.eq(Ambient.Current(), nil)
+		Ambient.Set("Bogus", 1)
+		T.eq(Ambient.Current(), nil, "unknown weather = none")
+		Ambient.Set("Dust", 0)
+		T.eq(Ambient.Current(), nil, "zero density = none")
+	end,
+	rigstyles_on_real_blueprints = function(T, Loader)
+		local okBuilder, RigBuilder = pcall(Loader.require, "ReplicatedStorage.Shared.Rigs.RigBuilder")
+		if not okBuilder or type(RigBuilder) ~= "table" or type(RigBuilder.Blueprints) ~= "function" then
+			print("  (graphics.spec: RigBuilder not available yet — real-blueprint style check skipped)")
+			T.ok(true)
+			return
+		end
+		local RigStyles = Loader.require(RIGSTYLES)
+		for _, id in RigBuilder.Blueprints() do
+			local okBuild, model = pcall(RigBuilder.Build, id)
+			if okBuild then
+				local before = {}
+				for _, d in model:GetDescendants() do
+					if d:IsA("BasePart") then
+						before[d] = { d.Material, d.Color, d.Reflectance }
+					end
+				end
+				for _, style in RigStyles.List() do
+					T.ok(RigStyles.Apply(model, style), id .. " " .. style)
+					local outlines, lights = 0, 0
+					for _, d in model:GetDescendants() do
+						if d.ClassName == "Highlight" then
+							outlines += 1
+						elseif d.Name == RigStyles.EYE_LIGHT_NAME then
+							lights += 1
+						end
+					end
+					T.eq(outlines, if style == "Toon" then 1 else 0, id .. " " .. style .. " outlines")
+					T.ok(lights <= RigStyles.MAX_EYE_LIGHTS, id .. " " .. style .. " eye lights")
+				end
+				RigStyles.Revert(model)
+				local changed = 0
+				for part, v in before do
+					if
+						part.Material ~= v[1]
+						or not close(part.Color, v[2], 0.006)
+						or not close(part.Reflectance, v[3], 1e-4)
+					then
+						changed += 1
+					end
+				end
+				T.eq(changed, 0, id .. " revert restores every part")
+			else
+				print("  (graphics.spec: RigBuilder.Build(" .. id .. ") failed — skipped: " .. tostring(model) .. ")")
+			end
+		end
 	end,
 }

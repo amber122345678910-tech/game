@@ -165,7 +165,14 @@ local function getSaveStarModule(): any
 	return saveStarModule
 end
 
-local function visualPart(parent: Instance, className: string, name: string, size: Vector3, cf: CFrame, color: Color3): BasePart
+local function visualPart(
+	parent: Instance,
+	className: string,
+	name: string,
+	size: Vector3,
+	cf: CFrame,
+	color: Color3
+): BasePart
 	local part = Instance.new(className) :: BasePart
 	part.Name = name
 	part.Size = size
@@ -183,16 +190,21 @@ local function visualPart(parent: Instance, className: string, name: string, siz
 	return part
 end
 
--- Fallback SAVE star: two crossed 5-point stars (2 wedges per point) around a glowing core.
+-- Fallback SAVE star: three thin 5-point stars (2 wedges per point) on vertical planes 60 degrees apart
+-- around a glowing core — reads as a radiant star from every horizontal angle (31 parts).
 local function buildFallbackStar(): Model
 	local model = Instance.new("Model")
 	model.Name = "SaveStar"
-	local core = visualPart(model, "Part", "Star", Vector3.new(1.1, 1.1, 1.1), CFrame.new(), STAR_LIT)
-	;(core :: Part).Shape = Enum.PartType.Ball
+	local core = visualPart(model, "Part", "Star", Vector3.new(1.1, 1.1, 1.1), CFrame.new(), STAR_LIT);
+	(core :: Part).Shape = Enum.PartType.Ball
 	local tip = 1.7 -- centre-to-tip length
 	local half = 0.42 * tip -- half width of each point at the centre
-	local thickness = 0.45
-	local planes: { Vector3 } = { Vector3.new(1, 0, 0), Vector3.new(0, 0, 1) }
+	local thickness = 0.32
+	local planes: { Vector3 } = {}
+	for i = 0, 2 do
+		local a = math.rad(i * 60)
+		table.insert(planes, Vector3.new(math.cos(a), 0, math.sin(a)))
+	end
 	local up = Vector3.new(0, 1, 0)
 	for p, horizontal in planes do
 		for k = 0, 4 do
@@ -456,8 +468,8 @@ function ObjectiveService.Setup(mapInfo: any)
 			Vector3.new(0.05, radius * 2, radius * 2),
 			CFrame.new(position + Vector3.new(0, 0.12, 0)) * CFrame.Angles(0, 0, math.rad(90)),
 			STAR_GOLD
-		)
-		;(zone :: Part).Shape = Enum.PartType.Cylinder
+		);
+		(zone :: Part).Shape = Enum.PartType.Cylinder
 		zone.Transparency = 0.88
 		container.Parent = f
 		CollectionService:AddTag(star, "SaveStar")
@@ -486,6 +498,9 @@ end
 function ObjectiveService.Total(): number
 	return #points
 end
+
+-- Preview/test hook: the crafted fallback star used when Rigs/Props/SaveStar is unavailable.
+ObjectiveService.BuildFallbackStar = buildFallbackStar
 
 function ObjectiveService.Init()
 	CharacterService = tryService("CharacterService")

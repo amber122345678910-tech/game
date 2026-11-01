@@ -132,13 +132,15 @@ end
 table.sort(services)
 print("  by service: " .. table.concat(services, ", "))
 if lighting then
-	print(("  Lighting: LightingStyle=%s PrioritizeLightingQuality=%s Technology=%s"):format(
-		tostring(lighting.LightingStyle),
-		tostring(lighting.PrioritizeLightingQuality),
-		tostring((pcall(function()
-			return lighting.Technology
-		end)) and lighting.Technology or "?")
-	))
+	print(
+		("  Lighting: LightingStyle=%s PrioritizeLightingQuality=%s Technology=%s"):format(
+			tostring(lighting.LightingStyle),
+			tostring(lighting.PrioritizeLightingQuality),
+			tostring((pcall(function()
+				return lighting.Technology
+			end)) and lighting.Technology or "?")
+		)
+	)
 end
 for _, w in warnings do
 	print("  WARNING: " .. w)

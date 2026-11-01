@@ -323,7 +323,13 @@ function DamageMath.ExhaustEnd(state: DodgeState, now: number): boolean
 	return false
 end
 
-function DamageMath.DodgeTick(state: DodgeState, now: number, dt: number, regenMult: number?, cfg: any?): (number, boolean)
+function DamageMath.DodgeTick(
+	state: DodgeState,
+	now: number,
+	dt: number,
+	regenMult: number?,
+	cfg: any?
+): (number, boolean)
 	local refilled = DamageMath.ExhaustEnd(state, now)
 	if refilled then
 		return 0, true
@@ -334,7 +340,13 @@ end
 ---------------------------------------------------------------------------------------------------
 -- Charges / cooldowns / combos / aim
 
-function DamageMath.ChargeTick(charges: number, max: number, acc: number, dt: number, rechargeTime: number): (number, number)
+function DamageMath.ChargeTick(
+	charges: number,
+	max: number,
+	acc: number,
+	dt: number,
+	rechargeTime: number
+): (number, number)
 	if charges >= max then
 		return max, 0
 	end
@@ -366,7 +378,13 @@ function DamageMath.ScaledCooldownEnd(now: number, remaining: number, windowLeft
 	return now + windowLeft + (remaining - windowLeft * m)
 end
 
-function DamageMath.NextComboIndex(prevIndex: number, lastTime: number?, now: number, window: number, comboLength: number): number
+function DamageMath.NextComboIndex(
+	prevIndex: number,
+	lastTime: number?,
+	now: number,
+	window: number,
+	comboLength: number
+): number
 	if comboLength <= 1 then
 		return 1
 	end
@@ -376,7 +394,13 @@ function DamageMath.NextComboIndex(prevIndex: number, lastTime: number?, now: nu
 	return 1
 end
 
-function DamageMath.ClampCharge(charge: any, readySince: number, now: number, maxHoldTime: number, tolerance: number?): number
+function DamageMath.ClampCharge(
+	charge: any,
+	readySince: number,
+	now: number,
+	maxHoldTime: number,
+	tolerance: number?
+): number
 	if type(charge) ~= "number" or charge ~= charge then
 		return 0
 	end

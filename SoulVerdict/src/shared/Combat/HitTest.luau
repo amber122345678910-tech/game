@@ -140,11 +140,7 @@ function HitTest.Grow(volume: Volume, extra: number): Volume
 		-- grow the band outward and inward, and the height
 		newSize = Vector3.new(s.X + extra, s.Y + extra, s.Z + extra)
 	else
-		newSize = Vector3.new(
-			math.max(0, s.X + extra),
-			math.max(0, s.Y + extra),
-			math.max(0, s.Z + extra)
-		)
+		newSize = Vector3.new(math.max(0, s.X + extra), math.max(0, s.Y + extra), math.max(0, s.Z + extra))
 	end
 	return { Shape = volume.Shape, CFrame = volume.CFrame, Size = newSize, Key = volume.Key }
 end
@@ -160,7 +156,7 @@ function HitTest.ClosestSegmentPoints(p1: Vector3, q1: Vector3, p2: Vector3, q2:
 	local a = d1:Dot(d1)
 	local e = d2:Dot(d2)
 	local f = d2:Dot(r)
-	local s, t
+	local s, t = 0, 0
 	if a <= EPS and e <= EPS then
 		return r:Dot(r), p1, p2
 	end
@@ -444,11 +440,23 @@ function HitTest.CapsuleVsBox(cap: Capsule, boxCFrame: CFrame, boxSize: Vector3)
 end
 
 function HitTest.CapsuleVsCylinder(cap: Capsule, cframe: CFrame, diameter: number, height: number): boolean
-	return HitTest.CapsuleVsVolume(cap, { Shape = "Cylinder", CFrame = cframe, Size = Vector3.new(diameter, height, diameter) })
+	return HitTest.CapsuleVsVolume(
+		cap,
+		{ Shape = "Cylinder", CFrame = cframe, Size = Vector3.new(diameter, height, diameter) }
+	)
 end
 
-function HitTest.CapsuleVsRing(cap: Capsule, cframe: CFrame, outerDiameter: number, height: number, thickness: number): boolean
-	return HitTest.CapsuleVsVolume(cap, { Shape = "Ring", CFrame = cframe, Size = Vector3.new(outerDiameter, height, thickness) })
+function HitTest.CapsuleVsRing(
+	cap: Capsule,
+	cframe: CFrame,
+	outerDiameter: number,
+	height: number,
+	thickness: number
+): boolean
+	return HitTest.CapsuleVsVolume(
+		cap,
+		{ Shape = "Ring", CFrame = cframe, Size = Vector3.new(outerDiameter, height, thickness) }
+	)
 end
 
 ---------------------------------------------------------------------------------------------------

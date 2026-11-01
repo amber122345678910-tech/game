@@ -1,7 +1,9 @@
 --!strict
 -- StatsService (P25): per-round statistics of every participant (players AND bots) for the results
--- screen, MVP, rewards, quests and achievements. Fed by DamageService (Damaged/Healed/Parried/Dodged),
--- CharacterService (Died/Revived), ObjectiveService (SaveLit) and VerdictBoxService (Ended, optional).
+-- screen, MVP, rewards, quests and achievements. Damage / Healing / Parries / DodgesForced are pushed by
+-- DamageService (StatsService.Add); this service adds Kills + Downs + Revives (CharacterService signals),
+-- Saves (ObjectiveService.SaveLit), BoxesSurvived / BoxHits (VerdictBoxService.Ended, optional),
+-- Survived / Win (RoundService at the end of the round).
 -- Rows exist only between BeginRound and the next BeginRound/Reset; Finish() freezes them.
 --
 -- API (SPEC §17)
@@ -60,7 +62,6 @@ local EVENT_ONLY: { [string]: boolean } = {
 }
 
 local CharacterService: any = nil
-local DamageService: any = nil
 local ObjectiveService: any = nil
 local VerdictBoxService: any = nil
 local RoundService: any = nil
@@ -264,40 +265,18 @@ end
 
 function StatsService.Init()
 	CharacterService = tryService("CharacterService")
-	DamageService = tryService("DamageService")
 	ObjectiveService = tryService("ObjectiveService")
 	VerdictBoxService = tryService("VerdictBoxService")
 	RoundService = tryService("RoundService")
 end
 
 function StatsService.Start()
-	connect(DamageService, "Damaged", function(info: any, result: any)
-		if type(info) ~= "table" or type(result) ~= "table" then
-			return
-		end
-		local attacker: Model? = info.Attacker
-		local target: Model? = info.Target
-		if not isEnemy(attacker, target) then
-			return
-		end
-		local applied = tonumber(result.Applied) or 0
-		if applied > 0 then
-			StatsService.Add(attacker, "Damage", applied)
-		end
-		if result.Downed == true then
+	-- NOTE: Damage, Healing, Parries and DodgesForced are added by DamageService itself (pipeline step 12),
+	-- so they are NOT counted from its signals here (that would double count).
+	connect(CharacterService, "Downed", function(model: Model, attacker: Model?)
+		if attacker and isEnemy(attacker, model) then
 			StatsService.Add(attacker, "Downs", 1)
 		end
-	end)
-	connect(DamageService, "Healed", function(target: Model?, amount: number?, source: Model?)
-		if source and type(amount) == "number" and amount > 0 then
-			StatsService.Add(source, "Healing", amount)
-		end
-	end)
-	connect(DamageService, "Parried", function(defender: Model?, _attacker: Model?)
-		StatsService.Add(defender, "Parries", 1)
-	end)
-	connect(DamageService, "Dodged", function(_monster: Model?, attacker: Model?)
-		StatsService.Add(attacker, "DodgesForced", 1)
 	end)
 	connect(CharacterService, "Died", function(model: Model, killer: Model?)
 		if killer and killer ~= model and isEnemy(killer, model) then

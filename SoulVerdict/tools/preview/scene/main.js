@@ -315,6 +315,18 @@ window.SVRender = async function SVRender(payload) {
     sky.updateMatrixWorld();
   };
 
+  // Turntables use one framing for every angle: a box that is square in XZ (radius around the
+  // vertical axis), so the model keeps the same scale in every cell.
+  if (sheet > 0) {
+    const c = frameBox.getCenter(new THREE.Vector3());
+    let rxz = 0;
+    for (const p of viewName === 'head' ? [frameBox.min, frameBox.max] : allCorners) {
+      rxz = Math.max(rxz, Math.hypot(p.x - c.x, p.z - c.z));
+    }
+    if (viewName === 'head') rxz = Math.hypot((frameBox.max.x - frameBox.min.x) / 2, (frameBox.max.z - frameBox.min.z) / 2);
+    frameBox = new THREE.Box3(new THREE.Vector3(c.x - rxz, frameBox.min.y, c.z - rxz), new THREE.Vector3(c.x + rxz, frameBox.max.y, c.z + rxz));
+  }
+
   const shots = [];
   if (sheet > 0) {
     const [baseAz, baseEl] = VIEWS[viewName === 'head' ? 'head' : 'front'] || [0, 8];
@@ -364,10 +376,10 @@ window.SVRender = async function SVRender(payload) {
   }
   if (opts.title) label(octx, opts.title, W / 2, 40, 26);
 
+  const png = out.toDataURL('image/png');
   const info = {
     ms: Math.round(performance.now() - t0),
     parts: partCount,
-    triangles: renderer.info.render.triangles,
     bloomParts: bloomMeshes.size,
     highlights: highlightSets.length,
     lights: allLights.length,
@@ -375,7 +387,6 @@ window.SVRender = async function SVRender(payload) {
     camera: camera.position.toArray().map((v) => +v.toFixed(3)),
     bounds: { min: box.min.toArray().map((v) => +v.toFixed(3)), max: box.max.toArray().map((v) => +v.toFixed(3)) },
   };
-  const png = out.toDataURL('image/png');
   renderer.dispose();
   return { png, info };
 };

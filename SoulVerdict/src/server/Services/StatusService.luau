@@ -369,7 +369,7 @@ end
 
 local function scheduleExpiry(model: Model, name: string, endsAt: number)
 	local delay = math.max(0, endsAt - now()) + 0.01
-	task.delay(delay, function()
+	Validation.Delay(delay, function()
 		local st = states[model]
 		if st == nil then
 			return
@@ -394,9 +394,6 @@ function StatusService.Apply(model: Model?, name: string, duration: number, data
 	end
 	if duration <= 0 then
 		StatusService.Remove(m, name)
-		return false
-	end
-	if m:GetAttribute("Dead") == true then
 		return false
 	end
 	duration = math.min(duration, MAX_DURATION)
@@ -604,7 +601,9 @@ local function tickDash(model: Model, st: ModelState, dt: number)
 		return
 	end
 	local kit = Validation.Kit(model)
-	local max = if kit and type(kit.Stats.DashCharges) == "number" then kit.Stats.DashCharges else Config.Human.DashCharges
+	local max = if kit and type(kit.Stats.DashCharges) == "number"
+		then kit.Stats.DashCharges
+		else Config.Human.DashCharges
 	if charges >= max then
 		st.DashAcc = 0
 		return
@@ -722,9 +721,14 @@ function StatusService.Start()
 			end)
 		end
 		if cs.Died then
+			-- CharacterService.Kill already clears statuses (and stuns the body); only refresh movement
 			cs.Died:Connect(function(model: Model)
-				StatusService.ClearAll(model)
 				StatusService.RecomputeMovement(model)
+			end)
+		end
+		if cs.Despawning then
+			cs.Despawning:Connect(function(model: Model)
+				StatusService.Untrack(model)
 			end)
 		end
 		if cs.Revived then

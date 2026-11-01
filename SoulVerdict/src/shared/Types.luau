@@ -199,6 +199,7 @@ export type ForceMovePacket = {
 	duration: number?,
 	cframe: CFrame?,
 	height: number?,
+	echo: boolean?, -- Dash answering the client's own Net "Dash" request (skip it if the dash was predicted)
 }
 
 export type BoxPacket = {

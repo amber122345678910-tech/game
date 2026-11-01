@@ -22,7 +22,10 @@ return {
 		en = "The judge has fallen. The SOULs shine on.",
 		ru = "Судья пал. ДУШИ продолжают сиять.",
 	},
-	["round.result.Humans.Survived"] = { en = "THEY SURVIVED THE VERDICT", ru = "ОНИ ПЕРЕЖИЛИ ПРИГОВОР" },
+	["round.result.Humans.Survived"] = {
+		en = "THEY SURVIVED THE VERDICT",
+		ru = "ОНИ ПЕРЕЖИЛИ ПРИГОВОР",
+	},
 	["round.result.Humans.Survived.sub"] = {
 		en = "The world collapsed, but they refused to.",
 		ru = "Мир рухнул, но они устояли.",
@@ -33,24 +36,36 @@ return {
 		ru = "Монстр ушёл. Никто не наказан.",
 	},
 	["round.result.Humans.Aborted"] = { en = "THE TRIAL WAS ADJOURNED", ru = "СУД ОТЛОЖЕН" },
-	["round.result.Humans.Aborted.sub"] = { en = "This round was stopped early.", ru = "Раунд остановлен досрочно." },
+	["round.result.Humans.Aborted.sub"] = {
+		en = "This round was stopped early.",
+		ru = "Раунд остановлен досрочно.",
+	},
 	["round.result.Monster.Eliminated"] = { en = "THE HUMANS WERE JUDGED", ru = "ЛЮДИ БЫЛИ СУЖДЕНЫ" },
 	["round.result.Monster.Eliminated.sub"] = {
 		en = "Every SOUL has been weighed... and found wanting.",
 		ru = "Каждая ДУША взвешена... и признана недостойной.",
 	},
-	["round.result.Monster.Left"] = { en = "NO ONE STAYED FOR THE VERDICT", ru = "НИКТО НЕ ДОЖДАЛСЯ ПРИГОВОРА" },
+	["round.result.Monster.Left"] = {
+		en = "NO ONE STAYED FOR THE VERDICT",
+		ru = "НИКТО НЕ ДОЖДАЛСЯ ПРИГОВОРА",
+	},
 	["round.result.Monster.Left.sub"] = {
 		en = "The humans fled the hall. The judge wins by default.",
 		ru = "Люди сбежали из зала. Судья побеждает по умолчанию.",
 	},
 	["round.result.Monster.Aborted"] = { en = "THE TRIAL WAS ADJOURNED", ru = "СУД ОТЛОЖЕН" },
-	["round.result.Monster.Aborted.sub"] = { en = "This round was stopped early.", ru = "Раунд остановлен досрочно." },
+	["round.result.Monster.Aborted.sub"] = {
+		en = "This round was stopped early.",
+		ru = "Раунд остановлен досрочно.",
+	},
 	["round.result.draw"] = { en = "THE TRIAL WAS ADJOURNED", ru = "СУД ОТЛОЖЕН" },
 	["round.result.victory"] = { en = "VICTORY", ru = "ПОБЕДА" },
 	["round.result.defeat"] = { en = "DEFEAT", ru = "ПОРАЖЕНИЕ" },
 	["round.result.mvp"] = { en = "MVP", ru = "MVP" },
-	["round.result.practice"] = { en = "PRACTICE — reduced rewards", ru = "ТРЕНИРОВКА — награды снижены" },
+	["round.result.practice"] = {
+		en = "PRACTICE — reduced rewards",
+		ru = "ТРЕНИРОВКА — награды снижены",
+	},
 
 	-- Revive prompt (ProximityPrompt texts; the prompt also carries ActionKey for client localisation)
 	["round.revive.action"] = { en = "Revive", ru = "Поднять" },
@@ -64,7 +79,10 @@ return {
 	["round.feed.revived"] = { en = "{2} revived {1}", ru = "{2} поднял(а) {1}" },
 	["round.feed.faded"] = { en = "{1} faded away", ru = "{1} угас(ла)" },
 	["round.feed.void"] = { en = "{1} fell into the void", ru = "{1} упал(а) в пустоту" },
-	["round.feed.collapse"] = { en = "{1} was swallowed by the collapse", ru = "{1} поглотило обрушение" },
+	["round.feed.collapse"] = {
+		en = "{1} was swallowed by the collapse",
+		ru = "{1} поглотило обрушение",
+	},
 	["round.feed.left"] = { en = "{1} left the trial", ru = "{1} покинул(а) суд" },
 	["round.feed.monsterDown"] = { en = "{1} has been defeated!", ru = "{1} повержен!" },
 
@@ -90,7 +108,10 @@ return {
 		en = "The world is collapsing! Stay inside the ring!",
 		ru = "Мир рушится! Оставайся внутри кольца!",
 	},
-	["round.notify.harmony"] = { en = "HARMONY +{1}% team damage", ru = "ГАРМОНИЯ +{1}% урона команды" },
+	["round.notify.harmony"] = {
+		en = "HARMONY +{1}% team damage",
+		ru = "ГАРМОНИЯ +{1}% урона команды",
+	},
 	["round.notify.spectating"] = {
 		en = "Your SOUL shattered. Spectating until the verdict.",
 		ru = "Твоя ДУША разбита. Наблюдаешь до приговора.",
@@ -112,7 +133,10 @@ return {
 	["round.save.name"] = { en = "SAVE", ru = "СОХРАНЕНИЕ" },
 	["round.save.channel"] = { en = "Channeling...", ru = "Сохранение..." },
 	["round.save.contested"] = { en = "CONTESTED", ru = "ОСПАРИВАЕТСЯ" },
-	["round.save.lit"] = { en = "A SAVE star shines! ({1}/{2})", ru = "Звезда СОХРАНЕНИЯ сияет! ({1}/{2})" },
+	["round.save.lit"] = {
+		en = "A SAVE star shines! ({1}/{2})",
+		ru = "Звезда СОХРАНЕНИЯ сияет! ({1}/{2})",
+	},
 	["round.save.surge"] = {
 		en = "DETERMINATION SURGE! The monster is exhausted!",
 		ru = "ВСПЛЕСК РЕШИМОСТИ! Монстр измотан!",
@@ -126,23 +150,35 @@ return {
 	["round.vote.title"] = { en = "VOTE FOR THE NEXT HALL", ru = "ГОЛОСУЙ ЗА СЛЕДУЮЩИЙ ЗАЛ" },
 	["round.vote.cast"] = { en = "You voted for {1}", ru = "Ты проголосовал(а) за {1}" },
 	["round.vote.closed"] = { en = "Voting is closed", ru = "Голосование закрыто" },
-	["round.vote.invalid"] = { en = "That map is not on the ballot", ru = "Этой карты нет в голосовании" },
+	["round.vote.invalid"] = {
+		en = "That map is not on the ballot",
+		ru = "Этой карты нет в голосовании",
+	},
 	["round.vote.nextMap"] = { en = "Next hall: {1}", ru = "Следующий зал: {1}" },
 
 	-- Monster queue
 	["round.queue.chance"] = { en = "Monster chance: {1}%", ru = "Шанс стать монстром: {1}%" },
 	["round.queue.prefSet"] = { en = "Role preference: {1}", ru = "Предпочтение роли: {1}" },
-	["round.queue.prefInvalid"] = { en = "Unknown role preference", ru = "Неизвестное предпочтение роли" },
+	["round.queue.prefInvalid"] = {
+		en = "Unknown role preference",
+		ru = "Неизвестное предпочтение роли",
+	},
 
 	-- Practice
-	["round.practice.start"] = { en = "PRACTICE: {1} vs bots", ru = "ТРЕНИРОВКА: {1} против ботов" },
+	["round.practice.start"] = {
+		en = "PRACTICE: {1} vs bots",
+		ru = "ТРЕНИРОВКА: {1} против ботов",
+	},
 	["round.practice.side.Human"] = { en = "Human", ru = "Человек" },
 	["round.practice.side.Monster"] = { en = "Monster", ru = "Монстр" },
 	["round.practice.busy"] = {
 		en = "Practice is only available while waiting for players.",
 		ru = "Тренировка доступна только во время ожидания игроков.",
 	},
-	["round.practice.unavailable"] = { en = "Practice bots are not available.", ru = "Боты для тренировки недоступны." },
+	["round.practice.unavailable"] = {
+		en = "Practice bots are not available.",
+		ru = "Боты для тренировки недоступны.",
+	},
 	["round.practice.disabled"] = { en = "Practice is disabled.", ru = "Тренировка отключена." },
 	["round.practice.queued"] = { en = "Practice is starting...", ru = "Тренировка начинается..." },
 	["round.practice.ended"] = { en = "Practice over.", ru = "Тренировка окончена." },
@@ -151,14 +187,26 @@ return {
 
 	-- Lobby / Try kit
 	["round.trykit.invalid"] = { en = "Unknown kit", ru = "Неизвестный набор" },
-	["round.trykit.notLobby"] = { en = "You can only try kits in the lobby.", ru = "Примерять наборы можно только в лобби." },
+	["round.trykit.notLobby"] = {
+		en = "You can only try kits in the lobby.",
+		ru = "Примерять наборы можно только в лобби.",
+	},
 	["round.trykit.trying"] = { en = "Trying {1}", ru = "Примеряешь: {1}" },
 
 	-- Style Lab (server side messages)
-	["round.lab.denied"] = { en = "Style Lab is for the owner only.", ru = "Style Lab доступен только владельцу." },
-	["round.lab.unknown"] = { en = "Unknown Style Lab action", ru = "Неизвестное действие Style Lab" },
+	["round.lab.denied"] = {
+		en = "Style Lab is for the owner only.",
+		ru = "Style Lab доступен только владельцу.",
+	},
+	["round.lab.unknown"] = {
+		en = "Unknown Style Lab action",
+		ru = "Неизвестное действие Style Lab",
+	},
 	["round.lab.done"] = { en = "Style Lab: {1}", ru = "Style Lab: {1}" },
-	["round.lab.noMap"] = { en = "Unknown or unavailable map", ru = "Неизвестная или недоступная карта" },
+	["round.lab.noMap"] = {
+		en = "Unknown or unavailable map",
+		ru = "Неизвестная или недоступная карта",
+	},
 	["round.lab.noRound"] = { en = "No round in progress", ru = "Раунд не идёт" },
 	["round.lab.noCharacter"] = { en = "You have no character", ru = "У тебя нет персонажа" },
 

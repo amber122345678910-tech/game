@@ -14,7 +14,10 @@ end
 local function vnear(T, a, b, eps, msg)
 	eps = eps or 1e-4
 	local d = (a - b).Magnitude
-	return T.ok(d <= eps, (msg or "vectors differ") .. (" (got %s, expected %s, |d|=%g)"):format(tostring(a), tostring(b), d))
+	return T.ok(
+		d <= eps,
+		(msg or "vectors differ") .. (" (got %s, expected %s, |d|=%g)"):format(tostring(a), tostring(b), d)
+	)
 end
 
 local function isFinite(x)
@@ -431,7 +434,10 @@ function tests.tableutil_shuffle_reconcile_freeze(T, Loader)
 	local data = { a = { b = { c = 1 } }, list = { 1, 2 } }
 	data.a.b.back = data
 	TU.freezeDeep(data)
-	T.ok(table.isfrozen(data) and table.isfrozen(data.a) and table.isfrozen(data.a.b) and table.isfrozen(data.list), "freezeDeep freezes all levels")
+	T.ok(
+		table.isfrozen(data) and table.isfrozen(data.a) and table.isfrozen(data.a.b) and table.isfrozen(data.list),
+		"freezeDeep freezes all levels"
+	)
 	T.fails(function()
 		data.a.b.c = 2
 	end, "frozen table rejects writes")
@@ -870,8 +876,10 @@ function tests.geometry_ellipsoid(T, Loader)
 		T.near(nn.Magnitude, 1, 1e-5, "unit normal")
 		T.ok(nn:Dot(q) > 0, "normal points outward")
 		local h = 0.1 -- central differences (float32 Vector3 precision)
-		local ty = G.ellipsoidPoint(CFrame.new(), radii, yaw + h, pitch) - G.ellipsoidPoint(CFrame.new(), radii, yaw - h, pitch)
-		local tp = G.ellipsoidPoint(CFrame.new(), radii, yaw, pitch + h) - G.ellipsoidPoint(CFrame.new(), radii, yaw, pitch - h)
+		local ty = G.ellipsoidPoint(CFrame.new(), radii, yaw + h, pitch)
+			- G.ellipsoidPoint(CFrame.new(), radii, yaw - h, pitch)
+		local tp = G.ellipsoidPoint(CFrame.new(), radii, yaw, pitch + h)
+			- G.ellipsoidPoint(CFrame.new(), radii, yaw, pitch - h)
 		if ty.Magnitude > 1e-6 then
 			T.ok(math.abs(ty.Unit:Dot(nn)) < 2e-3, "normal orthogonal to yaw tangent")
 		end
@@ -934,12 +942,57 @@ function tests.geometry_segments(T, Loader)
 	p = G.closestPointOnSegment(Vector3.new(3, 3, 3), Vector3.one, Vector3.one)
 	vnear(T, p, Vector3.one, nil, "degenerate segment")
 	-- segment-segment known cases
-	T.near(G.segmentSegmentDistance(Vector3.new(-1, 0, 0), Vector3.new(1, 0, 0), Vector3.new(0, -1, 2), Vector3.new(0, 1, 2)), 2, 1e-6, "skew perpendicular")
-	T.near(G.segmentSegmentDistance(Vector3.new(0, 0, 0), Vector3.new(0, 10, 0), Vector3.new(3, 2, 0), Vector3.new(3, 5, 0)), 3, 1e-6, "parallel overlapping")
-	T.near(G.segmentSegmentDistance(Vector3.new(0, 0, 0), Vector3.new(0, 1, 0), Vector3.new(0, 4, 0), Vector3.new(0, 9, 0)), 3, 1e-6, "collinear disjoint")
-	T.near(G.segmentSegmentDistance(Vector3.new(0, 0, 0), Vector3.new(0, 1, 0), Vector3.new(0, 1, 0), Vector3.new(5, 1, 0)), 0, 1e-6, "touching")
-	T.near(G.segmentSegmentDistance(Vector3.one, Vector3.one, Vector3.new(4, 5, 1), Vector3.new(4, 5, 1)), 5, 1e-6, "two points")
-	T.near(G.segmentSegmentDistance(Vector3.new(0, 3, 0), Vector3.new(0, 3, 0), Vector3.new(-5, 0, 0), Vector3.new(5, 0, 0)), 3, 1e-6, "point vs segment")
+	T.near(
+		G.segmentSegmentDistance(
+			Vector3.new(-1, 0, 0),
+			Vector3.new(1, 0, 0),
+			Vector3.new(0, -1, 2),
+			Vector3.new(0, 1, 2)
+		),
+		2,
+		1e-6,
+		"skew perpendicular"
+	)
+	T.near(
+		G.segmentSegmentDistance(
+			Vector3.new(0, 0, 0),
+			Vector3.new(0, 10, 0),
+			Vector3.new(3, 2, 0),
+			Vector3.new(3, 5, 0)
+		),
+		3,
+		1e-6,
+		"parallel overlapping"
+	)
+	T.near(
+		G.segmentSegmentDistance(Vector3.new(0, 0, 0), Vector3.new(0, 1, 0), Vector3.new(0, 4, 0), Vector3.new(0, 9, 0)),
+		3,
+		1e-6,
+		"collinear disjoint"
+	)
+	T.near(
+		G.segmentSegmentDistance(Vector3.new(0, 0, 0), Vector3.new(0, 1, 0), Vector3.new(0, 1, 0), Vector3.new(5, 1, 0)),
+		0,
+		1e-6,
+		"touching"
+	)
+	T.near(
+		G.segmentSegmentDistance(Vector3.one, Vector3.one, Vector3.new(4, 5, 1), Vector3.new(4, 5, 1)),
+		5,
+		1e-6,
+		"two points"
+	)
+	T.near(
+		G.segmentSegmentDistance(
+			Vector3.new(0, 3, 0),
+			Vector3.new(0, 3, 0),
+			Vector3.new(-5, 0, 0),
+			Vector3.new(5, 0, 0)
+		),
+		3,
+		1e-6,
+		"point vs segment"
+	)
 	-- random segments vs brute force
 	local Rng = U(Loader, "Rng")
 	local rng = Rng.new(2718)
@@ -993,9 +1046,19 @@ function tests.geometry_boxes(T, Loader)
 	T.ok(G.pointInBox(Vector3.new(2, 2, 2), box, size), "pointInBox boundary counts")
 	T.ok(not G.pointInBox(Vector3.new(2.01, 0, 0), box, size), "pointInBox outside")
 	-- segment through the box
-	T.near(G.segmentBoxDistance(Vector3.new(-10, 0, 0), Vector3.new(10, 0, 0), box, size), 0, 1e-9, "segment through box")
+	T.near(
+		G.segmentBoxDistance(Vector3.new(-10, 0, 0), Vector3.new(10, 0, 0), box, size),
+		0,
+		1e-9,
+		"segment through box"
+	)
 	-- segment passing a corner diagonally
-	T.near(G.segmentBoxDistance(Vector3.new(4, -10, 4), Vector3.new(4, 10, 4), box, size), math.sqrt(8), 1e-5, "segment beside an edge")
+	T.near(
+		G.segmentBoxDistance(Vector3.new(4, -10, 4), Vector3.new(4, 10, 4), box, size),
+		math.sqrt(8),
+		1e-5,
+		"segment beside an edge"
+	)
 	-- rotated boxes vs reference
 	local Rng = U(Loader, "Rng")
 	local rng = Rng.new(161803)
@@ -1062,10 +1125,19 @@ function tests.geometry_capsules(T, Loader)
 	oa, ob = G.verticalCapsule(Vector3.new(2.21, 3, 0), 5, r)
 	T.ok(not G.capsuleVsCapsule(a, b, r, oa, ob, r), "side by side apart")
 	-- horizontal bone (capsule, radius 0.5) sweeping past the legs: reach = 1.1 + 0.5 = 1.6
-	T.ok(G.capsuleVsCapsule(a, b, r, Vector3.new(-5, 1.6, -1.55), Vector3.new(5, 1.6, -1.55), 0.5), "bone at the shins hits")
-	T.ok(not G.capsuleVsCapsule(a, b, r, Vector3.new(-5, 1.6, -1.65), Vector3.new(5, 1.6, -1.65), 0.5), "bone passing in front misses")
+	T.ok(
+		G.capsuleVsCapsule(a, b, r, Vector3.new(-5, 1.6, -1.55), Vector3.new(5, 1.6, -1.55), 0.5),
+		"bone at the shins hits"
+	)
+	T.ok(
+		not G.capsuleVsCapsule(a, b, r, Vector3.new(-5, 1.6, -1.65), Vector3.new(5, 1.6, -1.65), 0.5),
+		"bone passing in front misses"
+	)
 	-- low bone under the feet: closest point is the bottom cap
-	T.ok(not G.capsuleVsCapsule(a, b, r, Vector3.new(-5, -0.05, -0.2), Vector3.new(5, -0.05, -0.2), 0.5), "bone below the feet misses")
+	T.ok(
+		not G.capsuleVsCapsule(a, b, r, Vector3.new(-5, -0.05, -0.2), Vector3.new(5, -0.05, -0.2), 0.5),
+		"bone below the feet misses"
+	)
 end
 
 function tests.geometry_volumes_cones(T, Loader)

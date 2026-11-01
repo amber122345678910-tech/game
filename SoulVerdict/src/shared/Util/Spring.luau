@@ -110,7 +110,8 @@ end
 
 function Spring.Update(self: SpringImpl, dt: number): any
 	if dt > 0 then
-		self.Position, self.Velocity = Spring.Step(self.Position, self.Velocity, self.Target, self.Speed, self.Damping, dt)
+		self.Position, self.Velocity =
+			Spring.Step(self.Position, self.Velocity, self.Target, self.Speed, self.Damping, dt)
 	end
 	return self.Position
 end

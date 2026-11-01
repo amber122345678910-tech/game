@@ -42,6 +42,7 @@ class Tok:
     line: int
     col: int
     end_line: int = 0
+    expr: bool = False  # True for if/then/elseif/else of an if-EXPRESSION (no `end`)
 
     def is_op(self, *ops: str) -> bool:
         return self.kind == "op" and self.value in ops
@@ -297,6 +298,7 @@ def lex(src: str) -> Lexed:
 
     lex_code(0)
     tokens.append(Tok("eof", "", line, 1))
+    classify_if_expressions(tokens)
     lexed = Lexed(tokens, comments, "".join(out), errors)
     # suppression comments: `-- check:ignore` or `-- check:ignore(tag1, tag2)`
     for cm in comments:
@@ -348,8 +350,112 @@ def matching(tokens: list, i: int) -> int:
     return len(tokens) - 1
 
 
-BLOCK_OPEN = {"function", "if", "do", "repeat"}
 BLOCK_CLOSE = {"end", "until"}
+
+# keywords after which an `if` starts an if-EXPRESSION (`local x = if a then b else c`)
+_EXPR_KEYWORDS = {"return", "and", "or", "not", "in", "until", "while", "if", "elseif"}
+
+
+def _expression_position(tokens: list, i: int) -> bool:
+    if i == 0:
+        return False
+    p = tokens[i - 1]
+    if p.kind == "op":
+        # tokens that can END an expression or a type annotation (`): T?`, `Foo<T>`, `...`) precede statements
+        return p.value not in (")", "]", "}", ";", "`end", "?", ">", "...")
+    if p.kind == "keyword":
+        return p.value in _EXPR_KEYWORDS
+    return False
+
+
+def classify_if_expressions(tokens: list) -> None:
+    """Marks (Tok.expr = True) the if/then/elseif/else keywords that belong to if-expressions, which
+    have no `end`. Every block counter must ignore them (see opens_block / closes_block)."""
+    stack: list = []  # frames: [kind, state]; kind in ifexpr | ifstmt | block | repeat
+    for i, t in enumerate(tokens):
+        if t.kind != "keyword":
+            continue
+        v = t.value
+        if v == "if":
+            if _expression_position(tokens, i):
+                t.expr = True
+                stack.append(["ifexpr", "cond"])
+            else:
+                stack.append(["ifstmt", "cond"])
+        elif v == "then":
+            for f in reversed(stack):
+                if f[0] in ("ifexpr", "ifstmt") and f[1] == "cond":
+                    if f[0] == "ifexpr":
+                        t.expr = True
+                        f[1] = "branch"
+                    else:
+                        f[1] = "block"
+                    break
+        elif v == "elseif":
+            if stack and stack[-1][0] == "ifexpr":
+                t.expr = True
+                stack[-1][1] = "cond"
+            elif stack and stack[-1][0] == "ifstmt":
+                stack[-1][1] = "cond"
+        elif v == "else":
+            if stack and stack[-1][0] == "ifexpr":
+                t.expr = True
+                stack.pop()  # the final expression follows; the frame is complete
+            elif stack and stack[-1][0] == "ifstmt":
+                stack[-1][1] = "else"
+        elif v in ("function", "do"):
+            stack.append(["block", None])
+        elif v == "repeat":
+            stack.append(["repeat", None])
+        elif v in ("end", "until"):
+            while stack and stack[-1][0] == "ifexpr":
+                stack.pop()  # malformed input safety
+            if stack:
+                stack.pop()
+
+
+def opens_block(t) -> bool:
+    """function / do / repeat / if-STATEMENT (closed by end or until)."""
+    return t.kind == "keyword" and (t.value in ("function", "do", "repeat") or (t.value == "if" and not t.expr))
+
+
+def closes_block(t) -> bool:
+    return t.kind == "keyword" and t.value in BLOCK_CLOSE
+
+
+def skip_type(tokens: list, k: int) -> int:
+    """tokens[k] starts a type (after `::` or `:`); returns the index just past a simple type:
+    Name(.Name)*<...>? | {...} | (...) [-> type] | typeof(...), each optionally followed by `?`."""
+    n = len(tokens)
+    if k >= n:
+        return k
+    t = tokens[k]
+    if t.kind == "name" and t.value == "typeof" and k + 1 < n and tokens[k + 1].is_op("("):
+        k = matching(tokens, k + 1) + 1
+    elif t.kind == "name" or t.is_kw("nil"):
+        k += 1
+        while k + 1 < n and tokens[k].is_op(".") and tokens[k + 1].kind == "name":
+            k += 2
+        if k < n and tokens[k].is_op("<"):
+            depth = 0
+            while k < n:
+                if tokens[k].is_op("<"):
+                    depth += 1
+                elif tokens[k].is_op(">"):
+                    depth -= 1
+                    if depth == 0:
+                        k += 1
+                        break
+                k += 1
+    elif t.is_op("{", "("):
+        k = matching(tokens, k) + 1
+        if k < n and tokens[k].is_op("->"):
+            return skip_type(tokens, k + 1)
+    else:
+        return k
+    if k < n and tokens[k].is_op("?"):
+        k += 1
+    return k
 
 
 def split_args(tokens: list, open_idx: int) -> list:
@@ -369,11 +475,10 @@ def split_args(tokens: list, open_idx: int) -> list:
             elif t.value == "," and depth == 0 and blocks == 0:
                 args.append((start, k))
                 start = k + 1
-        elif t.kind == "keyword":
-            if t.value in BLOCK_OPEN:
-                blocks += 1
-            elif t.value in BLOCK_CLOSE:
-                blocks -= 1
+        elif opens_block(t):
+            blocks += 1
+        elif closes_block(t):
+            blocks -= 1
     if close > open_idx + 1:
         args.append((start, close))
     return args

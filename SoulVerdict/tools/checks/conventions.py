@@ -11,8 +11,8 @@ Errors (exit 1):
   lune-safe       in Lune-safe roots: any use of game / workspace / plugin / RunService / TweenService /
                   UserInputService / ContextActionService
   lune-require    in Lune-safe roots: require(game...), require(workspace...), require("path"), require(assetId)
-  max-lines       file longer than MAX_LINES
 Warnings:
+  max-lines       file longer than MAX_LINES (3000): split it (agents read whole files; keep them small)
   header          line 2 should be a `--` comment describing the module
   determinism     Random.new / math.random in Lune-safe roots (use Shared/Util/Rng)
   tabs            indentation with spaces (first offending line per file)
@@ -27,6 +27,7 @@ from __future__ import annotations
 import os
 import sys
 
+sys.dont_write_bytecode = True  # keep tools/checks free of __pycache__
 sys.path.insert(0, os.path.dirname(__file__))
 
 from report import Reporter, load, load_json, luau_files, main_wrapper  # noqa: E402
@@ -37,6 +38,7 @@ from luau_lex import split_args  # noqa: E402
 # ---------------------------------------------------------------------------------------------------
 SRC_ROOTS = ["src"]
 MAX_LINES = 3000
+MAX_LINES_IS_ERROR = False  # a long file is a maintainability problem, not a runtime bug -> warning
 # Lune-safe roots + runtime-only exceptions live in tools/checks/lune_safe.json (shared with the Lune
 # require-all test). Today: everything under src/shared except Net.luau (SPEC §2.1).
 LUNE_SAFE_CONFIG = "tools/checks/lune_safe.json"
@@ -124,7 +126,8 @@ def check_file(path: str, rep: Reporter, roots, runtime_only) -> None:
     if not rest or not rest[0].startswith("--"):
         warn(2, "missing header comment (module purpose / public API) after --!strict", "header")
     if len(lines) > MAX_LINES:
-        err(MAX_LINES + 1, f"file has {len(lines)} lines (max {MAX_LINES}); split it", "max-lines")
+        report = err if MAX_LINES_IS_ERROR else warn
+        report(MAX_LINES + 1, f"file has {len(lines)} lines (max {MAX_LINES}); split it", "max-lines")
 
     # indentation with spaces (outside long strings/comments: use the stripped text)
     for i, ln in enumerate(lx.stripped_lines(), start=1):

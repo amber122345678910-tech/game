@@ -179,24 +179,23 @@ local function plainRect(ctx: Ctx, x: number, y: number, w: number, h: number, t
 	f.Parent = ctx.root
 end
 
--- emit a trapezoid slab whose left edge runs lt->lb and right edge rt->rb (x at ya / yb)
+-- emit a trapezoid slab whose left edge runs lt->lb and right edge rt->rb (x at ya / yb).
+-- Seams between stacked slabs are covered afterwards by interior patches (see polygon()).
 local function emitTrap(ctx: Ctx, ya: number, yb: number, lt: number, lb: number, rt: number, rb: number, tone: string, alpha: number?)
 	local h = yb - ya
-	-- extend downwards by EPS along the true edges to hide seams between slabs
-	local k = (h + EPS) / h
-	local lb2 = lt + (lb - lt) * k
-	local rb2 = rt + (rb - rt) * k
-	local yb2 = yb + EPS
-	local innerL = math.max(lt, lb2)
-	local innerR = math.min(rt, rb2)
+	local innerL = math.max(lt, lb)
+	local innerR = math.min(rt, rb)
 	if innerR - innerL > 0.05 then
-		plainRect(ctx, innerL - EPS, ya, (innerR - innerL) + 2 * EPS, yb2 - ya, tone, alpha)
+		-- widen into the wedges (their adjacent columns are fully filled) to hide vertical seams
+		local growL = if math.abs(lb - lt) > 0.05 then EPS else 0
+		local growR = if math.abs(rb - rt) > 0.05 then EPS else 0
+		plainRect(ctx, innerL - growL, ya, (innerR - innerL) + growL + growR, h, tone, alpha)
 	end
-	if math.abs(lb2 - lt) > 0.05 then
-		wedge(ctx, math.min(lt, lb2), ya, math.abs(lb2 - lt), yb2 - ya, if lt < lb2 then "TR" else "BR", tone, alpha)
+	if math.abs(lb - lt) > 0.05 then
+		wedge(ctx, math.min(lt, lb), ya, math.abs(lb - lt), h, if lt < lb then "TR" else "BR", tone, alpha)
 	end
-	if math.abs(rb2 - rt) > 0.05 then
-		wedge(ctx, math.min(rt, rb2), ya, math.abs(rb2 - rt), yb2 - ya, if rt > rb2 then "TL" else "BL", tone, alpha)
+	if math.abs(rb - rt) > 0.05 then
+		wedge(ctx, math.min(rt, rb), ya, math.abs(rb - rt), h, if rt > rb then "TL" else "BL", tone, alpha)
 	end
 end
 
@@ -215,7 +214,7 @@ local function trapezoid(ctx: Ctx, ya: number, yb: number, lt: number, lb: numbe
 	end
 	local sl, sr = (lb - lt) / h, (rb - rt) / h
 	if math.abs(sl - sr) < 0.02 then
-		strip(ctx, ya, yb + EPS, lt, lb + sl * EPS, rt, rb + sr * EPS, tone, alpha)
+		strip(ctx, ya, yb, lt, lb, rt, rb, tone, alpha)
 		return
 	end
 	if depth >= 4 then
@@ -260,6 +259,39 @@ local function trapezoid(ctx: Ctx, ya: number, yb: number, lt: number, lb: numbe
 	trapezoid(ctx, ym, yb, lt + sl * h / 2, lb, rt + sr * h / 2, rb, tone, alpha, depth + 1)
 end
 
+-- filled spans of the polygon at height y (even-odd), sorted
+local function spansAt(pts: { number }, n: number, y: number): { { number } }
+	local xs: { number } = {}
+	for i = 1, n do
+		local j = i % n + 1
+		local x1, y1, x2, y2 = pts[2 * i - 1], pts[2 * i], pts[2 * j - 1], pts[2 * j]
+		if (y1 <= y and y2 > y) or (y2 <= y and y1 > y) then
+			table.insert(xs, x1 + (y - y1) * (x2 - x1) / (y2 - y1))
+		end
+	end
+	table.sort(xs)
+	local out: { { number } } = {}
+	for k = 1, #xs - 1, 2 do
+		table.insert(out, { xs[k], xs[k + 1] })
+	end
+	return out
+end
+
+local function intersectSpans(a: { { number } }, b: { { number } }): { { number } }
+	local out: { { number } } = {}
+	for _, s1 in a do
+		for _, s2 in b do
+			local lo, hi = math.max(s1[1], s2[1]), math.min(s1[2], s2[2])
+			if hi > lo then
+				table.insert(out, { lo, hi })
+			end
+		end
+	end
+	return out
+end
+
+local PATCH = 0.7 -- half-height of the seam patches (icon units)
+
 local function polygon(ctx: Ctx, pts: { number }, tone: string, alpha: number?)
 	local n = #pts // 2
 	if n < 3 then
@@ -296,6 +328,24 @@ local function polygon(ctx: Ctx, pts: { number }, tone: string, alpha: number?)
 			trapezoid(ctx, ya, yb, left[2], left[3], right[2], right[3], tone, alpha, 0)
 		end
 	end
+	-- seam patches: thin bands across every internal slab boundary, clipped to the region that is
+	-- inside the polygon for the whole band (so they never change the silhouette)
+	if alpha == nil or alpha == 0 then
+		for li = 2, #levels - 1 do
+			local y = levels[li]
+			local d = math.min(PATCH, (y - levels[li - 1]) * 0.5, (levels[li + 1] - y) * 0.5)
+			if d > 0.05 then
+				local safe = intersectSpans(spansAt(pts, n, y - d), spansAt(pts, n, y + d))
+				safe = intersectSpans(safe, spansAt(pts, n, y - 0.001))
+				safe = intersectSpans(safe, spansAt(pts, n, y + 0.001))
+				for _, span in safe do
+					if span[2] - span[1] > 0.3 then
+						plainRect(ctx, span[1] + 0.05, y - d, span[2] - span[1] - 0.1, d * 2, tone, alpha)
+					end
+				end
+			end
+		end
+	end
 end
 
 local function rotatePoints(pts: { number }, cx: number, cy: number, deg: number): { number }
@@ -329,10 +379,10 @@ local function builder(ctx: Ctx): Builder
 		local span = to - from
 		local radius = d / 2
 		local mid = radius - t / 2
-		local segments = math.max(6, math.ceil(math.abs(span) / 360 * math.clamp(d * 0.42, 14, 28)))
+		local segments = math.max(6, math.ceil(math.abs(span) / 360 * math.clamp(d * 0.5, 16, 40)))
 		local step = span / segments
 		local half = math.rad(math.abs(step) / 2)
-		local length = 2 * radius * math.tan(half) + 0.6
+		local length = 2 * radius * math.tan(half) + 1.4
 		for i = 0, segments - 1 do
 			local a = math.rad(from + (i + 0.5) * step)
 			rect(ctx, cx + mid * math.cos(a), cy + mid * math.sin(a), length, t, tone, math.deg(a) + 90, nil, alpha)
@@ -342,7 +392,7 @@ local function builder(ctx: Ctx): Builder
 	-- tapered arc (crescents): thickness tMin at the ends -> tMax in the middle, outer radius fixed
 	b.Arc = function(cx, cy, radius, a0, a1, tMax, tMin, tone)
 		local span = a1 - a0
-		local segments = math.max(8, math.ceil(math.abs(span) / 360 * 30))
+		local segments = math.max(10, math.ceil(math.abs(span) / 360 * 48))
 		local step = span / segments
 		local half = math.rad(math.abs(step) / 2)
 		for i = 0, segments - 1 do
@@ -350,7 +400,7 @@ local function builder(ctx: Ctx): Builder
 			local t = tMin + (tMax - tMin) * math.sin(math.pi * s)
 			local a = math.rad(a0 + (i + 0.5) * step)
 			local mid = radius - t / 2
-			local length = 2 * radius * math.tan(half) + 0.6
+			local length = 2 * radius * math.tan(half) + 1.4
 			rect(ctx, cx + mid * math.cos(a), cy + mid * math.sin(a), length, t, tone, math.deg(a) + 90)
 		end
 	end
@@ -583,23 +633,11 @@ DEFS.Chain = function(b)
 end
 
 DEFS.Rage = function(b)
-	local arm, t = 20, 9
-	for _, q in { { -1, -1 }, { 1, -1 }, { 1, 1 }, { -1, 1 } } do
-		local sx, sy = q[1], q[2]
-		local cx, cy = 50 + sx * 11, 50 + sy * 11
-		-- an "L" whose corner faces the centre, then the whole mark is tilted 45 degrees
-		local hx, hy = cx + sx * arm / 2, cy
-		local vx, vy = cx, cy + sy * arm / 2
-		local function rot(x: number, y: number): (number, number)
-			local a = math.rad(45)
-			local dx, dy = x - 50, y - 50
-			return 50 + dx * math.cos(a) - dy * math.sin(a), 50 + dx * math.sin(a) + dy * math.cos(a)
-		end
-		local ax, ay = rot(hx, hy)
-		local bx, by = rot(vx, vy)
-		b.R(ax, ay, arm + t, t, "p", 45, 0.5)
-		b.R(bx, by, t, arm + t, "p", 45, 0.5)
+	-- anger mark: four thick arcs whose bellies face the centre
+	for _, q in { { 14, 14, 0 }, { 86, 14, 90 }, { 86, 86, 180 }, { 14, 86, 270 } } do
+		b.O(q[1], q[2], 64, 12, "p", q[3] + 8, q[3] + 82)
 	end
+	b.C(50, 50, 8, "s")
 end
 
 DEFS.Crown = function(b)
@@ -745,11 +783,13 @@ DEFS.Flame = function(b)
 end
 
 DEFS.Shoe = function(b)
-	b.P({ 12, 72, 16, 58, 34, 52, 56, 46, 74, 48, 88, 58, 88, 72, 80, 78, 18, 78 }, "p")
-	b.R(50, 80, 78, 6, "d", 0, 0.5)
-	b.L(42, 52, 30, 20, 4, "s", true)
-	b.L(48, 50, 60, 18, 4, "s", true)
-	b.C(45, 51, 7, "s")
+	-- ballet slipper (side view) with crossed ribbons
+	b.L(36, 52, 22, 14, 4, "s", true)
+	b.L(50, 50, 66, 12, 4, "s", true)
+	b.P({ 10, 70, 12, 60, 22, 54, 40, 56, 58, 52, 76, 54, 88, 62, 92, 70, 86, 78, 16, 78 }, "p")
+	b.R(42, 56, 30, 7, "d", -4, 0.5)
+	b.R(52, 80, 80, 5, "d", 0, 0.5)
+	b.C(44, 58, 6, "s")
 end
 
 DEFS.Spin = function(b)

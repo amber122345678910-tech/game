@@ -5,3 +5,7 @@ sourcemap.json
 node_modules/
 tools/preview/out/
 /build/
+__pycache__/
+*.pyc
+tools/meshgen/out/
+tools/preview/out/

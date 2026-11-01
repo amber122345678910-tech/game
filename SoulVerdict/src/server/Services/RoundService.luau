@@ -355,7 +355,8 @@ local function snapshot(): any
 end
 
 local function evaluate()
-	if state.Result ~= nil or not isMatchPhase() then
+	-- an abort (practice player left / Style Lab) always wins over any result
+	if state.Result ~= nil or state.AbortRequested or not isMatchPhase() then
 		return
 	end
 	local winner, reason = RoundRules.Evaluate(snapshot())
@@ -767,7 +768,8 @@ local function setupPracticeMatch(info: any, request: PracticeRequest): Setup?
 			if #allySpawns == 0 then
 				allySpawns = spawns
 			end
-			local _, bots = call(BotService, "SpawnPracticeBots", "Human", allies, { Spawns = allySpawns, ExcludeKits = { kitId } })
+			local _, bots =
+				call(BotService, "SpawnPracticeBots", "Human", allies, { Spawns = allySpawns, ExcludeKits = { kitId } })
 			if type(bots) == "table" then
 				for _, bot in bots do
 					addParticipant(bot, nil, "Humans", bot:GetAttribute("KitId") or "")
@@ -935,7 +937,6 @@ local function runMatch(practice: boolean): string
 		if mp then
 			local kitId = CharacterService.EquippedKit(mp, "Monster")
 			fireRoundEvent("MonsterChosen", { userId = mp.UserId, kitId = kitId, name = mp.DisplayName })
-			notifyAll("round.notify.monsterChosen", { mp.DisplayName }, "Info")
 		end
 	end
 
@@ -1013,11 +1014,15 @@ local function runMatch(practice: boolean): string
 		harmony = harmony,
 		monsterTitle = if monsterKitDef then monsterKitDef.Title else nil,
 	})
-	for model, p in state.RoundModels do
+	for _, p in state.RoundModels do
 		if p.Player then
-			notify(p.Player, if p.Team == "Monster" then "round.notify.youAreMonster" else "round.notify.youAreHuman", nil, "Role")
+			notify(
+				p.Player,
+				if p.Team == "Monster" then "round.notify.youAreMonster" else "round.notify.youAreHuman",
+				nil,
+				"Role"
+			)
 		end
-		local _ = model
 	end
 	if harmony > 1 then
 		for _, p in s.HumanPlayers do
@@ -1076,7 +1081,6 @@ local function runMatch(practice: boolean): string
 			startsAt = state.CollapseStartedAt,
 			endsAt = state.PhaseEndsAt,
 		})
-		notifyAll("round.notify.collapse", nil, "Warning")
 		local lastDamage = now()
 		while true do
 			evaluate()
@@ -1101,8 +1105,8 @@ local function runMatch(practice: boolean): string
 	end
 
 	-- Ending
-	if state.AbortRequested and state.Result == nil then
-		-- practice player left / Style Lab abort: no results screen
+	if state.AbortRequested then
+		-- practice player left / Style Lab abort: no results screen, no rewards, no queue changes
 		if state.Practice then
 			notify(state.PracticePlayer, "round.practice.ended", nil, "Info")
 		end
@@ -1110,13 +1114,14 @@ local function runMatch(practice: boolean): string
 		local count = #Players:GetPlayers()
 		return RoundRules.Next("Ending", { Players = count, TimerDone = true })
 	end
-	local result: Result = state.Result or (function(): Result
-		local up, downed = roundHumans()
-		if #up + #downed > 0 then
-			return { winner = "Humans", reason = "Survived" }
-		end
-		return { winner = "Monster", reason = "Eliminated" }
-	end)()
+	local result: Result = state.Result
+		or (function(): Result
+			local up, downed = roundHumans()
+			if #up + #downed > 0 then
+				return { winner = "Humans", reason = "Survived" }
+			end
+			return { winner = "Monster", reason = "Eliminated" }
+		end)()
 	state.Result = result
 	finishMatch(result, s)
 	cleanup()
@@ -1350,7 +1355,6 @@ function RoundService.TriggerFinalPhase(): boolean
 		kitId = monster:GetAttribute("KitId"),
 		duration = Config.Round.FinalPhaseInvulnerable,
 	})
-	notifyAll("round.notify.finalPhase", nil, "Danger")
 	RoundService.FinalPhaseStarted:Fire(monster)
 	return true
 end

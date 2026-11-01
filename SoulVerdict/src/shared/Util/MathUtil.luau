@@ -58,7 +58,14 @@ function MathUtil.clamp(x: number, lo: number, hi: number): number
 	return x
 end
 
-function MathUtil.remap(x: number, inMin: number, inMax: number, outMin: number, outMax: number, clampOutput: boolean?): number
+function MathUtil.remap(
+	x: number,
+	inMin: number,
+	inMax: number,
+	outMin: number,
+	outMax: number,
+	clampOutput: boolean?
+): number
 	local t = MathUtil.inverseLerp(inMin, inMax, x)
 	if clampOutput then
 		t = MathUtil.clamp(t, 0, 1)

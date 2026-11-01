@@ -34,10 +34,12 @@
 -- API
 --   Skeletons.Get(id: string) -> SkeletonDef?                 raw definition ("Skeleton" | "Human")
 --   Skeletons.List() -> {string}
---   Skeletons.Resolve(id: string, overrides: Overrides?) -> Resolved
+--   Skeletons.Resolve(id: string, overrides: Overrides?, groundOffset: number?) -> Resolved
 --       overrides[limbName] = { Size = Vector3?, Joint = Vector3?, At = Vector3?, Offset = Vector3?,
 --                               Pivot = Vector3? }
 --       Joint is a DELTA (studs) added to that limb's pivot: it moves the limb and all its children.
+--       groundOffset lifts the whole skeleton (feet at y = groundOffset, HipHeight grows by it) for
+--       blueprints that stand on something of their own (a base, stilts, a hover disc).
 --   Skeletons.Pose(id: string, poseName: string) -> Pose?      named reference pose (degrees)
 --   Skeletons.LIMBS  -> {string}   the 16 physics part names (HumanoidRootPart first)
 --   Skeletons.JOINTS -> {string}   the 15 Motor6D names
@@ -319,10 +321,7 @@ local COMMON_POSES: { [string]: Pose } = {
 }
 
 local function withCommon(extra: { [string]: Pose }): { [string]: Pose }
-	local out: { [string]: Pose } = {}
-	for k, v in COMMON_POSES do
-		out[k] = v
-	end
+	local out: { [string]: Pose } = table.clone(COMMON_POSES)
 	for k, v in extra do
 		out[k] = v
 	end
@@ -445,7 +444,7 @@ end
 local ZERO = Vector3.new(0, 0, 0)
 
 -- Resolves a skeleton (plus optional per-limb overrides) to absolute rest CFrames.
-function Skeletons.Resolve(id: string, overrides: Overrides?): Resolved
+function Skeletons.Resolve(id: string, overrides: Overrides?, groundOffset: number?): Resolved
 	local def = DEFS[id]
 	assert(def ~= nil, "Skeletons.Resolve: unknown skeleton '" .. tostring(id) .. "'")
 	local ov: Overrides = overrides or {}
@@ -490,7 +489,9 @@ function Skeletons.Resolve(id: string, overrides: Overrides?): Resolved
 			maxY = math.max(maxY, c.Y + s.Y / 2)
 		end
 	end
-	local shift = Vector3.new(0, -minY, 0)
+	local lift = groundOffset or 0
+	assert(lift >= 0, "Skeletons.Resolve: groundOffset must be >= 0")
+	local shift = Vector3.new(0, lift - minY, 0)
 
 	local limbs: { [string]: ResolvedLimb } = {}
 	local joints: { [string]: ResolvedJoint } = {}
@@ -528,7 +529,10 @@ function Skeletons.Resolve(id: string, overrides: Overrides?): Resolved
 
 	local root = limbs.HumanoidRootPart
 	local hipHeight = root.CFrame.Position.Y - root.Size.Y / 2
-	assert(hipHeight > 0.05, ("skeleton %s: HumanoidRootPart reaches the ground (HipHeight %.3f)"):format(id, hipHeight))
+	assert(
+		hipHeight > 0.05,
+		("skeleton %s: HumanoidRootPart reaches the ground (HipHeight %.3f)"):format(id, hipHeight)
+	)
 
 	local order = table.clone(Skeletons.LIMBS)
 	return {

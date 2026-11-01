@@ -43,11 +43,12 @@ STYLES = {
         bone="#E9E2D6", socket="#16030A", inner="#1E0608", crack="fell", seed=7,
     ),
     "Eclipse": dict(
-        snout_len=1.95, snout_w=(0.76, 0.32), snout_h=(0.52, 0.26), snout_top_drop=0.40, stop=0.10,
+        snout_len=2.05, snout_w=(0.74, 0.27), snout_h=(0.52, 0.24), snout_top_drop=0.46, stop=0.12,
         eye_c=(0.50, 0.33, -0.30), eye_r=(0.31, 0.235), eye_yaw=0.30, eye_slant=0.24,
-        horn=dict(root=(0.40, 0.62, 0.22), c1=(0.52, 1.20, 0.42), c2=(0.70, 1.30, 0.95), tip=(0.80, 1.12, 1.48),
-                  r0=0.20, r1=0.02, blade=True),
-        cheek_spikes=[((0.86, -0.04, 0.30), (1.30, -0.26, 1.02), 0.12)],
+        horn=dict(root=(0.44, 0.58, 0.26), c1=(0.56, 1.02, 0.42), c2=(0.70, 1.22, 0.78), tip=(0.78, 1.20, 1.22),
+                  r0=0.24, r1=0.02, blade=True),
+        cheek_spikes=[((0.86, -0.04, 0.30), (1.30, -0.26, 1.02), 0.12), ((0.62, 0.70, 0.40), (0.86, 0.96, 1.14), 0.09),
+                      ((0.20, 0.82, 0.42), (0.26, 1.02, 1.12), 0.075)],
         brow_spikes=[], teeth_n=7, tooth_len=0.17, canine=1, canine_len=0.48, tooth_jag=0.1,
         bone="#ECEBF4", socket="#0C0618", inner="#120A22", crack="eclipse", seed=3,
     ),
@@ -92,11 +93,11 @@ def horn_sdf(q, h):
     hi = pts.max(axis=0) + h["r0"]
     d = bounded(q, lo, hi, lambda x: tube(x, pts, radii), 0.12)
     if h.get("blade"):
-        # flattened "ear blade": a second thinner tube offset outward, merged
-        pts2 = pts + np.array([0.10, -0.05, 0.0]) * (1 - t)[:, None]
-        d2 = bounded(q, pts2.min(axis=0) - 0.2, pts2.max(axis=0) + 0.2,
-                     lambda x: tube(x, pts2, radii * 0.65), 0.12)
-        d = smin(d, d2, 0.06)
+        # flattened "ear blade": a second tube offset downward/back, merged into a wide fin
+        pts2 = pts + np.array([0.04, -0.16, 0.10]) * np.sin(np.pi * t)[:, None]
+        d2 = bounded(q, pts2.min(axis=0) - 0.25, pts2.max(axis=0) + 0.25,
+                     lambda x: tube(x, pts2, radii * 0.8), 0.12)
+        d = smin(d, d2, 0.10)
     if h.get("prong"):
         mid = pts[5]
         tip = mid + np.array([0.18, 0.34, -0.04])
@@ -195,11 +196,6 @@ def skull_field(style, cracks=None):
         brow = ellipsoid(q, (ex + 0.02, ey + 0.27, ez + 0.06), (0.42, 0.13, 0.30),
                          euler(0.0, -st["eye_yaw"], -0.18 - st["eye_slant"] * 0.6))
         d = smin(d, brow, 0.14)
-        # nasal ridges flanking the centre seam
-        Ls = st["snout_len"]
-        rxt, ryt, cyt, _ = snout_profile(st, np.array([-Ls * 0.55]))
-        ridge = round_cone(q, (0.13, float(cyt[0] + ryt[0]) - 0.03, -Ls * 0.92), (0.20, 0.52, -0.42), 0.045, 0.07)
-        d = smin(d, ridge, 0.10)
         # zygomatic arches toward the hinge
         arch = round_cone(q, (0.70, -0.06, -0.40), (0.86, -0.16, 0.40), 0.13, 0.15)
         d = smin(d, arch, 0.16)
@@ -293,11 +289,13 @@ def skull_colorize(style, cracks=None):
         rgb = np.where(teeth[:, None], rgb * hex_color("#FFF8EA")[None, :], rgb)
         if style == "Fell":
             # red stain toward horn tips and spikes
-            tipness = smoothstep(1.1, 1.8, P[:, 2]) + smoothstep(1.1, 1.45, np.abs(P[:, 0]))
+            tipness = smoothstep(1.15, 1.8, P[:, 2]) + smoothstep(1.15, 1.45, np.abs(P[:, 0])) + \
+                smoothstep(0.85, 1.05, P[:, 1])
             rgb = C.lerp_rgb(rgb, C.FELL_RED * 0.85, np.clip(tipness, 0, 1) * 0.55)
         if style == "Eclipse":
-            tipness = smoothstep(1.0, 1.5, P[:, 2] + 0.5 * P[:, 1])
-            rgb = C.lerp_rgb(rgb, C.ECL_VIOLET * 0.55, np.clip(tipness, 0, 1) * 0.6)
+            # void tint creeping up the ear spikes and into the sockets
+            tipness = smoothstep(0.55, 1.15, P[:, 1]) * smoothstep(0.55, 1.0, P[:, 2])
+            rgb = C.lerp_rgb(rgb, C.ECL_VIOLET * 0.7, np.clip(tipness, 0, 1) * 0.75)
         if cracks is not None:
             rgb = crack_colors(rgb, P, f, cracks, in_eye)
         return rgb
@@ -337,12 +335,15 @@ def _crack_set(style, surface, center, which):
             width, depth = 0.04, 0.07
         else:
             paths = [
-                (np.array([(0.05, 1.05), (0.16, 0.92), (0.12, 0.80), (0.26, 0.70), (0.22, 0.58), (0.34, 0.50)]), 1.0),
-                (np.array([(0.16, 0.92), (0.34, 0.98), (0.48, 0.90), (0.62, 0.94)]), 0.65),
-                (np.array([(-0.04, 0.42), (-0.10, 0.30), (-0.04, 0.20), (-0.12, 0.08)]), 0.7),
-                (np.array([(0.12, 0.80), (-0.02, 0.72), (-0.08, 0.62)]), 0.45),
+                (np.array([(0.02, 1.25), (0.10, 1.10), (0.06, 0.96), (0.18, 0.84), (0.14, 0.70), (0.28, 0.58),
+                           (0.26, 0.48), (0.36, 0.40)]), 1.0),
+                (np.array([(0.10, 1.10), (0.30, 1.16), (0.46, 1.06), (0.66, 1.10), (0.82, 1.00)]), 0.7),
+                (np.array([(0.18, 0.84), (0.36, 0.86), (0.48, 0.76)]), 0.5),
+                # down the snout toward the nose
+                (np.array([(-0.06, 0.40), (-0.12, 0.30), (-0.06, 0.22), (-0.14, 0.14), (-0.08, 0.08)]), 0.75),
+                (np.array([(-0.12, 0.30), (-0.24, 0.26), (-0.30, 0.18)]), 0.45),
             ]
-            width, depth = 0.045, 0.08
+            width, depth = 0.05, 0.085
     else:
         if style == "Fell":
             paths = [(np.array([(0.10, -0.55), (0.20, -0.60), (0.28, -0.52), (0.38, -0.58)]), 1.0)]

@@ -114,20 +114,95 @@ export type KitOptions = {
 
 export type Kit = {
 	Scale: number,
-	Part: (parent: Instance?, name: string, shape: string, size: Vector3, cf: CFrame, color: Color3, props: Props?) -> BasePart,
+	Part: (
+		parent: Instance?,
+		name: string,
+		shape: string,
+		size: Vector3,
+		cf: CFrame,
+		color: Color3,
+		props: Props?
+	) -> BasePart,
 	Box: (parent: Instance?, name: string, size: Vector3, cf: CFrame, color: Color3, props: Props?) -> BasePart,
 	Ellipsoid: (parent: Instance?, name: string, size: Vector3, cf: CFrame, color: Color3, props: Props?) -> BasePart,
 	Ball: (parent: Instance?, name: string, diameter: number, cf: CFrame, color: Color3, props: Props?) -> BasePart,
-	Cyl: (parent: Instance?, name: string, length: number, diameter: number, cf: CFrame, color: Color3, props: Props?) -> BasePart,
-	Disc: (parent: Instance?, name: string, diameter: number, thickness: number, cf: CFrame, color: Color3, props: Props?) -> BasePart,
-	CylBetween: (parent: Instance?, name: string, p0: Vector3, p1: Vector3, diameter: number, color: Color3, props: Props?) -> BasePart,
+	Cyl: (
+		parent: Instance?,
+		name: string,
+		length: number,
+		diameter: number,
+		cf: CFrame,
+		color: Color3,
+		props: Props?
+	) -> BasePart,
+	Disc: (
+		parent: Instance?,
+		name: string,
+		diameter: number,
+		thickness: number,
+		cf: CFrame,
+		color: Color3,
+		props: Props?
+	) -> BasePart,
+	CylBetween: (
+		parent: Instance?,
+		name: string,
+		p0: Vector3,
+		p1: Vector3,
+		diameter: number,
+		color: Color3,
+		props: Props?
+	) -> BasePart,
 	Wedge: (parent: Instance?, name: string, size: Vector3, cf: CFrame, color: Color3, props: Props?) -> BasePart,
 	CornerWedge: (parent: Instance?, name: string, size: Vector3, cf: CFrame, color: Color3, props: Props?) -> BasePart,
-	RoundedBox: (parent: Instance?, name: string, size: Vector3, cf: CFrame, color: Color3, radius: number, props: Props?) -> { BasePart },
-	Cone: (parent: Instance?, name: string, p0: Vector3, p1: Vector3, d0: number, d1: number, color: Color3, props: Props?) -> { BasePart },
-	Taper: (parent: Instance?, name: string, p0: Vector3, p1: Vector3, d0: number, d1: number, color: Color3, props: Props?) -> { BasePart },
-	Bone: (parent: Instance?, name: string, p0: Vector3, p1: Vector3, thickness: number, color: Color3, props: Props?) -> { BasePart },
-	Ring: (parent: Instance?, name: string, cf: CFrame, radius: number, count: number, ballSize: number, color: Color3, props: Props?) -> { BasePart },
+	RoundedBox: (
+		parent: Instance?,
+		name: string,
+		size: Vector3,
+		cf: CFrame,
+		color: Color3,
+		radius: number,
+		props: Props?
+	) -> { BasePart },
+	Cone: (
+		parent: Instance?,
+		name: string,
+		p0: Vector3,
+		p1: Vector3,
+		d0: number,
+		d1: number,
+		color: Color3,
+		props: Props?
+	) -> { BasePart },
+	Taper: (
+		parent: Instance?,
+		name: string,
+		p0: Vector3,
+		p1: Vector3,
+		d0: number,
+		d1: number,
+		color: Color3,
+		props: Props?
+	) -> { BasePart },
+	Bone: (
+		parent: Instance?,
+		name: string,
+		p0: Vector3,
+		p1: Vector3,
+		thickness: number,
+		color: Color3,
+		props: Props?
+	) -> { BasePart },
+	Ring: (
+		parent: Instance?,
+		name: string,
+		cf: CFrame,
+		radius: number,
+		count: number,
+		ballSize: number,
+		color: Color3,
+		props: Props?
+	) -> { BasePart },
 	Arc: (
 		parent: Instance?,
 		name: string,
@@ -141,7 +216,14 @@ export type Kit = {
 		color: Color3,
 		props: Props?
 	) -> { BasePart },
-	Tube: (parent: Instance?, name: string, points: { Vector3 }, diameter: number | { number }, color: Color3, props: Props?) -> { BasePart },
+	Tube: (
+		parent: Instance?,
+		name: string,
+		points: { Vector3 },
+		diameter: number | { number },
+		color: Color3,
+		props: Props?
+	) -> { BasePart },
 	Dashes: (
 		parent: Instance?,
 		name: string,
@@ -181,7 +263,6 @@ PartKit.SMALL_PART = 0.3 -- parts whose largest side is below this do not cast s
 local EMPTY: Props = {}
 local Y_AXIS = Vector3.new(0, 1, 0)
 local Z_AXIS = Vector3.new(0, 0, 1)
-local X_AXIS = Vector3.new(1, 0, 0)
 
 -- Pure maths helpers --------------------------------------------------------------------------
 
@@ -297,7 +378,15 @@ function PartKit.new(options: KitOptions?): Kit
 	end
 
 	-- Raw (already scaled) constructors used internally.
-	local function rawPart(parent: Instance?, name: string, shape: string, size: Vector3, cf: CFrame, color: Color3, props: Props): BasePart
+	local function rawPart(
+		parent: Instance?,
+		name: string,
+		shape: string,
+		size: Vector3,
+		cf: CFrame,
+		color: Color3,
+		props: Props
+	): BasePart
 		local part: BasePart
 		if shape == "Wedge" then
 			part = Instance.new("WedgePart")
@@ -322,11 +411,26 @@ function PartKit.new(options: KitOptions?): Kit
 		return part
 	end
 
-	local function rawBall(parent: Instance?, name: string, d: number, pos: Vector3, color: Color3, props: Props): BasePart
+	local function rawBall(
+		parent: Instance?,
+		name: string,
+		d: number,
+		pos: Vector3,
+		color: Color3,
+		props: Props
+	): BasePart
 		return rawPart(parent, name, "Ball", Vector3.new(d, d, d), CFrame.new(pos), color, props)
 	end
 
-	local function rawCylBetween(parent: Instance?, name: string, a: Vector3, b: Vector3, d: number, color: Color3, props: Props): BasePart
+	local function rawCylBetween(
+		parent: Instance?,
+		name: string,
+		a: Vector3,
+		b: Vector3,
+		d: number,
+		color: Color3,
+		props: Props
+	): BasePart
 		local delta = b - a
 		local length = delta.Magnitude
 		assert(length > 1e-6, "PartKit.CylBetween: points coincide for " .. name)
@@ -339,7 +443,15 @@ function PartKit.new(options: KitOptions?): Kit
 
 	-- Public single-part builders -----------------------------------------------------------
 
-	function K.Part(parent: Instance?, name: string, shape: string, size: Vector3, cf: CFrame, color: Color3, props: Props?): BasePart
+	function K.Part(
+		parent: Instance?,
+		name: string,
+		shape: string,
+		size: Vector3,
+		cf: CFrame,
+		color: Color3,
+		props: Props?
+	): BasePart
 		return rawPart(parent, name, shape, S(size), SC(cf), color, props or EMPTY)
 	end
 
@@ -347,7 +459,14 @@ function PartKit.new(options: KitOptions?): Kit
 		return rawPart(parent, name, "Block", S(size), SC(cf), color, props or EMPTY)
 	end
 
-	function K.Ellipsoid(parent: Instance?, name: string, size: Vector3, cf: CFrame, color: Color3, props: Props?): BasePart
+	function K.Ellipsoid(
+		parent: Instance?,
+		name: string,
+		size: Vector3,
+		cf: CFrame,
+		color: Color3,
+		props: Props?
+	): BasePart
 		local part = Instance.new("Part")
 		part.Shape = Enum.PartType.Block
 		part.Size = S(size)
@@ -360,22 +479,53 @@ function PartKit.new(options: KitOptions?): Kit
 		return part
 	end
 
-	function K.Ball(parent: Instance?, name: string, diameter: number, cf: CFrame, color: Color3, props: Props?): BasePart
+	function K.Ball(
+		parent: Instance?,
+		name: string,
+		diameter: number,
+		cf: CFrame,
+		color: Color3,
+		props: Props?
+	): BasePart
 		local d = diameter * scale
 		return rawPart(parent, name, "Ball", Vector3.new(d, d, d), SC(cf), color, props or EMPTY)
 	end
 
-	function K.Cyl(parent: Instance?, name: string, length: number, diameter: number, cf: CFrame, color: Color3, props: Props?): BasePart
+	function K.Cyl(
+		parent: Instance?,
+		name: string,
+		length: number,
+		diameter: number,
+		cf: CFrame,
+		color: Color3,
+		props: Props?
+	): BasePart
 		local size = Vector3.new(length * scale, diameter * scale, diameter * scale)
 		return rawPart(parent, name, "Cylinder", size, SC(cf), color, props or EMPTY)
 	end
 
-	function K.Disc(parent: Instance?, name: string, diameter: number, thickness: number, cf: CFrame, color: Color3, props: Props?): BasePart
+	function K.Disc(
+		parent: Instance?,
+		name: string,
+		diameter: number,
+		thickness: number,
+		cf: CFrame,
+		color: Color3,
+		props: Props?
+	): BasePart
 		local size = Vector3.new(thickness * scale, diameter * scale, diameter * scale)
 		return rawPart(parent, name, "Cylinder", size, SC(cf) * CFrame.Angles(0, math.pi / 2, 0), color, props or EMPTY)
 	end
 
-	function K.CylBetween(parent: Instance?, name: string, p0: Vector3, p1: Vector3, diameter: number, color: Color3, props: Props?): BasePart
+	function K.CylBetween(
+		parent: Instance?,
+		name: string,
+		p0: Vector3,
+		p1: Vector3,
+		diameter: number,
+		color: Color3,
+		props: Props?
+	): BasePart
 		return rawCylBetween(parent, name, P(p0), P(p1), diameter * scale, color, props or EMPTY)
 	end
 
@@ -383,13 +533,28 @@ function PartKit.new(options: KitOptions?): Kit
 		return rawPart(parent, name, "Wedge", S(size), SC(cf), color, props or EMPTY)
 	end
 
-	function K.CornerWedge(parent: Instance?, name: string, size: Vector3, cf: CFrame, color: Color3, props: Props?): BasePart
+	function K.CornerWedge(
+		parent: Instance?,
+		name: string,
+		size: Vector3,
+		cf: CFrame,
+		color: Color3,
+		props: Props?
+	): BasePart
 		return rawPart(parent, name, "CornerWedge", S(size), SC(cf), color, props or EMPTY)
 	end
 
 	-- Multi-part builders -------------------------------------------------------------------
 
-	function K.RoundedBox(parent: Instance?, name: string, size: Vector3, cf: CFrame, color: Color3, radius: number, props: Props?): { BasePart }
+	function K.RoundedBox(
+		parent: Instance?,
+		name: string,
+		size: Vector3,
+		cf: CFrame,
+		color: Color3,
+		radius: number,
+		props: Props?
+	): { BasePart }
 		local pr = props or EMPTY
 		local sz = S(size)
 		local c = SC(cf)
@@ -416,7 +581,17 @@ function PartKit.new(options: KitOptions?): Kit
 			for _, sy in { -1, 1 } do
 				for _, sz2 in { -1, 1 } do
 					-- edges along X
-					add(rawPart(parent, nextName(), "Cylinder", Vector3.new(2 * hx, 2 * r, 2 * r), c * CFrame.new(0, sy * hy, sz2 * hz), color, pr))
+					add(
+						rawPart(
+							parent,
+							nextName(),
+							"Cylinder",
+							Vector3.new(2 * hx, 2 * r, 2 * r),
+							c * CFrame.new(0, sy * hy, sz2 * hz),
+							color,
+							pr
+						)
+					)
 				end
 			end
 			for _, sx in { -1, 1 } do
@@ -454,7 +629,16 @@ function PartKit.new(options: KitOptions?): Kit
 			for _, sx in { -1, 1 } do
 				for _, sy in { -1, 1 } do
 					for _, sz2 in { -1, 1 } do
-						add(rawBall(parent, nextName(), 2 * r, (c * CFrame.new(sx * hx, sy * hy, sz2 * hz)).Position, color, pr))
+						add(
+							rawBall(
+								parent,
+								nextName(),
+								2 * r,
+								(c * CFrame.new(sx * hx, sy * hy, sz2 * hz)).Position,
+								color,
+								pr
+							)
+						)
 					end
 				end
 			end
@@ -490,14 +674,33 @@ function PartKit.new(options: KitOptions?): Kit
 					else
 						offset = Vector3.new(s1 * a, s2 * b, 0)
 					end
-					add(rawPart(parent, nextName(), "Cylinder", Vector3.new(len, 2 * r, 2 * r), c * CFrame.new(offset) * axisCF, color, pr))
+					add(
+						rawPart(
+							parent,
+							nextName(),
+							"Cylinder",
+							Vector3.new(len, 2 * r, 2 * r),
+							c * CFrame.new(offset) * axisCF,
+							color,
+							pr
+						)
+					)
 				end
 			end
 		end
 		return out
 	end
 
-	function K.Cone(parent: Instance?, name: string, p0: Vector3, p1: Vector3, d0: number, d1: number, color: Color3, props: Props?): { BasePart }
+	function K.Cone(
+		parent: Instance?,
+		name: string,
+		p0: Vector3,
+		p1: Vector3,
+		d0: number,
+		d1: number,
+		color: Color3,
+		props: Props?
+	): { BasePart }
 		local pr = props or EMPTY
 		local a, b = P(p0), P(p1)
 		local segs = math.max(1, math.floor(pr.Segments or 5))
@@ -511,7 +714,16 @@ function PartKit.new(options: KitOptions?): Kit
 		return out
 	end
 
-	function K.Taper(parent: Instance?, name: string, p0: Vector3, p1: Vector3, d0: number, d1: number, color: Color3, props: Props?): { BasePart }
+	function K.Taper(
+		parent: Instance?,
+		name: string,
+		p0: Vector3,
+		p1: Vector3,
+		d0: number,
+		d1: number,
+		color: Color3,
+		props: Props?
+	): { BasePart }
 		local pr = props or EMPTY
 		local a, b = P(p0), P(p1)
 		local length = (b - a).Magnitude
@@ -527,7 +739,15 @@ function PartKit.new(options: KitOptions?): Kit
 		return out
 	end
 
-	function K.Bone(parent: Instance?, name: string, p0: Vector3, p1: Vector3, thickness: number, color: Color3, props: Props?): { BasePart }
+	function K.Bone(
+		parent: Instance?,
+		name: string,
+		p0: Vector3,
+		p1: Vector3,
+		thickness: number,
+		color: Color3,
+		props: Props?
+	): { BasePart }
 		local pr = props or EMPTY
 		local a, b = P(p0), P(p1)
 		local t = thickness * scale
@@ -554,7 +774,16 @@ function PartKit.new(options: KitOptions?): Kit
 		return out
 	end
 
-	function K.Ring(parent: Instance?, name: string, cf: CFrame, radius: number, count: number, ballSize: number, color: Color3, props: Props?): { BasePart }
+	function K.Ring(
+		parent: Instance?,
+		name: string,
+		cf: CFrame,
+		radius: number,
+		count: number,
+		ballSize: number,
+		color: Color3,
+		props: Props?
+	): { BasePart }
 		local pr = props or EMPTY
 		local c = SC(cf)
 		local r = radius * scale
@@ -608,7 +837,10 @@ function PartKit.new(options: KitOptions?): Kit
 				local z = x:Cross(y)
 				local cfSeg = CFrame.fromMatrix((q0 + q1) / 2, x, y, z)
 				idx += 1
-				table.insert(out, rawPart(parent, suffix(name, idx), "Block", Vector3.new(len + overlap, th, dp), cfSeg, color, pr))
+				table.insert(
+					out,
+					rawPart(parent, suffix(name, idx), "Block", Vector3.new(len + overlap, th, dp), cfSeg, color, pr)
+				)
 				if pr.Joints and i < segs then
 					idx += 1
 					table.insert(out, rawBall(parent, suffix(name, idx), math.min(th, dp), q1, color, pr))
@@ -618,7 +850,14 @@ function PartKit.new(options: KitOptions?): Kit
 		return out
 	end
 
-	function K.Tube(parent: Instance?, name: string, points: { Vector3 }, diameter: number | { number }, color: Color3, props: Props?): { BasePart }
+	function K.Tube(
+		parent: Instance?,
+		name: string,
+		points: { Vector3 },
+		diameter: number | { number },
+		color: Color3,
+		props: Props?
+	): { BasePart }
 		local pr = props or EMPTY
 		assert(#points >= 2, "PartKit.Tube needs at least 2 points")
 		local function dAt(i: number): number
@@ -753,14 +992,8 @@ function PartKit.new(options: KitOptions?): Kit
 		light.Brightness = pr.Brightness or 1
 		light.Color = pr.Color or Color3.new(1, 1, 1)
 		light.Shadows = pr.Shadows == true
-		local range = (pr.Range or 8) * scale
-		if light:IsA("PointLight") then
-			light.Range = range
-		elseif light:IsA("SpotLight") then
-			light.Range = range
-		elseif light:IsA("SurfaceLight") then
-			light.Range = range
-		end
+		-- Range lives on each light subclass (Point/Spot/Surface), not on Light itself
+		(light :: any).Range = (pr.Range or 8) * scale
 		light.Parent = part
 		return light
 	end
@@ -812,12 +1045,9 @@ function PartKit.ScaleModel(root: Instance, factor: number, origin: Vector3?)
 			local joint = inst :: any
 			joint.C0 = scaleCF(joint.C0)
 			joint.C1 = scaleCF(joint.C1)
-		elseif inst:IsA("PointLight") then
-			inst.Range = inst.Range * factor
-		elseif inst:IsA("SpotLight") then
-			inst.Range = inst.Range * factor
-		elseif inst:IsA("SurfaceLight") then
-			inst.Range = inst.Range * factor
+		elseif inst:IsA("PointLight") or inst:IsA("SpotLight") or inst:IsA("SurfaceLight") then
+			local light = inst :: any
+			light.Range = light.Range * factor
 		elseif inst:IsA("Humanoid") then
 			inst.HipHeight = inst.HipHeight * factor
 		elseif inst:IsA("ParticleEmitter") then

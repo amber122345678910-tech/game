@@ -587,7 +587,10 @@ function Apply.Snapshot(lighting: Instance, opts: ApplyOptions?): GraphicsPreset
 	local options: ApplyOptions = opts or {}
 	local lightingValues: Dict = {}
 	for _, key in ALLOWED.Lighting do
-		lightingValues[key] = (lighting :: any)[key]
+		local ok, value = pcall(function()
+			return (lighting :: any)[key]
+		end)
+		lightingValues[key] = if ok and value ~= nil then value else DEFAULTS.Lighting[key]
 	end
 	local out: Dict = {
 		Id = "Snapshot",

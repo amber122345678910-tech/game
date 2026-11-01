@@ -5,6 +5,8 @@
 --
 -- API
 --   Validation.Now() -> number                         workspace:GetServerTimeNow()
+--   Validation.Wait(s) / Delay(s, fn) / Defer(fn)      task.wait/delay/defer through a swappable scheduler
+--   Validation.SetScheduler({wait, delay, defer}?)     tests: simulated clock (nil restores task.*)
 --   Validation.Service(name) -> any?                   lazily required ServerScriptService.Server.Services[name]
 --                                                      (nil if missing / failed); SetService(name, impl?) overrides
 --   Validation.Root(model) -> BasePart?   .Humanoid(model) -> Humanoid?   .RootPosition(model) -> Vector3?
@@ -41,10 +43,46 @@ local HitTest = require(Shared.Combat.HitTest) :: any
 local Validation = {}
 
 ---------------------------------------------------------------------------------------------------
--- Time
+-- Time & scheduling (combat code waits/delays through these so tests can run on a simulated clock)
+
+type Scheduler = {
+	wait: (number?) -> number,
+	delay: (number, (...any) -> ()) -> any,
+	defer: ((...any) -> ()) -> any,
+}
+
+local defaultScheduler: Scheduler = {
+	wait = function(seconds: number?): number
+		return task.wait(seconds)
+	end,
+	delay = function(seconds: number, fn: (...any) -> ()): any
+		return task.delay(seconds, fn)
+	end,
+	defer = function(fn: (...any) -> ()): any
+		return task.defer(fn)
+	end,
+}
+local scheduler: Scheduler = defaultScheduler
 
 function Validation.Now(): number
 	return workspace:GetServerTimeNow()
+end
+
+function Validation.Wait(seconds: number?): number
+	return scheduler.wait(seconds)
+end
+
+function Validation.Delay(seconds: number, fn: () -> ())
+	scheduler.delay(seconds, fn)
+end
+
+function Validation.Defer(fn: () -> ())
+	scheduler.defer(fn)
+end
+
+-- Test / tooling hook: replace task.wait/delay/defer (nil restores the real task library).
+function Validation.SetScheduler(custom: Scheduler?)
+	scheduler = custom or defaultScheduler
 end
 
 ---------------------------------------------------------------------------------------------------

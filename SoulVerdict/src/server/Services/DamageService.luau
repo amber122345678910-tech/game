@@ -167,8 +167,20 @@ local function canBeDowned(target: Model): boolean
 	return type(revives) == "number" and revives > 0
 end
 
-local function finalPhasePending(): boolean
-	return Validation.InCombatPhase() and Validation.RoundAttr("FinalPhase") == false
+-- True while `monster` is the round's monster and its desperation phase has not started yet: it cannot die
+-- before RoundService.TriggerFinalPhase (HP floor 1).
+local function finalPhasePending(monster: Model): boolean
+	if not Validation.InCombatPhase() or Validation.RoundAttr("FinalPhase") ~= false then
+		return false
+	end
+	local rs = Validation.Service("RoundService")
+	if rs and type(rs.GetMonster) == "function" then
+		local ok, current = pcall(rs.GetMonster)
+		if ok and current ~= nil and current ~= monster then
+			return false
+		end
+	end
+	return true
 end
 
 local function broadcastFx(packet: { [string]: any })
@@ -285,7 +297,9 @@ function DamageService.Apply(info: any): any
 	else
 		info.Attacker = nil
 	end
-	local attackerTeam: string = if type(info.AttackerTeam) == "string" then info.AttackerTeam else Teams.TeamOf(attacker)
+	local attackerTeam: string = if type(info.AttackerTeam) == "string"
+		then info.AttackerTeam
+		else Teams.TeamOf(attacker)
 	local targetTeam: string = Teams.TeamOf(target)
 	local environment = attacker == nil and attackerTeam == ""
 	local now = Validation.Now()
@@ -320,14 +334,9 @@ function DamageService.Apply(info: any): any
 		result.Reason = "Immune"
 		return result
 	end
-	if kind == "Box" then
-		-- Verdict Box damage passes Invulnerable (the box makes its victim invulnerable to everything else)
-	else
-		if StatusService.Has(target, "Invulnerable") then
-			result.Reason = "Immune"
-			return result
-		end
-		if StatusService.Has(target, "Boxed") then
+	-- Verdict Box damage passes Invulnerable (the box makes its victim invulnerable to everything else)
+	if kind ~= "Box" then
+		if StatusService.Has(target, "Invulnerable") or StatusService.Has(target, "Boxed") then
 			result.Reason = "Immune"
 			return result
 		end
@@ -380,7 +389,11 @@ function DamageService.Apply(info: any): any
 			ability = info.Ability,
 		})
 	end
-	amount = math.clamp(if type(state.Amount) == "number" and state.Amount == state.Amount then state.Amount else amount, 0, MAX_AMOUNT)
+	amount = math.clamp(
+		if type(state.Amount) == "number" and state.Amount == state.Amount then state.Amount else amount,
+		0,
+		MAX_AMOUNT
+	)
 
 	-- 4. monster lazy dodge -------------------------------------------------------------------------
 	if targetTeam == "Monster" and kind ~= "True" and kind ~= "Box" then
@@ -388,7 +401,10 @@ function DamageService.Apply(info: any): any
 		local dodgeable = info.Dodgeable ~= false
 			and not state.Undodgeable
 			and not isUlt
-			and not (attacker ~= nil and (StatusService.Has(attacker, "Undodgeable") or StatusService.Has(attacker, "StealthStrike")))
+			and not (attacker ~= nil and (StatusService.Has(attacker, "Undodgeable") or StatusService.Has(
+				attacker,
+				"StealthStrike"
+			)))
 			and not StatusService.Has(target, "Stunned")
 			and not StatusService.Has(target, "Exhausted")
 			and not StatusService.Has(target, "Rage")
@@ -434,7 +450,8 @@ function DamageService.Apply(info: any): any
 			local root = Validation.Root(target)
 			local facing = true
 			if src and root then
-				facing = DamageMath.IsFacing(root.CFrame.Position, root.CFrame.LookVector, src, Config.Human.BlockAngleDot)
+				facing =
+					DamageMath.IsFacing(root.CFrame.Position, root.CFrame.LookVector, src, Config.Human.BlockAngleDot)
 			end
 			if facing then
 				local blockStart = target:GetAttribute("BlockStart")
@@ -523,7 +540,7 @@ function DamageService.Apply(info: any): any
 	if kind == "Box" or StatusService.Has(target, "Determined") then
 		minHp = 1
 	end
-	if targetTeam == "Monster" and finalPhasePending() then
+	if targetTeam == "Monster" and finalPhasePending(target) then
 		minHp = math.max(minHp, 1)
 	end
 	local newHp, applied = DamageMath.ApplyHealth(hp, amount, minHp)
@@ -552,7 +569,7 @@ function DamageService.Apply(info: any): any
 	elseif applied > 0 then
 		hum.Health = newHp
 	end
-	if targetTeam == "Monster" and applied > 0 and not result.Killed and finalPhasePending() then
+	if targetTeam == "Monster" and applied > 0 and not result.Killed and finalPhasePending(target) then
 		if newHp <= hum.MaxHealth * Config.Round.FinalPhaseHpFraction then
 			local rs = Validation.Service("RoundService")
 			if rs and type(rs.TriggerFinalPhase) == "function" then

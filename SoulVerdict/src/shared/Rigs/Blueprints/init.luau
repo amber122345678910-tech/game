@@ -12,12 +12,14 @@
 --   Blueprints.Has(id) -> boolean
 --   Blueprints.List() -> {string}         available ids (known roster order first, then extras A-Z)
 --   Blueprints.KNOWN -> {string}          the roster from SPEC §2.1 (may not all exist yet)
+--   Blueprints.Validate(id, bp)           asserts the blueprint shape (used by Get and RigBuilder)
 --
 -- BLUEPRINT MODULE SHAPE (SPEC §5.2)
 --   return {
 --     Id = "Dummy", Family = "Human", Scale = 1.0,
 --     Skeleton = "Human",                          -- optional, defaults to Family
 --     Overrides = { [limb] = { Size = Vector3?, Joint = Vector3? (pivot DELTA, studs) } }?,
+--     GroundOffset = number?,                      -- lift the skeleton (e.g. it stands on its own base)
 --     Palette = { [key] = Color3 },                -- default colours; skins override keys
 --     Anchors = { [attachmentName] = { Limb = "Head", CFrame = CFrame } }?  -- optional, limb-relative
 --     Build = function(rig: Blueprints.RigContext) ... end,
@@ -76,16 +78,83 @@ export type RigContext = {
 	Box: (limb: LimbRef, name: string, size: Vector3, cf: CFrame, color: Color3, props: Props?) -> BasePart,
 	Ellipsoid: (limb: LimbRef, name: string, size: Vector3, cf: CFrame, color: Color3, props: Props?) -> BasePart,
 	Ball: (limb: LimbRef, name: string, diameter: number, cf: CFrame, color: Color3, props: Props?) -> BasePart,
-	Cyl: (limb: LimbRef, name: string, length: number, diameter: number, cf: CFrame, color: Color3, props: Props?) -> BasePart,
-	Disc: (limb: LimbRef, name: string, diameter: number, thickness: number, cf: CFrame, color: Color3, props: Props?) -> BasePart,
-	CylBetween: (limb: LimbRef, name: string, p0: Vector3, p1: Vector3, diameter: number, color: Color3, props: Props?) -> BasePart,
+	Cyl: (
+		limb: LimbRef,
+		name: string,
+		length: number,
+		diameter: number,
+		cf: CFrame,
+		color: Color3,
+		props: Props?
+	) -> BasePart,
+	Disc: (
+		limb: LimbRef,
+		name: string,
+		diameter: number,
+		thickness: number,
+		cf: CFrame,
+		color: Color3,
+		props: Props?
+	) -> BasePart,
+	CylBetween: (
+		limb: LimbRef,
+		name: string,
+		p0: Vector3,
+		p1: Vector3,
+		diameter: number,
+		color: Color3,
+		props: Props?
+	) -> BasePart,
 	Wedge: (limb: LimbRef, name: string, size: Vector3, cf: CFrame, color: Color3, props: Props?) -> BasePart,
 	CornerWedge: (limb: LimbRef, name: string, size: Vector3, cf: CFrame, color: Color3, props: Props?) -> BasePart,
-	RoundedBox: (limb: LimbRef, name: string, size: Vector3, cf: CFrame, color: Color3, radius: number, props: Props?) -> { BasePart },
-	Cone: (limb: LimbRef, name: string, p0: Vector3, p1: Vector3, d0: number, d1: number, color: Color3, props: Props?) -> { BasePart },
-	Taper: (limb: LimbRef, name: string, p0: Vector3, p1: Vector3, d0: number, d1: number, color: Color3, props: Props?) -> { BasePart },
-	Bone: (limb: LimbRef, name: string, p0: Vector3, p1: Vector3, thickness: number, color: Color3, props: Props?) -> { BasePart },
-	Ring: (limb: LimbRef, name: string, cf: CFrame, radius: number, count: number, ballSize: number, color: Color3, props: Props?) -> { BasePart },
+	RoundedBox: (
+		limb: LimbRef,
+		name: string,
+		size: Vector3,
+		cf: CFrame,
+		color: Color3,
+		radius: number,
+		props: Props?
+	) -> { BasePart },
+	Cone: (
+		limb: LimbRef,
+		name: string,
+		p0: Vector3,
+		p1: Vector3,
+		d0: number,
+		d1: number,
+		color: Color3,
+		props: Props?
+	) -> { BasePart },
+	Taper: (
+		limb: LimbRef,
+		name: string,
+		p0: Vector3,
+		p1: Vector3,
+		d0: number,
+		d1: number,
+		color: Color3,
+		props: Props?
+	) -> { BasePart },
+	Bone: (
+		limb: LimbRef,
+		name: string,
+		p0: Vector3,
+		p1: Vector3,
+		thickness: number,
+		color: Color3,
+		props: Props?
+	) -> { BasePart },
+	Ring: (
+		limb: LimbRef,
+		name: string,
+		cf: CFrame,
+		radius: number,
+		count: number,
+		ballSize: number,
+		color: Color3,
+		props: Props?
+	) -> { BasePart },
 	Arc: (
 		limb: LimbRef,
 		name: string,
@@ -99,7 +168,14 @@ export type RigContext = {
 		color: Color3,
 		props: Props?
 	) -> { BasePart },
-	Tube: (limb: LimbRef, name: string, points: { Vector3 }, diameter: number | { number }, color: Color3, props: Props?) -> { BasePart },
+	Tube: (
+		limb: LimbRef,
+		name: string,
+		points: { Vector3 },
+		diameter: number | { number },
+		color: Color3,
+		props: Props?
+	) -> { BasePart },
 	Dashes: (
 		limb: LimbRef,
 		name: string,
@@ -121,6 +197,7 @@ export type Blueprint = {
 	Skeleton: string?,
 	Scale: number?,
 	Overrides: Skeletons.Overrides?,
+	GroundOffset: number?,
 	Palette: { [string]: Color3 },
 	Anchors: { [string]: { Limb: string, CFrame: CFrame } }?,
 	Build: (rig: RigContext) -> (),
@@ -154,6 +231,7 @@ local function findModule(id: string): Instance?
 end
 
 local function validate(id: string, bp: any)
+	assert(type(id) == "string", "blueprint id must be a string")
 	assert(type(bp) == "table", ("blueprint %s must return a table"):format(id))
 	assert(bp.Id == id, ("blueprint module %s has Id %s (must match the module name)"):format(id, tostring(bp.Id)))
 	assert(bp.Family == "Skeleton" or bp.Family == "Human", ("blueprint %s: Family must be Skeleton|Human"):format(id))
@@ -164,7 +242,15 @@ local function validate(id: string, bp: any)
 	if bp.Scale ~= nil then
 		assert(type(bp.Scale) == "number" and bp.Scale > 0, ("blueprint %s: Scale must be > 0"):format(id))
 	end
+	if bp.GroundOffset ~= nil then
+		assert(
+			type(bp.GroundOffset) == "number" and bp.GroundOffset >= 0,
+			("blueprint %s: GroundOffset must be >= 0"):format(id)
+		)
+	end
 end
+
+Blueprints.Validate = validate
 
 function Blueprints.Get(id: string): Blueprint?
 	local cached = cache[id]

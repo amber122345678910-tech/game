@@ -67,6 +67,12 @@ return {
 		end
 		Loader.quietWarnings = quiet
 		Loader.reset()
-		print(("  requireall: %d Lune-safe modules loaded, %d failed, %d runtime-only skipped"):format(loaded, failed, skipped))
+		print(
+			("  requireall: %d Lune-safe modules loaded, %d failed, %d runtime-only skipped"):format(
+				loaded,
+				failed,
+				skipped
+			)
+		)
 	end,
 }

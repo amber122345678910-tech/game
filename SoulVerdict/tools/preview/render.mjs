@@ -8,12 +8,15 @@
 //   --in <scene.json>          (repeatable) models to render; several = lineup side by side along X
 //   --out <file.png>           output PNG (default tools/preview/out/render.png)
 //   --env <env.json>           lighting/post preset (format: tools/preview/scene/env.js header)
-//   --view front|back|left|right|threeQuarter|threeQuarterLeft|head|top|iso|custom   (default threeQuarter)
+//   --view front|back|left|right|threeQuarter|threeQuarterLeft|head|top|iso|custom
+//                              (default threeQuarter; front when several --in are given)
 //                              front = camera on -Z looking at the face; left/right = the MODEL's left/right
 //   --cam x,y,z --target x,y,z custom camera (implies --view custom)
 //   --width 1600 --height 1000 output size;  --fov 35 vertical field of view (deg)
 //   --sheet N                  turntable contact sheet: N azimuths (front, then every 360/N deg) in one image
 //   --spacing 2                gap (studs) between lineup models;  --labels  name labels under lineup models
+//   --quality draft|normal|high  draft = 1x + MSAA4 (~3 s), normal = 2x supersampling (~5 s, default),
+//                              high = 3x supersampling + MSAA4 (showcase); --ss / --msaa override it
 //   --ss 2                     supersampling factor (1..4);  --msaa 4  MSAA samples on the HDR target (0 = off)
 //   --outline                  black toon outline on every model without its own Highlight (Toon style preview)
 //   --outline-px 2.5           outline thickness in output pixels
@@ -72,7 +75,7 @@ function serve() {
         res.end('not found');
         return;
       }
-      res.writeHead(200, { 'Content-Type': MIME[path.extname(file)] || 'application/octet-stream', 'Cache-Control': 'no-store' });
+      res.writeHead(200, { 'Content-Type': MIME[path.extname(file)] || 'application/octet-stream', 'Cache-Control': 'no-store', Connection: 'close' });
       fs.createReadStream(file).pipe(res);
     });
     server.listen(0, '127.0.0.1', () => resolve(server));
@@ -93,13 +96,13 @@ async function main() {
     width: Number(args.width || 1600),
     height: Number(args.height || 1000),
     fov: Number(args.fov || 35),
-    view: args.cam || args.target ? 'custom' : args.view || 'threeQuarter',
+    view: args.cam || args.target ? 'custom' : args.view || (args.in.length > 1 ? 'front' : 'threeQuarter'),
     cam: args.cam ? vec(args.cam) : undefined,
     target: args.target ? vec(args.target) : undefined,
     sheet: Number(args.sheet || 0),
     spacing: args.spacing !== undefined ? Number(args.spacing) : 2,
-    ss: Number(args.ss || 2),
-    msaa: args.msaa !== undefined ? Number(args.msaa) : 4,
+    ss: Number(args.ss || { draft: 1, normal: 2, high: 3 }[args.quality || 'normal'] || 2),
+    msaa: args.msaa !== undefined ? Number(args.msaa) : { draft: 4, normal: 0, high: 4 }[args.quality || 'normal'] ?? 0,
     outline: !!args.outline,
     outlinePx: args['outline-px'] !== undefined ? Number(args['outline-px']) : 2.5,
     floor: args.floor || 'auto',
@@ -108,7 +111,7 @@ async function main() {
     textures: !args['no-textures'],
     vignette: args.vignette !== undefined ? Number(args.vignette) : 0.16,
     title: args.title,
-    shadowMap: Number(args['shadow-map'] || 4096),
+    shadowMap: Number(args['shadow-map'] || (args.quality === 'draft' ? 2048 : 4096)),
     maxLights: Number(args['max-lights'] || 24),
   };
   const log = (...m) => {
@@ -133,10 +136,13 @@ async function main() {
     await page.goto(`http://127.0.0.1:${port}/scene/index.html`);
     await page.waitForFunction(() => window.SVReady === true, null, { timeout: 30000 });
     const t0 = Date.now();
+    let timer;
     const result = await Promise.race([
       page.evaluate((payload) => window.SVRender(payload), { scenes, env, opts }),
-      new Promise((_, rej) => setTimeout(() => rej(new Error(`render timed out after ${timeoutMs / 1000}s`)), timeoutMs)),
-    ]);
+      new Promise((_, rej) => {
+        timer = setTimeout(() => rej(new Error(`render timed out after ${timeoutMs / 1000}s`)), timeoutMs);
+      }),
+    ]).finally(() => clearTimeout(timer));
     const png = Buffer.from(result.png.split(',')[1], 'base64');
     fs.mkdirSync(path.dirname(path.resolve(out)), { recursive: true });
     fs.writeFileSync(out, png);
@@ -144,6 +150,7 @@ async function main() {
     if (!args.quiet) log(JSON.stringify(result.info));
   } finally {
     await browser.close();
+    server.closeAllConnections();
     server.close();
   }
   if (failed) process.exit(2);

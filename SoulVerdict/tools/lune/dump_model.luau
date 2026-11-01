@@ -11,6 +11,9 @@
 --        -> require(Maps/<MapId>).Build(...)   (a Model, or a table with .Model)
 --   lune run tools/lune/dump_model.luau module <src/path/To/Module> <Function> [jsonArgs] [--out ...]
 --        -> any module function returning a Model / Instance / table with .Model
+--   lune run tools/lune/dump_model.luau skeleton Human|Skeleton [--pose p]   bare skeleton (physics boxes + pivots)
+--   lune run tools/lune/dump_model.luau board shapes|materials|neon   renderer test boards built with PartKit
+--   extra rig flags: --physics (show physics parts + joint pivots), --palette '{"Key":[r,g,b]}' (0..1)
 --   lune run tools/lune/dump_model.luau list            (blueprints, props, maps, poses)
 --
 -- jsonArgs is a JSON array. Typed values: {"$Color3":[r,g,b]} (0..1), {"$rgb":[255,128,0]},
@@ -150,6 +153,245 @@ if kind == "list" then
 	process.exit(0)
 end
 
+-- Renderer test boards (PartKit only) -------------------------------------------------------------
+local function buildBoard(which)
+	local PartKit = Loader.require("ReplicatedStorage.Shared.Rigs.PartKit")
+	local K = PartKit.new({ Anchored = true })
+	local m = roblox.Instance.new("Model")
+	m.Name = "Board_" .. which
+	local white = Color3.fromRGB(235, 235, 235)
+	local base = K.Box(
+		m,
+		"Base",
+		Vector3.new(26, 0.4, 14),
+		CFrame.new(0, 0.2, 0),
+		Color3.fromRGB(90, 92, 98),
+		{ Material = Enum.Material.Slate }
+	)
+	local _ = base
+	if which == "shapes" then
+		-- row 1 (z = -3): primitives, every one in its DEFAULT orientation (front = -Z)
+		local y = 1.4
+		K.Box(m, "Block", Vector3.new(2, 2, 2), CFrame.new(-10, y, -3), Color3.fromRGB(220, 70, 60))
+		K.Ball(m, "Ball", 2, CFrame.new(-7, y, -3), Color3.fromRGB(240, 170, 50))
+		K.Cyl(m, "CylinderX", 2.4, 1.6, CFrame.new(-4, y, -3), Color3.fromRGB(90, 190, 90))
+		K.Wedge(m, "Wedge", Vector3.new(2, 2, 2), CFrame.new(-1, y, -3), Color3.fromRGB(70, 140, 230))
+		K.CornerWedge(m, "CornerWedge", Vector3.new(2, 2, 2), CFrame.new(2, y, -3), Color3.fromRGB(160, 90, 220))
+		K.Ellipsoid(m, "Ellipsoid", Vector3.new(2.6, 1.6, 1.2), CFrame.new(5.5, y, -3), Color3.fromRGB(240, 240, 240))
+		local head = K.Box(m, "HeadMesh", Vector3.new(2, 1, 1), CFrame.new(9, y, -3), Color3.fromRGB(245, 205, 160))
+		local hm = roblox.Instance.new("SpecialMesh")
+		hm.MeshType = Enum.MeshType.Head
+		hm.Scale = Vector3.new(1.25, 1.25, 1.25)
+		hm.Parent = head
+		-- direction markers: a red nub on each part's FRONT (-Z) face, green on +X (right)
+		for _, x in { -10, -7, -4, -1, 2, 5.5, 9 } do
+			K.Ball(
+				m,
+				"FrontMarker",
+				0.3,
+				CFrame.new(x, y, -4.25),
+				Color3.fromRGB(255, 0, 0),
+				{ Material = Enum.Material.Neon }
+			)
+			K.Ball(
+				m,
+				"RightMarker",
+				0.3,
+				CFrame.new(x + 1.35, y, -3),
+				Color3.fromRGB(0, 220, 0),
+				{ Material = Enum.Material.Neon }
+			)
+		end
+		-- row 2 (z = 3): composite builders
+		K.RoundedBox(
+			m,
+			"RoundedAll",
+			Vector3.new(2.2, 1.6, 1.6),
+			CFrame.new(-10, 1.2, 3),
+			Color3.fromRGB(200, 200, 210),
+			0.35
+		)
+		K.RoundedBox(
+			m,
+			"RoundedY",
+			Vector3.new(2.2, 1.6, 1.6),
+			CFrame.new(-7, 1.2, 3),
+			Color3.fromRGB(200, 200, 210),
+			0.35,
+			{ Round = "Y" }
+		)
+		K.Bone(
+			m,
+			"Bone",
+			Vector3.new(-4.8, 0.8, 3),
+			Vector3.new(-3.2, 2.6, 3),
+			0.35,
+			Color3.fromRGB(250, 250, 245),
+			{ Role = "Bone" }
+		)
+		K.Ring(m, "Ring", CFrame.new(-1, 1.2, 3), 0.9, 14, 0.32, Color3.fromRGB(245, 245, 245), { Role = "Trim" })
+		K.Arc(
+			m,
+			"Smile",
+			CFrame.new(2, 1.6, 2.2),
+			0.8,
+			200,
+			340,
+			8,
+			0.12,
+			0.12,
+			Color3.fromRGB(30, 30, 30),
+			{ Joints = true }
+		)
+		K.Cone(
+			m,
+			"Cone",
+			Vector3.new(4.5, 0.4, 3),
+			Vector3.new(4.5, 2.8, 3),
+			1.4,
+			0.05,
+			Color3.fromRGB(230, 120, 50),
+			{ Segments = 6 }
+		)
+		K.Taper(m, "Horn", Vector3.new(7, 0.6, 3), Vector3.new(7.8, 2.6, 2.6), 0.9, 0.12, Color3.fromRGB(240, 230, 210))
+		K.Tube(
+			m,
+			"Tube",
+			{ Vector3.new(9, 0.6, 3), Vector3.new(9.6, 1.8, 3.4), Vector3.new(10.4, 2.2, 2.6), Vector3.new(11, 1.2, 3) },
+			0.3,
+			Color3.fromRGB(60, 200, 200),
+			{ Caps = true }
+		)
+	elseif which == "materials" then
+		local names = {
+			"SmoothPlastic",
+			"Plastic",
+			"Neon",
+			"Glass",
+			"ForceField",
+			"Metal",
+			"DiamondPlate",
+			"Foil",
+			"CorrodedMetal",
+			"Fabric",
+			"Carpet",
+			"Leather",
+			"Wood",
+			"WoodPlanks",
+			"Marble",
+			"Granite",
+			"Slate",
+			"Concrete",
+			"Brick",
+			"Cobblestone",
+			"Pebble",
+			"Rock",
+			"Basalt",
+			"CrackedLava",
+			"Sand",
+			"Snow",
+			"Ice",
+			"Grass",
+			"LeafyGrass",
+			"CeramicTiles",
+		}
+		for i, name in names do
+			local col, row = (i - 1) % 10, math.floor((i - 1) / 10)
+			local x, z = -11.25 + col * 2.5, -4 + row * 4
+			local color = if name == "Neon"
+				then Color3.fromRGB(80, 200, 255)
+				elseif name == "ForceField" then Color3.fromRGB(255, 120, 240)
+				elseif name == "Glass" then Color3.fromRGB(150, 210, 255)
+				elseif name == "Grass" or name == "LeafyGrass" then Color3.fromRGB(90, 160, 70)
+				elseif name == "Brick" then Color3.fromRGB(170, 85, 60)
+				elseif name == "Wood" or name == "WoodPlanks" then Color3.fromRGB(150, 105, 65)
+				elseif name == "CrackedLava" then Color3.fromRGB(70, 50, 45)
+				else Color3.fromRGB(205, 205, 210)
+			K.Box(
+				m,
+				name .. "_Block",
+				Vector3.new(2, 1.6, 2),
+				CFrame.new(x, 1.2, z),
+				color,
+				{ Material = Enum.Material[name] }
+			)
+			K.Ball(m, name .. "_Ball", 1.4, CFrame.new(x, 2.75, z), color, { Material = Enum.Material[name] })
+		end
+	elseif which == "neon" then
+		m:FindFirstChild("Base").Color = Color3.fromRGB(28, 28, 34)
+		K.Ball(
+			m,
+			"NeonBall",
+			1.6,
+			CFrame.new(-6, 1.6, 0),
+			Color3.fromRGB(80, 200, 255),
+			{ Material = Enum.Material.Neon }
+		)
+		K.Ellipsoid(
+			m,
+			"NeonShell",
+			Vector3.new(2.6, 2.6, 2.6),
+			CFrame.new(-6, 1.6, 0),
+			Color3.fromRGB(80, 200, 255),
+			{ Material = Enum.Material.Neon, Transparency = 0.7 }
+		)
+		K.Bone(
+			m,
+			"NeonBone",
+			Vector3.new(-2, 0.6, 0),
+			Vector3.new(0, 2.6, 0),
+			0.35,
+			Color3.fromRGB(255, 255, 255),
+			{ Material = Enum.Material.Neon }
+		)
+		K.Cyl(
+			m,
+			"OrangeBar",
+			3,
+			0.3,
+			CFrame.new(3, 1.2, 0),
+			Color3.fromRGB(255, 150, 40),
+			{ Material = Enum.Material.Neon }
+		)
+		local lamp = K.Ball(
+			m,
+			"Lamp",
+			0.4,
+			CFrame.new(6, 2.5, -1),
+			Color3.fromRGB(255, 220, 160),
+			{ Material = Enum.Material.Neon }
+		)
+		K.Light(lamp, "Point", { Brightness = 3, Range = 12, Color = Color3.fromRGB(255, 200, 140) })
+		local spot = K.Box(
+			m,
+			"Spot",
+			Vector3.new(0.6, 0.6, 0.6),
+			CFrame.new(-2, 6, -2) * CFrame.Angles(math.rad(-60), 0, 0),
+			Color3.fromRGB(40, 40, 40)
+		)
+		K.Light(
+			spot,
+			"Spot",
+			{ Brightness = 5, Range = 16, Angle = 50, Color = Color3.fromRGB(120, 160, 255), Face = Enum.NormalId.Front }
+		)
+		local hlModel = roblox.Instance.new("Model")
+		hlModel.Name = "Highlighted"
+		K.Box(hlModel, "HLBlock", Vector3.new(1.6, 1.6, 1.6), CFrame.new(8, 1.2, 1.5), Color3.fromRGB(230, 230, 230))
+		K.Ball(hlModel, "HLBall", 1.2, CFrame.new(8, 2.6, 1.5), Color3.fromRGB(230, 230, 230))
+		local hl = roblox.Instance.new("Highlight")
+		hl.FillColor = Color3.fromRGB(255, 60, 60)
+		hl.FillTransparency = 0.75
+		hl.OutlineColor = Color3.fromRGB(0, 0, 0)
+		hl.OutlineTransparency = 0
+		hl.DepthMode = Enum.HighlightDepthMode.Occluded
+		hl.Parent = hlModel
+		hlModel.Parent = m
+	else
+		fail("unknown board " .. tostring(which) .. " (shapes|materials|neon)")
+	end
+	return m
+end
+
 local function asModel(result, label)
 	if type(result) == "table" then
 		result = result.Model or result.model or result[1]
@@ -172,16 +414,41 @@ if kind == "rig" then
 	if id == nil then
 		fail("rig needs a blueprint id (available: " .. table.concat(RigBuilder.Blueprints(), ", ") .. ")")
 	end
+	local palette = nil
+	if type(flags.palette) == "string" then
+		palette = {}
+		for key, c in serde.decode("json", flags.palette) do
+			palette[key] = Color3.new(c[1], c[2], c[3])
+		end
+	end
 	model = RigBuilder.Build(id, {
 		Skin = flags.skin,
 		Style = flags.style,
 		Name = flags.name,
 		Scale = flags.scale and tonumber(flags.scale) or nil,
+		Palette = palette,
 	})
+elseif kind == "skeleton" then
+	local family = id or "Human"
+	model = RigBuilder.BuildFromBlueprint({
+		Id = "Skeleton_" .. family,
+		Family = family,
+		Skeleton = family,
+		Palette = {},
+		Build = function() end,
+	}, { Name = family .. " skeleton" })
+	flags.physics = true
 elseif kind == "prop" or kind == "map" then
 	local dir = if kind == "prop" then "src/shared/Rigs/Props" else "src/shared/Maps"
 	if id == nil or not fs.isFile(dir .. "/" .. id .. ".luau") then
-		fail(("%s '%s' not found in %s (available: %s)"):format(kind, tostring(id), dir, table.concat(listModules(dir), ", ")))
+		fail(
+			("%s '%s' not found in %s (available: %s)"):format(
+				kind,
+				tostring(id),
+				dir,
+				table.concat(listModules(dir), ", ")
+			)
+		)
 	end
 	local mod = Loader.requirePath(dir .. "/" .. id)
 	local fn = if type(mod) == "table" then (mod.Build or mod.build) else nil
@@ -189,6 +456,8 @@ elseif kind == "prop" or kind == "map" then
 		fail(id .. " has no Build function")
 	end
 	model = asModel(fn(table.unpack(decodeArgs(positional[3]))), id .. ".Build")
+elseif kind == "board" then
+	model = buildBoard(id or "shapes")
 elseif kind == "module" then
 	local path, fnName = id, positional[3]
 	if path == nil or fnName == nil then
@@ -309,9 +578,36 @@ local bmin = Vector3.new(math.huge, math.huge, math.huge)
 local bmax = Vector3.new(-math.huge, -math.huge, -math.huge)
 local stats = { partCount = 0, visibleParts = 0, motors = 0, lights = 0, highlights = 0 }
 
+-- --physics: show the invisible physics parts (translucent, coloured per limb) and joint pivots.
+local PHYSICS_COLORS = {
+	HumanoidRootPart = { 0.9, 0.9, 0.9 },
+	LowerTorso = { 0.95, 0.75, 0.2 },
+	UpperTorso = { 0.95, 0.55, 0.15 },
+	Head = { 0.95, 0.85, 0.3 },
+	LeftUpperArm = { 0.3, 0.55, 0.95 },
+	LeftLowerArm = { 0.35, 0.65, 1 },
+	LeftHand = { 0.45, 0.75, 1 },
+	RightUpperArm = { 0.9, 0.3, 0.35 },
+	RightLowerArm = { 1, 0.4, 0.45 },
+	RightHand = { 1, 0.5, 0.55 },
+	LeftUpperLeg = { 0.25, 0.7, 0.45 },
+	LeftLowerLeg = { 0.3, 0.8, 0.5 },
+	LeftFoot = { 0.4, 0.9, 0.6 },
+	RightUpperLeg = { 0.7, 0.35, 0.85 },
+	RightLowerLeg = { 0.78, 0.45, 0.9 },
+	RightFoot = { 0.85, 0.55, 0.95 },
+}
+local physicsParts = {}
+local function isPhysics(part)
+	return part.Parent == model and PHYSICS_COLORS[part.Name] ~= nil
+end
+
 for i, e in list do
 	local part, cf = e.Part, e.CFrame
 	stats.partCount += 1
+	if flags.physics and isPhysics(part) and part.Name ~= "HumanoidRootPart" then
+		table.insert(physicsParts, { part = part, cf = cf })
+	end
 	if part.Transparency < 1 then
 		local shape = SHAPES[part.ClassName]
 		if shape == nil then
@@ -329,7 +625,11 @@ for i, e in list do
 				meshScale, meshOffset = child.Scale, child.Offset
 				break
 			elseif child:IsA("BlockMesh") or child:IsA("CylinderMesh") then
-				mesh = { type = if child:IsA("BlockMesh") then "Brick" else "CylinderY", scale = v3(child.Scale), offset = v3(child.Offset) }
+				mesh = {
+					type = if child:IsA("BlockMesh") then "Brick" else "CylinderY",
+					scale = v3(child.Scale),
+					offset = v3(child.Offset),
+				}
 				meshScale, meshOffset = child.Scale, child.Offset
 				break
 			end
@@ -371,6 +671,65 @@ for i, e in list do
 			end
 		end
 	end
+end
+
+if flags.physics then
+	for _, entry in physicsParts do
+		local part, cf = entry.part, entry.cf
+		local c = { cf:GetComponents() }
+		for k, x in c do
+			c[k] = r(x)
+		end
+		table.insert(parts, {
+			name = part.Name,
+			path = part:GetFullName(),
+			role = "Physics",
+			shape = "Block",
+			size = v3(part.Size),
+			cf = c,
+			color = PHYSICS_COLORS[part.Name],
+			material = "SmoothPlastic",
+			transparency = 0.35,
+			reflectance = 0,
+			castShadow = true,
+		})
+		local half = part.Size / 2
+		for _, sx in { -1, 1 } do
+			for _, sy in { -1, 1 } do
+				for _, sz in { -1, 1 } do
+					local p = cf * Vector3.new(half.X * sx, half.Y * sy, half.Z * sz)
+					bmin = bmin:Min(p)
+					bmax = bmax:Max(p)
+				end
+			end
+		end
+	end
+	-- joint pivots (Part0 * C0 after FK) as small white neon balls
+	for _, inst in model:GetDescendants() do
+		if inst:IsA("Motor6D") and inst.Part0 then
+			local pivot = cfOf(inst.Part0) * inst.C0
+			table.insert(parts, {
+				name = inst.Name .. "Pivot",
+				path = model.Name .. "." .. inst.Name .. "Pivot",
+				role = "Physics",
+				shape = "Ball",
+				size = { 0.16, 0.16, 0.16 },
+				cf = (function()
+					local c = { CFrame.new(pivot.Position):GetComponents() }
+					for k, x in c do
+						c[k] = r(x)
+					end
+					return c
+				end)(),
+				color = { 1, 1, 1 },
+				material = "Neon",
+				transparency = 0,
+				reflectance = 0,
+				castShadow = false,
+			})
+		end
+	end
+	stats.visibleParts = #parts
 end
 
 local lights, highlights, anchors = {}, {}, {}
@@ -466,7 +825,16 @@ if type(flags.out) == "string" then
 		fs.writeDir(dir)
 	end
 	fs.writeFile(flags.out, json)
-	print(("dump_model: %s %s -> %s (%d visible parts, %d lights, %d highlights)"):format(kind, tostring(id), flags.out, stats.visibleParts, stats.lights, stats.highlights))
+	print(
+		("dump_model: %s %s -> %s (%d visible parts, %d lights, %d highlights)"):format(
+			kind,
+			tostring(id),
+			flags.out,
+			stats.visibleParts,
+			stats.lights,
+			stats.highlights
+		)
+	)
 else
 	print(json)
 end

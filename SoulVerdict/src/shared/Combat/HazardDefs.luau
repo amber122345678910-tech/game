@@ -463,7 +463,10 @@ end
 
 register("BoneSpikes", {
 	Duration = function(p: Params): number
-		return num(p, D_SPIKES, "delay") + num(p, D_SPIKES, "rise") + num(p, D_SPIKES, "hold") + num(p, D_SPIKES, "retract")
+		return num(p, D_SPIKES, "delay")
+			+ num(p, D_SPIKES, "rise")
+			+ num(p, D_SPIKES, "hold")
+			+ num(p, D_SPIKES, "retract")
 	end,
 	Volumes = function(p: Params, t: number): { Volume }
 		local h = HazardDefs.SpikeHeight(p, t)
@@ -619,7 +622,9 @@ end
 
 register("Shockwave", {
 	Duration = function(p: Params): number
-		return num(p, D_WAVE, "delay") + num(p, D_WAVE, "maxRadius") / math.max(0.01, num(p, D_WAVE, "speed")) + num(p, D_WAVE, "linger")
+		return num(p, D_WAVE, "delay")
+			+ num(p, D_WAVE, "maxRadius") / math.max(0.01, num(p, D_WAVE, "speed"))
+			+ num(p, D_WAVE, "linger")
 	end,
 	Volumes = function(p: Params, t: number): { Volume }
 		local r = HazardDefs.ShockwaveRadius(p, t)
@@ -662,7 +667,10 @@ end
 
 register("Orb", {
 	Duration = function(p: Params): number
-		return num(p, D_ORB, "delay") + num(p, D_ORB, "duration") + num(p, D_ORB, "implodeTime") + num(p, D_ORB, "linger")
+		return num(p, D_ORB, "delay")
+			+ num(p, D_ORB, "duration")
+			+ num(p, D_ORB, "implodeTime")
+			+ num(p, D_ORB, "linger")
 	end,
 	Volumes = function(p: Params, t: number): { Volume }
 		local at = num(p, D_ORB, "delay") + num(p, D_ORB, "duration")
@@ -1089,7 +1097,9 @@ function HazardDefs.Telegraph(hazardType: string, p: Params): TelegraphDesc
 			return none
 		end
 		local s, e = telegraphTimes(p, delay)
-		local width = if hazardType == "BoneProjectile" then num(p, D_BONEPROJ, "length") else num(p, D_PROJ, "radius") * 2
+		local width = if hazardType == "BoneProjectile"
+			then num(p, D_BONEPROJ, "length")
+			else num(p, D_PROJ, "radius") * 2
 		return {
 			Kind = "Beam",
 			Color = color,
@@ -1101,15 +1111,36 @@ function HazardDefs.Telegraph(hazardType: string, p: Params): TelegraphDesc
 		}
 	elseif hazardType == "Shockwave" then
 		local s, e = telegraphTimes(p, delay)
-		return { Kind = "Circle", Color = color, Start = s, End = e, Center = vec(p, D_WAVE, "center"), Radius = num(p, D_WAVE, "maxRadius") }
+		return {
+			Kind = "Circle",
+			Color = color,
+			Start = s,
+			End = e,
+			Center = vec(p, D_WAVE, "center"),
+			Radius = num(p, D_WAVE, "maxRadius"),
+		}
 	elseif hazardType == "Orb" then
 		local at = delay + num(p, D_ORB, "duration")
 		local w = p.warn
 		local s = if type(w) == "number" and w >= 0 then math.max(0, at - w) else 0
-		return { Kind = "Circle", Color = color, Start = s, End = at, Center = vec(p, D_ORB, "center"), Radius = num(p, D_ORB, "radius") }
+		return {
+			Kind = "Circle",
+			Color = color,
+			Start = s,
+			End = at,
+			Center = vec(p, D_ORB, "center"),
+			Radius = num(p, D_ORB, "radius"),
+		}
 	elseif hazardType == "Zone" then
 		local s, e = telegraphTimes(p, delay)
-		return { Kind = "Circle", Color = color, Start = s, End = e, Center = vec(p, D_ZONE, "center"), Radius = num(p, D_ZONE, "radius") }
+		return {
+			Kind = "Circle",
+			Color = color,
+			Start = s,
+			End = e,
+			Center = vec(p, D_ZONE, "center"),
+			Radius = num(p, D_ZONE, "radius"),
+		}
 	elseif hazardType == "Rain" then
 		local items: { TelegraphDesc } = {}
 		local w = p.warn

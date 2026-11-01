@@ -753,7 +753,9 @@ local function prefill(weather: ActiveWeather)
 		local lifetime = (volume.Def.Lifetime.Min + volume.Def.Lifetime.Max) / 2
 		local count = math.floor(math.min(emitter.Rate * lifetime * PREFILL_FRACTION, PREFILL_CAP))
 		if count > 0 then
-			emitter:Emit(count)
+			pcall(function() -- never let a cosmetic burst break weather switching
+				emitter:Emit(count)
+			end)
 		end
 	end
 end
