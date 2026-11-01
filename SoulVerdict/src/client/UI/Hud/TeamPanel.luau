@@ -195,6 +195,9 @@ function TeamPanel.Create(theme: any, deps: any): any
 		harmony.Visible = bonus > 0
 		Style.SetText(harmony, Style.Upper(skin, Style.L("hud.team.harmony", bonus)))
 		panel.Visible = #humans > 0
+		if phone then
+			panel.Position = UDim2.fromOffset(10, if s.Device == "Touch" then 140 else 60)
+		end
 		tick(s.Now or 0)
 	end
 

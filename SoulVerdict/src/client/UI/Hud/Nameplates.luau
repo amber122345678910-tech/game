@@ -205,10 +205,11 @@ function Nameplates.Create(theme: any, deps: any): any
 
 	local function updatePreview(s: { [string]: any })
 		root:ClearAllChildren()
-		local row = Style.Frame({ Name = "Row", AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5), Size = UDim2.fromOffset(4 * (PLATE.X + 40), PLATE.Y), Parent = root })
+		local row = Style.Frame({ Name = "Row", AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5), Size = UDim2.fromOffset(4 * (PLATE.X + 40) - 40, PLATE.Y), Parent = root })
 		local l = Instance.new("UIListLayout")
 		l.FillDirection = Enum.FillDirection.Horizontal
 		l.Padding = UDim.new(0, 40)
+		l.HorizontalAlignment = Enum.HorizontalAlignment.Center
 		l.SortOrder = Enum.SortOrder.LayoutOrder
 		l.Parent = row
 		local viewer = if s.Me then s.Me.Team else "Humans"

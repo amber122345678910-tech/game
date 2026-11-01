@@ -15,6 +15,7 @@
 --        Attributes: PropId, Scale, Open (0..1), PartCount.
 --   GiantBook.SetOpen(model, alpha: number)   1 = flat open, 0 = slammed shut (-0.05..1.1 allowed for
 --        overshoot). Pure instance edits; reads Spine.CFrame, so it works wherever the book was moved.
+--   GiantBook.Preview(alpha?, scale?) -> Model   Build + SetOpen (galleries, previews)
 --   GiantBook.Size -> Vector3   open footprint at scale 1
 
 local Props = require(script.Parent)
@@ -68,7 +69,17 @@ local function cover(kit: any, model: Model, side: number, color: Color3): Model
 		local corner = Vector3.new(outer, COVER_T + 0.03, zs * COVER_L / 2)
 		local a = corner - Vector3.new(side * 1.3, 0, 0)
 		local b = corner - Vector3.new(0, 0, zs * 1.3)
-		Props.Triangle(kit, m, "Corner" .. i, corner, a, b, 0.08, GOLD, { Role = "Trim", Material = Enum.Material.Metal })
+		Props.Triangle(
+			kit,
+			m,
+			"Corner" .. i,
+			corner,
+			a,
+			b,
+			0.08,
+			GOLD,
+			{ Role = "Trim", Material = Enum.Material.Metal }
+		)
 	end
 	-- gold frame inset on the cover + the purple SOUL embossed in the middle
 	local fy = COVER_T + 0.02
@@ -97,17 +108,31 @@ local function cover(kit: any, model: Model, side: number, color: Color3): Model
 	heart:Destroy()
 	-- page edges: two darker stripes along the fore-edge read as stacked paper
 	for i, yy in { -PAGES_T * 0.32, -PAGES_T * 0.68 } do
-		kit.Box(m, "PageEdge" .. i, Vector3.new(0.03, 0.03, pageL * 0.98), CFrame.new(hingeX + side * (pageW + 0.035), yy, 0), PAGE:Lerp(INK, 0.35), {
-			Role = "Detail",
-			CastShadow = false,
-		})
+		kit.Box(
+			m,
+			"PageEdge" .. i,
+			Vector3.new(0.03, 0.03, pageL * 0.98),
+			CFrame.new(hingeX + side * (pageW + 0.035), yy, 0),
+			PAGE:Lerp(INK, 0.35),
+			{
+				Role = "Detail",
+				CastShadow = false,
+			}
+		)
 	end
 	-- glowing fore-edge (the magic of the ultimate)
-	kit.Box(m, "Edge", Vector3.new(0.08, PAGES_T * 0.25, pageL), CFrame.new(hingeX + side * (pageW + 0.06), -PAGES_T * 0.92, 0), GLOW, {
-		Role = "Glow",
-		Material = Enum.Material.Neon,
-		CastShadow = false,
-	})
+	kit.Box(
+		m,
+		"Edge",
+		Vector3.new(0.08, PAGES_T * 0.25, pageL),
+		CFrame.new(hingeX + side * (pageW + 0.06), -PAGES_T * 0.92, 0),
+		GLOW,
+		{
+			Role = "Glow",
+			Material = Enum.Material.Neon,
+			CastShadow = false,
+		}
+	)
 	m.PrimaryPart = board
 	m.Parent = model
 	return m
@@ -118,22 +143,43 @@ function GiantBook.Build(scale: number?, color: Color3?): Model
 	local kit = Props.Kit(s)
 	local c = color or PURPLE
 	local model = Props.NewModel("GiantBook", "GiantBook")
-	local spine = kit.Box(model, "Spine", Vector3.new(SPINE_HALF * 2, COVER_T, COVER_L), CFrame.new(0, COVER_T / 2, 0), c:Lerp(Color3.new(0, 0, 0), 0.25), {
-		Role = "Cloth",
-		Material = Enum.Material.Fabric,
-	})
+	local spine = kit.Box(
+		model,
+		"Spine",
+		Vector3.new(SPINE_HALF * 2, COVER_T, COVER_L),
+		CFrame.new(0, COVER_T / 2, 0),
+		c:Lerp(Color3.new(0, 0, 0), 0.25),
+		{
+			Role = "Cloth",
+			Material = Enum.Material.Fabric,
+		}
+	)
 	for i, z in { -COVER_L * 0.32, COVER_L * 0.32 } do
-		kit.Box(model, "Band" .. i, Vector3.new(SPINE_HALF * 2 + 0.04, COVER_T + 0.04, 0.32), CFrame.new(0, COVER_T / 2, z), GOLD, {
-			Role = "Trim",
-			Material = Enum.Material.Metal,
-		})
+		kit.Box(
+			model,
+			"Band" .. i,
+			Vector3.new(SPINE_HALF * 2 + 0.04, COVER_T + 0.04, 0.32),
+			CFrame.new(0, COVER_T / 2, z),
+			GOLD,
+			{
+				Role = "Trim",
+				Material = Enum.Material.Metal,
+			}
+		)
 	end
 	-- ribbon bookmark hanging from the spine between the pages
-	kit.Box(model, "Ribbon", Vector3.new(0.05, 2.2, 0.36), CFrame.new(0, -1.1, COVER_L * 0.18) * CFrame.Angles(0, 0, 0.08), MARGIN, {
-		Role = "Accent",
-		Material = Enum.Material.Fabric,
-		CastShadow = false,
-	})
+	kit.Box(
+		model,
+		"Ribbon",
+		Vector3.new(0.05, 2.2, 0.36),
+		CFrame.new(0, -1.1, COVER_L * 0.18) * CFrame.Angles(0, 0, 0.08),
+		MARGIN,
+		{
+			Role = "Accent",
+			Material = Enum.Material.Fabric,
+			CastShadow = false,
+		}
+	)
 	kit.Attach(spine, "LeftHinge", CFrame.new(-SPINE_HALF, -COVER_T / 2, 0))
 	kit.Attach(spine, "RightHinge", CFrame.new(SPINE_HALF, -COVER_T / 2, 0))
 	for _, side in { -1, 1 } do
@@ -150,6 +196,13 @@ function GiantBook.Build(scale: number?, color: Color3?): Model
 	model:SetAttribute("Scale", s)
 	model:SetAttribute("Open", 1)
 	return Props.Finish(model, spine)
+end
+
+-- Built + SetOpen in one call (galleries, previews).
+function GiantBook.Preview(alpha: number?, scale: number?): Model
+	local model = GiantBook.Build(scale)
+	GiantBook.SetOpen(model, alpha or 1)
+	return model
 end
 
 function GiantBook.SetOpen(model: Model, alpha: number)

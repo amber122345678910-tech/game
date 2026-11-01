@@ -154,7 +154,7 @@ function RoundHud.Create(theme: any, deps: any): any
 		return Style.Text(skin, {
 			Name = "Label",
 			Text = text,
-			TextSize = if phone then 9 else (if battle then 10 else 12),
+			TextSize = if phone then 8 else (if battle then 10 else 12),
 			Color = if battle then C.Text else C.Dim,
 			AutoX = true,
 			Size = UDim2.new(0, 0, 1, 0),
@@ -183,19 +183,28 @@ function RoundHud.Create(theme: any, deps: any): any
 		block:ClearAllChildren()
 		hpBar, guardBar, ultBar, ultRing, readyChip, titleLabel = nil, nil, nil, nil, nil, nil
 		local resourceRow: Frame
+		local compact = phone and touch -- phones: stats move to the top-left, thumbs own the bottom corners
 		if battle then
-			-- UT stats row, centred above the ability bar
-			local abilityTop = if phone then (if touch then 30 else 86) else 112
+			-- UT stats row, centred above the ability bar (compact: two left-aligned rows top-left)
+			local abilityTop = if phone then 86 else 112
 			local row1Y = -(abilityTop + 46)
-			local row1 = Style.Frame({ Name = "Row1", AnchorPoint = Vector2.new(0.5, 1), Position = UDim2.new(0.5, 0, 1, row1Y + 26), Size = UDim2.new(1, 0, 0, 26), ZIndex = 3, Parent = block })
-			list(row1, true, 10, "Center")
-			soulHolder = Style.Frame({ Name = "Soul", Size = UDim2.fromOffset(18, 18), LayoutOrder = 1, ZIndex = 3, Parent = row1 })
-			nameLabel = Style.Text(skin, { Name = "Name", Text = "", Role = "Title", TextSize = if phone then 12 else 16, AutoX = true, Size = UDim2.new(0, 0, 1, 0), LayoutOrder = 2, ZIndex = 3, Parent = row1 })
-			lvLabel = Style.Text(skin, { Name = "LV", Text = "", Role = "Title", TextSize = if phone then 12 else 16, AutoX = true, Size = UDim2.new(0, 0, 1, 0), LayoutOrder = 3, ZIndex = 3, Parent = row1 })
-			Style.Frame({ Name = "Spacer", Size = UDim2.fromOffset(if phone then 6 else 18, 1), LayoutOrder = 4, Parent = row1 })
-			local valueWidth = (if monster then 11 else 9) * (if phone then 11 else 13) + 8
-			local labelWidth = if phone then 26 else 34
-			hpHolder = Style.Frame({ Name = "HPHolder", Size = UDim2.fromOffset(labelWidth + 6 + hpWidth + 36 + valueWidth + 8, 24), LayoutOrder = 5, ZIndex = 3, Parent = row1 })
+			local row1 = Style.Frame({
+				Name = "Row1",
+				AnchorPoint = if compact then Vector2.new(0, 0) else Vector2.new(0.5, 1),
+				Position = if compact then UDim2.fromOffset(10, 8) else UDim2.new(0.5, 0, 1, row1Y + 26),
+				Size = if compact then UDim2.fromOffset(320, 22) else UDim2.new(1, 0, 0, 26),
+				ZIndex = 3,
+				Parent = block,
+			})
+			list(row1, true, if compact then 6 else 10, if compact then nil else "Center")
+			soulHolder = Style.Frame({ Name = "Soul", Size = UDim2.fromOffset(if compact then 14 else 18, if compact then 14 else 18), LayoutOrder = 1, ZIndex = 3, Parent = row1 })
+			nameLabel = Style.Text(skin, { Name = "Name", Text = "", Role = "Title", TextSize = if phone then 12 else 16, AutoX = true, Size = UDim2.new(0, 0, 1, 0), LayoutOrder = 2, ZIndex = 3, Visible = not compact, Parent = row1 })
+			lvLabel = Style.Text(skin, { Name = "LV", Text = "", Role = "Title", TextSize = if phone then 12 else 16, AutoX = true, Size = UDim2.new(0, 0, 1, 0), LayoutOrder = 3, ZIndex = 3, Visible = not compact, Parent = row1 })
+			Style.Frame({ Name = "Spacer", Size = UDim2.fromOffset(if compact then 0 else (if phone then 6 else 18), 1), LayoutOrder = 4, Parent = row1 })
+			local valueWidth = (if monster then 11 else 9) * (if compact then 9 else (if phone then 11 else 13)) + 8
+			local labelWidth = if compact then 20 else (if phone then 26 else 34)
+			local barWidth = if compact then (if monster then 110 else 120) else hpWidth
+			hpHolder = Style.Frame({ Name = "HPHolder", Size = UDim2.fromOffset(labelWidth + 6 + barWidth + (if compact then 26 else 36) + valueWidth + 8, if compact then 20 else 24), LayoutOrder = 5, ZIndex = 3, Parent = row1 })
 			hpBar = Style.Bar(skin, {
 				Name = "HP",
 				Kind = "HP",
@@ -209,36 +218,64 @@ function RoundHud.Create(theme: any, deps: any): any
 				Format = function(v: number, m: number): string
 					return Style.FormatHp(skin, v, m)
 				end,
-				Height = if phone then 16 else 20,
+				Height = if compact then 12 else (if phone then 16 else 20),
 				Size = UDim2.fromScale(1, 1),
 				ZIndex = 3,
 				Parent = hpHolder,
 			})
-			resourceRow = Style.Frame({ Name = "Row2", AnchorPoint = Vector2.new(0.5, 1), Position = UDim2.new(0.5, 0, 1, row1Y + 26 + 22), Size = UDim2.new(1, 0, 0, 16), ZIndex = 3, Parent = block })
-			list(resourceRow, true, 10, "Center")
-			statusRow = Style.Frame({ Name = "Statuses", AnchorPoint = Vector2.new(0.5, 1), Position = UDim2.new(0.5, 0, 1, row1Y - 12), Size = UDim2.new(1, 0, 0, 34), ZIndex = 3, Parent = block })
-			list(statusRow, true, 8, "Center")
-			bannerCol = Style.Frame({ Name = "Banners", AnchorPoint = Vector2.new(0.5, 1), Position = UDim2.new(0.5, 0, 1, row1Y - 56), Size = UDim2.new(0, 360, 0, 70), ZIndex = 3, Parent = block })
+			if compact then
+				for _, d in hpHolder:GetDescendants() do
+					if d:IsA("TextLabel") then
+						d.TextSize = 9
+					end
+				end
+			end
+			resourceRow = Style.Frame({
+				Name = "Row2",
+				AnchorPoint = if compact then Vector2.new(0, 0) else Vector2.new(0.5, 1),
+				Position = if compact then UDim2.fromOffset(10, 34) else UDim2.new(0.5, 0, 1, row1Y + 26 + 22),
+				Size = if compact then UDim2.fromOffset(320, 14) else UDim2.new(1, 0, 0, 16),
+				ZIndex = 3,
+				Parent = block,
+			})
+			list(resourceRow, true, if compact then 8 else 10, if compact then nil else "Center")
+			statusRow = Style.Frame({
+				Name = "Statuses",
+				AnchorPoint = if compact then Vector2.new(0, 0) else Vector2.new(0.5, 1),
+				Position = if compact then UDim2.fromOffset(10, 56) else UDim2.new(0.5, 0, 1, row1Y - 12),
+				Size = if compact then UDim2.fromOffset(320, 28) else UDim2.new(1, 0, 0, 34),
+				ZIndex = 3,
+				Parent = block,
+			})
+			list(statusRow, true, 8, if compact then nil else "Center")
+			bannerCol = Style.Frame({
+				Name = "Banners",
+				AnchorPoint = if compact then Vector2.new(1, 0) else Vector2.new(0.5, 1),
+				Position = if compact then UDim2.new(1, -10, 0, 104) else UDim2.new(0.5, 0, 1, row1Y - 56),
+				Size = UDim2.new(0, if compact then 230 else 360, 0, 70),
+				ZIndex = 3,
+				Parent = block,
+			})
 		else
-			-- Modern player card, bottom-left
-			local cardW = if phone then 330 else 440
-			local cardH = if phone then 92 else 118
-			local margin = if phone then 12 else 24
+			-- Modern player card, bottom-left (compact: top-left)
+			local cardW = if phone then 300 else 440
+			local cardH = if phone then 84 else 118
+			local margin = if phone then 10 else 24
 			local card = Style.Box(skin, {
 				Name = "Card",
-				AnchorPoint = Vector2.new(0, 1),
-				Position = if phone and touch then UDim2.new(0, margin, 0, margin + cardH + 52) else UDim2.new(0, margin, 1, -margin),
+				AnchorPoint = if compact then Vector2.new(0, 0) else Vector2.new(0, 1),
+				Position = if compact then UDim2.fromOffset(margin, 8) else UDim2.new(0, margin, 1, -margin),
 				Size = UDim2.fromOffset(cardW, cardH),
 				ZIndex = 2,
 				Parent = block,
 			})
-			local av = if phone then 62 else 80
+			local av = if phone then 56 else 80
 			local avatar = Style.Frame({
 				Name = "Avatar",
 				BackgroundTransparency = 0,
 				BackgroundColor3 = Color3.fromRGB(20, 22, 34),
 				AnchorPoint = Vector2.new(0, 0.5),
-				Position = UDim2.new(0, if phone then 12 else 16, 0.5, 0),
+				Position = UDim2.new(0, if phone then 10 else 16, 0.5, 0),
 				Size = UDim2.fromOffset(av, av),
 				ZIndex = 3,
 				Parent = card,
@@ -263,22 +300,22 @@ function RoundHud.Create(theme: any, deps: any): any
 				BackgroundColor3 = C.UltFull,
 				AnchorPoint = Vector2.new(0.5, 0.5),
 				Position = UDim2.new(0.5, 0, 1, -2),
-				Size = UDim2.fromOffset(av + 6, 18),
+				Size = UDim2.fromOffset(av + 6, if phone then 15 else 18),
 				ZIndex = 6,
 				Visible = false,
 				Parent = avatar,
 			})
 			Style.Corner(chip, UDim.new(0.5, 0))
-			Style.Text(skin, { Name = "Text", Text = Style.L("hud.ready"), TextSize = 11, Color = Style.BLACK, X = "Center", Stroke = false, Size = UDim2.fromScale(1, 1), ZIndex = 6, Parent = chip })
+			Style.Text(skin, { Name = "Text", Text = Style.L("hud.ready"), TextSize = if phone then 9 else 11, Color = Style.BLACK, X = "Center", Stroke = false, Size = UDim2.fromScale(1, 1), ZIndex = 6, Parent = chip })
 			readyChip = chip
-			local x0 = av + (if phone then 24 else 30)
-			local rightW = cardW - x0 - (if phone then 12 else 18)
-			local line1 = Style.Frame({ Name = "Line1", Position = UDim2.fromOffset(x0, if phone then 8 else 12), Size = UDim2.fromOffset(rightW, if phone then 18 else 22), ZIndex = 3, Parent = card })
-			list(line1, true, 8)
-			nameLabel = Style.Text(skin, { Name = "Name", Text = "", Role = "Title", TextSize = if phone then 15 else 19, Upper = false, AutoX = true, Size = UDim2.new(0, 0, 1, 0), LayoutOrder = 1, ZIndex = 3, Parent = line1 })
-			lvLabel = Style.Text(skin, { Name = "LV", Text = "", TextSize = if phone then 11 else 13, Color = C.Dim, AutoX = true, Size = UDim2.new(0, 0, 1, 0), LayoutOrder = 2, ZIndex = 3, Parent = line1 })
-			titleLabel = Style.Text(skin, { Name = "Title", Text = "", TextSize = if phone then 10 else 12, AutoX = true, Size = UDim2.new(0, 0, 1, 0), LayoutOrder = 3, ZIndex = 3, Parent = line1 })
-			hpHolder = Style.Frame({ Name = "HPHolder", Position = UDim2.fromOffset(x0, if phone then 32 else 42), Size = UDim2.fromOffset(rightW, if phone then 18 else 22), ZIndex = 3, Parent = card })
+			local x0 = av + (if phone then 20 else 30)
+			local rightW = cardW - x0 - (if phone then 10 else 18)
+			local line1 = Style.Frame({ Name = "Line1", Position = UDim2.fromOffset(x0, if phone then 8 else 12), Size = UDim2.fromOffset(rightW, if phone then 16 else 22), ZIndex = 3, Parent = card })
+			list(line1, true, if phone then 6 else 8)
+			nameLabel = Style.Text(skin, { Name = "Name", Text = "", Role = "Title", TextSize = if phone then 13 else 19, Upper = false, AutoX = true, Size = UDim2.new(0, 0, 1, 0), LayoutOrder = 1, ZIndex = 3, Parent = line1 })
+			lvLabel = Style.Text(skin, { Name = "LV", Text = "", TextSize = if phone then 10 else 13, Color = C.Dim, AutoX = true, Size = UDim2.new(0, 0, 1, 0), LayoutOrder = 2, ZIndex = 3, Parent = line1 })
+			titleLabel = Style.Text(skin, { Name = "Title", Text = "", TextSize = if phone then 9 else 12, AutoX = true, Size = UDim2.new(0, 0, 1, 0), LayoutOrder = 3, ZIndex = 3, Visible = not phone, Parent = line1 })
+			hpHolder = Style.Frame({ Name = "HPHolder", Position = UDim2.fromOffset(x0, if phone then 29 else 42), Size = UDim2.fromOffset(rightW, if phone then 18 else 22), ZIndex = 3, Parent = card })
 			hpBar = Style.Bar(skin, {
 				Name = "HP",
 				Kind = if monster then "Monster" else "HP",
@@ -286,28 +323,43 @@ function RoundHud.Create(theme: any, deps: any): any
 				Max = 1,
 				Secondary = if monster then nil else 0,
 				ShowValue = true,
-				ValueWidth = if phone then 70 else 86,
-				Height = if phone then 13 else 16,
+				ValueWidth = if phone then 66 else 86,
+				Height = if phone then 12 else 16,
 				Size = UDim2.fromScale(1, 1),
 				ZIndex = 3,
 				Parent = hpHolder,
 			})
-			resourceRow = Style.Frame({ Name = "Row2", Position = UDim2.fromOffset(x0, if phone then 60 else 78), Size = UDim2.fromOffset(rightW, if phone then 16 else 20), ZIndex = 3, Parent = card })
-			list(resourceRow, true, if phone then 8 else 12)
-			statusRow = Style.Frame({ Name = "Statuses", AnchorPoint = Vector2.new(0, 1), Position = UDim2.new(0, 0, 0, -10), Size = UDim2.new(1, 0, 0, 34), ZIndex = 3, Parent = card })
+			resourceRow = Style.Frame({ Name = "Row2", Position = UDim2.fromOffset(x0, if phone then 56 else 78), Size = UDim2.fromOffset(rightW, if phone then 16 else 20), ZIndex = 3, Parent = card })
+			list(resourceRow, true, if phone then 7 else 12)
+			statusRow = Style.Frame({
+				Name = "Statuses",
+				AnchorPoint = if compact then Vector2.new(0, 0) else Vector2.new(0, 1),
+				Position = if compact then UDim2.new(0, 0, 1, 8) else UDim2.new(0, 0, 0, -10),
+				Size = UDim2.new(1, 0, 0, if phone then 28 else 34),
+				ZIndex = 3,
+				Parent = card,
+			})
 			list(statusRow, true, 8)
-			bannerCol = Style.Frame({ Name = "Banners", AnchorPoint = Vector2.new(0, 1), Position = UDim2.new(0, 0, 0, -54), Size = UDim2.new(1, 0, 0, 70), ZIndex = 3, Parent = card })
+			bannerCol = Style.Frame({
+				Name = "Banners",
+				AnchorPoint = if compact then Vector2.new(1, 0) else Vector2.new(0, 1),
+				Position = if compact then UDim2.new(1, -10, 0, 104) else UDim2.new(0, 0, 0, -54),
+				Size = UDim2.new(0, if compact then 230 else cardW, 0, 70),
+				ZIndex = 3,
+				Parent = if compact then block else card,
+			})
 		end
-		list(bannerCol, false, 6, if battle then "Center" else nil).VerticalAlignment = Enum.VerticalAlignment.Bottom
+		local bl = list(bannerCol, false, 6, if phone and touch then "Right" elseif battle then "Center" else nil)
+		bl.VerticalAlignment = if phone and touch then Enum.VerticalAlignment.Top else Enum.VerticalAlignment.Bottom
 		-- resources
 		guardGroup = Style.Frame({ Name = "Guard", Size = UDim2.new(0, 0, 1, 0), AutomaticSize = Enum.AutomaticSize.X, LayoutOrder = 1, ZIndex = 3, Parent = resourceRow })
 		list(guardGroup, true, 6)
 		smallLabel(guardGroup, Style.L("stat.guard"), 1)
-		guardBar = miniBar(guardGroup, "Guard", if phone then 70 else (if battle then 110 else 100), 2)
+		guardBar = miniBar(guardGroup, "Guard", if phone then 54 else (if battle then 110 else 100), 2)
 		dashGroup = Style.Frame({ Name = "Dash", Size = UDim2.new(0, 0, 1, 0), AutomaticSize = Enum.AutomaticSize.X, LayoutOrder = 2, ZIndex = 3, Parent = resourceRow })
 		list(dashGroup, true, 6)
 		smallLabel(dashGroup, Style.L("hud.dash"), 1)
-		dashPips = Style.Pips(skin, { Name = "Pips", Max = 2, Value = 2, PipSize = Vector2.new(14, 14), Gap = 3, Color = C.Guard, Empty = C.DodgeEmpty, Shape = "Diamond", LayoutOrder = 2, ZIndex = 3, Parent = dashGroup })
+		dashPips = Style.Pips(skin, { Name = "Pips", Max = 2, Value = 2, PipSize = if phone then Vector2.new(11, 11) else Vector2.new(14, 14), Gap = 3, Color = C.Guard, Empty = C.DodgeEmpty, Shape = "Diamond", LayoutOrder = 2, ZIndex = 3, Parent = dashGroup })
 		dodgeGroup = Style.Frame({ Name = "Dodges", Size = UDim2.new(0, 0, 1, 0), AutomaticSize = Enum.AutomaticSize.X, LayoutOrder = 1, ZIndex = 3, Parent = resourceRow })
 		list(dodgeGroup, true, 6)
 		smallLabel(dodgeGroup, Style.L("stat.dodges"), 1)
@@ -328,7 +380,7 @@ function RoundHud.Create(theme: any, deps: any): any
 		list(ultGroup, true, 6)
 		smallLabel(ultGroup, Style.L("stat.ult"), 1)
 		if battle then
-			ultBar = miniBar(ultGroup, "Ult", if phone then 70 else 110, 2)
+			ultBar = miniBar(ultGroup, "Ult", if phone then 54 else 110, 2)
 		end
 		ultText = Style.Text(skin, { Name = "Pct", Text = "", Role = "Number", TextSize = if battle then 10 else 13, AutoX = true, Size = UDim2.new(0, 0, 1, 0), LayoutOrder = 3, ZIndex = 3, Parent = ultGroup })
 		shieldLabel = Style.Text(skin, { Name = "Shield", Text = "", TextSize = if battle then 10 else 12, Color = C.Gold, AutoX = true, Size = UDim2.new(0, 0, 1, 0), LayoutOrder = 4, ZIndex = 3, Parent = resourceRow })

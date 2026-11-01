@@ -26,16 +26,18 @@ function Notifications.Create(theme: any, deps: any): any
 	local _skin, layout, root = Style.Context(theme, deps, "Notifications")
 	local phone = layout.Phone
 	local width = if phone then 270 else 350
+	-- desktop: bottom-right corner (free in every HUD layout); phone: top centre under the timer strip
 	local holder = Style.Frame({
 		Name = "Toasts",
-		AnchorPoint = Vector2.new(1, 0),
-		Position = UDim2.new(1, if phone then -10 else -20, 0, if phone then 92 else 230),
+		AnchorPoint = if phone then Vector2.new(0.5, 0) else Vector2.new(1, 1),
+		Position = if phone then UDim2.new(0.5, 0, 0, 132) else UDim2.new(1, -24, 1, -24),
 		Size = UDim2.fromOffset(width, 400),
 		Parent = root,
 	})
 	local l = Instance.new("UIListLayout")
 	l.SortOrder = Enum.SortOrder.LayoutOrder
-	l.HorizontalAlignment = Enum.HorizontalAlignment.Right
+	l.HorizontalAlignment = if phone then Enum.HorizontalAlignment.Center else Enum.HorizontalAlignment.Right
+	l.VerticalAlignment = if phone then Enum.VerticalAlignment.Top else Enum.VerticalAlignment.Bottom
 	l.Padding = UDim.new(0, 8)
 	l.Parent = holder
 	type Item = { Root: GuiObject, Expires: number }
@@ -44,7 +46,7 @@ function Notifications.Create(theme: any, deps: any): any
 	local clock = 0
 
 	local function push(text: string, kind: string?, icon: string?, duration: number?)
-		order -= 1
+		order += if phone then -1 else 1
 		local toast = UIKit.Toast(theme, { Text = text, Kind = kind or "Info", Icon = icon, Width = width, LayoutOrder = order })
 		toast.Root.Parent = holder
 		local d = duration or 4.5

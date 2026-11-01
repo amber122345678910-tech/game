@@ -8,8 +8,23 @@ local Vector3, CFrame, Color3, Enum = roblox.Vector3, roblox.CFrame, roblox.Colo
 
 local ROOT = "ReplicatedStorage.Shared.Rigs.Props"
 
+local ROLE_LIST = {
+	"Skin",
+	"Bone",
+	"Cloth",
+	"ClothAlt",
+	"Trim",
+	"Accent",
+	"Eye",
+	"Glow",
+	"Hair",
+	"Metal",
+	"Weapon",
+	"Detail",
+	"Dark",
+}
 local ROLES = {}
-for _, r in { "Skin", "Bone", "Cloth", "ClothAlt", "Trim", "Accent", "Eye", "Glow", "Hair", "Metal", "Weapon", "Detail", "Dark" } do
+for _, r in ROLE_LIST do
 	ROLES[r] = true
 end
 
@@ -69,7 +84,21 @@ return {
 	registry = function(T, Loader)
 		local Props = Loader.require(ROOT)
 		local names = Props.Names()
-		for _, n in { "Bone", "GasterBlaster", "Soul", "SaveStar", "VerdictBox3D", "Rift", "VoidOrb", "GiantBook", "Dish", "StarBone", "Chain" } do
+		for _, n in
+			{
+				"Bone",
+				"GasterBlaster",
+				"Soul",
+				"SaveStar",
+				"VerdictBox3D",
+				"Rift",
+				"VoidOrb",
+				"GiantBook",
+				"Dish",
+				"StarBone",
+				"Chain",
+			}
+		do
 			T.ok(table.find(names, n) ~= nil, "registry lists " .. n)
 			local m = Props.Get(n)
 			T.ok(type(m) == "table" and type(m.Build) == "function", n .. " has Build")
@@ -87,9 +116,27 @@ return {
 		local kit = Props.Kit(1)
 		local folder = roblox.Instance.new("Model")
 		-- right triangle -> one wedge; scalene -> two wedges whose vertices span the triangle
-		local r = Props.Triangle(kit, folder, "R", Vector3.new(0, 0, 0), Vector3.new(2, 0, 0), Vector3.new(0, 3, 0), 0.1, Color3.new(1, 1, 1))
+		local r = Props.Triangle(
+			kit,
+			folder,
+			"R",
+			Vector3.new(0, 0, 0),
+			Vector3.new(2, 0, 0),
+			Vector3.new(0, 3, 0),
+			0.1,
+			Color3.new(1, 1, 1)
+		)
 		T.eq(#r, 1, "right triangle = 1 wedge")
-		local t = Props.Triangle(kit, folder, "T", Vector3.new(0, 0, 0), Vector3.new(4, 0, 0), Vector3.new(1, 2, 0), 0.1, Color3.new(1, 1, 1))
+		local t = Props.Triangle(
+			kit,
+			folder,
+			"T",
+			Vector3.new(0, 0, 0),
+			Vector3.new(4, 0, 0),
+			Vector3.new(1, 2, 0),
+			0.1,
+			Color3.new(1, 1, 1)
+		)
 		T.eq(#t, 2, "scalene triangle = 2 wedges")
 		local area = 0
 		for _, w in t do
@@ -126,8 +173,8 @@ return {
 					if p.Name == "Shaft" then
 						ext = p.Size.X / 2
 					end
-					top = math.max(top, p.Position.Y + ext)
-					bottom = math.min(bottom, p.Position.Y - ext)
+					top = math.max(top, p.CFrame.Position.Y + ext)
+					bottom = math.min(bottom, p.CFrame.Position.Y - ext)
 				end
 				T.near(top - bottom, len, math.max(0.02, len * 0.02), ("Bone %g: tip-to-tip length"):format(len))
 			end
@@ -136,7 +183,7 @@ return {
 		T.eq(neon.Shaft.Material, Enum.Material.Neon, "material parameter")
 		Bone.SetLength(neon, 8)
 		T.near(neon:GetAttribute("Length"), 8, 1e-6, "SetLength attribute")
-		T.ok(neon.KnobTopL.Position.Y > 3.5, "SetLength moves the knobs")
+		T.ok(neon.KnobTopL.CFrame.Position.Y > 3.5, "SetLength moves the knobs")
 		Bone.SetColor(neon, Bone.Colors.Blue)
 		T.eq(neon.KnobBottomR.Color, Bone.Colors.Blue, "SetColor")
 	end,
@@ -155,7 +202,10 @@ return {
 				T.eq(m:GetAttribute("Style"), style, label .. ": Style attribute")
 				T.eq(m:GetAttribute("RigScale"), scale, label .. ": RigScale for HDMesh")
 				local jaw = m:FindFirstChild("Jaw")
-				T.ok(jaw and jaw:IsA("Model") and jaw.PrimaryPart and jaw.PrimaryPart.Name == "Mandible", label .. ": Jaw model")
+				T.ok(
+					jaw and jaw:IsA("Model") and jaw.PrimaryPart and jaw.PrimaryPart.Name == "Mandible",
+					label .. ": Jaw model"
+				)
 				local hinge = core:FindFirstChild("JawHinge")
 				local muzzle = core:FindFirstChild("Muzzle")
 				T.ok(hinge and hinge:IsA("Attachment"), label .. ": JawHinge attachment")
@@ -173,7 +223,13 @@ return {
 				local anchors = skullData.Anchors
 				nearV(T, hinge.CFrame.Position, anchors.JawHinge * scale, 0.01 * scale, label .. ": hinge = HD hinge")
 				nearV(T, muzzle.CFrame.Position, anchors.Muzzle * scale, 0.01 * scale, label .. ": muzzle = HD muzzle")
-				nearV(T, core.RightEye.CFrame.Position, anchors.RightEye * scale, 0.01 * scale, label .. ": right eye = HD anchor")
+				nearV(
+					T,
+					core.RightEye.CFrame.Position,
+					anchors.RightEye * scale,
+					0.01 * scale,
+					label .. ": right eye = HD anchor"
+				)
 				local mandible = jaw.PrimaryPart
 				local hdJaw = mandible:FindFirstChild("HD_BlasterJaw")
 				T.ok(hdJaw ~= nil, label .. ": HD_BlasterJaw on Mandible")
@@ -205,16 +261,20 @@ return {
 				T.ok(skullN >= 20 and jawN >= 6, label .. ": HDGroup tags present")
 				T.eq(eyes, 2, label .. ": two Eye parts")
 				-- bounding box close to the HD skull + jaw union (fallback matches the HD proportions)
-				local minV, maxV = Vector3.new(math.huge, math.huge, math.huge), Vector3.new(-math.huge, -math.huge, -math.huge)
+				local minV, maxV =
+					Vector3.new(math.huge, math.huge, math.huge), Vector3.new(-math.huge, -math.huge, -math.huge)
 				for _, p in parts(m) do
 					if p.Transparency < 0.99 then
-						minV = minV:Min(p.Position)
-						maxV = maxV:Max(p.Position)
+						minV = minV:Min(p.CFrame.Position)
+						maxV = maxV:Max(p.CFrame.Position)
 					end
 				end
 				local span = (maxV - minV) / scale
 				T.ok(math.abs(span.X - skullData.Size.X) < 0.9, label .. ": width close to HD skull (" .. span.X .. ")")
-				T.ok(math.abs(span.Z - skullData.Size.Z) < 0.9, label .. ": length close to HD skull (" .. span.Z .. ")")
+				T.ok(
+					math.abs(span.Z - skullData.Size.Z) < 0.9,
+					label .. ": length close to HD skull (" .. span.Z .. ")"
+				)
 			end
 		end
 	end,
@@ -227,7 +287,7 @@ return {
 			local mandible = m.Jaw.Mandible
 			local chin = m.Jaw:FindFirstChild("Chin")
 			local rest = mandible.CFrame
-			local chinRest = chin.Position
+			local chinRest = chin.CFrame.Position
 			-- move the whole blaster first: SetJaw must use the current Core frame
 			local shift = CFrame.new(10, 5, -3) * CFrame.Angles(0, math.rad(40), 0)
 			for _, p in parts(m) do
@@ -238,13 +298,15 @@ return {
 			T.near(m:GetAttribute("JawOpen"), 1, 1e-6, style .. ": JawOpen attribute")
 			local hingeAfter = (mandible.CFrame * mandible.JawHinge.CFrame).Position
 			nearV(T, hingeAfter, hingeW, 1e-3, style .. ": jaw rotates about the hinge")
-			local chinOpen = chin.Position
+			local chinOpen = chin.CFrame.Position
 			local chinClosedW = (shift * CFrame.new(chinRest)).Position
 			T.ok(chinOpen.Y < chinClosedW.Y - 0.5, style .. ": open jaw drops the chin")
-			local angle = math.acos(math.clamp((shift.Rotation * rest.Rotation).LookVector:Dot(mandible.CFrame.LookVector), -1, 1))
+			local angle = math.acos(
+				math.clamp((shift.Rotation * rest.Rotation).LookVector:Dot(mandible.CFrame.LookVector), -1, 1)
+			)
 			T.near(angle, m:GetAttribute("JawMaxOpen"), 0.02, style .. ": opening angle = JawMaxOpen")
 			GB.SetJaw(m, 0)
-			nearV(T, chin.Position, chinClosedW, 1e-3, style .. ": SetJaw(0) restores the rest pose")
+			nearV(T, chin.CFrame.Position, chinClosedW, 1e-3, style .. ": SetJaw(0) restores the rest pose")
 			-- glow
 			local light = find(m, "Glow")
 			T.ok(light and light:IsA("PointLight") and not light.Enabled, style .. ": light off at rest")
@@ -290,7 +352,7 @@ return {
 					for _, sx in { -1, 1 } do
 						for _, sy in { -1, 1 } do
 							for _, sz in { -1, 1 } do
-								local w = p.Position + r * Vector3.new(half.X * sx, half.Y * sy, half.Z * sz)
+								local w = p.CFrame.Position + r * Vector3.new(half.X * sx, half.Y * sy, half.Z * sz)
 								minX, maxX = math.min(minX, w.X), math.max(maxX, w.X)
 								minY, maxY = math.min(minY, w.Y), math.max(maxY, w.Y)
 							end
@@ -310,10 +372,10 @@ return {
 		nearV(T, pivot.Position, Vector3.new(0, 0, 0), 1e-4, "half pivot at the heart centre")
 		local leftX, rightX = 0, 0
 		for _, p in parts(l) do
-			leftX += p.Position.X
+			leftX += p.CFrame.Position.X
 		end
 		for _, p in parts(r) do
-			rightX += p.Position.X
+			rightX += p.CFrame.Position.X
 		end
 		T.ok(leftX < 0 and rightX > 0, "halves on their sides")
 		T.noerror(function()
@@ -322,11 +384,14 @@ return {
 		local shards = Soul.Shards(Color3.fromRGB(255, 0, 0), 1, 9, 3)
 		T.eq(#shards, 9, "Shards count")
 		for i, s in shards do
-			T.ok(s:IsA("WedgePart") and s.Parent == nil and s.Anchored, "shard " .. i .. " is an unparented anchored wedge")
-			T.ok(s.Position.Magnitude < 0.8, "shard inside the heart area")
+			T.ok(
+				s:IsA("WedgePart") and s.Parent == nil and s.Anchored,
+				"shard " .. i .. " is an unparented anchored wedge"
+			)
+			T.ok(s.CFrame.Position.Magnitude < 0.8, "shard inside the heart area")
 		end
 		local again = Soul.Shards(Color3.fromRGB(255, 0, 0), 1, 9, 3)
-		nearV(T, again[4].Position, shards[4].Position, 1e-9, "Shards deterministic per seed")
+		nearV(T, again[4].CFrame.Position, shards[4].CFrame.Position, 1e-9, "Shards deterministic per seed")
 		T.ok(#Soul.Outline(1) > 10, "Outline polygon")
 	end,
 
@@ -382,7 +447,7 @@ return {
 		local screen = box:FindFirstChild("Screen")
 		T.ok(screen and screen:IsA("BasePart"), "Screen part")
 		T.eq(screen:GetAttribute("SurfaceFace"), "Front", "Screen face")
-		T.ok(screen.Position.Z < 0, "Screen on the front (-Z)")
+		T.ok(screen.CFrame.Position.Z < 0, "Screen on the front (-Z)")
 
 		local Rift = Props.Get("Rift")
 		local rift = Rift.Build(Color3.fromRGB(139, 61, 255), 2)
@@ -408,8 +473,14 @@ return {
 		local openUp = left.PrimaryPart.CFrame.UpVector
 		Book.SetOpen(book, 0)
 		T.near(math.abs(left.PrimaryPart.CFrame.UpVector.Y), 0, 1e-3, "closed: covers vertical")
-		T.ok(left.PrimaryPart.Position.Y < 0 and right.PrimaryPart.Position.Y < 0, "closed: covers swing down")
-		T.ok(left.PrimaryPart.Position.X < 0 and right.PrimaryPart.Position.X > 0, "closed: covers on their sides")
+		T.ok(
+			left.PrimaryPart.CFrame.Position.Y < 0 and right.PrimaryPart.CFrame.Position.Y < 0,
+			"closed: covers swing down"
+		)
+		T.ok(
+			left.PrimaryPart.CFrame.Position.X < 0 and right.PrimaryPart.CFrame.Position.X > 0,
+			"closed: covers on their sides"
+		)
 		Book.SetOpen(book, 1)
 		nearV(T, left.PrimaryPart.CFrame.UpVector, openUp, 1e-4, "SetOpen(1) restores")
 
@@ -435,11 +506,11 @@ return {
 		local c = Chain.Build(6)
 		local from, to = Vector3.new(0, 1, 0), Vector3.new(12, 3, 4)
 		Chain.Fit(c, from, to, 0)
-		nearV(T, c.Anchor.Position, from, 1e-4, "Fit: anchor at from")
+		nearV(T, c.Anchor.CFrame.Position, from, 1e-4, "Fit: anchor at from")
 		local tipZ = math.huge
 		local far = 0
 		for _, p in parts(c) do
-			far = math.max(far, (p.Position - from).Magnitude)
+			far = math.max(far, (p.CFrame.Position - from).Magnitude)
 		end
 		T.near(far, (to - from).Magnitude, 0.6, "Fit: hook reaches the target")
 		local _ = tipZ

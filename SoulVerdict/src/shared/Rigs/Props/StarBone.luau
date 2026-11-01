@@ -31,12 +31,27 @@ function StarBone.Build(scale: number?, color: Color3?): Model
 	-- twinkle: three long thin diamonds along X, Y and the flight axis
 	kit.Box(model, "Ray1", Vector3.new(1.7, 0.12, 0.12), CFrame.new() * CFrame.Angles(math.pi / 4, 0, 0), CYAN, glow)
 	kit.Box(model, "Ray2", Vector3.new(0.12, 1.7, 0.12), CFrame.new() * CFrame.Angles(0, math.pi / 4, 0), CYAN, glow)
-	kit.Box(model, "Ray3", Vector3.new(0.1, 0.1, 1.15), CFrame.new(0, 0, -0.1) * CFrame.Angles(0, 0, math.pi / 4), tint:Lerp(CYAN, 0.5), glow)
+	kit.Box(
+		model,
+		"Ray3",
+		Vector3.new(0.1, 0.1, 1.15),
+		CFrame.new(0, 0, -0.1) * CFrame.Angles(0, 0, math.pi / 4),
+		tint:Lerp(CYAN, 0.5),
+		glow
+	)
 	-- the bone trailing behind the star (axis along Z)
 	local len, t = 2.5, 0.3
 	local z0, z1 = 0.45, 0.45 + len
 	local bone = { Role = "Bone", Material = Enum.Material.SmoothPlastic }
-	kit.Cyl(model, "Shaft", z1 - z0 - 0.3, t, CFrame.new(0, 0, (z0 + z1) / 2) * CFrame.Angles(0, math.pi / 2, 0), BONE, bone)
+	kit.Cyl(
+		model,
+		"Shaft",
+		z1 - z0 - 0.3,
+		t,
+		CFrame.new(0, 0, (z0 + z1) / 2) * CFrame.Angles(0, math.pi / 2, 0),
+		BONE,
+		bone
+	)
 	for i, k in { { -1, z0 + 0.15 }, { 1, z0 + 0.15 }, { -1, z1 - 0.15 }, { 1, z1 - 0.15 } } do
 		kit.Ball(model, "Knob" .. i, t * 1.35, CFrame.new(k[1] * t * 0.42, 0, k[2]), BONE, bone)
 	end

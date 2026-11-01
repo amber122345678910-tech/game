@@ -15,7 +15,7 @@ function BossBar.Create(theme: any, deps: any): any
 	local skin, layout, root = Style.Context(theme, deps, "BossBar")
 	local C = skin.C
 	local phone = layout.Phone
-	local W = if phone then 430 else 720
+	local W = if phone then 370 else 720
 	local barH = if phone then 14 else (if skin.Battle then 22 else 18)
 	local top = if phone then 58 else (if skin.Battle then 80 else 88)
 	local holder = Style.Frame({

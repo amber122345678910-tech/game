@@ -112,7 +112,14 @@ local function notebook(K: Kit, m: Model, C: ColorFn): BasePart
 	K.Box(m, "CoverFront", V(0.025, 0.74, 0.56), CF(0.063, cy, cz), cover, coverP)
 	K.Box(m, "CoverBack", V(0.025, 0.74, 0.56), CF(-0.063, cy, cz), cover, coverP)
 	-- torn corner on the front cover (bottom-front) shows the pages beneath
-	K.Wedge(m, "TornCorner", V(0.03, 0.2, 0.18), CF(0.066, cy - 0.27, cz - 0.19) * CFrame.Angles(0, math.pi, 0), page, paper)
+	K.Wedge(
+		m,
+		"TornCorner",
+		V(0.03, 0.2, 0.18),
+		CF(0.066, cy - 0.27, cz - 0.19) * CFrame.Angles(0, math.pi, 0),
+		page,
+		paper
+	)
 	-- label
 	K.Box(m, "Label", V(0.03, 0.14, 0.26), CF(0.064, cy + 0.12, cz - 0.02), rgb(248, 244, 230), paper)
 	K.Box(m, "LabelLine", V(0.034, 0.02, 0.2), CF(0.064, cy + 0.12, cz - 0.02), shade(cover, -0.2), {
@@ -136,10 +143,17 @@ local function notebook(K: Kit, m: Model, C: ColorFn): BasePart
 		)
 	end
 	-- ribbon bookmark hanging below
-	K.Box(m, "Bookmark", V(0.012, 0.2, 0.05), CF(0.0, cy - 0.43, cz + 0.08) * CFrame.Angles(rad(8), 0, 0), rgb(214, 56, 76), {
-		Role = "Weapon",
-		CastShadow = false,
-	})
+	K.Box(
+		m,
+		"Bookmark",
+		V(0.012, 0.2, 0.05),
+		CF(0.0, cy - 0.43, cz + 0.08) * CFrame.Angles(rad(8), 0, 0),
+		rgb(214, 56, 76),
+		{
+			Role = "Weapon",
+			CastShadow = false,
+		}
+	)
 	return grip
 end
 
@@ -163,17 +177,31 @@ local function notebookOpen(K: Kit, m: Model, C: ColorFn): BasePart
 		K.Box(m, "Pages" .. tag, V(0.5, 0.045, 0.7), half * CF(0.27 * s, 0.024, 0), page, paper)
 		K.Ellipsoid(m, "Curl" .. tag, V(0.14, 0.07, 0.7), half * CF(0.06 * s, 0.04, 0), page, paper)
 		for r = 1, 3 do
-			K.Box(m, "Line" .. tag .. r, V(0.36, 0.05, 0.016), half * CF(0.3 * s, 0.03, -0.2 + r * 0.12), rgb(160, 176, 214), {
-				Role = "Weapon",
-				CastShadow = false,
-			})
+			K.Box(
+				m,
+				"Line" .. tag .. r,
+				V(0.36, 0.05, 0.016),
+				half * CF(0.3 * s, 0.03, -0.2 + r * 0.12),
+				rgb(160, 176, 214),
+				{
+					Role = "Weapon",
+					CastShadow = false,
+				}
+			)
 		end
 	end
 	for i = 1, 6 do
 		local z = -0.3 + (i - 1) * 0.12
 		K.Cyl(m, "Coil" .. i, 0.025, 0.12, spine * CF(0, 0.02, z) * AXIS_Z, trim, metal)
 	end
-	K.Wedge(m, "TornPage", V(0.01, 0.12, 0.14), spine * CF(0.5, 0.06, -0.36) * CFrame.Angles(0, 0, rad(80)), page, paper)
+	K.Wedge(
+		m,
+		"TornPage",
+		V(0.01, 0.12, 0.14),
+		spine * CF(0.5, 0.06, -0.36) * CFrame.Angles(0, 0, rad(80)),
+		page,
+		paper
+	)
 	return grip
 end
 
@@ -205,9 +233,30 @@ local function burntPan(K: Kit, m: Model, C: ColorFn): BasePart
 	end
 	-- the stuck egg: burnt rim, white, yolk
 	local egg = c * CF(0.075, -0.05, 0.08)
-	K.Ellipsoid(m, "EggBurnt", V(0.03, 0.34, 0.3), egg * CFrame.Angles(rad(20), 0, 0), rgb(92, 58, 34), props(nil, { CastShadow = false }))
-	K.Ellipsoid(m, "EggWhite", V(0.04, 0.28, 0.24), egg * CF(0.006, 0.01, 0) * CFrame.Angles(rad(20), 0, 0), rgb(246, 240, 226), props(nil, { CastShadow = false }))
-	K.Ellipsoid(m, "EggYolk", V(0.07, 0.12, 0.12), egg * CF(0.025, 0.03, -0.02), rgb(255, 176, 40), props(nil, { CastShadow = false }))
+	K.Ellipsoid(
+		m,
+		"EggBurnt",
+		V(0.03, 0.34, 0.3),
+		egg * CFrame.Angles(rad(20), 0, 0),
+		rgb(92, 58, 34),
+		props(nil, { CastShadow = false })
+	)
+	K.Ellipsoid(
+		m,
+		"EggWhite",
+		V(0.04, 0.28, 0.24),
+		egg * CF(0.006, 0.01, 0) * CFrame.Angles(rad(20), 0, 0),
+		rgb(246, 240, 226),
+		props(nil, { CastShadow = false })
+	)
+	K.Ellipsoid(
+		m,
+		"EggYolk",
+		V(0.07, 0.12, 0.12),
+		egg * CF(0.025, 0.03, -0.02),
+		rgb(255, 176, 40),
+		props(nil, { CastShadow = false })
+	)
 	for i, y in { 0.06, -0.06 } do
 		K.Ball(m, "Rivet" .. i, 0.06, CF(0.0, y, -0.43), shade(iron, 0.2), metal)
 	end
@@ -227,9 +276,22 @@ local function emptyGun(K: Kit, m: Model, C: ColorFn): BasePart
 	local metal = props(Enum.Material.Metal, { Reflectance = 0.08 })
 	local small = props(Enum.Material.Metal, { CastShadow = false })
 	local G = GUN_TO_GRIP
-	local grip =
-		K.Ellipsoid(m, "Grip", V(0.13, 0.4, 0.17), G * CF(0, -0.02, 0.05) * CFrame.Angles(rad(-16), 0, 0), wood, props(Enum.Material.Wood))
-	K.Ellipsoid(m, "ButtCap", V(0.135, 0.08, 0.18), G * CF(0, -0.21, 0.11) * CFrame.Angles(rad(-16), 0, 0), brass, small)
+	local grip = K.Ellipsoid(
+		m,
+		"Grip",
+		V(0.13, 0.4, 0.17),
+		G * CF(0, -0.02, 0.05) * CFrame.Angles(rad(-16), 0, 0),
+		wood,
+		props(Enum.Material.Wood)
+	)
+	K.Ellipsoid(
+		m,
+		"ButtCap",
+		V(0.135, 0.08, 0.18),
+		G * CF(0, -0.21, 0.11) * CFrame.Angles(rad(-16), 0, 0),
+		brass,
+		small
+	)
 	K.Box(m, "Frame", V(0.1, 0.2, 0.36), G * CF(0, 0.25, -0.12), steel, metal)
 	K.Cyl(m, "Cylinder", 0.22, 0.22, G * CF(0, 0.26, -0.15) * AXIS_Z, shade(steel, 0.08), metal)
 	K.Cyl(m, "CylinderBand", 0.03, 0.225, G * CF(0, 0.26, -0.2) * AXIS_Z, shade(steel, -0.18), small)
@@ -237,16 +299,50 @@ local function emptyGun(K: Kit, m: Model, C: ColorFn): BasePart
 	K.Cyl(m, "EjectorRod", 0.36, 0.05, G * CF(0, 0.245, -0.45) * AXIS_Z, shade(steel, -0.1), small)
 	K.Cyl(m, "Muzzle", 0.02, 0.05, G * CF(0, 0.31, -0.805) * AXIS_Z, rgb(16, 14, 16), small)
 	K.Box(m, "FrontSight", V(0.02, 0.05, 0.05), G * CF(0, 0.37, -0.76), brass, small)
-	K.Box(m, "Hammer", V(0.05, 0.1, 0.07), G * CF(0, 0.37, 0.04) * CFrame.Angles(rad(-30), 0, 0), shade(steel, -0.1), small)
-	K.Box(m, "HammerSpur", V(0.06, 0.03, 0.06), G * CF(0, 0.42, 0.08) * CFrame.Angles(rad(-30), 0, 0), shade(steel, -0.1), small)
+	K.Box(
+		m,
+		"Hammer",
+		V(0.05, 0.1, 0.07),
+		G * CF(0, 0.37, 0.04) * CFrame.Angles(rad(-30), 0, 0),
+		shade(steel, -0.1),
+		small
+	)
+	K.Box(
+		m,
+		"HammerSpur",
+		V(0.06, 0.03, 0.06),
+		G * CF(0, 0.42, 0.08) * CFrame.Angles(rad(-30), 0, 0),
+		shade(steel, -0.1),
+		small
+	)
 	-- trigger guard (lower semicircle in the gun's YZ plane) + trigger
 	local guardCF = G * CF(0, 0.11, -0.1) * CFrame.Angles(0, math.pi / 2, 0)
-	K.Arc(m, "Guard", guardCF, 0.08, 180, 360, 5, 0.025, 0.035, brass, { Role = "Weapon", Material = Enum.Material.Metal, CastShadow = false })
+	K.Arc(
+		m,
+		"Guard",
+		guardCF,
+		0.08,
+		180,
+		360,
+		5,
+		0.025,
+		0.035,
+		brass,
+		{ Role = "Weapon", Material = Enum.Material.Metal, CastShadow = false }
+	)
 	K.Box(m, "Trigger", V(0.025, 0.09, 0.03), G * CF(0, 0.1, -0.09) * CFrame.Angles(rad(18), 0, 0), brass, small)
 	-- empty chambers on the cylinder face (the top one hides behind the barrel)
 	for i = 1, 5 do
 		local a = rad(90 + i * 60)
-		K.Cyl(m, "Chamber" .. i, 0.02, 0.05, G * CF(math.cos(a) * 0.068, 0.26 + math.sin(a) * 0.068, -0.262) * AXIS_Z, rgb(18, 16, 18), small)
+		K.Cyl(
+			m,
+			"Chamber" .. i,
+			0.02,
+			0.05,
+			G * CF(math.cos(a) * 0.068, 0.26 + math.sin(a) * 0.068, -0.262) * AXIS_Z,
+			rgb(18, 16, 18),
+			small
+		)
 	end
 	return grip
 end
@@ -262,7 +358,15 @@ local function boneSword(K: Kit, m: Model, C: ColorFn): BasePart
 	local boneP = props(Enum.Material.SmoothPlastic)
 	local grip = K.Cyl(m, "Grip", 0.5, 0.12, CF(0, 0, 0.06) * AXIS_Z, bone, boneP)
 	for i, z in { -0.08, 0.06, 0.2 } do
-		K.Cyl(m, "Wrap" .. i, 0.05, 0.135, CF(0, 0, z) * AXIS_Z * CFrame.Angles(rad(i * 9), 0, 0), wrap, props(Enum.Material.Leather))
+		K.Cyl(
+			m,
+			"Wrap" .. i,
+			0.05,
+			0.135,
+			CF(0, 0, z) * AXIS_Z * CFrame.Angles(rad(i * 9), 0, 0),
+			wrap,
+			props(Enum.Material.Leather)
+		)
 	end
 	for _, x in { -0.065, 0.065 } do
 		K.Ball(m, "Pommel", 0.17, CF(x, 0, 0.33), bone, boneP)
@@ -279,9 +383,30 @@ local function boneSword(K: Kit, m: Model, C: ColorFn): BasePart
 	local zc = -0.26 - bladeLen / 2
 	K.Box(m, "Blade", V(0.07, 0.27, bladeLen), CF(0, 0, zc), bone, boneP)
 	K.Wedge(m, "TipTop", V(0.07, 0.135, 0.42), CF(0, 0.0675, zc - bladeLen / 2 - 0.21), bone, boneP)
-	K.Wedge(m, "TipBottom", V(0.07, 0.135, 0.42), CF(0, -0.0675, zc - bladeLen / 2 - 0.21) * CFrame.Angles(0, 0, math.pi), bone, boneP)
-	K.Box(m, "Core", V(0.08, 0.05, bladeLen - 0.1), CF(0, 0, zc), glow, props(Enum.Material.Neon, { CastShadow = false }))
-	K.Box(m, "CoreTip", V(0.08, 0.035, 0.3), CF(0, 0, zc - bladeLen / 2 - 0.08), glow, props(Enum.Material.Neon, { CastShadow = false }))
+	K.Wedge(
+		m,
+		"TipBottom",
+		V(0.07, 0.135, 0.42),
+		CF(0, -0.0675, zc - bladeLen / 2 - 0.21) * CFrame.Angles(0, 0, math.pi),
+		bone,
+		boneP
+	)
+	K.Box(
+		m,
+		"Core",
+		V(0.08, 0.05, bladeLen - 0.1),
+		CF(0, 0, zc),
+		glow,
+		props(Enum.Material.Neon, { CastShadow = false })
+	)
+	K.Box(
+		m,
+		"CoreTip",
+		V(0.08, 0.035, 0.3),
+		CF(0, 0, zc - bladeLen / 2 - 0.08),
+		glow,
+		props(Enum.Material.Neon, { CastShadow = false })
+	)
 	-- jagged teeth along both edges (diamonds half-buried in the edge), alternating sizes
 	for i = 1, 6 do
 		local z = -0.42 - (i - 1) * 0.26
@@ -289,7 +414,14 @@ local function boneSword(K: Kit, m: Model, C: ColorFn): BasePart
 		local s = if big then 0.15 else 0.11
 		for _, side in { 1, -1 } do
 			local y = side * (0.135 + (if big then 0.02 else 0.01))
-			K.Box(m, "Tooth", V(0.06, s, s), CF(0, y, z + side * 0.03) * CFrame.Angles(rad(45 + side * 10), 0, 0), bone, boneP)
+			K.Box(
+				m,
+				"Tooth",
+				V(0.06, s, s),
+				CF(0, y, z + side * 0.03) * CFrame.Angles(rad(45 + side * 10), 0, 0),
+				bone,
+				boneP
+			)
 		end
 	end
 	return grip

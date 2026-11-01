@@ -3,6 +3,9 @@
 -- Icons.Names()), the HUD-style bars, and the Gallery screen (every page, desktop + phone, en + ru).
 -- Lune validates property names / enum items, so a wrong property in a builder fails here.
 
+local roblox = require("@lune/roblox")
+local UDim2 = roblox.UDim2
+
 local UI = "src/client/UI/"
 
 local function setup(Loader)

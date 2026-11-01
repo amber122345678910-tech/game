@@ -60,11 +60,12 @@ function Rift.Build(color: Color3?, radius: number?): Model
 	local model = Props.NewModel("Rift", "Rift")
 	local hot = c:Lerp(Color3.new(1, 1, 1), 0.55)
 
-	local void = kit.Ellipsoid(model, "Void", Vector3.new(R * 1.62, R * 2.3, 0.08), CFrame.new(), Color3.fromRGB(6, 3, 14), {
-		Role = "Dark",
-		Material = NEON,
-		CastShadow = false,
-	})
+	local void =
+		kit.Ellipsoid(model, "Void", Vector3.new(R * 1.62, R * 2.3, 0.08), CFrame.new(), Color3.fromRGB(6, 3, 14), {
+			Role = "Dark",
+			Material = NEON,
+			CastShadow = false,
+		})
 	ring(kit, model, "Rim", RIM_SEGMENTS, R, 0.22, 0.2, hot, { Role = "Glow", Material = NEON, CastShadow = false })
 	ring(kit, model, "Aura", AURA_SEGMENTS, R * 1.06, 0.6, 0.1, c, {
 		Role = "Glow",

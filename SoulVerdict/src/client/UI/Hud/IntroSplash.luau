@@ -180,10 +180,9 @@ function IntroSplash.Create(theme: any, deps: any): any
 		Text = "",
 		TextSize = math.floor((if battle then 11 else 14) * k),
 		Color = C.Good,
-		AnchorPoint = Vector2.new(0, 1),
-		Position = UDim2.new(0, 0, 1, 0),
-		Size = UDim2.new(1, 0, 0, 18),
-		Parent = humansCol,
+		Size = UDim2.new(1, 0, 0, 22),
+		LayoutOrder = 1000,
+		Parent = cards,
 	})
 
 	-- countdown --------------------------------------------------------------------------------------------
@@ -291,7 +290,7 @@ function IntroSplash.Create(theme: any, deps: any): any
 		end
 		setPortrait(monster.KitId or "", monster.SkinId, kitColor)
 		for _, child in cards:GetChildren() do
-			if child:IsA("GuiObject") then
+			if child:IsA("GuiObject") and child ~= harmonyLabel then
 				child:Destroy()
 			end
 		end

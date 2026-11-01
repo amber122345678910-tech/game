@@ -12,7 +12,7 @@ function TopStrip.Create(theme: any, deps: any): any
 	local skin, layout, root = Style.Context(theme, deps, "TopStrip")
 	local C = skin.C
 	local phone = layout.Phone
-	local W = if phone then 372 else 476
+	local W = if phone then 330 else 476
 	local H = if phone then 44 else 54
 	local box = Style.Box(skin, {
 		Name = "Strip",

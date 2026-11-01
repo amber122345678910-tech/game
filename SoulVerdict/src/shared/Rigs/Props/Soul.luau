@@ -51,14 +51,8 @@ function Soul.Build(color: Color3, size: number?): Model
 	local s = size or 1
 	local kit = Props.Kit(s)
 	local model = Props.NewModel("Soul", "Soul")
-	local core = kit.Box(
-		model,
-		"Core",
-		Vector3.new(W, Y_C - Y_V, DEPTH),
-		CFrame.new(0, (Y_C + Y_V) / 2, 0),
-		color,
-		glowProps()
-	)
+	local core =
+		kit.Box(model, "Core", Vector3.new(W, Y_C - Y_V, DEPTH), CFrame.new(0, (Y_C + Y_V) / 2, 0), color, glowProps())
 	lobe(kit, model, "LobeL", -0.25, color)
 	lobe(kit, model, "LobeR", 0.25, color)
 	-- the V: two right-triangle wedges sharing the vertical leg on the centre line
@@ -105,7 +99,7 @@ local CRACK: { Vector2 } = {
 	Vector2.new(0, Y_TIP),
 }
 
-local function half(parent: Model, kit: any, color: Color3, side: number, s: number): Model
+local function half(parent: Model, kit: any, color: Color3, side: number): Model
 	local model = Instance.new("Model")
 	model.Name = if side < 0 then "LeftHalf" else "RightHalf"
 	-- polygon: outer corner at the lobe line -> outer V start -> tip -> crack (bottom to top) -> notch
@@ -128,8 +122,8 @@ function Soul.BuildBroken(color: Color3, size: number?, gap: number?): Model
 	local s = size or 1
 	local kit = Props.Kit(s)
 	local model = Props.NewModel("SoulBroken", "Soul")
-	local left = half(model, kit, color, -1, s)
-	local right = half(model, kit, color, 1, s)
+	local left = half(model, kit, color, -1)
+	local right = half(model, kit, color, 1)
 	local g = gap or 0
 	if g ~= 0 then
 		-- pre-split: halves pushed apart and tilted away from the crack (pivot = heart centre)

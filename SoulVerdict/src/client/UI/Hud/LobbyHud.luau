@@ -215,7 +215,7 @@ function LobbyHud.Create(theme: any, deps: any): any
 	local cardH = if phone then 70 else 112
 	local votePanel = UIKit.Panel(theme, {
 		Name = "Vote",
-		Title = Style.L("round.vote.title"),
+		Title = Style.L("lobby.vote.title"),
 		TitleIcon = "Map",
 		Padding = if phone then 10 else 14,
 		AnchorPoint = Vector2.new(1, 0),
@@ -236,7 +236,7 @@ function LobbyHud.Create(theme: any, deps: any): any
 		Padding = 18,
 		AnchorPoint = Vector2.new(0.5, 0.5),
 		Position = UDim2.fromScale(0.5, 0.52),
-		Size = UDim2.fromOffset(if phone then 520 else 760, if phone then 170 else 232),
+		Size = UDim2.fromOffset(if phone then 500 else 700, if phone then 170 else 232),
 		Parent = root,
 	})
 	chosen.Root.Visible = false
@@ -316,11 +316,11 @@ function LobbyHud.Create(theme: any, deps: any): any
 				Name = "Name",
 				Text = if meta then Style.Pick(meta.Name) else mapId,
 				Role = "Heading",
-				TextSize = if phone then math.floor(theme.TextSize.Small * 1.05) else math.floor(theme.TextSize.Body * 1.05),
+				TextSize = if phone then theme.TextSize.Caption else theme.TextSize.Small,
 				Upper = true,
-				Scaled = true,
-				Position = UDim2.fromOffset(x0, if phone then 6 else 10),
-				Size = UDim2.new(1, -x0 - 10, 0, if phone then 20 else 26),
+				Truncate = true,
+				Position = UDim2.fromOffset(x0, if phone then 6 else 9),
+				Size = UDim2.new(1, -x0 - 10, 0, if phone then 18 else 22),
 				Parent = button,
 			})
 			if not phone and meta then
@@ -331,7 +331,7 @@ function LobbyHud.Create(theme: any, deps: any): any
 					Tone = "Dim",
 					Wrap = true,
 					Truncate = true,
-					Position = UDim2.fromOffset(x0, 40),
+					Position = UDim2.fromOffset(x0, 36),
 					Size = UDim2.new(1, -x0 - 10, 0, 34),
 					Parent = button,
 				})
@@ -358,8 +358,8 @@ function LobbyHud.Create(theme: any, deps: any): any
 				Size = UDim2.fromOffset(84, 20),
 				Parent = button,
 			})
-			local mine = UIKit.Badge(theme, { Text = Style.L("lobby.vote.mine"), Color = c.Accent, Style = "Solid", Icon = "Check", AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, -8, 0, 8), Parent = button })
-			local lead = UIKit.Badge(theme, { Text = Style.L("lobby.vote.leading"), Color = c.Gold, Style = "Soft", Icon = "Crown", AnchorPoint = Vector2.new(0, 0), Position = UDim2.fromOffset(12, 10), Parent = button })
+			local mine = UIKit.Badge(theme, { Text = Style.L("lobby.vote.mine"), Color = c.Accent, Style = "Solid", Icon = "Check", AnchorPoint = Vector2.new(0, 1), Position = UDim2.new(0, 12, 1, -12), Height = if phone then 18 else 22, Parent = button })
+			local lead = UIKit.Badge(theme, { Text = Style.L("lobby.vote.leading"), Color = c.Gold, Style = "Solid", Icon = "Crown", AnchorPoint = Vector2.new(0, 0), Position = UDim2.fromOffset(12, 12), Height = if phone then 18 else 22, Parent = button })
 			lead.ZIndex = 3
 			Motion.On(button, "Activated", function()
 				vote(mapId)

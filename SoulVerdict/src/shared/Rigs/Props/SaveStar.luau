@@ -25,8 +25,8 @@ local Props = require(script.Parent)
 local SaveStar = {}
 
 SaveStar.Colors = {
-	Gold = Color3.fromRGB(255, 205, 52),
-	Core = Color3.fromRGB(255, 238, 150),
+	Gold = Color3.fromRGB(255, 190, 30),
+	Core = Color3.fromRGB(255, 226, 110),
 	Lit = Color3.fromRGB(255, 248, 222),
 	Empty = Color3.fromRGB(58, 56, 74),
 	Contested = Color3.fromRGB(255, 70, 58),
@@ -103,22 +103,8 @@ function SaveStar.Build(scale: number?): Model
 		local props = { Role = "Glow", Material = NEON, CastShadow = false, Attributes = { Sparkle = i } }
 		-- a long thin diamond = a square block squashed along one diagonal
 		kit.Box(model, "Sparkle" .. i .. "a", Vector3.new(len * 0.2, len * 0.2, 0.04), cf, C.Core, props)
-		kit.Box(
-			model,
-			"Sparkle" .. i .. "b",
-			Vector3.new(len * 0.08, len * 0.72, 0.04),
-			CFrame.new(pos),
-			C.Core,
-			props
-		)
-		kit.Box(
-			model,
-			"Sparkle" .. i .. "c",
-			Vector3.new(len * 0.72, len * 0.08, 0.04),
-			CFrame.new(pos),
-			C.Core,
-			props
-		)
+		kit.Box(model, "Sparkle" .. i .. "b", Vector3.new(len * 0.08, len * 0.72, 0.04), CFrame.new(pos), C.Core, props)
+		kit.Box(model, "Sparkle" .. i .. "c", Vector3.new(len * 0.72, len * 0.08, 0.04), CFrame.new(pos), C.Core, props)
 	end
 	-- progress ring: horizontal, segments clockwise from the front (-Z) seen from above
 	local ring = Instance.new("Model")

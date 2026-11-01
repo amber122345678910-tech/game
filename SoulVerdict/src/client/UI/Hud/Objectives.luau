@@ -27,8 +27,8 @@ function Objectives.Create(theme: any, deps: any): any
 	Style.Vignette({ Name = "Vignette", Color = Color3.fromRGB(150, 40, 255), Strength = 0.7, Depth = 0.22, Parent = warn })
 	local warnBox = Style.Box(skin, {
 		Name = "Banner",
-		AnchorPoint = Vector2.new(0.5, 0),
-		Position = UDim2.new(0.5, 0, 0, if phone then 128 else 196),
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Position = UDim2.fromScale(0.5, if phone then 0.56 else 0.6),
 		Size = UDim2.fromOffset(if phone then 360 else 520, if phone then 46 else 60),
 		Border = C.Danger,
 		Stroke = if battle then 3 else 2,
@@ -60,6 +60,7 @@ function Objectives.Create(theme: any, deps: any): any
 	type Marker = { Root: Frame, Ring: any, RingFill: Frame?, StarHolder: Frame, Label: TextLabel, Sub: TextLabel, Arrow: Frame, ArrowKey: string, StarKey: string }
 	local markers: { Marker } = {}
 	local snap: { [string]: any }? = nil
+	local touch = false
 
 	local size = if phone then 38 else 48
 	local function newMarker(i: number): Marker
@@ -134,6 +135,9 @@ function Objectives.Create(theme: any, deps: any): any
 				dir = if dy > 0 then "ArrowDown" else "ArrowUp"
 			end
 		end
+		if touch and px > canvas.X - 340 and py > canvas.Y - 300 then
+			py = canvas.Y - 300 -- keep clear of the touch button cluster
+		end
 		mk.Root.Position = UDim2.fromOffset(px, py)
 		mk.Arrow.Visible = off
 		if off and mk.ArrowKey ~= dir then
@@ -177,6 +181,7 @@ function Objectives.Create(theme: any, deps: any): any
 
 	local function update(s: { [string]: any })
 		snap = s
+		touch = s.Device == "Touch"
 		local saves = s.Saves or {}
 		while #markers < #saves do
 			table.insert(markers, newMarker(#markers + 1))

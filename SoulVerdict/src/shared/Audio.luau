@@ -183,6 +183,19 @@ local SOUNDS: { [string]: SoundDef } = {
 	SoulCrack = sfx("", 0.7, nil, true, "heart crack (SOUL cracked / downed)"),
 	SoulShatter = sfx("", 0.8, nil, true, "heart shatters into pieces"),
 	Dust = sfx("", 0.6, nil, true, "a monster turns to dust: soft sandy crumble"),
+	-- kit-specific (Classic Sans client kit)
+	BlasterSummon = sfx("", 0.75, { 0.97, 1.03 }, true, "Gaster Blaster materialising: deep magical whoom"),
+	BlasterTick = sfx("", 0.45, { 1.0, 1.08 }, true, "short tick while a blaster locks on"),
+	BoneSummon = sfx("", 0.7, { 0.95, 1.05 }, true, "a field of bones erupting from the ground"),
+	SoulGrab = sfx("", 0.7, nil, true, "blue SOUL grab: magical whoosh + chime"),
+	Slam = sfx("", 0.85, { 0.92, 1.0 }, true, "body slammed into the ground: heavy thud"),
+	Shortcut = sfx("", 0.6, { 0.98, 1.04 }, true, "the monster takes a shortcut: quick blink"),
+	BadTime = sfx("", 0.9, nil, true, "ominous low sting for the monster's ultimate"),
+	-- kit-specific (Determination client kit)
+	Lunge = sfx("", 0.65, { 0.95, 1.05 }, true, "fast lunge whoosh + stab"),
+	Counter = sfx("", 0.75, { 1.0, 1.05 }, true, "sharp counter-strike clang"),
+	Afterimage = sfx("", 0.5, { 1.0, 1.1 }, true, "ghostly whoosh as an afterimage is left behind"),
+	Determination = sfx("", 0.85, nil, true, "heroic DETERMINATION swell (human ultimate)"),
 	Portal = sfx("", 0.6, { 0.95, 1.05 }, true, "void portal open"),
 	VoidHum = sfx("", 0.4, nil, true, "dark void hum loop"),
 	Freeze = sfx("", 0.55, nil, true, "ice crackle"),
@@ -214,6 +227,7 @@ local SOUNDS: { [string]: SoundDef } = {
 	TextBlip = ui("", 0.3, { 0.98, 1.02 }, "typewriter text blip (very short)"),
 	SansTextBlip = ui("", 0.3, { 0.98, 1.02 }, "lower, rounder text blip for the monster's lines"),
 	Notify = ui("", 0.4, nil, "notification pop"),
+	Denied = ui("", 0.4, nil, "short 'not ready' buzz (ability on cooldown / no target)"),
 }
 
 -- defaults that are fallbacks of other generic entries
@@ -222,6 +236,7 @@ SOUNDS.UiClose.Fallback = "UiBack"
 SOUNDS.UiToggle.Fallback = "UiClick"
 SOUNDS.UiReward.Fallback = "UiConfirm"
 SOUNDS.Notify.Fallback = "UiHover"
+SOUNDS.Denied.Fallback = "UiError"
 SOUNDS.SansTextBlip.Fallback = "TextBlip"
 SOUNDS.HitHeavy.Fallback = "Hit"
 SOUNDS.Crit.Fallback = "Hit"
@@ -236,6 +251,16 @@ SOUNDS.Shockwave.Fallback = "Explosion"
 SOUNDS.SoulCrack.Fallback = "Downed"
 SOUNDS.SoulShatter.Fallback = "SoulBreak"
 SOUNDS.Implode.Fallback = "Portal"
+SOUNDS.BlasterSummon.Fallback = "BlasterCharge"
+SOUNDS.BoneSummon.Fallback = "BoneRise"
+SOUNDS.SoulGrab.Fallback = "Cast"
+SOUNDS.Slam.Fallback = "SlamLand"
+SOUNDS.Shortcut.Fallback = "Teleport"
+SOUNDS.BadTime.Fallback = "FinalPhaseStinger"
+SOUNDS.Lunge.Fallback = "Slash"
+SOUNDS.Counter.Fallback = "Parry"
+SOUNDS.Afterimage.Fallback = "Dodge"
+SOUNDS.Determination.Fallback = "Surge"
 
 -- UI theme keys used by src/client/UI/Themes.luau ("UI.<Theme>.<Kind>"): silent placeholders that fall back to
 -- the generic Ui* entries. Paste theme-specific ids here to give each menu theme its own voice.

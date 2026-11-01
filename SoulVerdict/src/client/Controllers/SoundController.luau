@@ -12,7 +12,7 @@
 -- and comes back to the pool when it ends. Plays of one entry closer than MinInterval are dropped (hit spam).
 --
 -- API (SPEC §20)
---   SoundController.Play(name, at?: Vector3|BasePart|Attachment, opts?) -> Sound?
+--   SoundController.Play(name, at?: Vector3|CFrame|BasePart|Attachment|Model, opts?) -> Sound?
 --       opts: { Volume: number? (x entry volume), Pitch: number? (exact PlaybackSpeed), Looped: boolean?,
 --               Delay: number? (schedules the play; returns nil), StartTime: number?, Force2D: boolean? }
 --       The returned Sound belongs to the pool: never Destroy it; stop it with SoundController.Stop(sound).

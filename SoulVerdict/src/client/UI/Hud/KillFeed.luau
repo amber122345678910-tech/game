@@ -23,7 +23,7 @@ function KillFeed.Create(theme: any, deps: any): any
 		Name = "List",
 		AnchorPoint = Vector2.new(1, 0),
 		Position = UDim2.new(1, if phone then -10 else -20, 0, if phone then 8 else 18),
-		Size = UDim2.fromOffset(if phone then 300 else 460, (rowH + 6) * maxEntries),
+		Size = UDim2.fromOffset(if phone then 290 else 460, (rowH + 6) * maxEntries),
 		Parent = root,
 	})
 	local layoutObj = Instance.new("UIListLayout")
@@ -35,7 +35,7 @@ function KillFeed.Create(theme: any, deps: any): any
 	type Row = { Frame: Frame, Time: number }
 	local rows: { Row } = {}
 	local order = 0
-	local textSize = if phone then 9 else (if battle then 10 else 14)
+	local textSize = if phone then (if battle then 8 else 11) else (if battle then 10 else 14)
 
 	local function nameText(parent: Instance, text: string, color: Color3?, layoutOrder: number)
 		Style.Text(skin, {

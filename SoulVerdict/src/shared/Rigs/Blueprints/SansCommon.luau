@@ -759,6 +759,7 @@ export type FurOptions = {
 	FrontDip: number?, -- how far the ring drops at the front (default 0.24)
 	FrontGap: number?, -- degrees either side of the front left open (the trim parts around the
 	-- jacket opening, e.g. to show a collar); 0 = closed ring
+	Inner: boolean?, -- second, higher roll behind the neck (default true)
 }
 
 -- Fluffy fur trim of the lowered hood, bunched around the neck & shoulders: a dense outer roll of
@@ -797,7 +798,7 @@ function SansCommon.FurRing(rig: RigContext, opts: FurOptions)
 		rig.Ellipsoid("UpperTorso", "Fur", V(d * 1.35, d * 0.92, d), cf, if i % 2 == 0 then shade else opts.Color, fur)
 	end
 	-- inner roll: higher, bunched up behind the neck (skipped at the front so the jaw stays clear)
-	local m = math.floor(n * 0.6)
+	local m = if opts.Inner == false then 0 else math.floor(n * 0.6)
 	for i = 1, m do
 		local a = (i - 0.5) / m * math.pi * 2 + 0.25
 		local pos, front = ringPoint(a, 0.74, 0.17)

@@ -23,7 +23,7 @@ local jitter = SansCommon.Jitter
 -- Fissures over his right crown (yaw deg + = his right, pitch deg up), after the HD sculpt.
 local CRACK_MAIN = { { 1, 74 }, { 5, 64 }, { 11.5, 58 }, { 9.7, 50 }, { 17, 42 }, { 15.5, 34 }, { 22, 27 } }
 local CRACK_BRANCHES = {
-	{ { 11.5, 58 }, { 22, 61 }, { 30, 56 }, { 40, 58 }, { 49, 53 } },
+	{ { 11.5, 58 }, { 22, 61 }, { 30, 56 }, { 45, 56 } },
 	{ { 17, 42 }, { 26, 40 }, { 33, 33 } },
 	{ { 30, 56 }, { 35, 65 }, { 44, 70 } },
 	{ { 5, 64 }, { -3.5, 58 }, { -7, 53 } },
@@ -52,18 +52,18 @@ local function build(rig: RigContext)
 	rig.Disc(
 		"Head",
 		"LeftEyeHalo",
-		0.4 * K,
+		0.34 * K,
 		0.008,
 		ringCF * CFrame.new(0, 0, 0.012),
 		PartKit.Mix(P.EyeGlow, P.Void, 0.45),
-		{ Role = "Glow", Material = Enum.Material.Neon, Transparency = 0.45, CastShadow = false }
+		{ Role = "Glow", Material = Enum.Material.Neon, Transparency = 0.6, CastShadow = false }
 	)
-	local ring = rig.Disc("Head", "LeftPupil", 0.25 * K, 0.012, ringCF, P.EyeGlow, {
+	local ring = rig.Disc("Head", "LeftPupil", 0.24 * K, 0.012, ringCF, P.EyeGlow, {
 		Role = "Eye",
 		Material = Enum.Material.Neon,
 		CastShadow = false,
 	})
-	rig.Disc("Head", "LeftPupilCore", 0.11 * K, 0.012, ringCF * CFrame.new(0, 0, -0.008), BLACK, {
+	rig.Disc("Head", "LeftPupilCore", 0.145 * K, 0.012, ringCF * CFrame.new(0, 0, -0.008), BLACK, {
 		Role = "Dark",
 		Material = Enum.Material.Neon,
 		CastShadow = false,
@@ -88,9 +88,9 @@ local function build(rig: RigContext)
 		end
 		return out
 	end
-	SansCommon.DomeLine(rig, skull, "Fissure", CRACK_MAIN, 0.05, gradient(#CRACK_MAIN - 1, 0.85, 0.15), neon)
+	SansCommon.DomeLine(rig, skull, "Fissure", CRACK_MAIN, 0.068, gradient(#CRACK_MAIN - 1, 1, 0.5), neon)
 	for _, path in CRACK_BRANCHES do
-		SansCommon.DomeLine(rig, skull, "Fissure", path, 0.036, gradient(#path - 1, 0.35, 1), neon)
+		SansCommon.DomeLine(rig, skull, "Fissure", path, 0.05, gradient(#path - 1, 0.6, 1), neon)
 	end
 	local chip = skull.Dome(CHIP[1], CHIP[2], -0.01)
 	rig.Ellipsoid(
@@ -110,33 +110,34 @@ local function build(rig: RigContext)
 		{ Role = "Dark", Material = Enum.Material.Neon, CastShadow = false, Attributes = { HDGroup = "Skull" } }
 	)
 
-	-- the broken eclipse halo behind his head: void disc, cracked corona, drifting shards
-	local haloCF = skull.CF * CFrame.new(0, 0.2 * K, 1.3 * K) * CFrame.Angles(math.rad(10), 0, math.rad(-12))
-	local disc = rig.Disc("Head", "HaloDisc", 2.62, 0.05, haloCF, PartKit.Mix(P.Hoodie, BLACK, 0.75), {
+	-- the broken eclipse halo behind his head: a void disc (the skull eclipses it) rimmed by a cracked
+	-- corona, a few drifting shards and a soft back light
+	local haloCF = skull.CF * CFrame.new(0, 0.42 * K, 1.5 * K) * CFrame.Angles(math.rad(8), 0, math.rad(-10))
+	local disc = rig.Disc("Head", "HaloDisc", 2.2, 0.04, haloCF, PartKit.Mix(P.Void, BLACK, 0.86), {
 		Role = "Dark",
 		Material = Enum.Material.Neon,
 		CastShadow = false,
 	})
-	local corona = haloCF * CFrame.new(0, 0, -0.03)
-	for _, arc in { { 18, 104, 3 }, { 128, 208, 3 }, { 232, 338, 4 } } do
-		rig.Arc("Head", "Corona", corona, 1.36, arc[1], arc[2], arc[3], 0.11, 0.04, P.EyeGlow, neon)
+	local corona = haloCF * CFrame.new(0, 0, -0.025)
+	for _, arc in { { 14, 100, 3 }, { 124, 206, 3 }, { 230, 336, 4 } } do
+		rig.Arc("Head", "Corona", corona, 1.14, arc[1], arc[2], arc[3], 0.1, 0.035, P.EyeGlow, neon)
 	end
-	for _, arc in { { 40, 86, 2 }, { 150, 196, 2 }, { 262, 316, 2 } } do
-		rig.Arc("Head", "CoronaFlare", corona, 1.5, arc[1], arc[2], arc[3], 0.05, 0.03, P.Void, neon)
+	for _, arc in { { 36, 84, 2 }, { 256, 312, 2 } } do
+		rig.Arc("Head", "CoronaFlare", corona, 1.27, arc[1], arc[2], arc[3], 0.045, 0.03, P.Void, neon)
 	end
-	for i, deg in { 116, 220 } do
+	for i, deg in { 112, 218 } do
 		local a = math.rad(deg)
-		local r = 1.42 + 0.08 * i
+		local r = 1.2 + 0.07 * i
 		rig.Box(
 			"Head",
 			"HaloShard",
-			V(0.2, 0.09, 0.04),
+			V(0.18, 0.08, 0.035),
 			corona * CFrame.new(math.cos(a) * r, math.sin(a) * r, -0.02) * CFrame.Angles(0, 0, a + 0.7 * i),
 			if i == 1 then P.EyeGlow else P.Void,
 			neon
 		)
 	end
-	rig.Light(disc, "Point", { Name = "CoronaLight", Color = P.EyeGlow, Brightness = 1.4, Range = 5 })
+	rig.Light(disc, "Point", { Name = "CoronaLight", Color = P.EyeGlow, Brightness = 1.2, Range = 5 })
 
 	------------------------------------------------------------------------------------------
 	-- TORSO: navy hoodie with the night inside, tattered hood rim
@@ -148,8 +149,6 @@ local function build(rig: RigContext)
 		InnerRole = "Dark",
 		Zipper = PartKit.Mix(P.Lining, P.Hoodie, 0.55),
 		Pull = P.Lining,
-		Cord = PartKit.Mix(P.Lining, P.Hoodie, 0.3),
-		Aglet = P.Void,
 		HoodInner = liningBase,
 	})
 	SansCommon.Pockets(rig, hoodie, { Body = P.Hoodie, Dark = hoodDark })
@@ -159,16 +158,16 @@ local function build(rig: RigContext)
 	for i = 1, 9 do
 		local y = waistY - 0.35 + (neckY - 0.45 - (waistY - 0.35)) * (i - 0.5) / 9
 		local edge = hoodie.EdgeX(y)
-		local x = edge * 0.7 * jitter(i, 21)
+		local x = edge * 0.8 * jitter(i, 21)
 		local z = hoodie.InnerFrontZ(x, y)
 		if z then
-			local d = 0.035 + 0.03 * math.abs(jitter(i, 22))
+			local d = 0.022 + 0.026 * math.abs(jitter(i, 22)) ^ 2
 			rig.Ball(
 				"UpperTorso",
 				"Star",
 				d,
 				CFrame.new(x, y, z - 0.004),
-				if i % 3 == 0 then P.Lining else rgb(236, 240, 255),
+				if i % 3 == 0 then P.Lining elseif i % 3 == 1 then rgb(236, 240, 255) else P.EyeGlow,
 				neon
 			)
 		end
@@ -194,23 +193,22 @@ local function build(rig: RigContext)
 		Count = 16,
 		FrontGap = 26,
 		Radius = Vector2.new(1.02, 0.78),
+		Inner = false,
 	})
+	-- torn strips hanging from the lowered hood's edge down his back
 	local tatter: Props = { Role = "ClothAlt", Material = mat }
-	for i = 1, 9 do
-		local deg = 62 + (i - 1) * (236 / 8) + jitter(i, 41) * 8
-		local a = math.rad(deg)
-		local normal = V(math.sin(a), 0, -math.cos(a))
-		local back = math.max(-normal.Z, 0)
-		local rim = V(normal.X * 1.0, neckY - 0.18 + 0.1 * back, 0.14 + normal.Z * 0.78)
-		local L = 0.42 + 0.18 * math.abs(jitter(i, 43))
-		local W = 0.3 + 0.08 * jitter(i, 44)
-		local frame = PartKit.Basis(rim, normal, V(0, 1, 0)) * CFrame.Angles(0, 0, 0.55 + 0.15 * jitter(i, 45))
+	for i = 1, 6 do
+		local x = -0.6 + (i - 1) * 0.24 + jitter(i, 41) * 0.03
+		local top = V(x, neckY - 0.84 - 0.12 * math.abs(x), 0.9 - 0.12 * math.abs(x))
+		local L = 0.36 + 0.24 * math.abs(jitter(i, 43))
+		local W = 0.22 + 0.05 * jitter(i, 44)
+		local frame = PartKit.Basis(top, V(x * 0.4, 0, 1), V(0, 1, 0)) * CFrame.Angles(0, 0, -0.22)
 		rig.Wedge(
 			"UpperTorso",
 			"HoodTatter",
-			V(0.05, L, W),
+			V(0.045, L, W),
 			frame * CFrame.new(0, -L / 2, W / 2 * (if i % 2 == 0 then 1 else -1)) * CFrame.Angles(math.pi, 0, 0),
-			if i % 2 == 0 then P.Hoodie else PartKit.Shade(P.Hoodie, -0.18),
+			if i % 2 == 0 then P.Hoodie else PartKit.Shade(P.Hoodie, -0.2),
 			tatter
 		)
 	end

@@ -658,7 +658,8 @@ local MOUSE_KEYS = { M1 = true, LMB = true, MouseButton1 = true, MB1 = true }
 
 function Style.KeyCap(skin: Skin, text: string, height: number, props: { [string]: any }?): Frame
 	local h = height
-	local label = if MOUSE_KEYS[text] then "" else text
+	local mouse = MOUSE_KEYS[text] == true and h >= 24
+	local label = if mouse then "" elseif MOUSE_KEYS[text] then "M1" else text
 	local chars = utf8.len(label) or #label
 	local w = math.max(h, math.ceil(chars * h * (if skin.Battle then 0.5 else 0.42) + h * 0.5))
 	local cap = Style.Frame({
@@ -673,7 +674,7 @@ function Style.KeyCap(skin: Skin, text: string, height: number, props: { [string
 		Style.Corner(cap, UDim.new(0, math.floor(h * 0.28)))
 		Style.Stroke(cap, WHITE, 1, 0.55)
 	end
-	if MOUSE_KEYS[text] then
+	if mouse then
 		local icon = Icons.Create("Mouse", skin.C.Text, math.floor(h * 0.8))
 		icon.AnchorPoint = Vector2.new(0.5, 0.5)
 		icon.Position = UDim2.fromScale(0.5, 0.5)

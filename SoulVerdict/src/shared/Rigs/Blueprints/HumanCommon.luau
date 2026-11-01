@@ -510,30 +510,28 @@ local function buildHair(rig: RigContext, spec: Spec, C: Colors, _face: Face): H
 		top = cf.Position.Y + r.Y
 	elseif style == "Spiky" then
 		cf, r = helmet(V(1.48, 1.16, 1.42), V(0, 0.24, 0.08))
-		-- spikes swept up and back (soft cartoon spikes: slim ellipsoids rooted inside the cap)
+		-- spikes all over the crown, swept up and back (soft cartoon spikes: slim ellipsoids rooted in the cap);
+		-- {yaw, pitch, length, width, back-sweep}
 		local back, up = V(0, 0, 1), V(0, 1, 0)
 		local spikes = {
-			{ -32, 48, 0.56, 0.3 },
-			{ 0, 54, 0.64, 0.33 },
-			{ 32, 48, 0.56, 0.3 },
-			{ -52, 70, 0.6, 0.3 },
-			{ 0, 80, 0.68, 0.34 },
-			{ 52, 70, 0.6, 0.3 },
-			{ -128, 52, 0.56, 0.3 },
-			{ 180, 58, 0.6, 0.32 },
-			{ 128, 52, 0.56, 0.3 },
-			{ -92, 42, 0.46, 0.27 },
-			{ 92, 42, 0.46, 0.27 },
+			{ -34, 34, 0.42, 0.3, 0.15 },
+			{ -11, 38, 0.48, 0.32, 0.15 },
+			{ 13, 38, 0.48, 0.32, 0.15 },
+			{ 35, 34, 0.42, 0.3, 0.15 },
+			{ -56, 58, 0.5, 0.3, 0.6 },
+			{ -20, 66, 0.56, 0.32, 0.6 },
+			{ 20, 66, 0.56, 0.32, 0.6 },
+			{ 56, 58, 0.5, 0.3, 0.6 },
+			{ -122, 46, 0.48, 0.3, 0.9 },
+			{ 180, 54, 0.5, 0.32, 0.9 },
+			{ 122, 46, 0.48, 0.3, 0.9 },
+			{ -90, 34, 0.38, 0.28, 0.5 },
+			{ 90, 34, 0.38, 0.28, 0.5 },
 		}
 		for i, sp in spikes do
-			local at = on(cf, r, sp[1], sp[2], 0.14)
-			local dir = (at.LookVector + back * 0.85 + up * 0.45).Unit
-			tuft(rig, "Head", "Spike" .. i, at.Position, dir, sp[4], sp[4] * 0.72, sp[3] + 0.14, at.UpVector, if i % 4 == 0 then C.HairDark else C.Hair, hairP)
-		end
-		-- short front flicks over the forehead
-		for i, yaw in { -18, 14 } do
-			local at = on(cf, r, yaw, 30, 0.08)
-			tuft(rig, "Head", "Flick" .. i, at.Position, (at.LookVector + up * 1.1 - back * 0.1).Unit, 0.24, 0.13, 0.32, at.UpVector, C.Hair, hairP)
+			local at = on(cf, r, sp[1], sp[2], 0.12)
+			local dir = (at.LookVector + back * sp[5] + up * 0.35).Unit
+			tuft(rig, "Head", "Spike" .. i, at.Position, dir, sp[4] * 0.85, sp[4] * 0.62, sp[3] + 0.12, at.UpVector, if i % 4 == 0 then C.HairDark else C.Hair, hairP)
 		end
 		-- sideburns
 		for _, s in { -1, 1 } do
@@ -688,7 +686,7 @@ local function buildSweater(rig: RigContext, spec: Spec, C: Colors): Sweater
 		end
 	end
 	local yw, yd = size(yokeY)
-	rig.Ellipsoid("UpperTorso", "Yoke", V(yw, 0.6, yd), CF(0, yokeY, 0.01), C.Sweater, cloth)
+	rig.Ellipsoid("UpperTorso", "Yoke", V(yw + 0.14, 0.6, yd + 0.02), CF(0, yokeY, 0.01), C.Sweater, cloth)
 	-- ribbed hem: band + vertical rib lines
 	local hw, hd = size(ribTop)
 	band(rig, "UpperTorso", "Hem", V(0, hemY + 0.075, 0.01), 0.15, hw + 0.04, hd + 0.04, C.Rib, rib)

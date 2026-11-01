@@ -25,8 +25,10 @@
 --        -0.1..1.25 allowed for anticipation/overshoot). Works wherever the model was moved
 --        (reads Core.CFrame); welded HD jaw meshes follow the Mandible.
 --   GasterBlaster.SetGlow(model, color: Color3, intensity: number)
---        0 = idle (white pupils, no halo, mouth dark, light off) .. 1 = charged (tinted pupils, eye
---        halos + mouth glow visible, light on). Pure instance edits; call per frame while charging.
+--        0 = idle (matte pupils in the style's idle colour, halos + mouth glow at Transparency 0.995 -
+--        kept just under 1 so pooled-blaster code that skips fully transparent parts still moves them -
+--        light off) .. 1 = charged (Neon pupils tinted towards `color`, eye halos + mouth glow visible,
+--        light on). Pure instance edits; cheap enough to call per frame while charging.
 --   GasterBlaster.Preview(style?, scale?, jawAlpha?, glow?) -> Model   Build + SetJaw + SetGlow
 --   GasterBlaster.Styles() -> {string}
 --   GasterBlaster.DefaultGlow(style) -> Color3
@@ -131,7 +133,14 @@ local STYLES: { [string]: Style } = {
 		EyeR = { 0.335, 0.275 },
 		EyeYaw = 0.34,
 		EyeSlant = 0,
-		Horn = { Root = V(0.42, 0.6, 0.18), C1 = V(0.62, 1.1, 0.55), C2 = V(0.86, 1.1, 1.15), Tip = V(0.98, 0.78, 1.72), R0 = 0.22, R1 = 0.03 },
+		Horn = {
+			Root = V(0.42, 0.6, 0.18),
+			C1 = V(0.62, 1.1, 0.55),
+			C2 = V(0.86, 1.1, 1.15),
+			Tip = V(0.98, 0.78, 1.72),
+			R0 = 0.22,
+			R1 = 0.03,
+		},
 		CheekSpikes = {
 			spike(V(0.9, -0.04, 0.32), V(1.36, -0.2, 1.1), 0.13),
 			spike(V(0.8, -0.26, 0.24), V(1.16, -0.56, 0.92), 0.1),
@@ -454,14 +463,12 @@ function GasterBlaster.Build(style: string?, scale: number?): Model
 	local rx0, ry0, cy0 = profile(st, z0)
 	local rx1, ry1, cy1 = profile(st, z1)
 	local barH = (ry0 + ry1) * 0.42
-	local bars: { Solid } = {}
 	for _, side in { -1, 1 } do
 		local a = V(rx0 * 0.78 * side, cy0 - ry0 * 0.32, z0)
 		local b = V(rx1 * 0.62 * side, cy1 - ry1 * 0.25, z1)
 		seg(model, if side < 0 then "MaxillaL" else "MaxillaR", a, b, 0.3, barH, 1.16, bone, skullProps())
 		local sol = solidOf(a, b, 0.3, barH, 1.16)
 		table.insert(snout, sol)
-		table.insert(bars, sol)
 	end
 	local zm = -L * 0.5
 	local rxm, rym, cym = profile(st, zm)
@@ -488,7 +495,14 @@ function GasterBlaster.Build(style: string?, scale: number?): Model
 		for i = 1, #pts - 1 do
 			local a, b = pts[i], pts[i + 1]
 			local cf = PartKit.LookFrame(P((a + b) / 2), (b - a).Unit, V(0, 1, 0))
-			kit.Box(model, "Seam" .. i, V(0.04, 0.03, (b - a).Magnitude + 0.03), cf, st.Seam, skullProps("Dark", { CastShadow = false }))
+			kit.Box(
+				model,
+				"Seam" .. i,
+				V(0.04, 0.03, (b - a).Magnitude + 0.03),
+				cf,
+				st.Seam,
+				skullProps("Dark", { CastShadow = false })
+			)
 		end
 	end
 
@@ -522,7 +536,8 @@ function GasterBlaster.Build(style: string?, scale: number?): Model
 			* CFrame.Angles(0, 0, (0.16 + st.EyeSlant * 0.8) * side)
 		kit.Ellipsoid(model, "Brow" .. suffix, V(0.6, 0.2, 0.3), browCF, bone, skullProps())
 		-- socket: dark lens recessed at the HD socket floor
-		local sockCF = CFrame.new(P((frame * CFrame.new(0, 0, 0.02)).Position)) * frame.Rotation
+		local sockCF = CFrame.new(P((frame * CFrame.new(0, 0, 0.02)).Position))
+			* frame.Rotation
 			* CFrame.Angles(0, 0, slant * 0.35)
 		kit.Ellipsoid(
 			model,
@@ -548,23 +563,20 @@ function GasterBlaster.Build(style: string?, scale: number?): Model
 		local pupilCF = CFrame.new(P((frame * CFrame.new(0, 0, -0.14)).Position))
 			* frame.Rotation
 			* CFrame.Angles(0, 0, math.pi / 4)
-		kit.Box(
-			model,
-			"Pupil" .. suffix,
-			V(0.085, 0.085, 0.04),
-			pupilCF,
-			st.Pupil,
-			{ Role = "Eye", Material = Enum.Material.SmoothPlastic, CastShadow = false, Attributes = { IdleColor = st.Pupil } }
-		)
+		kit.Box(model, "Pupil" .. suffix, V(0.085, 0.085, 0.04), pupilCF, st.Pupil, {
+			Role = "Eye",
+			Material = Enum.Material.SmoothPlastic,
+			CastShadow = false,
+			Attributes = { IdleColor = st.Pupil },
+		})
 		local haloCF = CFrame.new(P((frame * CFrame.new(0, 0, -0.13)).Position)) * frame.Rotation
-		kit.Ellipsoid(
-			model,
-			"EyeHalo" .. suffix,
-			V(st.EyeR[1] * 1.45, st.EyeR[2] * 1.45, 0.04),
-			haloCF,
-			st.Glow,
-			{ Role = "Glow", Material = NEON, Transparency = HIDDEN, CastShadow = false, Attributes = { GlowKind = "EyeHalo" } }
-		)
+		kit.Ellipsoid(model, "EyeHalo" .. suffix, V(st.EyeR[1] * 1.45, st.EyeR[2] * 1.45, 0.04), haloCF, st.Glow, {
+			Role = "Glow",
+			Material = NEON,
+			Transparency = HIDDEN,
+			CastShadow = false,
+			Attributes = { GlowKind = "EyeHalo" },
+		})
 		-- hinge boss
 		kit.Ellipsoid(
 			model,
@@ -611,13 +623,27 @@ function GasterBlaster.Build(style: string?, scale: number?): Model
 			local dir = b - a
 			local len = dir.Magnitude
 			local cf = PartKit.LookFrame(P(a + dir * 0.38), dir.Unit, V(0, 1, 0))
-			kit.Ellipsoid(model, "Spike" .. suffix .. i, V(sp.r * 1.7, sp.r * 1.9, len * 1.24), cf, tint(0.85), skullProps())
+			kit.Ellipsoid(
+				model,
+				"Spike" .. suffix .. i,
+				V(sp.r * 1.7, sp.r * 1.9, len * 1.24),
+				cf,
+				tint(0.85),
+				skullProps()
+			)
 		end
 		for i, sp in st.BrowSpikes do
 			local a, b = mirror(sp.a, side), mirror(sp.b, side)
 			local dir = b - a
 			local cf = PartKit.LookFrame(P(a + dir * 0.3), dir.Unit, V(0, 1, 0))
-			kit.Ellipsoid(model, "BrowSpike" .. suffix .. i, V(sp.r * 2.2, sp.r * 2.2, dir.Magnitude * 1.4), cf, tint(0.95), skullProps())
+			kit.Ellipsoid(
+				model,
+				"BrowSpike" .. suffix .. i,
+				V(sp.r * 2.2, sp.r * 2.2, dir.Magnitude * 1.4),
+				cf,
+				tint(0.95),
+				skullProps()
+			)
 		end
 	end
 
@@ -694,14 +720,13 @@ function GasterBlaster.Build(style: string?, scale: number?): Model
 	end
 
 	-- mouth glow (charge light), hidden until SetGlow
-	local mouthGlow = kit.Ellipsoid(
-		model,
-		"MouthGlow",
-		V(0.62, 0.2, L * 0.7),
-		at(V(0, -0.47, -L * 0.52)),
-		st.Glow,
-		{ Role = "Glow", Material = NEON, Transparency = HIDDEN, CastShadow = false, Attributes = { GlowKind = "Mouth" } }
-	)
+	local mouthGlow = kit.Ellipsoid(model, "MouthGlow", V(0.62, 0.2, L * 0.7), at(V(0, -0.47, -L * 0.52)), st.Glow, {
+		Role = "Glow",
+		Material = NEON,
+		Transparency = HIDDEN,
+		CastShadow = false,
+		Attributes = { GlowKind = "Mouth" },
+	})
 	local light = kit.Light(mouthGlow, "Point", { Name = "Glow", Color = st.Glow, Brightness = 0, Range = 12 })
 	light.Enabled = false
 
@@ -717,24 +742,18 @@ function GasterBlaster.Build(style: string?, scale: number?): Model
 	end
 	local jzBack, jzFront = 0.28, -(L - 0.08)
 	local midRx = jawProfile((jzBack + jzFront) / 2)
-	local mandibleC = V(0, -0.7, (jzBack + jzFront) / 2 + 0.06)
-	local mandible = kit.Ellipsoid(
-		jaw,
-		"Mandible",
-		V(midRx * 1.5, 0.28, (jzBack - jzFront) * 0.96),
-		at(mandibleC),
-		bone,
-		jawProps()
-	)
+	local mandibleC = V(0, -0.77, (jzBack + jzFront) / 2 + 0.06)
+	local mandible =
+		kit.Ellipsoid(jaw, "Mandible", V(midRx * 1.5, 0.32, (jzBack - jzFront) * 0.96), at(mandibleC), bone, jawProps())
 	local jawSolids: { Solid } = {}
 	for _, side in { -1, 1 } do
 		local suffix = if side < 0 then "L" else "R"
 		local rxB, topB, botB = jawProfile(0.2)
 		local rxF, topF, botF = jawProfile(jzFront + 0.26)
-		local a = V((rxB - 0.1) * side, (topB + botB) / 2 + 0.05, 0.2)
-		local b = V((rxF - 0.13) * side, (topF + botF) / 2 + 0.03, jzFront + 0.26)
-		seg(jaw, "JawSide" .. suffix, a, b, 0.26, 0.4, 1.12, bone, jawProps())
-		table.insert(jawSolids, solidOf(a, b, 0.26, 0.4, 1.12))
+		local a = V((rxB - 0.1) * side, (topB + botB) / 2 + 0.01, 0.2)
+		local b = V((rxF - 0.13) * side, (topF + botF) / 2 - 0.01, jzFront + 0.26)
+		seg(jaw, "JawSide" .. suffix, a, b, 0.27, 0.46, 1.12, bone, jawProps())
+		table.insert(jawSolids, solidOf(a, b, 0.27, 0.46, 1.12))
 		seg(
 			jaw,
 			"Ramus" .. suffix,
@@ -751,7 +770,7 @@ function GasterBlaster.Build(style: string?, scale: number?): Model
 			kit.Ellipsoid(jaw, "JawSpike" .. suffix, V(0.12, 0.12, 0.6), cf, tint(0.9), jawProps())
 		end
 	end
-	local chinC = V(0, -0.66, -L + 0.26)
+	local chinC = V(0, -0.71, -L + 0.26)
 	kit.Ellipsoid(jaw, "Chin", V(0.4, 0.24, 0.36), at(chinC), bone, jawProps())
 	if styleId == "Fell" then
 		local cf = PartKit.LookFrame(P(chinC + V(0, -0.1, 0)), V(0, -0.9, -0.45).Unit, V(0, 0, -1))

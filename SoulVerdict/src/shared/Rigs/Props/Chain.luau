@@ -35,7 +35,14 @@ local function linkParts(kit: any, model: Model, i: number, centre: CFrame, colo
 	for _, z in { -half + 0.07, half - 0.07 } do
 		for _, x in { -0.055, 0.055 } do
 			k += 1
-			kit.Ball(model, "Link" .. i .. "k" .. k, 0.15, frame * CFrame.new(x, 0, z), color:Lerp(DARK, 0.12), knobProps)
+			kit.Ball(
+				model,
+				"Link" .. i .. "k" .. k,
+				0.15,
+				frame * CFrame.new(x, 0, z),
+				color:Lerp(DARK, 0.12),
+				knobProps
+			)
 		end
 	end
 end
@@ -59,7 +66,14 @@ function Chain.Build(links: number?, color: Color3?, scale: number?): Model
 		local z = -dir.Unit
 		local y = z:Cross(x).Unit
 		x = y:Cross(z)
-		kit.Ellipsoid(model, name, Vector3.new(d, d, dir.Magnitude * 1.35), CFrame.fromMatrix((a + b) / 2, x, y, z), c, hook)
+		kit.Ellipsoid(
+			model,
+			name,
+			Vector3.new(d, d, dir.Magnitude * 1.35),
+			CFrame.fromMatrix((a + b) / 2, x, y, z),
+			c,
+			hook
+		)
 	end
 	-- harpoon head: a thicker bone shank, a sharp point and two barbs swept back
 	local p0 = Vector3.new(0, 0, zEnd + 0.02)

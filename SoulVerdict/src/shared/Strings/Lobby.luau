@@ -11,6 +11,7 @@ return {
 	["lobby.intro.line"] = { en = "* The trial is about to begin...", ru = "* Суд вот-вот начнётся..." },
 	["lobby.round.line"] = { en = "* A trial is in progress. You'll join the next one.", ru = "* Идёт суд. Ты присоединишься к следующему." },
 	-- vote
+	["lobby.vote.title"] = { en = "NEXT HALL", ru = "СЛЕДУЮЩИЙ ЗАЛ" },
 	["lobby.vote.votes"] = { en = "{1} VOTES", ru = "ГОЛОСОВ: {1}" },
 	["lobby.vote.one"] = { en = "1 VOTE", ru = "1 ГОЛОС" },
 	["lobby.vote.mine"] = { en = "YOUR VOTE", ru = "ТВОЙ ГОЛОС" },

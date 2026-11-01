@@ -34,13 +34,29 @@ local function plate(kit: any, model: Model): BasePart
 		Role = "Detail",
 		Material = Enum.Material.SmoothPlastic,
 	})
-	kit.Disc(model, "PlateFoot", 1.5, 0.08, CFrame.new(0, 0.04, 0) * CFrame.Angles(-math.pi / 2, 0, 0), PLATE:Lerp(rgb(170, 175, 190), 0.25), {
-		Role = "Detail",
-	})
-	kit.Disc(model, "PlateWell", 1.85, 0.01, CFrame.new(0, 0.152, 0) * CFrame.Angles(-math.pi / 2, 0, 0), rgb(226, 230, 238), {
-		Role = "Detail",
-		CastShadow = false,
-	})
+	kit.Disc(
+		model,
+		"PlateFoot",
+		1.5,
+		0.08,
+		CFrame.new(0, 0.04, 0) * CFrame.Angles(-math.pi / 2, 0, 0),
+		PLATE:Lerp(rgb(170, 175, 190), 0.25),
+		{
+			Role = "Detail",
+		}
+	)
+	kit.Disc(
+		model,
+		"PlateWell",
+		1.85,
+		0.01,
+		CFrame.new(0, 0.152, 0) * CFrame.Angles(-math.pi / 2, 0, 0),
+		rgb(226, 230, 238),
+		{
+			Role = "Detail",
+			CastShadow = false,
+		}
+	)
 	return p
 end
 
@@ -48,19 +64,34 @@ end
 local function crimp(kit: any, model: Model, y: number, r: number, n: number, d: number)
 	for i = 1, n do
 		local a = (i - 1) / n * math.pi * 2
-		kit.Ball(model, "Crimp" .. i, d, CFrame.new(math.cos(a) * r, y, math.sin(a) * r), if i % 2 == 0 then CRUST else CRUST_HI, {
-			Role = "Trim",
-			CastShadow = false,
-		})
+		kit.Ball(
+			model,
+			"Crimp" .. i,
+			d,
+			CFrame.new(math.cos(a) * r, y, math.sin(a) * r),
+			if i % 2 == 0 then CRUST else CRUST_HI,
+			{
+				Role = "Trim",
+				CastShadow = false,
+			}
+		)
 	end
 end
 
 local function pie(kit: any, model: Model, butterscotch: boolean)
 	local base, top = 0.155, 0.47
 	-- crust shell
-	kit.Disc(model, "Crust", 1.95, top - base, CFrame.new(0, (base + top) / 2, 0) * CFrame.Angles(-math.pi / 2, 0, 0), CRUST, {
-		Role = "Accent",
-	})
+	kit.Disc(
+		model,
+		"Crust",
+		1.95,
+		top - base,
+		CFrame.new(0, (base + top) / 2, 0) * CFrame.Angles(-math.pi / 2, 0, 0),
+		CRUST,
+		{
+			Role = "Accent",
+		}
+	)
 	local fill = if butterscotch then rgb(238, 162, 46) else rgb(150, 62, 38)
 	kit.Disc(model, "Filling", 1.76, 0.05, CFrame.new(0, top + 0.01, 0) * CFrame.Angles(-math.pi / 2, 0, 0), fill, {
 		Role = "Accent",
@@ -73,10 +104,17 @@ local function pie(kit: any, model: Model, butterscotch: boolean)
 			local t = i / 9
 			local a = t * math.pi * 3.2
 			local r = 0.12 + t * 0.6
-			kit.Ellipsoid(model, "Cinnamon" .. i, V(0.12, 0.03, 0.12), CFrame.new(math.cos(a) * r, top + 0.04, math.sin(a) * r), rgb(140, 72, 30), {
-				Role = "Detail",
-				CastShadow = false,
-			})
+			kit.Ellipsoid(
+				model,
+				"Cinnamon" .. i,
+				V(0.12, 0.03, 0.12),
+				CFrame.new(math.cos(a) * r, top + 0.04, math.sin(a) * r),
+				rgb(140, 72, 30),
+				{
+					Role = "Detail",
+					CastShadow = false,
+				}
+			)
 		end
 		kit.Ellipsoid(model, "Cream", V(0.42, 0.26, 0.42), CFrame.new(0, top + 0.13, 0), rgb(255, 250, 240), {
 			Role = "Detail",
@@ -90,10 +128,17 @@ local function pie(kit: any, model: Model, butterscotch: boolean)
 		for i = -1, 1 do
 			local o = i * 0.42
 			local len = 2 * math.sqrt(math.max(0.85 ^ 2 - o * o, 0.05))
-			kit.Box(model, "LatticeX" .. (i + 2), V(len, 0.06, 0.16), CFrame.new(0, top + 0.05, o) * CFrame.Angles(0, 0, 0), CRUST_HI, {
-				Role = "Trim",
-				CastShadow = false,
-			})
+			kit.Box(
+				model,
+				"LatticeX" .. (i + 2),
+				V(len, 0.06, 0.16),
+				CFrame.new(0, top + 0.05, o) * CFrame.Angles(0, 0, 0),
+				CRUST_HI,
+				{
+					Role = "Trim",
+					CastShadow = false,
+				}
+			)
 			kit.Box(model, "LatticeZ" .. (i + 2), V(0.16, 0.06, len), CFrame.new(o, top + 0.075, 0), CRUST_HI, {
 				Role = "Trim",
 				CastShadow = false,
@@ -134,7 +179,12 @@ local function sandwich(kit: any)
 	return function(model: Model)
 		-- half 1 flat on the plate, half 2 leaning on it
 		sandwichHalf(kit, model, 1, CFrame.new(-0.85, 0.15, -0.6))
-		sandwichHalf(kit, model, 2, CFrame.new(0.95, 0.3, 0.75) * CFrame.Angles(0, math.pi, 0) * CFrame.Angles(0, 0, -0.32))
+		sandwichHalf(
+			kit,
+			model,
+			2,
+			CFrame.new(0.95, 0.3, 0.75) * CFrame.Angles(0, math.pi, 0) * CFrame.Angles(0, 0, -0.32)
+		)
 	end
 end
 

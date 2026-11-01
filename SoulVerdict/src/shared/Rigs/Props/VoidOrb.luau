@@ -71,12 +71,19 @@ function VoidOrb.Build(scale: number?, color: Color3?): Model
 		local dir = Vector3.new(math.cos(a), math.sin(a), 0)
 		local mid = dir * (1.0 + len * 0.42)
 		local cf = PartKit.LookFrame(mid + Vector3.new(0, 0, 0.18), dir, Vector3.new(0, 0, 1))
-		kit.Ellipsoid(model, "Ray" .. i, Vector3.new(0.16, 0.1, len), cf, if long then tint:Lerp(CYAN, 0.25) else tint, {
-			Role = "Glow",
-			Material = NEON,
-			Transparency = if long then 0.15 else 0.3,
-			CastShadow = false,
-		})
+		kit.Ellipsoid(
+			model,
+			"Ray" .. i,
+			Vector3.new(0.16, 0.1, len),
+			cf,
+			if long then tint:Lerp(CYAN, 0.25) else tint,
+			{
+				Role = "Glow",
+				Material = NEON,
+				Transparency = if long then 0.15 else 0.3,
+				CastShadow = false,
+			}
+		)
 	end
 	-- tilted accretion disc (reads from the side and from above)
 	local discFrame = CFrame.Angles(math.rad(72), 0, math.rad(-18))
