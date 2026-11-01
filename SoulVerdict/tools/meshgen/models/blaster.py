@@ -24,7 +24,7 @@ HINGE = (0.0, -0.36, 0.40)
 STYLES = {
     "Classic": dict(
         snout_len=1.62, snout_w=(0.84, 0.42), snout_h=(0.56, 0.33), snout_top_drop=0.28, stop=0.0,
-        eye_c=(0.53, 0.29, -0.30), eye_r=(0.30, 0.245), eye_yaw=0.42, eye_slant=0.0,
+        eye_c=(0.52, 0.30, -0.32), eye_r=(0.335, 0.275), eye_yaw=0.34, eye_slant=0.0,
         horn=dict(root=(0.42, 0.60, 0.18), c1=(0.62, 1.10, 0.55), c2=(0.86, 1.10, 1.15), tip=(0.98, 0.78, 1.72),
                   r0=0.22, r1=0.03),
         cheek_spikes=[((0.90, -0.04, 0.32), (1.36, -0.20, 1.10), 0.13), ((0.80, -0.26, 0.24), (1.16, -0.56, 0.92), 0.10)],
@@ -33,7 +33,7 @@ STYLES = {
     ),
     "Fell": dict(
         snout_len=1.66, snout_w=(0.86, 0.40), snout_h=(0.56, 0.32), snout_top_drop=0.30, stop=0.0,
-        eye_c=(0.53, 0.28, -0.30), eye_r=(0.31, 0.235), eye_yaw=0.42, eye_slant=0.42,
+        eye_c=(0.52, 0.29, -0.32), eye_r=(0.34, 0.27), eye_yaw=0.34, eye_slant=0.40,
         horn=dict(root=(0.42, 0.60, 0.18), c1=(0.66, 1.18, 0.50), c2=(0.95, 1.22, 1.10), tip=(1.12, 0.92, 1.78),
                   r0=0.23, r1=0.025, prong=True),
         cheek_spikes=[((0.90, -0.04, 0.32), (1.42, -0.18, 1.12), 0.13), ((0.80, -0.26, 0.24), (1.22, -0.62, 0.92), 0.10),
@@ -44,7 +44,7 @@ STYLES = {
     ),
     "Eclipse": dict(
         snout_len=1.95, snout_w=(0.76, 0.32), snout_h=(0.52, 0.26), snout_top_drop=0.40, stop=0.10,
-        eye_c=(0.50, 0.32, -0.28), eye_r=(0.29, 0.22), eye_yaw=0.36, eye_slant=0.22,
+        eye_c=(0.50, 0.33, -0.30), eye_r=(0.31, 0.235), eye_yaw=0.30, eye_slant=0.24,
         horn=dict(root=(0.40, 0.62, 0.22), c1=(0.52, 1.20, 0.42), c2=(0.70, 1.30, 0.95), tip=(0.80, 1.12, 1.48),
                   r0=0.20, r1=0.02, blade=True),
         cheek_spikes=[((0.86, -0.04, 0.30), (1.30, -0.26, 1.02), 0.12)],
@@ -195,6 +195,11 @@ def skull_field(style, cracks=None):
         brow = ellipsoid(q, (ex + 0.02, ey + 0.27, ez + 0.06), (0.42, 0.13, 0.30),
                          euler(0.0, -st["eye_yaw"], -0.18 - st["eye_slant"] * 0.6))
         d = smin(d, brow, 0.14)
+        # nasal ridges flanking the centre seam
+        Ls = st["snout_len"]
+        rxt, ryt, cyt, _ = snout_profile(st, np.array([-Ls * 0.55]))
+        ridge = round_cone(q, (0.13, float(cyt[0] + ryt[0]) - 0.03, -Ls * 0.92), (0.20, 0.52, -0.42), 0.045, 0.07)
+        d = smin(d, ridge, 0.10)
         # zygomatic arches toward the hinge
         arch = round_cone(q, (0.70, -0.06, -0.40), (0.86, -0.16, 0.40), 0.13, 0.15)
         d = smin(d, arch, 0.16)
@@ -229,6 +234,15 @@ def skull_field(style, cracks=None):
         rxb, ryb, cyb, _ = snout_profile(st, np.array([-0.6]))
         palate = ellipsoid(p, (0, float(cyb[0] - ryb[0] * 0.80) - 0.06, -0.75), (float(rxb[0]) * 0.62, 0.12, L * 0.42))
         d = smax(d, -palate, 0.05)
+        # dragon-skull openings: antorbital fossa on the snout side, temporal fossa behind the eye
+        zA = -0.52 - 0.30 * (L / 1.62)
+        rxa, rya, cya, _ = snout_profile(st, np.array([zA]))
+        ant = ellipse_prism(q, (float(rxa[0]) * 0.92, float(cya[0]) - 0.02, zA), (0.24 * L / 1.62, 0.10), -0.5, 0.11,
+                            euler(0.0, -1.30, -0.12), floor_round=0.06)
+        temp = ellipse_prism(q, (0.80, 0.30, 0.22), (0.17, 0.12), -0.5, 0.12, euler(-0.35, -1.25, 0.25),
+                             floor_round=0.06)
+        fen = np.minimum(ant, temp)
+        d = smax(d, -fen, 0.025)
         pre_groove = d
         # centre seam (the blaster's iconic centre line) from the crest down to the nose
         seam_pts = np.array([[0, ntop + 0.12, -L - 0.10], [0, ntop + 0.32, -L + 0.45], [0, 0.42, -0.70],
@@ -241,7 +255,7 @@ def skull_field(style, cracks=None):
         tsd = teeth_sdf(q, teeth_specs(st, upper=True))
         d = smin(d, tsd, 0.025)
         out = {"head": head, "eye": e, "nose": nose, "palate": palate, "seam": ds, "pre_groove": pre_groove,
-               "teeth": tsd}
+               "teeth": tsd, "fen": fen}
         pre_cracks = d
         if cracks is not None:
             d = C.carve_cracks(d, p, cracks["paths"], cracks["width"], cracks["depth"])
@@ -267,6 +281,8 @@ def skull_colorize(style, cracks=None):
         rgb = np.where(in_eye[:, None], C.depth_tint(rgb, depth, socket, 0.004, 0.07), rgb)
         in_nose = f["nose"] < 0.03
         rgb = np.where(in_nose[:, None], C.depth_tint(rgb, depth, socket, 0.004, 0.06), rgb)
+        in_fen = f["fen"] < 0.025
+        rgb = np.where(in_fen[:, None], C.depth_tint(rgb, depth, socket, 0.003, 0.05), rgb)
         in_pal = (f["palate"] < 0.03) & (f["teeth"] > 0.004)
         rgb = np.where(in_pal[:, None], C.depth_tint(rgb, depth, inner, 0.004, 0.05), rgb)
         gdepth = np.maximum(-f["pre_groove"], 0.0)
@@ -418,6 +434,9 @@ def jaw_field(style, cracks=None):
         d = smin(d, ramus, 0.12)
         cond = ellipsoid(q, (0.74, HINGE[1], HINGE[2]), (0.12, 0.11, 0.12))
         d = smin(d, cond, 0.06)
+        # lower edge ridge
+        rl = round_cone(q, (0.70, -0.86, 0.10), (0.20, -0.72, -L + 0.30), 0.06, 0.05)
+        d = smin(d, rl, 0.08)
         # chin
         chin = ellipsoid(p, (0, -0.70, -L + 0.18), (0.22, 0.12, 0.18))
         d = smin(d, chin, 0.10)
