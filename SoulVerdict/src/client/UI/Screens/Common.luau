@@ -26,7 +26,8 @@
 --   Common.Swatch(theme, kit, skin, props) -> Frame    palette swatch (2-3 colours) with a rarity ring
 --   Common.RigView(theme, props) -> RigViewHandle      ViewportFrame with the kit's 3D rig (RigBuilder),
 --       posed ("Pockets" skeletons / "Ready" humans), framed, slowly turning, drag to spin.
---       props: Kit, Skin, Size, Position, AnchorPoint, Style (rig style id), Spin (deg/s), Parent
+--       props: Kit, Skin, Size, Position, AnchorPoint, Style (rig style id), Styler (fn(model), e.g.
+--       RigStyleController.ApplyTo), Spin (deg/s), Parent
 --       handle: { Root, Set(kitId, skinId?), Destroy }
 --   Common.Bag() -> { Add(x), Connect(signal, fn), Clean() }    connection/cleanup bag
 --   Common.Empty(theme, text, props) -> Frame                   centred "nothing here" note
@@ -306,6 +307,17 @@ function Common.Request(deps: any, action: string, data: any): boolean
 		Net.Client.Fire("Request", action, data)
 	end)
 	return ok
+end
+
+-- RigStyleController.ApplyTo as a RigView styler (nil offline)
+function Common.Styler(deps: any): ((Model) -> ())?
+	local rs = deps and deps.RigStyle
+	if rs and type(rs.ApplyTo) == "function" then
+		return function(model: Model)
+			rs.ApplyTo(model)
+		end
+	end
+	return nil
 end
 
 function Common.Setting(deps: any, key: string): any
@@ -1080,7 +1092,7 @@ local function boundsOf(model: Instance): (Vector3, Vector3)
 	return minV, maxV
 end
 
-local function buildRig(kit: any, skinId: string?, style: string?): (Model?, number)
+local function buildRig(kit: any, skinId: string?, style: string?, styler: ((Model) -> ())?): (Model?, number)
 	local rigBuilder = Common.Module({ "Rigs", "RigBuilder" })
 	if rigBuilder == nil then
 		return nil, 0
@@ -1106,7 +1118,10 @@ local function buildRig(kit: any, skinId: string?, style: string?): (Model?, num
 		pcall(rigBuilder.Pose, model, pose)
 		pcall(rigBuilder.ApplyPose, model, pose)
 	end
-	if style then
+	if styler then
+		-- runtime: RigStyleController.ApplyTo (current style incl. Style Lab override, HD meshes)
+		pcall(styler, model)
+	elseif style then
 		local rigStyles = Common.Module({ "Rigs", "RigStyles" })
 		if rigStyles then
 			pcall(rigStyles.Apply, model, style)
@@ -1140,46 +1155,38 @@ function Common.RigView(theme: Theme, props: { [string]: any }): RigViewHandle
 	local world = Instance.new("WorldModel")
 	world.Parent = vpf
 	local model: Model? = nil
-	local baseCF: { [BasePart]: CFrame } = {}
 	local yaw = math.rad(props.Yaw or -24)
-	local centerY = 2.6
+	local baseCam = view.Camera.CFrame
+	local baseLight = Vector3.new(-0.55, -0.9, -0.6)
 	local function placeCamera(height: number)
 		local h = math.max(height, 3)
-		centerY = h * 0.5
+		local centerY = h * 0.5
 		local fov = math.rad(view.Camera.FieldOfView)
 		local dist = (h * 0.58) / math.tan(fov / 2)
 		-- camera in front of the rig (rig faces -Z), slightly above, looking back at it (basis vectors are
 		-- built by hand: no CFrame.lookAt, which is mirrored under Lune)
 		local pitch = math.rad(-6)
 		local pos = Vector3.new(0, centerY + dist * math.sin(-pitch), -dist * math.cos(pitch))
-		view.Camera.CFrame = CFrame.new(pos) * CFrame.Angles(0, math.pi, 0) * CFrame.Angles(pitch, 0, 0)
+		baseCam = CFrame.new(pos) * CFrame.Angles(0, math.pi, 0) * CFrame.Angles(pitch, 0, 0)
 	end
+	-- turning the rig by +yaw == orbiting camera and light by -yaw around it: only the camera moves per
+	-- frame (cheap), the parts stay put
 	local function applyYaw()
-		if model == nil then
-			return
-		end
-		local rot = CFrame.Angles(0, yaw, 0)
-		for part, cf in baseCF do
-			part.CFrame = rot * cf
-		end
+		local rot = CFrame.Angles(0, -yaw, 0)
+		view.Camera.CFrame = rot * baseCam
+		vpf.LightDirection = rot * baseLight
 	end
 	local function set(kitId: string?, skinId: string?)
 		if model then
 			model:Destroy()
 			model = nil
 		end
-		table.clear(baseCF)
 		local k = kits and kitId and kits.Get(kitId)
 		if k == nil then
 			return
 		end
-		local built, height = buildRig(k, skinId, props.Style)
+		local built, height = buildRig(k, skinId, props.Style, props.Styler)
 		if built then
-			for _, d in built:GetDescendants() do
-				if d:IsA("BasePart") then
-					baseCF[d] = d.CFrame
-				end
-			end
 			model = built
 			placeCamera(height)
 			applyYaw()

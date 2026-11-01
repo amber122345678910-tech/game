@@ -39,6 +39,7 @@
 --   AnimController.IsPlaying(character, clip) -> boolean
 --   AnimController.Track(model, opts?) / Untrack(model) / IsTracked(model)   opts.Viewport = true animates a
 --       model outside the workspace (ViewportFrame previews: FK writes part CFrames at 30 Hz)
+--   AnimController.Step(dt)        advance all characters (tests/tools; the game uses PreSimulation)
 --   Signals: Marker(character, clipName, markerName), Footstep(character, side "Left"|"Right"|"Both", intensity)
 --   AnimController.Tuning   (numbers below)
 
@@ -861,7 +862,7 @@ local function fireMarkers(st: CharState, t: Track, a: number, b: number)
 	end)
 end
 
-local function sense(st: CharState, dt: number, now: number)
+local function sense(st: CharState, dt: number)
 	local root = st.Root
 	local cf = root.CFrame
 	local pos = cf.Position
@@ -1446,7 +1447,7 @@ local function updateCharacter(st: CharState, dt: number, now: number, serverNow
 		end
 		return
 	end
-	sense(st, dt, now)
+	sense(st, dt)
 	buildPose(st, dt, now, serverNow)
 	-- idle fidgets
 	if not st.IsDummy and not st.Viewport then
@@ -1689,6 +1690,12 @@ function AnimController.PlayAbility(character: Model, kitId: string?, abilityId:
 		end
 	end
 	return AnimController.Play(character, clipName :: string, opts)
+end
+
+-- Advances every tracked character by dt (the controller drives itself from PreSimulation; tools and
+-- headless tests call this directly).
+function AnimController.Step(dt: number)
+	onStep(dt)
 end
 
 function AnimController.Track(model: Model, opts: { Viewport: boolean? }?): boolean

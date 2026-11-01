@@ -227,7 +227,11 @@ function Style.Resolve(theme: Theme, hud: any?): Skin
 		Battle = battle,
 		C = C,
 		Font = function(role: string): Font
-			return Themes.HudFont(style, (if role == "Number" or role == "Title" or role == "Body" then role else "Label") :: any, lang)
+			return Themes.HudFont(
+				style,
+				(if role == "Number" or role == "Title" or role == "Body" then role else "Label") :: any,
+				lang
+			)
 		end,
 		Size = {
 			Label = style.TextSize.Label,
@@ -272,7 +276,13 @@ function Style.Corner(parent: Instance, radius: UDim?): UICorner
 	return c
 end
 
-function Style.Stroke(parent: Instance, color: Color3, thickness: number, transparency: number?, miter: boolean?): UIStroke
+function Style.Stroke(
+	parent: Instance,
+	color: Color3,
+	thickness: number,
+	transparency: number?,
+	miter: boolean?
+): UIStroke
 	local s = Instance.new("UIStroke")
 	s.Color = color
 	s.Thickness = thickness
@@ -283,7 +293,12 @@ function Style.Stroke(parent: Instance, color: Color3, thickness: number, transp
 	return s
 end
 
-function Style.Gradient(parent: Instance, color: ColorSequence?, transparency: NumberSequence?, rotation: number?): UIGradient
+function Style.Gradient(
+	parent: Instance,
+	color: ColorSequence?,
+	transparency: NumberSequence?,
+	rotation: number?
+): UIGradient
 	local g = Instance.new("UIGradient")
 	if color then
 		g.Color = color
@@ -353,8 +368,10 @@ function Style.Box(skin: Skin, props: { [string]: any }): Frame
 	return f
 end
 
-local ALIGN_X = { Left = Enum.TextXAlignment.Left, Center = Enum.TextXAlignment.Center, Right = Enum.TextXAlignment.Right }
-local ALIGN_Y = { Top = Enum.TextYAlignment.Top, Center = Enum.TextYAlignment.Center, Bottom = Enum.TextYAlignment.Bottom }
+local ALIGN_X =
+	{ Left = Enum.TextXAlignment.Left, Center = Enum.TextXAlignment.Center, Right = Enum.TextXAlignment.Right }
+local ALIGN_Y =
+	{ Top = Enum.TextYAlignment.Top, Center = Enum.TextYAlignment.Center, Bottom = Enum.TextYAlignment.Bottom }
 
 function Style.Text(skin: Skin, props: { [string]: any }): TextLabel
 	local role: string = props.Role or "Label"
@@ -415,6 +432,11 @@ end
 
 -- Re-colours a UIKit.Bar fill with a gradient (Modern) or a flat colour (Battle).
 function Style.TintBar(skin: Skin, barRoot: Instance, color: Color3, color2: Color3?)
+	local key = tostring(color) .. "|" .. tostring(color2)
+	if barRoot:GetAttribute("Tint") == key then
+		return
+	end
+	barRoot:SetAttribute("Tint", key)
 	local track = barRoot:FindFirstChild("Track")
 	local fill = if track then track:FindFirstChild("Fill") else nil
 	if not fill or not fill:IsA("Frame") then
@@ -433,7 +455,9 @@ function Style.TintBar(skin: Skin, barRoot: Instance, color: Color3, color2: Col
 		g = Instance.new("UIGradient")
 		g.Parent = fill
 	end
-	(g :: UIGradient).Color = if color2 then Style.CSeq(color, color2) else Style.CSeq(color:Lerp(BLACK, 0.3), color:Lerp(WHITE, 0.35));
+	(g :: UIGradient).Color = if color2
+		then Style.CSeq(color, color2)
+		else Style.CSeq(color:Lerp(BLACK, 0.3), color:Lerp(WHITE, 0.35));
 	(g :: UIGradient).Rotation = 0
 end
 
@@ -443,7 +467,10 @@ function Style.Icon(name: string?, color: Color3, size: (number | UDim2)?): Fram
 end
 
 -- bars ------------------------------------------------------------------------------------------------
-function Style.Bar(skin: Skin, props: { [string]: any }): { Root: Frame, Set: (number, number?, number?) -> (), SetColor: (Color3) -> (), Destroy: () -> () }
+function Style.Bar(
+	skin: Skin,
+	props: { [string]: any }
+): { Root: Frame, Set: (number, number?, number?) -> (), SetColor: (Color3) -> (), Destroy: () -> () }
 	local p = table.clone(props)
 	p.Hud = skin.Hud
 	local bar = UIKit.Bar(skin.Theme, p)
@@ -461,12 +488,23 @@ function Style.Bar(skin: Skin, props: { [string]: any }): { Root: Frame, Set: (n
 		Style.Corner(flash :: Frame, skin.Hud.Bar.Corner)
 	end
 	local last: number = props.Value or 0
+	local lastMax: number? = props.Max
+	local lastKr: number? = props.Secondary
 	return {
 		Root = bar.Root,
 		Set = function(v: number, max: number?, kr: number?)
+			-- skip redundant sets (the HUD refreshes at 10 Hz; UIKit.Bar tweens on every Set)
+			if math.abs(v - last) < 0.01 and max == lastMax and (kr or 0) == (lastKr or 0) then
+				return
+			end
+			lastMax, lastKr = max, kr
 			if flash and v < last - 0.5 then
 				flash.BackgroundTransparency = 0.35
-				Motion.Tween(flash, { Time = 0.35, Style = Enum.EasingStyle.Quad, Direction = Enum.EasingDirection.Out }, { BackgroundTransparency = 1 })
+				Motion.Tween(
+					flash,
+					{ Time = 0.35, Style = Enum.EasingStyle.Quad, Direction = Enum.EasingDirection.Out },
+					{ BackgroundTransparency = 1 }
+				)
 			end
 			last = v
 			bar.Set(v, max, kr)
@@ -813,7 +851,11 @@ end
 
 -- motion helpers (no-ops offline: Motion applies end values immediately) ------------------------------
 function Style.Tween(inst: Instance, time: number, props: { [string]: any }, easing: Enum.EasingStyle?)
-	Motion.Tween(inst, { Time = time, Style = easing or Enum.EasingStyle.Quad, Direction = Enum.EasingDirection.Out }, props)
+	Motion.Tween(
+		inst,
+		{ Time = time, Style = easing or Enum.EasingStyle.Quad, Direction = Enum.EasingDirection.Out },
+		props
+	)
 end
 
 function Style.Live(): boolean
@@ -919,7 +961,16 @@ function Style.Slots(kitId: string?): { SlotInfo }
 				BuiltIn = true,
 			})
 		elseif slot == "F" then
-			table.insert(out, { Slot = "F", Action = "F", Id = "Block", Icon = "Shield", Name = Style.L("hud.slot.block"), Cooldown = 0, Ult = false, BuiltIn = true })
+			table.insert(out, {
+				Slot = "F",
+				Action = "F",
+				Id = "Block",
+				Icon = "Shield",
+				Name = Style.L("hud.slot.block"),
+				Cooldown = 0,
+				Ult = false,
+				BuiltIn = true,
+			})
 		elseif slot == "Shift" and not monster then
 			table.insert(out, {
 				Slot = "Shift",
@@ -963,16 +1014,53 @@ function Style.Initial(deps: any, default: string): { [string]: any }?
 end
 
 -- default key labels when InputController is absent (previews / early boot)
-local DEFAULT_KEYS = { M1 = "M1", Q = "Q", E = "E", R = "R", T = "T", F = "F", G = "G", Shift = "SHIFT", Jump = "SPACE", CameraLock = "CTRL" }
+local DEFAULT_KEYS = {
+	M1 = "M1",
+	Q = "Q",
+	E = "E",
+	R = "R",
+	T = "T",
+	F = "F",
+	G = "G",
+	Shift = "SHIFT",
+	Jump = "SPACE",
+	CameraLock = "CTRL",
+}
 function Style.KeyLabel(deps: any, action: string): string
 	local input = if type(deps) == "table" then deps.Input else nil
 	if type(input) == "table" and type(input.KeyLabel) == "function" then
 		local ok, label = pcall(input.KeyLabel, action)
 		if ok and type(label) == "string" and label ~= "" then
-			return label
+			return Style.ShortKey(label)
 		end
 	end
 	return DEFAULT_KEYS[action] or action
+end
+
+-- Short cap text for a key label ("ButtonX" -> "X", "DPadUp" -> "UP", "LeftShift" -> "SHIFT").
+local KEY_ALIAS = {
+	MouseButton1 = "M1",
+	MouseButton2 = "M2",
+	MouseButton3 = "M3",
+	LeftControl = "CTRL",
+	RightControl = "CTRL",
+	LeftAlt = "ALT",
+	RightAlt = "ALT",
+	LeftShift = "SHIFT",
+	RightShift = "SHIFT",
+	Return = "ENTER",
+	Backspace = "BKSP",
+}
+function Style.ShortKey(label: string): string
+	if KEY_ALIAS[label] then
+		return KEY_ALIAS[label]
+	end
+	local short = label
+	short = string.gsub(short, "^Button", "")
+	short = string.gsub(short, "^DPad", "")
+	short = string.gsub(short, "^Left(%u)", "%1")
+	short = string.gsub(short, "^Right(%u)", "R%1")
+	return string.upper(short)
 end
 
 return Style

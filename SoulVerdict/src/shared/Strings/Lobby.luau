@@ -7,9 +7,18 @@ return {
 		en = "* Waiting for one more SOUL... or start a PRACTICE round vs bots.",
 		ru = "* Ждём ещё одну душу... или начни ТРЕНИРОВКУ против ботов.",
 	},
-	["lobby.intermission.line"] = { en = "* The monster is chosen in {1}s", ru = "* Монстр будет выбран через {1}с" },
-	["lobby.intro.line"] = { en = "* The trial is about to begin...", ru = "* Суд вот-вот начнётся..." },
-	["lobby.round.line"] = { en = "* A trial is in progress. You'll join the next one.", ru = "* Идёт суд. Ты присоединишься к следующему." },
+	["lobby.intermission.line"] = {
+		en = "* The monster is chosen in {1}s",
+		ru = "* Монстр будет выбран через {1}с",
+	},
+	["lobby.intro.line"] = {
+		en = "* The trial is about to begin...",
+		ru = "* Суд вот-вот начнётся...",
+	},
+	["lobby.round.line"] = {
+		en = "* A trial is in progress. You'll join the next one.",
+		ru = "* Идёт суд. Ты присоединишься к следующему.",
+	},
 	-- vote
 	["lobby.vote.title"] = { en = "NEXT HALL", ru = "СЛЕДУЮЩИЙ ЗАЛ" },
 	["lobby.vote.votes"] = { en = "{1} VOTES", ru = "ГОЛОСОВ: {1}" },
@@ -35,6 +44,12 @@ return {
 	["lobby.btn.quests"] = { en = "QUESTS", ru = "ЗАДАНИЯ" },
 	-- monster announcement
 	["lobby.chosen.title"] = { en = "THE MONSTER HAS BEEN CHOSEN", ru = "МОНСТР ВЫБРАН" },
-	["lobby.chosen.line"] = { en = "* {1} will judge you as {2}.", ru = "* {1} будет судить вас в роли: {2}." },
-	["lobby.chosen.you"] = { en = "* It's you. Judge them well.", ru = "* Это ты. Суди их как следует." },
+	["lobby.chosen.line"] = {
+		en = "* {1} will judge you as {2}.",
+		ru = "* {1} будет судить вас в роли: {2}.",
+	},
+	["lobby.chosen.you"] = {
+		en = "* It's you. Judge them well.",
+		ru = "* Это ты. Суди их как следует.",
+	},
 }

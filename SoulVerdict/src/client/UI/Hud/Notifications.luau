@@ -47,7 +47,8 @@ function Notifications.Create(theme: any, deps: any): any
 
 	local function push(text: string, kind: string?, icon: string?, duration: number?)
 		order += if phone then -1 else 1
-		local toast = UIKit.Toast(theme, { Text = text, Kind = kind or "Info", Icon = icon, Width = width, LayoutOrder = order })
+		local toast =
+			UIKit.Toast(theme, { Text = text, Kind = kind or "Info", Icon = icon, Width = width, LayoutOrder = order })
 		toast.Root.Parent = holder
 		local d = duration or 4.5
 		table.insert(items, 1, { Root = toast.Root, Expires = if clock > 0 then clock + d else -d })

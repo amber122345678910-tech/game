@@ -24,7 +24,13 @@ function Objectives.Create(theme: any, deps: any): any
 
 	-- collapse warning
 	local warn = Style.Frame({ Name = "Collapse", Size = UDim2.fromScale(1, 1), Visible = false, Parent = root })
-	Style.Vignette({ Name = "Vignette", Color = Color3.fromRGB(150, 40, 255), Strength = 0.7, Depth = 0.22, Parent = warn })
+	Style.Vignette({
+		Name = "Vignette",
+		Color = Color3.fromRGB(150, 40, 255),
+		Strength = 0.7,
+		Depth = 0.22,
+		Parent = warn,
+	})
 	local warnBox = Style.Box(skin, {
 		Name = "Banner",
 		AnchorPoint = Vector2.new(0.5, 0.5),
@@ -57,14 +63,29 @@ function Objectives.Create(theme: any, deps: any): any
 		Parent = warnBox,
 	})
 
-	type Marker = { Root: Frame, Ring: any, RingFill: Frame?, StarHolder: Frame, Label: TextLabel, Sub: TextLabel, Arrow: Frame, ArrowKey: string, StarKey: string }
+	type Marker = {
+		Root: Frame,
+		Ring: any,
+		RingFill: Frame?,
+		StarHolder: Frame,
+		Label: TextLabel,
+		Sub: TextLabel,
+		Arrow: Frame,
+		ArrowKey: string,
+		StarKey: string,
+	}
 	local markers: { Marker } = {}
 	local snap: { [string]: any }? = nil
 	local touch = false
 
 	local size = if phone then 38 else 48
 	local function newMarker(i: number): Marker
-		local m = Style.Frame({ Name = "Save" .. i, AnchorPoint = Vector2.new(0.5, 0.5), Size = UDim2.fromOffset(size, size), Parent = root })
+		local m = Style.Frame({
+			Name = "Save" .. i,
+			AnchorPoint = Vector2.new(0.5, 0.5),
+			Size = UDim2.fromOffset(size, size),
+			Parent = root,
+		})
 		local disc = Style.Frame({
 			Name = "Disc",
 			BackgroundTransparency = if battle then 0 else 0.3,
@@ -87,7 +108,13 @@ function Objectives.Create(theme: any, deps: any): any
 		if battle then
 			Style.Stroke(disc, Style.WHITE, 2, 0)
 		end
-		local starHolder = Style.Frame({ Name = "Star", AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5), Size = UDim2.fromOffset(size * 0.5, size * 0.5), Parent = inner })
+		local starHolder = Style.Frame({
+			Name = "Star",
+			AnchorPoint = Vector2.new(0.5, 0.5),
+			Position = UDim2.fromScale(0.5, 0.5),
+			Size = UDim2.fromOffset(size * 0.5, size * 0.5),
+			Parent = inner,
+		})
 		local label = Style.Text(skin, {
 			Name = "Label",
 			Text = "",
@@ -110,8 +137,23 @@ function Objectives.Create(theme: any, deps: any): any
 			Size = UDim2.fromOffset(140, 12),
 			Parent = m,
 		})
-		local arrow = Style.Frame({ Name = "Arrow", AnchorPoint = Vector2.new(0.5, 0.5), Size = UDim2.fromOffset(size * 0.5, size * 0.5), Visible = false, Parent = m })
-		return { Root = m, Ring = ring, StarHolder = starHolder, Label = label, Sub = sub, Arrow = arrow, ArrowKey = "", StarKey = "" }
+		local arrow = Style.Frame({
+			Name = "Arrow",
+			AnchorPoint = Vector2.new(0.5, 0.5),
+			Size = UDim2.fromOffset(size * 0.5, size * 0.5),
+			Visible = false,
+			Parent = m,
+		})
+		return {
+			Root = m,
+			Ring = ring,
+			StarHolder = starHolder,
+			Label = label,
+			Sub = sub,
+			Arrow = arrow,
+			ArrowKey = "",
+			StarKey = "",
+		}
 	end
 
 	-- place a marker at canvas position (x, y); offscreen markers are clamped with an outward arrow
@@ -197,7 +239,11 @@ function Objectives.Create(theme: any, deps: any): any
 			if starKey ~= mk.StarKey then
 				mk.StarKey = starKey
 				mk.StarHolder:ClearAllChildren()
-				local icon = Style.Icon(if lit then "Check" else "Star", if lit then C.Gold elseif save.Contested then C.Danger else Style.WHITE, UDim2.fromScale(1, 1))
+				local icon = Style.Icon(
+					if lit then "Check" else "Star",
+					if lit then C.Gold elseif save.Contested then C.Danger else Style.WHITE,
+					UDim2.fromScale(1, 1)
+				)
 				icon.Parent = mk.StarHolder
 			end
 			mk.Ring.Set(if lit then 1 else math.clamp(save.Progress or 0, 0, 1))
@@ -225,7 +271,12 @@ function Objectives.Create(theme: any, deps: any): any
 		local collapse = s.Collapse
 		warn.Visible = collapse ~= nil and collapse.Outside == true
 		if collapse then
-			Style.SetText(ringText, Style.Upper(skin, Style.L("hud.collapse.radius", math.floor(collapse.Radius or 0))) .. "  ·  " .. Style.L("hud.obj.distance", math.floor(collapse.Distance or 0)))
+			Style.SetText(
+				ringText,
+				Style.Upper(skin, Style.L("hud.collapse.radius", math.floor(collapse.Radius or 0)))
+					.. "  ·  "
+					.. Style.L("hud.obj.distance", math.floor(collapse.Distance or 0))
+			)
 		end
 		tick(s.Now or 0)
 	end

@@ -394,6 +394,7 @@ function Loadout.Create(theme: Theme, deps: any): any
 		Kit = selectedKit,
 		Skin = nil,
 		Style = Common.Setting(d, "RigStyle"),
+		Styler = Common.Styler(d),
 		Size = UDim2.new(1, 0, 1, -skinsH - (if phone then 4 else 10)),
 	})
 	rigView.Root.Parent = hero.Content

@@ -25,8 +25,19 @@ function Nameplates.BuildPlate(skin: any, unit: any, viewerTeam: string): any
 	local C = skin.C
 	local battle = skin.Battle
 	local root = Style.Frame({ Name = "Plate", Size = UDim2.fromOffset(PLATE.X, PLATE.Y) })
-	local marker = Style.Frame({ Name = "Marker", AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.fromScale(0.5, 0), Size = UDim2.fromOffset(22, 22), Parent = root })
-	local nameRow = Style.Frame({ Name = "NameRow", Position = UDim2.fromOffset(0, 22), Size = UDim2.new(1, 0, 0, 20), Parent = root })
+	local marker = Style.Frame({
+		Name = "Marker",
+		AnchorPoint = Vector2.new(0.5, 0),
+		Position = UDim2.fromScale(0.5, 0),
+		Size = UDim2.fromOffset(22, 22),
+		Parent = root,
+	})
+	local nameRow = Style.Frame({
+		Name = "NameRow",
+		Position = UDim2.fromOffset(0, 22),
+		Size = UDim2.new(1, 0, 0, 20),
+		Parent = root,
+	})
 	local l = Instance.new("UIListLayout")
 	l.FillDirection = Enum.FillDirection.Horizontal
 	l.HorizontalAlignment = Enum.HorizontalAlignment.Center
@@ -34,7 +45,8 @@ function Nameplates.BuildPlate(skin: any, unit: any, viewerTeam: string): any
 	l.SortOrder = Enum.SortOrder.LayoutOrder
 	l.Padding = UDim.new(0, 6)
 	l.Parent = nameRow
-	local heartHolder = Style.Frame({ Name = "Soul", Size = UDim2.fromOffset(15, 14), LayoutOrder = 1, Parent = nameRow })
+	local heartHolder =
+		Style.Frame({ Name = "Soul", Size = UDim2.fromOffset(15, 14), LayoutOrder = 1, Parent = nameRow })
 	local name = Style.Text(skin, {
 		Name = "Name",
 		Text = "",
@@ -85,7 +97,8 @@ function Nameplates.BuildPlate(skin: any, unit: any, viewerTeam: string): any
 		local color = if kit then kit.Color else C.SoulRed
 		local monster = u.Team == "Monster"
 		local mate = isTeammate(u, viewer)
-		local k = string.format("%s|%s|%s|%s", tostring(color), tostring(monster), tostring(u.Downed), tostring(u.FinalForm))
+		local k =
+			string.format("%s|%s|%s|%s", tostring(color), tostring(monster), tostring(u.Downed), tostring(u.FinalForm))
 		if k ~= key then
 			key = k
 			marker:ClearAllChildren()
@@ -101,7 +114,10 @@ function Nameplates.BuildPlate(skin: any, unit: any, viewerTeam: string): any
 		marker.Visible = monster
 		heartHolder.Visible = not monster
 		Style.SetText(name, if battle then Style.Upper(skin, tostring(u.Name)) else tostring(u.Name))
-		name.TextColor3 = if monster then color:Lerp(Style.WHITE, 0.35) elseif mate then Style.WHITE else Color3.fromRGB(255, 170, 170)
+		name.TextColor3 = if monster
+			then color:Lerp(Style.WHITE, 0.35)
+			elseif mate then Style.WHITE
+			else Color3.fromRGB(255, 170, 170)
 		local subText = Style.L("hud.lv", u.Level or 1)
 		if u.Title and u.Title ~= "" then
 			subText ..= "  ·  " .. u.Title
@@ -116,7 +132,10 @@ function Nameplates.BuildPlate(skin: any, unit: any, viewerTeam: string): any
 		end
 		down.Visible = u.Downed == true
 		if u.Downed then
-			Style.SetText(down, Style.Upper(skin, Style.L("hud.team.down", math.max(0, math.ceil((u.DownedEndsAt or now) - now)))))
+			Style.SetText(
+				down,
+				Style.Upper(skin, Style.L("hud.team.down", math.max(0, math.ceil((u.DownedEndsAt or now) - now))))
+			)
 		end
 	end
 	set(unit, viewerTeam, 0)
@@ -155,7 +174,9 @@ function Nameplates.Create(theme: any, deps: any): any
 		if not folder then
 			return
 		end
-		local viewer = if s.Me and not s.Me.Dead then s.Me.Team else (if s.Role == "Spectator" then "Spectator" else "Lobby")
+		local viewer = if s.Me and not s.Me.Dead
+			then s.Me.Team
+			else (if s.Role == "Spectator" then "Spectator" else "Lobby")
 		local seen: { [Model]: boolean } = {}
 		for _, u in units(s) do
 			local model = u.Model
@@ -205,7 +226,13 @@ function Nameplates.Create(theme: any, deps: any): any
 
 	local function updatePreview(s: { [string]: any })
 		root:ClearAllChildren()
-		local row = Style.Frame({ Name = "Row", AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5), Size = UDim2.fromOffset(4 * (PLATE.X + 40) - 40, PLATE.Y), Parent = root })
+		local row = Style.Frame({
+			Name = "Row",
+			AnchorPoint = Vector2.new(0.5, 0.5),
+			Position = UDim2.fromScale(0.5, 0.5),
+			Size = UDim2.fromOffset(4 * (PLATE.X + 40) - 40, PLATE.Y),
+			Parent = root,
+		})
 		local l = Instance.new("UIListLayout")
 		l.FillDirection = Enum.FillDirection.Horizontal
 		l.Padding = UDim.new(0, 40)

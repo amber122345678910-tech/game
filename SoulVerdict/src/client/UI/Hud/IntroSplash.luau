@@ -32,7 +32,13 @@ function IntroSplash.Create(theme: any, deps: any): any
 	local live = type(deps) == "table" and deps.Live == true
 	local k = if phone then 0.56 else 1 -- size factor
 
-	local backdrop = Style.Frame({ Name = "Backdrop", BackgroundTransparency = if battle then 0.03 else 0, BackgroundColor3 = if battle then Style.BLACK else Style.WHITE, Size = UDim2.fromScale(1, 1), Parent = root })
+	local backdrop = Style.Frame({
+		Name = "Backdrop",
+		BackgroundTransparency = if battle then 0.03 else 0,
+		BackgroundColor3 = if battle then Style.BLACK else Style.WHITE,
+		Size = UDim2.fromScale(1, 1),
+		Parent = root,
+	})
 	local backGrad: UIGradient? = nil
 	if not battle then
 		backGrad = Style.Gradient(backdrop, Style.CSeq(Color3.fromRGB(8, 10, 22), Color3.fromRGB(6, 6, 12)), nil, 0)
@@ -48,7 +54,12 @@ function IntroSplash.Create(theme: any, deps: any): any
 		Rotation = 14,
 		Parent = root,
 	})
-	local slashGrad = Style.Gradient(slash, Style.CSeq(Style.WHITE, Style.WHITE), Style.Seq({ { 0, 0.15 }, { 0.75, 0.55 }, { 1, 1 } }), 0)
+	local slashGrad = Style.Gradient(
+		slash,
+		Style.CSeq(Style.WHITE, Style.WHITE),
+		Style.Seq({ { 0, 0.15 }, { 0.75, 0.55 }, { 1, 1 } }),
+		0
+	)
 
 	local mapLabel = Style.Text(skin, {
 		Name = "Map",
@@ -122,7 +133,13 @@ function IntroSplash.Create(theme: any, deps: any): any
 	})
 
 	-- VS ---------------------------------------------------------------------------------------------------
-	local vs = Style.Frame({ Name = "VS", AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5), Size = UDim2.fromOffset(math.floor(150 * k), math.floor(150 * k)), Parent = root })
+	local vs = Style.Frame({
+		Name = "VS",
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Position = UDim2.fromScale(0.5, 0.5),
+		Size = UDim2.fromOffset(math.floor(150 * k), math.floor(150 * k)),
+		Parent = root,
+	})
 	if not battle then
 		local diamond = Style.Frame({
 			Name = "Diamond",
@@ -224,7 +241,17 @@ function IntroSplash.Create(theme: any, deps: any): any
 	local lastCount = -1
 
 	local function portraitFallback(kitColor: Color3)
-		Style.Glow({ Name = "Glow", Color = kitColor, AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.52), Size = UDim2.fromOffset(math.floor(170 * k), math.floor(170 * k)), Spread = math.floor(60 * k), Strength = 0.55, Corner = UDim.new(0.5, 0), Parent = portrait })
+		Style.Glow({
+			Name = "Glow",
+			Color = kitColor,
+			AnchorPoint = Vector2.new(0.5, 0.5),
+			Position = UDim2.fromScale(0.5, 0.52),
+			Size = UDim2.fromOffset(math.floor(170 * k), math.floor(170 * k)),
+			Spread = math.floor(60 * k),
+			Strength = 0.55,
+			Corner = UDim.new(0.5, 0),
+			Parent = portrait,
+		})
 		local skull = Style.Icon("Skull", kitColor:Lerp(Style.WHITE, 0.1), math.floor(230 * k))
 		skull.AnchorPoint = Vector2.new(0.5, 0.5)
 		skull.Position = UDim2.fromScale(0.5, 0.52)
@@ -278,7 +305,10 @@ function IntroSplash.Create(theme: any, deps: any): any
 		local kit = Style.Kit(monster.KitId)
 		local kitColor = if kit then kit.Color else C.Monster
 		Style.SetText(mapLabel, (if battle then "* " else "") .. Style.Upper(skin, mapName(intro.MapId)))
-		Style.SetText(monsterKitLabel, Style.Upper(skin, if kit then Style.Pick(kit.Name) else tostring(monster.Name or "?")))
+		Style.SetText(
+			monsterKitLabel,
+			Style.Upper(skin, if kit then Style.Pick(kit.Name) else tostring(monster.Name or "?"))
+		)
 		Style.SetText(monsterTitle, Style.Upper(skin, if kit then Style.Pick(kit.Title) else ""))
 		monsterTitle.TextColor3 = kitColor
 		local who = tostring(monster.Name or "?")
@@ -310,7 +340,14 @@ function IntroSplash.Create(theme: any, deps: any): any
 				Parent = cards,
 			})
 			if not battle then
-				local strip = Style.Frame({ Name = "Strip", BackgroundTransparency = 0, BackgroundColor3 = color, Size = UDim2.new(0, 5, 1, -16), Position = UDim2.fromOffset(0, 8), Parent = card })
+				local strip = Style.Frame({
+					Name = "Strip",
+					BackgroundTransparency = 0,
+					BackgroundColor3 = color,
+					Size = UDim2.new(0, 5, 1, -16),
+					Position = UDim2.fromOffset(0, 8),
+					Parent = card,
+				})
 				Style.Corner(strip, UDim.new(0.5, 0))
 			end
 			local heart = Style.Heart(color, math.floor(cardH * 0.46), "Whole")
@@ -350,7 +387,12 @@ function IntroSplash.Create(theme: any, deps: any): any
 			})
 			if Style.Live() then
 				card.Position = UDim2.fromOffset(math.floor(60 * k), 0)
-				Motion.Tween(card, { Time = 0.45, Style = Enum.EasingStyle.Quart, Direction = Enum.EasingDirection.Out, Delay = 0.12 * i }, { Position = UDim2.fromOffset(0, 0) })
+				Motion.Tween(card, {
+					Time = 0.45,
+					Style = Enum.EasingStyle.Quart,
+					Direction = Enum.EasingDirection.Out,
+					Delay = 0.12 * i,
+				}, { Position = UDim2.fromOffset(0, 0) })
 			end
 		end
 		local classes = 0
@@ -367,8 +409,13 @@ function IntroSplash.Create(theme: any, deps: any): any
 		harmonyLabel.Visible = bonus > 0.001
 		Style.SetText(harmonyLabel, Style.L("hud.intro.harmony", math.floor(bonus * 100 + 0.5)))
 		if Style.Live() then
-			monsterBox.Position = UDim2.new(0.5, -math.floor(110 * k) - mW - math.floor(80 * k), 0.5, math.floor(10 * k))
-			Motion.Tween(monsterBox, { Time = 0.55, Style = Enum.EasingStyle.Quart, Direction = Enum.EasingDirection.Out }, { Position = UDim2.new(0.5, -math.floor(110 * k) - mW, 0.5, math.floor(10 * k)) })
+			monsterBox.Position =
+				UDim2.new(0.5, -math.floor(110 * k) - mW - math.floor(80 * k), 0.5, math.floor(10 * k))
+			Motion.Tween(
+				monsterBox,
+				{ Time = 0.55, Style = Enum.EasingStyle.Quart, Direction = Enum.EasingDirection.Out },
+				{ Position = UDim2.new(0.5, -math.floor(110 * k) - mW, 0.5, math.floor(10 * k)) }
+			)
 		end
 	end
 
@@ -383,7 +430,11 @@ function IntroSplash.Create(theme: any, deps: any): any
 			Style.SetText(countNumber, if n > 3 then Style.FormatClock(left) else tostring(math.max(1, n)))
 			if Style.Live() and n <= 3 then
 				countNumber.TextSize = math.floor((if battle then 50 else 60) * k)
-				Motion.Tween(countNumber, { Time = 0.3, Style = Enum.EasingStyle.Back, Direction = Enum.EasingDirection.Out }, { TextSize = math.floor((if battle then 36 else 44) * k) })
+				Motion.Tween(
+					countNumber,
+					{ Time = 0.3, Style = Enum.EasingStyle.Back, Direction = Enum.EasingDirection.Out },
+					{ TextSize = math.floor((if battle then 36 else 44) * k) }
+				)
 			end
 		end
 	end

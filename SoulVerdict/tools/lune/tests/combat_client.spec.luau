@@ -29,17 +29,19 @@ end
 
 return {
 	modules_load_under_lune = function(T, Loader)
-		for _, path in {
-			"Controllers.HazardVisuals",
-			"Controllers.FxController",
-			"Controllers.CombatController",
-			"VFX.Lib",
-			"VFX.Pool",
-			"VFX.ScreenFX",
-			"VFX.DamageNumbers",
-			"Kits.ClassicSans",
-			"Kits.Determination",
-		} do
+		for _, path in
+			{
+				"Controllers.HazardVisuals",
+				"Controllers.FxController",
+				"Controllers.CombatController",
+				"VFX.Lib",
+				"VFX.Pool",
+				"VFX.ScreenFX",
+				"VFX.DamageNumbers",
+				"Kits.ClassicSans",
+				"Kits.Determination",
+			}
+		do
 			T.noerror(function()
 				local m = Loader.require(CLIENT .. path)
 				assert(type(m) == "table", path .. " did not return a table")
@@ -120,7 +122,8 @@ return {
 		T.ok(on1 ~= on2, "blinks during the last 30 %")
 		-- real hazards: the telegraph ends exactly when damage starts
 		local D = defs(Loader)
-		local spikes = D.Normalize("BoneSpikes", { center = Vector3.new(0, 0, 0), radius = 10, delay = 1.4, warn = 0.6 })
+		local spikes =
+			D.Normalize("BoneSpikes", { center = Vector3.new(0, 0, 0), radius = 10, delay = 1.4, warn = 0.6 })
 		local desc = D.Telegraph("BoneSpikes", spikes)
 		T.eq(desc.Kind, "Circle")
 		T.near(desc.Start, 0.8, 1e-9)
@@ -136,7 +139,10 @@ return {
 	spike_visuals_lead_the_hitbox = function(T, Loader)
 		local H = hv(Loader)
 		local D = defs(Loader)
-		local p = D.Normalize("BoneSpikes", { center = Vector3.new(0, 0, 0), radius = 8, height = 5, delay = 0.6, rise = 0.12, hold = 0.45 })
+		local p = D.Normalize(
+			"BoneSpikes",
+			{ center = Vector3.new(0, 0, 0), radius = 8, height = 5, delay = 0.6, rise = 0.12, hold = 0.45 }
+		)
 		T.eq(H.SpikeFrac(p, 0.3), 0, "hidden before the peek")
 		T.ok(H.SpikeFrac(p, 0.55) > 0 and H.SpikeFrac(p, 0.55) < 0.1, "tips peek just before")
 		for i = 0, 57 do
@@ -169,7 +175,10 @@ return {
 		local root = Vector3.new(0, 3, 0)
 		local look = Vector3.new(0, 0, -1)
 		-- Direction: clamped to Range
-		local dirP = C.BuildPayload({ Aim = "Direction", Range = 90 }, { Root = root, Look = look, Aim = Vector3.new(0, 3, -200), CastId = 7 })
+		local dirP = C.BuildPayload(
+			{ Aim = "Direction", Range = 90 },
+			{ Root = root, Look = look, Aim = Vector3.new(0, 3, -200), CastId = 7 }
+		)
 		T.near((dirP.aim - root).Magnitude, 90, 1e-4, "direction aim clamped to range")
 		T.ok(dirP.dir:Dot(Vector3.new(0, 0, -1)) > 0.999, "direction dir")
 		T.eq(dirP.castId, 7)
@@ -190,24 +199,46 @@ return {
 		T.ok(groundP.dir:Dot(Vector3.new(1, 0, 0)) > 0.999, "flat dir toward the point")
 		-- Target
 		local m = Instance.new("Model")
-		local tgtP = C.BuildPayload({ Aim = "Target", Range = 45 }, { Root = root, Look = look, Aim = Vector3.new(5, 3, -5), Target = m, TargetPos = Vector3.new(0, 3, -20), CastId = 2 })
+		local tgtP = C.BuildPayload(
+			{ Aim = "Target", Range = 45 },
+			{
+				Root = root,
+				Look = look,
+				Aim = Vector3.new(5, 3, -5),
+				Target = m,
+				TargetPos = Vector3.new(0, 3, -20),
+				CastId = 2,
+			}
+		)
 		T.eq(tgtP.target, m)
 		T.ok((tgtP.aim - Vector3.new(0, 3, -20)).Magnitude < 1e-6, "target aim = target position")
 		-- Self
-		local selfP = C.BuildPayload({ Aim = "Self" }, { Root = root, Look = Vector3.new(1, 0.5, 0), Aim = Vector3.new(9, 9, 9), CastId = 3 })
+		local selfP = C.BuildPayload(
+			{ Aim = "Self" },
+			{ Root = root, Look = Vector3.new(1, 0.5, 0), Aim = Vector3.new(9, 9, 9), CastId = 3 }
+		)
 		T.ok((selfP.aim - root).Magnitude < 1e-6, "self aim = own position")
 		T.ok(selfP.dir:Dot(Vector3.new(1, 0, 0)) > 0.999, "self dir = flat look")
 		-- Ally without a target: clamped aim, no target
-		local allyP = C.BuildPayload({ Aim = "Ally", Range = 30 }, { Root = root, Look = look, Aim = Vector3.new(0, 3, -100), CastId = 4 })
+		local allyP = C.BuildPayload(
+			{ Aim = "Ally", Range = 30 },
+			{ Root = root, Look = look, Aim = Vector3.new(0, 3, -100), CastId = 4 }
+		)
 		T.eq(allyP.target, nil)
 		T.near((allyP.aim - root).Magnitude, 30, 1e-4)
 		-- Hold: charge clamped to [0, 1]
-		local holdP = C.BuildPayload({ Aim = "Direction", Range = 90, Hold = { MaxTime = 1.2 } }, { Root = root, Look = look, Aim = Vector3.new(0, 3, -10), Charge = 1.7, CastId = 5 })
+		local holdP = C.BuildPayload(
+			{ Aim = "Direction", Range = 90, Hold = { MaxTime = 1.2 } },
+			{ Root = root, Look = look, Aim = Vector3.new(0, 3, -10), Charge = 1.7, CastId = 5 }
+		)
 		T.eq(holdP.charge, 1)
 		T.near(C.ChargeOf(0.6, 1.2), 0.5, 1e-9)
 		T.eq(C.ChargeOf(5, 1.2), 1)
 		-- aim right under the caster: falls back to the facing
-		local close = C.BuildPayload({ Aim = "Direction", Range = 90 }, { Root = root, Look = look, Aim = Vector3.new(0, 0, 0.2), CastId = 6 })
+		local close = C.BuildPayload(
+			{ Aim = "Direction", Range = 90 },
+			{ Root = root, Look = look, Aim = Vector3.new(0, 0, 0.2), CastId = 6 }
+		)
 		T.ok(close.dir:Dot(look) > 0.999, "degenerate aim uses the facing")
 	end,
 
@@ -222,7 +253,11 @@ return {
 		}
 		local pick = C.SelectTarget(Vector3.zero, Vector3.new(0, 0, -1), Vector3.zero, cands, 45, 22)
 		T.eq(pick, b, "closest to the aim ray within range")
-		T.eq(C.SelectTarget(Vector3.zero, Vector3.new(1, 0, 0), Vector3.zero, { cands[1] }, 45, 22), nil, "nothing in the cone")
+		T.eq(
+			C.SelectTarget(Vector3.zero, Vector3.new(1, 0, 0), Vector3.zero, { cands[1] }, 45, 22),
+			nil,
+			"nothing in the cone"
+		)
 		local justice = Loader.require("ReplicatedStorage.Shared.Kits").Get("Justice")
 		local ammo = C.AmmoAbility(justice)
 		T.ok(ammo ~= nil and ammo.Numbers.Ammo == 6, "Justice M1 carries ammo")
@@ -274,7 +309,10 @@ return {
 		local human = Instance.new("Model")
 		human:SetAttribute("Team", "Humans")
 		human:SetAttribute("KitId", "Determination")
-		T.ok(colorEq(Fx.HitColor({ kind = "Melee", attacker = human }), Color3.fromRGB(255, 0, 0)), "human hits use the SOUL colour")
+		T.ok(
+			colorEq(Fx.HitColor({ kind = "Melee", attacker = human }), Color3.fromRGB(255, 0, 0)),
+			"human hits use the SOUL colour"
+		)
 		T.eq(Fx.CastClip({ Clip = "Slash1" }, 1), "Slash1")
 		T.eq(Fx.CastClip({ Clip = "Slash1" }, 3), "Slash3")
 		T.eq(Fx.CastClip({ Clip = "Slash1" }, 5), "Slash1", "wraps after 4")
@@ -297,7 +335,22 @@ return {
 
 	visual_registry = function(T, Loader)
 		local H = hv(Loader)
-		for _, name in { "Orb", "Bone", "Bullet", "Ribbon", "Page", "Dish", "StarBone", "Chain", "Star", "Fireball", "Knife", "VoidOrb" } do
+		for _, name in
+			{
+				"Orb",
+				"Bone",
+				"Bullet",
+				"Ribbon",
+				"Page",
+				"Dish",
+				"StarBone",
+				"Chain",
+				"Star",
+				"Fireball",
+				"Knife",
+				"VoidOrb",
+			}
+		do
 			T.ok(H.HasVisual(name), "built-in visual " .. name)
 		end
 		T.ok(not H.HasVisual("NoSuchVisual"))

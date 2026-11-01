@@ -25,7 +25,7 @@
 --   HazardVisuals.HasVisual(name) -> boolean    HazardVisuals.Visuals() -> {string}
 --   HazardVisuals.RegisterRenderer(type, renderer)   renderer = { Create(rec), Update(rec, t, dt) -> boolean,
 --                                               Destroy(rec), EndEarly(rec, t)?, NoTelegraph: boolean? }
---   HazardVisuals.AcquireBlaster(style, width) -> Blaster   (kit indicators: ghost blasters)
+--   HazardVisuals.AcquireBlaster(style, width, opts?) -> Blaster   (opts.Ghost: translucent preview, never HD)
 --        blaster:Pose(muzzleCFrame, jawAngle) :SetEyes(0..1, color?) :SetTransparency(t) :SetGhost(on)
 --        :Release()
 -- Pure helpers (Lune-tested): BeamLayers(params, t) -> (core, mid, outer, alpha, phase),
@@ -259,7 +259,11 @@ function HazardVisuals.BlasterPose(p: Params, t: number): { [string]: any }
 	pos -= look * recoil
 	-- opacity
 	local alpha = clamp01(t / 0.08)
-	local phase = if t < fly then "FlyIn" elseif t < fireAt then "Charge" elseif t <= fireAt + duration then "Fire" else "Leave"
+	local phase = if t < fly
+		then "FlyIn"
+		elseif t < fireAt then "Charge"
+		elseif t <= fireAt + duration then "Fire"
+		else "Leave"
 	if t > fireAt + duration then
 		alpha = 1 - clamp01((t - fireAt - duration) / math.max(0.05, linger))
 	end
@@ -409,7 +413,15 @@ local function buildMiniBlaster(w: number): Model
 	model.Name = "MiniBlaster"
 	local white = Color3.fromRGB(245, 245, 245)
 	local dark = Color3.fromRGB(15, 15, 22)
-	local function part(name: string, shape: string, size: Vector3, cf: CFrame, color: Color3, parent: Instance, mat: Enum.Material?): BasePart
+	local function part(
+		name: string,
+		shape: string,
+		size: Vector3,
+		cf: CFrame,
+		color: Color3,
+		parent: Instance,
+		mat: Enum.Material?
+	): BasePart
 		local p: BasePart
 		if shape == "Wedge" then
 			p = Instance.new("WedgePart")
@@ -438,18 +450,55 @@ local function buildMiniBlaster(w: number): Model
 		p.Parent = parent
 		return p
 	end
-	local core = part("Core", "Ellipsoid", Vector3.new(w, 0.78 * w, 1.15 * w), CFrame.new(0, 0.12 * w, 0.15 * w), white, model)
-	part("Snout", "Ellipsoid", Vector3.new(0.62 * w, 0.42 * w, 0.85 * w), CFrame.new(0, -0.04 * w, -0.5 * w), white, model)
+	local core =
+		part("Core", "Ellipsoid", Vector3.new(w, 0.78 * w, 1.15 * w), CFrame.new(0, 0.12 * w, 0.15 * w), white, model)
+	part(
+		"Snout",
+		"Ellipsoid",
+		Vector3.new(0.62 * w, 0.42 * w, 0.85 * w),
+		CFrame.new(0, -0.04 * w, -0.5 * w),
+		white,
+		model
+	)
 	part("Ridge", "Block", Vector3.new(0.1 * w, 0.12 * w, 0.9 * w), CFrame.new(0, 0.48 * w, 0.0), white, model)
 	for _, s in { -1, 1 } do
-		part("Socket", "Ellipsoid", Vector3.new(0.3 * w, 0.24 * w, 0.2 * w), CFrame.new(s * 0.23 * w, 0.2 * w, -0.4 * w), dark, model)
-		local eye = part("Eye", "Ball", Vector3.one * (0.1 * w), CFrame.new(s * 0.23 * w, 0.2 * w, -0.47 * w), Color3.new(1, 1, 1), model, Enum.Material.Neon)
+		part(
+			"Socket",
+			"Ellipsoid",
+			Vector3.new(0.3 * w, 0.24 * w, 0.2 * w),
+			CFrame.new(s * 0.23 * w, 0.2 * w, -0.4 * w),
+			dark,
+			model
+		)
+		local eye = part(
+			"Eye",
+			"Ball",
+			Vector3.one * (0.1 * w),
+			CFrame.new(s * 0.23 * w, 0.2 * w, -0.47 * w),
+			Color3.new(1, 1, 1),
+			model,
+			Enum.Material.Neon
+		)
 		eye:SetAttribute("Role", "Eye")
-		part("Horn", "Wedge", Vector3.new(0.12 * w, 0.55 * w, 0.4 * w), CFrame.new(s * 0.42 * w, 0.45 * w, 0.55 * w) * CFrame.Angles(math.rad(-25), 0, s * math.rad(-20)), white, model)
+		part(
+			"Horn",
+			"Wedge",
+			Vector3.new(0.12 * w, 0.55 * w, 0.4 * w),
+			CFrame.new(s * 0.42 * w, 0.45 * w, 0.55 * w) * CFrame.Angles(math.rad(-25), 0, s * math.rad(-20)),
+			white,
+			model
+		)
 	end
 	local jaw = Instance.new("Model")
 	jaw.Name = "Jaw"
-	part("Mandible", "Ellipsoid", Vector3.new(0.58 * w, 0.18 * w, 0.85 * w), CFrame.new(0, -0.3 * w, -0.42 * w), white, jaw)
+	part(
+		"Mandible",
+		"Ellipsoid",
+		Vector3.new(0.58 * w, 0.18 * w, 0.85 * w),
+		CFrame.new(0, -0.3 * w, -0.42 * w),
+		white,
+		jaw
+	)
 	part("Teeth", "Block", Vector3.new(0.46 * w, 0.06 * w, 0.06 * w), CFrame.new(0, -0.2 * w, -0.8 * w), dark, jaw)
 	jaw.Parent = model
 	local hinge = Instance.new("Attachment")
@@ -484,6 +533,30 @@ local function modelWidth(model: Model): number
 	return if maxX > minX then maxX - minX else 1
 end
 
+-- Pure: world CFrames of a blaster's parts for a muzzle frame (Position = muzzle, LookVector = facing) and a jaw
+-- angle (radians, Rx(-angle) about the Core's JawHinge opens it). `offsets` are rest CFrames relative to the Core's
+-- position (model built at the origin facing -Z); results go into `out`.
+local function blasterFrames(
+	muzzleCF: CFrame,
+	muzzle: Vector3,
+	hinge: CFrame,
+	hingeInv: CFrame,
+	jaw: number,
+	offsets: { CFrame },
+	jawMask: { boolean },
+	out: { CFrame }
+)
+	local frame = muzzleCF * CFrame.new(-muzzle)
+	local jawCF = hinge * CFrame.Angles(-jaw, 0, 0) * hingeInv
+	for i = 1, #offsets do
+		if jawMask[i] then
+			out[i] = frame * jawCF * offsets[i]
+		else
+			out[i] = frame * offsets[i]
+		end
+	end
+end
+
 -- Turns a built blaster model (Rigs/Props/GasterBlaster or the mini fallback) into an animatable Blaster:
 -- every part is anchored and moved with one BulkMoveTo from cached offsets; jaw parts rotate about the
 -- Core's JawHinge (Rx(-angle) opens, like GasterBlaster.SetJaw / HDMesh.PoseBlasterJaw).
@@ -502,7 +575,7 @@ local function rigBlaster(model: Model, kind: string, key: string): Blaster
 		root = model:FindFirstChildWhichIsA("BasePart", true)
 	end
 	-- reference frame: the model as built (at the origin, facing -Z), positioned at the core
-	local ref = CFrame.new(if root then root.Position else Vector3.zero)
+	local ref = CFrame.new(if root then root.CFrame.Position else Vector3.zero)
 	local refInv = ref:Inverse()
 	if root then
 		local h = root:FindFirstChild("JawHinge")
@@ -570,16 +643,8 @@ local function rigBlaster(model: Model, kind: string, key: string): Blaster
 	function self.Pose(_s: any, muzzleCF: CFrame, jaw: number)
 		-- muzzleCF: Position = muzzle point, LookVector = facing
 		local a = if type(maxOpen) == "number" then math.min(jaw, maxOpen * 1.1) else jaw
-		local frame = muzzleCF * CFrame.new(-self.Muzzle)
-		local jawCF = self.Hinge * CFrame.Angles(-a, 0, 0) * self.HingeInv
 		local cfs = self.CFrames
-		for i = 1, #self.Parts do
-			if self.JawMask[i] then
-				cfs[i] = frame * jawCF * self.Offsets[i]
-			else
-				cfs[i] = frame * self.Offsets[i]
-			end
-		end
+		blasterFrames(muzzleCF, self.Muzzle, self.Hinge, self.HingeInv, a, self.Offsets, self.JawMask, cfs)
 		W:BulkMoveTo(self.Parts, cfs, Enum.BulkMoveMode.FireCFrameChanged)
 	end
 	-- glow 0..1 (charge); 0 = hollow sockets (firing). Prop blasters use GasterBlaster.SetGlow (rate-limited).
@@ -734,15 +799,22 @@ local function upgradeHD(b: Blaster)
 	end)
 end
 
-function HazardVisuals.AcquireBlaster(style: string, width: number): Blaster
+-- opts.Ghost: a translucent preview blaster (kit indicators). Ghosts come from their own pool and are never
+-- upgraded to HD meshes (HDMesh hides the part-built skull that the ghost look relies on).
+function HazardVisuals.AcquireBlaster(style: string, width: number, opts: { Ghost: boolean? }?): Blaster
+	local ghost = opts ~= nil and opts.Ghost == true
 	local nominal = propNominal(style) or propNominal("Classic")
 	local kind = if nominal then "Prop" else "Mini"
 	local scale = if nominal then scaleBucket(HazardVisuals.BlasterScale(width, nominal)) else scaleBucket(width * 1.25)
-	local key = kind .. "|" .. style .. "|" .. scale
+	local suffix = if ghost then "|Ghost" else ""
+	local key = kind .. "|" .. style .. "|" .. scale .. suffix
 	local pool = blasterPools[key]
 	while pool and #pool > 0 do
 		local b = table.remove(pool) :: Blaster
 		if b.Model.Parent ~= nil then
+			if ghost then
+				b:SetGhost(true)
+			end
 			return b
 		end
 	end
@@ -753,14 +825,16 @@ function HazardVisuals.AcquireBlaster(style: string, width: number): Blaster
 	if model == nil then
 		kind = "Mini"
 		scale = scaleBucket(width * 1.25)
-		key = kind .. "|" .. style .. "|" .. scale
+		key = kind .. "|" .. style .. "|" .. scale .. suffix
 		model = buildMiniBlaster(scale)
 	end
 	local m = model :: Model
 	Lib.PrepModel(m)
 	m.Parent = Lib.Folder()
 	local b = rigBlaster(m, kind, key)
-	if kind == "Prop" then
+	if ghost then
+		b:SetGhost(true)
+	elseif kind == "Prop" then
 		upgradeHD(b)
 	end
 	return b
@@ -798,7 +872,13 @@ function HazardVisuals.Visuals(): { string }
 end
 
 -- Generic multi-part visual helper: parts placed relative to a frame every Update.
-local function partsVisual(parts: { BasePart }, offsets: { CFrame }, spin: ((t: number) -> CFrame)?, light: PointLight?, trail: { [string]: any }?): Visual
+local function partsVisual(
+	parts: { BasePart },
+	offsets: { CFrame },
+	spin: ((t: number) -> CFrame)?,
+	light: PointLight?,
+	trail: { [string]: any }?
+): Visual
 	local cfs: { CFrame } = table.create(#parts)
 	local W = game:GetService("Workspace")
 	local lastEmit = 0
@@ -833,10 +913,23 @@ end
 local function orbVisual(ctx: { [string]: any }, coreColor: Color3?, glowScale: number?): Visual
 	local r = math.max(0.2, ctx.Size or 0.6)
 	local c: Color3 = ctx.Color
-	local core = Lib.Part("Ball", Vector3.one * (r * 2.1), Pool.PARK, coreColor or c:Lerp(Color3.new(1, 1, 1), 0.55), Enum.Material.Neon, 0)
+	local core = Lib.Part(
+		"Ball",
+		Vector3.one * (r * 2.1),
+		Pool.PARK,
+		coreColor or c:Lerp(Color3.new(1, 1, 1), 0.55),
+		Enum.Material.Neon,
+		0
+	)
 	local shell = Lib.Part("Ball", Vector3.one * (r * 2 * (glowScale or 1.7)), Pool.PARK, c, Enum.Material.Neon, 0.62)
 	local light = Lib.Light(core, c, 2.5, math.min(24, r * 10))
-	return partsVisual({ core, shell }, { CFrame.identity, CFrame.identity }, nil, light, { Kind = "Mote", Color = c, Every = 0.04 })
+	return partsVisual(
+		{ core, shell },
+		{ CFrame.identity, CFrame.identity },
+		nil,
+		light,
+		{ Kind = "Mote", Color = c, Every = 0.04 }
+	)
 end
 
 visuals.Orb = function(ctx)
@@ -849,10 +942,18 @@ end
 
 visuals.VoidOrb = function(ctx)
 	local r = math.max(0.3, ctx.Size or 0.8)
-	local core = Lib.Part("Ball", Vector3.one * (r * 1.9), Pool.PARK, Color3.fromRGB(8, 4, 16), Enum.Material.SmoothPlastic, 0)
-	local rim = Lib.Part("Ball", Vector3.one * (r * 2.5), Pool.PARK, Color3.fromRGB(150, 70, 255), Enum.Material.Neon, 0.6)
+	local core =
+		Lib.Part("Ball", Vector3.one * (r * 1.9), Pool.PARK, Color3.fromRGB(8, 4, 16), Enum.Material.SmoothPlastic, 0)
+	local rim =
+		Lib.Part("Ball", Vector3.one * (r * 2.5), Pool.PARK, Color3.fromRGB(150, 70, 255), Enum.Material.Neon, 0.6)
 	local light = Lib.Light(rim, Color3.fromRGB(150, 70, 255), 2, math.min(24, r * 10))
-	return partsVisual({ core, rim }, { CFrame.identity, CFrame.identity }, nil, light, { Kind = "Mote", Color = Color3.fromRGB(170, 110, 255), Every = 0.04 })
+	return partsVisual(
+		{ core, rim },
+		{ CFrame.identity, CFrame.identity },
+		nil,
+		light,
+		{ Kind = "Mote", Color = Color3.fromRGB(170, 110, 255), Every = 0.04 }
+	)
 end
 
 local function boneVisual(ctx: { [string]: any }, color: Color3?, spinRate: number?): Visual
@@ -917,7 +1018,14 @@ end
 visuals.Bullet = function(ctx)
 	local c: Color3 = if ctx.Rule == "White" then Lib.Colors.Yellow else ctx.Color
 	local r = math.max(0.15, ctx.Size or 0.3)
-	local body = Lib.Part("Cylinder", Vector3.new(r * 5, r * 1.3, r * 1.3), Pool.PARK, Color3.fromRGB(255, 250, 220), Enum.Material.Neon, 0)
+	local body = Lib.Part(
+		"Cylinder",
+		Vector3.new(r * 5, r * 1.3, r * 1.3),
+		Pool.PARK,
+		Color3.fromRGB(255, 250, 220),
+		Enum.Material.Neon,
+		0
+	)
 	local glow = Lib.Part("Cylinder", Vector3.new(r * 9, r * 2.6, r * 2.6), Pool.PARK, c, Enum.Material.Neon, 0.6)
 	return partsVisual(
 		{ body, glow },
@@ -930,9 +1038,22 @@ end
 
 visuals.Knife = function(ctx)
 	local c: Color3 = ctx.Color
-	local blade = Lib.Part("Wedge", Vector3.new(0.12, 0.35, 1.6), Pool.PARK, Color3.fromRGB(235, 235, 245), Enum.Material.Metal, 0)
+	local blade = Lib.Part(
+		"Wedge",
+		Vector3.new(0.12, 0.35, 1.6),
+		Pool.PARK,
+		Color3.fromRGB(235, 235, 245),
+		Enum.Material.Metal,
+		0
+	)
 	local edge = Lib.Part("Block", Vector3.new(0.05, 0.08, 1.7), Pool.PARK, c, Enum.Material.Neon, 0.2)
-	return partsVisual({ blade, edge }, { CFrame.identity, CFrame.new(0, -0.15, 0) }, nil, nil, { Kind = "Mote", Color = c, Every = 0.05 })
+	return partsVisual(
+		{ blade, edge },
+		{ CFrame.identity, CFrame.new(0, -0.15, 0) },
+		nil,
+		nil,
+		{ Kind = "Mote", Color = c, Every = 0.05 }
+	)
 end
 
 visuals.Ribbon = function(ctx)
@@ -940,7 +1061,10 @@ visuals.Ribbon = function(ctx)
 	local parts: { BasePart } = {}
 	local offsets: { CFrame } = {}
 	for i = 0, 3 do
-		table.insert(parts, Lib.Part("Block", Vector3.new(0.7, 0.06, 0.55), Pool.PARK, c, Enum.Material.Neon, 0.05 + i * 0.12))
+		table.insert(
+			parts,
+			Lib.Part("Block", Vector3.new(0.7, 0.06, 0.55), Pool.PARK, c, Enum.Material.Neon, 0.05 + i * 0.12)
+		)
 		table.insert(offsets, CFrame.new(0, 0, i * 0.5))
 	end
 	local function spin(t: number): CFrame
@@ -953,7 +1077,9 @@ visuals.Ribbon = function(ctx)
 	function v.Update(_s: any, cf: CFrame, t: number, _dt: number)
 		for i = 1, #parts do
 			local k = i - 1
-			cfs[i] = cf * CFrame.new(math.sin(t * 12 - k * 0.9) * 0.35, 0, k * 0.5) * CFrame.Angles(0, 0, math.sin(t * 9 - k) * 0.7)
+			cfs[i] = cf
+				* CFrame.new(math.sin(t * 12 - k * 0.9) * 0.35, 0, k * 0.5)
+				* CFrame.Angles(0, 0, math.sin(t * 9 - k) * 0.7)
 		end
 		W:BulkMoveTo(parts, cfs, Enum.BulkMoveMode.FireCFrameChanged)
 	end
@@ -964,24 +1090,50 @@ end
 
 visuals.Page = function(ctx)
 	local c: Color3 = if ctx.Rule == "White" then Lib.Colors.Purple else ctx.Color
-	local page = Lib.Part("Block", Vector3.new(1.3, 1.7, 0.06), Pool.PARK, Color3.fromRGB(250, 246, 235), Enum.Material.SmoothPlastic, 0)
+	local page = Lib.Part(
+		"Block",
+		Vector3.new(1.3, 1.7, 0.06),
+		Pool.PARK,
+		Color3.fromRGB(250, 246, 235),
+		Enum.Material.SmoothPlastic,
+		0
+	)
 	local glyph = Lib.Part("Block", Vector3.new(0.8, 0.12, 0.08), Pool.PARK, c, Enum.Material.Neon, 0)
 	local glyph2 = Lib.Part("Block", Vector3.new(0.6, 0.12, 0.08), Pool.PARK, c, Enum.Material.Neon, 0)
 	local function spin(t: number): CFrame
 		return CFrame.Angles(math.sin(t * 7) * 0.5, t * 5, math.sin(t * 5) * 0.4)
 	end
-	return partsVisual({ page, glyph, glyph2 }, { CFrame.identity, CFrame.new(0, 0.25, 0), CFrame.new(-0.1, -0.15, 0) }, spin, nil, { Kind = "Mote", Color = c, Every = 0.06 })
+	return partsVisual(
+		{ page, glyph, glyph2 },
+		{ CFrame.identity, CFrame.new(0, 0.25, 0), CFrame.new(-0.1, -0.15, 0) },
+		spin,
+		nil,
+		{ Kind = "Mote", Color = c, Every = 0.06 }
+	)
 end
 
 visuals.Dish = function(ctx)
 	local c: Color3 = if ctx.Rule == "White" then Lib.Colors.Green else ctx.Color
 	local r = math.max(0.5, ctx.Size or 0.8)
-	local plate = Lib.Part("Cylinder", Vector3.new(0.18, r * 2.2, r * 2.2), Pool.PARK, Color3.fromRGB(245, 245, 240), Enum.Material.SmoothPlastic, 0)
+	local plate = Lib.Part(
+		"Cylinder",
+		Vector3.new(0.18, r * 2.2, r * 2.2),
+		Pool.PARK,
+		Color3.fromRGB(245, 245, 240),
+		Enum.Material.SmoothPlastic,
+		0
+	)
 	local rim = Lib.Part("Cylinder", Vector3.new(0.12, r * 2.5, r * 2.5), Pool.PARK, c, Enum.Material.Neon, 0.35)
 	local function spin(t: number): CFrame
 		return CFrame.Angles(0, t * 14, 0) * CFrame.Angles(0, 0, math.pi / 2)
 	end
-	return partsVisual({ plate, rim }, { CFrame.identity, CFrame.new(-0.05, 0, 0) }, spin, nil, { Kind = "Heal", Color = c, Every = 0.07 })
+	return partsVisual(
+		{ plate, rim },
+		{ CFrame.identity, CFrame.new(-0.05, 0, 0) },
+		spin,
+		nil,
+		{ Kind = "Heal", Color = c, Every = 0.07 }
+	)
 end
 
 visuals.Chain = function(ctx)
@@ -1044,7 +1196,13 @@ visuals.Star = function(ctx)
 	local function spin(t: number): CFrame
 		return CFrame.Angles(0, t * 6, t * 9)
 	end
-	return partsVisual({ core, a, b }, { CFrame.identity, CFrame.identity, CFrame.identity }, spin, light, { Kind = "Star", Color = c, Every = 0.03 })
+	return partsVisual(
+		{ core, a, b },
+		{ CFrame.identity, CFrame.identity, CFrame.identity },
+		spin,
+		light,
+		{ Kind = "Star", Color = c, Every = 0.03 }
+	)
 end
 
 ---------------------------------------------------------------------------------------------------
@@ -1324,7 +1482,12 @@ renderers.BoneLine = {
 		if #xs > 0 and t >= delay and t <= delay + travelTime and t - S.LastDust > 0.07 then
 			S.LastDust = t
 			local x = xs[math.random(1, #xs)]
-			Lib.Emit("Dust", (o * CFrame.new(x, 0.3, -travel + 0.6)).Position, 1, { Dir = -o.LookVector + Vector3.new(0, 0.6, 0) })
+			Lib.Emit(
+				"Dust",
+				(o * CFrame.new(x, 0.3, -travel + 0.6)).Position,
+				1,
+				{ Dir = -o.LookVector + Vector3.new(0, 0.6, 0) }
+			)
 		end
 		return t <= delay + travelTime + linger
 	end,
@@ -1380,7 +1543,12 @@ renderers.BoneSpikes = {
 			local centre: Vector3 = S.Center
 			local ring = p.ring == true
 			Lib.Dust(centre, if ring then radius else radius * 0.7, nil, math.floor(radius * 2.2))
-			Lib.EmitRing(centre + Vector3.new(0, 0.2, 0), radius + (if ring then num(p, "ringWidth", 3) * 0.5 else 0), rec.Color, 0.35)
+			Lib.EmitRing(
+				centre + Vector3.new(0, 0.2, 0),
+				radius + (if ring then num(p, "ringWidth", 3) * 0.5 else 0),
+				rec.Color,
+				0.35
+			)
 			Lib.Emit("Debris", centre, math.floor(radius), { Color = Color3.fromRGB(150, 140, 130) })
 			playSound("BoneRise", centre)
 			shakeNear(centre, radius + 2, radius + 22, 0.32, 0.25)
@@ -1519,7 +1687,8 @@ renderers.Shockwave = {
 		local chord = 2 * S.Max * math.sin(math.pi / WAVE_SEGS) * 1.05
 		S.Segs = {}
 		for i = 1, WAVE_SEGS do
-			S.Segs[i] = Lib.Part("Block", Vector3.new(chord, 0.22, 0.22), Pool.PARK, rec.Color, Enum.Material.Neon, 0.05)
+			S.Segs[i] =
+				Lib.Part("Block", Vector3.new(chord, 0.22, 0.22), Pool.PARK, rec.Color, Enum.Material.Neon, 0.05)
 		end
 		S.CFrames = table.create(WAVE_SEGS)
 	end,
@@ -1550,13 +1719,31 @@ renderers.Shockwave = {
 		local band = math.min(math.max(0.05, num(p, "thickness", 2)), math.max(r, 0.05))
 		if not S.Started then
 			S.Started = true
-			S.Wall = Lib.GroundCircle(center, math.max(0.1, r), rec.Color, { Rim = band, Height = h, Lift = h / 2, Fill = 1 })
+			S.Wall = Lib.GroundCircle(
+				center,
+				math.max(0.1, r),
+				rec.Color,
+				{ Rim = band, Height = h, Lift = h / 2, Fill = 1 }
+			)
 			S.Wall:SetTransparency(0.3, 1)
-			S.LightPart = Lib.Part("Ball", Vector3.one * 0.2, CFrame.new(center + Vector3.new(0, h, 0)), rec.Color, Enum.Material.Neon, 1)
+			S.LightPart = Lib.Part(
+				"Ball",
+				Vector3.one * 0.2,
+				CFrame.new(center + Vector3.new(0, h, 0)),
+				rec.Color,
+				Enum.Material.Neon,
+				1
+			)
 			S.Light = Lib.Light(S.LightPart, rec.Color, 3, math.clamp(S.Max * 1.2, 8, 40))
 			playSound("Shockwave", center)
 			shakeNear(center, S.Max * 0.5, S.Max + 20, 0.3, 0.3)
-			Lib.EmitRing(center + Vector3.new(0, 0.15, 0), S.Max, rec.Color, S.Max / math.max(0.01, num(p, "speed", 28)) + 0.1, { Start = 0.02 })
+			Lib.EmitRing(
+				center + Vector3.new(0, 0.15, 0),
+				S.Max,
+				rec.Color,
+				S.Max / math.max(0.01, num(p, "speed", 28)) + 0.1,
+				{ Start = 0.02 }
+			)
 		end
 		local wall = S.Wall
 		wall:SetRadius(math.max(0.1, r))
@@ -1603,7 +1790,14 @@ renderers.Orb = {
 		if type(custom) == "string" and custom ~= "Orb" and visuals[custom] then
 			S.Visual = buildVisual(custom, visualCtx(rec, "Orb", radius))
 		end
-		S.Core = Lib.Part("Ball", Vector3.one * 0.1, CFrame.new(center), Color3.fromRGB(6, 2, 12), Enum.Material.SmoothPlastic, 0)
+		S.Core = Lib.Part(
+			"Ball",
+			Vector3.one * 0.1,
+			CFrame.new(center),
+			Color3.fromRGB(6, 2, 12),
+			Enum.Material.SmoothPlastic,
+			0
+		)
 		S.Rim = Lib.Part("Ball", Vector3.one * 0.1, CFrame.new(center), violet, Enum.Material.Neon, 0.55)
 		S.Light = Lib.Light(S.Rim, violet, 3, math.clamp(radius * 1.5, 10, 40))
 		local field = Lib.Part("Ball", Vector3.one * (radius * 2), CFrame.new(center), violet, Enum.Material.Neon, 1)
@@ -1735,10 +1929,27 @@ renderers.Zone = {
 		if not S.Started then
 			S.Started = true
 			local c: Color3 = S.ZColor
-			S.Disc = Lib.GroundCircle(center, radius, c, { Rim = math.clamp(radius * 0.05, 0.25, 0.5), Fill = 0.8, Height = 0.3 })
-			S.Wall = Lib.GroundCircle(center, radius, c, { Rim = 0.08, Height = S.Height * 0.55, Lift = S.Height * 0.275, Fill = 1, Shadow = false })
+			S.Disc = Lib.GroundCircle(
+				center,
+				radius,
+				c,
+				{ Rim = math.clamp(radius * 0.05, 0.25, 0.5), Fill = 0.8, Height = 0.3 }
+			)
+			S.Wall = Lib.GroundCircle(
+				center,
+				radius,
+				c,
+				{ Rim = 0.08, Height = S.Height * 0.55, Lift = S.Height * 0.275, Fill = 1, Shadow = false }
+			)
 			S.Wall:SetTransparency(0.85, 1)
-			S.LightPart = Lib.Part("Ball", Vector3.one * 0.2, CFrame.new(center + Vector3.new(0, 1.5, 0)), c, Enum.Material.Neon, 1)
+			S.LightPart = Lib.Part(
+				"Ball",
+				Vector3.one * 0.2,
+				CFrame.new(center + Vector3.new(0, 1.5, 0)),
+				c,
+				Enum.Material.Neon,
+				1
+			)
 			S.Light = Lib.Light(S.LightPart, c, 1.6, math.clamp(radius * 1.6, 10, 40))
 			Lib.EmitRing(center + Vector3.new(0, 0.2, 0), radius, c, 0.4)
 		end
@@ -1756,14 +1967,25 @@ renderers.Zone = {
 		if active and tickIndex ~= S.LastTick then
 			S.LastTick = tickIndex
 			if tickIndex > 0 then
-				Lib.EmitRing(center + Vector3.new(0, 0.25, 0), radius * 0.95, S.ZColor, 0.3, { Start = 0.5, Brightness = 2 })
+				Lib.EmitRing(
+					center + Vector3.new(0, 0.25, 0),
+					radius * 0.95,
+					S.ZColor,
+					0.3,
+					{ Start = 0.5, Brightness = 2 }
+				)
 			end
 		end
 		if active and t - S.LastEmit > 0.08 then
 			S.LastEmit = t
 			local a = math.random() * math.pi * 2
 			local rr = radius * math.sqrt(math.random())
-			Lib.Emit(S.Emit, center + Vector3.new(math.cos(a) * rr, 0.3, math.sin(a) * rr), 2, { Color = S.ZColor, Dir = Vector3.yAxis })
+			Lib.Emit(
+				S.Emit,
+				center + Vector3.new(math.cos(a) * rr, 0.3, math.sin(a) * rr),
+				2,
+				{ Color = S.ZColor, Dir = Vector3.yAxis }
+			)
 		end
 		local v: Visual? = S.Visual
 		if v and v.Update then
@@ -1839,7 +2061,8 @@ renderers.Rain = {
 				local len = math.max(2.4, size * 1.2)
 				local cf: CFrame
 				if state == "Fall" then
-					cf = CFrame.new(pos + Vector3.new(0, height + len * 0.5, 0)) * CFrame.Angles(0.25, i * 1.7 + t * 2, 0.15)
+					cf = CFrame.new(pos + Vector3.new(0, height + len * 0.5, 0))
+						* CFrame.Angles(0.25, i * 1.7 + t * 2, 0.15)
 				else
 					-- stuck in the ground, sinking slowly
 					local sink = (t - drop.ImpactTime) * 2.2
@@ -1876,7 +2099,9 @@ local function volumePart(v: { [string]: any }, color: Color3): (BasePart, CFram
 	local shape = v.Shape
 	local s: Vector3 = v.Size
 	if shape == "Ball" then
-		return Lib.Part("Ball", Vector3.one * s.X, v.CFrame, color, Enum.Material.Neon, 0.6), v.CFrame, Vector3.one * s.X
+		return Lib.Part("Ball", Vector3.one * s.X, v.CFrame, color, Enum.Material.Neon, 0.6),
+			v.CFrame,
+			Vector3.one * s.X
 	elseif shape == "Capsule" or shape == "Cylinder" or shape == "Ring" then
 		local size = Vector3.new(s.Y, s.X, s.X)
 		local cf = v.CFrame * CFrame.Angles(0, 0, math.pi / 2)
@@ -1930,7 +2155,10 @@ renderers.Generic = {
 
 function HazardVisuals.RegisterRenderer(hazardType: string, renderer: any)
 	assert(type(hazardType) == "string" and hazardType ~= "", "HazardVisuals.RegisterRenderer: bad type")
-	assert(type(renderer) == "table" and type(renderer.Update) == "function", "HazardVisuals.RegisterRenderer: bad renderer")
+	assert(
+		type(renderer) == "table" and type(renderer.Update) == "function",
+		"HazardVisuals.RegisterRenderer: bad renderer"
+	)
 	renderers[hazardType] = renderer
 end
 
@@ -2100,6 +2328,134 @@ end
 
 function HazardVisuals.Get(id: number): Record?
 	return records[id]
+end
+
+---------------------------------------------------------------------------------------------------
+-- Offline snapshot (Lune-safe: plain Instances, no workspace): a static Model of a hazard at time t built with the
+-- SAME pose / layer / layout maths as the live renderers, for tools/preview renders and visual review.
+--   lune run tools/lune/dump_model.luau module src/client/Controllers/HazardVisuals Snapshot '["BoneSpikes", {...}, 0.8]'
+
+function HazardVisuals.Snapshot(hazardType: string, params: Params, t: number): Model
+	local p = HazardDefs.Normalize(hazardType, params)
+	local model = Instance.new("Model")
+	model.Name = "Snapshot_" .. hazardType
+	local color = Lib.Color(p.color)
+	local function part(shape: string, size: Vector3, cf: CFrame, c: Color3, mat: Enum.Material, transp: number): BasePart
+		local q = Instance.new("Part")
+		q.Shape = if shape == "Ball" then Enum.PartType.Ball elseif shape == "Cylinder" then Enum.PartType.Cylinder else Enum.PartType.Block
+		q.Size = size
+		q.CFrame = cf
+		q.Color = c
+		q.Material = mat
+		q.Transparency = transp
+		q.Anchored = true
+		q.CastShadow = false
+		q.Parent = model
+		return q
+	end
+	-- telegraph discs / rings as thin cylinders (HandleAdornments do not exist offline)
+	local desc = HazardDefs.Telegraph(hazardType, p)
+	local items = if desc.Kind == "Multi" then desc.Items else { desc }
+	for _, d in items or {} do
+		local phase, k = Lib.TelegraphPhase(d.Start, d.End, t)
+		if phase == "Warn" and (d.Kind == "Circle" or d.Kind == "Ring") then
+			local c: Vector3 = d.Center
+			local r: number = d.Radius
+			local flat = CFrame.new(c + Vector3.new(0, 0.05, 0)) * CFrame.Angles(0, 0, math.pi / 2)
+			part("Cylinder", Vector3.new(0.06, r * 2 + 0.4, r * 2 + 0.4), flat, Color3.new(0, 0, 0), Enum.Material.SmoothPlastic, 0.5)
+			part("Cylinder", Vector3.new(0.1, r * 2, r * 2), flat * CFrame.new(0.03, 0, 0), color, Enum.Material.Neon, 0.25)
+			local fill = (if d.Kind == "Ring" then (d.InnerRadius or 0) + (r - (d.InnerRadius or 0)) * k else r * k)
+			part("Cylinder", Vector3.new(0.12, fill * 2, fill * 2), flat * CFrame.new(0.05, 0, 0), color, Enum.Material.Neon, 0.6)
+		elseif phase == "Warn" and d.Kind == "Beam" and d.CFrame then
+			local len = d.Length or 10
+			local axis = d.CFrame * CFrame.new(0, 0, -len / 2) * CFrame.Angles(0, math.pi / 2, 0)
+			part("Cylinder", Vector3.new(len, 0.14, 0.14), axis, color, Enum.Material.Neon, 0.2)
+			part("Cylinder", Vector3.new(len, d.Width or 1, d.Width or 1), axis, color, Enum.Material.Neon, 0.9)
+		elseif phase == "Warn" and d.Kind == "Lane" and d.CFrame then
+			local len, w = d.Length or 10, d.Width or 2
+			part("Block", Vector3.new(w, 0.1, len * k), d.CFrame * CFrame.new(0, 0.05, -len * k / 2), color, Enum.Material.Neon, 0.6)
+			part("Block", Vector3.new(0.3, 0.2, len), d.CFrame * CFrame.new(-w / 2, 0.1, -len / 2), color, Enum.Material.Neon, 0.1)
+			part("Block", Vector3.new(0.3, 0.2, len), d.CFrame * CFrame.new(w / 2, 0.1, -len / 2), color, Enum.Material.Neon, 0.1)
+		end
+	end
+	local BoneProp = Lib.Prop("Bone")
+	local function bone(len: number, thick: number, cf: CFrame)
+		if BoneProp and type(BoneProp.Build) == "function" then
+			local b = BoneProp.Build(len, thick, color, Enum.Material.Neon)
+			b:PivotTo(cf)
+			b.Parent = model
+		else
+			part("Cylinder", Vector3.new(len, thick, thick), cf * CFrame.Angles(0, 0, math.pi / 2), color, Enum.Material.Neon, 0)
+		end
+	end
+	if hazardType == "BlasterBeam" then
+		local width = num(p, "width", 4)
+		local nominal = propNominal(p.style) or propNominal("Classic")
+		local bm = if nominal then buildProp(p.style, scaleBucket(HazardVisuals.BlasterScale(width, nominal))) else nil
+		bm = bm or buildMiniBlaster(scaleBucket(width * 1.25))
+		local b = bm :: Model
+		local root = b.PrimaryPart or b:FindFirstChildWhichIsA("BasePart", true) :: BasePart
+		local refInv = CFrame.new(root.CFrame.Position):Inverse()
+		local hinge, muzzle = CFrame.identity, Vector3.new(0, 0, -1)
+		local h = root:FindFirstChild("JawHinge")
+		if h and h:IsA("Attachment") then
+			hinge = refInv * root.CFrame * h.CFrame
+		end
+		local m = root:FindFirstChild("Muzzle")
+		if m and m:IsA("Attachment") then
+			muzzle = (refInv * root.CFrame * m.CFrame).Position
+		end
+		local jawModel = b:FindFirstChild("Jaw")
+		local list: { BasePart } = {}
+		local offsets: { CFrame } = {}
+		local mask: { boolean } = {}
+		for _, d in b:GetDescendants() do
+			if d:IsA("BasePart") then
+				table.insert(list, d)
+				table.insert(offsets, refInv * d.CFrame)
+				table.insert(mask, jawModel ~= nil and d:IsDescendantOf(jawModel))
+			end
+		end
+		local pose = HazardVisuals.BlasterPose(p, t)
+		local out: { CFrame } = {}
+		blasterFrames(LookAlong(pose.Pos, pose.Look), muzzle, hinge, hinge:Inverse(), pose.Jaw, offsets, mask, out)
+		for i, q in list do
+			q.CFrame = out[i]
+		end
+		local Prop = Lib.Prop("GasterBlaster")
+		if Prop and type(Prop.SetGlow) == "function" then
+			Prop.SetGlow(b, styleColors(p.style, p.color).Eye, if pose.Eyes <= 0.02 then 1 else pose.Eyes)
+		end
+		b.Parent = model
+		local core, mid, outer, alpha = HazardVisuals.BeamLayers(p, t)
+		if outer > 0 then
+			local C = styleColors(p.style, p.color)
+			local look = (p.origin :: CFrame).LookVector
+			local start = HazardDefs.BeamStart(p)
+			local back = math.max(0, (start - pose.Pos):Dot(look))
+			local s0 = start - look * back
+			local len = num(p, "length", 60) + back
+			local cf = LookAlong(s0 + look * (len / 2), look) * ROT_X_TO_LOOK
+			part("Cylinder", Vector3.new(len, core, core), cf, C.Core, Enum.Material.Neon, 1 - alpha)
+			part("Cylinder", Vector3.new(len, mid, mid), cf, C.Mid, Enum.Material.Neon, 0.25 + 0.75 * (1 - alpha))
+			part("Cylinder", Vector3.new(len, outer, outer), cf, C.Outer, Enum.Material.Neon, 0.58 + 0.42 * (1 - alpha))
+			part("Ball", Vector3.one * outer, CFrame.new(s0), C.Outer, Enum.Material.Neon, 0.58)
+		end
+	elseif hazardType == "BoneSpikes" then
+		local frac = HazardVisuals.SpikeFrac(p, t)
+		if frac > 0 then
+			for _, sp in HazardDefs.SpikeLayout(p) do
+				local L = sp.Height
+				local mid = (p.center :: Vector3) + sp.Offset + sp.Tilt * (frac * L - L * 0.5)
+				bone(L, num(p, "boneThickness", 0.9), AxisFrame(mid, sp.Tilt))
+			end
+		end
+	elseif hazardType == "BoneLine" then
+		for _, b in HazardDefs.BoneLineBones(p, t) do
+			bone(num(p, "height", 5), num(p, "boneThickness", 0.8), b.CFrame)
+		end
+	end
+	return model
 end
 
 function HazardVisuals.Init() end

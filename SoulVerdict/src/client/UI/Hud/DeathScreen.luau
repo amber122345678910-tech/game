@@ -19,7 +19,13 @@ function DeathScreen.Create(theme: any, deps: any): any
 	local battle = skin.Battle
 	local phone = layout.Phone
 	local k = if phone then 0.62 else 1
-	Style.Frame({ Name = "Dim", BackgroundTransparency = if battle then 0.12 else 0.25, BackgroundColor3 = Style.BLACK, Size = UDim2.fromScale(1, 1), Parent = root })
+	Style.Frame({
+		Name = "Dim",
+		BackgroundTransparency = if battle then 0.12 else 0.25,
+		BackgroundColor3 = Style.BLACK,
+		Size = UDim2.fromScale(1, 1),
+		Parent = root,
+	})
 	Style.Vignette({ Name = "Vignette", Color = Color3.fromRGB(120, 0, 0), Strength = 0.7, Depth = 0.3, Parent = root })
 	local heartHolder = Style.Frame({
 		Name = "Heart",
@@ -104,10 +110,19 @@ function DeathScreen.Create(theme: any, deps: any): any
 			})
 			if animate then
 				shard.Position = UDim2.fromScale(0.5, 0.5)
-				Motion.Tween(shard, { Time = 0.9, Style = Enum.EasingStyle.Quad, Direction = Enum.EasingDirection.Out, Delay = 0.35 }, {
-					Position = UDim2.new(0.5, math.floor(off[1] * 90 * k), 0.5, math.floor(off[2] * 90 * k + 40 * k)),
-					BackgroundTransparency = 1,
-				})
+				Motion.Tween(
+					shard,
+					{ Time = 0.9, Style = Enum.EasingStyle.Quad, Direction = Enum.EasingDirection.Out, Delay = 0.35 },
+					{
+						Position = UDim2.new(
+							0.5,
+							math.floor(off[1] * 90 * k),
+							0.5,
+							math.floor(off[2] * 90 * k + 40 * k)
+						),
+						BackgroundTransparency = 1,
+					}
+				)
 			end
 		end
 	end

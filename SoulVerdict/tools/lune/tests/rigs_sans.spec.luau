@@ -9,7 +9,17 @@ local SANS = { "ClassicSans", "FellSans", "EclipseSans" }
 local VARIANT = { ClassicSans = "Classic", FellSans = "Fell", EclipseSans = "Eclipse" }
 local SIGNATURE = {
 	ClassicSans = { "LeftIris", "Drawstring", "Aglet", "Fur", "ZipperPull", "Slipper", "GrinTooth", "LeftPocket" },
-	FellSans = { "GoldTooth", "Scar", "RightBrow", "LeftBrow", "Spike", "SpikeCollar", "Turtleneck", "Sneaker", "GrinFangs" },
+	FellSans = {
+		"GoldTooth",
+		"Scar",
+		"RightBrow",
+		"LeftBrow",
+		"Spike",
+		"SpikeCollar",
+		"Turtleneck",
+		"Sneaker",
+		"GrinFangs",
+	},
 	EclipseSans = { "HaloDisc", "Corona", "Fissure", "ChipHole", "Star", "LeftPupilCore", "HoodTatter", "HandVein" },
 }
 
@@ -233,7 +243,10 @@ return {
 					T.eq(m.Part0 and m.Part0.Name, spec[1], id .. " " .. m.Name .. ".Part0")
 					T.eq(m.Part1 and m.Part1.Name, spec[2], id .. " " .. m.Name .. ".Part1")
 					T.ok(m.Parent == m.Part1, id .. " " .. m.Name .. " parented to Part1")
-					T.ok(isIdentityRotation(m.C0) and isIdentityRotation(m.C1), id .. " " .. m.Name .. " identity C0/C1")
+					T.ok(
+						isIdentityRotation(m.C0) and isIdentityRotation(m.C1),
+						id .. " " .. m.Name .. " identity C0/C1"
+					)
 				end
 			end
 			for name, limb in ATTACHMENTS do
@@ -290,8 +303,14 @@ return {
 			T.ok(sameColor(pupil.Color, Color3.new(1, 1, 1)), "Classic pupils are white")
 			T.ok(pupil.Size.X < socket.Size.X * 0.25, "Classic pupil is tiny vs the socket")
 			T.ok(pupil.CFrame.Position.Y < socket.CFrame.Position.Y, side .. " pupil sits low")
-			T.ok(math.abs(pupil.CFrame.Position.X) < math.abs(socket.CFrame.Position.X), side .. " pupil sits toward the nose")
-			T.ok(socket.Material == Enum.Material.Neon and socket.Color == Color3.new(0, 0, 0), side .. " socket is a void")
+			T.ok(
+				math.abs(pupil.CFrame.Position.X) < math.abs(socket.CFrame.Position.X),
+				side .. " pupil sits toward the nose"
+			)
+			T.ok(
+				socket.Material == Enum.Material.Neon and socket.Color == Color3.new(0, 0, 0),
+				side .. " socket is a void"
+			)
 		end
 	end,
 
@@ -405,7 +424,10 @@ return {
 						end
 					end
 				end
-				T.ok(total > 0 and inside == total, ("%s %s hand tucked in the pocket (%d/%d)"):format(id, side, inside, total))
+				T.ok(
+					total > 0 and inside == total,
+					("%s %s hand tucked in the pocket (%d/%d)"):format(id, side, inside, total)
+				)
 			end
 		end
 	end,
@@ -452,7 +474,10 @@ return {
 		local head = eclipse.Head
 		T.ok(head.LeftPupil.Size.Y > head.RightPupil.Size.Y * 2, "Eclipse: one bright ring eye, one ember")
 		T.ok(head.Fissure.CFrame.Position.X > 0, "Eclipse fissures on his right crown")
-		T.ok(head.HaloDisc.CFrame.Position.Z > head.Cranium.CFrame.Position.Z + 1, "Eclipse halo floats behind the head")
+		T.ok(
+			head.HaloDisc.CFrame.Position.Z > head.Cranium.CFrame.Position.Z + 1,
+			"Eclipse halo floats behind the head"
+		)
 	end,
 
 	sans_scale_keeps_hd_size = function(T, Loader)

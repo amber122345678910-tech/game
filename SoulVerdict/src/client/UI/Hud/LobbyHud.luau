@@ -55,14 +55,25 @@ end
 -- a tiny painted landscape of the map (sky, sun/moon, horizon glow, pillars, floor)
 local function mapArt(mapId: string, size: Vector2, corner: UDim): Frame
 	local sky, horizon, ground, night = presetColors(mapId)
-	local art = Style.Frame({ Name = "Art", BackgroundTransparency = 0, BackgroundColor3 = Style.WHITE, Size = UDim2.fromOffset(size.X, size.Y), ClipsDescendants = true })
+	local art = Style.Frame({
+		Name = "Art",
+		BackgroundTransparency = 0,
+		BackgroundColor3 = Style.WHITE,
+		Size = UDim2.fromOffset(size.X, size.Y),
+		ClipsDescendants = true,
+	})
 	Style.Corner(art, corner)
-	Style.Gradient(art, ColorSequence.new({
-		ColorSequenceKeypoint.new(0, sky),
-		ColorSequenceKeypoint.new(0.62, horizon),
-		ColorSequenceKeypoint.new(0.64, ground:Lerp(horizon, 0.3)),
-		ColorSequenceKeypoint.new(1, ground),
-	}), nil, 90)
+	Style.Gradient(
+		art,
+		ColorSequence.new({
+			ColorSequenceKeypoint.new(0, sky),
+			ColorSequenceKeypoint.new(0.62, horizon),
+			ColorSequenceKeypoint.new(0.64, ground:Lerp(horizon, 0.3)),
+			ColorSequenceKeypoint.new(1, ground),
+		}),
+		nil,
+		90
+	)
 	local orb = Style.Frame({
 		Name = if night then "Moon" else "Sun",
 		BackgroundTransparency = 0.05,
@@ -73,7 +84,17 @@ local function mapArt(mapId: string, size: Vector2, corner: UDim): Frame
 		Parent = art,
 	})
 	Style.Corner(orb, UDim.new(0.5, 0))
-	Style.Glow({ Name = "OrbGlow", Color = orb.BackgroundColor3, AnchorPoint = Vector2.new(0.5, 0.5), Position = orb.Position, Size = orb.Size, Spread = size.Y * 0.14, Strength = 0.5, Corner = UDim.new(0.5, 0), Parent = art })
+	Style.Glow({
+		Name = "OrbGlow",
+		Color = orb.BackgroundColor3,
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Position = orb.Position,
+		Size = orb.Size,
+		Spread = size.Y * 0.14,
+		Strength = 0.5,
+		Corner = UDim.new(0.5, 0),
+		Parent = art,
+	})
 	for i, p in { { 0.12, 0.5, 0.08 }, { 0.3, 0.42, 0.05 }, { 0.86, 0.55, 0.07 } } do
 		Style.Frame({
 			Name = "Pillar" .. i,
@@ -87,7 +108,14 @@ local function mapArt(mapId: string, size: Vector2, corner: UDim): Frame
 	end
 	if night then
 		for i, st in { { 0.2, 0.15 }, { 0.42, 0.08 }, { 0.55, 0.24 }, { 0.9, 0.12 } } do
-			Style.Frame({ Name = "Star" .. i, BackgroundTransparency = 0.2, BackgroundColor3 = Style.WHITE, Position = UDim2.fromScale(st[1], st[2]), Size = UDim2.fromOffset(2, 2), Parent = art })
+			Style.Frame({
+				Name = "Star" .. i,
+				BackgroundTransparency = 0.2,
+				BackgroundColor3 = Style.WHITE,
+				Position = UDim2.fromScale(st[1], st[2]),
+				Size = UDim2.fromOffset(2, 2),
+				Parent = art,
+			})
 		end
 	end
 	return art
@@ -147,7 +175,12 @@ function LobbyHud.Create(theme: any, deps: any): any
 	})
 
 	-- quick buttons -----------------------------------------------------------------------------------------
-	local buttons = Style.Frame({ Name = "Buttons", Position = UDim2.fromOffset(margin, top), Size = UDim2.fromOffset(if phone then 300 else 330, if phone then 92 else 232), Parent = root })
+	local buttons = Style.Frame({
+		Name = "Buttons",
+		Position = UDim2.fromOffset(margin, top),
+		Size = UDim2.fromOffset(if phone then 300 else 330, if phone then 92 else 232),
+		Parent = root,
+	})
 	local grid = Instance.new("UIGridLayout")
 	grid.CellSize = if phone then UDim2.fromOffset(146, 40) else UDim2.fromOffset(330, 50)
 	grid.CellPadding = if phone then UDim2.fromOffset(8, 8) else UDim2.fromOffset(0, 10)
@@ -166,7 +199,14 @@ function LobbyHud.Create(theme: any, deps: any): any
 		end
 	end
 	local practiceButton: any = nil
-	for i, b in { { "Practice", "Swords", "lobby.btn.practice" }, { "Loadout", "Soul", "lobby.btn.loadout" }, { "Shop", "Shop", "lobby.btn.shop" }, { "Quests", "Quests", "lobby.btn.quests" } } do
+	for i, b in
+		{
+			{ "Practice", "Swords", "lobby.btn.practice" },
+			{ "Loadout", "Soul", "lobby.btn.loadout" },
+			{ "Shop", "Shop", "lobby.btn.shop" },
+			{ "Quests", "Quests", "lobby.btn.quests" },
+		}
+	do
 		local button = UIKit.Button(theme, {
 			Name = b[1],
 			Text = Style.L(b[3]),
@@ -186,7 +226,9 @@ function LobbyHud.Create(theme: any, deps: any): any
 
 	-- monster chances ---------------------------------------------------------------------------------------
 	local chanceTop = top + (if phone then 100 else 246)
-	local chanceHeight = if phone then layout.Canvas.Y - chanceTop - 12 else math.min(330, layout.Canvas.Y - chanceTop - 190)
+	local chanceHeight = if phone
+		then layout.Canvas.Y - chanceTop - 12
+		else math.min(330, layout.Canvas.Y - chanceTop - 190)
 	local chancePanel = UIKit.Panel(theme, {
 		Name = "Chances",
 		Title = Style.L("lobby.chance.title"),
@@ -241,9 +283,28 @@ function LobbyHud.Create(theme: any, deps: any): any
 	})
 	chosen.Root.Visible = false
 	chosen.Root.ZIndex = 20
-	local chosenIcon = Style.Frame({ Name = "Icon", AnchorPoint = Vector2.new(0, 0.5), Position = UDim2.fromScale(0, 0.5), Size = UDim2.fromOffset(if phone then 90 else 130, if phone then 90 else 130), Parent = chosen.Content })
-	local chosenText = Style.Frame({ Name = "Text", Position = UDim2.fromOffset(if phone then 108 else 156, 0), Size = UDim2.new(1, if phone then -108 else -156, 1, 0), Parent = chosen.Content })
-	UIKit.Label(theme, { Name = "Header", Text = Style.L("lobby.chosen.title"), Role = "Caption", Tone = "Dim", Upper = true, Size = UDim2.new(1, 0, 0, 22), Parent = chosenText })
+	local chosenIcon = Style.Frame({
+		Name = "Icon",
+		AnchorPoint = Vector2.new(0, 0.5),
+		Position = UDim2.fromScale(0, 0.5),
+		Size = UDim2.fromOffset(if phone then 90 else 130, if phone then 90 else 130),
+		Parent = chosen.Content,
+	})
+	local chosenText = Style.Frame({
+		Name = "Text",
+		Position = UDim2.fromOffset(if phone then 108 else 156, 0),
+		Size = UDim2.new(1, if phone then -108 else -156, 1, 0),
+		Parent = chosen.Content,
+	})
+	UIKit.Label(theme, {
+		Name = "Header",
+		Text = Style.L("lobby.chosen.title"),
+		Role = "Caption",
+		Tone = "Dim",
+		Upper = true,
+		Size = UDim2.new(1, 0, 0, 22),
+		Parent = chosenText,
+	})
 	local chosenKit = UIKit.Label(theme, {
 		Name = "Kit",
 		Text = "",
@@ -254,7 +315,15 @@ function LobbyHud.Create(theme: any, deps: any): any
 		Size = UDim2.new(1, 0, 0, if phone then 38 else 58),
 		Parent = chosenText,
 	})
-	local chosenTitle = UIKit.Label(theme, { Name = "Title", Text = "", Role = "Subtitle", Upper = true, Position = UDim2.fromOffset(0, if phone then 66 else 88), Size = UDim2.new(1, 0, 0, 24), Parent = chosenText })
+	local chosenTitle = UIKit.Label(theme, {
+		Name = "Title",
+		Text = "",
+		Role = "Subtitle",
+		Upper = true,
+		Position = UDim2.fromOffset(0, if phone then 66 else 88),
+		Size = UDim2.new(1, 0, 0, 24),
+		Parent = chosenText,
+	})
 	local chosenLine = UIKit.Label(theme, {
 		Name = "Line",
 		Text = "",
@@ -272,7 +341,15 @@ function LobbyHud.Create(theme: any, deps: any): any
 	local snap: { [string]: any }? = nil
 	local voteKey = ""
 	local chanceKey = ""
-	type Card = { Id: string, Root: TextButton, Bar: Frame, Count: TextLabel, Mine: Frame, Lead: Frame, Stroke: UIStroke? }
+	type Card = {
+		Id: string,
+		Root: TextButton,
+		Bar: Frame,
+		Count: TextLabel,
+		Mine: Frame,
+		Lead: Frame,
+		Stroke: UIStroke?,
+	}
 	local cards: { Card } = {}
 
 	local function vote(mapId: string)
@@ -307,8 +384,18 @@ function LobbyHud.Create(theme: any, deps: any): any
 			button.Size = UDim2.new(1, 0, 0, cardH)
 			button.LayoutOrder = i
 			Style.Corner(button, theme.CornerRadius)
-			local stroke = Style.Stroke(button, c.StrokeDim, if theme.Id == "Classic" then 2 else 1, 0, theme.Id == "Classic" or theme.Id == "Fell")
-			local art = mapArt(mapId, Vector2.new(if phone then 96 else 150, cardH - 12), UDim.new(0, math.max(0, theme.CornerRadius.Offset - 4)))
+			local stroke = Style.Stroke(
+				button,
+				c.StrokeDim,
+				if theme.Id == "Classic" then 2 else 1,
+				0,
+				theme.Id == "Classic" or theme.Id == "Fell"
+			)
+			local art = mapArt(
+				mapId,
+				Vector2.new(if phone then 96 else 150, cardH - 12),
+				UDim.new(0, math.max(0, theme.CornerRadius.Offset - 4))
+			)
 			art.Position = UDim2.fromOffset(6, 6)
 			art.Parent = button
 			local x0 = (if phone then 96 else 150) + 18
@@ -346,7 +433,13 @@ function LobbyHud.Create(theme: any, deps: any): any
 				Parent = button,
 			})
 			Style.Corner(track, if theme.Id == "Classic" then UDim.new(0, 0) else UDim.new(0.5, 0))
-			local bar = Style.Frame({ Name = "Fill", BackgroundTransparency = 0, BackgroundColor3 = c.Accent, Size = UDim2.fromScale(0, 1), Parent = track })
+			local bar = Style.Frame({
+				Name = "Fill",
+				BackgroundTransparency = 0,
+				BackgroundColor3 = c.Accent,
+				Size = UDim2.fromScale(0, 1),
+				Parent = track,
+			})
 			Style.Corner(bar, if theme.Id == "Classic" then UDim.new(0, 0) else UDim.new(0.5, 0))
 			local count = UIKit.Label(theme, {
 				Name = "Count",
@@ -358,14 +451,35 @@ function LobbyHud.Create(theme: any, deps: any): any
 				Size = UDim2.fromOffset(84, 20),
 				Parent = button,
 			})
-			local mine = UIKit.Badge(theme, { Text = Style.L("lobby.vote.mine"), Color = c.Accent, Style = "Solid", Icon = "Check", AnchorPoint = Vector2.new(0, 1), Position = UDim2.new(0, 12, 1, -12), Height = if phone then 18 else 22, Parent = button })
-			local lead = UIKit.Badge(theme, { Text = Style.L("lobby.vote.leading"), Color = c.Gold, Style = "Solid", Icon = "Crown", AnchorPoint = Vector2.new(0, 0), Position = UDim2.fromOffset(12, 12), Height = if phone then 18 else 22, Parent = button })
+			local mine = UIKit.Badge(theme, {
+				Text = Style.L("lobby.vote.mine"),
+				Color = c.Accent,
+				Style = "Solid",
+				Icon = "Check",
+				AnchorPoint = Vector2.new(0, 1),
+				Position = UDim2.new(0, 12, 1, -12),
+				Height = if phone then 18 else 22,
+				Parent = button,
+			})
+			local lead = UIKit.Badge(theme, {
+				Text = Style.L("lobby.vote.leading"),
+				Color = c.Gold,
+				Style = "Solid",
+				Icon = "Crown",
+				AnchorPoint = Vector2.new(0, 0),
+				Position = UDim2.fromOffset(12, 12),
+				Height = if phone then 18 else 22,
+				Parent = button,
+			})
 			lead.ZIndex = 3
 			Motion.On(button, "Activated", function()
 				vote(mapId)
 			end)
 			button.Parent = voteList
-			table.insert(cards, { Id = mapId, Root = button, Bar = bar, Count = count, Mine = mine, Lead = lead, Stroke = stroke })
+			table.insert(
+				cards,
+				{ Id = mapId, Root = button, Bar = bar, Count = count, Mine = mine, Lead = lead, Stroke = stroke }
+			)
 		end
 	end
 
@@ -374,14 +488,26 @@ function LobbyHud.Create(theme: any, deps: any): any
 		local rowH = if phone then 22 else 28
 		local maxRows = math.max(1, math.floor((chanceHeight - (if phone then 70 else 96)) / rowH))
 		if #list == 0 then
-			UIKit.Label(theme, { Name = "Empty", Text = Style.L("lobby.chance.empty"), Role = "Caption", Tone = "Dim", Size = UDim2.new(1, 0, 0, rowH), Parent = chanceRows })
+			UIKit.Label(theme, {
+				Name = "Empty",
+				Text = Style.L("lobby.chance.empty"),
+				Role = "Caption",
+				Tone = "Dim",
+				Size = UDim2.new(1, 0, 0, rowH),
+				Parent = chanceRows,
+			})
 			return
 		end
 		for i, entry in list do
 			if i > maxRows then
 				break
 			end
-			local row = Style.Frame({ Name = "Row" .. i, Position = UDim2.fromOffset(0, (i - 1) * rowH), Size = UDim2.new(1, 0, 0, rowH), Parent = chanceRows })
+			local row = Style.Frame({
+				Name = "Row" .. i,
+				Position = UDim2.fromOffset(0, (i - 1) * rowH),
+				Size = UDim2.new(1, 0, 0, rowH),
+				Parent = chanceRows,
+			})
 			if entry.IsLocal then
 				local cursor = UIKit.Cursor(theme, if phone then 12 else 14)
 				cursor.AnchorPoint = Vector2.new(0, 0.5)
@@ -401,9 +527,23 @@ function LobbyHud.Create(theme: any, deps: any): any
 				Parent = row,
 			})
 			local pct = math.floor((entry.Chance or 0) * 100 + 0.5)
-			local track = Style.Frame({ Name = "Track", BackgroundTransparency = 0, BackgroundColor3 = c.PanelInset, AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, -46, 0.5, -2), Size = UDim2.fromOffset(70, 6), Parent = row })
+			local track = Style.Frame({
+				Name = "Track",
+				BackgroundTransparency = 0,
+				BackgroundColor3 = c.PanelInset,
+				AnchorPoint = Vector2.new(1, 0.5),
+				Position = UDim2.new(1, -46, 0.5, -2),
+				Size = UDim2.fromOffset(70, 6),
+				Parent = row,
+			})
 			Style.Corner(track, if theme.Id == "Classic" then UDim.new(0, 0) else UDim.new(0.5, 0))
-			local fill = Style.Frame({ Name = "Fill", BackgroundTransparency = 0, BackgroundColor3 = if entry.Pity then c.Gold elseif entry.Pref == "Monster" then c.Danger else c.Accent, Size = UDim2.fromScale(math.clamp(entry.Chance or 0, 0, 1), 1), Parent = track })
+			local fill = Style.Frame({
+				Name = "Fill",
+				BackgroundTransparency = 0,
+				BackgroundColor3 = if entry.Pity then c.Gold elseif entry.Pref == "Monster" then c.Danger else c.Accent,
+				Size = UDim2.fromScale(math.clamp(entry.Chance or 0, 0, 1), 1),
+				Parent = track,
+			})
 			Style.Corner(fill, if theme.Id == "Classic" then UDim.new(0, 0) else UDim.new(0.5, 0))
 			UIKit.Label(theme, {
 				Name = "Pct",
@@ -416,7 +556,15 @@ function LobbyHud.Create(theme: any, deps: any): any
 				Size = UDim2.new(0, 44, 1, -6),
 				Parent = row,
 			})
-			Style.Frame({ Name = "Rule", BackgroundTransparency = 0.85, BackgroundColor3 = c.Text, AnchorPoint = Vector2.new(0, 1), Position = UDim2.fromScale(0, 1), Size = UDim2.new(1, 0, 0, 1), Parent = row })
+			Style.Frame({
+				Name = "Rule",
+				BackgroundTransparency = 0.85,
+				BackgroundColor3 = c.Text,
+				AnchorPoint = Vector2.new(0, 1),
+				Position = UDim2.fromScale(0, 1),
+				Size = UDim2.new(1, 0, 0, 1),
+				Parent = row,
+			})
 		end
 	end
 
@@ -424,13 +572,23 @@ function LobbyHud.Create(theme: any, deps: any): any
 		local kit = Style.Kit(info.KitId)
 		local color = if kit then kit.Color else c.Accent
 		chosenIcon:ClearAllChildren()
-		Style.Glow({ Name = "Glow", Color = color, Size = UDim2.fromScale(1, 1), Spread = 18, Strength = 0.45, Corner = UDim.new(0.5, 0), Parent = chosenIcon })
+		Style.Glow({
+			Name = "Glow",
+			Color = color,
+			Size = UDim2.fromScale(1, 1),
+			Spread = 18,
+			Strength = 0.45,
+			Corner = UDim.new(0.5, 0),
+			Parent = chosenIcon,
+		})
 		local icon = Icons.Create("Skull", color, UDim2.fromScale(1, 1))
 		icon.Parent = chosenIcon
 		chosenKit.Text = UIKit.Upper(if kit then Style.Pick(kit.Name) else tostring(info.KitId))
 		chosenKit.TextColor3 = color
 		chosenTitle.Text = UIKit.Upper(if kit then Style.Pick(kit.Title) else "")
-		chosenLine.Text = if info.IsLocal then Style.L("lobby.chosen.you") else Style.L("lobby.chosen.line", info.Name or "?", if kit then Style.Pick(kit.Name) else "?")
+		chosenLine.Text = if info.IsLocal
+			then Style.L("lobby.chosen.you")
+			else Style.L("lobby.chosen.line", info.Name or "?", if kit then Style.Pick(kit.Name) else "?")
 		chosen.Root.Visible = true
 		chosenUntil = if Style.Live() then clock + CHOSEN_TIME else math.huge
 	end
@@ -494,13 +652,24 @@ function LobbyHud.Create(theme: any, deps: any): any
 			card.Lead.Visible = n > 0 and n == best
 			if card.Stroke then
 				card.Stroke.Color = if s.MyVote == card.Id then c.Accent else c.StrokeDim
-				card.Stroke.Thickness = if s.MyVote == card.Id then (if theme.Id == "Classic" then 3 else 2) else (if theme.Id == "Classic" then 2 else 1)
+				card.Stroke.Thickness = if s.MyVote == card.Id
+					then (if theme.Id == "Classic" then 3 else 2)
+					else (if theme.Id == "Classic" then 2 else 1)
 			end
 		end
 		-- chances
 		local parts = {}
 		for _, entry in s.Chances or {} do
-			table.insert(parts, string.format("%s:%.3f:%s:%s", entry.Name, entry.Chance or 0, tostring(entry.Pref), tostring(entry.Pity)))
+			table.insert(
+				parts,
+				string.format(
+					"%s:%.3f:%s:%s",
+					entry.Name,
+					entry.Chance or 0,
+					tostring(entry.Pref),
+					tostring(entry.Pity)
+				)
+			)
 		end
 		local ck = table.concat(parts, "|")
 		if ck ~= chanceKey then

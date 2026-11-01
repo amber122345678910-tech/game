@@ -648,14 +648,30 @@ function FxController.HitColor(packet: Map): Color3
 	return HIT_COLORS[packet.kind] or Lib.Colors.White
 end
 
-type KRState = { Credit: number, CreditT: number, Pending: number, PendingT: number, Acc: number, LastFlush: number, LastHP: number }
+type KRState = {
+	Credit: number,
+	CreditT: number,
+	Pending: number,
+	PendingT: number,
+	Acc: number,
+	LastFlush: number,
+	LastHP: number,
+}
 local krStates: { [Model]: KRState } = setmetatable({}, { __mode = "k" }) :: any
 
 local function krState(model: Model): KRState
 	local s = krStates[model]
 	if s == nil then
 		local hum = humanoidOf(model)
-		s = { Credit = 0, CreditT = 0, Pending = 0, PendingT = 0, Acc = 0, LastFlush = 0, LastHP = if hum then hum.Health else 0 }
+		s = {
+			Credit = 0,
+			CreditT = 0,
+			Pending = 0,
+			PendingT = 0,
+			Acc = 0,
+			LastFlush = 0,
+			LastHP = if hum then hum.Health else 0,
+		}
 		krStates[model] = s
 	end
 	return s
@@ -664,7 +680,13 @@ end
 local function krCredit(packet: Map)
 	local target = packet.target
 	local amount = packet.amount
-	if typeof(target) ~= "Instance" or type(amount) ~= "number" or amount <= 0 or packet.kind == "Heal" or packet.kind == "DodgeDrain" then
+	if
+		typeof(target) ~= "Instance"
+		or type(amount) ~= "number"
+		or amount <= 0
+		or packet.kind == "Heal"
+		or packet.kind == "DodgeDrain"
+	then
 		return
 	end
 	local s = krStates[target]
@@ -752,7 +774,9 @@ local function onDamageFx(packet: Map)
 		return
 	end
 	local pos: Vector3 = if typeof(packet.pos) == "Vector3" then packet.pos else (chestPos(target) or Vector3.zero)
-	local attacker: Model? = if typeof(packet.attacker) == "Instance" and packet.attacker:IsA("Model") then packet.attacker else nil
+	local attacker: Model? = if typeof(packet.attacker) == "Instance" and packet.attacker:IsA("Model")
+		then packet.attacker
+		else nil
 	local localChar = FxController.LocalCharacter()
 	local isVictim = target == localChar
 	local isAttacker = attacker ~= nil and attacker == localChar
@@ -823,8 +847,19 @@ local function onDamageFx(packet: Map)
 			FxController.Sound(if kind == "Beam" then "HitBeam" elseif kind == "Melee" then "Hit" else "HitArea", pos)
 		end
 		if packet.guardBreak then
-			Lib.Shatter(CFrame.new(pos), 4, Color3.fromRGB(150, 205, 255), 10, { Speed = 16, Material = Enum.Material.Glass })
-			Lib.Text(pos + Vector3.new(0, 1.5, 0), Strings.L("fx.guardBreak"), Lib.Colors.Orange, { Kind = "Alert", Scale = 1.15 })
+			Lib.Shatter(
+				CFrame.new(pos),
+				4,
+				Color3.fromRGB(150, 205, 255),
+				10,
+				{ Speed = 16, Material = Enum.Material.Glass }
+			)
+			Lib.Text(
+				pos + Vector3.new(0, 1.5, 0),
+				Strings.L("fx.guardBreak"),
+				Lib.Colors.Orange,
+				{ Kind = "Alert", Scale = 1.15 }
+			)
 			FxController.Sound("GuardBreak", pos)
 			if isVictim then
 				ScreenFX.Pulse("GuardBreak")
@@ -836,7 +871,9 @@ local function onDamageFx(packet: Map)
 		if amount > 0 then
 			flinch(target, packet)
 			if kind == "Melee" then
-				local stop = if heavy then (Config.Combat.HitStopHeavy or 0.12) else (Config.Combat.HitStopMelee or 0.06)
+				local stop = if heavy
+					then (Config.Combat.HitStopHeavy or 0.12)
+					else (Config.Combat.HitStopMelee or 0.06)
 				FxController.HitStop(target, stop)
 				if attacker then
 					FxController.HitStop(attacker, stop)
@@ -887,7 +924,12 @@ local deathPlayed: { [Model]: boolean } = setmetatable({}, { __mode = "k" }) :: 
 local function visibleParts(model: Model): { BasePart }
 	local out: { BasePart } = {}
 	for _, d in model:GetDescendants() do
-		if d:IsA("BasePart") and d.Name ~= "HumanoidRootPart" and d.Transparency < 0.95 and d.LocalTransparencyModifier < 0.95 then
+		if
+			d:IsA("BasePart")
+			and d.Name ~= "HumanoidRootPart"
+			and d.Transparency < 0.95
+			and d.LocalTransparencyModifier < 0.95
+		then
 			table.insert(out, d)
 		end
 	end
@@ -934,7 +976,11 @@ local function dustAway(model: Model)
 						local s = p.Size
 						local bursts = math.clamp(math.floor(s.X * s.Y * s.Z * 2) + 1, 1, 4)
 						for _ = 1, bursts do
-							local off = Vector3.new(Lib.Rand(-0.5, 0.5) * s.X, Lib.Rand(-0.5, 0.5) * s.Y, Lib.Rand(-0.5, 0.5) * s.Z)
+							local off = Vector3.new(
+								Lib.Rand(-0.5, 0.5) * s.X,
+								Lib.Rand(-0.5, 0.5) * s.Y,
+								Lib.Rand(-0.5, 0.5) * s.Z
+							)
 							Lib.Emit("SoulDust", (p.CFrame * CFrame.new(off)).Position, 2, { Color = dustColor })
 						end
 					end
@@ -1121,7 +1167,8 @@ local function statusStep()
 				if stunned and st.Stars == nil then
 					st.Stars = {}
 					for k = 1, 3 do
-						(st.Stars :: any)[k] = Lib.Part("Ball", Vector3.one * 0.32, CFrame.new(), STAR_COLOR, Enum.Material.Neon, 0)
+						(st.Stars :: any)[k] =
+							Lib.Part("Ball", Vector3.one * 0.32, CFrame.new(), STAR_COLOR, Enum.Material.Neon, 0)
 					end
 				elseif not stunned and st.Stars then
 					for _, s in st.Stars do
@@ -1131,7 +1178,14 @@ local function statusStep()
 				end
 				local blocking = not dead and m:GetAttribute("Blocking") == true
 				if blocking and st.Shield == nil then
-					st.Shield = Lib.Part("Cylinder", Vector3.new(0.12, 4.6, 4.6), CFrame.new(), Color3.fromRGB(130, 200, 255), Enum.Material.ForceField, 0.1)
+					st.Shield = Lib.Part(
+						"Cylinder",
+						Vector3.new(0.12, 4.6, 4.6),
+						CFrame.new(),
+						Color3.fromRGB(130, 200, 255),
+						Enum.Material.ForceField,
+						0.1
+					)
 				elseif not blocking and st.Shield then
 					Lib.Release(st.Shield)
 					st.Shield = nil
@@ -1155,11 +1209,16 @@ local function statusStep()
 					st.Downed = nil
 				end
 				local ex = m:GetAttribute("Exhausted")
-				local exhausted = not dead and ((type(ex) == "number" and ex > Lib.Now()) or statusActive(m, "Exhausted"))
+				local exhausted = not dead
+					and ((type(ex) == "number" and ex > Lib.Now()) or statusActive(m, "Exhausted"))
 				if exhausted and st.Sweat == nil then
 					local head = attachment(m, "HeadTop") or attachment(m, "LeftEye")
 					if head then
-						st.Sweat = Lib.Emitter("Sweat", head, { Color = Color3.fromRGB(150, 210, 255), Rate = 7 * Lib.ParticleScale() })
+						st.Sweat = Lib.Emitter(
+							"Sweat",
+							head,
+							{ Color = Color3.fromRGB(150, 210, 255), Rate = 7 * Lib.ParticleScale() }
+						)
 					end
 				elseif not exhausted and st.Sweat then
 					st.Sweat:Destroy()
@@ -1175,7 +1234,9 @@ local function statusStep()
 					local hp = headPos(m) or (rcf.Position + Vector3.new(0, 3, 0))
 					for k, s in stars do
 						local a = now * 4 + k * (math.pi * 2 / 3)
-						s.CFrame = CFrame.new(hp + Vector3.new(math.cos(a) * 0.9, 0.35 + math.sin(now * 6 + k) * 0.1, math.sin(a) * 0.9))
+						s.CFrame = CFrame.new(
+							hp + Vector3.new(math.cos(a) * 0.9, 0.35 + math.sin(now * 6 + k) * 0.1, math.sin(a) * 0.9)
+						)
 					end
 				end
 				if st.Shield then
@@ -1185,7 +1246,10 @@ local function statusStep()
 				if cpos and (st.Blue or st.Downed) then
 					local look = if cam then (cam.CFrame.Position - cpos) else rcf.LookVector
 					local flat = Vector3.new(look.X, 0, look.Z)
-					local cf = Lib.LookAlong(cpos + Vector3.new(0, math.sin(now * 3) * 0.08, 0), if flat.Magnitude > 1e-3 then flat else rcf.LookVector)
+					local cf = Lib.LookAlong(
+						cpos + Vector3.new(0, math.sin(now * 3) * 0.08, 0),
+						if flat.Magnitude > 1e-3 then flat else rcf.LookVector
+					)
 					if st.Blue then
 						st.Blue:PivotTo(cf * CFrame.new(0, 0, -0.6))
 					end

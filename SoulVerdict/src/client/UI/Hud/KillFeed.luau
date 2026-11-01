@@ -54,7 +54,12 @@ function KillFeed.Create(theme: any, deps: any): any
 	end
 
 	local function iconOf(parent: Instance, name: string, color: Color3, layoutOrder: number)
-		local holder = Style.Frame({ Name = "Icon", Size = UDim2.fromOffset(rowH - 10, rowH - 10), LayoutOrder = layoutOrder, Parent = parent })
+		local holder = Style.Frame({
+			Name = "Icon",
+			Size = UDim2.fromOffset(rowH - 10, rowH - 10),
+			LayoutOrder = layoutOrder,
+			Parent = parent,
+		})
 		local icon = Style.Icon(name, color, UDim2.fromScale(1, 1))
 		icon.Parent = holder
 	end
@@ -85,14 +90,24 @@ function KillFeed.Create(theme: any, deps: any): any
 		if kind == "Kill" or kind == "Downed" or kind == "Revived" then
 			if entry.A and entry.A ~= "" then
 				nameText(box, entry.A, entry.AColor, 1)
-				iconOf(box, entry.Icon or (if kind == "Revived" then "Heart" else "Skull"), if kind == "Revived" then C.Good else (entry.AColor or C.Text), 2)
+				iconOf(
+					box,
+					entry.Icon or (if kind == "Revived" then "Heart" else "Skull"),
+					if kind == "Revived" then C.Good else (entry.AColor or C.Text),
+					2
+				)
 				nameText(box, entry.B or "?", entry.BColor, 3)
 			else
 				iconOf(box, entry.Icon or "Skull", C.Muted, 1)
 				nameText(box, entry.Text or (entry.B or "?"), entry.BColor, 2)
 			end
 			if kind == "Kill" then
-				local holder = Style.Frame({ Name = "Shattered", Size = UDim2.fromOffset(rowH - 12, rowH - 12), LayoutOrder = 4, Parent = box })
+				local holder = Style.Frame({
+					Name = "Shattered",
+					Size = UDim2.fromOffset(rowH - 12, rowH - 12),
+					LayoutOrder = 4,
+					Parent = box,
+				})
 				local heart = Style.Heart(entry.BColor or C.SoulRed, rowH - 12, "Broken")
 				heart.Parent = holder
 			elseif kind == "Downed" then

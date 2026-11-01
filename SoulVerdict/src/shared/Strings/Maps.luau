@@ -29,6 +29,7 @@ return {
 		en = "v0.1 - THE FIRST TRIAL\n* Hall of Verdicts and Snowdin Crossroads\n* 3 monsters, 7 SOULs\n* Verdict Box, SAVE stars, Collapse\n* Daily shop, quests, mastery\nStay determined!",
 		ru = "v0.1 - ПЕРВЫЙ СУД\n* Зал Приговоров и Перекрёсток Сноудина\n* 3 монстра, 7 ДУШ\n* Коробка Приговора, звёзды СОХРАНЕНИЯ, Обрушение\n* Лавка дня, задания, мастерство\nНе теряй решимости!",
 	},
+	["maps.lobby.podium.try"] = { en = "Try on", ru = "Примерить" },
 	["maps.lobby.plate.monster"] = { en = "MONSTER", ru = "МОНСТР" },
 	["maps.lobby.plate.human"] = { en = "SOUL", ru = "ДУША" },
 

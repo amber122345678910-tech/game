@@ -90,13 +90,19 @@ function AbilityBar.BuildSlot(skin: any, info: any, size: number, opts: { [strin
 	else
 		container = Style.Frame({ Name = "Slot_" .. info.Slot, Size = UDim2.fromOffset(size, size + nameH) })
 	end
-	local corner = if round then UDim.new(0.5, 0) elseif battle then UDim.new(0, 0) else UDim.new(0, math.floor(size * 0.22))
+	local corner = if round
+		then UDim.new(0.5, 0)
+		elseif battle then UDim.new(0, 0)
+		else UDim.new(0, math.floor(size * 0.22))
 	local glow = Style.Glow({
 		Name = "ReadyGlow",
 		Color = C.UltFull,
 		Size = UDim2.fromOffset(size, size),
 		Spread = math.floor(size * 0.18),
-		Corner = if round then UDim.new(0.5, 0) elseif battle then UDim.new(0, 0) else UDim.new(0, math.floor(size * 0.3)),
+		Corner = if round
+			then UDim.new(0.5, 0)
+			elseif battle then UDim.new(0, 0)
+			else UDim.new(0, math.floor(size * 0.3)),
 		Strength = 1.3,
 		ZIndex = 1,
 		Parent = container,
@@ -120,7 +126,16 @@ function AbilityBar.BuildSlot(skin: any, info: any, size: number, opts: { [strin
 	local ultRing: any = nil
 	if isUlt then
 		if round or not battle then
-			ultRing = Style.Radial({ Name = "UltRing", Mode = "Filled", Color = C.Ult, Transparency = 0.15, Circle = round, Corner = corner, ZIndex = 2, Parent = box })
+			ultRing = Style.Radial({
+				Name = "UltRing",
+				Mode = "Filled",
+				Color = C.Ult,
+				Transparency = 0.15,
+				Circle = round,
+				Corner = corner,
+				ZIndex = 2,
+				Parent = box,
+			})
 			local inner = Style.Frame({
 				Name = "Inner",
 				BackgroundTransparency = 0,
@@ -184,7 +199,16 @@ function AbilityBar.BuildSlot(skin: any, info: any, size: number, opts: { [strin
 			Parent = box,
 		})
 	else
-		radial = Style.Radial({ Name = "Wipe", Mode = "Remaining", Color = Style.BLACK, Transparency = 0.3, Circle = round, Corner = corner, ZIndex = 5, Parent = box })
+		radial = Style.Radial({
+			Name = "Wipe",
+			Mode = "Remaining",
+			Color = Style.BLACK,
+			Transparency = 0.3,
+			Circle = round,
+			Corner = corner,
+			ZIndex = 5,
+			Parent = box,
+		})
 	end
 	local seconds = Style.Text(skin, {
 		Name = "Seconds",
@@ -227,7 +251,14 @@ function AbilityBar.BuildSlot(skin: any, info: any, size: number, opts: { [strin
 		Visible = false,
 		Parent = box,
 	})
-	local meterFill = Style.Frame({ Name = "Fill", BackgroundTransparency = 0, BackgroundColor3 = C.Guard, Size = UDim2.fromScale(1, 1), ZIndex = 6, Parent = meter })
+	local meterFill = Style.Frame({
+		Name = "Fill",
+		BackgroundTransparency = 0,
+		BackgroundColor3 = C.Guard,
+		Size = UDim2.fromScale(1, 1),
+		ZIndex = 6,
+		Parent = meter,
+	})
 	if not battle then
 		Style.Corner(meter, UDim.new(0.5, 0))
 		Style.Corner(meterFill, UDim.new(0.5, 0))
@@ -262,7 +293,7 @@ function AbilityBar.BuildSlot(skin: any, info: any, size: number, opts: { [strin
 			Color = C.Dim,
 			X = "Center",
 			Y = "Top",
-			Wrap = true,
+			Wrap = string.find(info.Name, " ", 1, true) ~= nil, -- single long words shrink instead of breaking
 			Scaled = true,
 			MinSize = 6,
 			AnchorPoint = Vector2.new(0.5, 1),
@@ -354,7 +385,10 @@ function AbilityBar.BuildSlot(skin: any, info: any, size: number, opts: { [strin
 			pips.Set(state.Ammo, state.AmmoMax)
 		elseif state.Charges then
 			pips.Root.Visible = not showMeter
-			pips.Set(state.Charges + (state.ChargeNext or 0) * (if state.Charges < state.ChargesMax then 1 else 0), state.ChargesMax)
+			pips.Set(
+				state.Charges + (state.ChargeNext or 0) * (if state.Charges < state.ChargesMax then 1 else 0),
+				state.ChargesMax
+			)
 		elseif state.Combo then
 			pips.Root.Visible = not showMeter
 			pips.Set(state.Combo, state.ComboMax)
@@ -406,7 +440,16 @@ function AbilityBar.Create(theme: any, deps: any): any
 		Visible = false,
 		Parent = bar,
 	})
-	local chipText = Style.Text(skin, { Name = "Text", Text = "", TextSize = skin.Size.Small + 1, Color = C.Danger, X = "Center", Stroke = false, Size = UDim2.fromScale(1, 1), Parent = chip })
+	local chipText = Style.Text(skin, {
+		Name = "Text",
+		Text = "",
+		TextSize = skin.Size.Small + 1,
+		Color = C.Danger,
+		X = "Center",
+		Stroke = false,
+		Size = UDim2.fromScale(1, 1),
+		Parent = chip,
+	})
 	local slots: { any } = {}
 	local kitShown = ""
 	local snap: { [string]: any }? = nil
@@ -421,12 +464,20 @@ function AbilityBar.Create(theme: any, deps: any): any
 		local x = 0
 		for _, info in infos do
 			local s = if info.Ult then ultSize else size
-			local slot = AbilityBar.BuildSlot(skin, info, s, { Round = info.Ult and not battle, Key = Style.KeyLabel(deps, info.Action), Name = true })
+			local slot = AbilityBar.BuildSlot(
+				skin,
+				info,
+				s,
+				{ Round = info.Ult and not battle, Key = Style.KeyLabel(deps, info.Action), Name = true }
+			)
 			slot.Root.Position = UDim2.fromOffset(x, ultSize - s)
 			slot.Root.Parent = bar
 			table.insert(slots, slot)
 			x += s + gap
-			if (info.Slot == "E" and not (infos[1] and Style.Kit(kitId) and Style.Kit(kitId).Role == "Monster")) or info.Slot == "T" then
+			if
+				(info.Slot == "E" and not (infos[1] and Style.Kit(kitId) and Style.Kit(kitId).Role == "Monster"))
+				or info.Slot == "T"
+			then
 				x += math.floor(gap * 0.8) -- small group gap before the built-ins
 			end
 		end
@@ -448,7 +499,10 @@ function AbilityBar.Create(theme: any, deps: any): any
 		end
 		chip.Visible = reason ~= nil
 		if reason then
-			Style.SetText(chipText, Style.Upper(skin, Style.L(if reason == "Stunned" then "hud.slot.stunned" else "hud.slot.silenced")))
+			Style.SetText(
+				chipText,
+				Style.Upper(skin, Style.L(if reason == "Stunned" then "hud.slot.stunned" else "hud.slot.silenced"))
+			)
 		end
 	end
 

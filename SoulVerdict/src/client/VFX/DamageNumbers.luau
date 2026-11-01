@@ -314,7 +314,14 @@ local function acquire(): Entry?
 	return e
 end
 
-local function spawnText(pos: Vector3, text: string, color: Color3, stroke: Color3, scale: number, opts: { [string]: any })
+local function spawnText(
+	pos: Vector3,
+	text: string,
+	color: Color3,
+	stroke: Color3,
+	scale: number,
+	opts: { [string]: any }
+)
 	if not enabled then
 		return
 	end

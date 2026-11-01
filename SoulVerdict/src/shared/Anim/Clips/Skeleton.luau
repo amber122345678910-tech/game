@@ -50,7 +50,6 @@ local function pick(src: Pose, names: { string }): Pose
 end
 local ARMS = pick(POCKETS, { "LeftShoulder", "LeftElbow", "LeftWrist", "RightShoulder", "RightElbow", "RightWrist" })
 local L_POCKET = pick(ARMS, { "LeftShoulder", "LeftElbow", "LeftWrist" })
-local R_POCKET = pick(ARMS, { "RightShoulder", "RightElbow", "RightWrist" })
 local SHRUG = Skeletons.Pose("Skeleton", "Shrug") or {}
 
 -- Rotates the pocket arms a little (walk swing) without pulling the hands out of the pockets.

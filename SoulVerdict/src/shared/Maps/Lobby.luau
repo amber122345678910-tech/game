@@ -121,7 +121,7 @@ end
 local function buildIsland(B: MapKit.Builder)
 	B:Group("Island")
 	B:Disc("Geometry", "Grass", V(0, -3, 0), L.IslandR * 2, 6, C.Grass, M.Grass, { Shadow = false })
-	B:Disc("Decor", "GrassEdge", V(0, -1.2, 0), L.IslandR * 2 + 1.2, 2.6, C.GrassDark, M.Grass, { Shadow = false })
+	B:Disc("Decor", "GrassEdge", V(0, -1.7, 0), L.IslandR * 2 + 1.2, 2.6, C.GrassDark, M.Grass, { Shadow = false })
 	-- stepped rock underside
 	local tiers = { { 148, 8, -9 }, { 124, 10, -17 }, { 96, 12, -27 }, { 64, 12, -38 }, { 34, 12, -49 }, { 12, 10, -58 } }
 	for i, t in tiers do
@@ -678,7 +678,7 @@ local function buildPathsAndGardens(B: MapKit.Builder)
 	for k = 0, 6 do
 		table.insert(angles, L.SoulPhase + k * GAP + (if k % 2 == 0 then 6 else -6))
 	end
-	for _, extra in { 240, 300, 345 } do
+	for _, extra in { 236, 330, 345 } do
 		table.insert(angles, extra)
 	end
 	for i, a in angles do
@@ -701,6 +701,31 @@ local function buildPathsAndGardens(B: MapKit.Builder)
 			local p = center + V(fx, 0.75, fz)
 			B:Deco("Ball", "Flower", V(0.7, 0.7, 0.7), CFrame.new(p), flowerColors[rng:Integer(1, #flowerColors)], M.SmoothPlastic, { Shadow = false })
 			B:Deco("Ball", "Leaf", V(0.9, 0.5, 0.9), CFrame.new(p - V(0, 0.35, 0)), C.GrassDark, M.Grass, { Shadow = false })
+		end
+	end
+	-- low hedges curving behind the SOUL podiums (between the destinations)
+	for k = 0, 6 do
+		local a = L.SoulPhase + k * GAP
+		for j = -1, 1 do
+			local p = polar(47.5, a + j * 7)
+			B:Deco("Ellipsoid", "Hedge", V(6.5, 3, 3.4), MapKit.Facing(p, V(0, 0, 0)) * CFrame.new(0, 1.2, 0), if j == 0 then C.GrassDark else rgb(104, 152, 76), M.LeafyGrass)
+		end
+	end
+	-- mossy rocks near the rim
+	for i = 1, 8 do
+		local a = rng:Number(0, 360)
+		local r = rng:Number(66, 71)
+		B:Rock("Rock" .. i, polar(r, a), rng:Number(2.2, 4.2), { Color = rgb(150, 140, 126), Material = M.Slate, Collide = false })
+	end
+	-- lily pond with a tiny arched bridge
+	local pond = polar(60, 300)
+	B:Disc("Decor", "Pond", pond + V(0, 0.06, 0), 16, 0.1, rgb(90, 170, 210), M.Glass, { Transparency = 0.15, Shadow = false, Reflectance = 0.3 })
+	B:Ring("Decor", "PondRim", pond + V(0, 0.2, 0), 8.2, 1.2, 0.4, 20, C.StoneMid, M.Limestone, { Shadow = false })
+	for i = 1, 5 do
+		local lx, lz = rng:InCircle(5.5)
+		B:Disc("Decor", "LilyPad", pond + V(lx, 0.13, lz), rng:Number(1.2, 2), 0.06, rgb(96, 168, 80), M.SmoothPlastic, { Shadow = false })
+		if i % 2 == 1 then
+			B:Deco("Ball", "Lily", V(0.6, 0.6, 0.6), CFrame.new(pond + V(lx, 0.4, lz)), rgb(255, 196, 220), M.SmoothPlastic, { Shadow = false })
 		end
 	end
 	-- SOUL pennants on poles along the portal path

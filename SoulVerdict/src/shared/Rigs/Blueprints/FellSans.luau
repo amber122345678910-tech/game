@@ -81,7 +81,15 @@ local function build(rig: RigContext)
 		{ 0.43, 0.32 },
 		{ 0.405, 0.22 },
 	}, 0.05, P.Scar, scarProps)
-	SansCommon.FaceLine(rig, skull, "Scar", { { 0.43, 0.36 }, { 0.49, 0.43 }, { 0.53, 0.46 } }, 0.032, P.Scar, scarProps)
+	SansCommon.FaceLine(
+		rig,
+		skull,
+		"Scar",
+		{ { 0.43, 0.36 }, { 0.49, 0.43 }, { 0.53, 0.46 } },
+		0.032,
+		P.Scar,
+		scarProps
+	)
 	SansCommon.FaceLine(rig, skull, "Scar", {
 		{ 0.4, -0.18 },
 		{ 0.42, -0.27 },

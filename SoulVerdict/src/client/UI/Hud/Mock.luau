@@ -97,9 +97,24 @@ end
 
 local function team(): { Unit }
 	return {
-		Mock.Unit("Determination", "NovaHeart", { IsLocal = true, Level = 12, Title = "Star Lighter", HP = 72, KR = 14, Guard = 64, Dash = 1, DashNext = 0.55, Ult = 87, Statuses = { Slowed = NOW + 2.4, DamageUp = NOW + 5.1 } }),
+		Mock.Unit("Determination", "NovaHeart", {
+			IsLocal = true,
+			Level = 12,
+			Title = "Star Lighter",
+			HP = 72,
+			KR = 14,
+			Guard = 64,
+			Dash = 1,
+			DashNext = 0.55,
+			Ult = 87,
+			Statuses = { Slowed = NOW + 2.4, DamageUp = NOW + 5.1 },
+		}),
 		Mock.Unit("Kindness", "kindcookie", { Level = 8, Title = "Kind Soul", HP = 118, Ult = 40 }),
-		Mock.Unit("Patience", "Ghostly_Owl", { Level = 15, Title = "Night Owl", HP = 0, Downed = true, DownedEndsAt = NOW + 9.2 }),
+		Mock.Unit(
+			"Patience",
+			"Ghostly_Owl",
+			{ Level = 15, Title = "Night Owl", HP = 0, Downed = true, DownedEndsAt = NOW + 9.2 }
+		),
 		Mock.Unit("Bravery", "BraveBrick", { Level = 5, Title = "Bone Dodger", HP = 41, KR = 22, IsBot = true }),
 	}
 end
@@ -109,7 +124,14 @@ local function monster(opts: { [string]: any }?): Unit
 	m.HP = math.floor(m.MaxHP * 0.68)
 	m.Dodges = 5
 	m.Ult = 40
-	m.Cooldowns = { GasterBlaster = NOW + 5.2, BlueSoul = NOW + 0.0, BoneZone = NOW + 7.4, BoneWall = NOW + 2.1, Shortcut = NOW + 0, VerdictBox = NOW + 22 }
+	m.Cooldowns = {
+		GasterBlaster = NOW + 5.2,
+		BlueSoul = NOW + 0.0,
+		BoneZone = NOW + 7.4,
+		BoneWall = NOW + 2.1,
+		Shortcut = NOW + 0,
+		VerdictBox = NOW + 22,
+	}
 	if opts then
 		for k, v in opts do
 			m[k] = v
@@ -125,17 +147,65 @@ local function feed(): { { [string]: any } }
 	local sans = Style.KitColor("ClassicSans")
 	return {
 		{ Kind = "Save", A = "kindcookie", AColor = kind, B = "1", Icon = "Star", Time = NOW - 21 },
-		{ Kind = "Kill", A = "SansMain_77", AColor = sans, B = "LittleFern", BColor = Style.KitColor("Integrity"), Icon = "Blaster", Time = NOW - 12 },
-		{ Kind = "Revived", A = "NovaHeart", AColor = det, B = "BraveBrick", BColor = Style.KitColor("Bravery"), Icon = "Heart", Time = NOW - 6 },
-		{ Kind = "Downed", A = "SansMain_77", AColor = sans, B = "Ghostly_Owl", BColor = pat, Icon = "BoneZone", Time = NOW - 2 },
+		{
+			Kind = "Kill",
+			A = "SansMain_77",
+			AColor = sans,
+			B = "LittleFern",
+			BColor = Style.KitColor("Integrity"),
+			Icon = "Blaster",
+			Time = NOW - 12,
+		},
+		{
+			Kind = "Revived",
+			A = "NovaHeart",
+			AColor = det,
+			B = "BraveBrick",
+			BColor = Style.KitColor("Bravery"),
+			Icon = "Heart",
+			Time = NOW - 6,
+		},
+		{
+			Kind = "Downed",
+			A = "SansMain_77",
+			AColor = sans,
+			B = "Ghostly_Owl",
+			BColor = pat,
+			Icon = "BoneZone",
+			Time = NOW - 2,
+		},
 	}
 end
 
 local function saves(): { { [string]: any } }
 	return {
-		{ Index = 1, Progress = 1, Lit = true, Contested = false, Channelers = 0, Distance = 38, Screen = Vector2.new(0.27, 0.42) },
-		{ Index = 2, Progress = 0.62, Lit = false, Contested = false, Channelers = 2, Distance = 14, Screen = Vector2.new(0.64, 0.5) },
-		{ Index = 3, Progress = 0.18, Lit = false, Contested = true, Channelers = 1, Distance = 71, Screen = Vector2.new(1.3, 0.62) },
+		{
+			Index = 1,
+			Progress = 1,
+			Lit = true,
+			Contested = false,
+			Channelers = 0,
+			Distance = 38,
+			Screen = Vector2.new(0.27, 0.42),
+		},
+		{
+			Index = 2,
+			Progress = 0.62,
+			Lit = false,
+			Contested = false,
+			Channelers = 2,
+			Distance = 14,
+			Screen = Vector2.new(0.64, 0.5),
+		},
+		{
+			Index = 3,
+			Progress = 0.18,
+			Lit = false,
+			Contested = true,
+			Channelers = 1,
+			Distance = 71,
+			Screen = Vector2.new(1.3, 0.62),
+		},
 	}
 end
 
@@ -322,7 +392,11 @@ end
 
 BUILDERS.Perseverance = function()
 	local s = base()
-	local me = Mock.Unit("Perseverance", "NovaHeart", { IsLocal = true, Level = 12, Title = "Star Lighter", HP = 88, Ult = 100, Guard = 100, Dash = 2 })
+	local me = Mock.Unit(
+		"Perseverance",
+		"NovaHeart",
+		{ IsLocal = true, Level = 12, Title = "Star Lighter", HP = 88, Ult = 100, Guard = 100, Dash = 2 }
+	)
 	s.Me = me
 	s.Humans[1] = me
 	s.Studious = true
@@ -333,7 +407,11 @@ end
 
 BUILDERS.Justice = function()
 	local s = base()
-	local me = Mock.Unit("Justice", "NovaHeart", { IsLocal = true, Level = 12, HP = 101, Ult = 55, Shield = 25, Statuses = { Shielded = NOW + 4 } })
+	local me = Mock.Unit(
+		"Justice",
+		"NovaHeart",
+		{ IsLocal = true, Level = 12, HP = 101, Ult = 55, Shield = 25, Statuses = { Shielded = NOW + 4 } }
+	)
 	s.Me = me
 	s.Humans[1] = me
 	s.Cooldowns = { FanTheHammer = NOW + 3.4 }

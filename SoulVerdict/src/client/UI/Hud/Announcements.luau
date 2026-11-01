@@ -26,22 +26,44 @@ local function spec(skin: any, kind: string, data: { [string]: any }): Spec
 			Icon = "Eye",
 		}
 	elseif kind == "Surge" then
-		return { Title = Style.L("hud.surge"), Line = Style.L(if data.Monster then "hud.ann.surge.monster" else "hud.ann.surge.line"), Color = C.Gold, Icon = "Star" }
+		return {
+			Title = Style.L("hud.surge"),
+			Line = Style.L(if data.Monster then "hud.ann.surge.monster" else "hud.ann.surge.line"),
+			Color = C.Gold,
+			Icon = "Star",
+		}
 	elseif kind == "SecondWind" then
 		return {
 			Title = Style.L("hud.secondWind"),
-			Line = if data.Self then Style.L("hud.ann.secondWind.self") else Style.L("hud.ann.secondWind.line", data.Name or "?"),
+			Line = if data.Self
+				then Style.L("hud.ann.secondWind.self")
+				else Style.L("hud.ann.secondWind.line", data.Name or "?"),
 			Color = Color3.fromRGB(120, 255, 200),
 			Icon = "Heart",
 		}
 	elseif kind == "Collapse" then
-		return { Title = Style.L("hud.ann.collapse"), Line = Style.L("hud.ann.collapse.line"), Color = Color3.fromRGB(170, 90, 255), Icon = "Eclipse" }
+		return {
+			Title = Style.L("hud.ann.collapse"),
+			Line = Style.L("hud.ann.collapse.line"),
+			Color = Color3.fromRGB(170, 90, 255),
+			Icon = "Eclipse",
+		}
 	elseif kind == "SaveLit" then
-		return { Title = Style.L("hud.ann.saveLit", data.Lit or 1, data.Total or 3), Line = Style.L("hud.ann.saveLit.line"), Color = C.Gold, Icon = "Star" }
+		return {
+			Title = Style.L("hud.ann.saveLit", data.Lit or 1, data.Total or 3),
+			Line = Style.L("hud.ann.saveLit.line"),
+			Color = C.Gold,
+			Icon = "Star",
+		}
 	elseif kind == "Exhausted" then
 		return { Title = Style.L("hud.ann.exhausted"), Line = "", Color = C.Warn, Icon = "Moon" }
 	elseif kind == "Fight" then
-		return { Title = Style.L("hud.ann.fight"), Line = Style.L(if data.Monster then "hud.ann.fight.monster" else "hud.ann.fight.line"), Color = C.Gold, Icon = nil }
+		return {
+			Title = Style.L("hud.ann.fight"),
+			Line = Style.L(if data.Monster then "hud.ann.fight.monster" else "hud.ann.fight.line"),
+			Color = C.Gold,
+			Icon = nil,
+		}
 	end
 	return { Title = data.Title or "", Line = data.Line or "", Color = data.Color or C.Text, Icon = nil }
 end
@@ -61,17 +83,36 @@ function Announcements.Create(theme: any, deps: any): any
 	local scaleObj = Instance.new("UIScale")
 	scaleObj.Parent = group
 	local titleSize = if phone then 26 else (if battle then 46 else 62)
-	local glow = Style.Glow({
-		Name = "Glow",
+	-- soft horizontal light band behind the title (Modern); thin fading rules above and below it
+	local glow = Style.Frame({
+		Name = "Band",
+		BackgroundTransparency = 0,
+		BackgroundColor3 = Style.WHITE,
 		AnchorPoint = Vector2.new(0.5, 0.5),
-		Position = UDim2.new(0.5, 0, 0, titleSize * 0.62),
-		Size = UDim2.fromOffset(if phone then 360 else 620, titleSize * 0.6),
-		Spread = if phone then 18 else 30,
-		Strength = 0.55,
-		Corner = UDim.new(0.5, 0),
+		Position = UDim2.new(0.5, 0, 0, math.floor(titleSize * 0.6)),
+		Size = UDim2.fromOffset(if phone then 560 else 980, math.floor(titleSize * 1.55)),
 		Parent = group,
 	})
-	local iconHolder = Style.Frame({ Name = "Icon", AnchorPoint = Vector2.new(0.5, 1), Position = UDim2.new(0.5, 0, 0, -6), Size = UDim2.fromOffset(titleSize * 0.8, titleSize * 0.8), Parent = group })
+	Style.Gradient(glow, nil, Style.Seq({ { 0, 1 }, { 0.5, 0.62 }, { 1, 1 } }), 0)
+	for i, y in { 0, 1 } do
+		local rule = Style.Frame({
+			Name = "Rule" .. i,
+			BackgroundTransparency = 0,
+			BackgroundColor3 = Style.WHITE,
+			AnchorPoint = Vector2.new(0.5, y),
+			Position = UDim2.fromScale(0.5, y),
+			Size = UDim2.new(1, 0, 0, 1),
+			Parent = glow,
+		})
+		Style.Gradient(rule, nil, Style.Seq({ { 0, 1 }, { 0.5, 0.2 }, { 1, 1 } }), 0)
+	end
+	local iconHolder = Style.Frame({
+		Name = "Icon",
+		AnchorPoint = Vector2.new(0.5, 1),
+		Position = UDim2.new(0.5, 0, 0, -6),
+		Size = UDim2.fromOffset(titleSize * 0.8, titleSize * 0.8),
+		Parent = group,
+	})
 	local title = Style.Text(skin, {
 		Name = "Title",
 		Text = "",
@@ -131,9 +172,10 @@ function Announcements.Create(theme: any, deps: any): any
 			titleGradient.Color = Style.CSeq(Style.WHITE, sp.Color:Lerp(Style.WHITE, 0.15))
 		end
 		underline.BackgroundColor3 = sp.Color
-		for _, layer in glow:GetChildren() do
-			if layer:IsA("Frame") then
-				layer.BackgroundColor3 = sp.Color
+		glow.BackgroundColor3 = sp.Color:Lerp(Style.BLACK, 0.35)
+		for _, rule in glow:GetChildren() do
+			if rule:IsA("Frame") then
+				rule.BackgroundColor3 = sp.Color
 			end
 		end
 		glow.Visible = not battle
@@ -152,7 +194,11 @@ function Announcements.Create(theme: any, deps: any): any
 			line.Text = ""
 			typer = Motion.Typewriter(line, text, { Interval = 0.028 })
 			scaleObj.Scale = 1.35
-			Motion.Tween(scaleObj, { Time = 0.35, Style = Enum.EasingStyle.Back, Direction = Enum.EasingDirection.Out }, { Scale = 1 })
+			Motion.Tween(
+				scaleObj,
+				{ Time = 0.35, Style = Enum.EasingStyle.Back, Direction = Enum.EasingDirection.Out },
+				{ Scale = 1 }
+			)
 		else
 			line.Text = text
 		end
@@ -192,7 +238,13 @@ function Announcements.Create(theme: any, deps: any): any
 		if not Style.Live() then
 			local a = s.Announcement
 			if a then
-				render(a.Kind, { Monster = s.Role == "Monster", Self = true, Name = if s.Me then s.Me.Name else nil, Lit = s.SavesLit, Total = s.SavesTotal })
+				render(a.Kind, {
+					Monster = s.Role == "Monster",
+					Self = true,
+					Name = if s.Me then s.Me.Name else nil,
+					Lit = s.SavesLit,
+					Total = s.SavesTotal,
+				})
 			else
 				group.Visible = false
 			end

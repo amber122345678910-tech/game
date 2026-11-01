@@ -112,22 +112,35 @@ local function build(rig: RigContext)
 
 	-- the broken eclipse halo behind his head: a void disc (the skull eclipses it) rimmed by a cracked
 	-- corona, a few drifting shards and a soft back light
-	local haloCF = skull.CF * CFrame.new(0, 0.42 * K, 1.5 * K) * CFrame.Angles(math.rad(8), 0, math.rad(-10))
-	local disc = rig.Disc("Head", "HaloDisc", 2.2, 0.04, haloCF, PartKit.Mix(P.Void, BLACK, 0.86), {
+	local haloCF = skull.CF * CFrame.new(0, 0.4 * K, 1.42 * K) * CFrame.Angles(math.rad(8), 0, math.rad(-10))
+	local disc = rig.Disc("Head", "HaloDisc", 2.1, 0.04, haloCF, PartKit.Mix(P.Void, BLACK, 0.9), {
 		Role = "Dark",
 		Material = Enum.Material.Neon,
 		CastShadow = false,
 	})
 	local corona = haloCF * CFrame.new(0, 0, -0.025)
-	for _, arc in { { 14, 100, 3 }, { 124, 206, 3 }, { 230, 336, 4 } } do
-		rig.Arc("Head", "Corona", corona, 1.14, arc[1], arc[2], arc[3], 0.1, 0.035, P.EyeGlow, neon)
+	local coronaColor = PartKit.Mix(P.EyeGlow, P.Void, 0.3)
+	for k, arc in { { 14, 100, 3 }, { 124, 206, 3 }, { 230, 336, 4 } } do
+		rig.Arc(
+			"Head",
+			"Corona",
+			corona,
+			1.09,
+			arc[1],
+			arc[2],
+			arc[3],
+			0.075,
+			0.03,
+			if k == 1 then P.EyeGlow else coronaColor,
+			neon
+		)
 	end
 	for _, arc in { { 36, 84, 2 }, { 256, 312, 2 } } do
-		rig.Arc("Head", "CoronaFlare", corona, 1.27, arc[1], arc[2], arc[3], 0.045, 0.03, P.Void, neon)
+		rig.Arc("Head", "CoronaFlare", corona, 1.2, arc[1], arc[2], arc[3], 0.04, 0.03, P.Void, neon)
 	end
 	for i, deg in { 112, 218 } do
 		local a = math.rad(deg)
-		local r = 1.2 + 0.07 * i
+		local r = 1.14 + 0.07 * i
 		rig.Box(
 			"Head",
 			"HaloShard",
@@ -138,6 +151,8 @@ local function build(rig: RigContext)
 		)
 	end
 	rig.Light(disc, "Point", { Name = "CoronaLight", Color = P.EyeGlow, Brightness = 1.2, Range = 5 })
+	-- above-head UI clears the halo
+	rig.Attachment("Head", "HeadTop", CFrame.new(0, (haloCF * CFrame.new(0, 1.3, 0)).Position.Y + 0.25, 0))
 
 	------------------------------------------------------------------------------------------
 	-- TORSO: navy hoodie with the night inside, tattered hood rim
@@ -234,7 +249,7 @@ local blueprint: Blueprints.Blueprint = {
 	Scale = 1,
 	Overrides = SansCommon.Overrides,
 	Palette = {
-		Hoodie = rgb(26, 32, 74), -- deep navy
+		Hoodie = rgb(32, 42, 96), -- deep navy
 		Lining = rgb(132, 96, 255), -- starfield glow / trims
 		Void = rgb(150, 72, 255), -- fissures, chip, veins, corona flare
 		EyeGlow = rgb(170, 240, 255), -- the ring eye and the corona

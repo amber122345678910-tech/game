@@ -381,7 +381,11 @@ function Data:Build(): { [string]: any }
 				ReloadEndsAt = a1.ReloadEndsAt or a1.Reload or 0,
 			}
 		elseif type(a1) == "number" then
-			ammo = { Count = a1, Max = if type(a2) == "number" then a2 else a1, ReloadEndsAt = if type(a3) == "number" then a3 else 0 }
+			ammo = {
+				Count = a1,
+				Max = if type(a2) == "number" then a2 else a1,
+				ReloadEndsAt = if type(a3) == "number" then a3 else 0,
+			}
 		end
 	end
 
@@ -413,9 +417,14 @@ function Data:Build(): { [string]: any }
 	if targetModel then
 		spectating = self:UnitOf(targetModel, now)
 	end
+	-- the local SOUL shattered this round: stays "dead" until the round ends or a living body returns
+	local phase = round.Phase or "Waiting"
+	local fight = phase == "Round" or phase == "Collapse"
 	local dead = me ~= nil and me.Dead == true
 	if dead and self.deadAt == nil then
 		self.deadAt = now
+	elseif me == nil and self.deadAt ~= nil and fight then
+		dead = true
 	elseif not dead then
 		self.deadAt = nil
 	end
@@ -432,7 +441,7 @@ function Data:Build(): { [string]: any }
 
 	return {
 		Now = now,
-		Phase = round.Phase or "Waiting",
+		Phase = phase,
 		EndsAt = round.PhaseEndsAt or 0,
 		Practice = round.Practice == true,
 		Role = role,

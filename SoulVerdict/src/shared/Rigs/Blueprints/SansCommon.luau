@@ -332,7 +332,9 @@ function SansCommon.DomeLine(
 			local x = (pb - pa).Unit
 			local zAxis = -(normal - x * x:Dot(normal)).Unit
 			local y = zAxis:Cross(x)
-			local c: Color3 = if typeof(color) == "Color3" then color else (color :: { Color3 })[i] or (color :: { Color3 })[1]
+			local c: Color3 = if typeof(color) == "Color3"
+				then color
+				else (color :: { Color3 })[i] or (color :: { Color3 })[1]
 			table.insert(
 				out,
 				rig.Box(
@@ -467,6 +469,9 @@ function SansCommon.Grin(rig: RigContext, skull: Skull, opts: GrinOptions): { { 
 		end
 		return pts
 	end
+	-- SPEC §5.1 Mouth anchor: centre of the grin, just proud of the teeth
+	local mx, my = skull.Grin(0, (skull.Upper(0) + skull.Lower(0)) / 2)
+	rig.Attachment("Head", "Mouth", skull.Front(mx, my, -0.03))
 	SansCommon.FaceLine(rig, skull, "GrinUpper", curve(skull.Upper, 6, 1), w, opts.Line)
 	SansCommon.FaceLine(rig, skull, "GrinLower", curve(skull.Lower, 7, 1), w, opts.Line)
 	local zig: { { number } } = {}
@@ -495,7 +500,14 @@ function SansCommon.Grin(rig: RigContext, skull: Skull, opts: GrinOptions): { { 
 			local x, y = skull.Grin(cu + du, cv + dv)
 			return { x, y }
 		end
-		SansCommon.FaceLine(rig, skull, "GrinCrease", { p(-s * 0.01, -0.012), p(s * 0.045, 0.075) }, w * 0.85, opts.Line)
+		SansCommon.FaceLine(
+			rig,
+			skull,
+			"GrinCrease",
+			{ p(-s * 0.01, -0.012), p(s * 0.045, 0.075) },
+			w * 0.85,
+			opts.Line
+		)
 	end
 	return zig
 end
@@ -587,6 +599,13 @@ function SansCommon.Hoodie(rig: RigContext, opts: HoodieOptions): HoodieInfo
 		opts.Inner,
 		{ Role = opts.InnerRole or "ClothAlt", Material = opts.InnerMaterial or mat }
 	)
+
+	-- SPEC §5.1 Chest anchor (SOUL / hit VFX): on the shirt in the open front
+	do
+		local cy = panelC.Y + 0.38
+		local cz = ellipsoidFrontZ(shirtC, shirtR, 0, cy) or (shirtC.Z - shirtR.Z)
+		rig.Attachment("UpperTorso", "Chest", CFrame.new(0, cy, cz - 0.04))
+	end
 
 	local function panelFrontZ(x: number, y: number): number?
 		local best: number? = nil
@@ -913,7 +932,14 @@ function SansCommon.Hands(rig: RigContext, opts: HandOptions)
 			local len = if f == 2 or f == 3 then 0.28 else 0.24
 			local base = palmC + V(u * 0.13 * sx, -0.14 + math.abs(u) * 0.02, 0)
 			local tip = base + V(u * 0.035 * sx, -len, 0.09)
-			rig.Ellipsoid(hand, "Finger", V(len + 0.07, 0.095, 0.095), PartKit.Basis((base + tip) / 2, tip - base), opts.Bone, bone)
+			rig.Ellipsoid(
+				hand,
+				"Finger",
+				V(len + 0.07, 0.095, 0.095),
+				PartKit.Basis((base + tip) / 2, tip - base),
+				opts.Bone,
+				bone
+			)
 		end
 		-- thumb on the body side, angled down and forward
 		local tb = palmC + V(-0.17 * sx, 0.02, -0.01)
@@ -948,7 +974,14 @@ function SansCommon.Shorts(rig: RigContext, opts: ShortsOptions)
 	local mat = opts.Material or Enum.Material.Fabric
 	local cloth: Props = { Role = "ClothAlt", Material = mat }
 	local pelvis = rig.CFrameOf("LowerTorso").Position
-	rig.Ellipsoid("LowerTorso", "ShortsSeat", V(1.66, 0.78, 1.12), CFrame.new(pelvis + V(0, -0.12, 0.02)), opts.Body, cloth)
+	rig.Ellipsoid(
+		"LowerTorso",
+		"ShortsSeat",
+		V(1.66, 0.78, 1.12),
+		CFrame.new(pelvis + V(0, -0.12, 0.02)),
+		opts.Body,
+		cloth
+	)
 	for _, side in { "Left", "Right" } do
 		local sx = if side == "Left" then -1 else 1
 		local ul = side .. "UpperLeg"

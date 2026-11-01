@@ -37,7 +37,13 @@ function SpectateHud.Create(theme: any, deps: any): any
 		Size = UDim2.new(1, 0, 0, 14),
 		Parent = panel,
 	})
-	local center = Style.Frame({ Name = "Target", AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0, if phone then 22 else 28), Size = UDim2.new(1, -200, 0, if phone then 20 else 26), Parent = panel })
+	local center = Style.Frame({
+		Name = "Target",
+		AnchorPoint = Vector2.new(0.5, 0),
+		Position = UDim2.new(0.5, 0, 0, if phone then 22 else 28),
+		Size = UDim2.new(1, -200, 0, if phone then 20 else 26),
+		Parent = panel,
+	})
 	local row = Instance.new("UIListLayout")
 	row.FillDirection = Enum.FillDirection.Horizontal
 	row.HorizontalAlignment = Enum.HorizontalAlignment.Center
@@ -45,9 +51,30 @@ function SpectateHud.Create(theme: any, deps: any): any
 	row.SortOrder = Enum.SortOrder.LayoutOrder
 	row.Padding = UDim.new(0, 10)
 	row.Parent = center
-	local heartHolder = Style.Frame({ Name = "Soul", Size = UDim2.fromOffset(20, 18), LayoutOrder = 1, Parent = center })
-	local nameLabel = Style.Text(skin, { Name = "Name", Text = "", Role = "Title", TextSize = if phone then 13 else (if battle then 16 else 20), Upper = false, AutoX = true, Size = UDim2.new(0, 0, 1, 0), Stroke = false, LayoutOrder = 2, Parent = center })
-	local classLabel = Style.Text(skin, { Name = "Class", Text = "", TextSize = if phone then 9 else (if battle then 10 else 13), AutoX = true, Size = UDim2.new(0, 0, 1, 0), Stroke = false, LayoutOrder = 3, Parent = center })
+	local heartHolder =
+		Style.Frame({ Name = "Soul", Size = UDim2.fromOffset(20, 18), LayoutOrder = 1, Parent = center })
+	local nameLabel = Style.Text(skin, {
+		Name = "Name",
+		Text = "",
+		Role = "Title",
+		TextSize = if phone then 13 else (if battle then 16 else 20),
+		Upper = false,
+		AutoX = true,
+		Size = UDim2.new(0, 0, 1, 0),
+		Stroke = false,
+		LayoutOrder = 2,
+		Parent = center,
+	})
+	local classLabel = Style.Text(skin, {
+		Name = "Class",
+		Text = "",
+		TextSize = if phone then 9 else (if battle then 10 else 13),
+		AutoX = true,
+		Size = UDim2.new(0, 0, 1, 0),
+		Stroke = false,
+		LayoutOrder = 3,
+		Parent = center,
+	})
 	local bar = Style.Bar(skin, {
 		Name = "HP",
 		Kind = "HP",
@@ -119,7 +146,7 @@ function SpectateHud.Create(theme: any, deps: any): any
 		local u = s.Spectating
 		center.Visible = u ~= nil
 		bar.Root.Visible = u ~= nil
-		Style.SetText(line, Style.L(if u then "hud.spec.line" else "hud.spec.none"))
+		Style.SetText(line, Style.L(if u or (s.HumansAlive or 0) > 0 then "hud.spec.line" else "hud.spec.none"))
 		if not u then
 			return
 		end
@@ -133,7 +160,10 @@ function SpectateHud.Create(theme: any, deps: any): any
 			heart.Parent = heartHolder
 		end
 		Style.SetText(nameLabel, if battle then Style.Upper(skin, tostring(u.Name)) else tostring(u.Name))
-		Style.SetText(classLabel, Style.Upper(skin, (if kit then Style.Pick(kit.Name) .. "  " else "") .. Style.L("hud.lv", u.Level or 1)))
+		Style.SetText(
+			classLabel,
+			Style.Upper(skin, (if kit then Style.Pick(kit.Name) .. "  " else "") .. Style.L("hud.lv", u.Level or 1))
+		)
 		classLabel.TextColor3 = color
 		bar.Set(if u.Downed then 0 else (u.HP or 0), math.max(1, u.MaxHP or 1), math.min(u.KR or 0, u.HP or 0))
 	end

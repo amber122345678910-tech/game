@@ -141,7 +141,10 @@ function Hud.FeedFromEvent(name: string, data: any, now: number?, unitOf: any?):
 				Text = Style.L(special or "round.feed.faded", victimName),
 				B = victimName,
 				BColor = colorOf(unitOf, data.victim),
-				Icon = if data.ability == "Void" then "ArrowDown" elseif data.ability == "Collapse" then "Eclipse" else "Skull",
+				Icon = if data.ability == "Void"
+					then "ArrowDown"
+					elseif data.ability == "Collapse" then "Eclipse"
+					else "Skull",
 				Time = t,
 			}
 		end
@@ -156,7 +159,15 @@ function Hud.FeedFromEvent(name: string, data: any, now: number?, unitOf: any?):
 				icon = "Box"
 			end
 		end
-		return { Kind = "Kill", A = nameOf(killer, data.killerName), AColor = colorOf(unitOf, killer), B = victimName, BColor = colorOf(unitOf, data.victim), Icon = icon, Time = t }
+		return {
+			Kind = "Kill",
+			A = nameOf(killer, data.killerName),
+			AColor = colorOf(unitOf, killer),
+			B = victimName,
+			BColor = colorOf(unitOf, data.victim),
+			Icon = icon,
+			Time = t,
+		}
 	elseif name == "Downed" then
 		local attacker = data.attacker
 		return {
@@ -170,10 +181,21 @@ function Hud.FeedFromEvent(name: string, data: any, now: number?, unitOf: any?):
 			Time = t,
 		}
 	elseif name == "Revived" then
-		return { Kind = "Revived", A = nameOf(data.by, data.byName), AColor = colorOf(unitOf, data.by), B = nameOf(data.victim, data.name), BColor = colorOf(unitOf, data.victim), Icon = "Heart", Time = t }
+		return {
+			Kind = "Revived",
+			A = nameOf(data.by, data.byName),
+			AColor = colorOf(unitOf, data.by),
+			B = nameOf(data.victim, data.name),
+			BColor = colorOf(unitOf, data.victim),
+			Icon = "Heart",
+			Time = t,
+		}
 	elseif name == "SaveLit" then
 		local by = data.by
-		local who = if type(by) == "table" and by[1] then nameOf(by[1], nil) elseif typeof(by) == "Instance" then nameOf(by, nil) else "?"
+		local who = if type(by) == "table" and by[1]
+			then nameOf(by[1], nil)
+			elseif typeof(by) == "Instance" then nameOf(by, nil)
+			else "?"
 		return { Kind = "Save", A = who, B = tostring(data.index or "?"), Time = t }
 	elseif name == "Surge" then
 		return { Kind = "Surge", Time = t }
@@ -186,7 +208,12 @@ function Hud.FeedFromEvent(name: string, data: any, now: number?, unitOf: any?):
 end
 
 -- builds every piece into `container`; returns name -> handle
-local function buildPieces(theme: any, pdeps: { [string]: any }, container: Instance, only: { [string]: boolean }?): { [string]: any }
+local function buildPieces(
+	theme: any,
+	pdeps: { [string]: any },
+	container: Instance,
+	only: { [string]: boolean }?
+): { [string]: any }
 	local pieces: { [string]: any } = {}
 	for _, entry in Hud.PIECES do
 		if only == nil or only[entry.Name] then
@@ -213,13 +240,24 @@ end
 
 -- painted stand-in for the 3D world behind offline previews
 local function previewScene(phase: string?): Frame
-	local scene = Style.Frame({ Name = "PreviewScene", BackgroundTransparency = 0, BackgroundColor3 = Style.WHITE, Size = UDim2.fromScale(1, 1), ZIndex = 0 })
-	Style.Gradient(scene, ColorSequence.new({
-		ColorSequenceKeypoint.new(0, Color3.fromRGB(26, 30, 58)),
-		ColorSequenceKeypoint.new(0.52, Color3.fromRGB(150, 108, 92)),
-		ColorSequenceKeypoint.new(0.56, Color3.fromRGB(70, 52, 50)),
-		ColorSequenceKeypoint.new(1, Color3.fromRGB(18, 14, 18)),
-	}), nil, 90)
+	local scene = Style.Frame({
+		Name = "PreviewScene",
+		BackgroundTransparency = 0,
+		BackgroundColor3 = Style.WHITE,
+		Size = UDim2.fromScale(1, 1),
+		ZIndex = 0,
+	})
+	Style.Gradient(
+		scene,
+		ColorSequence.new({
+			ColorSequenceKeypoint.new(0, Color3.fromRGB(26, 30, 58)),
+			ColorSequenceKeypoint.new(0.52, Color3.fromRGB(150, 108, 92)),
+			ColorSequenceKeypoint.new(0.56, Color3.fromRGB(70, 52, 50)),
+			ColorSequenceKeypoint.new(1, Color3.fromRGB(18, 14, 18)),
+		}),
+		nil,
+		90
+	)
 	if phase == "Waiting" or phase == "Intermission" then
 		scene.BackgroundColor3 = Color3.fromRGB(150, 170, 220)
 	end
@@ -235,7 +273,14 @@ local function previewScene(phase: string?): Frame
 		})
 		Style.Gradient(pillar, ColorSequence.new(Color3.fromRGB(120, 96, 90), Color3.fromRGB(40, 30, 32)), nil, 0)
 	end
-	local floor = Style.Frame({ Name = "Floor", BackgroundTransparency = 0.55, BackgroundColor3 = Color3.fromRGB(230, 190, 120), Position = UDim2.fromScale(0, 0.62), Size = UDim2.fromScale(1, 0.004), Parent = scene })
+	local floor = Style.Frame({
+		Name = "Floor",
+		BackgroundTransparency = 0.55,
+		BackgroundColor3 = Color3.fromRGB(230, 190, 120),
+		Position = UDim2.fromScale(0, 0.62),
+		Size = UDim2.fromScale(1, 0.004),
+		Parent = scene,
+	})
 	Style.Gradient(floor, nil, Style.Seq({ { 0, 1 }, { 0.5, 0 }, { 1, 1 } }), 0)
 	return scene
 end
@@ -303,7 +348,10 @@ function Hud.Mount(screenGui: Instance, deps: any?): any
 	local okRoot, UIRoot = pcall(function()
 		return require(script.Parent.UIRoot) :: any
 	end)
-	local themeService: any = if type(d.Theme) == "table" and d.Theme.Current then d.Theme elseif okTS then ThemeService else nil
+	local themeService: any = if type(d.Theme) == "table" and d.Theme.Current
+		then d.Theme
+		elseif okTS then ThemeService
+		else nil
 
 	local function camera(): Camera?
 		local ok, cam = pcall(function()
@@ -328,9 +376,9 @@ function Hud.Mount(screenGui: Instance, deps: any?): any
 	local uiScale: UIScale? = nil
 	if ownRoot then
 		base = Style.Frame({ Name = "SV_HudRoot", Size = UDim2.fromScale(1 / layout.Scale, 1 / layout.Scale) })
-		uiScale = Instance.new("UIScale")
-		;(uiScale :: UIScale).Scale = layout.Scale
-		;(uiScale :: UIScale).Parent = base
+		uiScale = Instance.new("UIScale");
+		(uiScale :: UIScale).Scale = layout.Scale;
+		(uiScale :: UIScale).Parent = base
 		base.Parent = screenGui
 	else
 		base = screenGui :: any
@@ -356,10 +404,7 @@ function Hud.Mount(screenGui: Instance, deps: any?): any
 	local conns: { any } = {}
 
 	local function pdeps(): { [string]: any }
-		local p: { [string]: any } = {}
-		for k, v in d do
-			p[k] = v
-		end
+		local p: { [string]: any } = table.clone(d)
 		p.Live = true
 		p.Layout = layout
 		p.Source = source
@@ -401,6 +446,9 @@ function Hud.Mount(screenGui: Instance, deps: any?): any
 		handle.Pieces = pieces
 		for _, piece in pieces do
 			piece.Root.Visible = false
+			if piece.SetActive then
+				pcall(piece.SetActive, false) -- e.g. MobileControls drops its touch bindings until shown
+			end
 		end
 		if pieces.KillFeed then
 			for _, entry in feedHistory do
@@ -458,7 +506,11 @@ function Hud.Mount(screenGui: Instance, deps: any?): any
 		elseif name == "MonsterChosen" then
 			if pieces.LobbyHud and pieces.LobbyHud.ShowChosen then
 				local localPlayer = Data.LocalPlayer(Players)
-				pcall(pieces.LobbyHud.ShowChosen, { Name = data.name, KitId = data.kitId, IsLocal = localPlayer ~= nil and data.userId == localPlayer.UserId })
+				pcall(pieces.LobbyHud.ShowChosen, {
+					Name = data.name,
+					KitId = data.kitId,
+					IsLocal = localPlayer ~= nil and data.userId == localPlayer.UserId,
+				})
 			end
 		elseif name == "Intro" then
 			table.clear(feedHistory)
@@ -504,7 +556,24 @@ function Hud.Mount(screenGui: Instance, deps: any?): any
 	if type(state) == "table" and state.RoundEvent then
 		table.insert(conns, connect(state.RoundEvent, onRoundEvent))
 	elseif type(state) == "table" and type(state.OnRoundEvent) == "function" then
-		for _, name in { "PhaseChanged", "MapVote", "MonsterChosen", "Intro", "Kill", "Downed", "Revived", "SaveLit", "Surge", "FinalPhase", "SecondWind", "Collapse", "RoundEnd", "PlayerLeft" } do
+		for _, name in
+			{
+				"PhaseChanged",
+				"MapVote",
+				"MonsterChosen",
+				"Intro",
+				"Kill",
+				"Downed",
+				"Revived",
+				"SaveLit",
+				"Surge",
+				"FinalPhase",
+				"SecondWind",
+				"Collapse",
+				"RoundEnd",
+				"PlayerLeft",
+			}
+		do
 			local ok, conn = pcall(state.OnRoundEvent, name, function(data: any)
 				onRoundEvent(name, data)
 			end)
@@ -534,43 +603,59 @@ function Hud.Mount(screenGui: Instance, deps: any?): any
 		end)
 	end
 	if type(state) == "table" and state.Notify then
-		table.insert(conns, connect(state.Notify, function(key: string, args: any, style: any)
-			if pieces.Notifications then
-				pcall(pieces.Notifications.Notify, key, args, style)
-			end
-		end))
+		table.insert(
+			conns,
+			connect(state.Notify, function(key: string, args: any, style: any)
+				if pieces.Notifications then
+					pcall(pieces.Notifications.Notify, key, args, style)
+				end
+			end)
+		)
 	end
 	if type(state) == "table" and state.RoundChanged then
-		table.insert(conns, connect(state.RoundChanged, function()
-			refresh()
-		end))
+		table.insert(
+			conns,
+			connect(state.RoundChanged, function()
+				refresh()
+			end)
+		)
 	end
 	if themeService then
 		table.insert(conns, connect(themeService.Changed, rebuild))
 		table.insert(conns, connect(themeService.HudChanged, rebuild))
 	end
 	if type(d.Input) == "table" and d.Input.DeviceChanged then
-		table.insert(conns, connect(d.Input.DeviceChanged, function()
-			rebuild()
-			refresh()
-		end))
+		table.insert(
+			conns,
+			connect(d.Input.DeviceChanged, function()
+				rebuild()
+				refresh()
+			end)
+		)
 	end
 	local cam = camera()
 	if cam then
-		table.insert(conns, connect((cam :: any):GetPropertyChangedSignal("ViewportSize"), function()
-			local newLayout = computeLayout()
-			if newLayout.Phone ~= layout.Phone or math.abs(newLayout.Scale - layout.Scale) > 0.01 or newLayout.Canvas ~= layout.Canvas then
-				if ownRoot or d.Layout == nil then
-					layout = newLayout
+		table.insert(
+			conns,
+			connect((cam :: any):GetPropertyChangedSignal("ViewportSize"), function()
+				local newLayout = computeLayout()
+				if
+					newLayout.Phone ~= layout.Phone
+					or math.abs(newLayout.Scale - layout.Scale) > 0.01
+					or newLayout.Canvas ~= layout.Canvas
+				then
+					if ownRoot or d.Layout == nil then
+						layout = newLayout
+					end
+					if uiScale then
+						uiScale.Scale = layout.Scale
+						base.Size = UDim2.fromScale(1 / layout.Scale, 1 / layout.Scale)
+					end
+					rebuild()
+					refresh()
 				end
-				if uiScale then
-					uiScale.Scale = layout.Scale
-					base.Size = UDim2.fromScale(1 / layout.Scale, 1 / layout.Scale)
-				end
-				rebuild()
-				refresh()
-			end
-		end))
+			end)
+		)
 	end
 
 	-- frame loop: snapshot at 10 Hz, per-frame Tick for timers / cooldown wipes / markers

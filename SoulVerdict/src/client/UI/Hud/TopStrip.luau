@@ -26,7 +26,12 @@ function TopStrip.Create(theme: any, deps: any): any
 	local x = 0
 	local cellFrames: { Frame } = {}
 	for i, w in cells do
-		local cell = Style.Frame({ Name = "Cell" .. i, Position = UDim2.fromScale(x, 0), Size = UDim2.fromScale(w, 1), Parent = box })
+		local cell = Style.Frame({
+			Name = "Cell" .. i,
+			Position = UDim2.fromScale(x, 0),
+			Size = UDim2.fromScale(w, 1),
+			Parent = box,
+		})
 		table.insert(cellFrames, cell)
 		x += w
 		if i < #cells then

@@ -304,7 +304,9 @@ end
 function CombatController.ComboIndex(): (number, string?)
 	local kit = CombatController.Kit()
 	local ability = if combo.Ability and kit then Kits.Ability(kit.Id, combo.Ability) else nil
-	local window = if ability and ability.Numbers and type(ability.Numbers.ComboWindow) == "number"
+	local window = if ability
+			and ability.Numbers
+			and type(ability.Numbers.ComboWindow) == "number"
 		then ability.Numbers.ComboWindow
 		else Config.Combat.ComboResetTime
 	if now() - combo.Last > window then
@@ -447,7 +449,9 @@ local function genericIndicator(ability: Map): Map?
 	local mode = ability.Aim
 	local white = Lib.Colors.White
 	if mode == "Ground" then
-		local radius = if ability.Numbers and type(ability.Numbers.Radius) == "number" then ability.Numbers.Radius else 2.5
+		local radius = if ability.Numbers and type(ability.Numbers.Radius) == "number"
+			then ability.Numbers.Radius
+			else 2.5
 		local circle = Lib.GroundCircle(Vector3.zero, radius, white, { Rim = 0.18, Fill = 0.85, Height = 0.16 })
 		return {
 			Update = function(_self: any, aim: Vector3, _charge: number)
@@ -597,7 +601,9 @@ local function cast(ability: Map, charge: number?, forcedTarget: Model?): boolea
 	-- combo
 	local comboIndex = 1
 	if type(ability.Combo) == "number" and ability.Combo > 1 then
-		local window = if type(ability.Numbers.ComboWindow) == "number" then ability.Numbers.ComboWindow else Config.Combat.ComboResetTime
+		local window = if type(ability.Numbers.ComboWindow) == "number"
+			then ability.Numbers.ComboWindow
+			else Config.Combat.ComboResetTime
 		local prevIndex = if combo.Ability == id then combo.Index else 0
 		comboIndex = DamageMath.NextComboIndex(prevIndex, combo.Last, now(), window, ability.Combo)
 		combo.Index = comboIndex
@@ -857,7 +863,12 @@ local function onAction(action: string, state: string, _input: any)
 				sendBlock(true)
 				local root = rootOf(localChar())
 				if root then
-					Lib.EmitBurst((root.CFrame * CFrame.new(0, 0.5, -1.6)).Position, 3.2, Color3.fromRGB(150, 210, 255), 0.18)
+					Lib.EmitBurst(
+						(root.CFrame * CFrame.new(0, 0.5, -1.6)).Position,
+						3.2,
+						Color3.fromRGB(150, 210, 255),
+						0.18
+					)
 				end
 			elseif state == "End" then
 				blockHeld = false
@@ -981,7 +992,13 @@ local function step()
 	local char = localChar()
 	if blockSent and supp then
 		sendBlock(false)
-	elseif blockHeld and not supp and char and char:GetAttribute("Blocking") ~= true and os.clock() - lastBlockSend > 0.5 then
+	elseif
+		blockHeld
+		and not supp
+		and char
+		and char:GetAttribute("Blocking") ~= true
+		and os.clock() - lastBlockSend > 0.5
+	then
 		sendBlock(true)
 	end
 	-- reload mirror
@@ -1044,9 +1061,12 @@ local function resetForCharacter(model: Model?)
 			end
 		end
 		table.insert(charTrove, model:GetAttributeChangedSignal("Ammo"):Connect(syncAmmo))
-		table.insert(charTrove, model:GetAttributeChangedSignal("KitId"):Connect(function()
-			resetForCharacter(model)
-		end))
+		table.insert(
+			charTrove,
+			model:GetAttributeChangedSignal("KitId"):Connect(function()
+				resetForCharacter(model)
+			end)
+		)
 		syncAmmo()
 	end
 end

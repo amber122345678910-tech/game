@@ -595,10 +595,6 @@ function AnimMath.CopyBuffer(dst: Buffer, src: Buffer)
 	end
 end
 
-local function easeArrivalIsSmooth(compiled: Compiled, k: number): boolean
-	return compiled.Ease[k] == false
-end
-
 -- Fritsch-Butland monotone tangent from two secant slopes over intervals h0, h1.
 local function pchipTangent(d0: number, d1: number, h0: number, h1: number): number
 	if d0 * d1 <= 0 then

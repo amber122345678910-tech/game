@@ -102,7 +102,10 @@ local function boneSwing(fx: any, comboIndex: number)
 		if comboIndex == 1 then
 			Lib.Slash(base, { Radius = 4, From = 75, To = -60, Width = 0.9, Color = SANS_CYAN, Duration = 0.2 })
 		elseif comboIndex == 2 then
-			Lib.Slash(base * CFrame.Angles(0, 0, math.rad(-18)), { Radius = 4, From = -75, To = 60, Width = 0.9, Color = SANS_CYAN, Duration = 0.2 })
+			Lib.Slash(
+				base * CFrame.Angles(0, 0, math.rad(-18)),
+				{ Radius = 4, From = -75, To = 60, Width = 0.9, Color = SANS_CYAN, Duration = 0.2 }
+			)
 		else
 			-- overhead: arc in the vertical plane through the facing direction
 			Lib.Slash(base * CFrame.new(0, 0.5, 0) * CFrame.Angles(0, 0, math.rad(90)), {
@@ -206,12 +209,12 @@ Indicator.GasterBlaster = function(fx: any): Map?
 	local count = 0
 	local function ensure(n: number)
 		while #ghosts < n do
-			local b = if hv and hv.AcquireBlaster then hv.AcquireBlaster("Classic", width) else nil
-			if b then
-				b:SetGhost(true)
-			end
+			local b = if hv and hv.AcquireBlaster then hv.AcquireBlaster("Classic", width, { Ghost = true }) else nil
 			table.insert(ghosts, b or false)
-			table.insert(lines, Lib.Part("Cylinder", Vector3.new(1, 0.12, 0.12), CFrame.new(), WHITE, Enum.Material.Neon, 0.45))
+			table.insert(
+				lines,
+				Lib.Part("Cylinder", Vector3.new(1, 0.12, 0.12), CFrame.new(), WHITE, Enum.Material.Neon, 0.45)
+			)
 		end
 	end
 	local handle = {}
@@ -346,7 +349,9 @@ Effects.BlueSoul = function(fx: any, packet: Map)
 				local cam = game:GetService("Workspace").CurrentCamera
 				local look = if cam then cam.CFrame.Position - pos else Vector3.new(0, 0, 1)
 				local bob = 0.06 * math.sin(elapsed * 18) -- the grabbed SOUL trembles
-				heart:PivotTo(Lib.LookAlong(pos + Vector3.new(bob, 0, 0), flat(look, Vector3.zAxis)) * CFrame.new(0, 0, -0.7))
+				heart:PivotTo(
+					Lib.LookAlong(pos + Vector3.new(bob, 0, 0), flat(look, Vector3.zAxis)) * CFrame.new(0, 0, -0.7)
+				)
 			end
 			return nil
 		end, function()
@@ -434,7 +439,12 @@ Indicator.BoneZone = function(fx: any): Map?
 	local N = numbers("BoneZone")
 	local r = N.Radius or 10
 	local inner = Lib.GroundCircle(Vector3.zero, r, WHITE, { Rim = 0.22, Fill = 0.86, Height = 0.16 })
-	local outer = Lib.GroundCircle(Vector3.zero, r + 1.5 + 2, ORANGE, { Inner = r + 1.5 - 2, Rim = 0.16, Fill = 0.88, Height = 0.14 })
+	local outer = Lib.GroundCircle(
+		Vector3.zero,
+		r + 1.5 + 2,
+		ORANGE,
+		{ Inner = r + 1.5 - 2, Rim = 0.16, Fill = 0.88, Height = 0.14 }
+	)
 	local handle = {}
 	function handle.Update(_self: any, aim: Vector3, _charge: number)
 		inner:SetCenter(aim)
@@ -456,7 +466,10 @@ Effects.BoneWall = function(fx: any, packet: Map)
 	end
 	local cf = rootCF(fx)
 	if cf then
-		fx.VFX.Slash(cf * CFrame.new(0, 0.2, 0), { Radius = 3.4, From = -80, To = 80, Width = 0.7, Color = BLUE, Duration = 0.3 })
+		fx.VFX.Slash(
+			cf * CFrame.new(0, 0.2, 0),
+			{ Radius = 3.4, From = -80, To = 80, Width = 0.7, Color = BLUE, Duration = 0.3 }
+		)
 		fx.VFX.Dust(cf.Position - Vector3.new(0, 2.6, 0) + cf.LookVector * 2.5, 2.5, nil, 8)
 	end
 end
@@ -464,7 +477,10 @@ end
 Predict.BoneWall = function(fx: any, _payload: Map)
 	local cf = rootCF(fx)
 	if cf then
-		fx.VFX.Slash(cf * CFrame.new(0, 0.2, 0), { Radius = 3.4, From = -80, To = 80, Width = 0.7, Color = BLUE, Duration = 0.3 })
+		fx.VFX.Slash(
+			cf * CFrame.new(0, 0.2, 0),
+			{ Radius = 3.4, From = -80, To = 80, Width = 0.7, Color = BLUE, Duration = 0.3 }
+		)
 	end
 end
 
@@ -504,7 +520,8 @@ Indicator.Shortcut = function(fx: any): Map?
 	local marker = Lib.GroundCircle(Vector3.zero, 1.6, SANS_CYAN, { Rim = 0.2, Fill = 0.7, Height = 0.18 })
 	local range = Lib.GroundCircle(Vector3.zero, dist, WHITE, { Rim = 0.1, Fill = 1, Height = 0.08, Shadow = false })
 	range:SetTransparency(0.8, 1)
-	local pillar = Lib.Part("Cylinder", Vector3.new(6, 0.5, 0.5), CFrame.new(0, 25000, 0), SANS_CYAN, Enum.Material.Neon, 0.6)
+	local pillar =
+		Lib.Part("Cylinder", Vector3.new(6, 0.5, 0.5), CFrame.new(0, 25000, 0), SANS_CYAN, Enum.Material.Neon, 0.6)
 	local handle = {}
 	function handle.Update(_self: any, aim: Vector3, _charge: number)
 		local r = fx.Root(fx.Character)

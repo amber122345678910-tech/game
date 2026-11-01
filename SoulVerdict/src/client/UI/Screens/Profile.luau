@@ -139,6 +139,7 @@ function Profile.Create(theme: Theme, deps: any): any
 			Kit = humanKit,
 			Skin = if kit then Common.EquippedSkin(profile, kit) else nil,
 			Style = Common.Setting(d, "RigStyle"),
+			Styler = Common.Styler(d),
 			Size = if phone then UDim2.fromOffset(math.floor(innerW * 0.42), h - 20) else UDim2.new(1, 0, 0, viewH),
 		})
 		rigView.Root.Parent = content

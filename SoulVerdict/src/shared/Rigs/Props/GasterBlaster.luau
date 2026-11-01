@@ -102,7 +102,8 @@ type Style = {
 	MaxOpen: number,
 	Seed: number,
 	Mesh: MeshInfo,
-	Cracks: { { { number } } }, -- polylines of {yawDeg, pitchDeg} on the cranium
+	Cracks: { { { number } } }, -- polylines of {yawDeg, pitchDeg} on the cranium (or the forehead)
+	CrackOnForehead: boolean?,
 }
 
 local function spike(a: Vector3, b: Vector3, r: number): Spike
@@ -279,9 +280,11 @@ local STYLES: { [string]: Style } = {
 			JawSize = V(1.7446, 0.9065, 2.5736),
 			JawHinge = V(0, 0.1991, 1.1637),
 		},
+		-- on the raised forehead (the most visible surface of the lupine skull)
+		CrackOnForehead = true,
 		Cracks = {
-			{ { 4, 84 }, { 12, 72 }, { 8, 62 }, { 22, 52 }, { 18, 40 }, { 32, 30 } },
-			{ { 12, 72 }, { -10, 66 }, { -24, 58 }, { -42, 54 } },
+			{ { 4, 82 }, { 12, 62 }, { 5, 48 }, { 20, 36 }, { 13, 24 }, { 30, 12 } },
+			{ { 12, 62 }, { -8, 52 }, { -20, 40 }, { -38, 33 } },
 		},
 	},
 }
@@ -688,11 +691,12 @@ function GasterBlaster.Build(style: string?, scale: number?): Model
 
 	-- cracks on the cranium (Fell: dark red; Eclipse: glowing violet/cyan)
 	if st.Crack then
-		local craniumCF = at(craniumC)
+		local surfCF = if st.CrackOnForehead then at(V(0, 0.48, -0.1)) else at(craniumC)
+		local surfR = if st.CrackOnForehead then V(0.6, (0.58 + st.Stop) / 2, 0.55) else craniumR
 		for ci, path in st.Cracks do
 			local pts: { CFrame } = {}
 			for _, yp in path do
-				table.insert(pts, PartKit.OnEllipsoid(craniumCF, craniumR, yp[1], yp[2], -0.012))
+				table.insert(pts, PartKit.OnEllipsoid(surfCF, surfR, yp[1], yp[2], -0.012))
 			end
 			for i = 1, #pts - 1 do
 				local a, b = pts[i].Position, pts[i + 1].Position

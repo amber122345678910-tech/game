@@ -44,7 +44,13 @@ function BossBar.Create(theme: any, deps: any): any
 	list.SortOrder = Enum.SortOrder.LayoutOrder
 	list.Padding = UDim.new(0, if phone then 6 else 10)
 	list.Parent = left
-	local skullHolder = Style.Frame({ Name = "SkullHolder", Size = UDim2.fromOffset(headerH, headerH), LayoutOrder = 1, ZIndex = 3, Parent = left })
+	local skullHolder = Style.Frame({
+		Name = "SkullHolder",
+		Size = UDim2.fromOffset(headerH, headerH),
+		LayoutOrder = 1,
+		ZIndex = 3,
+		Parent = left,
+	})
 	local nameLabel = Style.Text(skin, {
 		Name = "KitName",
 		Text = "",
@@ -146,7 +152,13 @@ function BossBar.Create(theme: any, deps: any): any
 	-- bottom row: dodges (left) + HP numbers (right)
 	local rowY = barTop + barH + (if phone then 5 else 8)
 	local rowH = if phone then 12 else 16
-	local row = Style.Frame({ Name = "Row", Position = UDim2.fromOffset(0, rowY), Size = UDim2.new(1, 0, 0, rowH), ZIndex = 3, Parent = holder })
+	local row = Style.Frame({
+		Name = "Row",
+		Position = UDim2.fromOffset(0, rowY),
+		Size = UDim2.new(1, 0, 0, rowH),
+		ZIndex = 3,
+		Parent = holder,
+	})
 	local dodgeLabel = Style.Text(skin, {
 		Name = "DodgeLabel",
 		Text = Style.L("stat.dodges"),
@@ -161,7 +173,9 @@ function BossBar.Create(theme: any, deps: any): any
 		Name = "Dodges",
 		Max = 6,
 		Value = 6,
-		PipSize = if phone then Vector2.new(16, 7) else (if skin.Battle then Vector2.new(24, 11) else Vector2.new(26, 8)),
+		PipSize = if phone
+			then Vector2.new(16, 7)
+			else (if skin.Battle then Vector2.new(24, 11) else Vector2.new(26, 8)),
 		Gap = if phone then 3 else 5,
 		Color = C.Dodge,
 		Empty = C.DodgeEmpty,
@@ -206,7 +220,14 @@ function BossBar.Create(theme: any, deps: any): any
 
 	-- Studious: the monster's cooldowns
 	local studY = rowY + rowH + (if phone then 6 else 10)
-	local studious = Style.Frame({ Name = "Studious", Position = UDim2.fromOffset(0, studY), Size = UDim2.new(1, 0, 0, if phone then 26 else 36), Visible = false, ZIndex = 3, Parent = holder })
+	local studious = Style.Frame({
+		Name = "Studious",
+		Position = UDim2.fromOffset(0, studY),
+		Size = UDim2.new(1, 0, 0, if phone then 26 else 36),
+		Visible = false,
+		ZIndex = 3,
+		Parent = holder,
+	})
 	local studCells: { { Id: string, Overlay: Frame, Text: TextLabel } } = {}
 	local studKit = ""
 
@@ -223,7 +244,13 @@ function BossBar.Create(theme: any, deps: any): any
 		end
 		table.clear(studCells)
 		local size = if phone then 24 else 34
-		local label = Style.Frame({ Name = "Label", Size = UDim2.new(0, 0, 1, 0), AutomaticSize = Enum.AutomaticSize.X, ZIndex = 3, Parent = studious })
+		local label = Style.Frame({
+			Name = "Label",
+			Size = UDim2.new(0, 0, 1, 0),
+			AutomaticSize = Enum.AutomaticSize.X,
+			ZIndex = 3,
+			Parent = studious,
+		})
 		local book = Style.Icon("Book", Style.KitColor("Perseverance"), size - 6)
 		book.AnchorPoint = Vector2.new(0, 0.5)
 		book.Position = UDim2.fromScale(0, 0.5)
@@ -286,7 +313,10 @@ function BossBar.Create(theme: any, deps: any): any
 		exhaust.Visible = exhausted
 		pips.Root.Visible = not exhausted
 		if exhausted then
-			Style.SetText(exhaustText, Style.Upper(skin, Style.L("hud.exhaustedFor", Style.FormatCd(m.ExhaustedUntil - now))))
+			Style.SetText(
+				exhaustText,
+				Style.Upper(skin, Style.L("hud.exhaustedFor", Style.FormatCd(m.ExhaustedUntil - now)))
+			)
 		end
 		if studious.Visible and m.Cooldowns then
 			for _, cell in studCells do

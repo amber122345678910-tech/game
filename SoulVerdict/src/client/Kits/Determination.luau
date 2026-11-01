@@ -45,13 +45,34 @@ local function knifeSwing(fx: any, combo: number)
 		local base = cf * CFrame.new(0, 0.7, 0)
 		local i = ((combo - 1) % 4) + 1
 		if i == 1 then
-			Lib.Slash(base * CFrame.Angles(0, 0, math.rad(12)), { Radius = 3.6, From = 80, To = -70, Width = 0.7, Color = RED, Core = PALE, Duration = 0.16 })
+			Lib.Slash(
+				base * CFrame.Angles(0, 0, math.rad(12)),
+				{ Radius = 3.6, From = 80, To = -70, Width = 0.7, Color = RED, Core = PALE, Duration = 0.16 }
+			)
 		elseif i == 2 then
-			Lib.Slash(base * CFrame.Angles(0, 0, math.rad(-14)), { Radius = 3.6, From = -80, To = 70, Width = 0.7, Color = RED, Core = PALE, Duration = 0.16 })
+			Lib.Slash(
+				base * CFrame.Angles(0, 0, math.rad(-14)),
+				{ Radius = 3.6, From = -80, To = 70, Width = 0.7, Color = RED, Core = PALE, Duration = 0.16 }
+			)
 		elseif i == 3 then
-			Lib.Slash(base * CFrame.Angles(0, 0, math.rad(70)), { Radius = 3.8, From = 70, To = -70, Width = 0.75, Color = RED, Core = PALE, Duration = 0.18 })
+			Lib.Slash(
+				base * CFrame.Angles(0, 0, math.rad(70)),
+				{ Radius = 3.8, From = 70, To = -70, Width = 0.75, Color = RED, Core = PALE, Duration = 0.18 }
+			)
 		else
-			Lib.Slash(base, { Radius = 4.6, From = 150, To = -150, Width = 1.2, Color = RED, Core = WHITE, Duration = 0.26, Segments = 18 })
+			Lib.Slash(
+				base,
+				{
+					Radius = 4.6,
+					From = 150,
+					To = -150,
+					Width = 1.2,
+					Color = RED,
+					Core = WHITE,
+					Duration = 0.26,
+					Segments = 18,
+				}
+			)
 		end
 		local hand = fx.Part(fx.Character, "RightHand")
 		if hand then
@@ -125,7 +146,10 @@ Effects.LungingStrike = function(fx: any, packet: Map)
 		fx.Delay(time, function()
 			local cf = rootCF(fx)
 			if cf then
-				Lib.Slash(cf * CFrame.new(0, 0.6, 0), { Radius = 4, From = 100, To = -100, Width = 1, Color = RED, Core = WHITE, Duration = 0.22 })
+				Lib.Slash(
+					cf * CFrame.new(0, 0.6, 0),
+					{ Radius = 4, From = 100, To = -100, Width = 1, Color = RED, Core = WHITE, Duration = 0.22 }
+				)
 			end
 		end)
 	end
@@ -159,18 +183,31 @@ Effects.Afterimage = function(fx: any, packet: Map)
 			Lib.Emit("Mote", data.from, 6, { Color = RED })
 		end
 	elseif packet.phase == "Counter" then
-		local attacker: Model? = if typeof(data.attacker) == "Instance" and data.attacker:IsA("Model") then data.attacker else nil
+		local attacker: Model? = if typeof(data.attacker) == "Instance" and data.attacker:IsA("Model")
+			then data.attacker
+			else nil
 		local r = if attacker then fx.Root(attacker) else nil
 		if r then
 			local cf = r.CFrame * CFrame.new(0, 0.6, 0)
 			-- red X: two crossing slashes facing the attacker
 			local face = Lib.LookAlong(cf.Position, (rootCF(fx) or cf).Position - cf.Position)
-			Lib.Slash(face * CFrame.Angles(0, 0, math.rad(45)) * CFrame.Angles(math.rad(90), 0, 0), { Radius = 2.6, From = -70, To = 70, Width = 0.9, Color = RED, Core = WHITE, Duration = 0.25 })
+			Lib.Slash(
+				face * CFrame.Angles(0, 0, math.rad(45)) * CFrame.Angles(math.rad(90), 0, 0),
+				{ Radius = 2.6, From = -70, To = 70, Width = 0.9, Color = RED, Core = WHITE, Duration = 0.25 }
+			)
 			fx.Delay(0.06, function()
-				Lib.Slash(face * CFrame.Angles(0, 0, math.rad(-45)) * CFrame.Angles(math.rad(90), 0, 0), { Radius = 2.6, From = -70, To = 70, Width = 0.9, Color = RED, Core = WHITE, Duration = 0.25 })
+				Lib.Slash(
+					face * CFrame.Angles(0, 0, math.rad(-45)) * CFrame.Angles(math.rad(90), 0, 0),
+					{ Radius = 2.6, From = -70, To = 70, Width = 0.9, Color = RED, Core = WHITE, Duration = 0.25 }
+				)
 			end)
 			Lib.Flash(cf.Position, RED, 4, 0.2)
-			Lib.Text(cf.Position + Vector3.new(0, 2.2, 0), Strings.L("fx.counter"), RED, { Kind = "Alert", Scale = 1.15 })
+			Lib.Text(
+				cf.Position + Vector3.new(0, 2.2, 0),
+				Strings.L("fx.counter"),
+				RED,
+				{ Kind = "Alert", Scale = 1.15 }
+			)
 			fx.HitStop(attacker, 0.14)
 			fx.HitStop(fx.Character, 0.14)
 			fx.Sound("Counter", cf.Position)

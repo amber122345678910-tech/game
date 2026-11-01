@@ -293,7 +293,13 @@ function Lib.Animate(duration: number, step: (number, number, number) -> boolean
 	}
 end
 
-function Lib.Tween(inst: Instance, time: number, props: { [string]: any }, style: Enum.EasingStyle?, dir: Enum.EasingDirection?): Tween?
+function Lib.Tween(
+	inst: Instance,
+	time: number,
+	props: { [string]: any },
+	style: Enum.EasingStyle?,
+	dir: Enum.EasingDirection?
+): Tween?
 	local ok, tw = pcall(function()
 		local info = TweenInfo.new(time, style or Enum.EasingStyle.Quad, dir or Enum.EasingDirection.Out)
 		local t = TweenService:Create(inst, info, props)
@@ -801,7 +807,13 @@ local function unlease(l: Lease, after: number)
 end
 
 -- Flat ring (lies in the plane perpendicular to `axis`, default up) growing from 0 to `radius`.
-function Lib.EmitRing(pos: Vector3, radius: number, color: Color3?, duration: number?, opts: { Axis: Vector3?, Brightness: number?, Start: number?, Transparency: number? }?)
+function Lib.EmitRing(
+	pos: Vector3,
+	radius: number,
+	color: Color3?,
+	duration: number?,
+	opts: { Axis: Vector3?, Brightness: number?, Start: number?, Transparency: number? }?
+)
 	if Lib.ParticleScale() <= 0.05 then
 		return
 	end
@@ -834,7 +846,13 @@ function Lib.EmitRing(pos: Vector3, radius: number, color: Color3?, duration: nu
 end
 
 -- Camera-facing soft glow growing to `size` studs.
-function Lib.EmitBurst(pos: Vector3, size: number, color: Color3?, duration: number?, opts: { Brightness: number?, Texture: string? }?)
+function Lib.EmitBurst(
+	pos: Vector3,
+	size: number,
+	color: Color3?,
+	duration: number?,
+	opts: { Brightness: number?, Texture: string? }?
+)
 	if Lib.ParticleScale() <= 0.05 then
 		return
 	end
@@ -1027,7 +1045,13 @@ function Lib.Ring(cf: CFrame, radius: number, color: Color3?, duration: number?,
 	end)
 end
 
-function Lib.Shockwave(pos: Vector3, radius: number, color: Color3?, duration: number?, opts: { Dust: boolean?, Height: number? }?)
+function Lib.Shockwave(
+	pos: Vector3,
+	radius: number,
+	color: Color3?,
+	duration: number?,
+	opts: { Dust: boolean?, Height: number? }?
+)
 	local c = color or Lib.Colors.White
 	local d = duration or 0.45
 	local o = opts or {}
@@ -1076,7 +1100,8 @@ function Lib.Beam(p0: Vector3, p1: Vector3, width: number, color: Color3?, durat
 		return
 	end
 	local cf = LookAlong(p0 + delta * 0.5, delta) * CFrame.Angles(0, math.pi / 2, 0)
-	local core = Lib.Part("Cylinder", Vector3.new(len, width * 0.5, width * 0.5), cf, Lib.Colors.White, Enum.Material.Neon, 0)
+	local core =
+		Lib.Part("Cylinder", Vector3.new(len, width * 0.5, width * 0.5), cf, Lib.Colors.White, Enum.Material.Neon, 0)
 	local shell = Lib.Part("Cylinder", Vector3.new(len, width, width), cf, c, Enum.Material.Neon, 0.45)
 	Lib.Animate(d, function(a)
 		local k = 0.8 ^ (a * d * 30)
@@ -1798,7 +1823,12 @@ export type BoneVisual = {
 
 local ROT_SHAFT = CFrame.Angles(0, 0, math.pi / 2) -- Cylinder X axis -> bone axis (UpVector)
 
-function Lib.Bone(thickness: number, length: number, color: Color3, opts: { Bottom: boolean?, Material: Enum.Material? }?): BoneVisual
+function Lib.Bone(
+	thickness: number,
+	length: number,
+	color: Color3,
+	opts: { Bottom: boolean?, Material: Enum.Material? }?
+): BoneVisual
 	local o = opts or {}
 	local bottom = o.Bottom ~= false
 	local mat = o.Material or Enum.Material.Neon
@@ -1943,7 +1973,11 @@ local function heartParts(parent: Instance, color: Color3, s: number, side: numb
 	local first: BasePart? = nil
 	for _, sgn in { -1, 1 } do
 		if side == nil or side == sgn then
-			local lobe = ellipsoid(if sgn < 0 then "LobeL" else "LobeR", Vector3.new(0.56 * s, 0.56 * s, 0.3 * s), CFrame.new(sgn * 0.22 * s, 0.14 * s, 0))
+			local lobe = ellipsoid(
+				if sgn < 0 then "LobeL" else "LobeR",
+				Vector3.new(0.56 * s, 0.56 * s, 0.3 * s),
+				CFrame.new(sgn * 0.22 * s, 0.14 * s, 0)
+			)
 			wedge(if sgn < 0 then "TipL" else "TipR", sgn)
 			first = first or lobe
 		end

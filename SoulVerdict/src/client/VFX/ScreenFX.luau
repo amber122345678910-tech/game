@@ -60,7 +60,14 @@ local function playerGui(): PlayerGui?
 	return lp:FindFirstChildOfClass("PlayerGui")
 end
 
-local function edgeFrame(parent: Instance, name: string, size: UDim2, pos: UDim2, anchor: Vector2, rotation: number): Frame
+local function edgeFrame(
+	parent: Instance,
+	name: string,
+	size: UDim2,
+	pos: UDim2,
+	anchor: Vector2,
+	rotation: number
+): Frame
 	local f = Instance.new("Frame")
 	f.Name = name
 	f.BorderSizePixel = 0
@@ -209,7 +216,10 @@ local function step()
 	if lowHealth < 0.3 then
 		active = true
 		local beat = (now * 1.35) % 1
-		local thump = math.max(math.exp(-beat * 9), 0.7 * math.exp(-math.max(0, beat - 0.22) * 9) * (if beat > 0.22 then 1 else 0))
+		local thump = math.max(
+			math.exp(-beat * 9),
+			0.7 * math.exp(-math.max(0, beat - 0.22) * 9) * (if beat > 0.22 then 1 else 0)
+		)
 		local severity = 1 - lowHealth / 0.3
 		local v = (0.1 + 0.32 * severity) * (0.35 + 0.65 * thump)
 		if v > layerI.Status then
@@ -319,7 +329,17 @@ function ScreenFX.Flash(color: Color3, alpha: number, duration: number)
 	if reducedMotion() then
 		peak = math.min(peak, 0.35)
 	end
-	table.insert(flashes, { Layer = "Flash", Color = color, Peak = peak, T0 = os.clock(), Duration = math.max(0.05, duration), Attack = 0.03 })
+	table.insert(
+		flashes,
+		{
+			Layer = "Flash",
+			Color = color,
+			Peak = peak,
+			T0 = os.clock(),
+			Duration = math.max(0.05, duration),
+			Attack = 0.03,
+		}
+	)
 	run()
 end
 
@@ -342,7 +362,17 @@ function ScreenFX.Tint(color: Color3, strength: number, duration: number, hold: 
 	if ensureCC() == nil then
 		return
 	end
-	table.insert(ccPulses, { Kind = "Tint", Color = color, Amount = math.clamp(strength, 0, 1), T0 = os.clock(), Duration = math.max(0.08, duration), Hold = hold or 0 })
+	table.insert(
+		ccPulses,
+		{
+			Kind = "Tint",
+			Color = color,
+			Amount = math.clamp(strength, 0, 1),
+			T0 = os.clock(),
+			Duration = math.max(0.08, duration),
+			Hold = hold or 0,
+		}
+	)
 	run()
 end
 
@@ -350,7 +380,17 @@ function ScreenFX.Desaturate(amount: number, duration: number, hold: number?)
 	if ensureCC() == nil then
 		return
 	end
-	table.insert(ccPulses, { Kind = "Desat", Color = Color3.new(1, 1, 1), Amount = math.clamp(amount, 0, 1), T0 = os.clock(), Duration = math.max(0.08, duration), Hold = hold or 0 })
+	table.insert(
+		ccPulses,
+		{
+			Kind = "Desat",
+			Color = Color3.new(1, 1, 1),
+			Amount = math.clamp(amount, 0, 1),
+			T0 = os.clock(),
+			Duration = math.max(0.08, duration),
+			Hold = hold or 0,
+		}
+	)
 	run()
 end
 

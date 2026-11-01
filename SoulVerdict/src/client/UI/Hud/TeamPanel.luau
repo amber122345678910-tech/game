@@ -24,7 +24,13 @@ function TeamPanel.Create(theme: any, deps: any): any
 		Transparency = if battle then 0.15 else 0.4,
 		Parent = root,
 	})
-	local header = Style.Frame({ Name = "Header", Position = UDim2.fromOffset(10, 4), Size = UDim2.new(1, -20, 0, headerH), ZIndex = 2, Parent = panel })
+	local header = Style.Frame({
+		Name = "Header",
+		Position = UDim2.fromOffset(10, 4),
+		Size = UDim2.new(1, -20, 0, headerH),
+		ZIndex = 2,
+		Parent = panel,
+	})
 	local title = Style.Text(skin, {
 		Name = "Title",
 		Text = Style.L("hud.team.title"),
@@ -35,7 +41,14 @@ function TeamPanel.Create(theme: any, deps: any): any
 		ZIndex = 2,
 		Parent = header,
 	})
-	local revives = Style.Frame({ Name = "Revives", AnchorPoint = Vector2.new(1, 0), Position = UDim2.fromScale(1, 0), Size = UDim2.fromScale(0.5, 1), ZIndex = 2, Parent = header })
+	local revives = Style.Frame({
+		Name = "Revives",
+		AnchorPoint = Vector2.new(1, 0),
+		Position = UDim2.fromScale(1, 0),
+		Size = UDim2.fromScale(0.5, 1),
+		ZIndex = 2,
+		Parent = header,
+	})
 	local revHeart = Style.Heart(C.Good, if phone then 11 else 14, "Whole")
 	revHeart.AnchorPoint = Vector2.new(1, 0.5)
 	revHeart.Position = UDim2.new(1, if phone then -26 else -34, 0.5, 0)
@@ -51,7 +64,13 @@ function TeamPanel.Create(theme: any, deps: any): any
 		ZIndex = 2,
 		Parent = revives,
 	})
-	local rows = Style.Frame({ Name = "Rows", Position = UDim2.fromOffset(10, headerH + 4), Size = UDim2.new(1, -20, 0, 0), ZIndex = 2, Parent = panel })
+	local rows = Style.Frame({
+		Name = "Rows",
+		Position = UDim2.fromOffset(10, headerH + 4),
+		Size = UDim2.new(1, -20, 0, 0),
+		ZIndex = 2,
+		Parent = panel,
+	})
 	local harmony = Style.Text(skin, {
 		Name = "Harmony",
 		Text = "",
@@ -68,7 +87,6 @@ function TeamPanel.Create(theme: any, deps: any): any
 	type Row = { Frame: Frame, Heart: Frame, HeartKey: string, Name: TextLabel, Status: TextLabel, Bar: any, Unit: any }
 	local rowList: { Row } = {}
 	local rosterKey = ""
-	local snap: { [string]: any }? = nil
 
 	local function buildRows(humans: { any })
 		for _, r in rowList do
@@ -76,7 +94,13 @@ function TeamPanel.Create(theme: any, deps: any): any
 		end
 		table.clear(rowList)
 		for i, u in humans do
-			local f = Style.Frame({ Name = "Row" .. i, Position = UDim2.fromOffset(0, (i - 1) * rowH), Size = UDim2.new(1, 0, 0, rowH), ZIndex = 2, Parent = rows })
+			local f = Style.Frame({
+				Name = "Row" .. i,
+				Position = UDim2.fromOffset(0, (i - 1) * rowH),
+				Size = UDim2.new(1, 0, 0, rowH),
+				ZIndex = 2,
+				Parent = rows,
+			})
 			if u.IsLocal then
 				local hl = Style.Frame({
 					Name = "Highlight",
@@ -91,7 +115,14 @@ function TeamPanel.Create(theme: any, deps: any): any
 					Style.Corner(hl, UDim.new(0, 6))
 				end
 			end
-			local heartHolder = Style.Frame({ Name = "Soul", AnchorPoint = Vector2.new(0, 0.5), Position = UDim2.new(0, 0, 0.5, 0), Size = UDim2.fromOffset(if phone then 14 else 18, if phone then 13 else 16), ZIndex = 3, Parent = f })
+			local heartHolder = Style.Frame({
+				Name = "Soul",
+				AnchorPoint = Vector2.new(0, 0.5),
+				Position = UDim2.new(0, 0, 0.5, 0),
+				Size = UDim2.fromOffset(if phone then 14 else 18, if phone then 13 else 16),
+				ZIndex = 3,
+				Parent = f,
+			})
 			local nameLabel = Style.Text(skin, {
 				Name = "Name",
 				Text = if battle then Style.Upper(skin, tostring(u.Name)) else tostring(u.Name),
@@ -133,7 +164,15 @@ function TeamPanel.Create(theme: any, deps: any): any
 				ZIndex = 3,
 				Parent = f,
 			})
-			table.insert(rowList, { Frame = f, Heart = heartHolder, HeartKey = "", Name = nameLabel, Status = status, Bar = bar, Unit = u })
+			table.insert(rowList, {
+				Frame = f,
+				Heart = heartHolder,
+				HeartKey = "",
+				Name = nameLabel,
+				Status = status,
+				Bar = bar,
+				Unit = u,
+			})
 		end
 		local h = #humans * rowH
 		rows.Size = UDim2.new(1, -20, 0, h)
@@ -144,13 +183,15 @@ function TeamPanel.Create(theme: any, deps: any): any
 		for _, r in rowList do
 			local u = r.Unit
 			if u.Downed and not u.Dead then
-				Style.SetText(r.Status, Style.Upper(skin, Style.L("hud.team.down", math.max(0, math.ceil((u.DownedEndsAt or now) - now)))))
+				Style.SetText(
+					r.Status,
+					Style.Upper(skin, Style.L("hud.team.down", math.max(0, math.ceil((u.DownedEndsAt or now) - now))))
+				)
 			end
 		end
 	end
 
 	local function update(s: { [string]: any })
-		snap = s
 		local humans = s.Humans or {}
 		local keyParts = {}
 		for _, u in humans do
@@ -183,14 +224,24 @@ function TeamPanel.Create(theme: any, deps: any): any
 			elseif u.Downed then
 				r.Status.TextColor3 = C.Danger
 			else
-				Style.SetText(r.Status, if u.IsLocal then Style.Upper(skin, Style.L("hud.you")) else Style.Upper(skin, Style.L("hud.lv", u.Level or 1)))
+				Style.SetText(
+					r.Status,
+					if u.IsLocal
+						then Style.Upper(skin, Style.L("hud.you"))
+						else Style.Upper(skin, Style.L("hud.lv", u.Level or 1))
+				)
 				r.Status.TextColor3 = if u.IsLocal then C.Gold else C.Dim
 			end
 		end
 		local rev = s.TeamRevives or 0
 		Style.SetText(revText, tostring(rev))
 		revText.TextColor3 = if rev > 0 then C.Text else C.Danger
-		Style.SetText(title, Style.Upper(skin, Style.L("hud.team.title")) .. "  " .. string.format("%d/%d", s.HumansAlive or 0, s.HumansTotal or #humans))
+		Style.SetText(
+			title,
+			Style.Upper(skin, Style.L("hud.team.title"))
+				.. "  "
+				.. string.format("%d/%d", s.HumansAlive or 0, s.HumansTotal or #humans)
+		)
 		local bonus = math.floor(((s.Harmony or 1) - 1) * 100 + 0.5)
 		harmony.Visible = bonus > 0
 		Style.SetText(harmony, Style.Upper(skin, Style.L("hud.team.harmony", bonus)))
