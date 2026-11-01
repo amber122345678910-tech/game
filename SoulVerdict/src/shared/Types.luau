@@ -287,16 +287,21 @@ export type Profile = {
 	Gold: number,
 	Stats: { [string]: number }, -- Rounds, Wins, MonsterWins, HumanWins, Kills, Downs, Damage, Healing, Parries, Dodges, Saves, Revives, BoxesSurvived, MVPs
 	Unlocked: { [string]: boolean }, -- kit ids and "kitId:skinId"
-	Equipped: { Human: string, Monster: string, Skins: { [string]: string }, Title: string },
+	Equipped: { Human: string, Monster: string, Skins: { [string]: string }, Title: string, Trail: string? }, -- Trail: mastery trail id ("" none)
 	Mastery: { [string]: number }, -- kit id -> mastery exp
 	MonsterChance: number,
 	RoundsSinceMonster: number,
 	RolePreference: "Either" | "Monster" | "Human",
 	Quests: { Window: number, List: { QuestState }, Rerolled: boolean },
 	Achievements: { [string]: boolean },
-	Login: { LastDay: number, Streak: number },
+	Login: { LastDay: number, Streak: number, Best: number?, FirstWinDay: number? }, -- UTC day indices
 	Settings: { [string]: any },
 	Titles: { [string]: boolean },
+	Created: number?, -- unix time of the first session
+	LastSeen: number?,
+	-- view-only (added by ProfileSchema.View for the client, never persisted):
+	ShopToday: { [string]: any }?, -- Shop.DailyShop {Day, EndsAt, Offers, Discount}
+	Meta: { [string]: any }?, -- derived info (ExpToNext, QuestWindowEndsAt, MasteryLevels, ...)
 }
 
 export type ProfileView = Profile -- what the client receives

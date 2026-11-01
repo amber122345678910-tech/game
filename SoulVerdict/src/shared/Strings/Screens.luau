@@ -137,7 +137,7 @@ return {
 	["scr.shop.equip"] = { en = "Equip", ru = "Надеть" },
 	["scr.shop.equipped"] = { en = "Equipped", ru = "Надето" },
 	["scr.shop.masteryLock"] = { en = "Mastery {1}", ru = "Мастерство {1}" },
-	["scr.shop.needKit"] = { en = "Unlock {1} first", ru = "Сначала открой: {1}" },
+	["scr.shop.needKit"] = { en = "Kit locked", ru = "Набор закрыт" },
 	["scr.shop.confirmTitle"] = { en = "Buy {1}?", ru = "Купить {1}?" },
 	["scr.shop.confirmText"] = { en = "Spend {1} G on {2} for {3}?", ru = "Потратить {1} G на «{2}» для {3}?" },
 	["scr.shop.confirmKit"] = {

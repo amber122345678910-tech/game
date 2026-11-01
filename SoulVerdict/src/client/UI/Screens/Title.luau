@@ -13,7 +13,6 @@
 
 local Themes = require(script.Parent.Parent.Themes)
 local UIKit = require(script.Parent.Parent.UIKit)
-local Icons = require(script.Parent.Parent.Icons)
 local Motion = require(script.Parent.Parent.Motion)
 local Common = require(script.Parent.Common)
 
@@ -224,7 +223,6 @@ end
 
 function Title.Create(theme: Theme, deps: any): any
 	local d = deps or {}
-	local c = theme.Colors
 	local layout = Common.Layout(d)
 	local phone = layout.Phone == true
 	local canvas: Vector2 = layout.Canvas

@@ -7,7 +7,8 @@
 --   shaker:AddTrauma(amount)               instant trauma (0..MaxTrauma), decays linearly at DecayRate per second
 --   shaker:Shake(intensity, duration?)     sustained source: `intensity` trauma that fades out over `duration`
 --                                          ((1 - t/d)^2 envelope). Many sources combine as max + 25 % of the rest.
---   shaker:Update(dt) -> (Vector3, Vector3)  advances time; returns (positionOffset studs in CAMERA space,
+--   shaker:Update(dt) -> (Vector3, Vector3)  advances time (dt clamped to 0.25 s so a frame hitch never eats a
+--                                          shake); returns (positionOffset studs in CAMERA space,
 --                                          rotationOffset radians (pitch, yaw, roll))
 --   shaker:Trauma() -> number              effective trauma after the last Update (0..MaxTrauma)
 --   shaker:Magnitude() -> number           Trauma()^Exponent * Scale (what drives the offsets)

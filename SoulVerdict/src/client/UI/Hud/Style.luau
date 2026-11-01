@@ -107,6 +107,25 @@ function Style.Shared(name: string): any
 	return shared(name)
 end
 
+-- Nested shared module, e.g. Style.Require("Maps", "Registry"); nil when missing or broken (cached).
+function Style.Require(...: string): any
+	local path = table.concat({ ... }, "/")
+	local hit = cache[path]
+	if hit ~= nil then
+		return if hit == false then nil else hit
+	end
+	local names = { ... }
+	local ok, result = pcall(function()
+		local node: any = game:GetService("ReplicatedStorage"):WaitForChild("Shared")
+		for _, n in names do
+			node = node:WaitForChild(n, 5)
+		end
+		return require(node) :: any
+	end)
+	cache[path] = if ok then result else false
+	return if ok then result else nil
+end
+
 function Style.L(key: string, ...: any): string
 	local s = shared("Strings")
 	if s then
@@ -388,6 +407,34 @@ function Style.SetText(label: TextLabel?, text: string)
 	if label and label.Text ~= text then
 		label.Text = text
 	end
+end
+
+function Style.Upper(skin: Skin, text: string): string
+	return if skin.Upper then UIKit.Upper(text) else text
+end
+
+-- Re-colours a UIKit.Bar fill with a gradient (Modern) or a flat colour (Battle).
+function Style.TintBar(skin: Skin, barRoot: Instance, color: Color3, color2: Color3?)
+	local track = barRoot:FindFirstChild("Track")
+	local fill = if track then track:FindFirstChild("Fill") else nil
+	if not fill or not fill:IsA("Frame") then
+		return
+	end
+	local g = fill:FindFirstChildOfClass("UIGradient")
+	if skin.Battle then
+		fill.BackgroundColor3 = color
+		if g then
+			g:Destroy()
+		end
+		return
+	end
+	fill.BackgroundColor3 = WHITE
+	if not g then
+		g = Instance.new("UIGradient")
+		g.Parent = fill
+	end
+	(g :: UIGradient).Color = if color2 then Style.CSeq(color, color2) else Style.CSeq(color:Lerp(BLACK, 0.3), color:Lerp(WHITE, 0.35));
+	(g :: UIGradient).Rotation = 0
 end
 
 function Style.Icon(name: string?, color: Color3, size: (number | UDim2)?): Frame
@@ -886,6 +933,32 @@ function Style.Slots(kitId: string?): { SlotInfo }
 		end
 	end
 	return out
+end
+
+-- piece scaffolding ----------------------------------------------------------------------------------------
+export type Layout = { Canvas: Vector2, Phone: boolean, Compact: boolean, Scale: number }
+
+-- Common start of every piece's Create(theme, deps): skin (deps.Skin or resolved from deps.Hud), layout
+-- (deps.Layout or a 1600x900 desktop canvas) and a full-canvas transparent root frame.
+function Style.Context(theme: Theme, deps: any, name: string): (Skin, Layout, Frame)
+	local d = if type(deps) == "table" then deps else {}
+	local skin: Skin = d.Skin or Style.Resolve(theme, d.Hud)
+	local layout: Layout = d.Layout or { Canvas = Vector2.new(1600, 900), Phone = false, Compact = false, Scale = 1 }
+	local root = Style.Frame({ Name = name, Size = UDim2.fromScale(1, 1) })
+	return skin, layout, root
+end
+
+-- The snapshot a piece renders right after Create: deps.Snapshot, else the mock scenario deps.Scenario.
+function Style.Initial(deps: any, default: string): { [string]: any }?
+	local d = if type(deps) == "table" then deps else {}
+	if d.Snapshot ~= nil then
+		return d.Snapshot
+	end
+	if d.Live then
+		return nil
+	end
+	local Mock = require(script.Parent.Mock) :: any
+	return Mock.Scenario(d.Scenario or default)
 end
 
 -- default key labels when InputController is absent (previews / early boot)

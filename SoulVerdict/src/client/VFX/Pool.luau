@@ -121,9 +121,7 @@ function Pool.Release(self: PoolImpl, obj: any)
 	end
 	if #self._free >= self._max then
 		owners[obj] = nil
-		if typeof(obj) == "Instance" then
-			obj:Destroy()
-		elseif type(obj) == "table" and type(obj.Destroy) == "function" then
+		if typeof(obj) == "Instance" or (type(obj) == "table" and type(obj.Destroy) == "function") then
 			obj:Destroy()
 		end
 		return
@@ -148,9 +146,7 @@ end
 function Pool.Clear(self: PoolImpl)
 	for _, obj in self._free do
 		owners[obj] = nil
-		if typeof(obj) == "Instance" then
-			obj:Destroy()
-		elseif type(obj) == "table" and type(obj.Destroy) == "function" then
+		if typeof(obj) == "Instance" or (type(obj) == "table" and type(obj.Destroy) == "function") then
 			obj:Destroy()
 		end
 	end

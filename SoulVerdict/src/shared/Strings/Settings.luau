@@ -11,7 +11,7 @@ return {
 
 	["set.GraphicsPreset"] = { en = "Lighting preset", ru = "Пресет освещения" },
 	["set.GraphicsQuality"] = { en = "Quality", ru = "Качество" },
-	["set.ParticleDensity"] = { en = "Particle density", ru = "Плотность частиц" },
+	["set.ParticleDensity"] = { en = "Particles", ru = "Частицы" },
 	["set.MenuTheme"] = { en = "Menu theme", ru = "Тема меню" },
 	["set.HudStyle"] = { en = "HUD style", ru = "Стиль HUD" },
 	["set.Language"] = { en = "Language", ru = "Язык" },
@@ -22,7 +22,18 @@ return {
 	["set.CameraShake"] = { en = "Camera shake", ru = "Тряска камеры" },
 	["set.FieldOfView"] = { en = "Field of view", ru = "Поле зрения" },
 	["set.Sensitivity"] = { en = "Sensitivity", ru = "Чувствительность" },
-	["set.CameraLock"] = { en = "Shoulder lock by default", ru = "Фиксация камеры по умолчанию" },
+	["set.CameraLock"] = { en = "Shoulder lock", ru = "Фиксация камеры" },
+	["set.ColorblindPatterns"] = { en = "Colorblind aid", ru = "Для дальтоников" },
+	["set.ReducedFlashes"] = { en = "Reduced flashes", ru = "Меньше вспышек" },
+	["set.desc.ColorblindPatterns"] = {
+		en = "Blue and orange attacks also get stripes and dots, so the colour is never the only clue.",
+		ru = "Синие и оранжевые атаки получают полосы и точки — цвет больше не единственная подсказка.",
+	},
+	["set.desc.ReducedFlashes"] = {
+		en = "Softer screen flashes and blaster glare for sensitive eyes.",
+		ru = "Мягче вспышки экрана и блики бластеров для чувствительных глаз.",
+	},
+	["set.previewTitle"] = { en = "Now showing", ru = "Сейчас" },
 
 	["set.preset.MapDefault"] = { en = "Map default", ru = "Как у карты" },
 	["set.quality.Auto"] = { en = "Auto", ru = "Авто" },

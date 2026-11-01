@@ -337,27 +337,32 @@ end
 function Common.Mastery(exp: number?): (number, number, boolean)
 	local e = exp or 0
 	local module = Common.Progression("Mastery")
-	local ok, lv = Common.Call(module, { "LevelFromExp", "LevelOf", "Level", "FromExp" }, e)
-	if ok and type(lv) == "number" then
-		local okF, frac = Common.Call(module, { "Progress", "Fraction", "ProgressOf" }, e)
-		local max = (type(module) == "table" and type(module.MaxLevel) == "number" and module.MaxLevel) or 10
-		return lv, if okF and type(frac) == "number" then math.clamp(frac, 0, 1) else 0, lv >= max
+	if module and type(module.Progress) == "function" then
+		-- Mastery.Progress(exp) -> (level, into, need); need = 0 at max level
+		local ok, lv, into, need = pcall(module.Progress, e)
+		if ok and type(lv) == "number" then
+			local isMax = (tonumber(need) or 0) <= 0
+			return lv, if isMax then 1 else math.clamp((tonumber(into) or 0) / need, 0, 1), isMax
+		end
 	end
-	-- fallback curve: level n needs 300 * n exp to reach n + 1
-	local level, need = 1, 300
-	while level < 10 and e >= need do
-		e -= need
-		level += 1
-		need = 300 * level
+	if module and type(module.Level) == "function" then
+		local ok, lv = pcall(module.Level, e)
+		if ok and type(lv) == "number" then
+			local max = (type(module.MaxLevel) == "number" and module.MaxLevel) or 10
+			local per = (type(module.ExpPerLevel) == "number" and module.ExpPerLevel) or 400
+			return lv, if lv >= max then 1 else (e % per) / per, lv >= max
+		end
 	end
-	return level, if level >= 10 then 1 else e / need, level >= 10
+	-- fallback (SPEC-level guess): 400 kit EXP per level, 10 levels
+	local level = math.min(1 + math.floor(e / 400), 10)
+	return level, if level >= 10 then 1 else (e % 400) / 400, level >= 10
 end
 
 function Common.KitOwned(profile: any, kit: any): boolean
 	if kit == nil then
 		return false
 	end
-	if (kit.Unlock and (kit.Unlock.Gold or 0) <= 0 and (kit.Unlock.Level or 0) <= 0) then
+	if kit.Unlock and (kit.Unlock.Gold or 0) <= 0 and (kit.Unlock.Level or 0) <= 0 then
 		return true
 	end
 	return profile ~= nil and type(profile.Unlocked) == "table" and profile.Unlocked[kit.Id] == true
@@ -1061,7 +1066,7 @@ local function boundsOf(model: Instance): (Vector3, Vector3)
 	local any = false
 	for _, d in model:GetDescendants() do
 		if d:IsA("BasePart") and d.Transparency < 0.99 then
-			local p = d.Position
+			local p = d.CFrame.Position
 			local s = d.Size * 0.5
 			local r = math.max(s.X, s.Z) -- loose (rotation-agnostic) horizontal extent
 			minV = Vector3.new(math.min(minV.X, p.X - r), math.min(minV.Y, p.Y - s.Y), math.min(minV.Z, p.Z - r))
@@ -1231,14 +1236,14 @@ function Common.SampleProfile(): any
 			HumanWins = 22,
 			Kills = 48,
 			Downs = 77,
-			Damage = 48210,
-			Healing = 6120,
-			Parries = 143,
+			Damage = 18210,
+			Healing = 2120,
+			Parries = 63,
 			Dodges = 211,
 			Saves = 39,
 			Revives = 27,
-			BoxesSurvived = 18,
-			MVPs = 11,
+			BoxesSurvived = 6,
+			MVPs = 4,
 		},
 		Unlocked = {
 			ClassicSans = true,
@@ -1250,26 +1255,51 @@ function Common.SampleProfile(): any
 			["ClassicSans:Midnight"] = true,
 			["Determination:Storyshift"] = true,
 		},
-		Equipped = { Human = "Determination", Monster = "ClassicSans", Skins = { ClassicSans = "Midnight" }, Title = "Judged" },
-		Mastery = { ClassicSans = 4200, Determination = 2600, Bravery = 900, Kindness = 300, FellSans = 1200, Patience = 120 },
+		Equipped = { Human = "Determination", Monster = "ClassicSans", Skins = { ClassicSans = "Midnight" }, Title = "wins_25" },
+		Mastery = { ClassicSans = 2950, Determination = 1500, Bravery = 900, Kindness = 300, FellSans = 1250, Patience = 120 },
 		MonsterChance = 3,
 		RoundsSinceMonster = 2,
 		RolePreference = "Either",
 		Quests = {
 			Window = 0,
 			List = {
-				{ Id = "DealDamage", Progress = 1260, Goal = 2000, Claimed = false },
-				{ Id = "PerfectParries", Progress = 5, Goal = 5, Claimed = false },
-				{ Id = "WinAsMonster", Progress = 1, Goal = 1, Claimed = true },
+				{ Id = "DealDamage", Progress = 860, Goal = 1200, Claimed = false },
+				{ Id = "Parries", Progress = 8, Goal = 8, Claimed = false },
+				{ Id = "MonsterWin", Progress = 1, Goal = 1, Claimed = true },
 			},
 			Rerolled = false,
 		},
-		Achievements = { FirstTrial = true, FirstWin = true, Parry25 = true, SaveAll = true, Judge10 = true },
+		Achievements = { first_round = true, rounds_25 = true, first_win = true, monster_win = true, wins_25 = true },
 		Login = { LastDay = 0, Streak = 4 },
 		Settings = {},
-		Titles = { Judged = true, Determined = true, Unbreakable = true },
-		ShopToday = nil,
+		Titles = { first_round = true, rounds_25 = true, first_win = true, monster_win = true, wins_25 = true, m_ClassicSans_3 = true },
+		ShopToday = {
+			Day = 0,
+			Items = {
+				{ KitId = "ClassicSans", SkinId = "Judge", Discount = 25, Featured = true },
+				{ KitId = "Bravery", SkinId = "Champion" },
+				{ KitId = "Patience", SkinId = "Frost" },
+				{ KitId = "FellSans", SkinId = "Ash" },
+			},
+		},
 	}
+end
+
+-- sample profile with achievements/titles derived from the real rules (Shared/Progression) when present
+local baseSample = Common.SampleProfile
+function Common.SampleProfile(): any
+	local p = baseSample()
+	local module = Common.Progression("Achievements")
+	if module and type(module.Check) == "function" then
+		local ok, ids = pcall(module.Check, p)
+		if ok and type(ids) == "table" then
+			for _, id in ids do
+				p.Achievements[id] = true
+				p.Titles[id] = true
+			end
+		end
+	end
+	return p
 end
 
 function Common.SampleRound(): { [string]: any }
@@ -1327,7 +1357,29 @@ function Common.SampleResult(): any
 end
 
 function Common.SampleRewards(): any
-	return { exp = 148, gold = 95, levelUp = true, level = 8, unlocked = { "FellSans:Crimson" }, questProgress = { { Id = "DealDamage", Progress = 2000, Goal = 2000 } } }
+	-- shape of RewardService's RoundEvent "Rewards" packet
+	return {
+		exp = 148,
+		gold = 95,
+		items = {
+			{ key = "prog.reward.participation", exp = 40, gold = 20 },
+			{ key = "prog.reward.win", exp = 50, gold = 30 },
+			{ key = "prog.reward.damage", exp = 37, gold = 18, count = 1840 },
+			{ key = "prog.reward.parries", exp = 12, gold = 6, count = 6 },
+			{ key = "prog.reward.mvp", exp = 9, gold = 21 },
+		},
+		levelUp = true,
+		levels = 1,
+		newLevel = 8,
+		level = 8,
+		expInto = 0,
+		expToNext = 520,
+		unlocked = { "title:first_win", "skin:FellSans:Ash", "achievement:first_win" },
+		questProgress = { { id = "DealDamage", key = "prog.quest.DealDamage", progress = 1200, goal = 1200, completed = true } },
+		mastery = { kitId = "Determination", from = 4, to = 5, exp = 1640, into = 40, need = 400 },
+		firstWin = true,
+		practice = false,
+	}
 end
 
 function Common.SampleAchievements(): { any }

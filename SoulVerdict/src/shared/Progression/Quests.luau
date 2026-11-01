@@ -87,23 +87,57 @@ local function real(ctx: RoundContext): boolean
 end
 
 -- Any role ------------------------------------------------------------------------------------------
-def({ Id = "PlayRounds", Role = "Any", Difficulty = 1, Goals = { 2, 3, 4 }, Round = function(ctx)
-	return if real(ctx) then 1 else 0
-end })
+def({
+	Id = "PlayRounds",
+	Role = "Any",
+	Difficulty = 1,
+	Goals = { 2, 3, 4 },
+	Round = function(ctx)
+		return if real(ctx) then 1 else 0
+	end,
+})
 def({ Id = "WinRounds", Role = "Any", Difficulty = 2, Goals = { 1, 2, 3 }, Stat = "Win" })
 def({ Id = "DealDamage", Role = "Any", Difficulty = 1, Goals = { 800, 1200, 1600 }, Stat = "Damage", Practice = true })
-def({ Id = "BeMvp", Role = "Any", Difficulty = 3, Goals = { 1 }, Round = function(ctx)
-	return if real(ctx) and ctx.mvp then 1 else 0
-end })
-def({ Id = "BigRound", Role = "Any", Difficulty = 2, Goals = { 1, 2 }, Param = 500, Round = function(ctx, t)
-	return if real(ctx) and n(ctx.row.damage) >= (t.Param or 0) then 1 else 0
-end })
-def({ Id = "EarnExp", Role = "Any", Difficulty = 1, Goals = { 250, 400, 600 }, Practice = true, Round = function(ctx)
-	return n(ctx.exp)
-end })
-def({ Id = "PracticeRound", Role = "Any", Difficulty = 1, Goals = { 1 }, Practice = true, Weight = 0.6, Round = function(ctx)
-	return if ctx.practice then 1 else 0
-end })
+def({
+	Id = "BeMvp",
+	Role = "Any",
+	Difficulty = 3,
+	Goals = { 1 },
+	Round = function(ctx)
+		return if real(ctx) and ctx.mvp then 1 else 0
+	end,
+})
+def({
+	Id = "BigRound",
+	Role = "Any",
+	Difficulty = 2,
+	Goals = { 1, 2 },
+	Param = 500,
+	Round = function(ctx, t)
+		return if real(ctx) and n(ctx.row.damage) >= (t.Param or 0) then 1 else 0
+	end,
+})
+def({
+	Id = "EarnExp",
+	Role = "Any",
+	Difficulty = 1,
+	Goals = { 250, 400, 600 },
+	Practice = true,
+	Round = function(ctx)
+		return n(ctx.exp)
+	end,
+})
+def({
+	Id = "PracticeRound",
+	Role = "Any",
+	Difficulty = 1,
+	Goals = { 1 },
+	Practice = true,
+	Weight = 0.6,
+	Round = function(ctx)
+		return if ctx.practice then 1 else 0
+	end,
+})
 -- Human ---------------------------------------------------------------------------------------------
 def({ Id = "HumanWin", Role = "Human", Difficulty = 2, Goals = { 1, 2, 3 }, Stat = "Win" })
 def({ Id = "HumanSurvive", Role = "Human", Difficulty = 1, Goals = { 1, 2, 3 }, Stat = "Survived" })
@@ -111,44 +145,129 @@ def({ Id = "Parries", Role = "Human", Difficulty = 1, Goals = { 5, 8, 12 }, Stat
 def({ Id = "Saves", Role = "Human", Difficulty = 1, Goals = { 2, 3, 4 }, Stat = "Saves", Practice = true })
 def({ Id = "Revives", Role = "Human", Difficulty = 2, Goals = { 2, 3 }, Stat = "Revives", Practice = true })
 def({ Id = "Healing", Role = "Human", Difficulty = 1, Goals = { 250, 400, 600 }, Stat = "Healing", Practice = true })
-def({ Id = "ForceDodges", Role = "Human", Difficulty = 1, Goals = { 15, 25, 40 }, Stat = "DodgesForced", Practice = true })
+def({
+	Id = "ForceDodges",
+	Role = "Human",
+	Difficulty = 1,
+	Goals = { 15, 25, 40 },
+	Stat = "DodgesForced",
+	Practice = true,
+})
 def({ Id = "BoxSurvivor", Role = "Human", Difficulty = 2, Goals = { 1, 2, 3 }, Stat = "BoxesSurvived", Practice = true })
 def({ Id = "HumanDamage", Role = "Human", Difficulty = 1, Goals = { 400, 700, 1000 }, Stat = "Damage", Practice = true })
-def({ Id = "DefeatMonster", Role = "Human", Difficulty = 3, Goals = { 1 }, Round = function(ctx)
-	return if real(ctx) and ctx.won and ctx.reason == "Defeated" then 1 else 0
-end })
+def({
+	Id = "DefeatMonster",
+	Role = "Human",
+	Difficulty = 3,
+	Goals = { 1 },
+	Round = function(ctx)
+		return if real(ctx) and ctx.won and ctx.reason == "Defeated" then 1 else 0
+	end,
+})
 def({ Id = "FinalBlow", Role = "Human", Difficulty = 3, Goals = { 1 }, Stat = "Kills" })
-def({ Id = "SurviveCollapse", Role = "Human", Difficulty = 2, Goals = { 1 }, Round = function(ctx)
-	return if real(ctx) and ctx.won and ctx.reason == "Survived" and ctx.row.survived then 1 else 0
-end })
-def({ Id = "ParryRound", Role = "Human", Difficulty = 2, Goals = { 1, 2 }, Param = 3, Practice = true, Round = function(ctx, t)
-	return if n(ctx.row.parries) >= (t.Param or 0) then 1 else 0
-end })
-def({ Id = "TeamPlayer", Role = "Human", Difficulty = 2, Goals = { 1 }, Practice = true, Round = function(ctx)
-	return if n(ctx.row.revives) >= 1 and n(ctx.row.saves) >= 1 then 1 else 0
-end })
-def({ Id = "HealerRound", Role = "Human", Difficulty = 2, Goals = { 1 }, Param = 200, Practice = true, Round = function(ctx, t)
-	return if n(ctx.row.healing) >= (t.Param or 0) then 1 else 0
-end })
+def({
+	Id = "SurviveCollapse",
+	Role = "Human",
+	Difficulty = 2,
+	Goals = { 1 },
+	Round = function(ctx)
+		return if real(ctx) and ctx.won and ctx.reason == "Survived" and ctx.row.survived then 1 else 0
+	end,
+})
+def({
+	Id = "ParryRound",
+	Role = "Human",
+	Difficulty = 2,
+	Goals = { 1, 2 },
+	Param = 3,
+	Practice = true,
+	Round = function(ctx, t)
+		return if n(ctx.row.parries) >= (t.Param or 0) then 1 else 0
+	end,
+})
+def({
+	Id = "TeamPlayer",
+	Role = "Human",
+	Difficulty = 2,
+	Goals = { 1 },
+	Practice = true,
+	Round = function(ctx)
+		return if n(ctx.row.revives) >= 1 and n(ctx.row.saves) >= 1 then 1 else 0
+	end,
+})
+def({
+	Id = "HealerRound",
+	Role = "Human",
+	Difficulty = 2,
+	Goals = { 1 },
+	Param = 200,
+	Practice = true,
+	Round = function(ctx, t)
+		return if n(ctx.row.healing) >= (t.Param or 0) then 1 else 0
+	end,
+})
 -- Monster -------------------------------------------------------------------------------------------
-def({ Id = "MonsterPlay", Role = "Monster", Difficulty = 1, Goals = { 1, 2 }, Round = function(ctx)
-	return if real(ctx) then 1 else 0
-end })
+def({
+	Id = "MonsterPlay",
+	Role = "Monster",
+	Difficulty = 1,
+	Goals = { 1, 2 },
+	Round = function(ctx)
+		return if real(ctx) then 1 else 0
+	end,
+})
 def({ Id = "MonsterWin", Role = "Monster", Difficulty = 3, Goals = { 1 }, Stat = "Win" })
 def({ Id = "MonsterKills", Role = "Monster", Difficulty = 2, Goals = { 3, 5, 8 }, Stat = "Kills", Practice = true })
 def({ Id = "MonsterDowns", Role = "Monster", Difficulty = 1, Goals = { 4, 6, 10 }, Stat = "Downs", Practice = true })
-def({ Id = "MonsterDamage", Role = "Monster", Difficulty = 1, Goals = { 1000, 1500, 2500 }, Stat = "Damage", Practice = true })
+def({
+	Id = "MonsterDamage",
+	Role = "Monster",
+	Difficulty = 1,
+	Goals = { 1000, 1500, 2500 },
+	Stat = "Damage",
+	Practice = true,
+})
 def({ Id = "BoxHits", Role = "Monster", Difficulty = 1, Goals = { 6, 10, 15 }, Stat = "BoxHits", Practice = true })
-def({ Id = "BoxCombo", Role = "Monster", Difficulty = 2, Goals = { 1, 2 }, Param = 3, Stat = "BoxHits", PerEvent = true, MinAmount = 3, Practice = true })
-def({ Id = "Rampage", Role = "Monster", Difficulty = 2, Goals = { 1 }, Param = 3, Practice = true, Round = function(ctx, t)
-	return if n(ctx.row.kills) >= (t.Param or 0) then 1 else 0
-end })
-def({ Id = "SwiftVerdict", Role = "Monster", Difficulty = 3, Goals = { 1 }, Round = function(ctx)
-	return if real(ctx) and ctx.won and ctx.reason == "Eliminated" and not ctx.collapse then 1 else 0
-end })
-def({ Id = "Unshaken", Role = "Monster", Difficulty = 3, Goals = { 1 }, Round = function(ctx)
-	return if real(ctx) and ctx.won and not ctx.finalPhase then 1 else 0
-end })
+def({
+	Id = "BoxCombo",
+	Role = "Monster",
+	Difficulty = 2,
+	Goals = { 1, 2 },
+	Param = 3,
+	Stat = "BoxHits",
+	PerEvent = true,
+	MinAmount = 3,
+	Practice = true,
+})
+def({
+	Id = "Rampage",
+	Role = "Monster",
+	Difficulty = 2,
+	Goals = { 1 },
+	Param = 3,
+	Practice = true,
+	Round = function(ctx, t)
+		return if n(ctx.row.kills) >= (t.Param or 0) then 1 else 0
+	end,
+})
+def({
+	Id = "SwiftVerdict",
+	Role = "Monster",
+	Difficulty = 3,
+	Goals = { 1 },
+	Round = function(ctx)
+		return if real(ctx) and ctx.won and ctx.reason == "Eliminated" and not ctx.collapse then 1 else 0
+	end,
+})
+def({
+	Id = "Unshaken",
+	Role = "Monster",
+	Difficulty = 3,
+	Goals = { 1 },
+	Round = function(ctx)
+		return if real(ctx) and ctx.won and not ctx.finalPhase then 1 else 0
+	end,
+})
 
 -- API -----------------------------------------------------------------------------------------------
 
@@ -191,7 +310,13 @@ function Quests.IsComplete(state: QuestState): boolean
 end
 
 -- Picks one template for `role` that is not in `taken` (deterministic order + weights).
-local function pick(rng: any, role: string, taken: { [string]: boolean }, allowHard: boolean, noMonster: boolean): Template?
+local function pick(
+	rng: any,
+	role: string,
+	taken: { [string]: boolean },
+	allowHard: boolean,
+	noMonster: boolean
+): Template?
 	local candidates: { Template } = {}
 	local weights: { number } = {}
 	for _, t in templates do
@@ -252,7 +377,13 @@ function Quests.Refresh(quests: any, userId: number, window: number, opts: { [st
 	return unclaimed
 end
 
-function Quests.Reroll(quests: any, index: number, userId: number, window: number, opts: { [string]: any }?): (boolean, string?)
+function Quests.Reroll(
+	quests: any,
+	index: number,
+	userId: number,
+	window: number,
+	opts: { [string]: any }?
+): (boolean, string?)
 	if quests.Window ~= window then
 		return false, "prog.err.questExpired"
 	end
@@ -310,7 +441,13 @@ local function roleMatches(t: Template, role: string): boolean
 	return t.Role == "Any" or t.Role == role
 end
 
-function Quests.TrackStat(list: { QuestState }, stat: string, amount: number, role: string, practice: boolean): { Change }
+function Quests.TrackStat(
+	list: { QuestState },
+	stat: string,
+	amount: number,
+	role: string,
+	practice: boolean
+): { Change }
 	local changes: { Change } = {}
 	if type(amount) ~= "number" or amount ~= amount or amount <= 0 then
 		return changes

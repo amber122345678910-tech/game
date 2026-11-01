@@ -5,6 +5,7 @@
 --   Rewards.Context(result, row, extras?) -> RoundContext
 --        result = RoundService.RoundEnded payload {winner, reason, rows, mvpUserId, practice, durations, ...}
 --        row    = this player's RoundStatRow; extras = {finalPhase?, boxesSurvived?, boxHits?, firstWinAvailable?}
+--        (a win by reason "Left" counts only when durations.round >= MinLeftWinTime)
 --   Rewards.Compute(ctx) -> Breakdown            per-player EXP/G breakdown:
 --        Participation, Win, Damage x PerDamage, Healing x PerHealing, Kill, Save, Revive, Parry, MVP
 --        (each stat capped, then x PracticeMult in practice; floors per item) + FirstWinOfDay (real rounds only)
@@ -16,8 +17,13 @@
 --        (STREAK_DECAY per missed day, never below 0) and then today's login counts (+1)
 --   Rewards.StreakGold(streak) -> number         min(25 + 15*(streak-1), 100) + 100 on every 7th day
 --   Rewards.FirstWinAvailable(profile, today) -> boolean      profile.Login.FirstWinDay ~= today
+--   Rewards.Grant(profile, exp, gold) -> GrantResult        mutates: EXP with level-ups (+ LevelUpGold), G,
+--        Stats.ExpEarned / GoldEarned; GrantResult = { LevelsGained, NewLevel, LevelGold }
 
 local Config = require(script.Parent.Parent.Config)
+local Levels = require(script.Parent.Levels)
+
+local MAX_GOLD = 1e9
 
 export type Row = {
 	userId: number,
@@ -71,6 +77,7 @@ local Rewards = {}
 local R = Config.Rewards
 local DAY = 86400
 Rewards.STREAK_DECAY = 2 -- streak days lost per missed day (soft decay instead of a hard reset)
+Rewards.MinLeftWinTime = 60 -- a win by the other side leaving counts only after this much fighting (anti-farm)
 
 -- Per-round caps so a freak round (or a bug) cannot mint huge payouts.
 Rewards.Caps = {
@@ -98,7 +105,11 @@ function Rewards.Context(result: any, row: Row, extras: { [string]: any }?): Rou
 	local winner = if type(result.winner) == "string" then result.winner else ""
 	local reason = if type(result.reason) == "string" then result.reason else ""
 	local role = if row.team == "Monster" then "Monster" else "Human"
+	local durations = if type(result.durations) == "table" then result.durations else {}
 	local won = winner ~= "" and reason ~= "Aborted" and winner == row.team
+	if won and reason == "Left" and num(durations.round) < Rewards.MinLeftWinTime then
+		won = false -- the monster (or every human) quit right away: participation only, no free win
+	end
 	local humans, survivors = 0, 0
 	if type(result.rows) == "table" then
 		for _, other in result.rows do
@@ -110,7 +121,6 @@ function Rewards.Context(result: any, row: Row, extras: { [string]: any }?): Rou
 			end
 		end
 	end
-	local durations = if type(result.durations) == "table" then result.durations else {}
 	return {
 		userId = row.userId,
 		row = row,
@@ -179,6 +189,27 @@ function Rewards.Compute(ctx: RoundContext): Breakdown
 		gold += item.gold
 	end
 	return { exp = exp, gold = gold, items = items, won = ctx.won, firstWin = firstWin, practice = ctx.practice }
+end
+
+export type GrantResult = { LevelsGained: number, NewLevel: number, LevelGold: number }
+
+-- Adds EXP + G to a profile (mutates): carries level-ups (+ Levels.LevelUpGold for each new LV) and the
+-- lifetime counters Stats.ExpEarned / Stats.GoldEarned. Used for rounds, quests, login and achievements.
+function Rewards.Grant(profile: any, exp: number, gold: number): GrantResult
+	local e = math.max(0, math.floor(num(exp)))
+	local g = math.max(0, math.floor(num(gold)))
+	local fromLevel = profile.Level
+	local level, rest, gained = Levels.Add(profile.Level, profile.Exp, e)
+	profile.Level = level
+	profile.Exp = rest
+	local levelGold = if gained > 0 then Levels.GoldForLevels(fromLevel, level) else 0
+	profile.Gold = math.min((profile.Gold or 0) + g + levelGold, MAX_GOLD)
+	local stats = profile.Stats
+	if type(stats) == "table" then
+		stats.ExpEarned = (stats.ExpEarned or 0) + e
+		stats.GoldEarned = (stats.GoldEarned or 0) + g + levelGold
+	end
+	return { LevelsGained = gained, NewLevel = level, LevelGold = levelGold }
 end
 
 function Rewards.Day(unixTime: number): number

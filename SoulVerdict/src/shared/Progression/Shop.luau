@@ -9,7 +9,7 @@
 --
 --   Shop.Day(unixTime) -> number                 Shop.DayEndsAt(day) -> unix time
 --   Shop.Catalog() -> {CatalogItem}              sorted by Key
---   Shop.Daily(day) -> DailyShop                 { Day, EndsAt, Offers = {Offer}, Discount }
+--   Shop.Daily(day) -> DailyShop                 { Day, EndsAt, Offers = {Offer}, Items (= Offers), Discount }
 --   Shop.PriceFor(kitId, skinId, day) -> (price, featured)    nil price = not for sale
 --   Shop.ParseItem(data) -> Item?                accepts {kind="Kit"|"Skin", kitId, skinId?} (+ PascalCase)
 --   Shop.CheckBuy(profile, item, day) -> (ok, errKey?, price?)
@@ -32,7 +32,7 @@ export type Offer = {
 	Rarity: string,
 	Featured: boolean,
 }
-export type DailyShop = { Day: number, EndsAt: number, Offers: { Offer }, Discount: number }
+export type DailyShop = { Day: number, EndsAt: number, Offers: { Offer }, Items: { Offer }, Discount: number }
 export type Item = { Kind: string, KitId: string, SkinId: string? }
 
 local Shop = {}
@@ -166,7 +166,13 @@ function Shop.Daily(day: number): DailyShop
 			Featured = featured,
 		})
 	end
-	local shop: DailyShop = { Day = day, EndsAt = Shop.DayEndsAt(day), Offers = offers, Discount = Shop.FeaturedDiscount }
+	local shop: DailyShop = {
+		Day = day,
+		EndsAt = Shop.DayEndsAt(day),
+		Offers = offers,
+		Items = offers, -- alias read by the Shop screen
+		Discount = Shop.FeaturedDiscount,
+	}
 	-- keep the cache small (today, yesterday, tomorrow are the only days a server asks for)
 	local size = 0
 	for _ in dailyCache do

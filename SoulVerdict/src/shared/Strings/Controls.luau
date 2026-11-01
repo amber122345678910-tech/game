@@ -98,10 +98,16 @@ return {
 		en = "Sticks move/look · LT/RT down/up · B exit",
 		ru = "Стики — движение/обзор · LT/RT — вниз/вверх · B — выход",
 	},
-	["controls.touch.look"] = { en = "Drag to look around", ru = "Проведите пальцем, чтобы осмотреться" },
+	["controls.touch.look"] = {
+		en = "Drag to look around",
+		ru = "Проведите пальцем, чтобы осмотреться",
+	},
 
 	-- spectating ----------------------------------------------------------------------------------
 	["controls.spectate.title"] = { en = "Spectating", ru = "Наблюдение" },
-	["controls.spectate.hint"] = { en = "{1} / {2} — switch player", ru = "{1} / {2} — сменить игрока" },
+	["controls.spectate.hint"] = {
+		en = "{1} / {2} — switch player",
+		ru = "{1} / {2} — сменить игрока",
+	},
 	["controls.spectate.none"] = { en = "No one left to watch", ru = "Не за кем наблюдать" },
 }

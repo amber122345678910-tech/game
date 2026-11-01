@@ -9,10 +9,11 @@
 --   Soul.Build(color: Color3, size: number?) -> Model
 --        PrimaryPart "Core" (the full-width band); parts LobeL, LobeR (round lobes flattened to the
 --        slab depth), TipL, TipR (wedges); PointLight "Glow" in Core (Range ~ 7 x size). Role "Glow".
---   Soul.BuildBroken(color: Color3, size: number?) -> Model
+--   Soul.BuildBroken(color: Color3, size: number?, gap: number?) -> Model
 --        child Models "LeftHalf" / "RightHalf" split along the iconic zig-zag crack (they interlock
 --        when unmoved). Each half's PrimaryPart is its lobe, with a PivotOffset that puts the half's
 --        pivot at the heart centre; the outer model's PrimaryPart is LeftHalf's lobe (same pivot).
+--        gap (studs, default 0) builds the halves already pushed apart and tilted (icons, menus).
 --   Soul.Shards(color: Color3, size: number?, n: number?, seed: number?) -> {BasePart}
 --        n (default 6) small triangular Neon shards (single WedgeParts), unparented, positioned in
 --        heart-local space (origin = heart centre, facing -Z) inside the heart outline. Move them with
@@ -123,12 +124,24 @@ local function half(parent: Model, kit: any, color: Color3, side: number, s: num
 	return model
 end
 
-function Soul.BuildBroken(color: Color3, size: number?): Model
+function Soul.BuildBroken(color: Color3, size: number?, gap: number?): Model
 	local s = size or 1
 	local kit = Props.Kit(s)
 	local model = Props.NewModel("SoulBroken", "Soul")
 	local left = half(model, kit, color, -1, s)
-	half(model, kit, color, 1, s)
+	local right = half(model, kit, color, 1, s)
+	local g = gap or 0
+	if g ~= 0 then
+		-- pre-split: halves pushed apart and tilted away from the crack (pivot = heart centre)
+		for side, m in { [-1] = left, [1] = right } do
+			local move = CFrame.new(side * g * 0.5, -g * 0.15, 0) * CFrame.Angles(0, 0, -side * g * 0.35 / s)
+			for _, d in m:GetDescendants() do
+				if d:IsA("BasePart") then
+					d.CFrame = move * d.CFrame
+				end
+			end
+		end
+	end
 	model:SetAttribute("Size", s)
 	return Props.Finish(model, left.PrimaryPart :: BasePart)
 end

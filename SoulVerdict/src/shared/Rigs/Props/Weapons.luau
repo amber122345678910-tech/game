@@ -104,7 +104,7 @@ local function notebook(K: Kit, m: Model, C: ColorFn): BasePart
 	local cover = C("Book", rgb(150, 52, 64))
 	local page = C("Page", rgb(244, 236, 214))
 	local trim = C("BookTrim", rgb(196, 198, 206))
-	local coverP = props(Enum.Material.Leather)
+	local coverP = props(Enum.Material.SmoothPlastic)
 	local paper = props(Enum.Material.SmoothPlastic)
 	local metal = props(Enum.Material.Metal, { CastShadow = false })
 	local cy, cz = -0.24, -0.02 -- book centre (top edge inside the fist)
@@ -112,14 +112,7 @@ local function notebook(K: Kit, m: Model, C: ColorFn): BasePart
 	K.Box(m, "CoverFront", V(0.025, 0.74, 0.56), CF(0.063, cy, cz), cover, coverP)
 	K.Box(m, "CoverBack", V(0.025, 0.74, 0.56), CF(-0.063, cy, cz), cover, coverP)
 	-- torn corner on the front cover (bottom-front) shows the pages beneath
-	K.CornerWedge(
-		m,
-		"TornCorner",
-		V(0.03, 0.2, 0.18),
-		CF(0.066, cy - 0.28, cz - 0.2) * CFrame.Angles(0, 0, math.pi),
-		page,
-		paper
-	)
+	K.Wedge(m, "TornCorner", V(0.03, 0.2, 0.18), CF(0.066, cy - 0.27, cz - 0.19) * CFrame.Angles(0, math.pi, 0), page, paper)
 	-- label
 	K.Box(m, "Label", V(0.03, 0.14, 0.26), CF(0.064, cy + 0.12, cz - 0.02), rgb(248, 244, 230), paper)
 	K.Box(m, "LabelLine", V(0.034, 0.02, 0.2), CF(0.064, cy + 0.12, cz - 0.02), shade(cover, -0.2), {
@@ -158,7 +151,7 @@ local function notebookOpen(K: Kit, m: Model, C: ColorFn): BasePart
 	local cover = C("Book", rgb(150, 52, 64))
 	local page = C("Page", rgb(244, 236, 214))
 	local trim = C("BookTrim", rgb(196, 198, 206))
-	local coverP = props(Enum.Material.Leather)
+	local coverP = props(Enum.Material.SmoothPlastic)
 	local paper = props(Enum.Material.SmoothPlastic)
 	local metal = props(Enum.Material.Metal, { CastShadow = false })
 	local spine = CF(0, 0.14, -0.02)

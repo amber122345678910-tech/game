@@ -23,27 +23,23 @@ local function build(rig: RigContext)
 	-- HEAD
 	------------------------------------------------------------------------------------------
 	local skull = SansCommon.Skull(rig, { Variant = "Classic", Bone = P.Bone })
-	SansCommon.Sockets(rig, skull, { Rim = P.BoneShade, Socket = P.Socket, Deep = rgb(3, 3, 6) })
+	SansCommon.Sockets(rig, skull, { Socket = P.Socket })
 	SansCommon.Pupils(rig, skull, { Color = P.Pupil })
 	SansCommon.Nose(rig, skull, P.Socket)
 	SansCommon.Grin(rig, skull, { Line = P.Line, Style = "Classic" })
 
 	-- attack-eye hint: a faint EyeGlow iris ring around his LEFT pupil + a tiny light
 	local leftPupil = rig.Model.Head:FindFirstChild("LeftPupil") :: BasePart
-	local iris = rig.Arc(
+	local iris = rig.Disc(
 		"Head",
 		"LeftIris",
+		0.15 * skull.K,
+		0.01,
 		leftPupil.CFrame * CFrame.new(0, 0, 0.012),
-		0.105,
-		0,
-		360,
-		10,
-		0.028,
-		0.02,
 		P.EyeGlow,
 		{ Role = "Glow", Material = Enum.Material.Neon, CastShadow = false }
 	)
-	rig.Light(iris[1], "Point", { Name = "EyeGlowLight", Color = P.EyeGlow, Brightness = 0.8, Range = 2.5 })
+	rig.Light(iris, "Point", { Name = "EyeGlowLight", Color = P.EyeGlow, Brightness = 0.8, Range = 2.5 })
 
 	------------------------------------------------------------------------------------------
 	-- TORSO: hoodie, shirt, fur trim
@@ -87,7 +83,7 @@ local blueprint: Blueprints.Blueprint = {
 		EyeGlow = rgb(132, 255, 242), -- #84FFF2
 		Bone = rgb(238, 236, 228),
 		BoneShade = rgb(198, 194, 186),
-		Socket = rgb(16, 14, 20),
+		Socket = rgb(0, 0, 0),
 		Line = rgb(34, 30, 34),
 		Pupil = rgb(255, 255, 255),
 	},

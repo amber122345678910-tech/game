@@ -295,6 +295,47 @@ function AnimMath.MirrorClip(clip: Clip): Clip
 	return out
 end
 
+-- Re-times a LOOPING clip so its new t = 0 is the old t = fraction * Length (keeps locomotion cycles
+-- phase-aligned, e.g. a mirrored strafe that must plant the LEFT foot at phase 0 like every other cycle).
+function AnimMath.PhaseShift(clip: Clip, fraction: number): Clip
+	assert(clip.Loop == true, "AnimMath.PhaseShift: clip must loop")
+	local len = clip.Length
+	local shift = (fraction % 1) * len
+	local out = copyClipFields(clip)
+	local keys: { ClipKey } = {}
+	local hasZero = false
+	for i, key in clip.Keys do
+		local closing = i == #clip.Keys and math.abs(key.t - len) < 1e-6
+		if not closing then
+			local t = (key.t - shift) % len
+			if math.abs(t - len) < 1e-6 then
+				t = 0
+			end
+			if math.abs(t) < 1e-6 then
+				hasZero = true
+				t = 0
+			end
+			table.insert(keys, { t = t, Ease = key.Ease, Dir = key.Dir, Pose = AnimMath.Merge(key.Pose) })
+		end
+	end
+	if not hasZero then
+		table.insert(keys, { t = 0, Pose = AnimMath.SamplePose(clip, shift) })
+	end
+	table.sort(keys, function(a, b)
+		return a.t < b.t
+	end)
+	out.Keys = keys
+	if out.Events then
+		for _, e in out.Events do
+			e.t = (e.t - shift) % len
+		end
+		table.sort(out.Events, function(a, b)
+			return a.t < b.t
+		end)
+	end
+	return AnimMath.Clip(out)
+end
+
 -- Normalises an authored clip definition (see header). Errors on invalid data (caught by tests at load).
 function AnimMath.Clip(def: Clip): Clip
 	local out = copyClipFields(def)
@@ -427,6 +468,108 @@ function AnimMath.Stance(family: string, spec: StanceSpec): Pose
 		local ax, ay, az = eulerDeg(ankleRot)
 		out[side .. "Ankle"] = { ax, ay, az }
 	end
+	return out
+end
+
+-- Limb direction / arm IK ---------------------------------------------------------------------------
+-- Limb(dir, bend?) -> {rx, ry, rz}: rotation of a joint whose child limb hangs along -Y at rest (shoulder,
+-- hip, elbow...) so the limb points along `dir` (parent frame). `bend` = direction the NEXT joint flexes
+-- toward (its +rx swings the child along this direction); default = the natural plane (ry = 0).
+function AnimMath.Limb(dir: Vector3, bend: Vector3?): PoseValue
+	local d = if dir.Magnitude > 1e-6 then dir.Unit else Vector3.new(0, -1, 0)
+	if bend == nil then
+		local rz = math.asin(math.clamp(d.X, -1, 1))
+		local rx = math.atan2(-d.Z, -d.Y)
+		if math.abs(math.cos(rz)) < 1e-6 then
+			rx = 0
+		end
+		return { r3(math.deg(rx)), 0, r3(math.deg(rz)) }
+	end
+	local b = bend :: Vector3
+	local f = b - d * b:Dot(d)
+	if f.Magnitude < 1e-5 then
+		f = Vector3.new(0, 0, -1) - d * (-d.Z)
+		if f.Magnitude < 1e-5 then
+			f = Vector3.new(0, 1, 0)
+		end
+	end
+	local y = -d
+	local z = -f.Unit
+	local x = y:Cross(z)
+	local cf = CFrame.fromMatrix(Vector3.zero, x, y, z)
+	local rx, ry, rz = cf:ToEulerAnglesXYZ()
+	return { r3(math.deg(rx)), r3(math.deg(ry)), r3(math.deg(rz)) }
+end
+
+type ArmGeo = {
+	Root: Vector3,
+	Waist: Vector3,
+	Shoulder: { [string]: Vector3 },
+	Upper: number,
+	Lower: number,
+}
+local armGeoCache: { [string]: ArmGeo } = {}
+
+local function armGeometry(family: string): ArmGeo
+	local g = armGeoCache[family]
+	if g then
+		return g
+	end
+	local r = Skeletons.Resolve(family)
+	local sh, el, wr = r.Joints.RightShoulder.Pivot, r.Joints.RightElbow.Pivot, r.Joints.RightWrist.Pivot
+	local hand = r.Limbs.RightHand.Size.Y
+	g = {
+		Root = r.Joints.Root.Pivot,
+		Waist = r.Joints.Waist.Pivot,
+		Shoulder = { Left = r.Joints.LeftShoulder.Pivot, Right = sh },
+		Upper = (sh - el).Magnitude,
+		Lower = (el - wr).Magnitude + hand * 0.45, -- to the palm centre
+	}
+	armGeoCache[family] = g
+	return g
+end
+
+local function poseCF(v: PoseValue?): CFrame
+	if v == nil then
+		return CFrame.new()
+	end
+	return CFrame.new(v[4] or 0, v[5] or 0, v[6] or 0) * CFrame.Angles(math.rad(v[1] or 0), math.rad(v[2] or 0), math.rad(v[3] or 0))
+end
+
+-- Reach(family, side, target, opts?) -> { [side.."Shoulder"], [side.."Elbow"], [side.."Wrist"] }
+--   2-bone arm IK: puts the palm centre on `target` (character rest space, studs at scale 1: Y up, -Z
+--   forward, feet at y = 0). opts.Spine = pose with Root/Waist values the target is NOT attached to (world
+--   targets such as the knees); omit it for targets that move with the torso (pockets, belly, grips).
+--   opts.Pole = where the elbow should point (torso frame; default down-out-back); opts.Wrist = wrist value.
+export type ReachOpts = { Spine: Pose?, Pole: Vector3?, Wrist: PoseValue? }
+function AnimMath.Reach(family: string, side: string, target: Vector3, opts: ReachOpts?): Pose
+	local o: ReachOpts = opts or {}
+	local g = armGeometry(family)
+	local spine: Pose = o.Spine or {}
+	local rootF = CFrame.new(g.Root) * poseCF(spine.Root)
+	local waistF = rootF * CFrame.new(g.Waist - g.Root) * poseCF(spine.Waist)
+	local shoulderW = waistF * (g.Shoulder[side] - g.Waist)
+	local v = waistF:VectorToObjectSpace(target - shoulderW)
+	local a, b = g.Upper, g.Lower
+	local L = math.clamp(v.Magnitude, math.abs(a - b) + 1e-3, (a + b) * 0.999)
+	local u = if v.Magnitude > 1e-6 then v.Unit else Vector3.new(0, -1, 0)
+	local cosA = math.clamp((a * a + L * L - b * b) / (2 * a * L), -1, 1)
+	local angA = math.acos(cosA)
+	local s = if side == "Left" then -1 else 1
+	local pole = o.Pole or Vector3.new(0.55 * s, -0.45, 0.6)
+	local p = pole - u * pole:Dot(u)
+	if p.Magnitude < 1e-5 then
+		p = Vector3.new(s, 0, 0) - u * (u.X * s)
+	end
+	p = p.Unit
+	local upper = u * math.cos(angA) + p * math.sin(angA)
+	local fore = (u * L - upper * a).Unit
+	local flex = math.acos(math.clamp(upper:Dot(fore), -1, 1))
+	local bend = fore - upper * fore:Dot(upper)
+	local out: Pose = {}
+	out[side .. "Shoulder"] = AnimMath.Limb(upper, if bend.Magnitude > 1e-5 then bend else nil)
+	out[side .. "Elbow"] = { r3(math.deg(flex)), 0, 0 }
+	out[side .. "Wrist"] = if o.Wrist then table.clone(o.Wrist) else { 0, 0, 0 }
 	return out
 end
 

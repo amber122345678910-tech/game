@@ -141,7 +141,11 @@ function ProfileSchema.Settings(): { [string]: SettingSpec }
 	local specs: { [string]: SettingSpec } = {
 		GraphicsPreset = { Type = "string", Default = D.GraphicsPreset or "MapDefault", Check = presetOk },
 		GraphicsQuality = { Type = "enum", Default = "Auto", Values = { "Auto", "Low", "Medium", "High", "Ultra" } },
-		MenuTheme = { Type = "enum", Default = D.MenuTheme or "Classic", Values = { "Classic", "Royal", "Void", "Fell" } },
+		MenuTheme = {
+			Type = "enum",
+			Default = D.MenuTheme or "Classic",
+			Values = { "Classic", "Royal", "Void", "Fell" },
+		},
 		HudStyle = { Type = "enum", Default = D.HudStyle or "Battle", Values = { "Battle", "Modern" } },
 		RigStyle = { Type = "enum", Default = D.RigStyle or "Toon", Values = rigStyleList() },
 		Language = { Type = "enum", Default = D.Language or "auto", Values = { "auto", "en", "ru" } },
@@ -162,7 +166,8 @@ function ProfileSchema.Settings(): { [string]: SettingSpec }
 			if type(default) == "boolean" then
 				specs[key] = { Type = "boolean", Default = default }
 			elseif type(default) == "number" then
-				specs[key] = { Type = "number", Default = default, Min = math.min(0, default), Max = math.max(1, default * 4) }
+				specs[key] =
+					{ Type = "number", Default = default, Min = math.min(0, default), Max = math.max(1, default * 4) }
 			elseif type(default) == "string" then
 				specs[key] = { Type = "string", Default = default }
 			end

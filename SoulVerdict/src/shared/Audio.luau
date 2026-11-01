@@ -175,6 +175,14 @@ local SOUNDS: { [string]: SoundDef } = {
 	SoulBreak = sfx("", 0.8, nil, true, "heart shatter (Undertale-like, original)"),
 	Revive = sfx("", 0.65, nil, true, "uplifting revive swell"),
 	Kill = sfx("", 0.7, nil, false, "kill confirm sting (2D)"),
+	HitConfirm = sfx("", 0.5, { 1.0, 1.05 }, false, "2D hit-marker tick for the attacker (very short)"),
+	BoneImpact = sfx("", 0.6, { 0.9, 1.1 }, true, "bone projectile hitting the ground"),
+	Shockwave = sfx("", 0.75, { 0.92, 1.05 }, true, "ground shockwave boom / ring"),
+	Implode = sfx("", 0.7, { 0.95, 1.05 }, true, "reverse whoosh into a dark implosion"),
+	SoulAppear = sfx("", 0.55, { 1.0, 1.04 }, true, "SOUL heart appears: soft shimmer"),
+	SoulCrack = sfx("", 0.7, nil, true, "heart crack (SOUL cracked / downed)"),
+	SoulShatter = sfx("", 0.8, nil, true, "heart shatters into pieces"),
+	Dust = sfx("", 0.6, nil, true, "a monster turns to dust: soft sandy crumble"),
 	Portal = sfx("", 0.6, { 0.95, 1.05 }, true, "void portal open"),
 	VoidHum = sfx("", 0.4, nil, true, "dark void hum loop"),
 	Freeze = sfx("", 0.55, nil, true, "ice crackle"),
@@ -212,7 +220,7 @@ local SOUNDS: { [string]: SoundDef } = {
 SOUNDS.UiOpen.Fallback = "UiConfirm"
 SOUNDS.UiClose.Fallback = "UiBack"
 SOUNDS.UiToggle.Fallback = "UiClick"
-SOUNDS.UiReward.Fallback = "Ding"
+SOUNDS.UiReward.Fallback = "UiConfirm"
 SOUNDS.Notify.Fallback = "UiHover"
 SOUNDS.SansTextBlip.Fallback = "TextBlip"
 SOUNDS.HitHeavy.Fallback = "Hit"
@@ -222,6 +230,12 @@ SOUNDS.Miss.Fallback = "Dodge"
 SOUNDS.SoulBreak.Fallback = "Downed"
 SOUNDS.SlamLand.Fallback = "Land"
 SOUNDS.Revive.Fallback = "GetUp"
+SOUNDS.HitConfirm.Fallback = "Hit"
+SOUNDS.BoneImpact.Fallback = "BoneHit"
+SOUNDS.Shockwave.Fallback = "Explosion"
+SOUNDS.SoulCrack.Fallback = "Downed"
+SOUNDS.SoulShatter.Fallback = "SoulBreak"
+SOUNDS.Implode.Fallback = "Portal"
 
 -- UI theme keys used by src/client/UI/Themes.luau ("UI.<Theme>.<Kind>"): silent placeholders that fall back to
 -- the generic Ui* entries. Paste theme-specific ids here to give each menu theme its own voice.
