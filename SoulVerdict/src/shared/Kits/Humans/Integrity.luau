@@ -18,7 +18,7 @@ local kit: Types.KitDef = {
 		en = "Double jump, leap in, spin away. Reflect bones with Pirouette and chain your ultimate dashes.",
 		ru = "Двойной прыжок, прыжок в бой, уход вращением. Отражай кости Пируэтом и связывай рывки ульты.",
 	},
-	Color = Color3.fromRGB(40, 90, 255),
+	Color = Color3.fromRGB(0, 60, 255),
 	Difficulty = 2,
 	Stats = { MaxHP = 105, WalkSpeed = 19, JumpPower = 54, MaxGuard = 90, DoubleJump = true },
 	Passives = {

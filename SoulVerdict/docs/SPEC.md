@@ -777,3 +777,10 @@ owner-provided ids in `Shared/Audio.luau` (empty ids = silent).
 UI deps table passed to screens/HUD: `{ Theme = ThemeService, State = StateController, Input = InputController,
 Camera = CameraController, Sound = SoundController, Combat = CombatController, Graphics = GraphicsController,
 UI = UIController, Kits = Kits, Strings = Strings }` (any may be nil under Lune previews).
+- (verified) Attachments whose names END WITH "RigAttachment" trigger R15 BuildRigFromAttachments — never use that suffix.
+- (verified) Use `BadgeService:AwardBadgeAsync`, `Player:LoadCharacterAsync` (we don't load characters this way), AudioPlayer.Volume 0–10.
+- (verified) `UIShadow` (BlurRadius, Spread, Offset, Inset, Mode, ZIndex, ShowBehindParent) exists — feature-detect with pcall.
+- (verified) `TweenService:SmoothDamp(current, target, velocity, smoothTime, maxSpeed?, dt?)` exists.
+- (verified) DataStore budgets: per-server StandardRead/Write `60 + n×40`; per-experience Read `300 + CCU×40`, Write `300 + CCU×20`.
+- (verified) `Lighting.ClockTime` is NotReplicated but writes propagate via TimeOfDay; client-only ClockTime is overwritten by later server changes.
+- (verified) Built-in character sounds list: docs/research/builtin_sounds.txt.

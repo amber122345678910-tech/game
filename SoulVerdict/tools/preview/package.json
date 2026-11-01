@@ -1,0 +1,13 @@
+{
+  "name": "soulverdict-scene-preview",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Offline three.js renderer for SOUL VERDICT rigs/props/maps dumped by tools/lune/dump_model.luau",
+  "type": "module",
+  "scripts": {
+    "render": "node render.mjs"
+  },
+  "dependencies": {
+    "three": "0.170.0"
+  }
+}

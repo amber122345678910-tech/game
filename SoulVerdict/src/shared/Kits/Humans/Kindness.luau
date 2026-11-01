@@ -18,7 +18,7 @@ local kit: Types.KitDef = {
 		en = "Keep the team alive. Heal zones cleanse KR, shields absorb blasters, your ultimate resets a bad fight.",
 		ru = "Держи команду в живых. Зоны лечения очищают KR, щиты поглощают бластеры, ульта спасает проигранный бой.",
 	},
-	Color = Color3.fromRGB(60, 230, 80),
+	Color = Color3.fromRGB(0, 192, 0),
 	Difficulty = 1,
 	Stats = { MaxHP = 120, WalkSpeed = 16, JumpPower = 50, MaxGuard = 110 },
 	Passives = {

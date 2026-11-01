@@ -42,9 +42,12 @@ type SpringImpl = {
 	Damping: number,
 }
 
-local CRITICAL_BAND = 1e-4
+-- |damping - 1| below this uses the critical formula. The under/over-damped formulas stay accurate
+-- much closer to 1 than this (no cancellation), so the switch costs < 1e-9 relative error.
+local CRITICAL_BAND = 1e-9
 
--- Exact solution of x'' = -w^2 x - 2 z w x' after time t, as a linear map of (x0, v0).
+-- Exact solution of x'' = -w^2 x - 2 z w x' after time t, as a linear map of (x0, v0):
+--   x(t) = A*x0 + B*v0,  v(t) = C*x0 + D*v0.
 function Spring.Coefficients(speed: number, damping: number, t: number): (number, number, number, number)
 	local w = speed
 	local z = math.max(damping, 0)
@@ -52,7 +55,7 @@ function Spring.Coefficients(speed: number, damping: number, t: number): (number
 		return 1, t, 0, 1 -- no spring force: coast
 	end
 	if z < 1 - CRITICAL_BAND then
-		-- under-damped
+		-- under-damped: decaying oscillation
 		local wd = w * math.sqrt(1 - z * z)
 		local e = math.exp(-z * w * t)
 		local c = math.cos(wd * t)
@@ -64,10 +67,20 @@ function Spring.Coefficients(speed: number, damping: number, t: number): (number
 		local e = math.exp(-w * t)
 		return (1 + w * t) * e, t * e, -w * w * t * e, (1 - w * t) * e
 	end
-	-- over-damped: two decaying exponentials (both roots negative)
-	local root = w * math.sqrt(z * z - 1)
-	local r1 = -z * w + root
-	local r2 = -z * w - root
+	-- over-damped: e^(-z w t) * (cosh, sinh) of gamma t, gamma = w sqrt(z^2 - 1)
+	local gamma = w * math.sqrt(z * z - 1)
+	local gt = gamma * t
+	if gt < 1 then
+		-- hyperbolic form: no cancellation when gamma*t is small, no overflow because gt < 1
+		local e = math.exp(-z * w * t)
+		local ch = math.cosh(gt)
+		local sh = math.sinh(gt)
+		local k = z * w / gamma
+		return e * (ch + k * sh), e * sh / gamma, -e * w * w / gamma * sh, e * (ch - k * sh)
+	end
+	-- two decaying exponentials (both roots negative): no overflow for huge t
+	local r1 = -z * w + gamma
+	local r2 = -z * w - gamma
 	local e1 = math.exp(r1 * t)
 	local e2 = math.exp(r2 * t)
 	local inv = 1 / (r2 - r1)

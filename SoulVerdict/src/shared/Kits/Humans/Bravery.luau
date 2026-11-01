@@ -18,7 +18,7 @@ local kit: Types.KitDef = {
 		en = "Stand in front. Charge in, stun, protect the team with Brave Stand.",
 		ru = "Стой впереди. Врывайся, оглушай, защищай команду Храброй стойкой.",
 	},
-	Color = Color3.fromRGB(255, 150, 30),
+	Color = Color3.fromRGB(252, 166, 0),
 	Difficulty = 1,
 	Stats = { MaxHP = 150, WalkSpeed = 16, JumpPower = 48, MaxGuard = 150 },
 	Passives = {

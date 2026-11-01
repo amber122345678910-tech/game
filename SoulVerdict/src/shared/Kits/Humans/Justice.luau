@@ -18,7 +18,7 @@ local kit: Types.KitDef = {
 		en = "Keep distance and keep shooting. Long-range shots hit harder. Your ultimate erases all dodges.",
 		ru = "Держи дистанцию и стреляй. Дальние выстрелы сильнее. Ульта стирает все уклонения.",
 	},
-	Color = Color3.fromRGB(255, 230, 40),
+	Color = Color3.fromRGB(255, 255, 0),
 	Difficulty = 2,
 	Stats = { MaxHP = 95, WalkSpeed = 17, JumpPower = 50, MaxGuard = 80 },
 	Passives = {

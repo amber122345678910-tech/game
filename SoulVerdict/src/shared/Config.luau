@@ -4,7 +4,7 @@
 
 local Config = {}
 
-Config.GameName = "UNDERTALE: SOUL VERDICT"
+Config.GameName = "SOUL VERDICT"
 Config.Version = "0.1.0"
 
 Config.Round = {

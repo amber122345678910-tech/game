@@ -1,0 +1,8 @@
+rbxasset://sounds/action_falling.ogg
+rbxasset://sounds/action_footsteps_plastic.mp3
+rbxasset://sounds/action_get_up.mp3
+rbxasset://sounds/action_jump.mp3
+rbxasset://sounds/action_jump_land.mp3
+rbxasset://sounds/action_swim.mp3
+rbxasset://sounds/impact_water.mp3
+rbxasset://sounds/uuhhh.mp3

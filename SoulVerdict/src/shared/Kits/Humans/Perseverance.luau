@@ -18,7 +18,7 @@ local kit: Types.KitDef = {
 		en = "Read the monster: you see its cooldowns. Root it with pages, rewind mistakes, slam it shut with your ultimate.",
 		ru = "Читай монстра: ты видишь его перезарядки. Связывай страницами, отматывай ошибки, захлопывай ультой.",
 	},
-	Color = Color3.fromRGB(190, 70, 255),
+	Color = Color3.fromRGB(213, 53, 217),
 	Difficulty = 2,
 	Stats = { MaxHP = 100, WalkSpeed = 17, JumpPower = 50, MaxGuard = 100 },
 	Passives = {

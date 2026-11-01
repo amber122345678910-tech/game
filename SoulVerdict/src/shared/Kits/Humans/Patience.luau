@@ -18,7 +18,7 @@ local kit: Types.KitDef = {
 		en = "Wait in stealth, strike when the monster commits, slip away. Your first stealth hit drains dodges.",
 		ru = "Жди в невидимости, бей, когда монстр раскроется, и уходи. Первый удар из невидимости сжигает уклонения.",
 	},
-	Color = Color3.fromRGB(70, 230, 255),
+	Color = Color3.fromRGB(66, 252, 255),
 	Difficulty = 3,
 	Stats = { MaxHP = 95, WalkSpeed = 18, JumpPower = 50, MaxGuard = 80 },
 	Passives = {

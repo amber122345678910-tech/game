@@ -18,7 +18,7 @@ local kit: Types.KitDef = {
 		en = "Fast knife combos. Pressure the monster's dodges, then go all-in with your ultimate.",
 		ru = "Быстрые комбо ножом. Сбивай уклонения монстра, затем выкладывайся ультой.",
 	},
-	Color = Color3.fromRGB(255, 30, 40),
+	Color = Color3.fromRGB(255, 0, 0),
 	Difficulty = 1,
 	Stats = { MaxHP = 110, WalkSpeed = 17, JumpPower = 50, MaxGuard = 100 },
 	Passives = {

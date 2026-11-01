@@ -1,0 +1,7 @@
+{
+  "_comment": "Lune-safety contract (docs/SPEC.md 0.4 and 2.1). Read by tools/checks/conventions.py and tools/lune/tests/requireall.spec.luau. Every module under a lune_safe_root must load under Lune and must not touch game/workspace/services; list a module under runtime_only (with the reason) only if the SPEC marks it NOT Lune-safe.",
+  "lune_safe_roots": ["src/shared"],
+  "runtime_only": {
+    "src/shared/Net.luau": "SPEC 2.1: remote wrappers; services are fetched lazily at call time"
+  }
+}

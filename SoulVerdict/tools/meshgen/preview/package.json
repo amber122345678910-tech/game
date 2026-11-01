@@ -1,0 +1,13 @@
+{
+  "name": "soulverdict-meshgen-preview",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Offline three.js + Playwright renderer for tools/meshgen preview JSON -> PNG.",
+  "type": "module",
+  "scripts": {
+    "render": "node render.mjs"
+  },
+  "dependencies": {
+    "three": "0.170.0"
+  }
+}

@@ -246,6 +246,7 @@ export type MapInfo = {
 	Preset: string, -- default graphics preset id
 	FinalPreset: string, -- preset during FinalPhase
 	Music: string, -- sound registry key
+	DummySpawns: { CFrame }?, -- optional: training-dummy ground CFrames (lobby); spawn CFrames are GROUND points
 }
 
 export type MapDef = {

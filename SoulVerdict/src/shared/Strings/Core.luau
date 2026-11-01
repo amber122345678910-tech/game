@@ -1,8 +1,12 @@
 --!strict
 -- Core strings shared by many areas. Lune-safe.
 return {
-	["game.title"] = { en = "UNDERTALE: SOUL VERDICT", ru = "UNDERTALE: SOUL VERDICT" },
-	["game.subtitle"] = { en = "a fan-made AU battle", ru = "фанатская AU-битва" },
+	["game.title"] = { en = "SOUL VERDICT", ru = "SOUL VERDICT" },
+	["game.subtitle"] = { en = "an UNDERTALE fan game", ru = "фанатская игра по UNDERTALE" },
+	["game.disclaimer"] = {
+		en = "Non-commercial fan game, not affiliated with Toby Fox. UNDERTALE © Toby Fox. Underfell is a fan AU by its community creators. Eclipse Sans is original to this game.",
+		ru = "Некоммерческая фанатская игра, не связана с Тоби Фоксом. UNDERTALE © Toby Fox. Underfell — фанатская AU её авторов из сообщества. Эклипс Санс — оригинальный персонаж этой игры.",
+	},
 	["team.monster"] = { en = "MONSTER", ru = "МОНСТР" },
 	["team.humans"] = { en = "HUMANS", ru = "ЛЮДИ" },
 	["role.monster"] = { en = "Monster", ru = "Монстр" },
