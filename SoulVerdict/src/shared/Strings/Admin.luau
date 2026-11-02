@@ -37,6 +37,12 @@ return {
 	["admin.sec.round"] = { en = "Round control", ru = "Управление раундом" },
 	["admin.skip"] = { en = "Skip phase", ru = "Пропуск фазы" },
 	["admin.final"] = { en = "Phase 2", ru = "Фаза 2" },
+	["admin.phase3"] = { en = "Phase 3 (Last Breath)", ru = "Фаза 3 (Last Breath)" },
+	["admin.ok.phase3"] = { en = "Phase 3!", ru = "Фаза 3!" },
+	["admin.err.noPhase3"] = {
+		en = "Phase 3 needs Last Breath Sans in Phase 2 during a fight.",
+		ru = "Фаза 3 — только у Last Breath Санса во 2-й фазе во время боя.",
+	},
 	["admin.collapse"] = { en = "Collapse", ru = "Коллапс" },
 	["admin.endHumans"] = { en = "Humans win", ru = "Победа людей" },
 	["admin.endMonster"] = { en = "Monster wins", ru = "Победа монстра" },

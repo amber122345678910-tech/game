@@ -8,4 +8,6 @@ return {
 	},
 	["p2.lb.line1"] = { en = "heh... you really don't give up, do you?", ru = "хех... а ты и правда не сдаёшься, да?" },
 	["p2.lb.line2"] = { en = "fine. this is my last breath.", ru = "ладно. это мой последний вздох." },
+	["p3.lb.line1"] = { en = "heh... you think THAT was my last breath?", ru = "хех... думаешь, ЭТО был мой последний вздох?" },
+	["p3.lb.line2"] = { en = "kid... i'm just getting started.", ru = "малой... я только начинаю." },
 }

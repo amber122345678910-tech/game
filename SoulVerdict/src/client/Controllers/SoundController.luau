@@ -1524,6 +1524,9 @@ function SoundController.ArenaMusicOrder(round: { [string]: any }): { string }
 	if round.Phase == "Collapse" then
 		add("CollapsePhase") -- the closing ring has its own track; when it is unusable the fight music keeps going
 	end
+	if round.MonsterPhase == 3 and kit and Audio.Get("Theme_" .. kit .. "_P3") then
+		add("Theme_" .. kit .. "_P3") -- Last Breath's Phase 3 track
+	end
 	if round.FinalPhase == true then
 		add(Audio.MonsterTheme(kit, true))
 		add(Audio.MonsterTheme(kit, false))

@@ -949,6 +949,7 @@ function Admin.Create(theme: Theme, deps: any): any
 		local roundActions = {
 			{ "admin.skip", "Rewind", { action = "SkipPhase" } },
 			{ "admin.final", "Eye", { action = "FinalPhase" } },
+			{ "admin.phase3", "Skull", { action = "Phase3" } },
 			{ "admin.collapse", "Target", { action = "Collapse" } },
 			{ "admin.endHumans", "Heart", { action = "EndRound", winner = "Humans" } },
 			{ "admin.endMonster", "Skull", { action = "EndRound", winner = "Monster" } },

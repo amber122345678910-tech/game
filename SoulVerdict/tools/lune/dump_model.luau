@@ -429,6 +429,10 @@ if kind == "rig" then
 		Palette = palette,
 	})
 	-- RigBuilder only records the style id; apply the actual RigStyles look so previews show it.
+	if flags.phase ~= nil then
+		local PhaseLook = Loader.requirePath("src/shared/Rigs/PhaseLook")
+		PhaseLook.Apply(model, tonumber(flags.phase) or 1)
+	end
 	if type(flags.style) == "string" then
 		local RigStyles = Loader.requirePath("src/shared/Rigs/RigStyles")
 		if not RigStyles.Apply(model, flags.style) then

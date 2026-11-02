@@ -125,6 +125,7 @@ local SCHEMA: { [string]: { [string]: Field } } = {
 	SetMinPlayers = { n = int(1, 2, true) },
 	SkipPhase = {},
 	FinalPhase = {},
+	Phase3 = {},
 	Collapse = {},
 	EndRound = { winner = enum(TEAMS) },
 	SetMap = { mapId = map(true) },
@@ -653,6 +654,13 @@ H.FinalPhase = function(_player: Player, _cmd: any)
 		return true, "admin.ok.final"
 	end
 	return false, "admin.err.noFight"
+end
+
+H.Phase3 = function(_player: Player, _cmd: any)
+	if yes(S.RoundService, "TriggerPhase3") then
+		return true, "admin.ok.phase3"
+	end
+	return false, "admin.err.noPhase3"
 end
 
 H.Collapse = function(_player: Player, _cmd: any)

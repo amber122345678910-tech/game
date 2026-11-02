@@ -44,6 +44,11 @@ local TIMELINES: { [string]: { { number | string } } } = {
 		{ 2.2, "Line1" }, { 4.4, "Line2" }, { 6.5, "Rise" }, { 6.5, "Ignite" }, { 7.3, "Flash" }, { 7.3, "Music" },
 		{ 8.4, "End" },
 	},
+	LastBreathSans3 = {
+		{ 0.0, "Begin" }, { 0.0, "Silence" }, { 0.0, "Smug" }, { 0.7, "Bam" }, { 0.8, "Fall" }, { 1.5, "Tired" },
+		{ 2.0, "Line1" }, { 4.2, "Line2" }, { 6.3, "Rise" }, { 6.3, "Ignite" }, { 7.1, "Flash" }, { 7.1, "Music" },
+		{ 8.2, "End" },
+	},
 	EclipseSans = {
 		{ 0.0, "Begin" }, { 0.0, "Smug" }, { 0.2, "Pulse" }, { 0.2, "Vignette" }, { 1.2, "Shake" }, { 3.0, "Flash" },
 		{ 3.8, "End" },
@@ -53,6 +58,7 @@ local TIMELINES: { [string]: { { number | string } } } = {
 local LINES: { [string]: { string } } = {
 	FellSans = { "p2.fell.line1", "p2.fell.line2" },
 	LastBreathSans = { "p2.lb.line1", "p2.lb.line2" },
+	LastBreathSans3 = { "p3.lb.line1", "p3.lb.line2" },
 }
 
 function Phase2CinematicController.Timeline(kitId: string?): { { number | string } }

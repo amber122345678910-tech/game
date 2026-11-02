@@ -38,6 +38,7 @@ local VALID = {
 	SetMinPlayers = { action = "SetMinPlayers", n = 1 },
 	SkipPhase = { action = "SkipPhase" },
 	FinalPhase = { action = "FinalPhase" },
+	Phase3 = { action = "Phase3" },
 	Collapse = { action = "Collapse" },
 	EndRound = { action = "EndRound", winner = "Monster" },
 	SetMap = { action = "SetMap", mapId = "VoidRift" },

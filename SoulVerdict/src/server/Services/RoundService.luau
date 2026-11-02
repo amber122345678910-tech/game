@@ -35,6 +35,7 @@ local Kits = require(Shared:WaitForChild("Kits")) :: any
 local Net = require(Shared:WaitForChild("Net")) :: any
 local Strings = require(Shared:WaitForChild("Strings")) :: any
 local Signal = require(Shared:WaitForChild("Util"):WaitForChild("Signal")) :: any
+local PhaseLook = require(Shared:WaitForChild("Rigs"):WaitForChild("PhaseLook")) :: any
 local RoundRules = require(Shared:WaitForChild("Round"):WaitForChild("RoundRules")) :: any
 local Registry = require(Shared:WaitForChild("Maps"):WaitForChild("Registry")) :: any
 
@@ -60,6 +61,10 @@ local STATE_DEFAULTS: { [string]: any } = {
 	SavesLit = 0,
 	SavesTotal = 0,
 	FinalPhase = false,
+	MonsterPhase = 1, -- 1 / 2 (= FinalPhase) / 3 (Last Breath Sans only)
+	CinematicKit = "", -- the Phase 2 / 3 scene playing now ("" = none): Phase2CinematicController
+	CinematicCause = "",
+	CinematicEndsAt = 0,
 	Winner = "",
 	WinReason = "",
 	Practice = false,
@@ -433,6 +438,8 @@ local function checkMonsterHp()
 	end
 	if RoundRules.ShouldTriggerFinalPhase(humanoid.Health, maxHealth, state.FinalPhase) then
 		RoundService.TriggerFinalPhase("Hp")
+	elseif state.FinalPhase and maxHealth > 0 and humanoid.Health / maxHealth <= RoundService.Phase3HpFraction then
+		RoundService.TriggerPhase3()
 	end
 end
 
@@ -946,6 +953,7 @@ local function runMatch(practice: boolean): string
 	setState("Winner", "")
 	setState("WinReason", "")
 	setState("FinalPhase", false)
+	setState("MonsterPhase", 1)
 
 	if practice then
 		local req = request :: PracticeRequest
@@ -1427,17 +1435,51 @@ function RoundService.TriggerFinalPhase(cause: string?, caster: Model?): boolean
 		cause = reason,
 	})
 	RoundService.FinalPhaseStarted:Fire(monster, reason)
+	PhaseLook.Apply(monster, 2)
+	setState("MonsterPhase", 2)
 	RoundService.StartCinematic(monster, reason)
+	return true
+end
+
+-- Phase 3 (owner: Last Breath Sans has three phases): in Phase 2 at <= Phase3HpFraction HP, or forced by an admin.
+-- His skull cracks (PhaseLook 3), he gets a second wind (heal + dodges refilled) and the "<kit>3" scene plays.
+RoundService.Phase3Kits = { LastBreathSans = true }
+RoundService.Phase3HpFraction = 0.2
+RoundService.Phase3Heal = 0.15
+
+function RoundService.TriggerPhase3(): boolean
+	local monster = state.Monster
+	if monster == nil or not isFightPhase() or not state.FinalPhase then
+		return false
+	end
+	local kitId = monster:GetAttribute("KitId")
+	if not (type(kitId) == "string" and RoundService.Phase3Kits[kitId]) then
+		return false
+	end
+	if monster:GetAttribute("SansPhase") == 3 then
+		return false
+	end
+	PhaseLook.Apply(monster, 3)
+	setState("MonsterPhase", 3)
+	local humanoid = humanoidOf(monster)
+	if humanoid and humanoid.MaxHealth > 0 then
+		call(DamageService, "Heal", monster, humanoid.MaxHealth * RoundService.Phase3Heal)
+	end
+	local maxDodges = monster:GetAttribute("MaxDodges")
+	if type(maxDodges) == "number" then
+		monster:SetAttribute("Dodges", maxDodges)
+	end
+	RoundService.StartCinematic(monster, "Phase3", kitId .. "3")
 	return true
 end
 
 -- Phase 2 cinematic (owner's design, played by every client's Phase2CinematicController from RoundState
 -- CinematicKit / CinematicCause / CinematicEndsAt): everyone in the round is frozen (Rooted + Silenced, as in the Intro)
 -- and Invulnerable, every attack on the field is cleared, and the round timer is paused for the scene.
-RoundService.CinematicTime = { ClassicSans = 6.4, FellSans = 9.2, EclipseSans = 4.0, LastBreathSans = 8.6 }
+RoundService.CinematicTime = { ClassicSans = 6.4, FellSans = 9.2, EclipseSans = 4.0, LastBreathSans = 8.6, LastBreathSans3 = 8.4 }
 
-function RoundService.StartCinematic(monster: Model, reason: string?): number
-	local kitId = monster:GetAttribute("KitId")
+function RoundService.StartCinematic(monster: Model, reason: string?, sceneKey: string?): number
+	local kitId = sceneKey or monster:GetAttribute("KitId")
 	local d = if type(kitId) == "string" then RoundService.CinematicTime[kitId] or 0 else 0
 	if d <= 0 or not isFightPhase() then
 		return 0

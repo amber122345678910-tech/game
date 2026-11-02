@@ -172,6 +172,7 @@ local SOUNDS: { [string]: SoundDef } = {
 	Theme_FellSans_Final = music("Fell Sans final phase: harsher, faster, darker remix (optional)", 0.55, { "134453206423714", "120928193831867", "137220025405002", "1837880957" }),
 	Theme_LastBreathSans = music("Last Breath Sans: desperate, heavy remix (falls back to Classic's theme)", 0.5, {}),
 	Theme_LastBreathSans_Final = music("Last Breath Sans Phase 2 (falls back to Classic's Phase 2)", 0.55, {}),
+	Theme_LastBreathSans_P3 = music("Last Breath Sans Phase 3 (owner: paste an id first)", 0.6, {}),
 	Theme_EclipseSans = music("Eclipse Sans (original void AU): eerie cosmic dark-synth boss loop", 0.5, { "88059047994896", "114505147154737", "9045683296", "9045934037", "1847456615" }),
 	Theme_EclipseSans_Final = music("Eclipse Sans final phase: darker, glitchier, faster (optional)", 0.55, { "74309809578759", "103167351125844", "78368445861935", "1837779548" }),
 
@@ -282,7 +283,8 @@ local SOUNDS: { [string]: SoundDef } = {
 SOUNDS.Menu.Fallback = "Lobby"
 -- Last Breath Sans uses Classic's candidates until the owner sends his own (paste them first in his entries)
 SOUNDS.Theme_LastBreathSans.Ids = table.clone(SOUNDS.Theme_ClassicSans.Ids :: any)
-SOUNDS.Theme_LastBreathSans_Final.Ids = table.clone(SOUNDS.Theme_ClassicSans_Final.Ids :: any) -- the title is never silent when the owner's menu id cannot load
+SOUNDS.Theme_LastBreathSans_Final.Ids = table.clone(SOUNDS.Theme_ClassicSans_Final.Ids :: any)
+SOUNDS.Theme_LastBreathSans_P3.Ids = table.clone(SOUNDS.Theme_ClassicSans_Final.Ids :: any) -- the title is never silent when the owner's menu id cannot load
 SOUNDS.Shop.Fallback = "Lobby" -- nor is the shop (it opens over the lobby: the lobby track simply goes on)
 SOUNDS.UiOpen.Fallback = "UiConfirm"
 SOUNDS.UiClose.Fallback = "UiBack"
