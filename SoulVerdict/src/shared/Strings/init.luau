@@ -34,6 +34,8 @@ local SOURCES = {
 	"Integration",
 	"Maps3",
 	"Maps2",
+	"Admin",
+	"MobileUI",
 }
 
 local merged: { [string]: Localized } = {}
