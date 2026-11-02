@@ -133,7 +133,7 @@ function Style.Build(ctx)
 		Knob = WHITE,
 		KnobSize = 14,
 		Corner = 2,
-		RowHeight = 46,
+		RowHeight = 42,
 		LabelSize = 21,
 		Width = 700,
 		ValueWidth = 90,

@@ -198,4 +198,78 @@ function U.surfaceGui(part, face, pixelsPerStud, lightInfluence)
 	return sg
 end
 
+--[[
+	A flat wall with rectangular holes (doors / windows).
+	axis = "x": the wall runs along X (a1..a2), thickness along Z (t1..t2), holes = {{x1, x2, y1, y2}, ...}
+	axis = "z": the wall runs along Z (a1..a2), thickness along X (t1..t2), holes = {{z1, z2, y1, y2}, ...}
+]]
+function U.wall(parent, name, axis, a1, a2, y1, y2, t1, t2, holes, color, material, props)
+	holes = holes or {}
+	local cuts = { a1, a2 }
+	for _, h in holes do
+		table.insert(cuts, math.clamp(h[1], a1, a2))
+		table.insert(cuts, math.clamp(h[2], a1, a2))
+	end
+	table.sort(cuts)
+	local parts = {}
+	local function emit(aa, ab, ya, yb)
+		if ab - aa < 1e-3 or yb - ya < 1e-3 then
+			return
+		end
+		local p
+		if axis == "x" then
+			p = U.box(parent, name, aa, ya, t1, ab, yb, t2, color, material, props)
+		else
+			p = U.box(parent, name, t1, ya, aa, t2, yb, ab, color, material, props)
+		end
+		table.insert(parts, p)
+	end
+	for i = 1, #cuts - 1 do
+		local aa, ab = cuts[i], cuts[i + 1]
+		if ab - aa > 1e-3 then
+			local blocked = {}
+			for _, h in holes do
+				if h[1] <= aa + 1e-4 and h[2] >= ab - 1e-4 then
+					table.insert(blocked, { math.max(h[3], y1), math.min(h[4], y2) })
+				end
+			end
+			table.sort(blocked, function(p1, p2)
+				return p1[1] < p2[1]
+			end)
+			local y = y1
+			for _, b in blocked do
+				if b[1] > y then
+					emit(aa, ab, y, b[1])
+				end
+				y = math.max(y, b[2])
+			end
+			if y < y2 then
+				emit(aa, ab, y, y2)
+			end
+		end
+	end
+	return parts
+end
+
+-- Wedge (triangular prism). Roblox wedge: vertical face at local +Z (back), slope rising from front-bottom (-Z) to back-top.
+function U.wedge(parent, name, cf, size, color, material, props)
+	local p = Instance.new("WedgePart")
+	p.Name = name
+	p.Anchored = true
+	p.Size = size
+	p.CFrame = cf
+	p.Color = color
+	p.Material = material or Enum.Material.SmoothPlastic
+	p.TopSurface = Enum.SurfaceType.Smooth
+	p.BottomSurface = Enum.SurfaceType.Smooth
+	if props then
+		for k, val in props do
+			p[k] = val
+		end
+	end
+	p.Parent = parent
+	U.partCount += 1
+	return p
+end
+
 return U

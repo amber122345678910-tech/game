@@ -29,12 +29,15 @@ Remotes.RequestSpawn.OnServerInvoke = function(player: Player)
 end
 
 -- Cutscene finished: put Morty next to his bed and let him move.
-Remotes.ReleaseCharacter.OnServerEvent:Connect(function(player: Player)
+Remotes.ReleaseCharacter.OnServerEvent:Connect(function(player: Player, target: any)
 	local char = player.Character
 	local hrp = rootOf(char)
 	if char and hrp then
-		char:PivotTo(wakePoint.CFrame)
+		char:PivotTo(if typeof(target) == "CFrame" then target else wakePoint.CFrame)
 		hrp.Anchored = false
+		pcall(function()
+			hrp:SetNetworkOwner(player)
+		end)
 	end
 end)
 

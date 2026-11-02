@@ -201,6 +201,7 @@ local highlights: { Highlight } = {}
 local lightOn: { [string]: boolean } = {}
 local portalConn: RBXScriptConnection? = nil
 local current: string? = nil
+local currentTable: any = nil
 local brightnessOffset = 0
 
 local function scan()
@@ -208,7 +209,7 @@ local function scan()
 		return
 	end
 	house = workspace:WaitForChild("MortysHouse") :: Model
-	for _, d in (house :: Model):GetDescendants() do
+	for _, d in workspace:GetDescendants() do
 		if d:IsA("Light") then
 			lights[d.Name] = lights[d.Name] or {}
 			table.insert(lights[d.Name], d)
@@ -231,7 +232,7 @@ local function scan()
 			if d:GetAttribute("PortalFX") then
 				table.insert(portalParts, d)
 			end
-		elseif d:IsA("Model") and d:GetAttribute("Outline") then
+		elseif d:IsA("Model") and d:GetAttribute("Outline") and d:IsDescendantOf(house :: Model) then
 			table.insert(outlineModels, d)
 		end
 	end
@@ -360,25 +361,19 @@ end
 
 function Graphics.SetBrightnessOffset(v: number)
 	brightnessOffset = v
-	if current then
-		local p = Graphics.Presets[current]
-		Lighting.ExposureCompensation = p.Lighting.ExposureCompensation + brightnessOffset
+	if currentTable then
+		Lighting.ExposureCompensation = (currentTable.Lighting.ExposureCompensation or 0) + brightnessOffset
 	end
 end
 
--- Apply a preset. `instant` skips the fade.
-function Graphics.Apply(name: string, instant: boolean?, keepClock: boolean?)
+-- Apply a preset table (same format as Graphics.Presets). Fields that are nil are left alone.
+function Graphics.ApplyTable(p: any, instant: boolean?, keepClock: boolean?)
 	scan()
-	local p = Graphics.Presets[name]
-	if not p then
-		warn("Unknown graphics preset", name)
-		return
-	end
-	current = name
+	currentTable = p
 	local t = if instant then 0 else 0.8
 
 	local lightingProps = table.clone(p.Lighting)
-	lightingProps.ExposureCompensation = p.Lighting.ExposureCompensation + brightnessOffset
+	lightingProps.ExposureCompensation = (p.Lighting.ExposureCompensation or 0) + brightnessOffset
 	local clockTime = lightingProps.ClockTime
 	lightingProps.ClockTime = nil
 	Lighting.ClockTime = clockTime
@@ -399,7 +394,7 @@ function Graphics.Apply(name: string, instant: boolean?, keepClock: boolean?)
 		end
 	end
 
-	for lightName, setting in p.Lights do
+	for lightName, setting in p.Lights or {} do
 		if setting == false then
 			Graphics.SetLight(lightName, false)
 		elseif setting == true then
@@ -409,18 +404,37 @@ function Graphics.Apply(name: string, instant: boolean?, keepClock: boolean?)
 		end
 	end
 
-	setNightWindows(p.NightWindows)
-	setPortal(p.Portal)
-	setOutlines(p.Outlines)
-	setDust(p.Dust)
-	if not keepClock then
+	if p.NightWindows ~= nil then
+		setNightWindows(p.NightWindows)
+	end
+	if p.Portal ~= nil then
+		setPortal(p.Portal)
+	end
+	if p.Outlines ~= nil then
+		setOutlines(p.Outlines)
+	end
+	if p.Dust ~= nil then
+		setDust(p.Dust)
+	end
+	if not keepClock and p.Clock then
 		setClock(p.Clock)
 	end
 end
 
+-- Apply a named menu preset. `instant` skips the fade.
+function Graphics.Apply(name: string, instant: boolean?, keepClock: boolean?)
+	local p = Graphics.Presets[name]
+	if not p then
+		warn("Unknown graphics preset", name)
+		return
+	end
+	current = name
+	Graphics.ApplyTable(p, instant, keepClock)
+end
+
 -- Extra outline target (e.g. the player's own character in the menu)
 function Graphics.OutlinesOn(): boolean
-	return current ~= nil and Graphics.Presets[current].Outlines == true
+	return currentTable ~= nil and currentTable.Outlines == true
 end
 
 return Graphics

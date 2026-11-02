@@ -6,6 +6,11 @@ local fs = require("@lune/fs")
 local process = require("@lune/process")
 local U = require("./Util")
 local Room = require("./Room")
+local House = require("./House")
+local Characters = require("./Characters")
+local Garage = require("./Garage")
+local Planet = require("./Planet")
+local Titan = require("./Titan")
 local Character = require("./Character")
 
 local Instance, Enum, rgb = U.Instance, U.Enum, U.rgb
@@ -46,7 +51,12 @@ workspace.Gravity = 196.2
 pcall(function()
 	workspace.StreamingEnabled = false
 end)
-Room.build(workspace)
+local house = Room.build(workspace)
+House.build(house)
+Characters.buildAll(workspace, house:FindFirstChild("Seats"))
+Garage.build(workspace)
+local planet = Planet.build(workspace)
+Titan.build(planet)
 
 -- Lighting (Future = real shadows from every lamp) -------------------------------
 lighting.Technology = Enum.Technology.Future
@@ -140,7 +150,7 @@ Character.build(starterPlayer, read("StarterCharacter/Animate.client.luau"))
 local gameFolder = Instance.new("Folder")
 gameFolder.Name = "Game"
 gameFolder.Parent = replicated
-for _, name in { "Config", "UI", "Widgets", "Settings", "Audio", "Graphics", "MenuController" } do
+for _, name in { "Config", "UI", "Widgets", "Settings", "Audio", "Graphics", "MenuController", "Lang", "Dialogue", "Director", "Fx", "Puppet", "Scenes", "Story" } do
 	script("ModuleScript", name, read("ReplicatedStorage/" .. name .. ".luau"), gameFolder)
 end
 local stylesFolder = Instance.new("Folder")
@@ -163,6 +173,7 @@ toMenu.Name = "ReturnToMenu"
 toMenu.Parent = remotes
 
 script("Script", "GameServer", read("ServerScriptService/GameServer.server.luau"), serverScripts)
+script("Script", "WorldGen", read("ServerScriptService/WorldGen.server.luau"), serverScripts)
 script("LocalScript", "Client", read("StarterPlayerScripts/Client.client.luau"), sps)
 
 -- Write ------------------------------------------------------------------------

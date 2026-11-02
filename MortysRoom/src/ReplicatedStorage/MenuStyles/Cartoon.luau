@@ -158,8 +158,8 @@ function Style.Build(ctx)
 		KnobStrokeThickness = 3,
 		KnobSize = 24,
 		Corner = 5,
-		RowHeight = 48,
-		LabelSize = 26,
+		RowHeight = 44,
+		LabelSize = 25,
 		Width = 640,
 		ValueWidth = 80,
 		Uppercase = false,
@@ -181,7 +181,7 @@ function Style.Build(ctx)
 		local holder = UI.new("Frame", {
 			Name = name,
 			BackgroundTransparency = 1,
-			Size = UDim2.fromOffset(720, 630),
+			Size = UDim2.fromOffset(720, 640),
 			Visible = false,
 			Parent = pages,
 		})

@@ -1,9 +1,8 @@
 --[[
-	Client flow:
-	  MENU   -> camera floats around sleeping Morty, you pick Play / Settings / ...
-	  WAKING -> camera dives into Morty's head, alarm rings, eyes open
-	  LYING  -> look around from the pillow, SPACE to get up
-	  PLAYING-> first person as Morty. E = use, P = pause, G = next graphics preset
+	Client core:
+	  * main menu (5 styles, style picker, settings, chapters) + pause menu
+	  * first person gameplay helpers: interactions, body / head bob, lying in bed, getting up
+	  * an `api` table that the Story module uses to run the chapters
 ]]
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -22,7 +21,13 @@ local UI = require(GameFolder:WaitForChild("UI"))
 local Settings = require(GameFolder:WaitForChild("Settings"))
 local Audio = require(GameFolder:WaitForChild("Audio"))
 local Graphics = require(GameFolder:WaitForChild("Graphics"))
+local Lang = require(GameFolder:WaitForChild("Lang"))
+local Fx = require(GameFolder:WaitForChild("Fx"))
+local Director = require(GameFolder:WaitForChild("Director"))
+local Dialogue = require(GameFolder:WaitForChild("Dialogue"))
+local Scenes = require(GameFolder:WaitForChild("Scenes"))
 local MenuController = require(GameFolder:WaitForChild("MenuController"))
+local Story = require(GameFolder:WaitForChild("Story"))
 local StylesFolder = GameFolder:WaitForChild("MenuStyles")
 local Remotes = GameFolder:WaitForChild("Remotes")
 
@@ -64,7 +69,6 @@ local function setControls(on: boolean)
 	end
 end
 
--- Hide Roblox UI we don't need -----------------------------------------------------
 pcall(function()
 	StarterGui:SetCoreGuiEnabled(Enum.CoreGuiType.All, false)
 end)
@@ -79,22 +83,23 @@ task.spawn(function()
 		task.wait(0.5)
 	end
 end)
-
--- Preload sounds in the background ----------------------------------------------------
 task.spawn(function()
 	local list = {}
 	for _, def in Config.Sounds do
-		local s = Instance.new("Sound")
-		s.SoundId = def.Id
-		table.insert(list, s)
+		if def.Id and def.Id ~= "" then
+			local s = Instance.new("Sound")
+			s.SoundId = def.Id
+			table.insert(list, s)
+		end
 	end
 	pcall(function()
 		ContentProvider:PreloadAsync(list)
 	end)
 end)
+Fx.init()
 
 ---------------------------------------------------------------------------------------
--- Overlay UI (fade, eyelids, crosshair, hints, subtitles, picker)
+-- Overlay UI
 ---------------------------------------------------------------------------------------
 local overlay = UI.new("ScreenGui", {
 	Name = "Overlay",
@@ -107,7 +112,6 @@ local overlay = UI.new("ScreenGui", {
 local overlayCanvas = UI.canvas(overlay)
 
 local lidTop = UI.new("Frame", {
-	Name = "LidTop",
 	BackgroundColor3 = Color3.new(0, 0, 0),
 	BorderSizePixel = 0,
 	Size = UDim2.fromScale(1, 0.62),
@@ -116,7 +120,6 @@ local lidTop = UI.new("Frame", {
 	Parent = overlay,
 }, { UI.gradient(nil, { 0, 0, 0, 1 }, 90) })
 local lidBottom = UI.new("Frame", {
-	Name = "LidBottom",
 	BackgroundColor3 = Color3.new(0, 0, 0),
 	BorderSizePixel = 0,
 	AnchorPoint = Vector2.new(0, 1),
@@ -126,17 +129,7 @@ local lidBottom = UI.new("Frame", {
 	Parent = overlay,
 }, { UI.gradient(nil, { 1, 0, 0, 0 }, 90) })
 
-local fade = UI.new("Frame", {
-	Name = "Fade",
-	BackgroundColor3 = Color3.new(0, 0, 0),
-	BorderSizePixel = 0,
-	Size = UDim2.fromScale(1, 1),
-	ZIndex = 30,
-	Parent = overlay,
-})
-
 local crosshair = UI.new("Frame", {
-	Name = "Crosshair",
 	BackgroundColor3 = Color3.new(1, 1, 1),
 	BackgroundTransparency = 0.25,
 	AnchorPoint = Vector2.new(0.5, 0.5),
@@ -148,74 +141,77 @@ local crosshair = UI.new("Frame", {
 }, { UI.round(), UI.stroke(1, Color3.new(0, 0, 0), 0.5, true) })
 
 local interactHint = UI.label({
-	Name = "InteractHint",
 	Font = Enum.Font.GothamMedium,
 	TextSize = 22,
 	TextColor3 = Color3.new(1, 1, 1),
 	TextXAlignment = Enum.TextXAlignment.Center,
 	AnchorPoint = Vector2.new(0.5, 0),
 	Position = UDim2.new(0.5, 0, 0.5, 26),
-	Size = UDim2.fromOffset(600, 30),
+	Size = UDim2.fromOffset(700, 30),
 	Visible = false,
 	ZIndex = 10,
 	Parent = overlayCanvas,
 })
 UI.stroke(1.5, Color3.new(0, 0, 0), 0.3).Parent = interactHint
 
-local promptLabel = UI.label({
-	Name = "Prompt",
-	Font = Enum.Font.GothamMedium,
-	TextSize = 24,
-	TextColor3 = Color3.new(1, 1, 1),
-	TextTransparency = 1,
-	TextXAlignment = Enum.TextXAlignment.Center,
-	AnchorPoint = Vector2.new(0.5, 1),
-	Position = UDim2.new(0.5, 0, 1, -70),
-	Size = UDim2.fromOffset(1200, 34),
+local function fadingLabel(name: string, size: number, pos: UDim2, anchorY: number, width: number, height: number)
+	local l = UI.label({
+		Name = name,
+		Font = Enum.Font.GothamMedium,
+		TextSize = size,
+		TextColor3 = Color3.new(1, 1, 1),
+		TextTransparency = 1,
+		TextXAlignment = Enum.TextXAlignment.Center,
+		TextWrapped = true,
+		AnchorPoint = Vector2.new(0.5, anchorY),
+		Position = pos,
+		Size = UDim2.fromOffset(width, height),
+		ZIndex = 10,
+		Parent = overlayCanvas,
+	})
+	local s = UI.stroke(1.8, Color3.new(0, 0, 0), 1)
+	s.Parent = l
+	return l, s
+end
+local promptLabel, promptStroke = fadingLabel("Prompt", 24, UDim2.new(0.5, 0, 1, -70), 1, 1300, 34)
+local subtitle, subtitleStroke = fadingLabel("Subtitle", 26, UDim2.new(0.5, 0, 1, -130), 1, 1100, 70)
+local toast, toastStroke = fadingLabel("Toast", 20, UDim2.new(0.5, 0, 0, 60), 0, 1200, 28)
+
+-- objective (top left)
+local objective = UI.new("Frame", {
+	Name = "Objective",
+	BackgroundColor3 = Color3.new(0, 0, 0),
+	BackgroundTransparency = 1,
+	Position = UDim2.fromOffset(40, 40),
+	Size = UDim2.fromOffset(10, 44),
+	AutomaticSize = Enum.AutomaticSize.X,
 	ZIndex = 10,
 	Parent = overlayCanvas,
-})
-local promptStroke = UI.stroke(1.5, Color3.new(0, 0, 0), 1)
-promptStroke.Parent = promptLabel
-
-local subtitle = UI.label({
-	Name = "Subtitle",
-	Font = Enum.Font.GothamMedium,
-	TextSize = 26,
+}, { UI.corner(10), UI.padding(16, 0, 18, 0) })
+local objectiveDot = UI.new("Frame", {
+	BackgroundColor3 = rgb(250, 222, 70),
+	BackgroundTransparency = 1,
+	AnchorPoint = Vector2.new(0, 0.5),
+	Position = UDim2.fromScale(0, 0.5),
+	Size = UDim2.fromOffset(10, 10),
+	Parent = objective,
+}, { UI.round() })
+local objectiveText = UI.label({
+	Font = Enum.Font.GothamBold,
+	TextSize = 22,
 	TextColor3 = Color3.new(1, 1, 1),
 	TextTransparency = 1,
-	TextXAlignment = Enum.TextXAlignment.Center,
-	TextWrapped = true,
-	AnchorPoint = Vector2.new(0.5, 1),
-	Position = UDim2.new(0.5, 0, 1, -130),
-	Size = UDim2.fromOffset(1100, 70),
-	ZIndex = 10,
-	Parent = overlayCanvas,
+	Position = UDim2.fromOffset(22, 0),
+	Size = UDim2.new(0, 0, 1, 0),
+	AutomaticSize = Enum.AutomaticSize.X,
+	Parent = objective,
 })
-local subtitleStroke = UI.stroke(2, Color3.new(0, 0, 0), 1)
-subtitleStroke.Parent = subtitle
-
-local toast = UI.label({
-	Name = "Toast",
-	Font = Enum.Font.GothamMedium,
-	TextSize = 20,
-	TextColor3 = Color3.new(1, 1, 1),
-	TextTransparency = 1,
-	TextXAlignment = Enum.TextXAlignment.Center,
-	AnchorPoint = Vector2.new(0.5, 0),
-	Position = UDim2.new(0.5, 0, 0, 60),
-	Size = UDim2.fromOffset(1100, 28),
-	ZIndex = 40,
-	Parent = overlayCanvas,
-})
-local toastStroke = UI.stroke(1.5, Color3.new(0, 0, 0), 1)
-toastStroke.Parent = toast
 
 local subtitleToken = 0
-local function say(text: string, seconds: number?)
+local function say(text: any, seconds: number?)
 	subtitleToken += 1
 	local my = subtitleToken
-	subtitle.Text = text
+	subtitle.Text = Lang.t(text)
 	UI.tween(subtitle, 0.25, { TextTransparency = 0 })
 	UI.tween(subtitleStroke, 0.25, { Transparency = 0.4 })
 	task.delay(seconds or 3.5, function()
@@ -241,9 +237,11 @@ local function showToast(text: string)
 	end)
 end
 
-local function showPrompt(text: string?)
-	if text then
-		promptLabel.Text = text
+local promptKey: any = nil
+local function showPrompt(key: any)
+	promptKey = key
+	if key then
+		promptLabel.Text = Lang.t(key)
 		UI.tween(promptLabel, 0.4, { TextTransparency = 0 })
 		UI.tween(promptStroke, 0.4, { Transparency = 0.4 })
 	else
@@ -252,28 +250,41 @@ local function showPrompt(text: string?)
 	end
 end
 
-local function fadeTo(alpha: number, t: number)
-	UI.tween(fade, t, { BackgroundTransparency = 1 - alpha }, Enum.EasingStyle.Sine)
+local objectiveKey: any = nil
+local function setObjective(key: any)
+	objectiveKey = key
+	if key then
+		objectiveText.Text = Lang.t(key)
+		Audio.play("UISwoosh", 1.2)
+		UI.tween(objective, 0.4, { BackgroundTransparency = 0.45 })
+		UI.tween(objectiveText, 0.4, { TextTransparency = 0 })
+		UI.tween(objectiveDot, 0.4, { BackgroundTransparency = 0 })
+	else
+		UI.tween(objective, 0.4, { BackgroundTransparency = 1 })
+		UI.tween(objectiveText, 0.4, { TextTransparency = 1 })
+		UI.tween(objectiveDot, 0.4, { BackgroundTransparency = 1 })
+	end
 end
 
 local lidOpen = Instance.new("NumberValue")
 lidOpen.Value = 1
-local function applyLids()
+lidOpen.Changed:Connect(function()
 	local o = lidOpen.Value
 	lidTop.Position = UDim2.fromScale(0, -0.62 * o)
 	lidBottom.Position = UDim2.fromScale(0, 1 + 0.62 * o)
-end
-lidOpen.Changed:Connect(applyLids)
-applyLids()
+end)
 local function lids(target: number, t: number)
+	if t <= 0 then
+		lidOpen.Value = target
+		return
+	end
 	UI.tween(lidOpen, t, { Value = target }, Enum.EasingStyle.Sine)
 	task.wait(t)
 end
 
--- touch buttons
 local isTouch = UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled
-local function touchButton(text: string, pos: UDim2)
-	local b = UI.new("TextButton", {
+local function touchButton(text: string, pos: UDim2, w: number?)
+	return UI.new("TextButton", {
 		Text = text,
 		Font = Enum.Font.GothamBold,
 		TextSize = 22,
@@ -283,55 +294,37 @@ local function touchButton(text: string, pos: UDim2)
 		AutoButtonColor = true,
 		AnchorPoint = Vector2.new(1, 1),
 		Position = pos,
-		Size = UDim2.fromOffset(150, 70),
+		Size = UDim2.fromOffset(w or 170, 70),
 		Visible = false,
 		ZIndex = 15,
 		Parent = overlayCanvas,
 	}, { UI.corner(14), UI.stroke(2, Color3.new(1, 1, 1), 0.6, true) })
-	return b
 end
-local getUpButton = touchButton("GET UP", UDim2.new(1, -60, 1, -60))
-local useButton = touchButton("USE", UDim2.new(1, -60, 1, -150))
-local pauseButton = touchButton("II", UDim2.new(1, -40, 0, 150))
-pauseButton.Size = UDim2.fromOffset(70, 70)
+local getUpButton = touchButton(Lang.t("touch.getup"), UDim2.new(1, -60, 1, -60))
+local useButton = touchButton(Lang.t("touch.use"), UDim2.new(1, -60, 1, -150))
+local pauseButton = touchButton("II", UDim2.new(1, -40, 0, 150), 70)
 
 ---------------------------------------------------------------------------------------
 -- Room sounds
 ---------------------------------------------------------------------------------------
 local snore = Audio.make("Snore", headCore)
 local alarm = Audio.make("Alarm", clockFace)
-local tick = Audio.make("ClockTick", clockFace)
-if tick then
-	tick:Play()
-end
-local ambience: Sound? = nil
-local ambienceKey: string? = nil
-local function setAmbience(key: string?)
-	if key == ambienceKey then
-		return
-	end
-	if ambience then
-		Audio.fadeOut(ambience, 1.5, true)
-	end
-	ambience = nil
-	ambienceKey = key
-	if key then
-		local s = Audio.make(key, workspace.CurrentCamera)
-		if s then
-			Audio.fadeIn(s, 2)
-			ambience = s
-		end
-	end
+local clockTick = Audio.make("ClockTick", clockFace)
+if clockTick then
+	clockTick:Play()
 end
 
 ---------------------------------------------------------------------------------------
 -- Settings -> world
 ---------------------------------------------------------------------------------------
-local function applyGraphics(name: string, instant: boolean?)
+local state = "menu" -- menu | story | playing | paused
+local refreshPicker: () -> ()
+
+local function applyMenuGraphics(name: string, instant: boolean?)
 	Graphics.Apply(name, instant)
 	local p = Graphics.Get(name)
 	if p then
-		setAmbience(p.Ambience)
+		Scenes.setAmbience(p.Ambience)
 	end
 end
 
@@ -342,10 +335,7 @@ Graphics.SetBrightnessOffset(Settings.Get("Brightness") * 0.6)
 pcall(function()
 	UserInputService.MouseDeltaSensitivity = Settings.Get("Sensitivity")
 end)
-applyGraphics(Settings.Get("Graphics"), true)
-
-local state = "menu"
-local refreshPicker: () -> () -- defined further down
+applyMenuGraphics(Settings.Get("Graphics"), true)
 
 Settings.Changed:Connect(function(key, value)
 	if key == "Music" then
@@ -360,21 +350,29 @@ Settings.Changed:Connect(function(key, value)
 	elseif key == "Brightness" then
 		Graphics.SetBrightnessOffset(value * 0.6)
 	elseif key == "Graphics" then
-		applyGraphics(value)
+		-- the menu preset only changes the menu / Morty's room at night
+		if state == "menu" then
+			applyMenuGraphics(value)
+		end
 		refreshPicker()
 		local p = Graphics.Get(value)
 		showToast("GRAPHICS: " .. string.upper(value) .. (if p then "  —  " .. p.Description else ""))
-	elseif key == "FOV" then
-		if state == "playing" or state == "lying" then
-			camera.FieldOfView = value
+	elseif key == "Language" then
+		getUpButton.Text = Lang.t("touch.getup")
+		useButton.Text = Lang.t("touch.use")
+		if promptKey then
+			promptLabel.Text = Lang.t(promptKey)
+		end
+		if objectiveKey then
+			objectiveText.Text = Lang.t(objectiveKey)
 		end
 	end
 end)
 
 ---------------------------------------------------------------------------------------
--- Sleeping Morty visuals
+-- Sleeping Morty in the bed
 ---------------------------------------------------------------------------------------
-local function setVisible(container: Instance, visible: boolean)
+local function setLocalVisible(container: Instance, visible: boolean)
 	for _, d in container:GetDescendants() do
 		if d:IsA("BasePart") then
 			d.LocalTransparencyModifier = if visible then 0 else 1
@@ -385,8 +383,8 @@ end
 local blanketOn = bed:WaitForChild("BlanketOn")
 local blanketOff = bed:WaitForChild("BlanketOff")
 local function setSleeping(sleeping: boolean)
-	setVisible(npcHead, sleeping)
-	setVisible(npc:WaitForChild("Arm"), sleeping)
+	setLocalVisible(npcHead, sleeping)
+	setLocalVisible(npc:WaitForChild("Arm"), sleeping)
 	for _, d in blanketOn:GetDescendants() do
 		if d:IsA("BasePart") then
 			d.Transparency = if sleeping then 0 else 1
@@ -401,14 +399,12 @@ local function setSleeping(sleeping: boolean)
 	end
 end
 
--- floating "Z z z"
 local zzz = UI.new("BillboardGui", {
 	Name = "Zzz",
 	Adornee = headCore,
 	Size = UDim2.fromOffset(120, 140),
 	StudsOffset = Vector3.new(0.6, 1.6, 0),
 	LightInfluence = 0,
-	AlwaysOnTop = false,
 	ResetOnSpawn = false,
 	Parent = playerGui,
 })
@@ -431,6 +427,389 @@ local function updateZzz(t: number, visible: boolean)
 		z.Position = UDim2.fromOffset(20 + i * 18 + math.sin(t * 2 + i) * 6, 100 - phase * 100)
 		z.TextTransparency = if visible then 0.15 + 0.85 * math.abs(phase * 2 - 1) ^ 2 else 1
 		z.Rotation = math.sin(t * 1.5 + i) * 12
+	end
+end
+
+---------------------------------------------------------------------------------------
+-- Character helpers
+---------------------------------------------------------------------------------------
+local character: Model? = nil
+local humanoid: Humanoid? = nil
+local bodyParts: { BasePart } = {}
+local characterHidden = true
+
+local function onCharacter(char: Model)
+	character = char
+	humanoid = char:WaitForChild("Humanoid") :: Humanoid
+	table.clear(bodyParts)
+	for _, d in char:GetDescendants() do
+		if d:IsA("BasePart") then
+			table.insert(bodyParts, d)
+		end
+	end
+end
+player.CharacterAdded:Connect(onCharacter)
+player.CharacterRemoving:Connect(function()
+	character = nil
+	humanoid = nil
+	table.clear(bodyParts)
+end)
+if player.Character then
+	task.spawn(onCharacter, player.Character)
+end
+
+local function rootPart(): BasePart?
+	return humanoid and humanoid.RootPart or nil
+end
+
+---------------------------------------------------------------------------------------
+-- Interactions
+---------------------------------------------------------------------------------------
+local interactEnabled = false
+local allowOnly: { [string]: boolean }? = nil
+local handlers: { [string]: (Instance) -> () } = {}
+local alarmRinging = false
+local curtainsOpen = false
+
+local function setAlarm(on: boolean)
+	alarmRinging = on
+	if alarm then
+		if on then
+			alarm:Play()
+		else
+			alarm:Stop()
+		end
+	end
+	clockText.Visible = true
+	if on then
+		clockText.Text = "7:00"
+	end
+end
+
+local function slideCurtains(open: boolean)
+	curtainsOpen = open
+	Audio.play("Cloth", 1.1)
+	for _, name in { "CurtainLeft", "CurtainRight" } do
+		local m = house:FindFirstChild(name) :: Model?
+		if m then
+			local dir = m:GetAttribute("SlideDir") or 1
+			if m:GetAttribute("ClosedPivot") == nil then
+				m:SetAttribute("ClosedPivot", m:GetPivot())
+			end
+			local closed = m:GetAttribute("ClosedPivot") :: CFrame
+			local target = if open then closed + Vector3.new(dir * 1.25, 0, 0) else closed
+			local from = m:GetPivot()
+			task.spawn(function()
+				local start = os.clock()
+				while true do
+					local a = Director.ease((os.clock() - start) / 0.7)
+					m:PivotTo(from:Lerp(target, a))
+					if a >= 1 then
+						break
+					end
+					RunService.Heartbeat:Wait()
+				end
+			end)
+		end
+	end
+end
+
+handlers.AlarmClock = function()
+	if alarmRinging then
+		setAlarm(false)
+		Audio.play("Click")
+		say({ ru = "Морти: ...семь утра. Ох, божечки.", en = "Morty: ...seven AM. Aw jeez." })
+	else
+		Audio.play("Click")
+		say({ ru = "Сейчас " .. clockText.Text .. ".", en = "It's " .. clockText.Text .. "." })
+	end
+end
+handlers.NightLamp = function()
+	Graphics.SetLight("NightLamp", not Graphics.IsLightOn("NightLamp"))
+	Audio.play("Click")
+end
+handlers.DeskLamp = function()
+	Graphics.SetLight("DeskLamp", not Graphics.IsLightOn("DeskLamp"))
+	Audio.play("Click")
+end
+handlers.LightSwitch = function(model: Instance)
+	local on = not Graphics.IsLightOn("CeilingLight")
+	Graphics.SetLight("CeilingLight", on)
+	Audio.play("Switch")
+	local toggle = model:FindFirstChild("Toggle") :: BasePart?
+	if toggle then
+		if toggle:GetAttribute("BaseCF") == nil then
+			toggle:SetAttribute("BaseCF", toggle.CFrame)
+		end
+		toggle.CFrame = (toggle:GetAttribute("BaseCF") :: CFrame) * CFrame.new(0, if on then 0.06 else 0, 0)
+	end
+end
+handlers.Curtains = function()
+	slideCurtains(not curtainsOpen)
+end
+handlers.Monitor = function()
+	Audio.play("Click")
+	say({ ru = "Морти: Домашка, домашка... и 38 непрочитанных от Рика. Не-а.", en = "Morty: Homework, homework... and 38 unread messages from Rick. Nope." })
+end
+handlers.FrontDoor = function()
+	Audio.play("Click", 0.7)
+	say({ ru = "Морти: Сначала завтрак. Мама убьёт.", en = "Morty: Breakfast first. Mom will kill me." })
+end
+handlers.SummerDoor = function()
+	Audio.play("Click", 0.7)
+	say({ ru = "Саммер (за дверью): Даже не думай, Морти!", en = "Summer (behind the door): Don't even think about it, Morty!" })
+end
+
+local function interactText(model: Instance): string
+	local id = model:GetAttribute("Interact")
+	if id == "Curtains" and curtainsOpen then
+		return Lang.t("interact.Curtains.open")
+	elseif id == "AlarmClock" and not alarmRinging then
+		return Lang.t("interact.AlarmClock.idle")
+	elseif id == "Door" and model:GetAttribute("Open") then
+		return Lang.t("interact.Door.open")
+	end
+	local key = "interact." .. tostring(id)
+	if Lang.strings[key] then
+		return Lang.t(key)
+	end
+	return model:GetAttribute("InteractText") or "Use"
+end
+
+local rayParams = RaycastParams.new()
+rayParams.FilterType = Enum.RaycastFilterType.Exclude
+local function findTarget(maxDist: number): Instance?
+	local filter: { Instance } = { npcHead }
+	local arm = npc:FindFirstChild("Arm")
+	if arm then
+		table.insert(filter, arm)
+	end
+	if character then
+		table.insert(filter, character :: Model)
+	end
+	local cast = workspace:FindFirstChild("Cast")
+	if cast then
+		table.insert(filter, cast)
+	end
+	local fxf = workspace:FindFirstChild("ClientFx")
+	if fxf then
+		table.insert(filter, fxf)
+	end
+	rayParams.FilterDescendantsInstances = filter
+	local cf = camera.CFrame
+	local result = workspace:Raycast(cf.Position, cf.LookVector * maxDist, rayParams)
+	if not result then
+		return nil
+	end
+	local inst: Instance? = result.Instance
+	while inst and inst ~= workspace do
+		if inst:GetAttribute("Interact") then
+			return inst
+		end
+		inst = inst.Parent
+	end
+	return nil
+end
+
+local currentTarget: Instance? = nil
+local function updateInteraction(maxDist: number)
+	local target = if interactEnabled then findTarget(maxDist) else nil
+	if target and allowOnly and not allowOnly[target:GetAttribute("Interact")] then
+		target = nil
+	end
+	currentTarget = target
+	if target then
+		interactHint.Text = (if isTouch then "" else "[E]  ") .. interactText(target)
+		interactHint.Visible = true
+		crosshair.Size = UDim2.fromOffset(10, 10)
+	else
+		interactHint.Visible = false
+		crosshair.Size = UDim2.fromOffset(6, 6)
+	end
+	useButton.Visible = isTouch and target ~= nil
+end
+
+local function useTarget()
+	local target = currentTarget
+	if target then
+		local h = handlers[target:GetAttribute("Interact")]
+		if h then
+			h(target)
+		end
+	end
+end
+
+---------------------------------------------------------------------------------------
+-- Per-frame gameplay (first person body, head bob, interaction)
+---------------------------------------------------------------------------------------
+local bobTime, bobAmount = 0, 0
+RunService:BindToRenderStep("PlayingStep", Enum.RenderPriority.Camera.Value + 2, function(dt)
+	if characterHidden then
+		for _, p in bodyParts do
+			p.LocalTransparencyModifier = 1
+		end
+	end
+	if alarmRinging then
+		clockText.Visible = math.floor(os.clock() * 2) % 2 == 0
+	end
+	if state ~= "playing" then
+		return
+	end
+	local showBody = Settings.Get("ShowBody")
+	if not characterHidden then
+		for _, p in bodyParts do
+			local group = p:GetAttribute("BodyGroup")
+			if group then
+				p.LocalTransparencyModifier = if group == "Head" or not showBody then 1 else 0
+			end
+		end
+	end
+	local hum = humanoid
+	if hum then
+		local root = hum.RootPart
+		local speed = if root then Vector3.new(root.AssemblyLinearVelocity.X, 0, root.AssemblyLinearVelocity.Z).Magnitude else 0
+		local moving = speed > 1 and hum.FloorMaterial ~= Enum.Material.Air
+		bobAmount += ((if moving and Settings.Get("HeadBob") then 1 else 0) - bobAmount) * math.min(dt * 8, 1)
+		bobTime += dt * speed
+		hum.CameraOffset = Vector3.new(math.cos(bobTime * 0.5) * 0.05 * bobAmount, math.sin(bobTime) * 0.08 * bobAmount, if showBody then -0.35 else 0)
+	end
+	camera.FieldOfView = Settings.Get("FOV")
+	UserInputService.MouseIconEnabled = false
+	crosshair.Visible = true
+	updateInteraction(9)
+end)
+
+---------------------------------------------------------------------------------------
+-- Lying down (bed / operating table) + getting up
+---------------------------------------------------------------------------------------
+local lyingActive = false
+local getUpPressed = false
+
+local function lie(eyeCF: CFrame, opts: { [string]: any }?)
+	local o = opts or {}
+	state = "story"
+	setControls(false)
+	Director.cut(eyeCF, Settings.Get("FOV"))
+	Director.freeLook(true, { yaw = o.yaw or 1.75, pitchUp = 0.9, pitchDown = 1.1 })
+	Director.resetLook()
+	lyingActive = true
+	getUpPressed = false
+	interactEnabled = o.interact ~= false
+	allowOnly = o.allowOnly
+	crosshair.Visible = interactEnabled
+	if o.blink then
+		lidOpen.Value = 0
+		task.wait(o.closedTime or 1.2)
+		lids(0.18, 0.5)
+		task.wait(0.25)
+		lids(0, 0.2)
+		task.wait(0.5)
+		Audio.play("Gasp")
+		lids(0.45, 0.55)
+		task.wait(0.2)
+		lids(0.05, 0.18)
+		task.wait(0.15)
+		lids(1, 1.1)
+	end
+end
+
+local function waitGetUp(promptK: any)
+	showPrompt(promptK or (if isTouch then "hint.lying.touch" else "hint.lying.simple"))
+	getUpButton.Visible = isTouch
+	getUpPressed = false
+	while not getUpPressed do
+		RunService.RenderStepped:Wait()
+		if interactEnabled then
+			updateInteraction(7)
+			crosshair.Visible = true
+		end
+	end
+	showPrompt(nil)
+	getUpButton.Visible = false
+	lyingActive = false
+	interactEnabled = false
+	allowOnly = nil
+	interactHint.Visible = false
+	useButton.Visible = false
+	crosshair.Visible = false
+	Director.freeLook(false)
+end
+
+---------------------------------------------------------------------------------------
+-- Spawning / releasing / teleporting the player's character
+---------------------------------------------------------------------------------------
+local function spawnCharacter()
+	local ok = pcall(function()
+		Remotes.RequestSpawn:InvokeServer()
+	end)
+	local t0 = os.clock()
+	while not (character and humanoid and humanoid.RootPart) and os.clock() - t0 < 10 do
+		task.wait(0.1)
+	end
+	return ok
+end
+
+local function release(cf: CFrame)
+	pcall(function()
+		Remotes.ReleaseCharacter:FireServer(cf)
+	end)
+	local t0 = os.clock()
+	repeat
+		RunService.RenderStepped:Wait()
+		local r = rootPart()
+	until (r and (r.Position - cf.Position).Magnitude < 3 and not r.Anchored) or os.clock() - t0 > 4
+end
+
+local function teleport(cf: CFrame)
+	local char = character
+	if char then
+		local r = rootPart()
+		if r then
+			r.AssemblyLinearVelocity = Vector3.zero
+		end
+		char:PivotTo(cf)
+	end
+end
+
+local function freeze(on: boolean)
+	local r = rootPart()
+	if r then
+		if on then
+			r.Anchored = true
+			r:SetAttribute("ClientFrozen", true)
+		elseif r:GetAttribute("ClientFrozen") then
+			r.Anchored = false
+			r:SetAttribute("ClientFrozen", nil)
+		end
+	end
+end
+
+-- hand control to the player (first person) looking along `lookCF` if given
+local function gameplay(on: boolean, lookCF: CFrame?)
+	if on then
+		Director.stop()
+		freeze(false)
+		characterHidden = false
+		if humanoid then
+			camera.CameraSubject = humanoid
+		end
+		if lookCF then
+			camera.CFrame = lookCF
+		end
+		camera.CameraType = Enum.CameraType.Custom
+		setControls(true)
+		interactEnabled = true
+		allowOnly = nil
+		state = "playing"
+		pauseButton.Visible = isTouch
+	else
+		setControls(false)
+		interactEnabled = false
+		interactHint.Visible = false
+		useButton.Visible = false
+		crosshair.Visible = false
+		pauseButton.Visible = false
+		state = "story"
 	end
 end
 
@@ -470,11 +849,6 @@ local function shotCFrame(shot, t: number): CFrame
 	return cf
 end
 
-local function smooth(x: number): number
-	x = math.clamp(x, 0, 1)
-	return x * x * (3 - 2 * x)
-end
-
 local focus = Lighting:FindFirstChild("Focus") :: DepthOfFieldEffect?
 local blur = Lighting:FindFirstChild("Blur") :: BlurEffect?
 
@@ -486,7 +860,7 @@ local function menuCameraStep()
 	local t = os.clock() - menuStartTime
 	local target = shotCFrame(shot, t)
 	if blendFrom then
-		local a = smooth((os.clock() - blendStart) / 1.6)
+		local a = Director.ease((os.clock() - blendStart) / 1.6)
 		target = (blendFrom :: CFrame):Lerp(target, a)
 		if a >= 1 then
 			blendFrom = nil
@@ -547,7 +921,7 @@ local function cycle(list: { string }, current: string, d: number): string
 	return list[(i - 1 + d) % #list + 1]
 end
 
-local function buildPicker()
+do
 	local holder = UI.new("Frame", {
 		Name = "StylePicker",
 		BackgroundColor3 = rgb(10, 10, 14),
@@ -610,10 +984,8 @@ local function buildPicker()
 	end)
 	pickerGfxLabel = group(432, "GRAPHICS [G]", function()
 		Settings.Set("Graphics", cycle(Config.GraphicsPresets, Settings.Get("Graphics"), -1))
-		refreshPicker()
 	end, function()
 		Settings.Set("Graphics", cycle(Config.GraphicsPresets, Settings.Get("Graphics"), 1))
-		refreshPicker()
 	end)
 	local close = UI.new("TextButton", {
 		Text = "×",
@@ -632,7 +1004,6 @@ local function buildPicker()
 	picker = holder
 	refreshPicker()
 end
-buildPicker()
 
 local function setPickerVisible(on: boolean)
 	if picker then
@@ -650,6 +1021,10 @@ buildMenu = function(mode: string)
 		(menuGui :: ScreenGui):Destroy()
 	end
 	local styleName = Settings.Get("MenuStyle")
+	if mode == "pause" and styleName == "Monitor" then
+		-- the Monitor menu lives on Morty's computer, which you can't see from everywhere
+		styleName = "Cinematic"
+	end
 	local module = StylesFolder:FindFirstChild(styleName) or StylesFolder:FindFirstChild("Cinematic")
 	menuStyle = require(module :: ModuleScript)
 	local gui = UI.new("ScreenGui", {
@@ -663,7 +1038,6 @@ buildMenu = function(mode: string)
 	menuGui = gui
 	local full = UI.full(gui, "Full")
 	local canvas = UI.canvas(gui)
-	-- keeps the mouse free in first person while the menu is open
 	UI.new("TextButton", {
 		Name = "MouseUnlock",
 		Modal = true,
@@ -687,17 +1061,44 @@ buildMenu = function(mode: string)
 	refreshPicker()
 end
 
+local function stopMenuCamera()
+	RunService:UnbindFromRenderStep("MenuCamera")
+	if focus then
+		focus.Enabled = false
+	end
+	if blur then
+		blur.Enabled = false
+	end
+	updateZzz(0, false)
+end
+
+local function pauseCameraStep()
+	-- pause: keep the current view, blurred, with a free mouse
+	camera.CameraType = Enum.CameraType.Scriptable
+	if pausedCameraCFrame then
+		camera.CFrame = pausedCameraCFrame
+	end
+	UserInputService.MouseBehavior = Enum.MouseBehavior.Default
+	UserInputService.MouseIconEnabled = true
+end
+
 local function openMenu(mode: string)
 	state = if mode == "pause" then "paused" else "menu"
+	Director.stop()
 	menuStartTime = os.clock()
 	blendFrom = camera.CFrame
 	blendStart = os.clock()
-	RunService:BindToRenderStep("MenuCamera", Enum.RenderPriority.Camera.Value + 1, menuCameraStep)
+	RunService:BindToRenderStep("MenuCamera", Enum.RenderPriority.Camera.Value + 1, if mode == "pause" then pauseCameraStep else menuCameraStep)
 	buildMenu(mode)
+	if mode == "pause" and blur then
+		blur.Size = 14
+		blur.Enabled = true
+	end
 	setPickerVisible(mode == "main")
 	crosshair.Visible = false
 	interactHint.Visible = false
 	pauseButton.Visible = false
+	useButton.Visible = false
 end
 
 local function closeMenu(done: () -> ())
@@ -717,425 +1118,103 @@ local function closeMenu(done: () -> ())
 	end
 end
 
-local function stopMenuCamera()
-	RunService:UnbindFromRenderStep("MenuCamera")
-	if focus then
-		focus.Enabled = false
-	end
-	if blur then
-		blur.Enabled = false
-	end
-	updateZzz(0, false)
-end
-
 ---------------------------------------------------------------------------------------
--- Camera tween helper (Scriptable camera)
+-- The api handed to the Story module
 ---------------------------------------------------------------------------------------
-local function cameraTween(from: CFrame, to: CFrame, duration: number, fovTo: number?)
-	local fov0 = camera.FieldOfView
-	local start = os.clock()
-	while true do
-		local a = smooth((os.clock() - start) / duration)
-		camera.CameraType = Enum.CameraType.Scriptable
-		camera.CFrame = from:Lerp(to, a)
-		if fovTo then
-			camera.FieldOfView = fov0 + (fovTo - fov0) * a
-		end
-		if a >= 1 then
-			break
-		end
-		RunService.RenderStepped:Wait()
-	end
+local api = {}
+api.house = house
+api.headCore = headCore
+api.npcHead = npcHead
+api.wakePoint = wakePoint
+api.isTouch = isTouch
+api.handlers = handlers
+function api.character()
+	return character
 end
-
----------------------------------------------------------------------------------------
--- Interactions
----------------------------------------------------------------------------------------
-local alarmRinging = false
-local curtainsOpen = false
-local character: Model? = nil
-local humanoid: Humanoid? = nil
-
-local function stopAlarm()
-	if alarmRinging then
-		alarmRinging = false
-		if alarm then
-			alarm:Stop()
-		end
-		clockText.Visible = true
-		clockText.Text = "7:00"
-		Audio.play("Click")
-		say("Morty: ...seven AM. Aw jeez.")
-	end
+function api.humanoid()
+	return humanoid
 end
-
-local function slideCurtains(open: boolean)
-	curtainsOpen = open
-	Audio.play("Cloth", 1.1)
-	for _, name in { "CurtainLeft", "CurtainRight" } do
-		local m = house:FindFirstChild(name) :: Model?
-		if m then
-			local dir = m:GetAttribute("SlideDir") or 1
-			if m:GetAttribute("ClosedPivot") == nil then
-				m:SetAttribute("ClosedPivot", m:GetPivot())
-			end
-			local closed = m:GetAttribute("ClosedPivot") :: CFrame
-			local target = if open then closed + Vector3.new(dir * 1.25, 0, 0) else closed
-			local from = m:GetPivot()
-			task.spawn(function()
-				local start = os.clock()
-				while true do
-					local a = smooth((os.clock() - start) / 0.7)
-					m:PivotTo(from:Lerp(target, a))
-					if a >= 1 then
-						break
-					end
-					RunService.Heartbeat:Wait()
-				end
-			end)
-		end
-	end
+function api.root()
+	return rootPart()
 end
-
-local handlers = {}
-handlers.AlarmClock = function()
-	if alarmRinging then
-		stopAlarm()
-	else
-		Audio.play("Click")
-		say("It's " .. clockText.Text .. ".")
-	end
+function api.camera()
+	return camera
 end
-handlers.NightLamp = function()
-	Graphics.SetLight("NightLamp", not Graphics.IsLightOn("NightLamp"))
-	Audio.play("Click")
+api.spawn = spawnCharacter
+api.release = release
+api.teleport = teleport
+api.freeze = freeze
+api.gameplay = gameplay
+api.lie = lie
+api.waitGetUp = waitGetUp
+api.lids = lids
+api.say = say
+api.prompt = showPrompt
+api.objective = setObjective
+api.toast = showToast
+api.setSleeping = setSleeping
+api.setAlarm = setAlarm
+function api.alarmRinging()
+	return alarmRinging
 end
-handlers.DeskLamp = function()
-	Graphics.SetLight("DeskLamp", not Graphics.IsLightOn("DeskLamp"))
-	Audio.play("Click")
-end
-handlers.LightSwitch = function(model: Instance)
-	local on = not Graphics.IsLightOn("CeilingLight")
-	Graphics.SetLight("CeilingLight", on)
-	Audio.play("Switch")
-	local toggle = model:FindFirstChild("Toggle") :: BasePart?
-	if toggle then
-		if toggle:GetAttribute("BaseCF") == nil then
-			toggle:SetAttribute("BaseCF", toggle.CFrame)
-		end
-		toggle.CFrame = (toggle:GetAttribute("BaseCF") :: CFrame) * CFrame.new(0, if on then 0.06 else 0, 0)
-	end
-end
-handlers.Curtains = function()
-	slideCurtains(not curtainsOpen)
-end
-handlers.Monitor = function()
-	Audio.play("Click")
-	say("Morty: Homework, homework... and 38 unread messages from Rick. Nope.")
-end
-local doorLines = {
-	"Rick (behind the door): Not now, Morty! I'm in the middle of something! *burp*",
-	"Rick: Morty, I swear, if you open that door I'll turn you into a pickle.",
-	"The door is locked. From the outside. Weird.",
-}
-local doorIndex = 0
-handlers.Door = function()
-	Audio.play("Click", 0.7)
-	doorIndex = doorIndex % #doorLines + 1
-	say(doorLines[doorIndex], 4.5)
-end
-
-local function interactText(model: Instance): string
-	local text = model:GetAttribute("InteractText") or "Use"
-	local id = model:GetAttribute("Interact")
-	if id == "Curtains" then
-		text = if curtainsOpen then "Close curtains" else "Open curtains"
-	elseif id == "AlarmClock" and not alarmRinging then
-		text = "Check the time"
-	end
-	return text
-end
-
-local rayParams = RaycastParams.new()
-rayParams.FilterType = Enum.RaycastFilterType.Exclude
-local function findTarget(maxDist: number): Instance?
-	local filter: { Instance } = { npcHead, npc:FindFirstChild("Arm") :: Instance }
-	if character then
-		table.insert(filter, character :: Model)
-	end
-	rayParams.FilterDescendantsInstances = filter
-	local cf = camera.CFrame
-	local result = workspace:Raycast(cf.Position, cf.LookVector * maxDist, rayParams)
-	if not result then
-		return nil
-	end
-	local inst: Instance? = result.Instance
-	while inst and inst ~= house and inst ~= workspace do
-		if inst:GetAttribute("Interact") then
-			return inst
-		end
-		inst = inst.Parent
-	end
-	return nil
-end
-
-local currentTarget: Instance? = nil
-local function updateInteraction()
-	local target = findTarget(if state == "lying" then 7 else 9)
-	if state == "lying" and target and target:GetAttribute("Interact") ~= "AlarmClock" then
-		target = nil
-	end
-	currentTarget = target
-	if target then
-		interactHint.Text = (if isTouch then "" else "[E]  ") .. interactText(target)
-		interactHint.Visible = true
-		crosshair.Size = UDim2.fromOffset(10, 10)
-	else
-		interactHint.Visible = false
-		crosshair.Size = UDim2.fromOffset(6, 6)
-	end
-	useButton.Visible = isTouch and target ~= nil
-end
-
-local function useTarget()
-	local target = currentTarget
-	if target then
-		local id = target:GetAttribute("Interact")
-		local h = handlers[id]
-		if h then
-			h(target)
-		end
-	end
-end
-
----------------------------------------------------------------------------------------
--- Character (first person body, head bob)
----------------------------------------------------------------------------------------
-local bodyParts: { BasePart } = {}
-local function onCharacter(char: Model)
-	character = char
-	humanoid = char:WaitForChild("Humanoid") :: Humanoid
-	table.clear(bodyParts)
-	for _, d in char:GetDescendants() do
-		if d:IsA("BasePart") and d:GetAttribute("BodyGroup") then
-			table.insert(bodyParts, d)
-		end
-	end
-end
-player.CharacterAdded:Connect(onCharacter)
-if player.Character then
-	task.spawn(onCharacter, player.Character)
-end
-
-local bobTime = 0
-local bobAmount = 0
-local function playingStep(dt: number)
-	if state ~= "playing" then
-		return
-	end
-	local showBody = Settings.Get("ShowBody")
-	for _, p in bodyParts do
-		local group = p:GetAttribute("BodyGroup")
-		if group == "Head" then
-			p.LocalTransparencyModifier = 1
-		else
-			p.LocalTransparencyModifier = if showBody then 0 else 1
-		end
-	end
-	local hum = humanoid
-	if hum then
-		local root = hum.RootPart
-		local speed = if root then Vector3.new(root.AssemblyLinearVelocity.X, 0, root.AssemblyLinearVelocity.Z).Magnitude else 0
-		local moving = speed > 1 and hum.FloorMaterial ~= Enum.Material.Air
-		bobAmount += ((if moving and Settings.Get("HeadBob") then 1 else 0) - bobAmount) * math.min(dt * 8, 1)
-		bobTime += dt * (speed / 9) * 9
-		local y = math.sin(bobTime) * 0.08 * bobAmount
-		local x = math.cos(bobTime * 0.5) * 0.05 * bobAmount
-		hum.CameraOffset = Vector3.new(x, y, if showBody then -0.35 else 0)
-	end
-	camera.FieldOfView = Settings.Get("FOV")
-	UserInputService.MouseIconEnabled = false
-	crosshair.Visible = true
-	if alarmRinging then
-		clockText.Visible = math.floor(os.clock() * 2) % 2 == 0
-	end
-	updateInteraction()
-end
-RunService:BindToRenderStep("PlayingStep", Enum.RenderPriority.Camera.Value + 2, playingStep)
-
----------------------------------------------------------------------------------------
--- Waking up
----------------------------------------------------------------------------------------
-local lieYaw, liePitch = 0, 0
-local lieBase: CFrame = CFrame.new()
-local spawnReady = false
-local canGetUp = false
-local touchLook: Vector2 = Vector2.zero
-
-local function lyingEye(): CFrame
-	local offset = npcHead:GetAttribute("EyeOffset") or Vector3.new(0, 0.05, -0.55)
-	local cf = headCore.CFrame * CFrame.new(offset)
-	-- look straight out of the face, keep "up" towards the top of the head
-	return CFrame.lookAt(cf.Position, cf.Position + headCore.CFrame.LookVector, headCore.CFrame.UpVector)
-end
-
-local function lyingStep(_dt: number)
-	if state ~= "lying" then
-		return
-	end
-	UserInputService.MouseBehavior = Enum.MouseBehavior.LockCenter
-	UserInputService.MouseIconEnabled = false
-	local delta = UserInputService:GetMouseDelta() + touchLook
-	touchLook = Vector2.zero
-	local k = 0.0045
-	lieYaw = math.clamp(lieYaw - delta.X * k, -1.75, 1.75)
-	liePitch = math.clamp(liePitch - delta.Y * k, -1.1, 0.9)
-	local breathe = math.sin(os.clock() * 1.6) * 0.02
-	camera.CameraType = Enum.CameraType.Scriptable
-	camera.CFrame = lieBase * CFrame.new(0, 0, breathe) * CFrame.Angles(0, lieYaw, 0) * CFrame.Angles(liePitch, 0, 0)
-	camera.FieldOfView = Settings.Get("FOV")
-	crosshair.Visible = true
-	updateInteraction()
-	if alarmRinging then
-		clockText.Visible = math.floor(os.clock() * 2) % 2 == 0
-	end
-end
-RunService:BindToRenderStep("LyingStep", Enum.RenderPriority.Camera.Value + 2, lyingStep)
-
-UserInputService.InputChanged:Connect(function(input, processed)
-	if state == "lying" and input.UserInputType == Enum.UserInputType.Touch and not processed then
-		touchLook += Vector2.new(input.Delta.X, input.Delta.Y)
-	end
-end)
-
-local function wakeUp()
-	state = "waking"
-	stopMenuCamera()
-	Audio.music(nil, 2.5)
-	Audio.play("Whoosh")
-	local face = headCore.CFrame
-	local approach = CFrame.lookAt(face.Position + face.LookVector * 2.4 + Vector3.new(0.9, 0.5, 0.9), face.Position)
-	cameraTween(camera.CFrame, approach, 2.0, 50)
-	fadeTo(1, 0.6)
-	task.wait(0.7)
-
-	-- (black screen) become Morty
+function api.snore(on: boolean)
 	if snore then
-		snore:Stop()
-	end
-	setSleeping(false)
-	lidOpen.Value = 0
-	spawnReady = false
-	canGetUp = false
-	task.spawn(function()
-		pcall(function()
-			Remotes.RequestSpawn:InvokeServer()
-		end)
-		spawnReady = true
-	end)
-	lieBase = lyingEye()
-	lieYaw, liePitch = 0.15, 0
-	camera.CFrame = lieBase
-	camera.FieldOfView = Settings.Get("FOV")
-	if blur then
-		blur.Size = 20
-		blur.Enabled = true
-	end
-	fade.BackgroundTransparency = 1
-	clockText.Text = "7:00"
-	alarmRinging = true
-	if alarm then
-		alarm:Play()
-	end
-	state = "lying"
-	task.wait(1.4)
-
-	-- eyes open... close... open
-	lids(0.18, 0.5)
-	task.wait(0.25)
-	lids(0, 0.2)
-	task.wait(0.5)
-	Audio.play("Gasp")
-	lids(0.45, 0.55)
-	task.wait(0.2)
-	lids(0.05, 0.18)
-	task.wait(0.15)
-	if blur then
-		UI.tween(blur, 1.8, { Size = 0 }, Enum.EasingStyle.Sine)
-	end
-	lids(1, 1.1)
-	if blur then
-		task.delay(1.8, function()
-			if state ~= "menu" then
-				blur.Enabled = false
-			end
-		end)
-	end
-	canGetUp = true
-	if state == "lying" then
-		showPrompt(if isTouch then "Look around. Tap GET UP when ready." else "Look around with the mouse.   [SPACE] get up   ·   [E] on the alarm clock to turn it off")
-		getUpButton.Visible = isTouch
+		if on then
+			snore:Play()
+		else
+			snore:Stop()
+		end
 	end
 end
-
-local function getUp()
-	if state ~= "lying" or not canGetUp then
-		return
+function api.hideCharacter(hidden: boolean)
+	characterHidden = hidden
+	if not hidden then
+		for _, p in bodyParts do
+			p.LocalTransparencyModifier = 0
+		end
 	end
-	state = "gettingup"
-	-- make sure the server has created the character before we hand over
-	local waitStart = os.clock()
-	while not spawnReady and os.clock() - waitStart < 10 do
+end
+function api.state(s: string?)
+	if s then
+		state = s
+	end
+	return state
+end
+function api.interact(on: boolean, only: { [string]: boolean }?)
+	interactEnabled = on
+	allowOnly = only
+end
+-- yields until the player uses an object with this Interact id
+function api.waitInteract(id: string): Instance
+	local done: Instance? = nil
+	local old = handlers[id]
+	handlers[id] = function(model)
+		done = model
+	end
+	while not done do
+		task.wait()
+	end
+	handlers[id] = old
+	return done :: Instance
+end
+function api.waitNear(pos: Vector3, radius: number)
+	while true do
+		local r = rootPart()
+		if r and (r.Position - pos).Magnitude <= radius then
+			return
+		end
 		task.wait(0.1)
 	end
-	showPrompt(nil)
-	getUpButton.Visible = false
-	crosshair.Visible = false
-	interactHint.Visible = false
-	useButton.Visible = false
-	Audio.play("Cloth")
-	task.delay(0.5, function()
-		Audio.play("GetUp")
-	end)
-
-	local sitPos = Vector3.new(-6.95, 4.55, -4.9)
-	local sitCF = CFrame.lookAt(sitPos, sitPos + Vector3.new(1, -0.28, 0.35))
-	local standPos = wakePoint.Position + Vector3.new(0, 1.5, 0)
-	local standCF = CFrame.lookAt(standPos, standPos + wakePoint.CFrame.LookVector * 10 + Vector3.new(0, -0.8, 0))
-	cameraTween(camera.CFrame, sitCF, 1.4)
-	task.wait(0.15)
-	cameraTween(sitCF, standCF, 1.1)
-
-	-- hand over to the real character
-	pcall(function()
-		Remotes.ReleaseCharacter:FireServer()
-	end)
-	local t0 = os.clock()
-	repeat
-		RunService.RenderStepped:Wait()
-	until (humanoid and humanoid.RootPart and (humanoid.RootPart.Position - wakePoint.Position).Magnitude < 3) or os.clock() - t0 > 3
-	if humanoid then
-		camera.CameraSubject = humanoid
-	end
-	camera.CameraType = Enum.CameraType.Custom
-	camera.CFrame = standCF
-	setControls(true)
-	state = "playing"
-	pauseButton.Visible = isTouch
-	if alarmRinging then
-		showPrompt("Walk with WASD. Turn off that alarm: look at it and press [E].")
-	else
-		showPrompt(if isTouch then "Explore Morty's room." else "WASD walk  ·  [E] use  ·  [P] pause  ·  [G] graphics")
-	end
-	task.delay(7, function()
-		if state == "playing" then
-			showPrompt(nil)
-		end
-	end)
+end
+function api.stopMenuCamera()
+	stopMenuCamera()
+end
+function api.toMenu()
+	actions.MainMenu()
 end
 
 ---------------------------------------------------------------------------------------
--- Pause / resume / back to menu
+-- Pause / resume / menu actions
 ---------------------------------------------------------------------------------------
 local function pause()
 	if state ~= "playing" then
@@ -1157,23 +1236,25 @@ end
 actions.Resume = function()
 	closeMenu(function()
 		stopMenuCamera()
-		if humanoid then
-			camera.CameraSubject = humanoid
-		end
-		if pausedCameraCFrame then
-			camera.CFrame = pausedCameraCFrame
-		end
-		camera.CameraType = Enum.CameraType.Custom
-		setControls(true)
-		state = "playing"
-		pauseButton.Visible = isTouch
+		gameplay(true, pausedCameraCFrame)
+	end)
+end
+
+local function startStory(chapter: number)
+	closeMenu(function()
+		stopMenuCamera()
+		Audio.music(nil, 2)
+		state = "story"
+		Story.run(api, chapter)
 	end)
 end
 
 actions.Play = function()
-	closeMenu(function()
-		task.spawn(wakeUp)
-	end)
+	startStory(1)
+end
+
+actions.Chapter = function(n: number)
+	startStory(n)
 end
 
 actions.Quit = function()
@@ -1182,30 +1263,30 @@ end
 
 actions.MainMenu = function()
 	closeMenu(function()
-		fadeTo(1, 0.5)
-		task.wait(0.55)
+		Fx.fade(1, 0.5, true)
+		Story.stop()
+		Director.stop()
+		Dialogue.hide()
 		stopMenuCamera()
 		pcall(function()
 			Remotes.ReturnToMenu:FireServer()
 		end)
 		character = nil
 		humanoid = nil
-		setControls(false)
-		if alarm then
-			alarm:Stop()
-		end
-		alarmRinging = false
-		clockText.Visible = true
+		gameplay(false)
+		setAlarm(false)
+		setObjective(nil)
+		showPrompt(nil)
 		if curtainsOpen then
 			slideCurtains(false)
 		end
+		Story.reset(api)
+		lidOpen.Value = 1
 		setSleeping(true)
-		applyGraphics(Settings.Get("Graphics"), true)
-		if snore then
-			snore:Play()
-		end
+		applyMenuGraphics(Settings.Get("Graphics"), true)
+		api.snore(true)
 		openMenu("main")
-		fadeTo(0, 1.2)
+		Fx.fade(0, 1.2)
 	end)
 end
 
@@ -1214,13 +1295,11 @@ end
 ---------------------------------------------------------------------------------------
 UserInputService.InputBegan:Connect(function(input, processed)
 	local key = input.KeyCode
-	if state == "lying" then
-		if key == Enum.KeyCode.Space or key == Enum.KeyCode.ButtonA then
-			task.spawn(getUp)
-			return
-		end
+	if lyingActive and (key == Enum.KeyCode.Space or key == Enum.KeyCode.ButtonA) then
+		getUpPressed = true
+		return
 	end
-	if state == "lying" or state == "playing" then
+	if (state == "playing" or lyingActive) and interactEnabled then
 		if key == Enum.KeyCode.E or key == Enum.KeyCode.ButtonX or (input.UserInputType == Enum.UserInputType.MouseButton1 and not processed) then
 			useTarget()
 			return
@@ -1231,9 +1310,8 @@ UserInputService.InputBegan:Connect(function(input, processed)
 	end
 	if state == "playing" and (key == Enum.KeyCode.P or key == Enum.KeyCode.M or key == Enum.KeyCode.ButtonStart) then
 		pause()
-	elseif key == Enum.KeyCode.G then
+	elseif key == Enum.KeyCode.G and state == "menu" then
 		Settings.Set("Graphics", cycle(Config.GraphicsPresets, Settings.Get("Graphics"), 1))
-		refreshPicker()
 	elseif state == "menu" and menuMode == "main" then
 		local n = ({
 			[Enum.KeyCode.One] = 1,
@@ -1249,7 +1327,7 @@ UserInputService.InputBegan:Connect(function(input, processed)
 end)
 
 getUpButton.Activated:Connect(function()
-	task.spawn(getUp)
+	getUpPressed = true
 end)
 useButton.Activated:Connect(useTarget)
 pauseButton.Activated:Connect(pause)
@@ -1260,12 +1338,12 @@ pauseButton.Activated:Connect(pause)
 if not game:IsLoaded() then
 	game.Loaded:Wait()
 end
+Fx.black(1)
 setSleeping(true)
-if snore then
-	snore:Play()
-end
+api.snore(true)
+Story.init(api)
 camera.CameraType = Enum.CameraType.Scriptable
 openMenu("main")
 blendFrom = nil
 task.wait(0.4)
-fadeTo(0, 1.6)
+Fx.fade(0, 1.6)

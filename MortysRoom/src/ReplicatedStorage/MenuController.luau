@@ -44,6 +44,7 @@ function MenuController.new(styleModule, ctx)
 
 	self:_buildMain()
 	self:_buildSettings()
+	self:_buildChapters()
 	self:_buildCredits()
 	self:_buildConfirm()
 	self:Show("Main", true)
@@ -193,6 +194,9 @@ function MenuController:_buildMain()
 		self:_addButton("Main", "Play", "primary", function()
 			a.Play()
 		end)
+		self:_addButton("Main", "Chapters", "normal", function()
+			self:Show("Chapters")
+		end)
 		self:_addButton("Main", "Settings", "normal", function()
 			self:Show("Settings")
 		end)
@@ -221,6 +225,15 @@ function MenuController:_buildSettings()
 		Order = nextOrder(),
 		OnChanged = function(v)
 			Settings.Set("Graphics", v)
+		end,
+	})
+	Widgets.Choice(page, theme, {
+		Label = "Language",
+		Options = { "Russian", "English" },
+		Value = if Settings.Get("Language") == "EN" then "English" else "Russian",
+		Order = nextOrder(),
+		OnChanged = function(v)
+			Settings.Set("Language", if v == "English" then "EN" else "RU")
 		end,
 	})
 	local function pct(v)
@@ -309,6 +322,41 @@ function MenuController:_buildSettings()
 		end,
 	})
 	self:_addButton("Settings", "Back", "back", function()
+		self:Show("Main")
+	end)
+end
+
+MenuController.ChapterNames = {
+	"1. Good morning",
+	"2. Breakfast",
+	"3. Rick's garage",
+	"4. Flight to B137",
+	"5. Planet B137",
+	"6. The Titan",
+	"7. The bunker",
+}
+
+function MenuController:_buildChapters()
+	local page = self:_page("Chapters")
+	local theme = self.style.Theme
+	self.style.MakeHeading(page, "Chapters", 1)
+	local chosen = MenuController.ChapterNames[1]
+	Widgets.Choice(page, theme, {
+		Label = "Chapter",
+		Options = MenuController.ChapterNames,
+		Value = chosen,
+		Order = 3,
+		OnChanged = function(v)
+			chosen = v
+		end,
+	})
+	self:_addButton("Chapters", "Start", "primary", function()
+		local n = table.find(MenuController.ChapterNames, chosen) or 1
+		if self.ctx.Actions.Chapter then
+			self.ctx.Actions.Chapter(n)
+		end
+	end)
+	self:_addButton("Chapters", "Back", "back", function()
 		self:Show("Main")
 	end)
 end

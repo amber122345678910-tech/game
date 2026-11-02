@@ -137,7 +137,7 @@ function UI.canvas(parent: Instance): (Frame, UIScale)
 	return canvas, scale
 end
 
-function UI.label(props: { [string]: any }): TextLabel
+function UI.label(props: { [string]: any }, children: { Instance }?): TextLabel
 	local base = {
 		BackgroundTransparency = 1,
 		TextXAlignment = Enum.TextXAlignment.Left,
@@ -147,7 +147,7 @@ function UI.label(props: { [string]: any }): TextLabel
 	for k, val in props do
 		base[k] = val
 	end
-	return UI.new("TextLabel", base)
+	return UI.new("TextLabel", base, children)
 end
 
 return UI
