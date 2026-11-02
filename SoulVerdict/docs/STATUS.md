@@ -92,3 +92,14 @@ Journals: /root/.claude/projects/-home-user-game/f493f3e8-eb29-53b3-b677-a9d1a3d
   Previews: previews/ui/admin_*.png.
 - README: admin panel section + how to republish over the existing game (Publish to Roblox As → Overwrite).
 - Next: owner republishes and tests on the phone; send the first error/screenshot if anything is off.
+
+## Audio (owner asked for music from the internet, e.g. a Fell song)
+- roblox.com and free-audio sites are blocked by this environment's network policy (container and WebFetch), so no ID could
+  be tested here. WebSearch-only research found public candidates; the owner sent two IDs himself.
+- Runtime: Audio entries take candidate lists (`Ids`); SoundController probes each id (ContentProvider.PreloadAsync, 10 s
+  timeout, TimeLength 0 check), plays the first good one, warns once per bad id. Per-monster themes Theme_<Kit>(_Final),
+  CollapsePhase track (owner's 128611309933897), map tracks as fallback. Admin panel TEST -> MUSIC previews + live status.
+- Filled: all music slots (owner's Fell remix 120838650095309 first) and 80 SFX/UI keys (Undertale uploads first,
+  Roblox-licensed Pro Sound Effects / classic Roblox sounds as fallbacks). Crit falls back to Hit.
+- tools/check.sh: 0 errors, 371 tests. Commits 8477bf2 (music), e7fffa0 (SFX).
+- Next: owner republishes and listens on the phone; swap or re-level sounds he dislikes (volumes are unverified).
