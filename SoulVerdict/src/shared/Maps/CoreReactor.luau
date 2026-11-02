@@ -1240,7 +1240,9 @@ local function buildOverlook(B: Builder, spec: PadSpec): number
 	local c = spec.Center
 	pad(B, "OverlookFloor", spec)
 	-- laser fence along the outer (south-east) edges: emitter posts + thin beams + invisible guard
-	local fence = { corner(spec, -1, 1, 0.6), corner(spec, 1, 1, 0.6), corner(spec, 1, -1, 0.6) }
+	-- (the south run starts east of the walk to the Loading Bay)
+	local fence =
+		{ corner(spec, 1, 1, 0.6) - V(spec.SX * 0.55, 0, 0), corner(spec, 1, 1, 0.6), corner(spec, 1, -1, 0.6) }
 	for i = 1, #fence - 1 do
 		local a, b = fence[i], fence[i + 1]
 		for _, p in { a, b } do
@@ -1303,7 +1305,7 @@ local function buildVentPad(B: Builder, spec: PadSpec): number
 	)
 	B:Particles(holder, "Smoke", { Color = C.Steam, Rate = 8 })
 	steamVent(B, "VentGrate", c + V(4, 0, 3), 4)
-	railing(B, "VentRail", corner(spec, -1, -1, 0.5), corner(spec, 1, -1, 0.5))
+	railing(B, "VentRail", corner(spec, -1, -1, 0.5), corner(spec, -1, -1, 0.5) + V(spec.SX * 0.6, 0, 0))
 	railing(B, "VentRail", corner(spec, -1, -1, 0.5), corner(spec, -1, 1, 0.5))
 	B:Light("Point", c + V(2, 6, 2), { Name = "VentLight", Brightness = 1.2, Range = 18, Color = C.LightWarm })
 	B:Group(nil)

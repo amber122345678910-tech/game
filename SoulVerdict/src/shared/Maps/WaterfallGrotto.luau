@@ -529,7 +529,11 @@ local function buildCave(B: Builder, cutaway: boolean): number
 			-- a lower boulder in front, partly inside the arena (cover near the walls)
 			if k % 2 == 0 then
 				local rb = octagonRadius(a) + rng:Number(-1, 2)
-				B:Rock("WallBoulder", V(math.sin(a) * rb, rng:Number(-1, 0), -math.cos(a) * rb), rng:Number(7, 11), { Chunks = 1, Color = C.RockLight, Material = M.Slate })
+				local bp = V(math.sin(a) * rb, rng:Number(-1, 0), -math.cos(a) * rb)
+				local size = rng:Number(7, 11)
+				if not (bp.Z > 60 and math.abs(bp.X) < 48) then -- keep the human spawn rows clear
+					B:Rock("WallBoulder", bp, size, { Chunks = 1, Color = C.RockLight, Material = M.Slate })
+				end
 			end
 		end
 	end
@@ -607,8 +611,8 @@ local function buildCave(B: Builder, cutaway: boolean): number
 	-- (a soft translucent cylinder: no hard box edges when a player walks through it)
 	local beamTop = s + V(0, L.CeilingY + 4, 0)
 	local beamDir = V(0.12, -1, 0.08).Unit
-	B:Rod("Decor", "Moonbeam", beamTop, beamTop + beamDir * (L.CeilingY + 4.5), L.SkylightR * 0.85, rgb(70, 110, 150), M.Neon, {
-		Transparency = 0.965,
+	B:Rod("Decor", "Moonbeam", beamTop, beamTop + beamDir * (L.CeilingY + 4.5), L.SkylightR * 0.75, rgb(70, 110, 150), M.Neon, {
+		Transparency = 0.975,
 		Shadow = false,
 	})
 	-- broad, dim teal fill so the island floors stay readable between the glowing landmarks

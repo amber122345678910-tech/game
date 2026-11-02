@@ -195,6 +195,50 @@ tests.layoutRules = function(T, Loader)
 	end)
 end
 
+-- No invisible guard, rim or railing collider may stand on a walkway (deck, slab or stair ramp): sample a
+-- 3-lane strip 2.5 studs above every walkway and make sure no blocker box contains a sample.
+tests.walkwaysOpen = function(T, Loader)
+	each(T, function(id)
+		local info = build(Loader, id, 1)
+		local blockers, walks = {}, {}
+		for _, d in info.Model.Geometry:GetDescendants() do
+			if d:IsA("BasePart") then
+				local n = d.Name
+				if string.find(n, "Guard") or string.find(n, "_Rim") or string.find(n, "_Collider") then
+					table.insert(blockers, d)
+				elseif string.find(n, "_Deck$") or string.find(n, "_Slab$") or string.find(n, "_Ramp$") then
+					table.insert(walks, d)
+				end
+			end
+		end
+		T.ok(#walks >= 8, "found the walkways")
+		local blocked = {}
+		for _, w in walks do
+			local cf, s = w.CFrame, w.Size
+			local wedge = w:IsA("WedgePart")
+			local len = if wedge then s.Z else s.X
+			local wid = if wedge then s.X else s.Z
+			for i = 0, 20 do
+				local t = -len / 2 + len * i / 20
+				for _, lat in { -wid / 2 + 1.2, 0, wid / 2 - 1.2 } do
+					local lp = if wedge then Vector3.new(lat, 0, t) else Vector3.new(t, s.Y / 2 + 2.5, lat)
+					local p = cf:PointToWorldSpace(lp)
+					for _, b in blockers do
+						local q = b.CFrame:PointToObjectSpace(p)
+						local h = b.Size / 2
+						if math.abs(q.X) <= h.X + 0.2 and math.abs(q.Y) <= h.Y + 0.2 and math.abs(q.Z) <= h.Z + 0.2 then
+							blocked[w.Name .. " by " .. b.Name] = true
+						end
+					end
+				end
+			end
+		end
+		for what in blocked do
+			T.ok(false, "walkway blocked: " .. what)
+		end
+	end)
+end
+
 tests.deterministic = function(T, Loader)
 	local MapKit = Loader.require("ReplicatedStorage.Shared.Maps.MapKit")
 	each(T, function(id)
