@@ -59,15 +59,17 @@ local C = {
 	Rock = rgb(48, 60, 76),
 	RockDark = rgb(30, 38, 50),
 	RockLight = rgb(70, 86, 102),
-	Basalt = rgb(36, 42, 56),
-	Floor = rgb(56, 70, 84),
-	Moss = rgb(34, 78, 76),
-	Sand = rgb(74, 84, 92),
+	Basalt = rgb(50, 58, 76),
+	Floor = rgb(76, 94, 110),
+	Moss = rgb(46, 102, 98),
+	Sand = rgb(90, 102, 112),
 	Bed = rgb(14, 36, 46),
 	Water = rgb(40, 130, 150),
 	Wood = rgb(104, 78, 58),
 	WoodDark = rgb(66, 50, 40),
 	Cyan = rgb(90, 232, 255),
+	CrystalCyan = rgb(46, 176, 212),
+	CrystalViolet = rgb(124, 86, 206),
 	CyanLight = rgb(120, 220, 255),
 	Teal = rgb(70, 255, 210),
 	Violet = rgb(176, 124, 255),
@@ -87,8 +89,8 @@ local function inside(x: number, z: number, margin: number): boolean
 	return math.abs(x) <= L.Bound - margin and math.abs(z) <= L.Bound - margin and math.abs(x) + math.abs(z) <= DIAG - margin * 1.4142
 end
 
--- Islands: unions of rotated slabs {x, z, sizeX, sizeZ, yawDeg}; each slab sits 0.04 higher than the
--- previous one so overlapping tops never z-fight.
+-- Islands: unions of rotated slabs {x, z, sizeX, sizeZ, yawDeg}; each slab sits SLAB_STEP higher than the
+-- previous one so overlapping tops never z-fight (groundY returns the real top at a point).
 type Island = { Name: string, Top: number, Color: Color3, Material: Enum.Material, Slabs: { { number } } }
 
 local ISLANDS: { Island } = {
@@ -129,6 +131,8 @@ local ISLANDS: { Island } = {
 	},
 }
 
+local SLAB_STEP = 0.03
+
 local function slabFrame(slab: { number }, y: number): CFrame
 	return CFrame.new(slab[1], y, slab[2]) * CFrame.Angles(0, math.rad(slab[5]), 0)
 end
@@ -147,18 +151,36 @@ local function onIsland(isle: Island, p: Vector3, margin: number): boolean
 	return false
 end
 
+-- Walkable top at (x, z): the highest island slab covering it, else the lake bed.
+local function groundY(p: Vector3): number
+	local best = L.BedY
+	for _, isle in ISLANDS do
+		for i, slab in isle.Slabs do
+			if inSlab(slab, p, 0) then
+				best = math.max(best, isle.Top + (i - 1) * SLAB_STEP)
+			end
+		end
+	end
+	return best
+end
+
+local function onGround(x: number, z: number): Vector3
+	local p = V(x, 0, z)
+	return V(x, groundY(p), z)
+end
+
 -- Boardwalk / bridge landings (shore rocks keep clear of them)
 local CROSSINGS: { { Vector3 } } = {
-	{ V(0, 0.6, 61), V(0, 0.6, 19) }, -- dock: landing -> Echo Isle
-	{ V(-15, 0.6, 2), V(-34, 0.6, -2) }, -- isle -> garden
-	{ V(15, 0.6, 6), V(36, 0.6, 10) }, -- isle -> grove
-	{ V(-50, 0.6, 60), V(-55, 0.6, 40) }, -- landing -> garden
-	{ V(50, 0.6, 60), V(53, 0.6, 42) }, -- landing -> grove
+	{ V(0, 0.6, 63), V(0, 0.6, 15) }, -- dock: landing -> Echo Isle
+	{ V(-12, 0.6, 2), V(-40, 0.6, -2) }, -- isle -> garden
+	{ V(12, 0.6, 6), V(41, 0.6, 10) }, -- isle -> grove
+	{ V(-50, 0.6, 63), V(-55, 0.6, 33) }, -- landing -> garden
+	{ V(50, 0.6, 63), V(53, 0.6, 32) }, -- landing -> grove
 }
 local BRIDGES: { { Vector3 } } = {
-	{ V(0, L.IsleTop + 0.25, -9), V(0, L.LedgeTop + 0.25, -60) }, -- isle -> ledge (long arch)
-	{ V(-30, L.LedgeTop + 0.25, -67), V(-46, 0.25, -50) }, -- ledge -> garden
-	{ V(30, L.LedgeTop + 0.25, -67), V(44, 0.25, -50) }, -- ledge -> grove
+	{ V(0, L.IsleTop + 0.25, -8), V(0, L.LedgeTop + 0.25, -62) }, -- isle -> ledge (long arch)
+	{ V(-29, L.LedgeTop + 0.25, -67), V(-46, 0.25, -48) }, -- ledge -> garden
+	{ V(29, L.LedgeTop + 0.25, -67), V(46, 0.25, -45) }, -- ledge -> grove
 }
 
 local function nearCrossing(p: Vector3, radius: number): boolean
@@ -192,7 +214,7 @@ local function buildIslands(B: Builder)
 	local rng = B.Rng
 	for _, isle in ISLANDS do
 		for i, slab in isle.Slabs do
-			local top = isle.Top + (i - 1) * 0.04
+			local top = isle.Top + (i - 1) * SLAB_STEP
 			local h = top - L.BedY + 2
 			B:Solid("Block", isle.Name, V(slab[3], h, slab[4]), slabFrame(slab, top - h / 2), MapKit.Shade(isle.Color, (i % 2) * 0.02), isle.Material)
 		end
@@ -227,7 +249,7 @@ local function buildIslands(B: Builder)
 	end
 	-- ramps from the basalt ledge down to the water on its east and west tips
 	for _, sx in { -1, 1 } do
-		B:Solid("Wedge", "LedgeRamp", V(10, L.LedgeTop - L.BedY, 9), CFrame.new(sx * 34.5, (L.LedgeTop + L.BedY) / 2, -74) * CFrame.Angles(0, sx * math.pi / 2, 0), C.Basalt, M.Basalt)
+		B:Solid("Wedge", "LedgeRamp", V(10, L.LedgeTop - L.BedY, 9), CFrame.new(sx * 34.5, (L.LedgeTop + L.BedY) / 2, -77) * CFrame.Angles(0, -sx * math.pi / 2, 0), C.Basalt, M.Basalt)
 	end
 	B:Group(nil)
 end
@@ -299,32 +321,36 @@ local function buildFalls(B: Builder): number
 	-- recess wall behind the curtain + the crevice lip it pours from
 	B:Deco("Block", "FallsBack", V(hw * 2 + 30, 80, 6), CFrame.new(0, 30, z - 6), C.RockDark, M.Slate)
 	B:Deco("Block", "FallsLip", V(hw * 2 + 8, 4, 8), CFrame.new(0, L.FallsTop + 2, z - 1), C.Rock, M.Slate)
-	-- the curtain: two staggered layers of translucent glowing strips, brighter streaks in front
+	-- the curtain: a sheet of translucent glassy strips with thin glowing streaks stacked in front
 	local strips = 13
 	local w = hw * 2 / strips
-	for layer = 1, 2 do
-		for i = 0, strips - 1 do
-			local x = -hw + (i + 0.5) * w + (if layer == 2 then w * 0.5 else 0)
-			if math.abs(x) <= hw then
-				local top = L.FallsTop + rng:Number(-1.5, 0.5)
-				local h = top - L.WaterY
-				local depthZ = z + (layer - 1) * 0.9 + rng:Number(-0.25, 0.25)
-				B:Deco("Block", "Curtain", V(w * (if layer == 1 then 1.05 else 0.55), h, 0.3), CFrame.new(x, L.WaterY + h / 2, depthZ), MapKit.Shade(C.Falls, rng:Number(-0.06, 0.04)), M.Neon, {
-					Transparency = if layer == 1 then 0.55 else 0.35,
-					Shadow = false,
-				})
-			end
-		end
+	for i = 0, strips - 1 do
+		local x = -hw + (i + 0.5) * w
+		local top = L.FallsTop + rng:Number(-1.5, 0.5)
+		local h = top - L.WaterY
+		B:Deco("Block", "Curtain", V(w * 1.05, h, 0.4), CFrame.new(x, L.WaterY + h / 2, z + rng:Number(-0.3, 0.3)), MapKit.Shade(rgb(60, 140, 172), rng:Number(-0.08, 0.06)), M.Glass, {
+			Transparency = 0.25,
+			Shadow = false,
+		})
+	end
+	for i = 0, 2 * strips - 1 do
+		local x = -hw + (i + 0.5) * (w / 2) + rng:Number(-0.4, 0.4)
+		local top = L.FallsTop + rng:Number(-6, 0)
+		local h = top - L.WaterY - rng:Number(0, 8)
+		B:Deco("Block", "Streak", V(rng:Number(0.35, 0.9), h, 0.2), CFrame.new(x, top - h / 2, z + 0.9 + rng:Number(0, 0.6)), MapKit.Shade(C.Falls, rng:Number(-0.25, 0)), M.Neon, {
+			Transparency = rng:Number(0.35, 0.6),
+			Shadow = false,
+		})
 	end
 	-- churning foam + mist at the base, the top lip spill
 	for i = 0, 9 do
 		local x = -hw + (i + 0.5) * (hw * 2 / 10)
-		B:Deco("Ellipsoid", "Foam", V(rng:Number(6, 9), rng:Number(1.2, 2.2), rng:Number(4, 6)), CFrame.new(x, L.WaterY + 0.2, z + 2.2 + rng:Number(-0.6, 0.6)), C.Foam, M.Neon, {
-			Transparency = 0.45,
+		B:Deco("Ellipsoid", "Foam", V(rng:Number(6, 9), rng:Number(1.0, 1.8), rng:Number(4, 6)), CFrame.new(x, L.WaterY + 0.15, z + 2.2 + rng:Number(-0.6, 0.6)), rgb(150, 210, 230), M.Neon, {
+			Transparency = 0.55,
 			Shadow = false,
 		})
 	end
-	B:Deco("Cylinder", "Spill", V(hw * 2 + 2, 2, 2), CFrame.new(0, L.FallsTop + 0.2, z + 0.4), C.Foam, M.Neon, { Transparency = 0.4, Shadow = false })
+	B:Deco("Cylinder", "Spill", V(hw * 2 + 2, 1.6, 1.6), CFrame.new(0, L.FallsTop + 0.2, z + 0.4), rgb(150, 210, 230), M.Neon, { Transparency = 0.5, Shadow = false })
 	local mist = B:Deco("Block", "Mist", V(hw * 2, 1, 6), CFrame.new(0, 1, z + 4), C.Foam, M.SmoothPlastic, { Transparency = 1, Shadow = false })
 	B:Particles(mist, "Smoke", { Color = rgb(170, 230, 255), Rate = 6 })
 	B:Particles(mist, "Sparkles", { Color = C.CyanLight, Rate = 4 })
@@ -416,53 +442,62 @@ local function buildFlora(B: Builder): number
 	B:Group("Flora")
 	local lights = 0
 	-- the Echo Garden (west): flower meadows around SAVE 2
-	for i, p in { { V(-74, 0, -30), 6, 12 }, { V(-50, 0, -18), 5, 10 }, { V(-80, 0, 2), 5, 9 }, { V(-52, 0, 30), 5, 9 }, { V(-76, 0, 34), 4, 7 } } do
-		lights += flowerPatch(B, "EchoPatch", p[1], p[2], p[3], i <= 4)
+	local patches = {
+		{ X = -74, Z = -30, R = 6, N = 12 },
+		{ X = -50, Z = -18, R = 5, N = 10 },
+		{ X = -80, Z = 2, R = 5, N = 9 },
+		{ X = -52, Z = 30, R = 5, N = 9 },
+		{ X = -76, Z = 36, R = 4, N = 7 },
+	}
+	for i, pt in patches do
+		lights += flowerPatch(B, "EchoPatch", onGround(pt.X, pt.Z), pt.R, pt.N, i <= 4)
 	end
 	-- the Echo Isle: two patches flanking the SAVE ring
-	lights += flowerPatch(B, "IslePatch", V(-11, L.IsleTop, 12), 3, 6, true)
-	flowerPatch(B, "IslePatch", V(11, L.IsleTop, -4), 3, 6, false, C.Teal)
+	lights += flowerPatch(B, "IslePatch", onGround(-10, 14), 3, 6, true)
+	flowerPatch(B, "IslePatch", onGround(12, -5), 3, 6, false, C.Teal)
 	-- violet patches on the grove, cyan on the landing
-	lights += flowerPatch(B, "GrovePatch", V(80, 0, 22), 4, 7, true, C.Violet)
-	flowerPatch(B, "LandingPatch", V(-30, 0, 72), 4, 7, false)
+	lights += flowerPatch(B, "GrovePatch", onGround(80, 22), 4, 7, true, C.Violet)
+	flowerPatch(B, "LandingPatch", onGround(-30, 70), 4, 7, false)
 	-- giant mushrooms: the landing's flanks and the garden's south shore
+	local pink = rgb(255, 120, 220)
 	local shrooms = {
-		{ V(-40, 0, 78), 11, 9, C.Teal, true },
-		{ V(-48, 0, 70), 7, 6, C.Teal, false },
-		{ V(-62, 0, 80), 9, 8, rgb(255, 120, 220), true },
-		{ V(40, 0, 80), 10, 8.5, rgb(255, 120, 220), true },
-		{ V(50, 0, 72), 6.5, 5.5, C.Teal, false },
-		{ V(-66, 0, 30), 9, 8, C.Teal, true },
-		{ V(-84, 0, 16), 7, 6.5, rgb(255, 120, 220), false },
-		{ V(84, 0, -30), 8, 7, C.Teal, true },
+		{ X = -40, Z = 78, H = 11, D = 9, Glow = C.Teal, Light = true },
+		{ X = -48, Z = 70, H = 7, D = 6, Glow = C.Teal, Light = false },
+		{ X = -62, Z = 80, H = 9, D = 8, Glow = pink, Light = true },
+		{ X = 40, Z = 80, H = 10, D = 8.5, Glow = pink, Light = true },
+		{ X = 50, Z = 72, H = 6.5, D = 5.5, Glow = C.Teal, Light = false },
+		{ X = -66, Z = 30, H = 9, D = 8, Glow = C.Teal, Light = true },
+		{ X = -84, Z = 16, H = 7, D = 6.5, Glow = pink, Light = false },
+		{ X = 84, Z = -30, H = 8, D = 7, Glow = C.Teal, Light = true },
 	}
-	for _, s in shrooms do
-		lights += mushroom(B, "Mushroom", s[1], s[2], s[3], s[4], s[5])
+	for _, m in shrooms do
+		local base = onGround(m.X, m.Z)
+		lights += mushroom(B, "Mushroom", base, m.H, m.D, m.Glow, m.Light)
 		-- a few small ones at the foot of each giant
 		for k = 1, 3 do
 			local a = math.rad(k * 120 + B.Rng:Number(0, 40))
-			local r = s[3] * 0.55 + B.Rng:Number(0.5, 1.5)
-			mushroom(B, "Toadstool", s[1] + V(math.cos(a) * r, 0, math.sin(a) * r), B.Rng:Number(0.9, 1.8), B.Rng:Number(1.1, 1.8), s[4], false)
+			local r = m.D * 0.55 + B.Rng:Number(0.5, 1.5)
+			mushroom(B, "Toadstool", base + V(math.cos(a) * r, 0, math.sin(a) * r), B.Rng:Number(0.9, 1.8), B.Rng:Number(1.1, 1.8), m.Glow, false)
 		end
 	end
 	-- the Crystal Grove (east): big clusters as cover, small shards around
 	local clusters = {
-		{ V(48, 0, -22), 14, true },
-		{ V(76, 0, -8), 17, true },
-		{ V(58, 0, 24), 12, true },
-		{ V(80, 0, -44), 13, false },
-		{ V(42, 0, 6), 9, false },
-		{ V(-58, 0, -42), 11, true },
-		{ V(-86, 0, -16), 13, false },
+		{ X = 48, Z = -22, H = 14, Light = true },
+		{ X = 76, Z = -8, H = 17, Light = true },
+		{ X = 58, Z = 24, H = 12, Light = true },
+		{ X = 80, Z = -44, H = 13, Light = false },
+		{ X = 47, Z = 0, H = 9, Light = false },
+		{ X = -58, Z = -40, H = 11, Light = true },
+		{ X = -86, Z = -16, H = 13, Light = false },
 	}
 	for i, c in clusters do
-		lights += crystalCluster(B, "Crystal", c[1], c[2], if i % 3 == 0 then C.Violet else C.Cyan, c[3])
+		lights += crystalCluster(B, "Crystal", onGround(c.X, c.Z), c.H, if i % 3 == 0 then C.CrystalViolet else C.CrystalCyan, c.Light)
 	end
 	local rng = B.Rng
 	for _ = 1, 14 do
 		local x, z = rng:InCircle(26)
 		local p = V(64 + x, 0, -4 + z)
-		if (p - V(64, 0, -18)).Magnitude > 10 then
+		if (p - V(64, 0, -22)).Magnitude > 11 and (p - V(47, 0, 0)).Magnitude > 4 then
 			B:Crystal("Shard", p, rng:Number(1.6, 3.6), { Color = C.Cyan, Count = 2, Light = false })
 		end
 	end
@@ -505,7 +540,7 @@ local function buildCave(B: Builder, cutaway: boolean): number
 		local p = V(math.sin(a) * r, rng:Number(6, 22), -math.cos(a) * r)
 		if not (math.abs(p.X) < L.FallsHalfW + 6 and p.Z < -80) then
 			local withLight = k % 2 == 0
-			local light = B:Crystal("WallCrystal", p, rng:Number(5, 9), { Color = if k % 4 == 1 then C.Violet else C.Cyan, Count = 3, Light = withLight, Brightness = 1.4, Range = 22 })
+			local light = B:Crystal("WallCrystal", p, rng:Number(5, 9), { Color = if k % 4 == 1 then C.CrystalViolet else C.CrystalCyan, Count = 3, Light = withLight, Brightness = 1.4, Range = 22 })
 			if light then
 				lights += 1
 			end
@@ -569,7 +604,12 @@ local function buildCave(B: Builder, cutaway: boolean): number
 	end
 	-- the moonbeam through the skylight onto the Echo Isle
 	local s = L.Skylight
-	B:Shaft("Moonbeam", s + V(0, L.CeilingY + 4, 0), V(0.12, -1, 0.08), L.SkylightR * 1.3, L.SkylightR * 1.3, L.CeilingY + 6, rgb(170, 220, 255), { Transparency = 0.93 })
+	B:Shaft("Moonbeam", s + V(0, L.CeilingY + 4, 0), V(0.12, -1, 0.08), L.SkylightR * 0.8, L.SkylightR * 0.8, L.CeilingY + 5, rgb(70, 110, 150), { Transparency = 0.965 })
+	-- broad, dim teal fill so the island floors stay readable between the glowing landmarks
+	for _, p in { V(0, 30, 74), V(-60, 30, -4), V(60, 30, -6), V(0, 30, -66), V(0, 26, 38), V(0, 26, -30) } do
+		B:Light("Point", p, { Name = "CaveFill", Brightness = 0.7, Range = 60, Color = rgb(90, 170, 200) })
+		lights += 1
+	end
 	B:Light("Spot", MapKit.LookAt(s + V(0, L.CeilingY - 2, 0), s), { Name = "MoonbeamLight", Brightness = 2, Range = 70, Angle = 38, Color = rgb(170, 215, 255) })
 	B:Group(nil)
 	return lights + 1
@@ -619,13 +659,13 @@ end
 local function buildIsle(B: Builder)
 	B:Group("Isle")
 	-- a mossy standing stone with the plaque (the cavern "remembers every word")
-	local base = V(-12, L.IsleTop, -4)
+	local base = onGround(-12, -4)
 	local stone = B:Solid("Block", "StandingStone", V(3.4, 6, 1.6), CFrame.new(base + V(0, 3, 0)) * CFrame.Angles(0, math.rad(35), math.rad(3)), C.RockLight, M.Slate)
 	local plaque = B:Deco("Block", "Plaque", V(2.6, 1.6, 0.12), stone.CFrame * CFrame.new(0, 0.6, -0.86), rgb(150, 190, 200), M.Metal)
 	B:Text(plaque, Enum.NormalId.Front, { Key = "maps.grotto.plaque", Color = rgb(20, 40, 52), Font = "Merriweather", Pixels = 60 })
 	B:Deco("Ellipsoid", "StoneMoss", V(3.6, 0.8, 1.9), stone.CFrame * CFrame.new(0, 3, 0), C.Moss, M.Grass)
 	-- small rocks to break up the island floor
-	for _, p in { V(12, L.IsleTop, 12), V(-4, L.IsleTop, 18), V(14, L.IsleTop, -6) } do
+	for _, p in { onGround(13, 13), onGround(-5, 18), onGround(15, -7) } do
 		B:Rock("IsleRock", p, B.Rng:Number(2.2, 3.4), { Chunks = 1, Color = C.RockLight, Material = M.Slate })
 	end
 	B:Group(nil)
@@ -673,9 +713,9 @@ function WaterfallGrotto.Build(seed: number?, opts: { [string]: any }?): MapInfo
 
 	-- objectives: the Echo Isle (centre), the Echo Garden (west), the Crystal Grove (east)
 	local saves = {
-		B:SavePoint(1, V(2, L.IsleTop, 4), { Inner = rgb(24, 52, 70), InnerMaterial = M.Slate, StarColor = rgb(255, 236, 140) }),
-		B:SavePoint(2, V(-64, 0, 12), { Inner = rgb(22, 60, 58), InnerMaterial = M.Slate }),
-		B:SavePoint(3, V(64, 0, -22), { Inner = rgb(24, 46, 70), InnerMaterial = M.Slate }),
+		B:SavePoint(1, onGround(2, 4), { Inner = rgb(24, 52, 70), InnerMaterial = M.Slate, StarColor = rgb(255, 236, 140) }),
+		B:SavePoint(2, onGround(-64, 12), { Inner = rgb(22, 60, 58), InnerMaterial = M.Slate }),
+		B:SavePoint(3, onGround(64, -22), { Inner = rgb(24, 46, 70), InnerMaterial = M.Slate }),
 	}
 	local humanSpawns: { CFrame } = {}
 	local i = 0

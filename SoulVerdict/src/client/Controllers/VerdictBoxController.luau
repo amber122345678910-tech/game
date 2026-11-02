@@ -216,7 +216,8 @@ type Box = {
 	blasterPhase: { [number]: string },
 	stabPhase: { [number]: string },
 	typed: number,
-	trove: { any },
+	soulView: { [string]: any },
+	hudView: { [string]: any },
 }
 
 local boxes: { [number]: Box } = {}
@@ -298,13 +299,17 @@ end
 ---------------------------------------------------------------------------------------------------
 -- input (victim)
 
-local function readInput(box: Box): { [string]: any }
+local function keyDown(key: Enum.KeyCode): boolean
+	return UserInputService:IsKeyDown(key)
+end
+
+local inputState = { x = 0, y = 0, jump = false, slow = false }
+
+local function readInput(): { [string]: any }
 	local typing = UserInputService:GetFocusedTextBox() ~= nil
 	local x, y, jump, slow = 0, 0, false, false
 	if not typing then
-		x, y, jump, slow = VerdictBoxController.KeyAxes(function(key: Enum.KeyCode): boolean
-			return UserInputService:IsKeyDown(key)
-		end)
+		x, y, jump, slow = VerdictBoxController.KeyAxes(keyDown)
 	end
 	local pad = Enum.UserInputType.Gamepad1
 	if UserInputService:GetGamepadConnected(pad) then
@@ -327,9 +332,11 @@ local function readInput(box: Box): { [string]: any }
 	end
 	x += touchVec.X
 	y += touchVec.Y
-	jump = jump or touchJump
-	local _ = box
-	return { x = math.clamp(x, -1, 1), y = math.clamp(y, -1, 1), jump = jump, slow = slow }
+	inputState.x = math.clamp(x, -1, 1)
+	inputState.y = math.clamp(y, -1, 1)
+	inputState.jump = jump or touchJump
+	inputState.slow = slow
+	return inputState
 end
 
 local function disconnectInput()
@@ -401,7 +408,8 @@ local function connectInput(gui: ScreenGui)
 		if input.UserInputType == Enum.UserInputType.Touch and padTouch == nil then
 			padTouch = input
 			padOrigin = Vector2.new(input.Position.X, input.Position.Y)
-			ring.Position = UDim2.fromOffset(padOrigin.X - padArea.AbsolutePosition.X, padOrigin.Y - padArea.AbsolutePosition.Y)
+			ring.Position =
+				UDim2.fromOffset(padOrigin.X - padArea.AbsolutePosition.X, padOrigin.Y - padArea.AbsolutePosition.Y)
 			ring.Visible = true
 		end
 	end)
@@ -438,12 +446,18 @@ local function connectInput(gui: ScreenGui)
 	js.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
 	js.Parent = jumpButton
 	jumpButton.InputBegan:Connect(function(input: InputObject)
-		if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
+		if
+			input.UserInputType == Enum.UserInputType.Touch
+			or input.UserInputType == Enum.UserInputType.MouseButton1
+		then
 			touchJump = true
 		end
 	end)
 	jumpButton.InputEnded:Connect(function(input: InputObject)
-		if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
+		if
+			input.UserInputType == Enum.UserInputType.Touch
+			or input.UserInputType == Enum.UserInputType.MouseButton1
+		then
 			touchJump = false
 		end
 	end)
@@ -510,7 +524,9 @@ end
 
 local function soulView(box: Box, t: number, x: number, y: number, blink: boolean): { [string]: any }
 	local m = Sim.ModeAt(box.timeline, t)
-	return { x = x, y = y, mode = m.mode, gravity = m.gravity, blink = blink, visible = true }
+	local v = box.soulView
+	v.x, v.y, v.mode, v.gravity, v.blink, v.visible = x, y, m.mode, m.gravity, blink, true
+	return v
 end
 
 local function hudView(box: Box): { [string]: any }?
@@ -522,13 +538,13 @@ local function hudView(box: Box): { [string]: any }?
 	local lp = localPlayer()
 	local level = if lp then lp:GetAttribute("Level") else nil
 	local kr = character:GetAttribute("KR")
-	return {
-		name = if lp then lp.DisplayName else character.Name,
-		lv = if type(level) == "number" then level else 1,
-		hp = if hum then hum.Health else 0,
-		maxHp = if hum then hum.MaxHealth else 100,
-		kr = if type(kr) == "number" then kr else 0,
-	}
+	local v = box.hudView
+	v.name = if lp then lp.DisplayName else character.Name
+	v.lv = if type(level) == "number" then level else 1
+	v.hp = if hum then hum.Health else 0
+	v.maxHp = if hum then hum.MaxHealth else 100
+	v.kr = if type(kr) == "number" then kr else 0
+	return v
 end
 
 -- victim: sounds / hints that follow the timeline
@@ -596,7 +612,7 @@ local function stepVictim(box: Box, wall: number)
 	local sim = box.sim
 	if not box.closing and sim then
 		local cfg = Config.VerdictBox
-		local gained = Sim.AdvanceTo(sim, math.min(t, box.duration), readInput(box))
+		local gained = Sim.AdvanceTo(sim, math.min(t, box.duration), readInput())
 		-- events: hits, slams, mode changes
 		local events = sim.events
 		for i = box.eventIndex + 1, #events do
@@ -628,20 +644,18 @@ local function stepVictim(box: Box, wall: number)
 			Net.Client.Fire("BoxReport", box.id, 0, true)
 		end
 	end
-	-- fade in / out
-	local fade = 1 - math.clamp((wall - box.t0) / TUNING.FadeIn, 0, 1)
+	-- open (world -> black -> box) / close (backwards)
+	local open = math.clamp((wall - box.t0) / TUNING.FadeIn, 0, 1)
 	if box.closing then
-		fade = math.max(fade, math.clamp((wall - box.fadeOutStart) / TUNING.FadeOut, 0, 1))
+		open = math.min(open, 1 - math.clamp((wall - box.fadeOutStart) / TUNING.FadeOut, 0, 1))
 	end
-	view:SetFade(fade)
+	view:SetOpen(open)
 	local gui = box.gui
 	if gui and gui:IsA("ScreenGui") then
 		view:SetSize(gui.AbsoluteSize)
 	end
 	local soul = if sim then sim.soul else nil
-	local sv = if soul and soul.active
-		then soulView(box, t, soul.x, soul.y, sim.t < soul.iframesUntil)
-		else nil
+	local sv = if soul and soul.active then soulView(box, t, soul.x, soul.y, sim.t < soul.iframesUntil) else nil
 	view:Render(math.min(t, box.duration + 0.5), sv, hudView(box))
 end
 
@@ -684,7 +698,7 @@ local function stepWatcher(box: Box, wall: number, camera: Camera?)
 		local to = camera.CFrame.Position - pivot.Position
 		local flat = Vector3.new(to.X, 0, to.Z)
 		if flat.Magnitude > 0.5 then
-			local want = math.atan2(-flat.X, -flat.Z) + math.pi
+			local want = math.atan2(-flat.X, -flat.Z) -- LookVector (the screen's face) toward the camera
 			local cur = box.yaw or want
 			local diff = (want - cur + math.pi) % (2 * math.pi) - math.pi
 			cur += diff * 0.25
@@ -753,7 +767,8 @@ local function newBox(packet: { [string]: any }, isVictim: boolean): Box
 		blasterPhase = {},
 		stabPhase = {},
 		typed = 0,
-		trove = {},
+		soulView = {},
+		hudView = {},
 	}
 end
 
@@ -803,6 +818,15 @@ local function findBoxModel(packet: { [string]: any }): Model?
 	return nil
 end
 
+local FACES: { [string]: Enum.NormalId } = {
+	Front = Enum.NormalId.Front,
+	Back = Enum.NormalId.Back,
+	Top = Enum.NormalId.Top,
+	Bottom = Enum.NormalId.Bottom,
+	Left = Enum.NormalId.Left,
+	Right = Enum.NormalId.Right,
+}
+
 local function openMirror(box: Box)
 	local ViewMod = View()
 	local lp = localPlayer()
@@ -824,7 +848,7 @@ local function openMirror(box: Box)
 	local gui = Instance.new("SurfaceGui")
 	gui.Name = "VerdictBoxMirror"
 	gui.Adornee = screen
-	gui.Face = if type(face) == "string" and (Enum.NormalId :: any)[face] then (Enum.NormalId :: any)[face] else Enum.NormalId.Front
+	gui.Face = if type(face) == "string" and FACES[face] then FACES[face] else Enum.NormalId.Front
 	gui.SizingMode = Enum.SurfaceGuiSizingMode.PixelsPerStud
 	gui.PixelsPerStud = if type(pps) == "number" then pps else 48
 	gui.LightInfluence = 0

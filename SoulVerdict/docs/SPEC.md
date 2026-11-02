@@ -218,12 +218,12 @@ Remotes live in `ReplicatedStorage.Remotes` (Folder) and are created by the serv
 "Notify"        S→C  (key: string, args: {any}?, style: string?)
 "Profile"       S→C  (profile: ProfileView)              -- full replace of the client's profile view
 "BoxStart"      S→C  (packet: BoxPacket)                 -- to all; victim plays, others watch
-"BoxEnd"        S→C  (boxId: number, result: {hits: number, survived: boolean})
+"BoxEnd"        S→C  (boxId: number, result: {hits: number, survived: boolean, reason: string?})  -- reason: Duration|MonsterGone|VictimGone|Cancelled
 -- RemoteFunctions
 "GetProfile"    C→S  () -> ProfileView
 -- UnreliableRemoteEvents (≤ 900 bytes, may drop)
 "Aim"           C→S (aimPoint: Vector3) / S→C (character: Model, aimPoint: Vector3) at ≤ 10 Hz
-"BoxSoul"       C→S (boxId: number, x: number, y: number) / S→C (boxId, x, y) at ≤ 15 Hz
+"BoxSoul"       C→S (boxId: number, x: number, y: number) / S→C (boxId, x, y, hits) at ≤ 15 Hz  -- box px (VerdictBox/Sim), hits = accepted so far
 ```
 API:
 ```lua

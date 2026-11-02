@@ -43,12 +43,14 @@ local function flatDist(a, b)
 end
 
 local function each(T, fn)
+	local base = T.current
 	for _, id in MAPS do
 		if exists(id) then
-			T.current = T.current .. "[" .. id .. "]"
+			T.current = base .. "[" .. id .. "]"
 			fn(id)
 		end
 	end
+	T.current = base
 end
 
 local tests = {}
@@ -236,11 +238,14 @@ tests.boundaryWalls = function(T, Loader)
 		local walls = 0
 		local minR = math.huge
 		for _, p in parts(folder) do
-			walls += 1
-			T.ok(p.CanCollide and p.Transparency >= 1 and not p.CastShadow, "boundary wall invisible + collidable")
-			minR = math.min(minR, flatDist(p.CFrame.Position, info.Center))
+			T.ok(p.CanCollide and p.Transparency >= 1 and not p.CastShadow, "boundary part invisible + collidable: " .. p.Name)
+			-- the outer ring (other invisible guards may share the folder)
+			if string.find(p.Name, "^Boundary%d*$") then
+				walls += 1
+				minR = math.min(minR, flatDist(p.CFrame.Position, info.Center))
+			end
 		end
-		T.ok(walls >= 4, "at least 4 boundary walls")
+		T.ok(walls >= 4, "at least 4 outer boundary walls")
 		T.ok(minR >= info.Radius, ("boundary outside the Collapse ring (%.0f >= %.0f)"):format(minR, info.Radius))
 	end)
 end

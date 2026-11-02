@@ -5,7 +5,7 @@
 -- (VerdictBoxService.Rules: validation, hit rate limit, verdict) and a service integration run on the combat harness.
 
 local roblox = require("@lune/roblox")
-local Vector3, Instance = roblox.Vector3, roblox.Instance
+local Vector3, Vector2, Instance, Enum = roblox.Vector3, roblox.Vector2, roblox.Instance, roblox.Enum
 
 local function load(Loader, name)
 	return Loader.require("ReplicatedStorage.Shared.VerdictBox." .. name)
@@ -935,6 +935,85 @@ tests.server_box_lifecycle = function(T, Loader)
 	if not ok then
 		error(err, 0)
 	end
+end
+
+---------------------------------------------------------------------------------------------------
+-- Client: renderer + controller helpers
+
+tests.view_renders_every_set_without_leaks = function(T, Loader)
+	local View = Loader.requirePath("src/client/UI/VerdictBoxView")
+	local Patterns, Sim = load(Loader, "Patterns"), load(Loader, "Sim")
+	local px = 0
+	for _, r in View.SOUL_ROWS do
+		px += (r[3] - r[2] + 1) * r[4]
+	end
+	T.eq(px, 186, "the 16x16 heart sprite has 186 filled pixels")
+	local hud = { name = "Frisk", lv = 7, hp = 60, maxHp = 110, kr = 9 }
+	for _, set in Patterns.SetIds do
+		local tl = Patterns.Build(set, 31, 7)
+		for _, mode in { "Overlay", "Mirror" } do
+			local size = if mode == "Overlay" then Vector2.new(1600, 900) else Vector2.new(312, 312)
+			local v = View.new(nil, tl, { Mode = mode, Size = size, Name = "Kris" })
+			local function pass()
+				for t = 0, 7.4, 1 / 20 do
+					local x, y = Sim.AutoSoul(tl, t)
+					local m = Sim.ModeAt(tl, t)
+					v:Render(t, { x = x, y = y, mode = m.mode, gravity = m.gravity, blink = t % 1 < 0.2 }, hud)
+				end
+			end
+			local ok, err = pcall(pass)
+			T.ok(ok, ("%s %s renders the whole box: %s"):format(set, mode, tostring(err or "")))
+			local count1 = #v.Root:GetDescendants()
+			pcall(pass)
+			T.eq(#v.Root:GetDescendants(), count1, set .. " " .. mode .. ": pooled drawables (no growth on replay)")
+			T.ok(count1 < 2500, set .. " " .. mode .. " instance budget: " .. count1)
+			T.noerror(function()
+				v:Hit(3, 5, 3)
+				v:Pulse(3)
+				v:SetHint("hint")
+				v:SetVerdict("Innocent", "sub")
+				v:SetOpen(0.3)
+				v:Render(3.1, nil, nil)
+				v:SetOpen(1)
+				v:SetVerdict(nil)
+				v:Destroy()
+			end, set .. " " .. mode .. " controls")
+		end
+	end
+	-- preview wrapper (dump_gui contract)
+	local handle = View.Create(nil, { Set = "Fell", Seed = 3, Kind = "Overlay", Time = 3, HitAt = 2.9, Verdict = "Guilty" })
+	T.ok(handle and handle.Root and type(handle.Destroy) == "function", "Create(theme, deps) -> {Root, Destroy}")
+	handle.Destroy()
+end
+
+tests.controller_pure_helpers = function(T, Loader)
+	local C = Loader.requirePath("src/client/Controllers/VerdictBoxController")
+	T.eq(C.Priority, 40, "priority 40 (SPEC §20)")
+	local samples = { { 1, 0, 0 }, { 1.1, 10, -10 }, { 1.2, 20, -20 } }
+	local x, y = C.Interpolate(samples, 1.05)
+	T.near(x, 5, 1e-9, "interpolate x")
+	T.near(y, -5, 1e-9, "interpolate y")
+	x, y = C.Interpolate(samples, 0.5)
+	T.eq(x, 0, "clamped before the first sample")
+	x, y = C.Interpolate(samples, 9)
+	T.eq(x, 20, "clamped after the last sample")
+	T.eq(C.Interpolate({}, 1), nil, "no samples")
+	local tx, ty = C.TouchVector(Vector2.new(100, 100), Vector2.new(100 + 28, 100), 56)
+	T.near(tx, 0.5, 1e-9, "half radius = half speed")
+	T.near(ty, 0, 1e-9, "no vertical")
+	tx, ty = C.TouchVector(Vector2.new(0, 0), Vector2.new(0, 500), 56)
+	T.near(ty, 1, 1e-9, "full speed beyond the radius")
+	tx, ty = C.TouchVector(Vector2.new(0, 0), Vector2.new(3, 0), 56)
+	T.eq(tx, 0, "deadzone")
+	-- (Lune EnumItems are not interned: compare with == instead of table keys)
+	local kx, ky, jump, slow = C.KeyAxes(function(k)
+		return k == Enum.KeyCode.A or k == Enum.KeyCode.Up or k == Enum.KeyCode.Space
+	end)
+	T.ok(kx == -1 and ky == -1 and jump and not slow, "WASD / arrows / space")
+	T.eq(C.VerdictKind({ survived = true, reason = "Duration" }), "Innocent", "verdict kind")
+	T.eq(C.VerdictKind({ survived = false, reason = "Duration" }), "Guilty", "verdict kind")
+	T.eq(C.VerdictKind({ survived = false, reason = "Cancelled" }), "Dismissed", "verdict kind")
+	T.eq(C.VerdictKind(nil), "Dismissed", "verdict kind (no result)")
 end
 
 return tests

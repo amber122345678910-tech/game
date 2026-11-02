@@ -723,12 +723,21 @@ local function buildCover(B: Builder)
 	snowFort(B, "FortEast", MapKit.Facing(V(22, 0, 40), V(22, 0, 0)))
 	snowFort(B, "FortWest", MapKit.Facing(V(-18, 0, -32), V(0, 0, 0)))
 	snowman(B, "CampSnowman", V(-22, 0, 80), V(0.3, 0, -1), 0.85)
-	for _, r in { { V(-80, 0, 2), 5 }, { V(70, 0, -64), 5.5 }, { V(-6, 0, -58), 4 }, { V(84, 0, 46), 4.5 }, { V(-34, 0, 36), 4.2 }, { V(30, 0, 62.5), 3 }, { V(-88, 0, -40), 5 } } do
-		B:Rock("Boulder", r[1], r[2], { Snow = true, Color = C.Stone })
+	local boulders = {
+		{ P = V(-80, 0, 2), S = 5 },
+		{ P = V(70, 0, -64), S = 5.5 },
+		{ P = V(-6, 0, -58), S = 4 },
+		{ P = V(84, 0, 46), S = 4.5 },
+		{ P = V(-34, 0, 36), S = 4.2 },
+		{ P = V(30, 0, 62.5), S = 3 },
+		{ P = V(-88, 0, -40), S = 5 },
+	}
+	for _, r in boulders do
+		B:Rock("Boulder", r.P, r.S, { Snow = true, Color = C.Stone })
 	end
 	-- gentle walkable snow hills
-	for _, m in { { V(-60, 0, 66), 10, 1.8 }, { V(68, 0, 78), 9, 1.6 }, { V(76, 0, -24), 9, 2.2 } } do
-		B:Mound("Hill", m[1], m[2], m[3], { Collide = true })
+	for _, m in { { P = V(-60, 0, 66), R = 10, H = 1.8 }, { P = V(68, 0, 78), R = 9, H = 1.6 }, { P = V(76, 0, -24), R = 9, H = 2.2 } } do
+		B:Mound("Hill", m.P, m.R, m.H, { Collide = true })
 	end
 	-- fences along the creek's north bank (open around the bridge)
 	for _, seg in { { 14, 42 }, { -40, -14 } } do

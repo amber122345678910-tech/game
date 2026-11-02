@@ -212,6 +212,8 @@ export type BoxPacket = {
 	t0: number,
 	damagePerHit: number,
 	krPerHit: number,
+	box: Model?, -- (added by VerdictBoxService) the anchored VerdictBox3D model watchers mirror the duel on
+	bot: boolean?, -- (added) bot victim: auto-resolved by the server, watchers use Sim.AutoSoul
 }
 
 -- Animation

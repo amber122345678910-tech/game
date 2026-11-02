@@ -188,7 +188,7 @@ function Rules.Verdict(hits: number, reason: string, victimUp: boolean, c: any?)
 	return (reason == "Duration" or reason == "MonsterGone") and victimUp and hits <= conf.SurviveMaxHits
 end
 
-function Rules.VerdictName(hits: number, reason: string, survived: boolean): string
+function Rules.VerdictName(_hits: number, reason: string, survived: boolean): string
 	if reason == "Cancelled" or reason == "VictimGone" then
 		return "Dismissed"
 	end

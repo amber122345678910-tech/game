@@ -207,7 +207,16 @@ local function blaster(ctx: Ctx, seg: Seg, t: number, x: number, y: number, angl
 end
 
 -- Vertical wall of bones (top + bottom bone around a gap) moving horizontally from `side` ("Left"/"Right").
-local function gapWall(ctx: Ctx, seg: Seg, t: number, side: string, gapC: number, gap: number, speed: number, opts: { [string]: any }?)
+local function gapWall(
+	ctx: Ctx,
+	seg: Seg,
+	t: number,
+	side: string,
+	gapC: number,
+	gap: number,
+	speed: number,
+	opts: { [string]: any }?
+)
 	local o = opts or {}
 	local w, h = seg.w, seg.h
 	local dir = if side == "Left" then 1 else -1
@@ -262,7 +271,15 @@ local function fullWall(ctx: Ctx, seg: Seg, t: number, side: string, speed: numb
 end
 
 -- Chain of bones lying end to end across the box, sweeping perpendicular to itself, with a 2-link gap.
-local function chain(ctx: Ctx, seg: Seg, t: number, vertical: boolean, fromStart: boolean, speed: number, color: string?)
+local function chain(
+	ctx: Ctx,
+	seg: Seg,
+	t: number,
+	vertical: boolean,
+	fromStart: boolean,
+	speed: number,
+	color: string?
+)
 	local rng = ctx.rng
 	local span = if vertical then seg.h else seg.w
 	local depth = if vertical then seg.w else seg.h
@@ -299,7 +316,15 @@ local function star(ctx: Ctx, seg: Seg, spec: { [string]: any })
 end
 
 -- Rift on a box edge + a blaster emerging from it (flies outward, spins round) and firing back across the box.
-local function riftBlaster(ctx: Ctx, seg: Seg, t: number, edge: string, offset: number, tilt: number, opts: { [string]: any }?)
+local function riftBlaster(
+	ctx: Ctx,
+	seg: Seg,
+	t: number,
+	edge: string,
+	offset: number,
+	tilt: number,
+	opts: { [string]: any }?
+)
 	local o = opts or {}
 	local w, h = seg.w, seg.h
 	local px, py, nx, ny -- edge point and inward normal
@@ -544,7 +569,7 @@ GEN.PlatformBlaster = {
 	mode = "Blue",
 	box = WIDE,
 	nominal = 0.9,
-	min = 0.75,
+	min = 0.82,
 	gravity = "Down",
 	fn = function(ctx, seg)
 		local rng = ctx.rng
@@ -567,9 +592,10 @@ GEN.PlatformBlaster = {
 		end
 		local warn = math.max(0.46 * seg.warn, 0.36)
 		stab(ctx, seg, seg.t0, "Bottom", 18, warn, { hold = math.max(limit - seg.t0 - warn - 0.06 - 0.12, 0.12) })
-		-- a beam just above the platforms: stay low (don't jump) while it fires
+		-- a high beam over the platforms: the floor -> platform jump peaks ~11 px below its band (safe), jumping
+		-- again from a platform does not
 		local side = if rng:Bool() then -1 else 1
-		blaster(ctx, seg, seg.t0 + 0.3, side * (w / 2 + 34), top - 38, if side < 0 then 0 else PI, {
+		blaster(ctx, seg, seg.t0, side * (w / 2 + 34), top - 60, if side < 0 then 0 else PI, {
 			charge = math.max(0.42 * seg.warn, 0.32),
 		})
 	end,
@@ -647,7 +673,7 @@ GEN.Spiral = {
 	mode = "Red",
 	box = SQUARE,
 	nominal = 0.95,
-	min = 0.85,
+	min = 0.82,
 	fn = function(ctx, seg)
 		local rng = ctx.rng
 		local limit = limitOf(ctx, seg)
@@ -1245,7 +1271,10 @@ function Patterns.Build(setId: string?, seed: number, duration: number?): Timeli
 		local gen = p.gen
 		local dur = durs[i]
 		local nextPlan = plans[i + 1]
-		local same = nextPlan ~= nil and gen.mode == "Red" and nextPlan.gen.mode == "Red" and nextPlan.gen.box == gen.box
+		local same = nextPlan ~= nil
+			and gen.mode == "Red"
+			and nextPlan.gen.mode == "Red"
+			and nextPlan.gen.box == gen.box
 		local t1 = if i == n then D - Patterns.END_PAD else t + dur
 		local seg: Seg = {
 			name = p.item.name,

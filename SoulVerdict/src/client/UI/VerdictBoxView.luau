@@ -26,7 +26,8 @@
 --   view:Pulse(t, color?)                       ring + flash at the soul (mode change / slam)
 --   view:SetVerdict(kind?, sub?)                "Innocent" | "Guilty" | "Dismissed" banner (nil hides)
 --   view:SetHint(text?)                         Overlay hint line under the HP row (nil hides)
---   view:SetFade(alpha)                         0 = visible .. 1 = hidden (whole view)
+--   view:SetOpen(k)                             0..1 transition: 0-0.5 the world fades to black, 0.5-1 the box fades in
+--                                               (closing = the same backwards); default 1
 --   view:Destroy()
 --   view.Root: Frame
 --   VerdictBoxView.SOUL_ROWS                    the heart sprite as {row, x0, x1, rows} runs (16x16, 186 px)
@@ -282,14 +283,15 @@ export type View = typeof(setmetatable(
 		hitAt: number,
 		pulseAt: number,
 		pulseColor: Color3,
-		fade: number,
+		open: number,
 		lastT: number,
 	},
 	VerdictBoxView
 ))
 
 local function makeBone(parent: Instance): BoneObj
-	local root = frame({ Name = "Bone", AnchorPoint = Vector2.new(0.5, 0.5), BackgroundTransparency = 1, ZIndex = 4 }, nil)
+	local root =
+		frame({ Name = "Bone", AnchorPoint = Vector2.new(0.5, 0.5), BackgroundTransparency = 1, ZIndex = 4 }, nil)
 	local shaft = frame({
 		Name = "Shaft",
 		AnchorPoint = Vector2.new(0.5, 0.5),
@@ -323,11 +325,21 @@ local function makeBone(parent: Instance): BoneObj
 		stroke(bottom, WHITE, 1, false),
 	}
 	root.Parent = parent
-	return { root = root, shaft = shaft, top = top, bottom = bottom, strokes = strokes, lastL = -1, lastT = -1, look = "" }
+	return {
+		root = root,
+		shaft = shaft,
+		top = top,
+		bottom = bottom,
+		strokes = strokes,
+		lastL = -1,
+		lastT = -1,
+		look = "",
+	}
 end
 
 local function makeStar(parent: Instance): StarObj
-	local root = frame({ Name = "StarBone", AnchorPoint = Vector2.new(0.5, 0.5), BackgroundTransparency = 1, ZIndex = 4 }, nil)
+	local root =
+		frame({ Name = "StarBone", AnchorPoint = Vector2.new(0.5, 0.5), BackgroundTransparency = 1, ZIndex = 4 }, nil)
 	local bars, strokes = {}, {}
 	for i = 0, 2 do
 		local arm = frame({
@@ -361,7 +373,8 @@ local function makeStar(parent: Instance): StarObj
 end
 
 local function makeWarn(parent: Instance): WarnObj
-	local root = frame({ Name = "Warning", AnchorPoint = Vector2.new(0.5, 0.5), BackgroundTransparency = 1, ZIndex = 2 }, nil)
+	local root =
+		frame({ Name = "Warning", AnchorPoint = Vector2.new(0.5, 0.5), BackgroundTransparency = 1, ZIndex = 2 }, nil)
 	local s = stroke(root, WARN, 1)
 	s.LineJoinMode = Enum.LineJoinMode.Miter
 	root.Parent = parent
@@ -370,9 +383,20 @@ end
 
 -- skull in a 44 x 40 local box, facing +x (the beam direction); children in scale units
 local function makeBlaster(parent: Instance): BlasterObj
-	local root = frame({ Name = "Blaster", AnchorPoint = Vector2.new(0.5, 0.5), BackgroundTransparency = 1, ZIndex = 7 }, nil)
+	local root =
+		frame({ Name = "Blaster", AnchorPoint = Vector2.new(0.5, 0.5), BackgroundTransparency = 1, ZIndex = 7 }, nil)
 	local strokes = {}
-	local function part(name: string, x: number, y: number, w: number, h: number, color: Color3, rot: number?, round: number?, z: number?): Frame
+	local function part(
+		name: string,
+		x: number,
+		y: number,
+		w: number,
+		h: number,
+		color: Color3,
+		rot: number?,
+		round: number?,
+		z: number?
+	): Frame
 		local f = frame({
 			Name = name,
 			AnchorPoint = Vector2.new(0.5, 0.5),
@@ -420,7 +444,8 @@ local function makeBlaster(parent: Instance): BlasterObj
 end
 
 local function makeBeam(parent: Instance): BeamObj
-	local root = frame({ Name = "Beam", AnchorPoint = Vector2.new(0.5, 0.5), BackgroundTransparency = 1, ZIndex = 6 }, nil)
+	local root =
+		frame({ Name = "Beam", AnchorPoint = Vector2.new(0.5, 0.5), BackgroundTransparency = 1, ZIndex = 6 }, nil)
 	local layers = {}
 	for i, h in { 1, 0.8, 0.5 } do
 		local f = frame({
@@ -438,7 +463,8 @@ local function makeBeam(parent: Instance): BeamObj
 end
 
 local function makePlatform(parent: Instance): PlatformObj
-	local root = frame({ Name = "Platform", AnchorPoint = Vector2.new(0.5, 0.5), BackgroundTransparency = 1, ZIndex = 3 }, nil)
+	local root =
+		frame({ Name = "Platform", AnchorPoint = Vector2.new(0.5, 0.5), BackgroundTransparency = 1, ZIndex = 3 }, nil)
 	local back = frame({
 		Name = "Offset",
 		AnchorPoint = Vector2.new(0.5, 0.5),
@@ -456,7 +482,8 @@ local function makePlatform(parent: Instance): PlatformObj
 end
 
 local function makeRift(parent: Instance): RiftObj
-	local root = frame({ Name = "Rift", AnchorPoint = Vector2.new(0.5, 0.5), BackgroundTransparency = 1, ZIndex = 6 }, nil)
+	local root =
+		frame({ Name = "Rift", AnchorPoint = Vector2.new(0.5, 0.5), BackgroundTransparency = 1, ZIndex = 6 }, nil)
 	local core = frame({
 		Name = "Void",
 		AnchorPoint = Vector2.new(0.5, 0.5),
@@ -575,7 +602,8 @@ function VerdictBoxView.new(parent: Instance?, timeline: any, opts: { [string]: 
 	}, textLabel)
 
 	-- soul
-	local soulRoot = frame({ Name = "Soul", AnchorPoint = Vector2.new(0.5, 0.5), BackgroundTransparency = 1, ZIndex = 9 }, nil)
+	local soulRoot =
+		frame({ Name = "Soul", AnchorPoint = Vector2.new(0.5, 0.5), BackgroundTransparency = 1, ZIndex = 9 }, nil)
 	local soulPixels = {}
 	for _, run in VerdictBoxView.SOUL_ROWS do
 		local row, x0, x1, rows = run[1], run[2], run[3], run[4]
@@ -591,7 +619,10 @@ function VerdictBoxView.new(parent: Instance?, timeline: any, opts: { [string]: 
 		)
 	end
 	soulRoot.Parent = inner
-	local ring = frame({ Name = "Pulse", AnchorPoint = Vector2.new(0.5, 0.5), BackgroundTransparency = 1, ZIndex = 9, Visible = false }, inner)
+	local ring = frame(
+		{ Name = "Pulse", AnchorPoint = Vector2.new(0.5, 0.5), BackgroundTransparency = 1, ZIndex = 9, Visible = false },
+		inner
+	)
 	corner(ring, 0.5)
 	local ringStroke = stroke(ring, WHITE, 2)
 
@@ -602,9 +633,19 @@ function VerdictBoxView.new(parent: Instance?, timeline: any, opts: { [string]: 
 		BackgroundColor3 = Color3.fromRGB(40, 40, 40),
 		ZIndex = 2,
 	}, stage)
-	local timerFill = frame({ Name = "Fill", Size = UDim2.fromScale(1, 1), BackgroundColor3 = theme.border, ZIndex = 3 }, timer)
+	local timerFill =
+		frame({ Name = "Fill", Size = UDim2.fromScale(1, 1), BackgroundColor3 = theme.border, ZIndex = 3 }, timer)
 
-	local flash = frame({ Name = "Flash", Size = UDim2.fromScale(1, 1), BackgroundColor3 = WHITE, BackgroundTransparency = 1, ZIndex = 20 }, root)
+	local flash = frame(
+		{
+			Name = "Flash",
+			Size = UDim2.fromScale(1, 1),
+			BackgroundColor3 = WHITE,
+			BackgroundTransparency = 1,
+			ZIndex = 20,
+		},
+		root
+	)
 	local verdict = label({
 		Name = "Verdict",
 		AnchorPoint = Vector2.new(0.5, 0.5),
@@ -688,7 +729,7 @@ function VerdictBoxView.new(parent: Instance?, timeline: any, opts: { [string]: 
 		hitAt = -10,
 		pulseAt = -10,
 		pulseColor = WHITE,
-		fade = 0,
+		open = 1,
 		lastT = 0,
 	}, VerdictBoxView) :: any
 	self.textLabel.Text = self.lineText
@@ -738,13 +779,19 @@ function VerdictBoxView._buildHud(self: View, title: string?)
 		TextScaled = true,
 		ZIndex = 4,
 	}, stage)
-	hud.name = label({ Name = "Name", Text = "", TextScaled = true, TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 4 }, stage)
+	hud.name = label(
+		{ Name = "Name", Text = "", TextScaled = true, TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 4 },
+		stage
+	)
 	hud.hpTag = label({ Name = "HpTag", Text = Strings.L("vb.hp"), TextScaled = true, ZIndex = 4 }, stage)
 	hud.bar = frame({ Name = "HpBar", BackgroundColor3 = HP_BACK, ZIndex = 4 }, stage)
 	hud.fill = frame({ Name = "Fill", Size = UDim2.fromScale(1, 1), BackgroundColor3 = HP_FILL, ZIndex = 5 }, hud.bar)
 	hud.kr = frame({ Name = "KR", AnchorPoint = Vector2.new(1, 0), BackgroundColor3 = KR_COLOR, ZIndex = 6 }, hud.fill)
 	hud.krTag = label({ Name = "KrTag", Text = Strings.L("vb.kr"), TextScaled = true, ZIndex = 4 }, stage)
-	hud.numbers = label({ Name = "HpText", Text = "", TextScaled = true, TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 4 }, stage)
+	hud.numbers = label(
+		{ Name = "HpText", Text = "", TextScaled = true, TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 4 },
+		stage
+	)
 	self.hint = label({
 		Name = "Hint",
 		AnchorPoint = Vector2.new(0.5, 0.5),
@@ -768,7 +815,6 @@ end
 
 function VerdictBoxView.Hit(self: View, t: number, damage: number?, kr: number?)
 	self.hitAt = t
-	local soul = self.soulRoot
 	local placed = 0
 	for _, f in self.floats do
 		if placed >= 2 then
@@ -823,8 +869,8 @@ function VerdictBoxView.SetHint(self: View, text: string?)
 	hint.Text = text or ""
 end
 
-function VerdictBoxView.SetFade(self: View, alpha: number)
-	self.fade = math.clamp(alpha, 0, 1)
+function VerdictBoxView.SetOpen(self: View, k: number)
+	self.open = math.clamp(k, 0, 1)
 end
 
 function VerdictBoxView.Destroy(self: View)
@@ -850,8 +896,23 @@ local function colorOf(theme: Theme, color: string): Color3
 end
 
 -- look of a bone / star: fill + optional outline (Fell outline, darkness glow, chain rings)
-local function applyBoneLook(self: View, obj: any, parts: { Frame }, strokes: { UIStroke }, color: string, style: string, alpha: number, dark: boolean)
-	local key = color .. "|" .. style .. "|" .. (if dark then "D" else "L") .. "|" .. tostring(math.floor(alpha * 10 + 0.5))
+local function applyBoneLook(
+	self: View,
+	obj: any,
+	parts: { Frame },
+	strokes: { UIStroke },
+	color: string,
+	style: string,
+	alpha: number,
+	dark: boolean
+)
+	local key = color
+		.. "|"
+		.. style
+		.. "|"
+		.. (if dark then "D" else "L")
+		.. "|"
+		.. tostring(math.floor(alpha * 10 + 0.5))
 	if obj.look == key then
 		return
 	end
@@ -891,7 +952,18 @@ local function applyBoneLook(self: View, obj: any, parts: { Frame }, strokes: { 
 	end
 end
 
-function VerdictBoxView._bone(self: View, x: number, y: number, len: number, thick: number, angle: number, color: string, style: string, alpha: number, dark: boolean)
+function VerdictBoxView._bone(
+	self: View,
+	x: number,
+	y: number,
+	len: number,
+	thick: number,
+	angle: number,
+	color: string,
+	style: string,
+	alpha: number,
+	dark: boolean
+)
 	local s = self.scale
 	local o = take(self.bones)
 	local root = o.root
@@ -914,7 +986,16 @@ function VerdictBoxView._bone(self: View, x: number, y: number, len: number, thi
 	setVisible(root, true)
 end
 
-function VerdictBoxView._star(self: View, x: number, y: number, size: number, angle: number, color: string, alpha: number, dark: boolean)
+function VerdictBoxView._star(
+	self: View,
+	x: number,
+	y: number,
+	size: number,
+	angle: number,
+	color: string,
+	alpha: number,
+	dark: boolean
+)
 	local s = self.scale
 	local o = take(self.stars)
 	o.root.Position = UDim2.fromOffset(x * s, y * s)
@@ -1032,7 +1113,7 @@ function VerdictBoxView._camera(self: View, w: number, h: number)
 	end
 end
 
-function VerdictBoxView._layoutHud(self: View, w: number, h: number, hudData: HudView?, t: number)
+function VerdictBoxView._layoutHud(self: View, hudData: HudView?)
 	local hud = self.hud
 	if hud == nil then
 		return
@@ -1136,9 +1217,27 @@ function VerdictBoxView.Render(self: View, t: number, soul: SoulView?, hudData: 
 			if pose then
 				local kind = pose.kind
 				if kind == "Bone" then
-					self:_bone(pose.x + half.X / s, pose.y + half.Y / s, pose.len, pose.thick, pose.angle, pose.color, pose.style, pose.alpha, isDark)
+					self:_bone(
+						pose.x + half.X / s,
+						pose.y + half.Y / s,
+						pose.len,
+						pose.thick,
+						pose.angle,
+						pose.color,
+						pose.style,
+						pose.alpha,
+						isDark
+					)
 				elseif kind == "Star" then
-					self:_star(pose.x + half.X / s, pose.y + half.Y / s, pose.len, pose.angle, pose.color, pose.alpha, isDark)
+					self:_star(
+						pose.x + half.X / s,
+						pose.y + half.Y / s,
+						pose.len,
+						pose.angle,
+						pose.color,
+						pose.alpha,
+						isDark
+					)
 				elseif kind == "Stab" then
 					-- stab geometry is box-centred; shift into inner-frame space
 					if pose.phase == "Warn" then
@@ -1230,15 +1329,20 @@ function VerdictBoxView.Render(self: View, t: number, soul: SoulView?, hudData: 
 			flashLevel, flashColor = k, self.pulseColor
 		end
 	end
-	self.flash.BackgroundColor3 = flashColor
-	self.flash.BackgroundTransparency = 1 - math.max(flashLevel, self.fade)
-	if self.fade > flashLevel then
-		self.flash.BackgroundColor3 = BLACK
+	-- opening / closing: world -> black (backdrop), then black -> box (veil)
+	local k = self.open
+	local veil = if k < 0.5 then 1 else 1 - (k - 0.5) * 2
+	self.Root.BackgroundTransparency = if k < 0.5 then 1 - k * 2 else 0
+	setVisible(self.stage, k > 0.5)
+	if veil > flashLevel then
+		flashLevel, flashColor = veil, BLACK
 	end
+	self.flash.BackgroundColor3 = flashColor
+	self.flash.BackgroundTransparency = if k < 0.5 then 1 else 1 - flashLevel
 
 	-- HUD / header
 	if self.hud then
-		self:_layoutHud(w, h, hudData, t)
+		self:_layoutHud(hudData)
 	end
 end
 
@@ -1287,7 +1391,14 @@ function VerdictBoxView.Create(_theme: any, deps: { [string]: any }?): { Root: G
 	local tl = Patterns.Build(set, seed, d.Duration)
 	local layout = d.Layout
 	local canvas: Vector2 = if layout and layout.Canvas then layout.Canvas else Vector2.new(1600, 900)
-	local root = frame({ Name = "VerdictBoxPreview", Size = UDim2.fromOffset(canvas.X, canvas.Y), BackgroundColor3 = Color3.fromRGB(14, 14, 18) }, nil)
+	local root = frame(
+		{
+			Name = "VerdictBoxPreview",
+			Size = UDim2.fromOffset(canvas.X, canvas.Y),
+			BackgroundColor3 = Color3.fromRGB(14, 14, 18),
+		},
+		nil
+	)
 	local kind = d.Kind or "Sheet"
 	if kind == "Overlay" then
 		local view = VerdictBoxView.new(root, tl, { Mode = "Overlay", Size = canvas, Title = d.Title })
@@ -1295,10 +1406,18 @@ function VerdictBoxView.Create(_theme: any, deps: { [string]: any }?): { Root: G
 		if d.HitAt then
 			view:Hit(d.HitAt, 5, 3)
 		end
-		view:Render(t, previewSoul(tl, t), { name = d.Name or "Frisk", lv = 7, hp = d.Hp or 74, maxHp = 110, kr = d.Kr or 9 })
+		view:Render(
+			t,
+			previewSoul(tl, t),
+			{ name = d.Name or "Frisk", lv = 7, hp = d.Hp or 74, maxHp = 110, kr = d.Kr or 9 }
+		)
 		if d.Hint then
 			view:SetHint(Strings.L(d.Hint))
-			view:Render(t, previewSoul(tl, t), { name = d.Name or "Frisk", lv = 7, hp = d.Hp or 74, maxHp = 110, kr = d.Kr or 9 })
+			view:Render(
+				t,
+				previewSoul(tl, t),
+				{ name = d.Name or "Frisk", lv = 7, hp = d.Hp or 74, maxHp = 110, kr = d.Kr or 9 }
+			)
 		end
 		if d.Verdict then
 			view:SetVerdict(d.Verdict, Strings.L("vb.verdict." .. d.Verdict .. ".sub", 3))
@@ -1314,7 +1433,12 @@ function VerdictBoxView.Create(_theme: any, deps: { [string]: any }?): { Root: G
 			Name = "Caption",
 			Position = UDim2.fromOffset(pad, 4),
 			Size = UDim2.fromOffset(canvas.X - pad * 2, 24),
-			Text = string.format("VERDICT BOX - %s - seed %d - %s", set, seed, table.concat(Patterns.Chain(set, seed), " > ")),
+			Text = string.format(
+				"VERDICT BOX - %s - seed %d - %s",
+				set,
+				seed,
+				table.concat(Patterns.Chain(set, seed), " > ")
+			),
 			TextScaled = true,
 			TextXAlignment = Enum.TextXAlignment.Left,
 			TextColor3 = Color3.fromRGB(190, 190, 200),
@@ -1327,7 +1451,15 @@ function VerdictBoxView.Create(_theme: any, deps: { [string]: any }?): { Root: G
 				Size = UDim2.fromOffset(cell, cell),
 				BackgroundColor3 = BLACK,
 			}, root)
-			local view = VerdictBoxView.new(holder, tl, { Mode = if kind == "Overlay" then "Overlay" else "Mirror", Size = Vector2.new(cell, cell), Name = d.Name or "Frisk" })
+			local view = VerdictBoxView.new(
+				holder,
+				tl,
+				{
+					Mode = if kind == "Overlay" then "Overlay" else "Mirror",
+					Size = Vector2.new(cell, cell),
+					Name = d.Name or "Frisk",
+				}
+			)
 			view:Render(t, previewSoul(tl, t))
 			local segName = "intro"
 			for _, sg in tl.segments do
