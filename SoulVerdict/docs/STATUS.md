@@ -117,3 +117,11 @@ If a workflow died (usage limit): Workflow({scriptPath, resumeFromRunId}) re-run
 Resume rule (quality): do not blindly re-run a dead agent's prompt. Re-run it as a CONTINUATION: same prompt plus "an earlier agent
 was cut off mid-task; first read `git diff` / `git log -5` for your files, keep what is good, finish the rest, then run the tests".
 Then run the adversarial review on the finished part before shipping (as done for audio/loading/phase2).
+
+## 12:40 UTC — after the limit reset (continuation batch)
+The 3 workflows above were cut off by the usage limit (partial work committed as WIP). Review findings saved in the session scratchpad
+(review_findings.json). Now running (script continue-after-limit, one owner per file set, see its BASE text):
+- wf_44df9ced-5b9: box+sound (finish Verdict Box entry + SoundController review fixes), loading (UIController/Loading review fixes)
+- wf_e6443210-11b: shop-screen (pixel sleepy Sans in Shop), shop-booth (3D sleeping Sans at the lobby booth)
+- wf_62219af1-12d: phase2 (ult no longer a reset button, Unshaken meaning, Classic eye, lobby viewers' call-outs)
+Next: adversarial review of all of it, tools/check.sh, tools/build.sh, commit + push, send rbxl + previews with a RU summary.
