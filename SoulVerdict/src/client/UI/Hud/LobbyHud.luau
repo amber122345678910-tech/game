@@ -241,7 +241,7 @@ function LobbyHud.Create(theme: any, deps: any): any
 		if name == "Practice" then
 			-- (UI.Open("Practice") is not a screen: it returned nil without error and the tap did nothing)
 			if type(ui) == "table" and type(ui.Practice) == "function" then
-				pcall(ui.Practice, "Human")
+				pcall(ui.Practice) -- no side: the chooser asks "as Sans or as a human"
 			elseif type(d.State) == "table" and type(d.State.Request) == "function" then
 				pcall(d.State.Request, "StartPractice", { side = "Human" })
 			end
@@ -348,6 +348,75 @@ function LobbyHud.Create(theme: any, deps: any): any
 	})
 	local chanceRows = Style.Frame({ Name = "Rows", Size = UDim2.new(1, 0, 1, -24), Parent = chancePanel.Content })
 	local chanceValue: TextLabel? = nil
+	local lastChances: { any } = {}
+	-- the whole queue (owner: "make a table of who will be Sans"): every player by monster chance, the top one next
+	local queueModal: any = nil
+	local function openQueue()
+		if queueModal then
+			pcall(queueModal.Destroy)
+			queueModal = nil
+		end
+		local list = table.clone(lastChances)
+		table.sort(list, function(a, b)
+			if (a.Chance or 0) ~= (b.Chance or 0) then
+				return (a.Chance or 0) > (b.Chance or 0)
+			end
+			return tostring(a.Name) < tostring(b.Name)
+		end)
+		queueModal = UIKit.Modal(theme, {
+			Name = "SansQueue",
+			Title = Style.L("lobby.chance.title"),
+			TitleIcon = "Skull",
+			PanelSize = UDim2.fromOffset(560, if phone then 300 else 420),
+			OnClose = function()
+				queueModal = nil
+			end,
+		})
+		local body = Style.Frame({ Name = "Rows", Size = UDim2.fromScale(1, 1), Parent = queueModal.Content })
+		local layoutList = Instance.new("UIListLayout")
+		layoutList.Padding = UDim.new(0, 4)
+		layoutList.SortOrder = Enum.SortOrder.LayoutOrder
+		layoutList.Parent = body
+		if #list == 0 then
+			UIKit.Label(theme, { Text = Style.L("lobby.chance.empty"), Role = "Body", Size = UDim2.new(1, 0, 0, 28), Parent = body })
+		end
+		for i, entry in list do
+			if i > 8 then
+				break
+			end
+			local pct = math.floor((entry.Chance or 0) * 100 + 0.5)
+			local text = ("%d. %s%s  —  %d%%"):format(
+				i,
+				tostring(entry.Name),
+				if entry.IsLocal then "  (" .. Style.L("lobby.chance.you") .. ")" else "",
+				pct
+			)
+			if i == 1 then
+				text ..= "   " .. Style.L("lobby.queue.next")
+			end
+			UIKit.Label(theme, {
+				Name = "Row" .. i,
+				Text = text,
+				Role = "Body",
+				Tone = if i == 1 then "Accent" elseif entry.IsLocal then "Text" else "Dim",
+				Truncate = true,
+				LayoutOrder = i,
+				Size = UDim2.new(1, 0, 0, if phone then 24 else 30),
+				Parent = body,
+			})
+		end
+		UIKit.Label(theme, {
+			Name = "Hint",
+			Text = Style.L("lobby.chance.hint"),
+			Role = "Caption",
+			Tone = "Muted",
+			Wrap = true,
+			LayoutOrder = 99,
+			Size = UDim2.new(1, 0, 0, 44),
+			Parent = body,
+		})
+		queueModal.Root.Parent = root
+	end
 	if phone then
 		place(chancePanel.Root, pr.Chances)
 		chanceRows.Visible = false
@@ -379,6 +448,16 @@ function LobbyHud.Create(theme: any, deps: any): any
 			Size = UDim2.new(0, 96, 1, 0),
 			Parent = chancePanel.Content,
 		})
+		local tap = Instance.new("TextButton")
+		tap.Name = "OpenQueue"
+		tap.Text = ""
+		tap.BackgroundTransparency = 1
+		tap.Size = UDim2.fromScale(1, 1)
+		tap.ZIndex = 20
+		tap.Parent = chancePanel.Root
+		pcall(function() -- (offline mocks have no Activated)
+			tap.Activated:Connect(openQueue)
+		end)
 	end
 	UIKit.Label(theme, {
 		Name = "Hint",
@@ -659,6 +738,7 @@ function LobbyHud.Create(theme: any, deps: any): any
 	end
 
 	local function buildChances(list: { any })
+		lastChances = list
 		chanceRows:ClearAllChildren()
 		local rowH = if phone then 22 else 28
 		local maxRows = math.max(1, math.floor((chanceHeight - (if phone then 48 else 96)) / rowH))

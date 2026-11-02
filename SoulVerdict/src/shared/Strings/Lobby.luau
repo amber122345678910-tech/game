@@ -27,7 +27,8 @@ return {
 	["lobby.vote.leading"] = { en = "LEADING", ru = "ЛИДЕР" },
 	["lobby.vote.closed"] = { en = "VOTING CLOSED", ru = "ГОЛОСОВАНИЕ ЗАКРЫТО" },
 	-- monster chance
-	["lobby.chance.title"] = { en = "MONSTER CHANCE", ru = "ШАНС НА МОНСТРА" },
+	["lobby.chance.title"] = { en = "SANS QUEUE", ru = "ОЧЕРЕДЬ НА САНСА" },
+	["lobby.queue.next"] = { en = "<- next Sans", ru = "<- следующий Санс" },
 	["lobby.chance.you"] = { en = "YOU", ru = "ТЫ" },
 	["lobby.chance.pref.Monster"] = { en = "wants Monster", ru = "хочет монстра" },
 	["lobby.chance.pref.Human"] = { en = "human only", ru = "только человек" },

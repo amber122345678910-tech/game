@@ -539,7 +539,7 @@ function Title.Create(theme: Theme, deps: any): any
 			end
 		elseif id == "Practice" then
 			if type(ui.Practice) == "function" then
-				ui.Practice("Human")
+				ui.Practice() -- no side: the chooser asks "as Sans or as a human"
 			else
 				Common.Request(d, "StartPractice", { side = "Human" })
 				if type(ui.Close) == "function" then

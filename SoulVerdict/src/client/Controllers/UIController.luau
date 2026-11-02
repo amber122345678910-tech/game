@@ -901,7 +901,77 @@ function UIController.Play()
 	end
 end
 
+-- PRACTICE without a side (Title / lobby buttons): ask who to play as (owner: "I picked Sans, pressed practice and
+-- still played a human"). Two big buttons name the equipped monster and human kits; the choice starts at once.
+local practiceChooser: any = nil
+local function equippedKitName(role: string): string
+	local player = Players.LocalPlayer
+	local id = player and player:GetAttribute(if role == "Monster" then "EquippedMonster" else "EquippedHuman")
+	local ok, name = pcall(function()
+		local Kits = require(Shared:WaitForChild("Kits")) :: any
+		local kit = Kits.Get(if type(id) == "string" and id ~= "" then id else (if role == "Monster" then "ClassicSans" else "Determination"))
+		return if kit then Strings.Pick(kit.Name) else nil
+	end)
+	return if ok and type(name) == "string" then name else role
+end
+
+local function choosePracticeSide()
+	if practiceChooser then
+		pcall(practiceChooser.Destroy)
+		practiceChooser = nil
+	end
+	local theme = if ThemeService then ThemeService.Current() else nil
+	local okKit, UIKit = pcall(function()
+		return require((script.Parent.Parent :: any).UI.UIKit) :: any
+	end)
+	local okLayer, layer = false, nil
+	if UIRoot then
+		okLayer, layer = pcall(UIRoot.Layer, "Overlay")
+	end
+	if theme == nil or not okKit or not okLayer or layer == nil then
+		UIController.Practice("Human")
+		return
+	end
+	local function pick(side: string)
+		if practiceChooser then
+			pcall(practiceChooser.Destroy)
+			practiceChooser = nil
+		end
+		UIController.Practice(side)
+	end
+	local modal = UIKit.Modal(theme, {
+		Name = "PracticeChoice",
+		Title = Strings.L("practice.choose.title"),
+		TitleIcon = "Swords",
+		PanelSize = UDim2.fromOffset(620, 300),
+		Buttons = {
+			{ Text = Strings.L("practice.choose.monster", equippedKitName("Monster")), Variant = "Primary", Width = 280, Icon = "Skull",
+				OnActivated = function() pick("Monster") end },
+			{ Text = Strings.L("practice.choose.human", equippedKitName("Human")), Variant = "Secondary", Width = 280, Icon = "Heart",
+				OnActivated = function() pick("Human") end },
+		},
+		OnClose = function()
+			practiceChooser = nil
+		end,
+	})
+	UIKit.Label(theme, {
+		Name = "Explain",
+		Text = Strings.L("practice.choose.body"),
+		Role = "Body",
+		Wrap = true,
+		YAlign = "Top",
+		Size = UDim2.fromScale(1, 1),
+		Parent = modal.Content:FindFirstChild("Body") or modal.Content,
+	})
+	modal.Root.Parent = layer
+	practiceChooser = modal
+end
+
 function UIController.Practice(side: string?)
+	if side == nil then
+		choosePracticeSide()
+		return
+	end
 	local data = { side = if side == "Monster" then "Monster" else "Human" }
 	local requested = false
 	local function request()

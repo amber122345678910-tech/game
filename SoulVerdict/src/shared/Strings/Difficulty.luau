@@ -21,6 +21,13 @@ return {
 		en = "You're in the Verdict Box: move your heart and dodge the bones until it ends!",
 		ru = "Ты в Коробке Вердикта: двигай сердце и уворачивайся от костей, пока она не закончится!",
 	},
+	["practice.choose.title"] = { en = "PRACTICE: PLAY AS", ru = "ПРАКТИКА: ИГРАТЬ ЗА" },
+	["practice.choose.monster"] = { en = "SANS: {1}", ru = "САНСА: {1}" },
+	["practice.choose.human"] = { en = "HUMAN: {1}", ru = "ЧЕЛОВЕКА: {1}" },
+	["practice.choose.body"] = {
+		en = "A round against bots. As Sans you hunt bot humans; as a human you and bot allies face a bot Sans. Change the character in LOADOUT.",
+		ru = "Раунд против ботов. За Санса ты охотишься на ботов-людей; за человека ты с ботами-союзниками против бота-Санса. Персонажа меняй в СНАРЯЖЕНИИ.",
+	},
 	["diff.hint.Round"] = {
 		en = "Tip: dash (Shift / dash button) through attacks, block with F, light the SAVE stars to weaken the Sans.",
 		ru = "Совет: делай рывок (Shift / кнопка рывка) сквозь атаки, блокируй на F, зажигай звёзды SAVE, чтобы ослабить Санса.",
