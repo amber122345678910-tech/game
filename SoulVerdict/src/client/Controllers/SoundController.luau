@@ -1363,6 +1363,21 @@ local function hookState()
 	end
 end
 
+-- Verdict Box: the box track starts on the first frame of the victim's pull-in (VerdictBoxController warms its ids
+-- up with Prewarm at Start), so the switch INTO the box is a short fade; the way back out keeps a normal one.
+SoundController.BOX_FADE_IN = 0.15
+SoundController.BOX_FADE_OUT = 1.0
+
+-- Prewarm(name): checks an entry's candidates ahead of time (background probes, the next candidate after a bad one),
+-- so a later PlayMusic / Play of it starts at once instead of waiting for its first check. Safe to call repeatedly.
+function SoundController.Prewarm(name: string)
+	if type(name) ~= "string" or name == "" then
+		return
+	end
+	queueEntry(canonical(name))
+	pumpProbes()
+end
+
 local function hookInput()
 	local Input = controller("InputController")
 	if Input == nil or Input.ContextChanged == nil then
@@ -1374,7 +1389,7 @@ local function hookInput()
 	Input.ContextChanged:Connect(function(name: string, active: boolean)
 		if name == "Box" then
 			boxActive = active
-			refreshMusic(if active then 0.35 else 1.0)
+			refreshMusic(if active then SoundController.BOX_FADE_IN else SoundController.BOX_FADE_OUT)
 		end
 	end)
 end

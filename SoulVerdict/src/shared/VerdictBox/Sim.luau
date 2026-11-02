@@ -25,6 +25,9 @@
 --   Sim.new(timeline, opts?) -> State          opts: { hitInterval: number? }
 --   Sim.Step(state, dt, input?) -> number      advance by dt (fixed 1/60 ticks inside); returns hits gained
 --   Sim.AdvanceTo(state, t, input?) -> number  step until state.t reaches t (work capped; far behind = skip ahead)
+--   Sim.SkipTo(state, t)                       jump state.t to t WITHOUT simulating (no movement, no hits): time the
+--                                              player could not see (the victim's entry transition); the next tick
+--                                              enters the mode active at that time
 --   Sim.ModeAt(timeline, t) -> (Mode, index)   active soul mode ("Intro" before the first attack, "End" after)
 --   Sim.BoxAt(timeline, t) -> (w, h)           animated inner box size (Tuning.ResizeTime tween)
 --   Sim.NewPose() -> Pose ; Sim.Pose(bullet, t, out?) -> Pose?   geometry + render info at t (nil = inactive)
@@ -950,6 +953,16 @@ function Sim.AdvanceTo(st: State, target: number, input: Input?): number
 	end
 	st.acc = 0
 	return gained
+end
+
+-- Jump to `target` sim seconds without simulating the skipped ticks (never backwards).
+function Sim.SkipTo(st: State, target: number)
+	local want = math.floor(target / TICK + 1e-6)
+	if want > st.ticks then
+		st.ticks = want
+		st.t = want * TICK
+		st.acc = 0
+	end
 end
 
 -- A plausible, smooth soul path for watchers when no relay arrives (bot victims): wanders inside the box, rests

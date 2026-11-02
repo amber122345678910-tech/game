@@ -2,9 +2,17 @@
 -- VerdictBoxController (client, SPEC §11 / §20, Priority 40): the Verdict Box on every client.
 --   Net "BoxStart" {boxId, victim, monster, seed, patternSet, duration, t0, damagePerHit, krPerHit, box?, bot?}
 --     -> the timeline is rebuilt locally (VerdictBox/Patterns, deterministic from seed + set + duration).
---   VICTIM (the local character): pushes InputController context "Box" (combat suppressed; SoundController switches
---     to the "VerdictBox" music), opens a full-screen overlay (ScreenGui "VerdictBox", DisplayOrder 25) drawn by
---     UI/VerdictBoxView ("Overlay"): fade to black, the typed opening line, the battle box, HP / KR line, hints.
+--   VICTIM (the local character): the moment BoxStart arrives the ENTRY transition starts (UI/VerdictBoxEntry): the
+--     camera is pulled toward the victim's chest (render step "SV_VerdictBoxEntry" right after CameraController's,
+--     post-processing its frame: push + narrowing FOV + roll, blur / desaturation; put back exactly afterwards), a
+--     dark iris closes onto the red SOUL heart, full black, then a SHARP white flash reveals the battle box (Reduced
+--     Motion: darken + flash only). At the same moment the InputController context "Box" is pushed (combat suppressed;
+--     SoundController switches to the "VerdictBox" music with its short box fade - the ids are checked ahead of time
+--     at Start via SoundController.Prewarm) and "Implode" plays quietly; "BoxOpen" plays at the flash. The flash
+--     lands on the timeline's t0 (server open + Config.VerdictBox.IntroTime), and the SOUL is not simulated (no hits)
+--     before the box is fully revealed. Under the transition: a full-screen overlay (ScreenGui "VerdictBox",
+--     DisplayOrder 25) drawn by UI/VerdictBoxView ("Overlay"): the typed opening line, the battle box, HP / KR line,
+--     hints.
 --     The SOUL is simulated by VerdictBox/Sim on its fixed tick, kept in step with the server clock (t = now - t0):
 --     input = WASD / arrows / left stick / D-pad (Shift, X or gamepad B = slow), jump = Space / W / Up / gamepad A
 --     (blue soul); touch: drag anywhere on the left half to steer (relative virtual stick), JUMP button at the right.
@@ -52,7 +60,6 @@ local TUNING = {
 	RelayStale = 0.45, -- no relay for this long -> Sim.AutoSoul
 	MirrorRate = 1 / 30,
 	MirrorMaxDistance = 260,
-	FadeIn = 0.25,
 	FadeOut = 0.35,
 	VerdictHold = 1.1,
 	SafetyClose = 2,
@@ -60,6 +67,9 @@ local TUNING = {
 	TouchDeadzone = 0.12,
 	StickDeadzone = 0.2,
 	DisplayOrder = 25,
+	EntryZIndex = 60, -- the entry layer above the box overlay and the touch controls (same ScreenGui)
+	EntryStep = "SV_VerdictBoxEntry", -- render step right after CameraController's (Camera + 1)
+	ImplodeVolume = 0.45, -- the pull-in sound, quiet under the box music
 }
 VerdictBoxController.Tuning = TUNING
 
@@ -95,14 +105,24 @@ local function call(name: string, fn: string, ...: any): any
 	return nil
 end
 
-local viewModule: any = nil
-local function View(): any
-	if viewModule == nil then
+local uiModules: { [string]: any } = {}
+local function uiModule(name: string): any?
+	local cached = uiModules[name]
+	if cached == nil then
 		local ui = script.Parent and script.Parent.Parent and script.Parent.Parent:FindFirstChild("UI")
-		local mod = ui and ui:FindFirstChild("VerdictBoxView")
-		viewModule = if mod then require(mod :: ModuleScript) else false
+		local mod = ui and ui:FindFirstChild(name)
+		cached = if mod then require(mod :: ModuleScript) else false
+		uiModules[name] = cached
 	end
-	return if viewModule then viewModule else nil
+	return if cached then cached else nil
+end
+
+local function View(): any
+	return uiModule("VerdictBoxView")
+end
+
+local function Entry(): any
+	return uiModule("VerdictBoxEntry")
 end
 
 local function sound(name: string, at: any?, opts: { [string]: any }?)
@@ -218,6 +238,11 @@ type Box = {
 	typed: number,
 	soulView: { [string]: any },
 	hudView: { [string]: any },
+	-- victim entry transition (UI/VerdictBoxEntry)
+	stages: any?,
+	entry: any?, -- VerdictBoxEntry Runner while the transition plays
+	chest: Instance?,
+	flashed: boolean,
 }
 
 local boxes: { [number]: Box } = {}
@@ -477,7 +502,159 @@ local function deviceKey(base: string): string
 	return base
 end
 
+---------------------------------------------------------------------------------------------------
+-- entry transition (victim): pull-in -> black -> flash (UI/VerdictBoxEntry)
+
+local entryBound = false
+local postFx: { [string]: Instance } = {}
+
+local function reducedMotion(): boolean
+	return call("GraphicsController", "ReducedMotion") == true
+end
+
+-- the SOUL's anchor: the rig's "Chest" attachment on UpperTorso (SPEC §5.1), else the torso / root part
+local function findChest(model: any): Instance?
+	if typeof(model) ~= "Instance" then
+		return nil
+	end
+	local torso = model:FindFirstChild("UpperTorso")
+	local att = torso and torso:FindFirstChild("Chest")
+	if att and att:IsA("Attachment") then
+		return att
+	end
+	if torso and torso:IsA("BasePart") then
+		return torso
+	end
+	local root = model:FindFirstChild("HumanoidRootPart")
+	return if root and root:IsA("BasePart") then root else nil
+end
+
+local function chestPosition(box: Box): Vector3?
+	local c = box.chest
+	if c == nil or c.Parent == nil then
+		return nil
+	end
+	if c:IsA("Attachment") then
+		return c.WorldPosition
+	elseif c:IsA("BasePart") then
+		return if c.Name == "HumanoidRootPart" then c.Position + Vector3.new(0, 1, 0) else c.Position
+	end
+	return nil
+end
+
+local function clearPostFx()
+	for _, fx in postFx do
+		fx:Destroy()
+	end
+	table.clear(postFx)
+end
+
+-- camera-local post effects of the pull-in (blur + desaturation) by the camera amount 0..1; 0 removes them
+local function setPostFx(amount: number)
+	local camera = workspace.CurrentCamera
+	local Mod = Entry()
+	if amount <= 0.001 or camera == nil or Mod == nil then
+		clearPostFx()
+		return
+	end
+	local blur = postFx.Blur :: BlurEffect?
+	local color = postFx.Color :: ColorCorrectionEffect?
+	if blur == nil or color == nil or blur.Parent ~= camera then
+		clearPostFx()
+		local b = Instance.new("BlurEffect")
+		b.Name = "SV_VerdictBoxEntryBlur"
+		b.Size = 0
+		b.Parent = camera
+		local c = Instance.new("ColorCorrectionEffect")
+		c.Name = "SV_VerdictBoxEntryColor"
+		c.Parent = camera
+		postFx.Blur, postFx.Color = b, c
+		blur, color = b, c
+	end
+	local T = Mod.Tuning
+	local b = blur :: BlurEffect
+	local c = color :: ColorCorrectionEffect
+	b.Size = T.Blur * amount
+	c.Saturation = -T.Desaturate * amount
+	c.Contrast = 0.12 * amount
+end
+
+local function unbindEntry()
+	if entryBound then
+		entryBound = false
+		pcall(function()
+			RunService:UnbindFromRenderStep(TUNING.EntryStep)
+		end)
+	end
+end
+
+-- ends the transition: camera put back (if it still holds our frame), post effects off, the layer removed
+local function stopEntry(box: Box?)
+	unbindEntry()
+	if box and box.entry then
+		local runner = box.entry
+		box.entry = nil
+		pcall(runner.Stop, runner)
+	end
+	clearPostFx()
+end
+
+-- every frame of the transition, right after CameraController wrote the camera (Entry Runner: camera pull, effects,
+-- the layer centred on the chest as seen through the pulled camera)
+local function entryStep()
+	local box = victimBox
+	local runner = if box then box.entry else nil
+	if box == nil or runner == nil or runner.done then
+		stopEntry(box)
+		return
+	end
+	local ok, err = pcall(runner.Step, runner, now())
+	if not ok then
+		warn("[VerdictBoxController] entry transition failed: " .. tostring(err))
+	end
+	if not ok or runner.done then
+		stopEntry(box)
+	end
+end
+
+local function startEntry(box: Box, gui: ScreenGui)
+	local Mod = Entry()
+	if Mod == nil then
+		return
+	end
+	box.stages = Mod.Stages(now(), box.t0, box.timeline.introEnd, reducedMotion())
+	box.chest = findChest(box.packet.victim)
+	box.entry = Mod.Runner(box.stages, Mod.new(gui, { ZIndex = TUNING.EntryZIndex }), {
+		camera = function(): Camera?
+			return workspace.CurrentCamera
+		end,
+		chest = function(): Vector3?
+			return chestPosition(box)
+		end,
+		project = function(camera: Camera, point: Vector3): Vector2?
+			local p = camera:WorldToViewportPoint(point)
+			return if p.Z > 0 then Vector2.new(p.X, p.Y) else nil
+		end,
+		size = function(): Vector2
+			local size = gui.AbsoluteSize
+			local camera = workspace.CurrentCamera
+			if (size.X < 2 or size.Y < 2) and camera then
+				return camera.ViewportSize -- not laid out yet (first frame); the overlay is full-bleed
+			end
+			return size
+		end,
+		postFx = setPostFx,
+	})
+	if not entryBound then
+		entryBound = true
+		RunService:BindToRenderStep(TUNING.EntryStep, Enum.RenderPriority.Camera.Value + 2, entryStep)
+	end
+end
+
 local function destroyBox(box: Box)
+	if box.isVictim then
+		stopEntry(box)
+	end
 	boxes[box.id] = nil
 	if box.view then
 		pcall(function()
@@ -505,6 +682,14 @@ local function beginClose(box: Box, result: any?)
 	end
 	box.closing = true
 	local t = now()
+	if box.isVictim and not box.flashed then
+		-- ended before the box ever appeared (cancelled during the pull-in): no verdict, straight back to the world
+		stopEntry(box)
+		box.fadeOutStart = t
+		box.closeAt = t
+		VerdictBoxController.Ended:Fire(box.id, result)
+		return
+	end
 	local kind = VerdictBoxController.VerdictKind(result)
 	local hits = if type(result) == "table" and type(result.hits) == "number" then result.hits else box.shownHits
 	if box.view then
@@ -610,9 +795,20 @@ local function stepVictim(box: Box, wall: number)
 	local t = wall - box.t0
 	local view = box.view
 	local sim = box.sim
+	local stages = box.stages
+	if not box.flashed and wall >= (if stages then stages.flashAt else box.t0) then
+		box.flashed = true -- the white flash: the box is open underneath from now on
+		sound("BoxOpen", nil, { Force2D = true })
+	end
 	if not box.closing and sim then
 		local cfg = Config.VerdictBox
-		local gained = Sim.AdvanceTo(sim, math.min(t, box.duration), readInput())
+		local target = math.min(t, box.duration)
+		local gained = 0
+		if wall >= (if stages then stages.flashEnd else box.t0) then
+			gained = Sim.AdvanceTo(sim, target, readInput())
+		else
+			Sim.SkipTo(sim, target) -- the SOUL is never hit by anything the player could not see yet
+		end
 		-- events: hits, slams, mode changes
 		local events = sim.events
 		for i = box.eventIndex + 1, #events do
@@ -638,14 +834,16 @@ local function stepVictim(box: Box, wall: number)
 			box.lastSoulSend = wall
 			Net.Client.Fire("BoxSoul", box.id, math.round(sim.soul.x * 10) / 10, math.round(sim.soul.y * 10) / 10)
 		end
-		timelineCues(box, t)
+		if box.flashed then
+			timelineCues(box, t)
+		end
 		if t >= box.duration and not box.finishedSent then
 			box.finishedSent = true
 			Net.Client.Fire("BoxReport", box.id, 0, true)
 		end
 	end
-	-- open (world -> black -> box) / close (backwards)
-	local open = math.clamp((wall - box.t0) / TUNING.FadeIn, 0, 1)
+	-- the box shows from the flash on (the entry layer draws the pull-in / black / flash above it); close = backwards
+	local open = if box.flashed then 1 else 0
 	if box.closing then
 		open = math.min(open, 1 - math.clamp((wall - box.fadeOutStart) / TUNING.FadeOut, 0, 1))
 	end
@@ -769,6 +967,10 @@ local function newBox(packet: { [string]: any }, isVictim: boolean): Box
 		typed = 0,
 		soulView = {},
 		hudView = {},
+		stages = nil,
+		entry = nil,
+		chest = nil,
+		flashed = false,
 	}
 end
 
@@ -791,15 +993,20 @@ local function openOverlay(box: Box)
 	gui.DisplayOrder = TUNING.DisplayOrder
 	local view = ViewMod.new(gui, box.timeline, { Mode = "Overlay", Title = monsterTitle(box.packet.monster) })
 	view.Root.Active = true -- swallow clicks / touches meant for the world
+	view:SetOpen(0) -- invisible until the flash: the entry layer plays the pull-in over the world
+	view:Render(math.min(now() - box.t0, 0), nil, nil)
 	box.view = view
 	box.gui = gui
 	box.sim = Sim.new(box.timeline, { hitInterval = Config.VerdictBox.MinHitInterval })
 	connectInput(gui)
-	gui.Parent = playerGui
 	victimBox = box
+	startEntry(box, gui)
+	gui.Parent = playerGui
+	-- the pull-in, the box music (SoundController follows the "Box" context) and the implosion start together
 	call("InputController", "PushContext", "Box")
-	sound("BoxOpen", nil, { Force2D = true })
+	sound("Implode", nil, { Force2D = true, Volume = TUNING.ImplodeVolume })
 	VerdictBoxController.Changed:Fire(true)
+	entryStep() -- first frame of the transition right away
 end
 
 local function findBoxModel(packet: { [string]: any }): Model?
@@ -938,6 +1145,8 @@ function VerdictBoxController.Start()
 	Net.Client.On("BoxStart", onBoxStart)
 	Net.Client.On("BoxSoul", onBoxSoul)
 	Net.Client.On("BoxEnd", onBoxEnd)
+	-- the box music must start on the first frame of a pull-in: check its ids now, in the background
+	call("SoundController", "Prewarm", "VerdictBox")
 end
 
 return VerdictBoxController
