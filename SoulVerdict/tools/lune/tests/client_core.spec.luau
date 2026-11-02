@@ -483,7 +483,7 @@ return {
 		-- an empty entry with an empty fallback chain is silent; with a built-in at the end it resolves
 		local revive, reviveName = Audio.Resolve("Revive")
 		T.ok(revive ~= nil and reviveName == "GetUp", "Revive falls back to the built-in GetUp")
-		if Audio.Get("Hit").Id == "" then
+		if #Audio.Candidates("Hit") == 0 and #Audio.Candidates("HitHeavy") == 0 then -- (Id and Ids both count)
 			T.eq(Audio.Resolve("HitHeavy"), nil, "fallback to an empty entry is silent")
 		end
 		T.eq(Audio.MapMusic("Map_VoidRift"), "Map_VoidRift")

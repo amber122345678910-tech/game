@@ -770,8 +770,27 @@ actions: "M1","Q","E","R","T","F","G","Shift","Jump","Menu","Emote","CameraLock"
 **MovementController** (P22) — `Facing(on)`, `ApplyForceMove(packet)`, `IsDashing()`; handles Net "ForceMove",
 double jump, blue-soul gravity, local dash prediction, AlignOrientation facing toward camera yaw when locked.
 **SoundController** (P10) — `Play(name, at?: Vector3|BasePart|Attachment, opts?) -> Sound?`, `PlayMusic(key, fadeTime?)`,
-`StopMusic(fadeTime?)`, `SetVolumes(music, sfx)`, `Register(name, soundId, opts)`; registry of built-in rbxasset sounds +
-owner-provided ids in `Shared/Audio.luau` (empty ids = silent).
+`StopMusic(fadeTime?)`, `SetVolumes(music, sfx)`, `Register(name, soundId | {ids}, opts)`; registry of built-in rbxasset
+sounds + owner-provided ids in `Shared/Audio.luau`. Every entry has CANDIDATES `Audio.Candidates(name)` = normalized,
+de-duplicated `{Id, ...Ids}` (best first; `SoundDef.Ids: {string}?`); an entry without candidates is silent and never warns.
+- Id checks: each id is probed at most once with `ContentProvider:PreloadAsync({sound}, cb)`: `AssetFetchStatus.Success` =
+  good; Failure / TimedOut / no final answer within `PROBE_TIMEOUT` (10 s) = bad; a Sound that reports IsLoaded with
+  TimeLength 0, or a music deck that does not load a checked id within `LOAD_TIMEOUT` (15 s), = bad. Built-in rbxasset://
+  files are trusted. Every bad id warns once: `[Sound] audio id failed to load: <id> (<entry>)`. SFX/UI play the first
+  candidate not known bad (an untested one optimistically; a background batch probes SFX/UI after Start, 3 at a time) and
+  switch the pool's SoundId when it turns bad; music waits for its first GOOD candidate (the old track keeps playing).
+  An entry whose candidates all failed is dead: plays follow its Fallback chain.
+- Music selection, pure `MusicFor(round, ctx)` with `ctx.Usable(key)` (= a candidate along the Fallback chain that is not
+  dead; default: has candidates in Shared/Audio): Waiting/Intermission `Lobby`; Intro/Round/Collapse the first usable of
+  `Theme_<RoundState.MonsterKit>`, the map track; while FinalPhase `Theme_<kit>_Final`, `Theme_<kit>`, `<map>_Final`
+  (-> FinalPhase), `FinalPhase`, the map track (nothing usable -> the map track, silent); Ending the Victory/Defeat
+  stinger; Box `VerdictBox`; lobby viewers `Lobby`; `PreviewMusic` > `SetMusicOverride` > everything. A key that dies
+  re-runs the selection. Theme keys: `Audio.MonsterTheme(kitId, final?)`, kits with themes `Audio.ThemeKits`.
+- Test / admin API: `ActiveId(name) -> string?` (the id in use; music: the playing deck's), `Status(name) ->
+  "ok"|"pending"|"dead"|"empty"`, `PreviewMusic(key?)` (sticky test override; nil = automatic again), `NowPlaying() ->
+  {Key, Entry, Id, Status, Index, Count, Preview, Playing}`, `IdState(id)`; pure helpers `PickCandidate(candidates,
+  stateOf)`, `ResolveChain(name, defOf, stateOf, candidatesOf?)`, `ArenaMusicOrder(round)`. Admin panel TEST -> MUSIC
+  (client only) previews the 6 themes, Lobby, VerdictBox and FinalPhase and shows key -> entry, id and status.
 **FxController** (P30) — dispatches AbilityFx/DamageFx/Hazard packets to client kits/HazardVisuals/VFX; builds FxContext.
 **CombatController** (P35) — input → Cast/Block/Dash; local cooldowns `Cooldowns() -> {[abilityId]: endsAt}`,
 `CooldownChanged: Signal(abilityId, endsAt)`, `Charge() -> (abilityId?, 0..1)`, ammo/combo state for HUD.

@@ -1,5 +1,6 @@
 --!strict
 -- Admin panel strings (Screens/Admin, Hud/AdminButton) + AdminService results ("admin.ok.*" / "admin.err.*").
+-- "admin.music.*": the TEST tab music preview (client only, SoundController).
 -- Lune-safe. Every key has en + ru with the same {n} placeholders. Server args are already localised.
 return {
 	-- panel chrome ---------------------------------------------------------------------------------------------
@@ -87,6 +88,31 @@ return {
 	},
 
 	-- TEST tab -------------------------------------------------------------------------------------------------
+	["admin.sec.music"] = { en = "Music", ru = "Музыка" },
+	["admin.music.final"] = { en = "{1}: final", ru = "{1}: финал" },
+	["admin.music.lobby"] = { en = "Lobby", ru = "Лобби" },
+	["admin.music.box"] = { en = "Verdict Box", ru = "Коробка" },
+	["admin.music.finalPhase"] = { en = "Shared final", ru = "Общий финал" },
+	["admin.music.collapse"] = { en = "Collapse", ru = "Коллапс" },
+	["admin.music.stop"] = {
+		en = "Stop preview (normal music)",
+		ru = "Стоп превью (обычная музыка)",
+	},
+	["admin.music.hint"] = {
+		en = "The game checks every id by itself and skips broken ones (Output shows which). A preview keeps playing until you press Stop.",
+		ru = "Игра сама проверяет каждый ID и пропускает нерабочие (какие именно — видно в Output). Превью играет, пока не нажмёшь «Стоп».",
+	},
+	["admin.music.preview"] = { en = "Preview", ru = "Превью" },
+	["admin.music.auto"] = { en = "Auto", ru = "Авто" },
+	["admin.music.line"] = { en = "{1}: {2} · {3}", ru = "{1}: {2} · {3}" },
+	["admin.music.idLine"] = { en = "id {1} (#{2} of {3})", ru = "ID {1} (#{2} из {3})" },
+	["admin.music.noId"] = { en = "no id in use", ru = "ID не используется" },
+	["admin.music.none"] = { en = "silence", ru = "тишина" },
+	["admin.music.off"] = { en = "Sound is not running.", ru = "Звук сейчас недоступен." },
+	["admin.music.st.ok"] = { en = "works", ru = "работает" },
+	["admin.music.st.pending"] = { en = "checking…", ru = "проверка…" },
+	["admin.music.st.dead"] = { en = "every id failed", ru = "все ID не работают" },
+	["admin.music.st.empty"] = { en = "no ids yet", ru = "ID пока нет" },
 	["admin.sec.box"] = { en = "Verdict Box", ru = "Коробка приговора" },
 	["admin.boxNearest"] = { en = "Box the nearest", ru = "Коробка на ближнего" },
 	["admin.box.hint"] = {

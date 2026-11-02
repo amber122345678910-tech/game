@@ -10,7 +10,11 @@
 --   ME       quick actions (Heal, FullUlt, ResetCooldowns, TeleportLobby, TeleportArena), God / NoCooldowns
 --            toggles, Speed x1..x3, kit cards -> BecomeKit {kitId}
 --   PROGRESS AddGold {n}, AddLevels {n}, UnlockAll, ResetProfile {confirm = true} behind a confirm step
---   TEST     BoxNearest, DamageMe {n}, AddKR {n}, GiveDodges0
+--   TEST     MUSIC (client only, no server request): preview buttons for the monster themes (Theme_<kit>,
+--            Theme_<kit>_Final), Lobby, VerdictBox, FinalPhase and CollapsePhase -> deps.Sound.PreviewMusic(key) (sticky), Stop ->
+--            PreviewMusic(nil) (automatic music again), and a live line from deps.Sound.NowPlaying(): track key
+--            (-> the Audio entry that supplies it), the id in use (#n of the entry's candidates) and its check status;
+--            then BoxNearest, DamageMe {n}, AddKR {n}, GiveDodges0
 -- Requests go through Common.Request(deps, "Admin", data) (StateController.Request, else Net "Request"); the
 -- server (AdminService) validates everything again. Toggle states mirror the LocalPlayer attributes AdminGod /
 -- AdminNoCooldowns / AdminSpeed / AdminSolo and update live. Panel choices (tab, side, kits, map, bots, last result)
@@ -18,8 +22,9 @@
 --
 --   Admin.Create(theme, deps) -> { Root, Destroy, DefaultSelection, OnAction(action) -> boolean, Select(tabId) }
 --   deps: UI (UIController: Back), State (Request, Notify, Profile, ProfileChanged, Round, LocalCharacter,
---         CharacterChanged), Layout  (+ offline: Tab = "Match"|"Me"|"Progress"|"Test", Attrs {AdminGod = true, ...},
---         Profile, Round, PlayerCount, Feedback = {Text, Kind})
+--         CharacterChanged), Sound (SoundController: PreviewMusic, NowPlaying), Layout  (+ offline: Tab =
+--         "Match"|"Me"|"Progress"|"Test", Attrs {AdminGod = true, ...}, Profile, Round, PlayerCount,
+--         Feedback = {Text, Kind})
 --   Admin.Tabs = {"Match", "Me", "Progress", "Test"}      Admin.State() -> the module state (tests)
 
 local Themes = require(script.Parent.Parent.Themes)
@@ -47,6 +52,19 @@ local TAB_KEY: { [string]: string } = {
 local SPEEDS = { 1, 1.5, 2, 3 }
 local FEEDBACK_TIME = 5
 local RESET_ARM_TIME = 6
+-- TEST -> MUSIC: SoundController.Status values -> string key + theme colour name
+local MUSIC_STATUS: { [string]: { Key: string, Tone: string } } = {
+	ok = { Key = "admin.music.st.ok", Tone = "Success" },
+	pending = { Key = "admin.music.st.pending", Tone = "Warning" },
+	dead = { Key = "admin.music.st.dead", Tone = "Danger" },
+	empty = { Key = "admin.music.st.empty", Tone = "TextDim" },
+}
+local MUSIC_TRACKS = { -- shared tracks next to the monster themes: { key, label, icon }
+	{ "Lobby", "admin.music.lobby", "Music" },
+	{ "VerdictBox", "admin.music.box", "Box" },
+	{ "FinalPhase", "admin.music.finalPhase", "Flame" },
+	{ "CollapsePhase", "admin.music.collapse", "Target" },
+}
 
 -- panel state survives screen rebuilds (theme / language switches rebuild every screen)
 local state = {
@@ -1222,7 +1240,146 @@ function Admin.Create(theme: Theme, deps: any): any
 	end
 
 	-- TEST ----------------------------------------------------------------------------------------------------
+	-- MUSIC: preview any track on this client and see which id plays (SoundController checks every id itself)
+	local function musicInfo(): { [string]: any }?
+		local sound = d.Sound
+		if type(sound) ~= "table" or type(sound.NowPlaying) ~= "function" then
+			return nil
+		end
+		local ok, info = pcall(sound.NowPlaying)
+		return if ok and type(info) == "table" then info else nil
+	end
+
+	local function musicBuild(page: any)
+		section(page, "admin.sec.music", "Music")
+		local lineSize = if classic then (if phone then 9 else 10) else (if phone then 13 else 15)
+		local lineH = math.ceil(lineSize * 1.4) + 2
+		local statusLine = UIKit.Label(theme, {
+			Name = "MusicNow",
+			Text = "",
+			Role = "Mono",
+			TextSize = lineSize,
+			Truncate = true,
+			Size = UDim2.new(1, -10, 0, lineH),
+			LayoutOrder = nextOrder(),
+			Parent = page.Content,
+		})
+		local idLine = UIKit.Label(theme, {
+			Name = "MusicId",
+			Text = "",
+			Role = "Mono",
+			Tone = "Dim",
+			TextSize = lineSize,
+			Truncate = true,
+			Size = UDim2.new(1, -10, 0, lineH),
+			LayoutOrder = nextOrder(),
+			Parent = page.Content,
+		})
+		local handles: { [string]: any } = {}
+		local selectedKey: string? = nil
+		local function render()
+			local info = musicInfo()
+			local active: string? = nil
+			if info == nil then
+				statusLine.Text = L("admin.music.off")
+				statusLine.TextColor3 = c.TextDim
+				idLine.Text = ""
+			else
+				local mode = L(if info.Preview then "admin.music.preview" else "admin.music.auto")
+				local key = info.Key
+				if type(key) ~= "string" then
+					statusLine.Text = L("admin.music.line", mode, L("admin.music.none"), "-")
+					statusLine.TextColor3 = c.TextDim
+					idLine.Text = ""
+				else
+					local entry = info.Entry
+					local keyText = if type(entry) == "string" and entry ~= key then key .. " -> " .. entry else key
+					local st = MUSIC_STATUS[tostring(info.Status)] or MUSIC_STATUS.empty
+					statusLine.Text = L("admin.music.line", mode, keyText, L(st.Key))
+					statusLine.TextColor3 = (c :: any)[st.Tone] or c.Text
+					idLine.Text = if type(info.Id) == "string"
+						then L("admin.music.idLine", info.Id, tostring(info.Index or "?"), tostring(info.Count or 0))
+						else L("admin.music.noId")
+					active = if info.Preview then key else nil
+				end
+			end
+			if active ~= selectedKey then
+				selectedKey = active
+				for key, h in handles do
+					h.SetSelected(key == active)
+				end
+			end
+		end
+		local function preview(key: string?)
+			local sound = d.Sound
+			if type(sound) == "table" and type(sound.PreviewMusic) == "function" then
+				local ok, err = pcall(sound.PreviewMusic, key)
+				if not ok then
+					warn("[Admin] music preview: " .. tostring(err))
+				end
+			end
+			render()
+		end
+		-- monster themes: normal + final for every monster kit that has a Theme_<kit> entry
+		local audio = Common.Module({ "Audio" })
+		local themed: { any } = {}
+		for _, kit in sortedKits(kits, "Monster") do
+			if audio == nil or type(audio.MonsterTheme) ~= "function" or audio.MonsterTheme(kit.Id) ~= nil then
+				table.insert(themed, kit)
+			end
+		end
+		if #themed > 0 then
+			local themeGrid = grid(page, 2, #themed * 2)
+			for i, kit in themed do
+				local name = pick(kit.Name)
+				local icon = Common.KitIcon(kit)
+				for j, final in { false, true } do
+					local key = "Theme_" .. kit.Id .. (if final then "_Final" else "")
+					handles[key] = button(themeGrid, {
+						Name = "Music_" .. key,
+						Text = if final then L("admin.music.final", name) else name,
+						Icon = if final then "Flame" else icon,
+						OnActivated = function()
+							preview(key)
+						end,
+					}, (i - 1) * 2 + j)
+				end
+			end
+		end
+		local trackGrid = grid(page, 3, #MUSIC_TRACKS)
+		for i, track in MUSIC_TRACKS do
+			local key = track[1]
+			handles[key] = button(trackGrid, {
+				Name = "Music_" .. key,
+				Text = L(track[2]),
+				Icon = track[3],
+				OnActivated = function()
+					preview(key)
+				end,
+			}, i)
+		end
+		wide(page, {
+			Name = "MusicStop",
+			Text = L("admin.music.stop"),
+			Icon = "Close",
+			OnActivated = function()
+				preview(nil)
+			end,
+		})
+		caption(page, L("admin.music.hint"), 3)
+		render()
+		local acc = 0
+		bag.Add(Motion.Loop(statusLine, function(dt: number)
+			acc += dt
+			if acc > 0.5 then
+				acc = 0
+				render()
+			end
+		end))
+	end
+
 	builders.Test = function(page: any)
+		musicBuild(page)
 		section(page, "admin.sec.box", "Box")
 		wide(page, {
 			Name = "BoxNearest",

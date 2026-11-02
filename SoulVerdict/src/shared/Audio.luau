@@ -4,11 +4,22 @@
 -- OWNER: HOW TO ADD SOUNDS (no upload needed)
 --   1. In Roblox Studio open the Toolbox -> Creator Store -> Audio (100k+ free SFX & music by Roblox/partners).
 --   2. Find a sound that fits the entry's `Note`, right-click it -> "Copy Asset ID".
---   3. Paste it into that entry's Id below, e.g.  Id = "rbxassetid://1234567890"  (a bare "1234567890" works too).
---   An entry whose Id is "" plays NOTHING (silently) — the game is fully playable without any ids.
---   Do not use Undertale's soundtrack (copyrighted); use original / licensed Creator Store music.
---   Entries with `Fallback` use another entry while their own Id is empty: e.g. every UI theme sound falls back to
---   the generic Ui* sounds, every per-map "<Map>_Final" track falls back to "FinalPhase".
+--   3. Add it to that entry's CANDIDATE LIST, best first (a bare "1234567890" or "rbxassetid://1234567890"):
+--        music:   Theme_FellSans = music("...", 0.5, { "1234567890", "2345678901" }),
+--        SFX/UI:  Hit = sfx({ "1234567890", "2345678901" }, 0.6, ...),     (a single "id" string works too)
+--        others:  SOUNDS["Map_VoidRift_Final"].Ids = { "1234567890" }   (generated entries, below their loop)
+--   4. Or just send the ids to the developer.
+--   The game CHECKS every id automatically while it runs (ContentProvider:PreloadAsync) and skips the broken ones
+--   (private since Roblox's 2022 audio privacy update, deleted or moderated): the next candidate plays instead, and
+--   the Output window shows "[Sound] audio id failed to load: <id> (<entry>)" for each one. When every candidate
+--   of a monster theme fails, the map's track plays. Admin panel -> TEST -> MUSIC previews any track and shows the
+--   id in use and its status. An entry without candidates plays NOTHING (silently): the game is fully playable
+--   without any ids.
+--   Undertale / Underfell songs and remixes on Roblox are fan uploads of copyrighted music: Roblox can remove them
+--   at any time (then the next candidate plays). Original / licensed Creator Store music is the safe choice, so
+--   list one as the last candidate where you can.
+--   Entries with `Fallback` use another entry while they have no working candidate: e.g. every UI theme sound falls
+--   back to the generic Ui* sounds, every per-map "<Map>_Final" track falls back to "FinalPhase".
 --
 -- Only these built-in files are confirmed to ship with every Roblox client (docs/research/builtin_sounds.txt):
 --   rbxasset://sounds/{action_footsteps_plastic.mp3, action_falling.ogg, action_get_up.mp3, action_jump.mp3,
@@ -16,18 +27,25 @@
 --
 -- API
 --   Audio.Sounds: { [name]: SoundDef }               every entry (SFX, UI and music)
---   Audio.Get(name) -> SoundDef?                     raw entry (aliases resolved), Id may be ""
---   Audio.Resolve(name) -> (SoundDef?, string?)      first entry along the Fallback chain with a non-empty Id
+--   Audio.Get(name) -> SoundDef?                     raw entry (aliases resolved), may have no candidates
+--   Audio.Candidates(name) -> {string}               normalized, de-duplicated {Id, ...Ids} of that exact entry
+--                                                    (aliases resolved, no Fallback chain); {} when none
+--   Audio.CandidatesOf(def?) -> {string}             the same for a SoundDef table (runtime entries)
+--   Audio.IsFilled(def?) -> boolean                  the entry has at least one candidate
+--   Audio.Resolve(name) -> (SoundDef?, string?)      first entry along the Fallback chain with a candidate
 --                                                    (and the name of that entry); nil = silent
 --   Audio.NormalizeId(id) -> string                  "123" -> "rbxassetid://123"; "" stays ""
 --   Audio.Names(group?) -> {string}                  sorted names (optionally of one group)
 --   Audio.MapMusic(musicKey, final?) -> string       "<key>" or "<key>_Final" (final falls back to "FinalPhase")
+--   Audio.MonsterTheme(kitId?, final?) -> string?    "Theme_<kit>" / "Theme_<kit>_Final" when that entry exists
+--   Audio.ThemeKits: {string}                        kit ids that have Theme_<kit> entries
 --   Audio.Validate() -> {string}                     list of problems (empty = well-formed); used by the tests
 --   Audio.Groups: { Music, SFX, UI }                 base volumes of the SoundGroups (x player settings)
 --   Audio.Aliases: { [alias]: name }                 e.g. "HallOfVerdicts" -> "Map_HallOfVerdicts"
 --
 -- SoundDef = {
---   Id: string,            "rbxassetid://<n>" | "rbxasset://sounds/<file>" | "<n>" | "" (silent)
+--   Id: string,            "rbxassetid://<n>" | "rbxasset://sounds/<file>" | "<n>" | "" (none)
+--   Ids: {string}?,        more candidate ids (same formats), tried in order after Id
 --   Group: "Music" | "SFX" | "UI",
 --   Volume: number,        Sound.Volume before the group volume (0..2)
 --   Pitch: {number}?,      {min, max} random PlaybackSpeed per play (default {1, 1})
@@ -36,7 +54,7 @@
 --   RollOff: {number}?,    {min, max} studs for 3D sounds (default {10, 160})
 --   MaxInstances: number?, concurrent voices of this name (default 6, music 1)
 --   MinInterval: number?,  plays closer together than this (seconds) are dropped (default 0.03)
---   Fallback: string?,     entry used while this Id is empty
+--   Fallback: string?,     entry used while this one has no working candidate
 --   Note: string?,         what to search for in the Creator Store
 -- }
 
@@ -44,6 +62,7 @@ export type Group = "Music" | "SFX" | "UI"
 
 export type SoundDef = {
 	Id: string,
+	Ids: { string }?,
 	Group: Group,
 	Volume: number,
 	Pitch: { number }?,
@@ -80,9 +99,11 @@ local BUILTIN = {
 }
 Audio.Builtin = BUILTIN
 
-local function music(note: string, volume: number?, looped: boolean?): SoundDef
+-- `ids` = the candidate list, best first (OWNER: paste ids into the `{}` of an entry)
+local function music(note: string, volume: number?, ids: { string }?, looped: boolean?): SoundDef
 	return {
-		Id = "", -- OWNER: paste a Creator Store music id
+		Id = "",
+		Ids = ids or {},
 		Group = "Music",
 		Volume = volume or 0.5,
 		Looped = if looped == nil then true else looped,
@@ -91,9 +112,17 @@ local function music(note: string, volume: number?, looped: boolean?): SoundDef
 	}
 end
 
-local function sfx(id: string, volume: number, pitch: { number }?, spatial: boolean?, note: string?): SoundDef
+-- `id` = one id string ("" = none yet) or a candidate list { "123", "456" } (best first)
+local function sfx(
+	id: string | { string },
+	volume: number,
+	pitch: { number }?,
+	spatial: boolean?,
+	note: string?
+): SoundDef
 	return {
-		Id = id,
+		Id = if type(id) == "string" then id else "",
+		Ids = if type(id) == "table" then id else nil,
 		Group = "SFX",
 		Volume = volume,
 		Pitch = pitch,
@@ -102,9 +131,10 @@ local function sfx(id: string, volume: number, pitch: { number }?, spatial: bool
 	}
 end
 
-local function ui(id: string, volume: number, pitch: { number }?, note: string?): SoundDef
+local function ui(id: string | { string }, volume: number, pitch: { number }?, note: string?): SoundDef
 	return {
-		Id = id,
+		Id = if type(id) == "string" then id else "",
+		Ids = if type(id) == "table" then id else nil,
 		Group = "UI",
 		Volume = volume,
 		Pitch = pitch,
@@ -117,17 +147,28 @@ end
 
 local SOUNDS: { [string]: SoundDef } = {
 	------------------------------------------------------------------------------------------------- music
+	-- OWNER: candidate ids go into the `{}` of each entry, best first, e.g. music("...", 0.5, { "123", "456" }).
 	-- Keys match Maps/Registry `Music` fields ("Lobby", "Map_<MapId>").
-	Lobby = music("calm, mysterious lobby loop (piano / music box, ~90 BPM)", 0.45),
-	Map_HallOfVerdicts = music("solemn golden-hall battle loop: organ / strings, building tension", 0.5),
-	Map_SnowdinCrossroads = music("cozy-but-tense snowy town battle loop: bells, pizzicato, light drums", 0.5),
-	Map_WaterfallGrotto = music("echoing cave battle loop: plucks, pads, water ambience, mid tempo", 0.5),
-	Map_VoidRift = music("eerie synth battle loop: detuned pads, glitchy percussion", 0.5),
-	Map_CoreReactor = music("driving industrial/electronic battle loop, high energy", 0.5),
-	FinalPhase = music("desperate final-phase boss loop: fast, intense, heavy drums", 0.55),
-	VerdictBox = music("short frantic chiptune/8-bit bullet-hell loop (~7-15 s)", 0.55),
-	Victory = music("short triumphant victory stinger (3-8 s, not looping)", 0.6, false),
-	Defeat = music("short somber defeat stinger (3-8 s, not looping)", 0.6, false),
+	Lobby = music("calm, mysterious lobby loop (piano / music box, ~90 BPM)", 0.45, { "328964090", "314069452", "1848363318", "1838649967", "1848354536" }),
+	Map_HallOfVerdicts = music("solemn golden-hall battle loop: organ / strings, building tension", 0.5, { "746812937", "1844758350", "1839290228", "1837835644" }),
+	Map_SnowdinCrossroads = music("cozy-but-tense snowy town battle loop: bells, pizzicato, light drums", 0.5, { "14264872551", "98223235470761", "6390779289", "1836542585", "1836595204" }),
+	Map_WaterfallGrotto = music("echoing cave battle loop: plucks, pads, water ambience, mid tempo", 0.5, { "99649859652828", "126038262761422", "10728729976", "1839824117", "1846767914" }),
+	Map_VoidRift = music("eerie synth battle loop: detuned pads, glitchy percussion", 0.5, { "134959834418523", "1846350498", "1838974004", "1841587251" }),
+	Map_CoreReactor = music("driving industrial/electronic battle loop, high energy", 0.5, { "122054437119612", "16527023337", "1837825257", "1839246774", "1846368080" }),
+	FinalPhase = music("desperate final-phase boss loop: fast, intense, heavy drums", 0.55, { "88808485680832", "107986977620509", "1837853076", "9042370693" }),
+	CollapsePhase = music("arena collapse (the last ~40 s, the ring closes): urgent, relentless loop", 0.55, { "128611309933897" }),
+	VerdictBox = music("short frantic chiptune/8-bit bullet-hell loop (~7-15 s)", 0.55, { "6334012651", "117051223265396", "9048375035", "9048376021", "1841609664" }),
+	Victory = music("short triumphant victory stinger (3-8 s, not looping)", 0.6, { "1844604574", "1841605720", "1844876242" }, false),
+	Defeat = music("short somber defeat stinger (3-8 s, not looping)", 0.6, { "1846891028", "1841700487", "1836102253" }, false),
+	-- Monster themes, picked by RoundState.MonsterKit (kit id): "Theme_<kit>" plays during the fight and
+	-- "Theme_<kit>_Final" in the final phase (else the normal theme). When a theme has no candidates or every
+	-- candidate failed, the map's track plays (SoundController music selection, SPEC §20).
+	Theme_ClassicSans = music("Sans boss theme: fast, jazzy electronic loop, playful but deadly", 0.5, { "3745550364", "101598365847186", "98142057415884", "128830409645703", "3813059729", "137220025405002" }),
+	Theme_ClassicSans_Final = music("Sans final phase: the same theme, harder and faster (optional)", 0.55, { "85617271533620", "5119156054", "5956427401", "137220025405002" }),
+	Theme_FellSans = music("Fell Sans (Underfell): aggressive, distorted, heavy boss loop", 0.5, { "120838650095309", "101730223568557", "1837853076", "9043754347" }),
+	Theme_FellSans_Final = music("Fell Sans final phase: harsher, faster, darker remix (optional)", 0.55, { "120928193831867", "137220025405002", "1837880957" }),
+	Theme_EclipseSans = music("Eclipse Sans (original void AU): eerie cosmic dark-synth boss loop", 0.5, { "114505147154737", "9045683296", "9045934037", "1847456615" }),
+	Theme_EclipseSans_Final = music("Eclipse Sans final phase: darker, glitchier, faster (optional)", 0.55, { "103167351125844", "78368445861935", "1837779548" }),
 
 	------------------------------------------------------------------------------------------- movement
 	Footstep = sfx(BUILTIN.Footstep, 0.35, { 0.95, 1.1 }, true, "built-in"),
@@ -301,13 +342,15 @@ local MAP_MUSIC = {
 	"Map_CoreReactor",
 }
 for _, key in MAP_MUSIC do
-	local finalDef = music("optional: this map's own final-phase loop", 0.55)
+	local finalDef = music("optional: this map's own final-phase loop", 0.55, {})
 	finalDef.Fallback = "FinalPhase"
 	SOUNDS[key .. "_Final"] = finalDef
 end
+-- OWNER: candidates for the generated entries above, e.g. SOUNDS["Map_VoidRift_Final"].Ids = { "1234567890" }
 
 Audio.Sounds = SOUNDS
 Audio.MapMusicKeys = MAP_MUSIC
+Audio.ThemeKits = { "ClassicSans", "FellSans", "EclipseSans" }
 
 Audio.Aliases = {
 	HallOfVerdicts = "Map_HallOfVerdicts",
@@ -345,7 +388,58 @@ function Audio.NormalizeId(id: string?): string
 	return id
 end
 
--- Follows the Fallback chain to the first entry with a non-empty Id. Returns (nil, nil) when silent.
+-- The candidate ids of one SoundDef: {Id, ...Ids} normalized, without "" and without duplicates, in order.
+function Audio.CandidatesOf(def: SoundDef?): { string }
+	local out: { string } = {}
+	if type(def) ~= "table" then
+		return out
+	end
+	local seen: { [string]: boolean } = {}
+	local function add(id: any)
+		if type(id) ~= "string" then
+			return
+		end
+		local norm = Audio.NormalizeId(id)
+		if norm ~= "" and not seen[norm] then
+			seen[norm] = true
+			table.insert(out, norm)
+		end
+	end
+	add(def.Id)
+	local ids: any = def.Ids
+	if type(ids) == "table" then
+		for _, id in ipairs(ids) do
+			add(id)
+		end
+	end
+	return out
+end
+
+-- Candidates of that exact entry (aliases resolved, the Fallback chain is NOT followed).
+function Audio.Candidates(name: string): { string }
+	return Audio.CandidatesOf(Audio.Get(name))
+end
+
+-- true when the entry has at least one candidate id (a filled Ids list counts like a filled Id)
+function Audio.IsFilled(def: SoundDef?): boolean
+	if type(def) ~= "table" then
+		return false
+	end
+	if type(def.Id) == "string" and def.Id ~= "" then
+		return true
+	end
+	local ids: any = def.Ids
+	if type(ids) == "table" then
+		for _, id in ipairs(ids) do
+			if type(id) == "string" and id ~= "" then
+				return true
+			end
+		end
+	end
+	return false
+end
+
+-- Follows the Fallback chain to the first entry with a candidate id. Returns (nil, nil) when silent.
 function Audio.Resolve(name: string): (SoundDef?, string?)
 	local current: string? = if SOUNDS[name] then name else Audio.Aliases[name]
 	local depth = 0
@@ -354,7 +448,7 @@ function Audio.Resolve(name: string): (SoundDef?, string?)
 		if def == nil then
 			return nil, nil
 		end
-		if def.Id ~= "" then
+		if Audio.IsFilled(def) then
 			return def, current
 		end
 		current = def.Fallback
@@ -374,6 +468,15 @@ function Audio.MapMusic(musicKey: string?, final: boolean?): string
 		return "FinalPhase"
 	end
 	return key
+end
+
+-- "Theme_<kit>" (or "Theme_<kit>_Final" when `final`) when that entry exists, else nil.
+function Audio.MonsterTheme(kitId: string?, final: boolean?): string?
+	if type(kitId) ~= "string" or kitId == "" then
+		return nil
+	end
+	local key = "Theme_" .. kitId .. (if final then "_Final" else "")
+	return if SOUNDS[key] ~= nil then key else nil
 end
 
 function Audio.Names(group: Group?): { string }
@@ -411,6 +514,25 @@ function Audio.Validate(): { string }
 		end
 		if not validId(def.Id) then
 			bad(name, "bad Id " .. tostring(def.Id))
+		end
+		local ids: any = def.Ids
+		if ids ~= nil then
+			if type(ids) ~= "table" then
+				bad(name, "Ids must be a list of ids, got " .. type(ids))
+			else
+				local count = 0
+				for _ in ids do
+					count += 1
+				end
+				if count ~= #ids then
+					bad(name, 'Ids must be a plain list { "id", "id" } (no named keys / holes)')
+				end
+				for i, id in ipairs(ids) do
+					if not validId(id) then
+						bad(name, ("bad Ids[%d] %s"):format(i, tostring(id)))
+					end
+				end
+			end
 		end
 		if not VALID_GROUP[def.Group] then
 			bad(name, "bad Group " .. tostring(def.Group))
