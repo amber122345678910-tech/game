@@ -682,7 +682,7 @@ local function wantedMusic(): string?
 end
 
 -- Applies wantedMusic() when it changed (fade nil = SoundController's default). Runs on every menu change (sync)
--- and on every loading-screen step, so the override always matches the current state.
+-- and at every loading-screen music step (live, cue, end, no screen), so the override always matches the state.
 local function syncMenuMusic(fade: number?)
 	local want = wantedMusic()
 	if want ~= appliedMusic then
@@ -716,6 +716,10 @@ local function showLoading(kind: string, opts: { [string]: any }): any?
 	local overlay = if started then loadingOverlay() else nil
 	if overlay == nil then
 		return nil
+	end
+	local running = runningLoading()
+	if running ~= nil then
+		return running -- never take the music (or the token) from the screen that is up
 	end
 	local quick = kind == "Quick"
 	local token = {}

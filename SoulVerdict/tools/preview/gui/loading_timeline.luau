@@ -154,12 +154,15 @@ local function newRig()
 				black = if handle.Done then 0 else seq.Backdrop,
 				content = if handle.Done or plain then 0 else seq.Content,
 			})
-			if handle.Covered and not covered then
-				covered = true
+			local coveredNow = handle.Covered and not covered
+			local closedNow = open and not UI.IsOpen()
+			covered = covered or coveredNow
+			open = open and not closedNow
+			if coveredNow and closedNow then
+				event("black + menus closed")
+			elseif coveredNow then
 				event("black")
-			end
-			if open and not UI.IsOpen() then
-				open = false
+			elseif closedNow then
 				event("menus closed")
 			end
 		end
@@ -259,7 +262,7 @@ local parts = {}
 local function add(s, ...)
 	table.insert(parts, if select("#", ...) > 0 then string.format(s, ...) else s)
 end
-local H = TOP + LANE_H * #lanes + 70
+local H = TOP + LANE_H * #lanes + 84
 add('<svg xmlns="http://www.w3.org/2000/svg" width="%d" height="%d" font-family="Segoe UI, Arial, sans-serif">', W, H)
 add('<rect width="100%%" height="100%%" fill="#f6f6f3"/>')
 add('<text x="40" y="44" font-size="26" font-weight="700" fill="#1b1d22">Loading screen over time (measured, 60 fps)</text>')
@@ -269,8 +272,8 @@ add(
 		.. "this fix</text>"
 )
 for s = 0, SPAN do
-	add('<line x1="%.1f" y1="%d" x2="%.1f" y2="%d" stroke="#e1e2de" stroke-width="1"/>', x(s), TOP - 8, x(s), H - 52)
-	add('<text x="%.1f" y="%d" font-size="13" fill="#7a7f88" text-anchor="middle">%d s</text>', x(s), H - 32, s)
+	add('<line x1="%.1f" y1="%d" x2="%.1f" y2="%d" stroke="#e1e2de" stroke-width="1"/>', x(s), TOP - 8, x(s), H - 58)
+	add('<text x="%.1f" y="%d" font-size="13" fill="#7a7f88" text-anchor="middle">%d s</text>', x(s), H - 40, s)
 end
 for i, lane in lanes do
 	local y0 = TOP + (i - 1) * LANE_H
@@ -292,8 +295,8 @@ for i, lane in lanes do
 		add('<rect x="%.1f" y="%d" width="%.1f" height="%d" fill="#ffb347" opacity="0.28"/>', a, bandTop, b - a, bandH)
 		add(
 			'<text x="%.1f" y="%d" font-size="13" fill="#a35a00">practice Intro: VS splash, 3-2-1 (%.0f s)</text>',
-			a + 6,
-			bandTop + bandH - 8,
+			math.max(a, x(lane.length)) + 6,
+			bandTop + bandH - 10,
 			lane.intro[2] - lane.intro[1]
 		)
 	end
@@ -308,16 +311,23 @@ for i, lane in lanes do
 	add('<polygon points="%s" fill="#111317" opacity="0.92"/>', table.concat(poly, " "))
 	add('<polyline points="%s" fill="none" stroke="#f3c242" stroke-width="2.5"/>', table.concat(head, " "))
 	-- events
-	local placed = {}
+	local placed = {} -- label boxes {row, x0, x1}: a label goes to the lowest row where it overlaps nothing
 	local function marker(t, label, color)
 		local px = x(t)
+		local x0, x1 = px, px + 8 + #label * 6.8
 		local row = 0
-		for _, p in placed do
-			if math.abs(p - px) < 90 then
-				row += 1
+		local clash = true
+		while clash do
+			clash = false
+			for _, p in placed do
+				if p[1] == row and x0 < p[3] and p[2] < x1 then
+					clash = true
+					row += 1
+					break
+				end
 			end
 		end
-		table.insert(placed, px)
+		table.insert(placed, { row, x0, x1 })
 		add('<line x1="%.1f" y1="%d" x2="%.1f" y2="%d" stroke="%s" stroke-width="1.5"/>', px, bandTop - 4, px, bandTop + bandH, color)
 		add('<text x="%.1f" y="%d" font-size="12.5" fill="%s">%s</text>', px + 3, bandTop - 8 - row * 14, color, label)
 	end
@@ -344,6 +354,10 @@ for i, lane in lanes do
 	local segments = {}
 	for _, m in lane.music do
 		local key = m.key or lane.autoKey
+		local last = segments[#segments]
+		if last and last.to > m.t then
+			last.to = m.t -- a crossfade cut short by the next change
+		end
 		table.insert(segments, { from = from, to = m.t, key = current })
 		table.insert(segments, { from = m.t, to = m.t + (m.fade or 1.6), key = key, fadeFrom = current })
 		current = key
@@ -370,6 +384,16 @@ for i, lane in lanes do
 			end
 		end
 	end
+end
+-- legend
+do
+	local lx = LEFT
+	for _, key in { "Menu", "Silence", "Lobby", "Round theme" } do
+		add('<rect x="%d" y="%d" width="16" height="12" fill="%s"/>', lx, H - 22, COLORS[key])
+		add('<text x="%d" y="%d" font-size="13" fill="#555a63">%s</text>', lx + 22, H - 12, key)
+		lx += 40 + #key * 8
+	end
+	add('<text x="%d" y="%d" font-size="13" fill="#555a63">music override: Title "Menu" -> "Silence" into the black -> automatic (lobby / round track)</text>', lx + 10, H - 12)
 end
 add("</svg>")
 local html = '<!doctype html><html><head><meta charset="utf-8"><style>body{margin:0;background:#f6f6f3}</style></head><body>'

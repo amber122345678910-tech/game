@@ -4,14 +4,18 @@
 -- (Shared/PixelArt/SansShopkeeper: snowy booth, blue hoodie, counter with coins + ketchup, the "SHOP" board) and a
 -- dialogue box with Sans's line (ComicNeueAngular like his Verdict Box lines, Jura in ru, "* " in Classic).
 -- Pixels: every sprite cell is a whole number of SCREEN pixels (ShopKeeper.Fit picks it from the UIRoot scale), cells
--- are placed with Scale fractions of the scene frame (one Frame per merged rect), so the art stays crisp.
+-- are placed with Scale fractions of the scene frame (one Frame per merged rect; UDim offsets are whole design px, so
+-- Scale carries the sub-pixel part), and Snap keeps the scene's top-left corner on a whole screen pixel (re-checked
+-- every frame from the stage's AbsolutePosition), so every cell edge lands on a pixel edge: crisp, no seams.
 --
--- Sequence (ShopKeeper.Timing, seconds): asleep - the head bobs 1 cell, "Z z z" rise and fade, the box shows
--- "Zzz..." - for Sleep 0.8 -> wakes: sprite swap + a 3-cell hop (Hop 0.25) -> Beat 0.15 -> types shop.keeper.greet
--- with SansTextBlip blips -> idle (blinks every BlinkEvery s). Say(key) types another line (thanks / poor); said
--- while he still sleeps it wakes him first. Reduced Motion (GuiService.ReducedMotionEnabled or opts.ReducedMotion):
--- no bob, no hop, the Z letters stand still, no falling snow. Offline (Motion not live) the scene shows the settled
--- end state (awake, whole greeting) unless opts.At poses a moment of the sequence.
+-- Sequence (ShopKeeper.Timing, seconds): asleep - the head bobs 1 cell, "Z z z" rise beside his head, grow and fade,
+-- the box shows a dim "Zzz..." - for Sleep 0.8 -> wakes: sprite swap + a tiny hop (1 cell above the awake height,
+-- Hop 0.25) -> Beat 0.15 -> types shop.keeper.greet with SansTextBlip blips (every other letter, the first one
+-- voiced) -> idle (blinks every BlinkEvery s). Say(key) types another line (thanks / poor; the same line while it is
+-- being typed is not restarted); said while he still sleeps it wakes him first. Reduced Motion
+-- (GuiService.ReducedMotionEnabled or opts.ReducedMotion): no bob, no hop, the Z letters stand still, no falling
+-- snow. Offline (Motion not live) the scene shows the settled end state (awake, whole greeting) unless opts.At poses
+-- a moment of the sequence.
 --
 -- API
 --   ShopKeeper.Plan(bodyW, bodyH, scale, phone, gap) -> Plan?   column for a Shop body (design px): the largest whole
@@ -22,9 +26,10 @@
 --               (Deps.Sound.Play plays the blips; else Motion.Sound), At: number? (pose this moment, offline),
 --               ReducedMotion: boolean?, Name: string? }
 --   Keeper: { Root: Frame, Stage: Frame, Scene: Frame, Box: Frame, Text: TextLabel, Sign: TextLabel?, Fit: Fit,
---             Timeline: Timeline, Step(dt) (advance the clock: pose + blips), Pose(t) (pose only, no sound),
---             Settle() (end state), Say(key, ...), Time() -> number, State() -> string, Line() -> string,
---             Blips() -> number (blips played), Destroy() }
+--             Timeline: Timeline, Step(dt) (advance the clock: pose + blips + Snap), Pose(t) (pose only, no sound),
+--             Settle() (end state), Say(key, ...), Snap(stageAbs: Vector2?) (scene corner onto a whole screen
+--             pixel; default = the stage's AbsolutePosition), Time() -> number, State() -> string,
+--             Line() -> string, Blips() -> number (blips played), Destroy() }
 -- Pure (tests / previews)
 --   ShopKeeper.Timing                         Sleep, Hop, HopHeight, Beat, Interval, Pause, Comma, BobPeriod, ZEvery,
 --                                             ZLife, ZPreroll, BlinkEvery, BlinkTime, BlipEvery, SnowSpeed
@@ -79,7 +84,7 @@ local ShopKeeper = {}
 ShopKeeper.Timing = {
 	Sleep = 0.8, -- s asleep before he notices you
 	Hop = 0.25, -- s: the wake-up hop
-	HopHeight = 3, -- cells above the straight path at the top of the hop
+	HopHeight = 2, -- cells above the straight path at the top of the hop (1 cell above the awake height)
 	Beat = 0.15, -- s between landing and the first letter
 	Interval = 0.045, -- s per letter
 	Pause = 0.24, -- s after . ! ? (once per run of them)

@@ -92,6 +92,19 @@ local function localRotation(kits: any, day: number, count: number): { Offer }
 	return out
 end
 
+-- a button's label shrinks to fit a narrow tile (phones with the shopkeeper column) instead of overflowing it
+local function fitLabel(button: any)
+	local label = button and button.Label
+	if label then
+		local size = label.TextSize
+		label.TextScaled = true
+		local limit = Instance.new("UITextSizeConstraint")
+		limit.MaxTextSize = math.max(1, math.floor(size))
+		limit.MinTextSize = math.max(1, math.min(8, math.floor(size)))
+		limit.Parent = label
+	end
+end
+
 local function dailyOffers(deps: any, profile: any, kits: any): { Offer }
 	local config = Common.Config()
 	local count = (config and config.Shop and config.Shop.DailySkins) or 4
@@ -437,6 +450,7 @@ function Shop.Create(theme: Theme, deps: any): any
 		})
 		btn.Root.Size = UDim2.new(1, -pad * 2, 0, bh)
 		btn.Root.Parent = tile
+		fitLabel(btn)
 		pressed = btn.Root
 		if discount > 0 and not owned and base > price then
 			-- struck-through original price above the button
@@ -634,6 +648,7 @@ function Shop.Create(theme: Theme, deps: any): any
 			})
 			b.Root.Size = UDim2.new(1, -24, 0, if phone then 32 else 38)
 			b.Root.Parent = tile
+			fitLabel(b)
 			unlockButton = b.Root
 			grid.Add(tile)
 		end

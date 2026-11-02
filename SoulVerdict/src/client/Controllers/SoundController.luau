@@ -1569,8 +1569,12 @@ function SoundController.PrefetchOrder(round: { [string]: any }, ctx: { [string]
 		end
 	end
 	local function firstUsable(final: boolean): string?
-		local order =
-			SoundController.ArenaMusicOrder({ Phase = "Round", MapId = round.MapId, MonsterKit = round.MonsterKit, FinalPhase = final })
+		local order = SoundController.ArenaMusicOrder({
+			Phase = "Round",
+			MapId = round.MapId,
+			MonsterKit = round.MonsterKit,
+			FinalPhase = final,
+		})
 		for _, key in order do
 			if usable(key) then
 				return key

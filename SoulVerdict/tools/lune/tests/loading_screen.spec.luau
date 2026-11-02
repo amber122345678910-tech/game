@@ -7,6 +7,12 @@
 -- time, Until + settle, practice cap, skip, hitches) and the runtime driver with a fake frame loop / sound /
 -- scheduler (OnCovered and OnDone exactly once, no stacking, sound + ducking, errors and the failsafe never leave
 -- the black screen up). Also the Strings key, the Audio entry and the UIController fallback path.
+-- UIController flows (controllerRig: UIController._Harness + the real overlay on the fake loop, fake UIRoot / Sound /
+-- State, test clock): the music override never stays "Silence" (overlay missing / throwing / dead loop / already
+-- running), the owner's first PLAY timings (Menu out, lobby track 2 s before the light at 4 s, waits for a spawning
+-- character), later PLAYs = a ~0.6 s plain dip with a Menu -> lobby crossfade, PRACTICE revealed 0.3 s after the
+-- round's Intro starts (>= 2.5 s of the 4 s Intro visible), a refusal ends the black at once (re-toast only after a
+-- late reveal), no loading screen while a round runs; the music lead never delays the reveal; the plain dip view.
 local LOADING = "src/client/UI/Overlays/Loading"
 local SANS = "src/shared/PixelArt/SansHead"
 local DT = 1 / 60
@@ -1505,6 +1511,8 @@ return restoringFlags({
 				T.ok(seen >= 2.5, ("%s: %.2f s of the %.0f s Intro fully visible"):format(label, seen, introLength))
 				T.eq(rig.sound.override, nil, label .. ": automatic music (the round's track)")
 				T.eq(handle.Done, true, label .. ": done")
+				T.eq(rig.state.Notify:Count(), 0, label .. ": the refusal listener is gone")
+				T.eq(#rig.state.requests, 1, label .. ": one request")
 			end)
 			rig.done()
 			if not ok then

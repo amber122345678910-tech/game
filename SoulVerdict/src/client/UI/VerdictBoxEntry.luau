@@ -173,7 +173,13 @@ end
 
 -- The camera pulled toward the chest by k (0..1): turned toward it (keeping its own up / roll), pushed along the line
 -- to it (never closer than MinDistance), FOV narrowed to FovScale, rolled by rollDeg. k <= 0 returns base unchanged.
-function VerdictBoxEntry.CameraPose(base: CFrame, fov: number, chest: Vector3, k: number, rollDeg: number?): (CFrame, number)
+function VerdictBoxEntry.CameraPose(
+	base: CFrame,
+	fov: number,
+	chest: Vector3,
+	k: number,
+	rollDeg: number?
+): (CFrame, number)
 	if not (k > 0) then
 		return base, fov
 	end
@@ -224,7 +230,12 @@ function FxMethods.Apply(self: Fx, camera: any, chest: Vector3, k: number, rollD
 end
 
 function FxMethods.Restore(self: Fx, camera: any)
-	if camera ~= nil and self.wroteCF ~= nil and camera.CFrame == self.wroteCF and camera.FieldOfView == self.wroteFov then
+	if
+		camera ~= nil
+		and self.wroteCF ~= nil
+		and camera.CFrame == self.wroteCF
+		and camera.FieldOfView == self.wroteFov
+	then
 		camera.CFrame = self.baseCF
 		camera.FieldOfView = self.baseFov
 	end

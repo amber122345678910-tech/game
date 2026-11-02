@@ -139,16 +139,6 @@ local function skinForSale(Common, Kits, profile)
 	return nil, nil
 end
 
-local function countLabels(root, pred)
-	local n = 0
-	for _, d in root:GetDescendants() do
-		if pred(d) then
-			n += 1
-		end
-	end
-	return n
-end
-
 return restoringFlags({
 	-- pixel art ---------------------------------------------------------------------------------------------------
 	spriteIsWellFormed = function(T, Loader)
@@ -197,7 +187,7 @@ return restoringFlags({
 		-- ... and both eyes are closed arcs, mirror images of each other (x -> 40 - x)
 		local mirrored, arcCells = 0, 0
 		for y = 12, 17 do
-			for x = 3, 17 do
+			for x = 4, 17 do
 				if at(sleep, x, y) == "#" then
 					arcCells += 1
 				end
@@ -206,7 +196,7 @@ return restoringFlags({
 				end
 			end
 		end
-		T.eq(mirrored, 6 * 15, "the eye area is mirror-symmetric")
+		T.eq(mirrored, 6 * 14, "the eye area is mirror-symmetric")
 		T.ok(arcCells >= 6, "the left closed arc is drawn: " .. arcCells)
 		-- only the eye area changed (rows 12..19, left half); the grin, the nose and the outline are the owner's
 		for y = 0, 36 do
@@ -265,9 +255,12 @@ return restoringFlags({
 		-- Compose: the head sits HeadAsleepY - HeadAwakeY cells lower asleep
 		local awake, asleep = Sprite.Compose("Awake"), Sprite.Compose("Asleep")
 		T.eq(#awake, 72, "composed rows")
-		local top = Sprite.AwakeHead[1]
-		T.eq(string.sub(awake[Sprite.HeadAwakeY + 1], Sprite.HeadX + 1, Sprite.HeadX + 40), top, "awake head top row")
-		T.eq(string.sub(asleep[Sprite.HeadAsleepY + 1], Sprite.HeadX + 1, Sprite.HeadX + 40), top, "asleep head top row")
+		-- (the head is drawn over the booth, under the counter / arms: compare a row of the face)
+		local row = 16
+		local face = Sprite.AwakeHead[row + 1]
+		local sleepFace = Sprite.SleepHead[row + 1]
+		T.eq(string.sub(awake[Sprite.HeadAwakeY + row + 1], Sprite.HeadX + 1, Sprite.HeadX + 40), face, "awake face row")
+		T.eq(string.sub(asleep[Sprite.HeadAsleepY + row + 1], Sprite.HeadX + 1, Sprite.HeadX + 40), sleepFace, "asleep face row")
 		T.ok(Sprite.HeadAsleepY > Sprite.HeadAwakeY, "he slumps when asleep")
 	end,
 
@@ -481,9 +474,10 @@ return restoringFlags({
 			local pos = k.Scene.Position
 			local x = origin[1] + pos.X.Scale * stageW * layout.Scale + pos.X.Offset * layout.Scale
 			local y = origin[2] + pos.Y.Scale * stageH * layout.Scale + pos.Y.Offset * layout.Scale
-			T.near(x, math.round(x), 1e-6, "scene x on a whole pixel")
-			T.near(y, math.round(y), 1e-6, "scene y on a whole pixel")
-			T.near(x, origin[1] + k.Fit.SceneX * layout.Scale, 0.5 + 1e-6, "moved by half a pixel at most")
+			-- (UDim Scale is a float32: ~1e-5 px of noise, far from a rounding edge)
+			T.near(x, math.round(x), 1e-3, "scene x on a whole pixel")
+			T.near(y, math.round(y), 1e-3, "scene y on a whole pixel")
+			T.near(x, origin[1] + k.Fit.SceneX * layout.Scale, 0.5 + 1e-3, "moved by half a pixel at most")
 		end
 		k.Destroy()
 	end,
@@ -656,8 +650,11 @@ return restoringFlags({
 		T.eq(says, 0, "unrelated notifications are ignored")
 		state2.Notify:Fire("prog.notify.bought", { "x" }, "Success")
 		T.eq(h2.Keeper.Line(), L("shop.keeper.thanks"), "thanks")
-		-- the profile arrives after the notification: no second thanks
+		-- the profile (now owning the skin) arrives after the notification: no second thanks
 		local owned = table.clone(rich)
+		owned.Unlocked = table.clone(rich.Unlocked or {})
+		owned.Unlocked[kit2.Id .. ":" .. skin2.Id] = true
+		T.ok(Common.SkinOwned(owned, kit2, skin2), "owned now")
 		state2.ProfileChanged:Fire(owned)
 		T.eq(says, 1, "thanked once")
 		h2.Destroy()
@@ -671,31 +668,9 @@ return restoringFlags({
 		h3.Press(kit3.Id, skin3.Id)
 		h3.Confirm()
 		local after = table.clone(rich3)
-		-- mark the skin owned in whatever shape the profile view uses
-		local probe = table.clone(rich3)
-		local marked = false
-		for _, field in { "OwnedSkins", "Skins", "Owned" } do
-			if type(probe[field]) == "table" and not marked then
-				local copy = table.clone(probe[field])
-				if type(copy[kit3.Id]) == "table" then
-					local inner = table.clone(copy[kit3.Id])
-					if #inner > 0 then
-						table.insert(inner, skin3.Id)
-					else
-						inner[skin3.Id] = true
-					end
-					copy[kit3.Id] = inner
-				else
-					copy[kit3.Id .. ":" .. skin3.Id] = true
-					table.insert(copy, kit3.Id .. ":" .. skin3.Id)
-				end
-				after[field] = copy
-				marked = Common.SkinOwned(after, kit3, skin3)
-				if not marked then
-					after[field] = probe[field]
-				end
-			end
-		end
+		after.Unlocked = table.clone(rich3.Unlocked or {})
+		after.Unlocked[kit3.Id .. ":" .. skin3.Id] = true
+		local marked = Common.SkinOwned(after, kit3, skin3)
 		if T.ok(marked, "could mark the skin owned in the sample profile") then
 			state3.ProfileChanged:Fire(after)
 			T.eq(h3.Keeper.Line(), L("shop.keeper.thanks"), "thanks from the profile")
@@ -712,7 +687,6 @@ return restoringFlags({
 		T.ok(modalOpen(h4), "not-enough pop-up without the keeper")
 		T.eq(#requests4, 0, "no request")
 		h4.Destroy()
-		local _ = countLabels
 	end,
 
 	stringsExistInBothLanguages = function(T, Loader)

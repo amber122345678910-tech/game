@@ -474,7 +474,7 @@ end
 
 local TAIL_PIXEL = 3 -- = the border thickness, so the tail's steps match the box outline
 -- the tail, top (the box's bottom border band) to tip: { core width, outline width } per 3 px row
-local TAIL_ROWS = { { 16, 0 }, { 16, 22 }, { 10, 16 }, { 4, 10 }, { 0, 4 } }
+local TAIL_ROWS = { { 22, 0 }, { 22, 28 }, { 16, 22 }, { 10, 16 }, { 4, 10 }, { 0, 4 } }
 
 local function pixelRow(parent: Instance, name: string, width: number, y: number, color: Color3, z: number): Frame
 	local row = Instance.new("Frame")
@@ -595,13 +595,17 @@ local function setBubbleAlpha(bubble: Bubble, alpha: number)
 	end
 end
 
+-- Puts a line in the bubble with `shown` graphemes visible (0 = about to be typed; nil = all of it).
+local function setLine(bubble: Bubble, text: string, shown: number?)
+	bubble.Label.Text = text
+	bubble.Chars = graphemes(text)
+	bubble.Shown = math.clamp(shown or #bubble.Chars, 0, #bubble.Chars)
+	bubble.Label.MaxVisibleGraphemes = if bubble.Shown >= #bubble.Chars then -1 else bubble.Shown
+end
+
 local function say(r: Rig, key: string, hold: number)
 	local bubble = r.Bubble
-	local text = "* " .. L(key)
-	bubble.Label.Text = text
-	bubble.Label.MaxVisibleGraphemes = 0
-	bubble.Chars = graphemes(text)
-	bubble.Shown = 0
+	setLine(bubble, "* " .. L(key), 0)
 	bubble.Timer = 0.12 -- a beat before the first letter
 	bubble.Hold = hold
 	bubble.Visible = true
@@ -646,6 +650,24 @@ local function stepBubble(r: Rig, dt: number, reduced: boolean)
 	bubble.Gui.Enabled = alpha > 0.01
 end
 
+-- Three "Z"s, a third of a cycle apart, each rising up and to the right, growing, swaying and fading.
+local function layoutZzz(letters: { TextLabel }, strokes: { UIStroke }, clock: number, alpha: number, reduced: boolean)
+	local cycle = Tuning.ZZZ_CYCLE * (if reduced then 1.4 else 1)
+	for i, label in letters do
+		local phase = ((clock / cycle) + (i - 1) / #letters) % 1
+		local fadeIn = clamp01(phase / 0.18)
+		local fadeOut = clamp01((1 - phase) / 0.4)
+		local vis = math.min(fadeIn, fadeOut) * alpha
+		local sway = if reduced then 0 else math.sin(phase * math.pi * 3 + i) * 0.05
+		label.Position = UDim2.fromScale(0.18 + 0.5 * phase + sway, 0.86 - 0.72 * phase)
+		local size = 0.13 + 0.17 * phase
+		label.Size = UDim2.fromScale(size, size)
+		label.Rotation = if reduced then 0 else -14 + 22 * math.sin(phase * math.pi)
+		label.TextTransparency = 1 - vis
+		strokes[i].Transparency = 1 - vis
+	end
+end
+
 local function stepZzz(r: Rig, dt: number, reduced: boolean)
 	local asleep = r.Machine.State == "Asleep" or (r.Machine.State == "Dozing" and r.Machine.Time > Tuning.DOZE_TIME * 0.6)
 	local target = if asleep then 1 else 0
@@ -658,20 +680,7 @@ local function stepZzz(r: Rig, dt: number, reduced: boolean)
 	if not visible then
 		return
 	end
-	local cycle = Tuning.ZZZ_CYCLE * (if reduced then 1.4 else 1)
-	for i, label in r.Letters do
-		local phase = ((r.Clock / cycle) + (i - 1) / 3) % 1
-		local fadeIn = clamp01(phase / 0.18)
-		local fadeOut = clamp01((1 - phase) / 0.4)
-		local vis = math.min(fadeIn, fadeOut) * r.ZzzAlpha
-		local sway = if reduced then 0 else math.sin(phase * math.pi * 3 + i) * 0.05
-		label.Position = UDim2.fromScale(0.18 + 0.5 * phase + sway, 0.86 - 0.72 * phase)
-		local size = 0.13 + 0.17 * phase
-		label.Size = UDim2.fromScale(size, size)
-		label.Rotation = if reduced then 0 else -14 + 22 * math.sin(phase * math.pi)
-		label.TextTransparency = 1 - vis
-		r.LetterStrokes[i].Transparency = 1 - vis
-	end
+	layoutZzz(r.Letters, r.LetterStrokes, r.Clock, r.ZzzAlpha, reduced)
 end
 
 -- Eyes -------------------------------------------------------------------------------------------------------
@@ -959,6 +968,27 @@ local function step(dt: number)
 	r.SleepAccum = 0
 	local overshoot = if alpha > 1 then (alpha - 1) * math.rad(40) else 0
 	applyPose(r, alpha, breath, overshoot)
+end
+
+-- GUI builders (no services; offline tests and previews build them on any Attachment) -------------------------
+
+function ShopkeeperController.BuildBubble(anchor: Attachment, text: string?): BillboardGui
+	local bubble = buildBubble(anchor)
+	if text then
+		setLine(bubble, text)
+		setBubbleAlpha(bubble, 1)
+		bubble.Gui.Enabled = true
+	else
+		setBubbleAlpha(bubble, 0)
+	end
+	return bubble.Gui
+end
+
+function ShopkeeperController.BuildZzz(anchor: Attachment, clock: number?): BillboardGui
+	local gui, letters, strokes = buildZzz(anchor)
+	layoutZzz(letters, strokes, clock or 0, 1, false)
+	gui.Enabled = true
+	return gui
 end
 
 function ShopkeeperController.State(): string?
