@@ -615,7 +615,7 @@ return {
 		for _, kit in Kits.ForRole("Monster") do
 			monsters[kit.Id] = true
 		end
-		T.eq(#Audio.ThemeKits, 3, "three monster kits have themes")
+		T.eq(#Audio.ThemeKits, 4, "four monster kits have themes")
 		for _, kitId in Audio.ThemeKits do
 			T.ok(monsters[kitId], kitId .. " is a monster kit")
 		end

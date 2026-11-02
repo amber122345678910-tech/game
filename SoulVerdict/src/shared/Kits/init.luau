@@ -13,6 +13,7 @@ local MODULES = {
 	script.Monsters.ClassicSans,
 	script.Monsters.FellSans,
 	script.Monsters.EclipseSans,
+	script.Monsters.LastBreathSans,
 	script.Humans.Determination,
 	script.Humans.Patience,
 	script.Humans.Bravery,

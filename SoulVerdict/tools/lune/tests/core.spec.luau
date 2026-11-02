@@ -16,7 +16,7 @@ return {
 	kits_valid = function(T, Loader)
 		local Kits = Loader.require("ReplicatedStorage.Shared.Kits")
 		local all = Kits.All()
-		T.eq(#all, 10, "kit count")
+		T.eq(#all, 11, "kit count (+ Last Breath Sans)")
 		local icons = {}
 		for _, n in Kits.IconNames do
 			icons[n] = true
