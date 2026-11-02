@@ -159,7 +159,7 @@ local SOUNDS: { [string]: SoundDef } = {
 	Map_CoreReactor = music("driving industrial/electronic battle loop, high energy", 0.5, { "122054437119612", "16527023337", "1837825257", "1839246774", "1846368080" }),
 	FinalPhase = music("desperate final-phase boss loop: fast, intense, heavy drums", 0.55, { "88808485680832", "107986977620509", "1837853076", "9042370693" }),
 	CollapsePhase = music("arena collapse (the last ~40 s, the ring closes): urgent, relentless loop", 0.55, { "128611309933897" }),
-	VerdictBox = music("short frantic chiptune/8-bit bullet-hell loop (~7-15 s)", 0.55, { "6334012651", "117051223265396", "9048375035", "9048376021", "1841609664" }),
+	VerdictBox = music("short frantic chiptune/8-bit bullet-hell loop (~7-15 s)", 0.55, { "118325539349483", "6334012651", "117051223265396", "9048375035", "9048376021", "1841609664" }),
 	Victory = music("short triumphant victory stinger (3-8 s, not looping)", 0.6, { "1844604574", "1841605720", "1844876242" }, false),
 	Defeat = music("short somber defeat stinger (3-8 s, not looping)", 0.6, { "1846891028", "1841700487", "1836102253" }, false),
 	-- Monster themes, picked by RoundState.MonsterKit (kit id): "Theme_<kit>" plays during the fight and
@@ -170,7 +170,7 @@ local SOUNDS: { [string]: SoundDef } = {
 	Theme_FellSans = music("Fell Sans (Underfell): aggressive, distorted, heavy boss loop", 0.5, { "120838650095309", "101730223568557", "1837853076", "9043754347" }),
 	Theme_FellSans_Final = music("Fell Sans final phase: harsher, faster, darker remix (optional)", 0.55, { "134453206423714", "120928193831867", "137220025405002", "1837880957" }),
 	Theme_EclipseSans = music("Eclipse Sans (original void AU): eerie cosmic dark-synth boss loop", 0.5, { "88059047994896", "114505147154737", "9045683296", "9045934037", "1847456615" }),
-	Theme_EclipseSans_Final = music("Eclipse Sans final phase: darker, glitchier, faster (optional)", 0.55, { "103167351125844", "78368445861935", "1837779548" }),
+	Theme_EclipseSans_Final = music("Eclipse Sans final phase: darker, glitchier, faster (optional)", 0.55, { "74309809578759", "103167351125844", "78368445861935", "1837779548" }),
 
 	------------------------------------------------------------------------------------------- movement
 	Footstep = sfx(BUILTIN.Footstep, 0.35, { 0.95, 1.1 }, true, "built-in"),
