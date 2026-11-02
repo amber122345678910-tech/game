@@ -31,6 +31,12 @@
 local Themes = require(script.Parent.Parent.Themes)
 local UIKit = require(script.Parent.Parent.UIKit)
 local Icons = require(script.Parent.Parent.Icons)
+
+-- the owner's pixel ability icon when one exists ("Ability.<Id>"), else the vector icon name
+local function pixelAbilityIcon(ability: any): string
+	local P = Icons.PixelIcons
+	return if P then P.AbilityIcon(ability) else ability.Icon
+end
 local Motion = require(script.Parent.Parent.Motion)
 
 type Theme = Themes.Theme
@@ -940,7 +946,7 @@ function Style.Slots(kitId: string?): { SlotInfo }
 				Slot = slot,
 				Action = slot,
 				Id = ability.Id,
-				Icon = ability.Icon,
+				Icon = pixelAbilityIcon(ability),
 				Name = Style.Pick(ability.Name),
 				Cooldown = ability.Cooldown,
 				Ult = ability.Ult == true,

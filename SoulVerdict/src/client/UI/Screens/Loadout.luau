@@ -61,7 +61,7 @@ local function entries(kit: any): { Entry }
 			Slot = a.Slot,
 			Name = pick(a.Name),
 			Desc = pick(a.Desc),
-			Icon = a.Icon,
+			Icon = if Icons.PixelIcons then Icons.PixelIcons.AbilityIcon(a) else a.Icon,
 			Cooldown = a.Cooldown,
 			Tags = a.Tags or {},
 			Numbers = a.Numbers,

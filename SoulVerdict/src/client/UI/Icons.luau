@@ -1147,8 +1147,44 @@ function Icons.Names(): { string }
 	return table.clone(NAMES)
 end
 
+-- the owner's pixel icons (Shared/PixelArt/Icons): pixel keys ("Ability.X", "Kit.X", "Skin.K.S", "UI.X") and a few
+-- UI aliases ("Gold", "Shop" ...) are drawn as crisp pixel art instead of the vector shapes (colour ignored)
+local PixelIcons: any = nil
+do
+	local ok, result = pcall(function()
+		local shared = game:GetService("ReplicatedStorage"):FindFirstChild("Shared")
+		local folder = shared and shared:FindFirstChild("PixelArt")
+		local module = folder and folder:FindFirstChild("Icons")
+		return if module then require(module :: any) else nil
+	end)
+	if ok then
+		PixelIcons = result
+	end
+end
+Icons.PixelIcons = PixelIcons
+
 function Icons.Has(name: string): boolean
-	return DEFS[name] ~= nil
+	return DEFS[name] ~= nil or (PixelIcons ~= nil and PixelIcons.Resolve(name) ~= nil)
+end
+
+-- pixel art: one Frame per merged horizontal run, Scale-positioned on the 32x32 grid (+1 px overlap: no seams)
+local function buildPixel(root: Frame, key: string): boolean
+	local runs = PixelIcons and PixelIcons.Runs(key)
+	if runs == nil then
+		return false
+	end
+	local n = PixelIcons.Size
+	for i, run in runs do
+		local f = Instance.new("Frame")
+		f.Name = "P" .. i
+		f.BorderSizePixel = 0
+		f.BackgroundColor3 = run.Color
+		f.Position = UDim2.fromScale(run.X / n, run.Y / n)
+		f.Size = UDim2.new(run.Len / n, 1, 1 / n, 1)
+		f.Parent = root
+	end
+	root:SetAttribute("PixelIcon", key)
+	return true
 end
 
 function Icons.Create(name: string, color: Color3, size: (number | UDim2)?, accent: Color3?): Frame
@@ -1169,6 +1205,10 @@ function Icons.Create(name: string, color: Color3, size: (number | UDim2)?, acce
 	local aspect = Instance.new("UIAspectRatioConstraint")
 	aspect.AspectRatio = 1
 	aspect.Parent = root
+	local pixelKey = PixelIcons and PixelIcons.Resolve(name)
+	if pixelKey and buildPixel(root, pixelKey) then
+		return root
+	end
 	local def = DEFS[name] or DEFS.Info
 	local ctx: Ctx = { root = root, z = 0, tones = makeTones(color, accent) }
 	def(builder(ctx))

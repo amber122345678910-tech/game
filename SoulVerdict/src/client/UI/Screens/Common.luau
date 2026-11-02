@@ -440,6 +440,10 @@ function Common.KitIcon(kit: any): string
 	if kit == nil then
 		return "Soul"
 	end
+	local portrait = Icons.PixelIcons and Icons.PixelIcons.KitIcon(kit.Id)
+	if portrait then
+		return portrait -- the owner's pixel portrait
+	end
 	for _, slot in { "Q", "E", "M1" } do
 		for _, a in kit.Abilities do
 			if a.Slot == slot and Icons.Has(a.Icon) then

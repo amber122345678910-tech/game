@@ -437,10 +437,11 @@ function Shop.Create(theme: Theme, deps: any): any
 		-- keep dark palettes readable: lift the emblem and the glow toward white
 		local lum = 0.2126 * colors[1].R + 0.7152 * colors[1].G + 0.0722 * colors[1].B
 		local emblemColor = colors[1]:Lerp(Color3.new(1, 1, 1), if lum < 0.22 then 0.42 else 0.1)
+		local skinPixel = Icons.PixelIcons and Icons.PixelIcons.SkinIcon(kit.Id, skin.Id)
 		local emblem = Icons.Create(
-			Common.KitIcon(kit),
+			skinPixel or Common.KitIcon(kit), -- the owner's pixel icon of this skin / accessory
 			emblemColor,
-			UDim2.fromScale(if featured then 0.62 else 0.58, if featured then 0.62 else 0.58),
+			UDim2.fromScale(if featured then 0.7 else 0.66, if featured then 0.7 else 0.66),
 			colors[2]
 		)
 		emblem.Position = UDim2.fromScale(0.5, 0.48)
