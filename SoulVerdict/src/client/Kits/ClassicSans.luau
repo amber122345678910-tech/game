@@ -13,7 +13,8 @@
 --   Shortcut       Vanish {from}: ghost + eye glint; Teleport {from, to}: arrival flash. Indicator: destination
 --   BadTime (ult)  Start: eye blaze + darkening for players nearby; Blaze {center, radius, duration}: pulsing judgement
 --                  circle for the duration. Indicator: area + blaster ring
--- OnCharacter: idle pupil blinks; FinalForm attribute -> permanent blazing eye. OnDamageFx: lazy-dodge flourish.
+-- OnCharacter: idle pupil blinks; FinalForm attribute -> permanent blazing eye (the timed eye flashes above return to
+-- it when they end). OnDamageFx: lazy-dodge flourish.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Players = game:GetService("Players")
@@ -57,15 +58,36 @@ local function flat(v: Vector3, fallback: Vector3): Vector3
 	return f.Unit
 end
 
+-- The attack eye (left). Timed flashes (Gaster Blaster: the default cyan/yellow flame, Blue Soul: blue) and Bad Time's
+-- blaze claim it; only the newest claim puts it back to rest when it ends (an older flash ending never cuts a newer one
+-- short). At rest the eye blazes with the default flame in Phase 2 (FinalForm attribute) and is dark otherwise:
+-- FxController.EyeGlow keeps one flame per eye keyed by colour, so a blue flash replaces the Phase 2 flame and the
+-- rest state has to relight it.
+local eyeClaims: { [Model]: number } = setmetatable({}, { __mode = "k" }) :: any
+
+local function claimEye(char: Model?): number?
+	if char == nil then
+		return nil
+	end
+	local token = (eyeClaims[char] or 0) + 1
+	eyeClaims[char] = token
+	return token
+end
+
+-- `token` = the claim being released (nil = unconditionally): a newer claim keeps the eye as it is.
+local function restEye(fx: any, char: Model?, token: number?)
+	if char == nil or (token ~= nil and eyeClaims[char] ~= token) then
+		return
+	end
+	fx.EyeGlow(char, "Left", nil, char:GetAttribute("FinalForm") == true)
+end
+
 local function eyeFor(fx: any, color: Color3?, seconds: number)
 	local char = fx.Character
+	local token = claimEye(char)
 	fx.EyeGlow(char, "Left", color, true)
 	fx.Delay(seconds, function()
-		-- FinalForm keeps the eye lit (OnCharacter re-enables it)
-		if char and char:GetAttribute("FinalForm") == true and color == nil then
-			return
-		end
-		fx.EyeGlow(char, "Left", color, false)
+		restEye(fx, char, token)
 	end)
 end
 
@@ -561,6 +583,7 @@ Effects.BadTime = function(fx: any, packet: Map)
 	local Lib = fx.VFX
 	if packet.phase == "Start" then
 		local char = fx.Character
+		claimEye(char)
 		fx.EyeGlow(char, "Left", nil, true)
 		local head = fx.Part(char, "Head")
 		if head then
@@ -581,6 +604,7 @@ Effects.BadTime = function(fx: any, packet: Map)
 		local ringOut = Lib.GroundCircle(center, radius + 6, SANS_CYAN, { Rim = 0.2, Fill = 1, Height = 0.15 })
 		local lastShake = 0
 		local char = fx.Character
+		local eyeToken = if char then eyeClaims[char] else nil -- Start's claim (unless a newer flash took the eye)
 		Lib.Animate(duration, function(a, _dt, elapsed)
 			local pulse = 0.5 + 0.5 * math.sin(elapsed * 6)
 			circle:SetTransparency(0.15 + 0.25 * pulse + 0.6 * math.max(0, (a - 0.85) / 0.15), 0.9)
@@ -593,9 +617,7 @@ Effects.BadTime = function(fx: any, packet: Map)
 		end, function()
 			circle:Destroy()
 			ringOut:Destroy()
-			if char and char:GetAttribute("FinalForm") ~= true then
-				fx.EyeGlow(char, "Left", nil, false)
-			end
+			restEye(fx, char, eyeToken)
 		end)
 	end
 end

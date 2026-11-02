@@ -249,8 +249,24 @@ local BLACK = Color3.new(0, 0, 0)
 local WHITE = Color3.new(1, 1, 1)
 local SOUL_RED = Color3.fromRGB(255, 0, 0)
 local STREAK = Color3.fromRGB(236, 228, 255)
-local RING_ALPHA = { 0.93, 0.82, 0.68, 0.51, 0.33, 0.16 } -- soft inner edge of the iris (6 steps), then hard black
+local SOFT_STEPS = 12 -- soft inner edge of the iris, then the hard black
 local STREAKS = 14
+
+-- The soft edge is SOFT_STEPS stacked layers: layer k starts k-1 steps out from the hole and reaches under the hard
+-- black, so the darkness compounds outward (no seams between bands). Layer k's own transparency makes the total
+-- opacity of band k follow a smoothstep from the hole to the black: T_k = (1 - o_k) / (1 - o_(k-1)).
+local function softLayerAlphas(n: number): { number }
+	local out: { number } = {}
+	local prev = 1
+	for k = 1, n do
+		local u = k / (n + 1)
+		local cumulative = 1 - u * u * (3 - 2 * u) -- transparency of band k as a whole
+		table.insert(out, cumulative / prev)
+		prev = cumulative
+	end
+	return out
+end
+local RING_ALPHA = softLayerAlphas(SOFT_STEPS)
 
 local function new(className: string, props: { [string]: any }, parent: Instance?): any
 	local inst = Instance.new(className)
@@ -346,7 +362,7 @@ function VerdictBoxEntry.new(parent: Instance?, opts: { [string]: any }?): Entry
 		})
 	end
 	local glows: { Frame } = {}
-	local glowAlpha = { 0.94, 0.88, 0.78 } -- outer -> inner (transparency at full heart): a soft red halo
+	local glowAlpha = { 0.95, 0.92, 0.88, 0.84 } -- outer -> inner (transparency at full heart): a soft red halo
 	for i in glowAlpha do
 		local g = new("Frame", {
 			Name = "Glow" .. i,
@@ -421,13 +437,15 @@ function VerdictBoxEntry.Render(self: Entry, f: Frame, center: Vector2, size: Ve
 	self.dim.Visible = f.dark > 0.001
 	self.dim.BackgroundTransparency = 1 - f.dark
 
-	-- iris: a hole around the chest that shrinks to nothing; soft inner edge (adjacent rings) + hard black beyond
-	local feather = math.clamp(unit * 0.22, 24, 170)
+	-- iris: a hole around the chest that shrinks to nothing; a soft inner edge (stacked layers that each reach under
+	-- the hard black: the darkness compounds outward without seams) + the hard black beyond it
+	local feather = math.clamp(unit * 0.24, 24, 180)
 	local radius = (1 - f.iris) * (far + feather)
 	local soft = math.min(feather, radius * 0.8 + 3)
 	local showIris = f.iris > 0.001 and (f.stage == "Pull" or f.stage == "Black")
 	local n = #self.rings
 	local step = soft / (n - 1)
+	local hardInner = radius + soft
 	for i, r in self.rings do
 		local inner = radius + (i - 1) * step
 		local frame = r.frame
@@ -435,7 +453,7 @@ function VerdictBoxEntry.Render(self: Entry, f: Frame, center: Vector2, size: Ve
 		if frame.Visible then
 			frame.Position = UDim2.fromOffset(cx, cy)
 			frame.Size = UDim2.fromOffset(inner * 2, inner * 2)
-			r.stroke.Thickness = if i < n then step + 1 else far + 8
+			r.stroke.Thickness = if i < n then hardInner - inner + 1 else far + 8
 		end
 	end
 
@@ -480,7 +498,7 @@ function VerdictBoxEntry.Render(self: Entry, f: Frame, center: Vector2, size: Ve
 			end
 		end
 		for i, g in self.glows do
-			local d = hs * (3.6 - 0.8 * i) -- 2.8x, 2.0x, 1.2x the heart
+			local d = hs * (3.6 - 0.6 * i) -- 3.0x, 2.4x, 1.8x, 1.2x the heart
 			g.Position = UDim2.fromOffset(cx, cy)
 			g.Size = UDim2.fromOffset(d, d)
 			g.BackgroundTransparency = 1 - (1 - self.glowAlpha[i]) * f.heart

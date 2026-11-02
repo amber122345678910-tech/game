@@ -101,12 +101,13 @@ local function applyStats(profile: any, ctx: any)
 	end
 end
 
-local function finalPhaseReached(): boolean
-	local state = ReplicatedStorage:FindFirstChild("RoundState")
-	return state ~= nil and state:GetAttribute("FinalPhase") == true
+-- RoundEnded.monsterBroken: the humans pushed the monster to Config.Round.FinalPhaseHpFraction HP during the fight
+-- (the Unshaken quest / achievement). Not RoundState.FinalPhase: the monster's own first ultimate also starts Phase 2.
+local function monsterBroken(result: any): boolean
+	return type(result) == "table" and result.monsterBroken == true
 end
 
-local function processPlayer(player: Player, row: any, result: any, finalPhase: boolean)
+local function processPlayer(player: Player, row: any, result: any, broken: boolean)
 	local profile = DataService.Get(player)
 	if profile == nil then
 		return
@@ -121,7 +122,7 @@ local function processPlayer(player: Player, row: any, result: any, finalPhase: 
 	local today = Rewards.Day(os.time())
 	local box = boxStats[row.userId] or { BoxesSurvived = 0, BoxHits = 0 }
 	local ctx = Rewards.Context(result, row, {
-		finalPhase = finalPhase,
+		monsterBroken = broken,
 		boxesSurvived = box.BoxesSurvived,
 		boxHits = box.BoxHits,
 		firstWinAvailable = Rewards.FirstWinAvailable(profile, today),
@@ -242,14 +243,14 @@ function RewardService.Process(result: any, resolvePlayer: ((number) -> Player?)
 	if DataService == nil or not Rewards.ShouldReward(result) then
 		return
 	end
-	local finalPhase = finalPhaseReached()
+	local broken = monsterBroken(result)
 	for _, row in result.rows do
 		-- real players only — NOT "userId > 0": Studio test players (Test -> Local Server) have negative UserIds and
 		-- must get their rewards too; bot rows use StatsService's id range (<= BOT_ID_BASE) and are skipped
 		if type(row) == "table" and type(row.userId) == "number" and row.userId ~= 0 and not isBotId(row.userId) then
 			local player = if resolvePlayer then resolvePlayer(row.userId) else Players:GetPlayerByUserId(row.userId)
 			if player and DataService.Get(player) then
-				local ok, err = pcall(processPlayer, player, row, result, finalPhase)
+				local ok, err = pcall(processPlayer, player, row, result, broken)
 				if not ok then
 					warn(("[RewardService] rewards for %s failed: %s"):format(player.Name, tostring(err)))
 				end

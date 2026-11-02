@@ -1,18 +1,24 @@
 --!nocheck
 -- Ultimates -> Phase 2 (the monster's "FinalPhase" in code). The monster's FIRST ultimate of a round starts its
 -- Phase 2 through one central hook in AbilityService (RoundService.TriggerFinalPhase("Ult", caster) while the cast
--- commits); later ultimates are normal ones and the HP threshold stays the safety net. Two levels:
+-- commits); later ultimates are normal ones and the HP threshold stays the safety net. Levels:
 --   * combat harness (as in combat.spec.luau): the REAL AbilityService / CastContext / server kits / DamageService /
 --     StatusService / HazardService on Lune instances with a simulated clock (players and bots both cast through
 --     AbilityService.tryCast). RoundService is a stand-in that records every call and applies to the monster what
---     the real TriggerFinalPhase applies (Invulnerable window, Exhausted cleared, dodges, FinalForm, RoundState
---     FinalPhase, ult refill except for "Ult"), so each Sans' ultimate is checked to still fire under it;
+--     the real TriggerFinalPhase applies (FinalForm, RoundState FinalPhase; "Ult": nothing refilled, Invulnerable
+--     window only while not Exhausted; "Hp": Invulnerable window, Exhausted cleared, dodges + ult refilled), so each
+--     Sans' ultimate is checked to still fire under it and an Exhausted monster stays Exhausted through it;
 --   * round loop simulation (round.spec.luau's BuildSim: the REAL RoundService against faked engine services, practice
---     rounds): the "Ult" cause (round's monster only, fight phases only, once, no ult refill) and the HP path ("Hp").
+--     rounds): the "Ult" cause (round's monster only, fight phases only, once, no reset), the HP path ("Hp", full
+--     refresh) and RoundEnded.monsterBroken (the monster's HP reached the 30 % threshold) for the Unshaken rewards;
+--   * RewardService on a memory profile: the Unshaken quest / achievement follow monsterBroken, not Phase 2;
+--   * client: Classic Sans' attack eye (Blue Soul's flash returns to the Phase 2 eye) on a fake fx, and the HUD
+--     (Hud.Mount) showing the arena call-outs to round participants only, never to players waiting in the lobby.
 -- Run: lune run tools/lune/run_tests.luau ult_phase
 local roblox = require("@lune/roblox")
 local task = require("@lune/task")
 local Vector3 = roblox.Vector3
+local Color3 = roblox.Color3
 local Instance = roblox.Instance
 
 local MONSTER_ULTS = { ClassicSans = "BadTime", FellSans = "Execution", EclipseSans = "TotalEclipse" }
@@ -190,11 +196,18 @@ local function harness(Loader)
 				return false
 			end
 			H.round.FinalPhase = true
-			H.S.StatusService.Apply(m, "Invulnerable", H.Config.Round.FinalPhaseInvulnerable)
-			H.S.StatusService.Remove(m, "Exhausted")
-			m:SetAttribute("Dodges", m:GetAttribute("MaxDodges"))
-			m:SetAttribute("Exhausted", 0)
-			if cause ~= "Ult" then
+			local SS = H.S.StatusService
+			if cause == "Ult" then
+				-- no reset button: Exhausted / dodges / ult bar stay; the short transformation window only when the
+				-- monster is not Exhausted
+				if not SS.Has(m, "Exhausted") then
+					SS.Apply(m, "Invulnerable", H.Config.Round.FinalPhaseInvulnerable)
+				end
+			else
+				SS.Apply(m, "Invulnerable", H.Config.Round.FinalPhaseInvulnerable)
+				SS.Remove(m, "Exhausted")
+				m:SetAttribute("Dodges", m:GetAttribute("MaxDodges"))
+				m:SetAttribute("Exhausted", 0)
 				m:SetAttribute("Ult", 100)
 			end
 			m:SetAttribute("FinalForm", true)
@@ -373,6 +386,180 @@ local function checkUltFired(T, H, kitId, monster, humans, from)
 		T.ok(ec ~= nil and ec.data.duration == N.Duration, kitId .. ": Eclipse fx after the windup")
 		T.eq(#H.fx("TotalEclipse", "End", from), 1, kitId .. ": the eclipse ran to its end")
 	end
+end
+
+-- The third SAVE star's Surge on the monster (ObjectiveService.surge): dodges 0 + Exhausted for ExhaustTime.
+local function surgeExhaust(H, monster)
+	local exhaust = H.Config.Monster.ExhaustTime
+	monster:SetAttribute("Dodges", 0)
+	monster:SetAttribute("Exhausted", H.now() + exhaust)
+	H.S.StatusService.Apply(monster, "Exhausted", exhaust)
+end
+
+-- RewardService fixtures (progression.spec.luau's shapes): a RoundStatRow, a RoundEnded result, a Player stand-in.
+local function statRow(userId, fields)
+	local r = {
+		userId = userId,
+		name = "P" .. tostring(userId),
+		team = "Humans",
+		kitId = "Determination",
+		damage = 0,
+		healing = 0,
+		kills = 0,
+		downs = 0,
+		parries = 0,
+		dodgesForced = 0,
+		saves = 0,
+		revives = 0,
+		survived = false,
+	}
+	for k, v in fields or {} do
+		r[k] = v
+	end
+	return r
+end
+
+local function roundResult(fields)
+	local r = {
+		winner = "Monster",
+		reason = "Eliminated",
+		rows = {},
+		practice = false,
+		durations = { round = 200, collapse = 0, total = 230 },
+		mapId = "TestArena",
+		roundId = 1,
+	}
+	for k, v in fields do
+		r[k] = v
+	end
+	return r
+end
+
+local function fakePlayer(userId)
+	local attrs = {}
+	return {
+		Name = "Tester" .. tostring(userId),
+		DisplayName = "Tester",
+		UserId = userId,
+		Parent = {},
+		GetAttribute = function(_, k)
+			return attrs[k]
+		end,
+		SetAttribute = function(_, k, v)
+			attrs[k] = v
+		end,
+	}
+end
+
+-- Classic Sans' client attack eye on a fake fx: FxController.EyeGlow's semantics (one flame per eye keyed by colour; a
+-- call with another colour destroys the old flame, on/off enables / disables it) and a simulated fx.Delay clock.
+local function sansEyeRig(Loader)
+	local rig = { clock = 0, timers = {}, eye = nil }
+	rig.Kit = Loader.require("StarterPlayer.StarterPlayerScripts.Client.Kits.ClassicSans")
+	local function keyOf(color)
+		return if color then string.format("%.3f,%.3f,%.3f", color.R, color.G, color.B) else "default"
+	end
+	function rig.eyeGlow(_char, side, color, on)
+		assert(side == "Left", "the attack eye is the left one")
+		local key = keyOf(color)
+		local h = rig.eye
+		if h and h.key ~= key then
+			rig.eye = nil
+			h = nil
+		end
+		if on then
+			if h == nil then
+				h = { key = key }
+				rig.eye = h
+			end
+			h.on = true
+		elseif h then
+			h.on = false
+		end
+	end
+	-- "default" (the cyan/yellow flame), "blue" or "dark"
+	function rig.state()
+		local h = rig.eye
+		if h == nil or not h.on then
+			return "dark"
+		end
+		return if h.key == "default"
+			then "default"
+			elseif h.key == keyOf(Color3.fromRGB(20, 169, 255)) then "blue"
+			else h.key
+	end
+	function rig.at(seconds, fn)
+		table.insert(rig.timers, { at = rig.clock + seconds, fn = fn })
+	end
+	function rig.advance(seconds)
+		local target = rig.clock + seconds
+		while true do
+			table.sort(rig.timers, function(a, b)
+				return a.at < b.at
+			end)
+			local first = rig.timers[1]
+			if first == nil or first.at > target then
+				break
+			end
+			table.remove(rig.timers, 1)
+			rig.clock = math.max(rig.clock, first.at)
+			first.fn()
+		end
+		rig.clock = target
+	end
+	-- a Sans character (FinalForm = Phase 2) whose resting eye is already in place, as OnCharacter leaves it
+	function rig.character(finalForm)
+		local attrs = { FinalForm = finalForm }
+		local char = {
+			Name = "Sans",
+			GetAttribute = function(_, k)
+				return attrs[k]
+			end,
+			SetAttribute = function(_, k, v)
+				attrs[k] = v
+			end,
+		}
+		rig.eye = nil
+		rig.eyeGlow(char, "Left", nil, finalForm == true)
+		return char
+	end
+	function rig.fx(char, opts)
+		opts = opts or {}
+		local noop = function() end
+		return {
+			Character = char,
+			IsLocal = opts.isLocal == true,
+			Predicted = opts.predicted == true,
+			EyeGlow = rig.eyeGlow,
+			Delay = rig.at,
+			Sound = noop,
+			Shake = noop,
+			Root = function()
+				return nil
+			end,
+			Part = function()
+				return nil
+			end,
+			Screen = { Tint = noop, Vignette = noop },
+			VFX = {
+				EmitBurst = noop,
+				GroundCircle = function()
+					return { SetTransparency = noop, Destroy = noop }
+				end,
+				Animate = function(duration, _step, done)
+					rig.at(duration, function()
+						if done then
+							done()
+						end
+					end)
+				end,
+			},
+		}
+	end
+	function rig.effect(char, ability, phase, opts, data)
+		rig.Kit.Effects[ability](rig.fx(char, opts), { ability = ability, phase = phase, data = data or {} })
+	end
+	return rig
 end
 
 -------------------------------------------------------------------------------------------------
@@ -581,7 +768,9 @@ return {
 		end)
 	end,
 
-	-- 7) the REAL RoundService (round loop simulation, practice rounds): the "Ult" cause and the HP path
+	-- 7) the REAL RoundService (round loop simulation, practice rounds): the "Ult" cause (no reset: Exhausted, dodges
+	--    and the bar stay; the Invulnerable window only while not Exhausted), the HP path ("Hp": full refresh) and
+	--    RoundEnded {finalPhase, monsterBroken} (monsterBroken = HP reached the 30 % threshold in the fight, ever)
 	phase2_round_service_causes = function(T, Loader)
 		local RoundSpec = require("./round.spec")
 		local sim = RoundSpec.BuildSim(Loader)
@@ -598,9 +787,28 @@ return {
 		RS.FinalPhaseStarted:Connect(function(monster, cause)
 			table.insert(started, { monster = monster, cause = cause })
 		end)
+		local ended = {}
+		RS.RoundEnded:Connect(function(result)
+			table.insert(ended, result)
+		end)
 		RS.Start()
 		local function finalEvents()
 			return sim.events.FinalPhase or {}
+		end
+		local function damaged(target, attacker)
+			sim.services.DamageService.Damaged:Fire(
+				{ Target = target, Attacker = attacker, Amount = 10 },
+				{ Applied = 10 }
+			)
+		end
+		local function exhaustedRemovals(model)
+			local n = 0
+			for _, c in sim.calls do
+				if c.kind == "StatusRemove" and c.name == "Exhausted" and c.model == model then
+					n += 1
+				end
+			end
+			return n
 		end
 		local ok, err = pcall(function()
 			local function waitPhase(name, timeout)
@@ -610,6 +818,13 @@ return {
 					end, timeout or 3),
 					"reached phase " .. name .. " (now " .. RS.Phase() .. ")"
 				)
+			end
+			local function killHumans(by)
+				for m, r in sim.records do
+					if r.team == "Humans" and not r.dead then
+						CS.Kill(m, by, "BoneJab")
+					end
+				end
 			end
 			local owner = sim.addPlayer(1001, "Owner")
 			waitPhase("Waiting", 1)
@@ -624,6 +839,7 @@ return {
 			local monster = RS.GetMonster()
 			local human = CS.GetModel(owner)
 			monster:SetAttribute("Ult", 37) -- sentinel: AbilityService spends the bar right after the call
+			monster:SetAttribute("Dodges", 3) -- partly spent: the ultimate must not refill them
 			T.eq(RS.TriggerFinalPhase("Ult", human), false, "a human's ultimate never starts it")
 			T.eq(RS.TriggerFinalPhase("Ult", nil), false, "the Ult cause needs the caster")
 			T.eq(sim.state().FinalPhase, false, "still Phase 1")
@@ -633,7 +849,13 @@ return {
 			T.eq(sim.state().FinalPhase, true, "RoundState.FinalPhase (clients switch to Theme_<kit>_Final)")
 			T.eq(monster:GetAttribute("FinalForm"), true, "FinalForm")
 			T.eq(monster:GetAttribute("Ult"), 37, "no ult refill for an ult-started Phase 2")
-			T.eq(sim.count("StatusApply", "name", "Invulnerable"), invBefore + 1, "transformation window")
+			T.eq(monster:GetAttribute("Dodges"), 3, "no dodge refill: the first ultimate is no reset button")
+			T.eq(exhaustedRemovals(monster), 0, "Exhausted is never touched by an ult start")
+			T.eq(
+				sim.count("StatusApply", "name", "Invulnerable"),
+				invBefore + 1,
+				"transformation window (not Exhausted)"
+			)
 			local inv = sim.last("StatusApply")
 			T.ok(
 				inv and inv.model == monster and inv.duration == Config.Round.FinalPhaseInvulnerable,
@@ -641,32 +863,36 @@ return {
 			)
 			local ev = finalEvents()[1]
 			T.ok(ev ~= nil and ev.cause == "Ult" and ev.monster == monster, "RoundEvent FinalPhase {cause = Ult}")
+			T.eq(ev and ev.duration, Config.Round.FinalPhaseInvulnerable, "event duration = the window")
 			T.ok(#started == 1 and started[1].cause == "Ult", "FinalPhaseStarted(monster, Ult)")
 			T.eq(RS.TriggerFinalPhase("Ult", monster), false, "a second ultimate does not re-trigger")
 			T.eq(RS.TriggerFinalPhase(), false, "nor does a forced start")
 			monster._hum.Health = monster._hum.MaxHealth * 0.2
-			sim.services.DamageService.Damaged:Fire(
-				{ Target = monster, Attacker = human, Amount = 10 },
-				{ Applied = 10 }
-			)
+			damaged(monster, human)
 			task.wait(0.05)
 			T.eq(#finalEvents(), 1, "HP threshold after an ult-started Phase 2: nothing more")
 			T.eq(monster:GetAttribute("Ult"), 37, "and no late refill")
 			CS.Kill(monster, human, "KnifeCombo")
 			waitPhase("Ending", 1)
+			local r1 = ended[#ended] or {}
+			T.ok(#ended == 1 and r1.winner == "Humans", "round 1 ended: humans won")
+			T.eq(r1.finalPhase, true, "RoundEnded.finalPhase")
+			T.eq(r1.monsterBroken, true, "pushed to 20 % after the ult start: RoundEnded.monsterBroken")
 			waitPhase("Waiting", 2)
 
-			-- round 2: no ultimate used -> the HP threshold starts Phase 2 by itself (unchanged safety net)
+			-- round 2: no ultimate used -> the HP threshold starts Phase 2 by itself, with the full comeback refresh
 			T.ok(RS.StartPractice(owner, "Human"), "practice again")
 			waitPhase("Round", 3)
 			T.eq(sim.state().FinalPhase, false, "Phase 2 reset for the new round")
 			local m2 = RS.GetMonster()
 			m2:SetAttribute("Ult", 12)
+			-- Exhausted (dodges burnt) when the humans push it under 30 %
+			m2:SetAttribute("Dodges", 0)
+			m2:SetAttribute("Exhausted", os.clock() + Config.Monster.ExhaustTime)
+			sim.setStatus(m2, "Exhausted", true)
+			local inv2 = sim.count("StatusApply", "name", "Invulnerable")
 			m2._hum.Health = m2._hum.MaxHealth * 0.25
-			sim.services.DamageService.Damaged:Fire(
-				{ Target = m2, Attacker = CS.GetModel(owner), Amount = 10 },
-				{ Applied = 10 }
-			)
+			damaged(m2, CS.GetModel(owner))
 			T.ok(
 				waitFor(function()
 					return sim.state().FinalPhase == true
@@ -675,11 +901,74 @@ return {
 			)
 			local ev2 = finalEvents()[#finalEvents()]
 			T.ok(#finalEvents() == 2 and ev2.cause == "Hp", "RoundEvent FinalPhase {cause = Hp}")
+			T.eq(ev2 and ev2.duration, Config.Round.FinalPhaseInvulnerable, "Hp: event duration = the window")
 			T.eq(m2:GetAttribute("Ult"), 100, "HP start refills the ult")
+			T.eq(exhaustedRemovals(m2), 1, "HP start clears Exhausted")
+			T.eq(m2:GetAttribute("Exhausted"), 0, "Exhausted attribute cleared")
+			T.eq(m2:GetAttribute("Dodges"), m2:GetAttribute("MaxDodges"), "dodges refilled")
+			T.eq(sim.count("StatusApply", "name", "Invulnerable"), inv2 + 1, "Invulnerable window")
 			T.eq(started[2] and started[2].cause, "Hp", "FinalPhaseStarted(monster, Hp)")
 			T.eq(RS.TriggerFinalPhase("Ult", m2), false, "an ultimate after an HP start is a normal ultimate")
 			CS.Kill(m2, CS.GetModel(owner), "KnifeCombo")
 			waitPhase("Ending", 1)
+			local r2 = ended[#ended] or {}
+			T.ok(#ended == 2 and r2.finalPhase == true and r2.monsterBroken == true, "round 2: Hp start = broken")
+			waitPhase("Waiting", 2)
+
+			-- round 3: practice as the MONSTER; Exhausted by the SAVE Surge, it casts its first ultimate: Phase 2
+			-- starts but stays a no-reset start (no window, Exhausted + 0 dodges kept); it wins without ever going
+			-- under 30 % -> monsterBroken false (the Unshaken quest / achievement stay available)
+			T.ok(RS.StartPractice(owner, "Monster"), "monster practice")
+			waitPhase("Round", 3)
+			local m3 = CS.GetModel(owner)
+			T.eq(RS.GetMonster(), m3, "the owner is the monster")
+			local exhaustedUntil = os.clock() + Config.Monster.ExhaustTime
+			m3:SetAttribute("Dodges", 0)
+			m3:SetAttribute("Exhausted", exhaustedUntil)
+			sim.setStatus(m3, "Exhausted", true)
+			m3:SetAttribute("Ult", 100)
+			local inv3 = sim.count("StatusApply", "name", "Invulnerable")
+			T.eq(RS.TriggerFinalPhase("Ult", m3), true, "an Exhausted monster's first ultimate still starts Phase 2")
+			T.eq(m3:GetAttribute("FinalForm"), true, "FinalForm")
+			T.eq(sim.count("StatusApply", "name", "Invulnerable"), inv3, "no Invulnerable window while Exhausted")
+			T.eq(exhaustedRemovals(m3), 0, "Exhausted kept")
+			T.eq(sim.statuses[m3] and sim.statuses[m3].Exhausted, true, "the Exhausted status is still on")
+			T.eq(m3:GetAttribute("Exhausted"), exhaustedUntil, "Exhausted attribute kept")
+			T.eq(m3:GetAttribute("Dodges"), 0, "dodges stay 0")
+			local ev3 = finalEvents()[#finalEvents()]
+			T.ok(
+				ev3 ~= nil and ev3.cause == "Ult" and ev3.duration == 0,
+				"RoundEvent FinalPhase {cause = Ult, duration 0}"
+			)
+			m3._hum.Health = m3._hum.MaxHealth * 0.5
+			damaged(m3, nil)
+			task.wait(0.25) -- a few round-loop ticks at 50 %
+			killHumans(m3)
+			waitPhase("Ending", 1)
+			local r3 = ended[#ended] or {}
+			T.ok(#ended == 3 and r3.winner == "Monster" and r3.reason == "Eliminated", "round 3: the monster won")
+			T.eq(r3.finalPhase, true, "Phase 2 happened (from the ultimate)")
+			T.eq(r3.monsterBroken, false, "never under 30 %: monsterBroken false")
+			waitPhase("Waiting", 2)
+
+			-- round 4: practice as the monster; the Exhausted ATTRIBUTE alone (the Surge writes it first) also skips the
+			-- window; HP dips to 25 % with no hit event (the round loop's tick sees it) and is healed back: still broken
+			T.ok(RS.StartPractice(owner, "Monster"), "monster practice again")
+			waitPhase("Round", 3)
+			local m4 = CS.GetModel(owner)
+			T.eq(sim.state().FinalPhase, false, "Phase 2 reset")
+			m4:SetAttribute("Exhausted", os.clock() + Config.Monster.ExhaustTime)
+			local inv4 = sim.count("StatusApply", "name", "Invulnerable")
+			T.eq(RS.TriggerFinalPhase("Ult", m4), true, "ult start")
+			T.eq(sim.count("StatusApply", "name", "Invulnerable"), inv4, "Exhausted attribute: no window either")
+			m4._hum.Health = m4._hum.MaxHealth * 0.25
+			task.wait(0.3)
+			m4._hum.Health = m4._hum.MaxHealth
+			killHumans(m4)
+			waitPhase("Ending", 1)
+			local r4 = ended[#ended] or {}
+			T.ok(#ended == 4 and r4.winner == "Monster", "round 4: the monster won")
+			T.eq(r4.monsterBroken, true, "was pushed to 25 % once (healed since): monsterBroken")
 			waitPhase("Waiting", 2)
 		end)
 		sim.stopped = true
@@ -692,5 +981,339 @@ return {
 		end
 		T.eq(#loopErrors, 0, "no round loop / handler errors: " .. table.concat(loopErrors, " | "))
 		task.wait(0.15)
+	end,
+
+	-- 8) the first ultimate is no reset button (combat harness; the real RoundService is covered by 7):
+	--    a) every Sans, Exhausted by the SAVE Surge: still Exhausted with 0 dodges through the transformation, no
+	--       Invulnerable window, the humans' hits land at once with the Exhausted bonus; dodges return only when the
+	--       exhaustion ends (the normal rule)
+	--    b) not Exhausted, dodges partly spent: the count stays (no refill), only the short transformation window
+	--    c) the HP comeback ("Hp") keeps its full refresh: Exhausted cleared, dodges + ult refilled, Invulnerable
+	phase2_ult_is_no_reset_button = function(T, Loader)
+		for kitId, ultId in MONSTER_ULTS do
+			withHarness(Loader, function(H)
+				local SS, DS = H.S.StatusService, H.S.DamageService
+				local Config = H.Config
+				local maxDodges = H.Kits.Get(kitId).Stats.MaxDodges
+				local monster = H.monsterOf(kitId, nil, { dodges = maxDodges, hp = 5000 })
+				local human = H.spawn(
+					"Determination",
+					"Humans",
+					Vector3.new(-6, 0, -14),
+					{ look = Vector3.new(0, 0, 1), hp = 5000 }
+				)
+				surgeExhaust(H, monster)
+				local during = {}
+				H.at(0.05, function()
+					during.exhausted = SS.Has(monster, "Exhausted")
+					during.invulnerable = SS.Has(monster, "Invulnerable")
+					during.dodges = monster:GetAttribute("Dodges")
+					during.finalForm = monster:GetAttribute("FinalForm")
+					during.hit = DS.Apply({ Attacker = human, Target = monster, Amount = 100, Kind = "Melee" })
+				end)
+				local ok, why = H.S.AbilityService.CastAs(monster, ultId, { aim = Vector3.new(0, 0, -15) })
+				T.ok(ok, kitId .. ": ultimate accepted while Exhausted (" .. tostring(why) .. ")")
+				H.run(0.1)
+				T.eq(#H.triggers, 1, kitId .. ": Phase 2 from the ultimate")
+				T.eq(H.triggers[1] and H.triggers[1].cause, "Ult", kitId .. ": cause Ult")
+				T.eq(H.round.FinalPhase, true, kitId .. ": Phase 2 started")
+				T.eq(during.finalForm, true, kitId .. ": FinalForm (eye, faster dodge regen)")
+				T.eq(during.exhausted, true, kitId .. ": still Exhausted right after the transformation")
+				T.eq(during.dodges, 0, kitId .. ": no dodge refill")
+				T.eq(during.invulnerable, false, kitId .. ": no Invulnerable window on top of the exhaustion")
+				local hit = during.hit or {}
+				T.ok(
+					hit.Reason ~= "Immune" and hit.Dodged ~= true and (hit.Applied or 0) > 0,
+					kitId .. ": the humans' hit lands (" .. tostring(hit.Reason) .. ")"
+				)
+				T.near(
+					hit.Applied or 0,
+					100 * Config.Monster.ExhaustDamageMult,
+					0.01,
+					kitId .. ": with the Exhausted damage bonus"
+				)
+				T.eq(monster:GetAttribute("Ult"), 0, kitId .. ": the bar stays spent")
+				H.run(Config.Monster.ExhaustTime + 0.5)
+				T.eq(SS.Has(monster, "Exhausted"), false, kitId .. ": the exhaustion runs out as usual")
+				T.eq(monster:GetAttribute("Dodges"), maxDodges, kitId .. ": then the dodges come back (normal rule)")
+			end)
+		end
+
+		-- b) 3 of 8 dodges left, not Exhausted
+		withHarness(Loader, function(H)
+			local SS = H.S.StatusService
+			local monster = H.monsterOf("ClassicSans", nil, { dodges = 8 })
+			monster:SetAttribute("Dodges", 3)
+			local during = {}
+			H.at(0.05, function()
+				during.dodges = monster:GetAttribute("Dodges")
+				during.invulnerable = SS.Has(monster, "Invulnerable")
+				during.exhausted = SS.Has(monster, "Exhausted")
+			end)
+			T.ok(H.S.AbilityService.CastAs(monster, "BadTime", { aim = Vector3.new(0, 0, -15) }), "ultimate")
+			H.run(0.1)
+			T.eq(#H.triggers, 1, "Phase 2 from the ultimate")
+			T.eq(during.dodges, 3, "the dodge count stays (no refill)")
+			T.eq(during.exhausted, false, "not Exhausted")
+			T.eq(during.invulnerable, true, "the short transformation window")
+			H.run(H.Config.Round.FinalPhaseInvulnerable)
+			T.eq(SS.Has(monster, "Invulnerable"), false, "the window is over after FinalPhaseInvulnerable")
+		end)
+
+		-- c) Exhausted when the humans push it under 30 %: the comeback refresh
+		withHarness(Loader, function(H)
+			local SS, DS = H.S.StatusService, H.S.DamageService
+			local Config = H.Config
+			local monster = H.monsterOf("FellSans", nil, { ult = 0, hp = 1000, dodges = 6 })
+			local human = H.spawn("Determination", "Humans", Vector3.new(0, 0, -6), { look = Vector3.new(0, 0, 1) })
+			surgeExhaust(H, monster)
+			local r = DS.Apply({ Attacker = human, Target = monster, Amount = 700, Kind = "Melee" })
+			T.near(r.Applied, 700 * Config.Monster.ExhaustDamageMult, 0.01, "Exhausted: the hit lands with the bonus")
+			H.runDue()
+			T.ok(H.hp(monster) <= 1000 * Config.Round.FinalPhaseHpFraction, "under the threshold")
+			T.eq(#H.triggers, 1, "threshold crossed: one call")
+			T.eq(H.triggers[1] and H.triggers[1].cause, "Hp", "cause Hp")
+			T.eq(SS.Has(monster, "Exhausted"), false, "Exhausted cleared")
+			T.eq(monster:GetAttribute("Exhausted"), 0, "Exhausted attribute cleared")
+			T.eq(monster:GetAttribute("Dodges"), 6, "dodges refilled")
+			T.eq(monster:GetAttribute("Ult"), 100, "ult refilled")
+			T.eq(SS.Has(monster, "Invulnerable"), true, "the comeback's Invulnerable window")
+		end)
+	end,
+
+	-- 9) RewardService: the Unshaken quest and the "Not Even Sweating" achievement (+ its title) follow
+	--    RoundEnded.monsterBroken (the humans pushed the monster to the Phase 2 HP threshold), not Phase 2 itself
+	phase2_unshaken_rewards_follow_hp_threshold = function(T, Loader)
+		local base = "ServerScriptService.Server.Services."
+		local DS = Loader.require(base .. "DataService")
+		local Net = Loader.require("ReplicatedStorage.Shared.Net")
+		local Quests = Loader.require("ReplicatedStorage.Shared.Progression.Quests")
+		for _, name in { "RequestService", "MasteryService", "QuestService", "AchievementService", "RewardService" } do
+			Loader.require(base .. name).Init()
+		end
+		local Reward = Loader.require(base .. "RewardService")
+		DS._TestSetup({ Store = nil, Mode = "Memory", JobId = "J1" })
+		local original = Net.Server.Fire
+		Net.Server.Fire = function() end
+		-- one real monster win with an Unshaken quest in the list; returns the quest progress + achievement / title
+		local function monsterWin(userId, fields)
+			local p = fakePlayer(userId)
+			DS._StartSession(p)
+			DS.Update(p, function(prof)
+				prof.Quests.Window = Quests.Window(os.time())
+				prof.Quests.List = { { Id = "Unshaken", Progress = 0, Goal = 1, Claimed = false } }
+			end)
+			fields.rows = {
+				statRow(userId, { team = "Monster", kitId = "FellSans", kills = 2 }),
+				statRow(-1000001, { kitId = "Justice" }),
+			}
+			Reward.Process(roundResult(fields), function(id)
+				return if id == userId then p else nil
+			end)
+			local prof = DS.Get(p)
+			local quest = prof.Quests.List[1]
+			local out = {
+				quest = if quest and quest.Id == "Unshaken" then quest.Progress else -1,
+				achievement = prof.Achievements.unshaken == true,
+				title = prof.Titles.unshaken == true,
+			}
+			DS._ReleaseSession(p)
+			return out
+		end
+		local ok, err = pcall(function()
+			local ult = monsterWin(1401, { finalPhase = true, monsterBroken = false })
+			T.eq(ult.quest, 1, "Phase 2 from its own ultimate, never under 30 %: Unshaken quest done")
+			T.ok(ult.achievement and ult.title, "and the achievement + title")
+			local pushed = monsterWin(1402, { finalPhase = true, monsterBroken = true })
+			T.eq(pushed.quest, 0, "pushed to 30 % HP: no Unshaken quest")
+			T.ok(not pushed.achievement and not pushed.title, "and no achievement / title")
+			local calm = monsterWin(1403, { finalPhase = false, monsterBroken = false })
+			T.eq(calm.quest, 1, "won before any Phase 2: quest done")
+			T.ok(calm.achievement, "and the achievement")
+			local legacy = monsterWin(1404, { finalPhase = true })
+			T.eq(legacy.quest, 1, "a result without monsterBroken never fails it")
+		end)
+		Net.Server.Fire = original
+		T.ok(ok, "reward runs: " .. tostring(err))
+
+		-- the texts name the HP threshold (en + ru), in step with Config.Round.FinalPhaseHpFraction
+		local Strings = Loader.require("ReplicatedStorage.Shared.Strings")
+		local Config = Loader.require("ReplicatedStorage.Shared.Config")
+		local pct = tostring(math.floor(Config.Round.FinalPhaseHpFraction * 100 + 0.5)) .. "%"
+		local template = Quests.Get("Unshaken")
+		T.eq(template and template.Param, math.floor(Config.Round.FinalPhaseHpFraction * 100 + 0.5), "quest Param")
+		for _, lang in { "en", "ru" } do
+			Strings.SetLanguage(lang)
+			local quest = Strings.L("prog.quest.Unshaken", 1, template and template.Param)
+			local desc = Strings.L("prog.ach.unshaken.desc", 1)
+			T.ok(
+				string.find(quest, pct, 1, true) ~= nil and not string.find(quest, "{", 1, true),
+				lang .. ": " .. quest
+			)
+			T.ok(string.find(desc, pct, 1, true) ~= nil, lang .. ": " .. desc)
+		end
+		Strings.SetLanguage("en")
+	end,
+
+	-- 10) Classic Sans (client): Blue Soul's blue eye flash returns to the Phase 2 blazing eye instead of switching it
+	--     off; the newest flash owns the eye (an older Gaster Blaster flash ending never cuts a Blue Soul flash short);
+	--     outside Phase 2 the eye goes dark after each flash as before
+	phase2_classic_sans_eye_survives_blue_soul = function(T, Loader)
+		local rig = sansEyeRig(Loader)
+		local observer = { predicted = false }
+
+		-- a) Phase 2, seen by others: blue for the flash, then the Phase 2 flame again (and it stays)
+		local sans = rig.character(true)
+		T.eq(rig.state(), "default", "Phase 2: the eye blazes")
+		rig.effect(sans, "BlueSoul", "Start", observer)
+		T.eq(rig.state(), "blue", "Blue Soul: blue flash")
+		rig.advance(1.0)
+		T.eq(rig.state(), "blue", "still blue mid-flash")
+		rig.advance(0.7)
+		T.eq(rig.state(), "default", "after the flash: the Phase 2 eye blazes again")
+		rig.advance(5)
+		T.eq(rig.state(), "default", "and keeps blazing")
+
+		-- b) Phase 2, the local caster: the predicted flash (the confirmed Start adds none)
+		sans = rig.character(true)
+		rig.Kit.Predict.BlueSoul(rig.fx(sans, { isLocal = true }), {})
+		rig.effect(sans, "BlueSoul", "Start", { isLocal = true, predicted = true })
+		T.eq(rig.state(), "blue", "predicted Blue Soul: blue flash")
+		rig.advance(1.7)
+		T.eq(rig.state(), "default", "predicted flash over: the Phase 2 eye again")
+
+		-- c) Phase 1: the eye goes dark after the flash
+		sans = rig.character(false)
+		T.eq(rig.state(), "dark", "Phase 1: no blazing eye")
+		rig.effect(sans, "BlueSoul", "Start", observer)
+		T.eq(rig.state(), "blue", "Phase 1 Blue Soul flash")
+		rig.advance(1.7)
+		T.eq(rig.state(), "dark", "Phase 1: dark after the flash")
+
+		-- d) overlapping flashes: Gaster Blaster (1.5 s) then Blue Soul 1 s later
+		for _, finalForm in { true, false } do
+			local label = if finalForm then "Phase 2" else "Phase 1"
+			sans = rig.character(finalForm)
+			rig.effect(sans, "GasterBlaster", "Start", observer)
+			T.eq(rig.state(), "default", label .. ": blaster flash")
+			rig.advance(1.0)
+			rig.effect(sans, "BlueSoul", "Start", observer)
+			rig.advance(0.6) -- the blaster flash has ended
+			T.eq(rig.state(), "blue", label .. ": the newer Blue Soul flash is not cut short")
+			rig.advance(1.1)
+			T.eq(rig.state(), if finalForm then "default" else "dark", label .. ": then the resting eye")
+		end
+
+		-- e) Bad Time's blaze with a Blue Soul inside it
+		sans = rig.character(true)
+		rig.effect(sans, "BadTime", "Start", observer)
+		rig.effect(sans, "BadTime", "Blaze", observer, { center = Vector3.zero, radius = 18, duration = 6 })
+		rig.advance(1)
+		rig.effect(sans, "BlueSoul", "Start", observer)
+		T.eq(rig.state(), "blue", "Phase 2 blaze: Blue Soul flash")
+		rig.advance(1.7)
+		T.eq(rig.state(), "default", "Phase 2 blaze: back to the blazing eye")
+		rig.advance(5)
+		T.eq(rig.state(), "default", "Phase 2: still blazing after the blaze")
+		-- outside a round (lobby tryout, never Phase 2): an older Blue Soul flash ending keeps the blaze's eye lit
+		sans = rig.character(false)
+		rig.effect(sans, "BlueSoul", "Start", observer)
+		rig.advance(0.5)
+		rig.effect(sans, "BadTime", "Start", observer)
+		rig.effect(sans, "BadTime", "Blaze", observer, { center = Vector3.zero, radius = 18, duration = 6 })
+		rig.advance(1.5) -- the Blue Soul flash ends inside the blaze
+		T.eq(rig.state(), "default", "Phase 1 blaze: the eye stays lit for the blaze")
+		rig.advance(5)
+		T.eq(rig.state(), "dark", "Phase 1: dark once the blaze ends")
+	end,
+
+	-- 11) arena call-outs (FIGHT!, PHASE 2, Surge, SAVE n/3, Second Wind, COLLAPSE) only for round participants: a
+	--     player waiting in the lobby during someone else's round sees none of them, fighters and spectators see all;
+	--     the kill feed gets the same entries either way (unchanged)
+	phase2_lobby_sees_no_arena_callouts = function(T, Loader)
+		local isServer, quiet = Loader.isServer, Loader.quietWarnings
+		Loader.isServer = false
+		Loader.quietWarnings = true
+		local ok, err = pcall(function()
+			local roblox = Loader.roblox
+			local Strings = Loader.require("ReplicatedStorage.Shared.Strings")
+			Strings.SetLanguage("en")
+			local UIRoot = Loader.requirePath("src/client/UI/UIRoot")
+			local Hud = Loader.requirePath("src/client/UI/Hud")
+			local Signal = Loader.require("ReplicatedStorage.Shared.Util.Signal")
+
+			-- the pure rule
+			local kinds = 0
+			for kind in Hud.ARENA_CALLOUTS do
+				kinds += 1
+				T.eq(Hud.ShowsCallout(kind, "Lobby"), false, kind .. ": not in the lobby")
+				T.eq(Hud.ShowsCallout(kind, nil), false, kind .. ": no role yet = lobby")
+				for _, role in { "Human", "Monster", "Spectator" } do
+					T.eq(Hud.ShowsCallout(kind, role), true, kind .. ": shown to a " .. role)
+				end
+			end
+			T.eq(kinds, 6, "Fight, FinalPhase, Surge, SecondWind, Collapse, SaveLit")
+			T.eq(Hud.ShowsCallout("Exhausted", "Lobby"), true, "other kinds are not gated")
+			T.eq(Hud.ShowsCallout("Custom", nil), true, "previews are not gated")
+
+			-- the live HUD (Hud.Mount) with a StateController stand-in: RoundEvent + Role()
+			local role = "Lobby"
+			local roundEvent = Signal.new()
+			local state = {
+				RoundEvent = roundEvent,
+				Role = function()
+					return role
+				end,
+			}
+			local layout = UIRoot.ComputeLayout(roblox.Vector2.new(844, 390)) -- the owner's phone
+			local h = Hud.Mount(roblox.Instance.new("Frame"), { Layout = layout, State = state, Input = {}, UI = {} })
+			local shown, feed = {}, 0
+			h.Pieces.Announcements.Show = function(kind, data)
+				table.insert(shown, { kind = kind, data = data })
+			end
+			h.Pieces.KillFeed.Push = function()
+				feed += 1
+			end
+			local function play()
+				table.clear(shown)
+				feed = 0
+				-- back through Intermission so the next "Round" is a fresh fight start (FIGHT!)
+				roundEvent:Fire("PhaseChanged", { phase = "Intermission" })
+				roundEvent:Fire("PhaseChanged", { phase = "Round" })
+				roundEvent:Fire("SaveLit", { lit = 1, total = 3, index = 1, by = {} })
+				roundEvent:Fire("FinalPhase", { cause = "Ult" })
+				roundEvent:Fire("Surge", { duration = 20 })
+				roundEvent:Fire("SecondWind", { name = "Frisk" })
+				roundEvent:Fire("Collapse", {})
+				task.wait()
+			end
+			local function kindsShown()
+				local out = {}
+				for _, a in shown do
+					table.insert(out, a.kind)
+				end
+				return table.concat(out, ",")
+			end
+			play()
+			T.eq(kindsShown(), "", "lobby during someone else's round: no call-out at all")
+			local lobbyFeed = feed
+			T.ok(lobbyFeed > 0, "the kill feed still gets its entries")
+			for _, r in { "Human", "Monster", "Spectator" } do
+				role = r
+				play()
+				T.eq(kindsShown(), "Fight,SaveLit,FinalPhase,Surge,SecondWind,Collapse", r .. ": every call-out")
+				T.eq(feed, lobbyFeed, r .. ": the same kill-feed entries")
+			end
+			role = "Monster"
+			play()
+			local final = shown[3] or {}
+			T.ok(
+				final.kind == "FinalPhase" and final.data and final.data.Monster == true and final.data.Ult == true,
+				"the monster gets its own Phase 2 line (cause Ult)"
+			)
+			h.Destroy()
+		end)
+		Loader.isServer, Loader.quietWarnings = isServer, quiet
+		T.ok(ok, "HUD mounted and ran: " .. tostring(err))
 	end,
 }

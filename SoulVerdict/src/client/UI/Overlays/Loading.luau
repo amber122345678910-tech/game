@@ -17,8 +17,14 @@
 -- Sequence (seconds, Loading.Timing): FadeIn 0.35 -> OnCovered -> head + text appear (ContentIn 0.25) -> hold: at
 -- least MinVisible 2.2 from Show; with opts.Until until it returns true + Settle 0.3, but never past MaxWait 7 ->
 -- ContentOut 0.15 (head + text sink into the black) -> FadeOut 0.4 (the black lifts) -> OnDone.
+-- Music cue (opts.MusicLead > 0): OnMusicCue fires MusicLead s before the fade-out starts, or at once when the
+-- fade-out is already closer than that (Until turned true late): the lead NEVER delays the reveal. While still waiting
+-- on Until it fires MusicLead s before the cap. (PLAY 4 s: cue at 2 s, reveal at 4 s; PRACTICE: the round's Intro
+-- arrives -> cue now, reveal Settle s later, so the Intro is seen.)
 -- Sound: Audio "PlayTransition" starts with the fade to black; when the overlay ends it fades out (SoundFade 0.4 s)
 -- if it is still playing. The music is ducked while the screen is black (SoundController.Duck, re-armed 4x/s).
+-- A plain dip (opts.Content = false: no head / text, e.g. FadeIn 0.2 / MinVisible 0.3 / FadeOut 0.3) hides a quick
+-- menu -> game switch.
 --
 -- Pixels: the sprite is drawn with SansHead.LayeredRuns (one Frame per run) inside a container GRID x GRID sprite
 -- pixels big (power-of-two Scale fractions = exact maths); at rest every sprite pixel is an integer number of screen
@@ -29,8 +35,12 @@
 --   Loading.Show(opts?) -> Handle?   nil = could not show (the caller then does the old instant behaviour)
 --       opts: { OnCovered: (() -> ())?, Until: (() -> boolean)?, OnDone: (() -> ())?, MinVisible: number?,
 --               MusicLead: number?, OnMusicCue: (() -> ())? (fires MusicLead s before the reveal; no ducking then),
---               MaxWait: number?, Mode: SpinMode?, Theme: Theme?, Sound: SoundController?, Parent: Instance?
---               (default PlayerGui), ReducedMotion: boolean?, Driver: Driver? }
+--               MaxWait: number?, Settle / FadeIn / ContentIn / ContentOut / FadeOut: number? (Timing overrides),
+--               Content: boolean? (false = a plain black dip: no head / text), Mode: SpinMode?, Theme: Theme?,
+--               Sound: SoundController? (nil = no transition sound, no ducking), Parent: Instance? (default
+--               PlayerGui), ReducedMotion: boolean?, Driver: Driver? }
+--       The returned handle may already be Done (a dead frame loop finishes at once: OnCovered / OnMusicCue / OnDone
+--       have run inside Show then).
 --       Driver (tests / tools; default = RunService.Heartbeat + task.delay + the ScreenGui's AbsoluteSize):
 --               { Connect: (step: (dt) -> ()) -> (() -> ()) (returns disconnect), Viewport: (() -> Vector2)?,
 --                 Delay: ((seconds, fn) -> ())? }
@@ -44,9 +54,9 @@
 --   Loading.Bob(t, amplitude) -> integer px    Loading.DotCount(t) -> 0..3    Loading.Text(word, dots, color?) -> RichText
 --   Loading.NewSequence(timing?) -> Sequence { Stage, Time, Backdrop 0..1, Content 0..1, CoveredAt, ReadyAt, OutAt,
 --       Step(dt, ready) -> (coveredNow, doneNow), Skip() }
---   Loading.Build(theme?, { Viewport, Mode? }) -> View { Gui, Backdrop, Content, Curtain, Head, Normal, Mirrored?,
---       Label, Mode, Metrics, Layout(viewport), Pose(t, dots?), Fade(backdrop, content), Destroy() }
---       (text in Strings.Language(): "LOADING" / "ЗАГРУЗКА")
+--   Loading.Build(theme?, { Viewport, Mode?, Plain? }) -> View { Gui, Backdrop, Content, Curtain, Head, Normal,
+--       Mirrored?, Label, Mode, Plain, Metrics, Layout(viewport), Pose(t, dots?), Fade(backdrop, content), Destroy() }
+--       (text in Strings.Language(): "LOADING" / "ЗАГРУЗКА"; Plain = no sprite cells, no text: the black alone)
 --   Loading.Preview(theme?, viewport, { Spin = turn phase 0..1 (0 = facing front), Mode?, Dots? }?) -> View
 --       a settled frame for offline renders: black screen, head + text fully shown at that spin phase.
 
@@ -110,6 +120,7 @@ export type View = {
 	Mirrored: Frame?,
 	Label: TextLabel,
 	Mode: SpinMode,
+	Plain: boolean,
 	Metrics: Metrics,
 	Layout: (Vector2) -> (),
 	Pose: (number, number?) -> (),
@@ -296,8 +307,8 @@ function Loading.NewSequence(timing: { [string]: any }?): Sequence
 
 	-- Advances by dt seconds; `ready` = the caller's Until() (only read while holding). Returns (coveredNow,
 	-- doneNow, cueNow): coveredNow on the step the screen turned fully black, doneNow on the step the overlay finished,
-	-- cueNow on the step the music cue fires (Timing.MusicLead s before the fade-out; with MusicLead 0 on the step the
-	-- fade-out starts).
+	-- cueNow on the step the music cue fires (Timing.MusicLead s before the fade-out, at once when the fade-out is
+	-- already closer; with MusicLead 0 on the step the fade-out starts).
 	function seq.Step(dt: number, ready: boolean): (boolean, boolean, boolean)
 		if seq.Stage == "Done" then
 			return false, false, false
@@ -321,17 +332,17 @@ function Loading.NewSequence(timing: { [string]: any }?): Sequence
 			end
 			local readyAt = seq.ReadyAt
 			local lead = math.max(cfg.MusicLead or 0, 0)
-			if seq.CueAt == nil then
-				local cue = skipped
-					or t >= cfg.MaxWait - lead
-					or (readyAt ~= nil and t >= cfg.MinVisible - lead and t - readyAt >= cfg.Settle)
-				if cue then
-					seq.CueAt = t
-					cueNow = true
-				end
+			-- the reveal: MinVisible after Show and Settle after ready (never later than the cap); the music lead
+			-- never moves it - the cue goes out `lead` s before it, or at once when it is already closer than that
+			local releaseAt = math.min(
+				if readyAt ~= nil then math.max(cfg.MinVisible, readyAt + cfg.Settle) else math.huge,
+				cfg.MaxWait
+			)
+			local release = skipped or t >= releaseAt
+			if seq.CueAt == nil and (release or t >= releaseAt - lead) then
+				seq.CueAt = t
+				cueNow = true
 			end
-			local cueAt = seq.CueAt
-			local release = skipped or t >= cfg.MaxWait or (cueAt ~= nil and t - cueAt >= lead)
 			if release then
 				seq.Stage = "FadeOut"
 				seq.OutAt = t
@@ -394,7 +405,8 @@ end
 
 function Loading.Build(theme: Theme?, opts: { [string]: any }?): View
 	local o = opts or {}
-	local mode = validMode(o.Mode)
+	local plain = o.Plain == true -- the black alone (a quick dip): no sprite cells, no text
+	local mode = if plain then "Still" else validMode(o.Mode)
 	local lang = Strings.Language()
 	local th = theme or Themes.Get(nil)
 	local viewport: Vector2 = if typeof(o.Viewport) == "Vector2" then o.Viewport else Vector2.new(1920, 1080)
@@ -423,7 +435,7 @@ function Loading.Build(theme: Theme?, opts: { [string]: any }?): View
 	head.BackgroundTransparency = 1
 	head.BorderSizePixel = 0
 	head.ZIndex = 1
-	local normal = buildSprite("Normal", SansHead.Rows)
+	local normal = if plain then newFrame("Normal", BLACK, 1, 1) else buildSprite("Normal", SansHead.Rows)
 	normal.Parent = head
 	local mirrored: Frame? = nil
 	if mode == "Turn" then
@@ -434,7 +446,7 @@ function Loading.Build(theme: Theme?, opts: { [string]: any }?): View
 	end
 	head.Parent = content
 
-	local word = Strings.L("loading.title")
+	local word = if plain then "" else Strings.L("loading.title")
 	local dotColor: Color3? = if th.Id == "Fell" then th.Colors.SoulRed else nil
 	local label = Instance.new("TextLabel")
 	label.Name = "Label"
@@ -447,7 +459,7 @@ function Loading.Build(theme: Theme?, opts: { [string]: any }?): View
 	label.TextXAlignment = Enum.TextXAlignment.Center
 	label.TextYAlignment = Enum.TextYAlignment.Center
 	label.TextWrapped = false
-	label.Text = Loading.Text(word, 0, dotColor)
+	label.Text = if plain then "" else Loading.Text(word, 0, dotColor)
 	label.Parent = content
 	content.Parent = gui
 
@@ -466,6 +478,7 @@ function Loading.Build(theme: Theme?, opts: { [string]: any }?): View
 		Mirrored = mirrored,
 		Label = label,
 		Mode = mode,
+		Plain = plain,
 	} :: any
 
 	local metrics: Metrics = Loading.Metrics(viewport, mode)
@@ -492,6 +505,9 @@ function Loading.Build(theme: Theme?, opts: { [string]: any }?): View
 
 	-- t = seconds since the head appeared (0 = facing front, upright); dots = override of the animated dot count
 	function view.Pose(t: number, dots: number?)
+		if plain then
+			return -- nothing to animate on a plain dip
+		end
 		local bob = if mode == "Still" then 0 else Loading.Bob(t, metrics.Bob)
 		if mode == "Turn" then
 			local factor, flip = Loading.TurnPose(t)
@@ -520,7 +536,7 @@ function Loading.Build(theme: Theme?, opts: { [string]: any }?): View
 	-- backdrop 0..1 = how black the screen is; content 0..1 = how visible the head + text are
 	function view.Fade(backdropAlpha: number, contentAlpha: number)
 		backdrop.BackgroundTransparency = 1 - math.clamp(backdropAlpha, 0, 1)
-		local c = math.clamp(contentAlpha, 0, 1)
+		local c = if plain then 0 else math.clamp(contentAlpha, 0, 1)
 		content.Visible = c > 0
 		curtain.Visible = c > 0 and c < 1
 		curtain.BackgroundTransparency = c
@@ -616,15 +632,26 @@ function Loading.Show(opts: { [string]: any }?): Handle?
 	end
 	local reduce = if o.ReducedMotion ~= nil then o.ReducedMotion == true else (o.Driver == nil and reducedMotion())
 	local mode: SpinMode = if reduce then "Still" else validMode(o.Mode)
+	local plain = o.Content == false
 
 	-- everything that can fail happens before the overlay goes live (then the caller falls back cleanly)
-	local okBuild, built = pcall(Loading.Build, o.Theme, { Viewport = measure(nil), Mode = mode })
+	local okBuild, built = pcall(Loading.Build, o.Theme, { Viewport = measure(nil), Mode = mode, Plain = plain })
 	if not okBuild then
 		warn("[Loading] build failed: " .. tostring(built))
 		return nil
 	end
 	local view: View = built
-	local seq = Loading.NewSequence({ MinVisible = o.MinVisible, MaxWait = o.MaxWait, MusicLead = o.MusicLead })
+	-- timing overrides (NewSequence ignores anything that is not a finite number >= 0)
+	local seq = Loading.NewSequence({
+		MinVisible = o.MinVisible,
+		MaxWait = o.MaxWait,
+		MusicLead = o.MusicLead,
+		Settle = o.Settle,
+		FadeIn = o.FadeIn,
+		ContentIn = o.ContentIn,
+		ContentOut = o.ContentOut,
+		FadeOut = o.FadeOut,
+	})
 	-- with a music cue the caller hands the music over itself (menu track out, lobby track in): no ducking then
 	local duckMusic = not (type(o.MusicLead) == "number" and o.MusicLead > 0)
 	local cued = false

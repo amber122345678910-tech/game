@@ -166,6 +166,164 @@ local function guisUnder(parent)
 	return n
 end
 
+-- UIController's PLAY / PRACTICE / menu music driven offline (UIController._Harness): the real overlay on a fake
+-- frame loop, a fake UIRoot (screen stack + toasts), a fake SoundController that logs SetMusicOverride, a fake
+-- StateController (phase, role, local character, requests, Notify) and a test clock. Every rig loads a fresh module
+-- set (Loader.reset); rig.done() puts the shared mocks back (UIController.sync touches GuiService).
+local function syncSignal()
+	local s = { handlers = {} }
+	function s:Connect(fn)
+		local c = { Connected = true }
+		s.handlers[c] = fn
+		function c:Disconnect()
+			c.Connected = false
+			s.handlers[c] = nil
+		end
+		return c
+	end
+	function s:Fire(...)
+		for _, fn in table.clone(s.handlers) do
+			fn(...)
+		end
+	end
+	function s:Count()
+		local n = 0
+		for _ in s.handlers do
+			n += 1
+		end
+		return n
+	end
+	return s
+end
+
+local function controllerRig(Loader, opts)
+	opts = opts or {}
+	local snapshot = Loader.captureState()
+	Loader.reset()
+	local Loading, _, Strings, roblox = setup(Loader)
+	local UIController = Loader.requirePath("src/client/Controllers/UIController")
+	local rig = { now = 0, Loading = Loading, UI = UIController, Strings = Strings, roblox = roblox, warnings = {} }
+	Loader.onWarn = function(...)
+		table.insert(rig.warnings, table.concat({ ... }, " "))
+	end
+	rig.parent = roblox.Instance.new("Folder")
+	rig.driver = opts.Driver or fakeDriver(Loader, 860, 400)
+	rig.sound = fakeSound(true)
+	rig.sound.overrides = {}
+	rig.sound.SetMusicOverride = function(key, fade)
+		table.insert(rig.sound.overrides, { key = key, fade = fade, at = rig.now })
+		rig.sound.override = key
+	end
+	local state = { phase = "Waiting", role = "Lobby", requests = {}, Notify = syncSignal() }
+	state.Phase = function()
+		return state.phase
+	end
+	state.Role = function()
+		return state.role
+	end
+	state.Request = function(action, data)
+		table.insert(state.requests, { action = action, data = data, at = rig.now })
+	end
+	state.LocalCharacter = function()
+		return state.character
+	end
+	rig.state = state
+	local root = { screens = {}, toasts = {}, clears = 0 }
+	root.IsInitialized = function()
+		return true
+	end
+	root.Push = function(module)
+		local handle = { Root = { Visible = true }, Module = module }
+		table.insert(root.screens, handle)
+		return handle
+	end
+	root.Pop = function()
+		table.remove(root.screens)
+		return true
+	end
+	root.Replace = function(module)
+		table.remove(root.screens)
+		return root.Push(module)
+	end
+	root.Clear = function()
+		table.clear(root.screens)
+		root.clears += 1
+	end
+	root.Top = function()
+		return root.screens[#root.screens]
+	end
+	root.Toast = function(text, kind)
+		table.insert(root.toasts, { text = text, kind = kind, at = rig.now })
+	end
+	rig.root = root
+	local showOpts = { Driver = rig.driver, Parent = if opts.NoParent then nil else rig.parent }
+	UIController._Harness({
+		UIRoot = root,
+		Sound = rig.sound,
+		State = state,
+		ShowOpts = showOpts,
+		Clock = function()
+			return rig.now
+		end,
+	})
+
+	-- the local character (a Model with a positioned root part); nil = not spawned
+	function rig.spawn(position)
+		local model = roblox.Instance.new("Model")
+		local part = roblox.Instance.new("Part")
+		part.Name = "HumanoidRootPart"
+		part.Position = position or roblox.Vector3.new(0, 3, 0)
+		part.Parent = model
+		model.PrimaryPart = part
+		state.character = model
+		return model
+	end
+	-- advances the clock and the overlay's frame loop together (onStep(now) runs before each frame)
+	function rig.run(seconds, onStep)
+		local target = rig.now + seconds - 1e-9
+		while rig.now < target do
+			rig.now += DT
+			if onStep then
+				onStep(rig.now)
+			end
+			if rig.driver.step then
+				rig.driver.step(DT)
+			end
+		end
+	end
+	-- runs until the running overlay has finished; returns its handle and the clock when it finished
+	function rig.finish(maxSeconds, onStep)
+		local handle = Loading.Active()
+		local limit = rig.now + (maxSeconds or 30)
+		while handle and not handle.Done and rig.now < limit do
+			rig.now += DT
+			if onStep then
+				onStep(rig.now)
+			end
+			if rig.driver.step then
+				rig.driver.step(DT)
+			end
+		end
+		return handle, rig.now
+	end
+	-- the override log as "key@fade" (key "auto" = nil = automatic selection; fade "-" = SoundController's default)
+	function rig.music(from)
+		local out = {}
+		for i = from or 1, #rig.sound.overrides do
+			local o = rig.sound.overrides[i]
+			table.insert(out, ("%s@%s"):format(o.key or "auto", if o.fade then tostring(o.fade) else "-"))
+		end
+		return table.concat(out, " ")
+	end
+	function rig.done()
+		pcall(function()
+			rig.parent:Destroy()
+		end)
+		Loader.restoreState(snapshot)
+	end
+	return rig
+end
+
 -- the sprite exactly as the owner sent it (a copy: an accidental edit of the module fails here)
 local OWNER_ROWS = {
 	"             ###############            ",
@@ -1012,5 +1170,448 @@ return restoringFlags({
 		T.noerror(function()
 			UIController.Practice("Human")
 		end, "Practice before Start (instant fallback)")
+	end,
+
+	-- the reveal never waits for the music lead once the round is ready (PRACTICE's Intro must be seen); a plain dip
+	sequence_lead_never_delays_reveal = function(T, Loader)
+		local Loading = setup(Loader)
+		local function run(opts, readyFrom)
+			local seq = Loading.NewSequence(opts)
+			local cueAt, doneAt
+			while seq.Stage ~= "Done" and seq.Time < 30 do
+				local _covered, done, cue = seq.Step(DT, seq.Time >= (readyFrom or 0))
+				if cue and cueAt == nil then
+					cueAt = seq.Time
+				end
+				if done then
+					doneAt = seq.Time
+				end
+			end
+			return cueAt, seq.OutAt, doneAt
+		end
+		-- PRACTICE (1.2 s minimum, 2 s lead): the Intro arrives at 3.5 s -> cue now, reveal after the settle only
+		-- (one frame of slack below, a few above: `ready` is sampled before each 1/60 s step)
+		local function within(v, at, label)
+			T.ok(v ~= nil and v >= at - DT and v <= at + 4 * DT, ("%s (%s, expected ~%.2f)"):format(label, tostring(v), at))
+		end
+		local cueAt, outAt = run({ MinVisible = 1.2, MusicLead = 2, MaxWait = 7 }, 3.5)
+		within(cueAt, 3.5, "cue as soon as the round is ready")
+		within(outAt, 3.5 + Loading.Timing.Settle, "fade-out after the settle, not after the 2 s lead")
+		-- the Intro arrives early (0.5 s): the minimum time still holds, the music starts with the round
+		cueAt, outAt = run({ MinVisible = 1.2, MusicLead = 2, MaxWait = 7 }, 0.5)
+		within(cueAt, 0.5, "early round: cue at once")
+		within(outAt, 1.2, "early round: the 1.2 s minimum")
+		-- PLAY waiting for a late character (3 s): the lead shrinks, the 4 s reveal does not move
+		cueAt, outAt = run({ MinVisible = 4, MusicLead = 2, MaxWait = 7 }, 3)
+		within(cueAt, 3, "late character: cue when it is there")
+		within(outAt, 4, "late character: still revealed at 4 s")
+		-- a plain dip (a later PLAY): ~0.6 s in all
+		local _, dipOut, dipDone = run({ FadeIn = 0.2, MinVisible = 0.3, Settle = 0, ContentOut = 0, FadeOut = 0.3 })
+		within(dipOut, 0.3, "dip: black for a moment")
+		within(dipDone, 0.6, "dip: done after ~0.6 s")
+	end,
+
+	overlay_plain_dip = function(T, Loader)
+		local Loading, _, _, roblox = setup(Loader)
+		local view = Loading.Build(nil, { Viewport = roblox.Vector2.new(860, 400), Plain = true })
+		T.eq(view.Plain, true, "plain view")
+		T.eq(#view.Normal:GetChildren(), 0, "no sprite cells")
+		T.eq(view.Mirrored, nil, "no mirrored sprite")
+		T.eq(view.Label.Text, "", "no LOADING text")
+		view.Fade(1, 1)
+		T.eq(view.Content.Visible, false, "content never shows on a plain view")
+		view.Destroy()
+		-- runtime: Content = false + timing overrides; no Sound = no transition sound, no ducking
+		local parent = roblox.Instance.new("Folder")
+		local driver = fakeDriver(Loader, 860, 400)
+		local covered = 0
+		local handle = Loading.Show({
+			Driver = driver,
+			Parent = parent,
+			Content = false,
+			FadeIn = 0.2,
+			MinVisible = 0.3,
+			Settle = 0,
+			ContentOut = 0,
+			FadeOut = 0.3,
+			OnCovered = function()
+				covered += 1
+			end,
+		})
+		T.ok(handle ~= nil and handle.View.Plain, "a plain dip is up")
+		local shown = false
+		local t = 0
+		while not handle.Done and t < 5 do
+			shown = shown or handle.View.Content.Visible
+			driver.step(DT)
+			t += DT
+		end
+		T.ok(handle.Done, "done")
+		T.near(t, 0.6, 3 * DT, "~0.6 s")
+		T.eq(covered, 1, "OnCovered once")
+		T.eq(shown, false, "no head / text at any point")
+		parent:Destroy()
+	end,
+
+	-- review fix: whatever happens to the loading screen, the "Silence" override never outlives it
+	controller_music_never_stuck_silent = function(T, Loader)
+		local function scenario(label, opts, prepare)
+			local rig = controllerRig(Loader, opts)
+			local ok, err = pcall(function()
+				rig.spawn()
+				if prepare then
+					prepare(rig)
+				end
+				rig.UI.Open("Title")
+				T.eq(rig.sound.override, "Menu", label .. ": the Title plays the Menu track")
+				rig.UI.Play()
+				rig.run(0.1)
+				T.eq(rig.UI.IsOpen(), false, label .. ": PLAY closed the menus")
+				T.eq(rig.sound.override, nil, label .. ": music back on automatic selection")
+				T.ok(not string.find(rig.music(), "Silence", 1, true), label .. ": no Silence (" .. rig.music() .. ")")
+				T.eq(rig.Loading.Active(), nil, label .. ": no overlay left")
+				rig.UI.Open("Title")
+				rig.UI.Practice("Human")
+				rig.run(0.1)
+				T.eq(#rig.state.requests, 1, label .. ": PRACTICE still sends its request, once")
+				T.eq(rig.state.requests[1] and rig.state.requests[1].action, "StartPractice", label .. ": StartPractice")
+				T.eq(rig.UI.IsOpen(), false, label .. ": PRACTICE closed the menus")
+				T.eq(rig.sound.override, nil, label .. ": music automatic after PRACTICE")
+				T.ok(not string.find(rig.music(), "Silence", 1, true), label .. ": still no Silence")
+			end)
+			rig.done()
+			if not ok then
+				error(err, 0)
+			end
+		end
+		-- Show returns nil (no PlayerGui), Show throws, the module is unusable, the frame loop is dead
+		scenario("no PlayerGui", { NoParent = true })
+		scenario("Show throws", nil, function(rig)
+			rig.Loading.Show = function()
+				error("boom")
+			end
+		end)
+		scenario("module unusable", nil, function(rig)
+			rig.Loading.Show = nil
+		end)
+		scenario("dead frame loop", {
+			Driver = {
+				Connect = function()
+					error("no frame loop")
+				end,
+				Viewport = function()
+					return Loader.roblox.Vector2.new(860, 400)
+				end,
+				Delay = function() end,
+			},
+		})
+
+		-- a second activation while a screen runs: no side effects; PRACTICE during PLAY's fade-in only asks
+		local rig = controllerRig(Loader)
+		local ok, err = pcall(function()
+			rig.spawn()
+			rig.UI.Open("Title")
+			rig.UI.Play()
+			local handle = rig.Loading.Active()
+			T.ok(handle ~= nil, "PLAY's loading screen is up")
+			T.eq(rig.music(), "Menu@- Silence@1.2", "the menu track fades out into the black")
+			rig.run(0.1)
+			rig.UI.Play()
+			T.eq(rig.Loading.Active(), handle, "a second PLAY starts nothing")
+			T.eq(rig.music(), "Menu@- Silence@1.2", "a second PLAY changes no music")
+			rig.UI.Practice("Human")
+			T.eq(#rig.state.requests, 1, "PRACTICE during PLAY's fade-in still asks for the round")
+			T.eq(rig.music(), "Menu@- Silence@1.2", "and changes no music")
+			local h = rig.finish()
+			T.ok(h.Done, "PLAY's screen ends")
+			T.eq(rig.sound.override, nil, "automatic music after it")
+			T.eq(rig.music(), "Menu@- Silence@1.2 auto@1.5", "Menu -> silence -> lobby")
+			-- PRACTICE twice: the second press does nothing
+			rig.UI.Practice("Human")
+			rig.run(0.5)
+			rig.UI.Practice("Human")
+			rig.run(0.5)
+			T.eq(#rig.state.requests, 2, "one more request only")
+			rig.state.phase = "Intro"
+			rig.finish()
+			T.eq(rig.sound.override, nil, "automatic music (the round's) after practice loading")
+			T.eq(rig.Loading.Active(), nil, "nothing left running")
+		end)
+		rig.done()
+		if not ok then
+			error(err, 0)
+		end
+	end,
+
+	-- the owner's main flow: the first PLAY darkens, the head spins, the Menu track fades out into the black and the
+	-- lobby track starts 2 s before the light (4 s minimum); it also waits for a character that is still spawning
+	controller_first_play_keeps_the_owner_flow = function(T, Loader)
+		local rig = controllerRig(Loader)
+		local ok, err = pcall(function()
+			rig.spawn()
+			rig.UI.Open("Title")
+			rig.UI.Play()
+			T.eq(rig.music(), "Menu@- Silence@1.2", "the Menu track fades out into the black at once")
+			local handle = rig.Loading.Active()
+			T.ok(handle ~= nil and not handle.View.Plain, "the full loading screen (head + text)")
+			T.eq(rig.sound.plays[1], "PlayTransition", "the transition sound plays")
+			rig.run(0.3)
+			T.eq(rig.UI.IsOpen("Title"), true, "the Title stays until the screen is black")
+			rig.run(0.1)
+			T.eq(rig.UI.IsOpen(), false, "closed under the black")
+			local _, doneAt = rig.finish()
+			local cue = rig.sound.overrides[3]
+			T.ok(cue ~= nil and cue.key == nil and cue.fade == 1.5, "the lobby track fades in (" .. rig.music() .. ")")
+			T.near(cue and cue.at or -1, 2, 2 * DT, "2 s before the light")
+			T.near(handle.Sequence.OutAt, 4, 2 * DT, "the light comes back at 4 s")
+			T.near(doneAt, 4.55, 3 * DT, "done at ~4.55 s")
+			T.eq(#rig.sound.overrides, 3, "no other music change")
+			T.eq(#rig.sound.ducks, 0, "the music hand-over is not ducked")
+		end)
+		rig.done()
+		if not ok then
+			error(err, 0)
+		end
+		-- the character is still spawning: the black waits for it (at 4 s at the earliest, 7 s at the latest); the
+		-- lobby track comes with the character (or 2 s before the cap)
+		for _, case in { { 3, 3, 4 }, { 5.5, 5, 5.8 }, { math.huge, 5, 7 } } do
+			local spawnAt, cueAt, outAt = case[1], case[2], case[3]
+			local r = controllerRig(Loader)
+			local okCase, errCase = pcall(function()
+				r.UI.Open("Title")
+				r.UI.Play()
+				local handle = r.Loading.Active()
+				r.finish(20, function(now)
+					if now >= spawnAt and r.state.character == nil then
+						r.spawn()
+					end
+				end)
+				local label = ("spawn at %s s"):format(tostring(spawnAt))
+				local cue = r.sound.overrides[3]
+				T.ok(cue ~= nil and cue.key == nil, label .. ": the lobby track fades in (" .. r.music() .. ")")
+				T.near(cue and cue.at or -1, cueAt, 2 * DT, label .. ": cue time")
+				T.near(handle.Sequence.OutAt, outAt, 2 * DT, label .. ": reveal time")
+				T.eq(r.sound.override, nil, label .. ": automatic music at the end")
+			end)
+			r.done()
+			if not okCase then
+				error(errCase, 0)
+			end
+		end
+	end,
+
+	-- review fix: on phones PLAY is the only way back from a reopened Title - later PLAYs are a short dip
+	controller_later_play_is_a_quick_dip = function(T, Loader)
+		local rig = controllerRig(Loader)
+		local ok, err = pcall(function()
+			rig.spawn()
+			rig.UI.Open("Title")
+			rig.UI.Play()
+			rig.finish()
+			-- the lobby MENU button reopens the Title, PLAY goes back
+			rig.UI.Open("Title")
+			T.eq(rig.sound.override, "Menu", "the reopened Title plays the Menu track")
+			local before = #rig.sound.overrides
+			local plays = #rig.sound.plays
+			local pressedAt = rig.now
+			rig.UI.Play()
+			local handle = rig.Loading.Active()
+			T.ok(handle ~= nil and handle.View.Plain, "a plain dip (no head, no LOADING)")
+			T.eq(rig.music(before + 1), "auto@1", "Menu -> lobby crossfade (1 s) right at the press, no Silence")
+			T.eq(#rig.sound.plays, plays, "no transition sound for the dip")
+			local contentShown = false
+			local closedAt
+			local _, doneAt = rig.finish(5, function(now)
+				contentShown = contentShown or handle.View.Content.Visible
+				if closedAt == nil and not rig.UI.IsOpen() then
+					closedAt = now
+				end
+			end)
+			T.ok(closedAt ~= nil and closedAt - pressedAt <= 0.25, "the Title closes under the black (~0.2 s)")
+			T.ok(doneAt - pressedAt <= 0.65, ("the dip is over in ~0.6 s (%.2f)"):format(doneAt - pressedAt))
+			T.eq(contentShown, false, "no head / text during the dip")
+			T.eq(rig.music(before + 1), "auto@1", "no other music change")
+			T.eq(#rig.sound.ducks, 0, "nothing ducked")
+			-- the character is gone (respawning): the full screen again
+			rig.state.character = nil
+			rig.UI.Open("Title")
+			before = #rig.sound.overrides
+			rig.UI.Play()
+			T.eq(rig.music(before + 1), "Silence@1.2", "no character: the full loading screen")
+			local full = rig.Loading.Active()
+			T.ok(full ~= nil and not full.View.Plain, "with the head")
+			local spawnAt = rig.now + 1
+			rig.finish(20, function(now)
+				if now >= spawnAt and rig.state.character == nil then
+					rig.spawn()
+				end
+			end)
+			T.near(full.Sequence.OutAt, 4, 2 * DT, "revealed at 4 s (the character came at 1 s)")
+			T.eq(rig.sound.override, nil, "automatic music after it")
+		end)
+		rig.done()
+		if not ok then
+			error(err, 0)
+		end
+		-- leaving the join Title with the Menu key (no PLAY) counts as entering too
+		local r = controllerRig(Loader)
+		local okKey, errKey = pcall(function()
+			r.spawn()
+			r.UI.Open("Title")
+			r.UI.Close()
+			T.eq(r.sound.override, nil, "the Menu key closes the Title (automatic music)")
+			r.UI.Open("Title")
+			r.UI.Play()
+			local handle = r.Loading.Active()
+			T.ok(handle ~= nil and handle.View.Plain, "PLAY from the reopened Title is a dip")
+			r.finish()
+		end)
+		r.done()
+		if not okKey then
+			error(errKey, 0)
+		end
+	end,
+
+	-- review fix: PRACTICE reveals as soon as the round leaves "Waiting": its Intro (VS splash, 3-2-1, flyover) is seen
+	controller_practice_reveals_the_intro = function(T, Loader)
+		local RoundRules = Loader.require("ReplicatedStorage.Shared.Round.RoundRules")
+		local introLength = RoundRules.PhaseDuration("Intro", true)
+		for _, introAt in { 0.5, 1.2, 3.5 } do
+			local rig = controllerRig(Loader)
+			local ok, err = pcall(function()
+				local label = ("Intro at %.1f s"):format(introAt)
+				rig.spawn()
+				rig.UI.Open("Title")
+				rig.UI.Practice("Human")
+				T.eq(rig.music(), "Menu@- Silence@1.2", label .. ": the Menu track fades out into the black")
+				local handle = rig.Loading.Active()
+				rig.run(0.3)
+				T.eq(#rig.state.requests, 0, label .. ": no request before the screen is black")
+				rig.run(0.1)
+				T.eq(#rig.state.requests, 1, label .. ": request sent once black")
+				T.eq(rig.state.requests[1].data.side, "Human", label .. ": side")
+				T.eq(rig.UI.IsOpen(), false, label .. ": menus closed")
+				local _, doneAt = rig.finish(20, function(now)
+					if now >= introAt and rig.state.phase == "Waiting" then
+						rig.state.phase = "Intro"
+						rig.state.role = "Human"
+					end
+				end)
+				local cue = rig.sound.overrides[3]
+				T.near(cue and cue.at or -1, introAt, 2 * DT, label .. ": the round's track starts with the round")
+				local expected = math.max(1.2, introAt + 0.3) + 0.55
+				T.ok(doneAt <= expected + 3 * DT, ("%s: revealed by %.2f s (got %.2f)"):format(label, expected, doneAt))
+				local seen = introLength - (doneAt - introAt)
+				T.ok(seen >= 2.5, ("%s: %.2f s of the %.0f s Intro fully visible"):format(label, seen, introLength))
+				T.eq(rig.sound.override, nil, label .. ": automatic music (the round's track)")
+				T.eq(handle.Done, true, label .. ": done")
+			end)
+			rig.done()
+			if not ok then
+				error(err, 0)
+			end
+		end
+		-- the round never starts: the 7 s cap (the lobby track 2 s before it)
+		local rig = controllerRig(Loader)
+		local ok, err = pcall(function()
+			rig.spawn()
+			rig.UI.Practice("Human")
+			local handle = rig.Loading.Active()
+			rig.finish(20)
+			T.near(handle.Sequence.OutAt, 7, 2 * DT, "cap at 7 s")
+			local cue = rig.sound.overrides[2]
+			T.near(cue and cue.at or -1, 5, 2 * DT, "lobby track 2 s before the cap")
+			T.eq(rig.sound.override, nil, "automatic music")
+		end)
+		rig.done()
+		if not ok then
+			error(err, 0)
+		end
+	end,
+
+	-- review fix: a refused PRACTICE ends the black at once (its toast is seen); during a round no loading screen
+	controller_practice_refused_or_round_running = function(T, Loader)
+		local function refused(key, stall)
+			local rig = controllerRig(Loader)
+			local ok, err = pcall(function()
+				rig.spawn()
+				rig.UI.Open("Title")
+				rig.UI.Practice("Human")
+				local handle = rig.Loading.Active()
+				local refusedAt
+				local _, doneAt = rig.finish(20, function(now)
+					if refusedAt == nil and now >= 0.5 then
+						refusedAt = now
+						rig.state.Notify:Fire(key, nil, "Warning")
+						rig.now += stall -- a stalled frame loop (app in the background) keeps the black up
+					end
+				end)
+				local label = key .. (if stall > 0 then " + stall" else "")
+				T.ok(handle.Done, label .. ": the black ends")
+				T.ok(
+					doneAt - refusedAt - stall <= 0.55 + 3 * DT,
+					("%s: right after the refusal (%.2f s)"):format(label, doneAt - refusedAt - stall)
+				)
+				T.eq(rig.state.Notify:Count(), 0, label .. ": listener disconnected")
+				T.eq(rig.sound.override, nil, label .. ": automatic music (lobby)")
+				T.eq(rig.music(), "Menu@- Silence@1.2 auto@1.5", label .. ": Menu -> silence -> lobby")
+				if stall > 0 then
+					T.eq(#rig.root.toasts, 1, label .. ": the reason is toasted again after the late reveal")
+					local toast = rig.root.toasts[1]
+					T.eq(toast and toast.text, rig.Strings.L(key), label .. ": the server's reason")
+					T.eq(toast and toast.kind, "Warning", label .. ": as a warning")
+				else
+					T.eq(#rig.root.toasts, 0, label .. ": no duplicate of the server's toast (seen right away)")
+				end
+			end)
+			rig.done()
+			if not ok then
+				error(err, 0)
+			end
+		end
+		refused("round.practice.busy", 0)
+		refused("round.practice.disabled", 0)
+		refused("prog.err.rateLimited", 3)
+
+		-- other notifications (the server's "starting...") keep the black until the round comes
+		local rig = controllerRig(Loader)
+		local ok, err = pcall(function()
+			rig.spawn()
+			rig.UI.Practice("Human")
+			rig.run(0.5)
+			rig.state.Notify:Fire("round.practice.queued", nil, "Info")
+			rig.run(0.5)
+			T.ok(rig.Loading.Active() ~= nil, "still black after 'Practice is starting...'")
+			local _, doneAt = rig.finish(20, function(now)
+				if now >= 1.5 then
+					rig.state.phase = "Intro"
+				end
+			end)
+			T.near(doneAt, 1.5 + 0.3 + 0.55, 3 * DT, "revealed with the Intro")
+		end)
+		rig.done()
+		if not ok then
+			error(err, 0)
+		end
+
+		-- a round is running (Intermission / match / Ending): no loading screen, the request goes out at once
+		for _, phaseName in { "Intermission", "Round", "Ending" } do
+			local r = controllerRig(Loader)
+			local okPhase, errPhase = pcall(function()
+				r.spawn()
+				r.UI.Open("Title")
+				r.state.phase = phaseName
+				r.UI.Practice("Human")
+				T.eq(r.Loading.Active(), nil, phaseName .. ": no loading screen")
+				T.eq(guisUnder(r.parent), 0, phaseName .. ": nothing parented")
+				T.eq(#r.state.requests, 1, phaseName .. ": the request goes out at once")
+				T.eq(r.UI.IsOpen("Title"), true, phaseName .. ": the menu stays")
+				T.eq(r.music(), "Menu@-", phaseName .. ": music untouched")
+			end)
+			r.done()
+			if not okPhase then
+				error(errPhase, 0)
+			end
+		end
 	end,
 })

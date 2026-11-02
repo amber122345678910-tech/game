@@ -448,7 +448,8 @@ end
 -- The monster's FIRST ultimate of a round starts its Phase 2: RoundService.TriggerFinalPhase("Ult", model), called
 -- while the cast commits (after every check passed, before the ult bar is set to 0). Cheap pre-checks here (monster
 -- team, Round/Collapse, RoundState.FinalPhase still false); RoundService checks that `model` is the round's monster.
--- Phase 2 neither refills this bar nor stops the caster (its Invulnerable window only blocks incoming hits), so the
+-- Phase 2 started this way refills nothing (ult bar, dodges and Exhausted stay as they are: it is no reset button) and
+-- never stops the caster (its short Invulnerable window, skipped while Exhausted, only blocks incoming hits), so the
 -- ultimate below runs unchanged as the transformation's opening move. Human ultimates, casts outside fight phases
 -- and every ultimate after Phase 2 began are untouched; the HP threshold (DamageService) stays the safety net.
 local function startPhaseTwo(model: Model): boolean

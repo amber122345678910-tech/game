@@ -259,13 +259,16 @@ def({
 		return if real(ctx) and ctx.won and ctx.reason == "Eliminated" and not ctx.collapse then 1 else 0
 	end,
 })
+-- the humans never pushed the monster to the Phase 2 HP threshold ({2} = that threshold in %); its own first
+-- ultimate also starts Phase 2 and does not count against it
 def({
 	Id = "Unshaken",
 	Role = "Monster",
 	Difficulty = 3,
 	Goals = { 1 },
+	Param = math.floor(Config.Round.FinalPhaseHpFraction * 100 + 0.5),
 	Round = function(ctx)
-		return if real(ctx) and ctx.won and not ctx.finalPhase then 1 else 0
+		return if real(ctx) and ctx.won and not ctx.monsterBroken then 1 else 0
 	end,
 })
 

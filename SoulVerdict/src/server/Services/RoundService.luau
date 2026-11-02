@@ -17,10 +17,11 @@
 --   StartPractice(player, side "Human"|"Monster", allies?) -> (boolean, errKey?), ForceNextMap(mapId) -> boolean
 -- Extra: SkipPhase(), EndRound(winner?, reason?), ForceCollapse(), Abort(), IsPractice(), InMatch(),
 --   State() -> Configuration, FinalPhaseStarted: Signal(monster, cause "Ult"|"Hp"|"Forced")
---   (TriggerFinalPhase cause: "Ult" from AbilityService for the monster's first ultimate - no ult refill;
---    "Hp" from the HP threshold; nil = forced by admin / Style Lab)
+--   (TriggerFinalPhase cause: "Ult" from AbilityService for the monster's first ultimate - no reset: Exhausted,
+--    dodges and the ult bar stay; "Hp" from the HP threshold - full refresh; nil = forced by admin / Style Lab)
 -- RoundEnded result = { winner, reason, rows, mvpUserId, practice, durations = {round, collapse, total},
---   mapId, roundId, monsterUserId, humanUserIds }   (reason "Aborted" = stopped by Style Lab)
+--   mapId, roundId, monsterUserId, humanUserIds, finalPhase, monsterBroken }   (reason "Aborted" = stopped by Style Lab;
+--   finalPhase = Phase 2 started; monsterBroken = the monster's HP reached Config.Round.FinalPhaseHpFraction in the fight)
 -- Extra RoundState attributes: Harmony (team damage multiplier), RoundId, MonsterName, FinalPreset,
 --   LobbyPreset. Extra RoundEvents: "PlayerLeft" {name, team, userId}.
 -- Requests registered: "Vote" (mapId or {mapId}), "StartPractice" (side or {side, allies}).
@@ -118,6 +119,7 @@ local state = {
 	Participants = {} :: { [Player]: Participant },
 	HumansAtStart = 0,
 	FinalPhase = false,
+	MonsterBroken = false, -- the monster's HP reached Config.Round.FinalPhaseHpFraction during the fight
 	SecondWind = false,
 	TimeUp = false,
 	Result = nil :: Result?,
@@ -409,12 +411,26 @@ local function checkSecondWind()
 	end
 end
 
-local function checkFinalPhase()
-	if state.FinalPhase or not isFightPhase() then
+-- The monster's HP during the fight (every tick + every hit on it): MonsterBroken once it is at or below
+-- Config.Round.FinalPhaseHpFraction (whatever started Phase 2; RoundEnded.monsterBroken -> the Unshaken quest /
+-- achievement), and the Phase 2 safety net (cause "Hp") while no ultimate has started it yet.
+local function checkMonsterHp()
+	if not isFightPhase() then
 		return
 	end
 	local humanoid = humanoidOf(state.Monster)
-	if humanoid and RoundRules.ShouldTriggerFinalPhase(humanoid.Health, humanoid.MaxHealth, state.FinalPhase) then
+	if humanoid == nil then
+		return
+	end
+	local maxHealth = humanoid.MaxHealth
+	if
+		not state.MonsterBroken
+		and maxHealth > 0
+		and humanoid.Health / maxHealth <= Config.Round.FinalPhaseHpFraction
+	then
+		state.MonsterBroken = true
+	end
+	if RoundRules.ShouldTriggerFinalPhase(humanoid.Health, maxHealth, state.FinalPhase) then
 		RoundService.TriggerFinalPhase("Hp")
 	end
 end
@@ -531,6 +547,7 @@ local function resetMatchState()
 	table.clear(state.Participants)
 	state.HumansAtStart = 0
 	state.FinalPhase = false
+	state.MonsterBroken = false
 	state.SecondWind = false
 	state.TimeUp = false
 	state.Result = nil
@@ -887,6 +904,8 @@ local function finishMatch(result: Result, setup: Setup)
 		roundId = state.RoundId,
 		monsterUserId = if monsterPlayer then monsterPlayer.UserId else 0,
 		humanUserIds = humanUserIds,
+		finalPhase = state.FinalPhase,
+		monsterBroken = state.MonsterBroken,
 	}
 	RoundService.RoundEnded:Fire(resultInfo)
 
@@ -1059,7 +1078,7 @@ local function runMatch(practice: boolean): string
 		setPhase("Round", phaseDuration("Round"))
 		while true do
 			evaluate()
-			checkFinalPhase()
+			checkMonsterHp()
 			if state.Result ~= nil or state.AbortRequested then
 				break
 			end
@@ -1090,7 +1109,7 @@ local function runMatch(practice: boolean): string
 		local lastDamage = now()
 		while true do
 			evaluate()
-			checkFinalPhase()
+			checkMonsterHp()
 			if state.Result ~= nil or state.AbortRequested then
 				break
 			end
@@ -1267,7 +1286,7 @@ local function onDamaged(info: any, result: any)
 			local root = rootOf(state.Monster)
 			state.LastHit = { victim = state.Monster, position = if root then root.Position else nil }
 		end
-		checkFinalPhase()
+		checkMonsterHp()
 	end
 end
 
@@ -1337,16 +1356,30 @@ function RoundService.IsRoundCharacter(model: Model?): boolean
 	return model ~= nil and state.RoundModels[model] ~= nil
 end
 
--- Starts the monster's Phase 2 ("FinalPhase" in code), once per round and only during Round/Collapse:
--- Invulnerable for Config.Round.FinalPhaseInvulnerable s (nothing that stops moving or casting), Exhausted cleared,
--- dodges refilled, FinalForm attribute (x Config.Monster.FinalPhaseDodgeRegenMult dodge regen, blazing eye),
--- RoundState.FinalPhase (clients switch to Theme_<kit>_Final + the map's final lighting), RoundEvent "FinalPhase"
--- {monster, kitId, duration, cause}, FinalPhaseStarted:Fire(monster, cause). `cause`:
+-- Exhausted right now: the StatusService status, or the Exhausted = EndsAt attribute that it and the SAVE Surge
+-- (ObjectiveService) write on the monster.
+local function isExhausted(model: Model): boolean
+	local _, has = call(StatusService, "Has", model, "Exhausted")
+	if has == true then
+		return true
+	end
+	local endsAt = model:GetAttribute("Exhausted")
+	return type(endsAt) == "number" and endsAt > now()
+end
+
+-- Starts the monster's Phase 2 ("FinalPhase" in code), once per round and only during Round/Collapse. Always: the
+-- FinalForm attribute (x Config.Monster.FinalPhaseDodgeRegenMult dodge regen, blazing eye), RoundState.FinalPhase
+-- (clients switch to Theme_<kit>_Final + the map's final lighting), RoundEvent "FinalPhase" {monster, kitId, duration,
+-- cause} (duration = the Invulnerable window applied, 0 = none) and FinalPhaseStarted:Fire(monster, cause). `cause`:
 --   "Ult"  the monster's first ultimate of the round (AbilityService, while that cast commits). `caster` must be
---          the round's monster. The ult bar is NOT refilled: that cast spends it and still runs as the opening move.
---   "Hp"   HP crossed Config.Round.FinalPhaseHpFraction before any ultimate (DamageService / checkFinalPhase).
---   nil    forced (admin / Style Lab), reported as "Forced".
--- "Hp" and forced starts refill the ult to 100. Returns true when Phase 2 started now.
+--          the round's monster. NOT a reset button: Exhausted, dodges and the ult bar stay as they are (that cast
+--          spends the bar and still runs as the opening move); the transformation is Invulnerable for
+--          Config.Round.FinalPhaseInvulnerable s (blocks hits only, never moving or casting) only while the monster is
+--          not Exhausted, so it can never eat the humans' Exhausted / SAVE Surge window.
+--   "Hp"   HP crossed Config.Round.FinalPhaseHpFraction before any ultimate (DamageService / checkMonsterHp): the
+--          comeback refresh - Invulnerable window, Exhausted cleared, dodges refilled, ult set to 100.
+--   nil    forced (admin / Style Lab), reported as "Forced": the same refresh as "Hp".
+-- Returns true when Phase 2 started now.
 function RoundService.TriggerFinalPhase(cause: string?, caster: Model?): boolean
 	if state.FinalPhase or not isFightPhase() then
 		return false
@@ -1361,22 +1394,32 @@ function RoundService.TriggerFinalPhase(cause: string?, caster: Model?): boolean
 	end
 	local reason = if byUlt then "Ult" elseif cause == "Hp" then "Hp" else "Forced"
 	state.FinalPhase = true
-	call(StatusService, "Apply", monster, "Invulnerable", Config.Round.FinalPhaseInvulnerable)
-	call(StatusService, "Remove", monster, "Exhausted")
-	local maxDodges = monster:GetAttribute("MaxDodges")
-	if type(maxDodges) == "number" then
-		monster:SetAttribute("Dodges", maxDodges)
+	if reason == "Hp" then
+		state.MonsterBroken = true
 	end
-	monster:SetAttribute("Exhausted", 0)
-	if not byUlt then
+	local invulnerable = Config.Round.FinalPhaseInvulnerable
+	if byUlt then
+		if isExhausted(monster) then
+			invulnerable = 0
+		end
+	else
+		call(StatusService, "Remove", monster, "Exhausted")
+		local maxDodges = monster:GetAttribute("MaxDodges")
+		if type(maxDodges) == "number" then
+			monster:SetAttribute("Dodges", maxDodges)
+		end
+		monster:SetAttribute("Exhausted", 0)
 		monster:SetAttribute("Ult", 100)
+	end
+	if invulnerable > 0 then
+		call(StatusService, "Apply", monster, "Invulnerable", invulnerable)
 	end
 	monster:SetAttribute("FinalForm", true)
 	setState("FinalPhase", true)
 	fireRoundEvent("FinalPhase", {
 		monster = monster,
 		kitId = monster:GetAttribute("KitId"),
-		duration = Config.Round.FinalPhaseInvulnerable,
+		duration = invulnerable,
 		cause = reason,
 	})
 	RoundService.FinalPhaseStarted:Fire(monster, reason)

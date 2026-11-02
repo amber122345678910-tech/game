@@ -99,10 +99,11 @@ return {
 		en = "* Your eye blazes. Dodges and ultimate restored.",
 		ru = "* Твой глаз пылает. Уклонения и ульта восстановлены.",
 	},
-	-- Phase 2 started by the monster's own first ultimate (RoundEvent "FinalPhase" cause "Ult": no ult refill)
+	-- Phase 2 started by the monster's own first ultimate (RoundEvent "FinalPhase" cause "Ult"): nothing is refilled,
+	-- dodges only regenerate faster from now on
 	["hud.ann.final.monsterUlt"] = {
-		en = "* Your eye blazes. Dodges restored and recharging faster.",
-		ru = "* Твой глаз пылает. Уклонения восстановлены и копятся быстрее.",
+		en = "* Your eye blazes. Dodges recharge faster.",
+		ru = "* Твой глаз пылает. Уклонения копятся быстрее.",
 	},
 	["hud.ann.surge.line"] = {
 		en = "* Three stars burn as one. The monster falters!",

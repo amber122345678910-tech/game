@@ -121,9 +121,10 @@ return {
 		en = "Win as the Monster before the Collapse",
 		ru = "Победи за монстра до Обрушения",
 	},
+	-- {2} = Config.Round.FinalPhaseHpFraction in % (Quests "Unshaken" Param); the monster's ultimate does not count
 	["prog.quest.Unshaken"] = {
-		en = "Win as the Monster without reaching Phase 2",
-		ru = "Победи за монстра, не дойдя до Фазы 2",
+		en = "Win as the Monster without ever dropping to {2}% HP",
+		ru = "Победи за монстра, ни разу не опустившись до {2}% HP",
 	},
 
 	-- Achievements: name + description -------------------------------------------------------------
@@ -276,9 +277,10 @@ return {
 		ru = "За монстра осуди всех людей до Обрушения.",
 	},
 	["prog.ach.unshaken"] = { en = "Not Even Sweating", ru = "Ни капли пота" },
+	-- 30 % = Config.Round.FinalPhaseHpFraction (the Phase 2 HP threshold)
 	["prog.ach.unshaken.desc"] = {
-		en = "Win as the Monster without reaching Phase 2.",
-		ru = "Победи за монстра, не дойдя до Фазы 2.",
+		en = "Win as the Monster without the humans ever pushing you down to 30% HP.",
+		ru = "Победи за монстра так, чтобы люди ни разу не довели тебя до 30% HP.",
 	},
 	["prog.ach.big_damage"] = { en = "One-SOUL Army", ru = "Армия из одной ДУШИ" },
 	["prog.ach.big_damage.desc"] = {

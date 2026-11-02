@@ -115,17 +115,27 @@ end
 -- (task.delay / defer / spawn / wait, os.clock) driven by world.advance(seconds).
 -- world.fetch[id] = "Success" | "Failure" | "TimedOut" | "Empty" (PreloadAsync says Success but the Sound loads with
 -- TimeLength 0) | "Hang" (no answer until world.release(id, answer)) | "Error" (PreloadAsync throws).
+-- world.fetchStatus[id] = "Loading" | ... : what ContentProvider:GetAssetFetchStatus reports (default None).
+-- world.lengths[id] = TimeLength once loaded (default 30); world.resetPositionOnLoad = true: a Sound's TimePosition
+-- jumps back to 0 when its asset loads (the engine quirk the resume fix-up covers).
+-- world.sounds = every fake Sound; world.decks() = the two music decks; world.deckOf(id) = the deck playing `id`;
+-- world.setContext(name, active) (InputController), world.setRole(role), world.roundEvents[name](data).
 local function loadSoundWithMocks(Loader)
 	local roblox = Loader.roblox
 	local Enum = roblox.Enum
 	local world = {
 		now = 0,
 		fetch = {},
+		fetchStatus = {},
+		lengths = {},
 		preloads = {},
 		warnings = {},
 		prints = {},
+		sounds = {},
+		roundEvents = {},
 		round = { Phase = "Waiting" },
 		role = "Human",
+		resetPositionOnLoad = false,
 	}
 	local timers, deferred, hanging, loading = {}, {}, {}, {}
 	local seq = 0
@@ -202,6 +212,7 @@ local function loadSoundWithMocks(Loader)
 			function methods:Stop()
 				props.Playing = false
 			end
+			table.insert(world.sounds, obj)
 		end
 		return setmetatable(obj, {
 			__index = function(_, k)
@@ -249,7 +260,10 @@ local function loadSoundWithMocks(Loader)
 			local answer = world.fetch[props.SoundId]
 			if answer == "Success" or answer == "Empty" then
 				props.IsLoaded = true
-				props.TimeLength = if answer == "Success" then 30 else 0
+				props.TimeLength = if answer == "Success" then (world.lengths[props.SoundId] or 30) else 0
+				if world.resetPositionOnLoad then
+					props.TimePosition = 0
+				end
 				props.Loaded:Fire()
 			end
 		end
@@ -281,8 +295,8 @@ local function loadSoundWithMocks(Loader)
 			else Enum.AssetFetchStatus.Failure
 		callback(id, status)
 	end
-	function contentProvider:GetAssetFetchStatus()
-		return Enum.AssetFetchStatus.None
+	function contentProvider:GetAssetFetchStatus(id)
+		return Enum.AssetFetchStatus[world.fetchStatus[id] or "None"]
 	end
 	function world.release(id, answer)
 		world.fetch[id] = answer
@@ -304,15 +318,31 @@ local function loadSoundWithMocks(Loader)
 	function state.Setting()
 		return 1
 	end
-	function state.OnRoundEvent() end
+	function state.OnRoundEvent(name, fn)
+		world.roundEvents[name] = function(data)
+			fn(data)
+			world.flush()
+		end
+	end
 	function world.setRound(attr, value)
 		world.round[attr] = value
 		state.RoundChanged:Fire(attr, value)
 		world.flush()
 	end
+	function world.setRole(role)
+		world.role = role
+		state.RoleChanged:Fire(role)
+		world.flush()
+	end
+	local contexts = {}
 	local input = { ContextChanged = makeSignal() }
-	function input.HasContext()
-		return false
+	function input.HasContext(name)
+		return contexts[name] == true
+	end
+	function world.setContext(name, active)
+		contexts[name] = active or nil
+		input.ContextChanged:Fire(name, active)
+		world.flush()
 	end
 	local function module(path, fake)
 		return {
@@ -392,6 +422,44 @@ local function loadSoundWithMocks(Loader)
 	local source = fs.readFile("src/client/Controllers/SoundController.luau")
 	local chunk = luau.load(source, { debugName = "SoundController(mock)", environment = env, injectGlobals = true })
 	world.controller = chunk()
+	function world.decks()
+		local out = {}
+		for _, s in world.sounds do
+			if string.find(s.Name, "SV_MusicDeck", 1, true) then
+				table.insert(out, s)
+			end
+		end
+		return out
+	end
+	-- the music deck playing `id` (nil = none)
+	function world.deckOf(id)
+		for _, s in world.decks() do
+			if s.SoundId == id and s.Playing then
+				return s
+			end
+		end
+		return nil
+	end
+	-- the audible track: the playing deck with the highest volume (nil = silence)
+	function world.audible()
+		local best = nil
+		for _, s in world.decks() do
+			if s.Playing and s.Volume > 0.001 and (best == nil or s.Volume > best.Volume) then
+				best = s
+			end
+		end
+		return if best then best.SoundId else nil
+	end
+	-- how many PreloadAsync calls `id` got
+	function world.probes(id)
+		local n = 0
+		for _, pid in world.preloads do
+			if pid == id then
+				n += 1
+			end
+		end
+		return n
+	end
 	function world.count(list, needle)
 		local n = 0
 		for _, line in list do
@@ -406,6 +474,10 @@ end
 
 local function list(t)
 	return table.concat(t, ",")
+end
+
+local function rid(n)
+	return "rbxassetid://" .. tostring(n)
 end
 
 local function hasProblem(problems, pattern)
@@ -914,7 +986,8 @@ return {
 			world.setRound("Phase", "Intro")
 			T.eq(S.Status("Theme_FellSans"), "pending", "theme: 101 bad, 102 being checked")
 			T.eq(S.NowPlaying().Key, "Theme_FellSans", "the theme is requested")
-			T.eq(S.CurrentMusic(), "Lobby", "the old track keeps playing while the theme is checked")
+			world.advance(2)
+			T.eq(world.audible(), nil, "the lobby track is not kept in the arena while the theme is checked (silence)")
 			T.eq(
 				world.count(world.warnings, "[Sound] audio id failed to load: " .. id(101) .. " (Theme_FellSans)"),
 				1,
@@ -955,9 +1028,9 @@ return {
 			now = S.NowPlaying()
 			T.eq(fmt(now.Preview, now.Key, now.Id), fmt(false, "Theme_FellSans", id(102)), "automatic again")
 
-			-- no answer within PROBE_TIMEOUT -> bad (warned); a late Success makes it good again
+			-- no answer within MUSIC_PROBE_TIMEOUT (not Loading) -> bad (warned); a late Success makes it good again
 			S.PreviewMusic("Theme_ClassicSans")
-			world.advance(S.PROBE_TIMEOUT + 0.5)
+			world.advance(S.MUSIC_PROBE_TIMEOUT + 0.5)
 			T.eq(S.Status("Theme_ClassicSans"), "dead", "timed out")
 			T.eq(world.count(world.warnings, id(601) .. " (Theme_ClassicSans) - no answer"), 1, "timeout warned")
 			world.release(id(601), "Success")
@@ -1006,6 +1079,521 @@ return {
 				end
 			end
 			T.eq(#other, 0, "no unexpected warnings: " .. table.concat(other, " | "))
+		end)
+	end,
+
+	------------------------------------------------------------- SoundController review fixes (runtime, offline)
+	-- fix 1a: a track that is still being checked never keeps a stale track; acceptable stand-ins only
+	sound_no_stale_track = function(T, Loader)
+		local Audio = Loader.require(AUDIO)
+		local Sound = load(Loader, SOUND)
+		-- pure: MusicChoices = MusicFor's answer, then the stand-ins of the context it sits on
+		local fight = { Phase = "Round", MapId = "HallOfVerdicts", MonsterKit = "ClassicSans", FinalPhase = true }
+		local function all()
+			return true
+		end
+		local contexts = {
+			{ Participant = true, Usable = all },
+			{ Participant = true, Usable = all, Box = true },
+			{ Participant = true, Usable = all, Override = "Shop" },
+			{ Participant = true, Usable = all, Override = "Menu", Box = true },
+			{ Participant = false, Usable = all, Box = true },
+			{ Participant = true, Usable = all, Stinger = "Victory" },
+		}
+		for i, ctx in contexts do
+			for _, round in { fight, { Phase = "Waiting" }, { Phase = "Ending" } } do
+				T.eq(Sound.MusicChoices(round, ctx)[1], Sound.MusicFor(round, ctx), "MusicChoices[1] = MusicFor #" .. i)
+			end
+		end
+		T.eq(list(Sound.MusicChoices(fight, contexts[1])), list(Sound.ArenaMusicOrder(fight)), "arena: usable keys in order")
+		local boxed = Sound.MusicChoices(fight, contexts[2])
+		T.eq(boxed[1] .. "," .. boxed[2], "VerdictBox,Theme_ClassicSans_Final", "the box, then the fight it sits on")
+		T.eq(
+			list(Sound.MusicChoices({ Phase = "Ending" }, { Stinger = "Victory", Current = "Theme_ClassicSans" })),
+			"Victory",
+			"a stinger has no stand-in (the fight track is stale)"
+		)
+		T.eq(
+			list(Sound.MusicChoices({ Phase = "Ending" }, { Current = "VerdictBox", Playing = "Theme_ClassicSans" })),
+			"Theme_ClassicSans",
+			"Ending before RoundEnd keeps the fight track, never the box loop"
+		)
+		T.eq(list(Sound.MusicChoices({ Phase = "Waiting" }, { Override = "Shop" })), "Shop,Lobby", "an override sits on the lobby")
+		T.eq(list(Sound.MusicChoices(fight, { Participant = false, Usable = all })), "Lobby", "lobby viewer")
+
+		local base = {
+			Menu = { Ids = { "1001" } },
+			Shop = { Ids = { "1002" } },
+			Lobby = { Ids = { "301" } },
+			Theme_ClassicSans = { Ids = { "601" } },
+			Theme_ClassicSans_Final = { Ids = { "611" } },
+			Map_HallOfVerdicts = { Ids = { "201" } },
+			VerdictBox = { Ids = { "701" } },
+			CollapsePhase = { Ids = { "1003" } },
+			Victory = { Ids = { "1004" } },
+			Defeat = { Ids = { "1005" } },
+		}
+		local ok = { 1001, 1002, 301, 601, 611, 201, 701, 1003, 1004, 1005 }
+		local function run(answers, fn)
+			withPatch(Audio, base, function()
+				local world = loadSoundWithMocks(Loader)
+				for _, n in ok do
+					world.fetch[rid(n)] = "Success"
+				end
+				for n, answer in answers do
+					world.fetch[rid(n)] = answer
+				end
+				world.controller.Init()
+				world.controller.Start()
+				world.advance(1)
+				fn(world, world.controller)
+			end)
+		end
+		local function fightOn(world)
+			world.setRound("MapId", "HallOfVerdicts")
+			world.setRound("MonsterKit", "ClassicSans")
+			world.setRound("Phase", "Round")
+			world.advance(3)
+		end
+
+		-- the reviewer's case: the monster ults while the local player is boxed and the box closes while the Phase 2
+		-- theme still downloads -> the box loop goes at once; the normal theme stands in until Phase 2's is ready
+		run({ [611] = "Hang" }, function(world, S)
+			fightOn(world)
+			T.eq(world.audible(), rid(601), "the boss theme")
+			world.setContext("Box", true)
+			world.advance(1)
+			T.eq(world.audible(), rid(701), "the box loop")
+			world.setRound("FinalPhase", true)
+			world.advance(1)
+			T.eq(world.audible(), rid(701), "still the box loop while boxed")
+			world.setContext("Box", false)
+			world.advance(S.BOX_FADE_OUT + 0.3)
+			T.eq(world.deckOf(rid(701)), nil, "the box loop is gone within the box fade-out")
+			T.eq(world.audible(), rid(601), "the normal theme stands in while the Phase 2 theme downloads")
+			T.eq(S.NowPlaying().Key, "Theme_ClassicSans_Final", "the Phase 2 theme is the one requested")
+			world.release(rid(611), "Success")
+			world.advance(2)
+			T.eq(world.audible(), rid(611), "the Phase 2 theme once it is ready")
+		end)
+
+		-- box track still being checked: the fight it sits on keeps playing (not silence), then the box track
+		run({ [701] = "Hang" }, function(world, S)
+			fightOn(world)
+			world.setContext("Box", true)
+			world.advance(1)
+			T.eq(world.audible(), rid(601), "the arena track stands in while the box track is checked")
+			world.release(rid(701), "Success")
+			world.advance(0.5)
+			T.eq(world.audible(), rid(701), "the box track as soon as it is ready")
+			world.setContext("Box", false)
+			world.advance(S.BOX_FADE_OUT + 0.3)
+			T.eq(world.audible(), rid(601), "back to the theme")
+		end)
+
+		-- Ending with the stinger still being checked: the arena track is stale -> silence, then the stinger
+		run({ [1004] = "Hang" }, function(world, S)
+			fightOn(world)
+			world.setRound("Phase", "Ending")
+			world.roundEvents.RoundEnd({ winner = "Humans" })
+			world.advance(1)
+			T.eq(world.audible(), nil, "the fight track does not run over the results")
+			world.release(rid(1004), "Success")
+			world.advance(0.5)
+			T.eq(world.audible(), rid(1004), "the Victory stinger")
+		end)
+
+		-- a screen track (the Shop) still being checked: the lobby track keeps playing; when it closes, the lobby
+		run({ [1002] = "Hang" }, function(world, S)
+			T.eq(world.audible(), rid(301), "the lobby")
+			S.SetMusicOverride("Shop")
+			world.advance(1)
+			T.eq(world.audible(), rid(301), "the lobby stands in while the shop track is checked")
+			world.release(rid(1002), "Success")
+			world.advance(2)
+			T.eq(world.audible(), rid(1002), "the shop track")
+			S.SetMusicOverride(nil)
+			world.advance(2)
+			T.eq(world.audible(), rid(301), "back to the lobby")
+			-- the title screen's track (its single id dead -> its Fallback, the lobby track) and "Silence"
+			S.SetMusicOverride("Silence", 0.5)
+			world.advance(1)
+			T.eq(world.audible(), nil, "intentional silence fades everything out")
+			S.SetMusicOverride(nil, 0.5)
+			world.advance(1)
+			T.eq(world.audible(), rid(301), "the lobby again")
+		end)
+	end,
+
+	-- fix 1b: the music that will be needed soon is checked (downloaded) in the background, one id at a time
+	sound_music_warmup = function(T, Loader)
+		local Audio = Loader.require(AUDIO)
+		local Sound = load(Loader, SOUND)
+		local intro = { Phase = "Intro", MapId = "HallOfVerdicts", MonsterKit = "ClassicSans" }
+		T.eq(
+			list(Sound.PrefetchOrder(intro, { Participant = true, Usable = function()
+				return true
+			end })),
+			"Theme_ClassicSans,VerdictBox,Theme_ClassicSans_Final,CollapsePhase,Victory,Defeat",
+			"a round: the fight track, the box, Phase 2, the collapse, the stingers"
+		)
+		T.eq(
+			list(Sound.PrefetchOrder(intro, { Usable = function(key)
+				return string.sub(key, 1, 6) ~= "Theme_"
+			end })),
+			"Map_HallOfVerdicts,VerdictBox,Map_HallOfVerdicts_Final,CollapsePhase,Victory,Defeat",
+			"dead themes: the map's tracks instead"
+		)
+		T.eq(#Sound.PrefetchOrder({ Phase = "Waiting", MonsterKit = "ClassicSans" }, {}), 0, "nothing outside a round")
+		T.eq(#Sound.PrefetchOrder(intro, { Participant = false }), 0, "nothing for a lobby viewer")
+
+		withPatch(Audio, {
+			Menu = { Ids = { "1001" } },
+			Shop = { Ids = { "1002" } },
+			Lobby = { Ids = { "301" } },
+			Theme_ClassicSans = { Ids = { "601" } },
+			Theme_ClassicSans_Final = { Ids = { "611" } },
+			Map_HallOfVerdicts = { Ids = { "201" } },
+			VerdictBox = { Ids = { "701" } },
+			CollapsePhase = { Ids = { "1003" } },
+			Victory = { Ids = { "1004" } },
+			Defeat = { Ids = { "1005" } },
+		}, function()
+			local world = loadSoundWithMocks(Loader)
+			local S = world.controller
+			for _, n in { 1001, 1002, 701, 601, 611, 1003, 1004, 1005 } do
+				world.fetch[rid(n)] = "Hang" -- every warm-up answers only when released (one at a time?)
+			end
+			world.fetch[rid(301)] = "Success"
+			world.fetch[rid(201)] = "Success"
+			S.Init()
+			S.Start()
+			S.Prewarm("VerdictBox") -- VerdictBoxController.Start, right after
+			world.advance(0.3)
+			T.eq(world.preloads[1], rid(301), "the first track is checked before any warm-up")
+			T.eq(world.audible(), rid(301), "the first track (the lobby) checked in the foreground")
+			-- the start list: the title, (the lobby: done), the box, the shop - strictly one at a time
+			local expected = { 1001, 701, 1002 }
+			for i, n in expected do
+				T.eq(world.probes(rid(n)), 1, ("warm-up %d: %d is being checked"):format(i, n))
+				for j = i + 1, #expected do
+					T.eq(world.probes(rid(expected[j])), 0, ("%d waits for %d"):format(expected[j], n))
+				end
+				world.advance(2)
+				world.release(rid(n), "Success")
+				world.advance(0.2)
+			end
+			T.eq(S.Status("VerdictBox"), "ok", "the box track is ready before any box")
+			-- a round: the theme is checked in the FOREGROUND first; the warm-up never downloads next to it
+			world.setRound("MapId", "HallOfVerdicts")
+			world.setRound("MonsterKit", "ClassicSans")
+			world.setRound("Phase", "Intro")
+			world.advance(3)
+			T.eq(world.probes(rid(601)), 1, "the theme is being checked")
+			T.eq(world.probes(rid(611)), 0, "the Phase 2 theme waits for the track the player is waiting for")
+			world.release(rid(601), "Success")
+			world.advance(0.5)
+			T.eq(world.audible(), rid(601), "the theme")
+			for _, n in { 611, 1003, 1004, 1005 } do
+				T.eq(world.probes(rid(n)), 1, "warming up " .. n)
+				world.advance(1)
+				world.release(rid(n), "Success")
+				world.advance(0.2)
+			end
+			-- every later switch is instant: no new check, the next track is on the deck in the same frame
+			local before = #world.preloads
+			world.setRound("Phase", "Round")
+			world.setRound("FinalPhase", true)
+			T.eq(world.deckOf(rid(611)) ~= nil, true, "Phase 2 theme on a deck at once")
+			world.setRound("Phase", "Collapse")
+			T.eq(world.deckOf(rid(1003)) ~= nil, true, "collapse track on a deck at once")
+			world.setRound("Phase", "Ending")
+			world.roundEvents.RoundEnd({ winner = "Monster" }) -- a human lost
+			T.eq(world.deckOf(rid(1005)) ~= nil, true, "the Defeat stinger on a deck at once")
+			T.eq(#world.preloads, before, "no check needed for any of these switches")
+		end)
+
+		-- a lobby viewer does not download the arena's music
+		withPatch(Audio, {
+			Menu = { Ids = { "1001" } },
+			Shop = { Ids = { "1002" } },
+			Lobby = { Ids = { "301" } },
+			Theme_ClassicSans = { Ids = { "601" } },
+			Theme_ClassicSans_Final = { Ids = { "611" } },
+			Map_HallOfVerdicts = { Ids = { "201" } },
+			VerdictBox = { Ids = { "701" } },
+			CollapsePhase = { Ids = { "1003" } },
+		}, function()
+			local world = loadSoundWithMocks(Loader)
+			local S = world.controller
+			for _, n in { 1001, 1002, 301, 601, 611, 201, 701, 1003 } do
+				world.fetch[rid(n)] = "Success"
+			end
+			world.role = "Lobby"
+			S.Init()
+			S.Start()
+			world.advance(1)
+			world.setRound("MapId", "HallOfVerdicts")
+			world.setRound("MonsterKit", "ClassicSans")
+			world.setRound("Phase", "Round")
+			world.advance(1)
+			T.eq(world.probes(rid(611)) + world.probes(rid(1003)), 0, "no arena warm-up for a lobby viewer")
+			T.eq(world.audible(), rid(301), "the lobby track")
+			world.setRole("Human") -- joins the next fight
+			world.advance(0.5)
+			T.ok(world.probes(rid(611)) + world.probes(rid(1003)) > 0, "warm-up once a participant")
+		end)
+		-- Prewarm(name): music -> the warm-up queue (first in line); SFX -> the short-sound batch
+		withPatch(Audio, { Lobby = { Ids = { "301" } }, Victory = { Ids = { "1004" } }, Dash = { Ids = { "901" } } }, function()
+			local world = loadSoundWithMocks(Loader)
+			local S = world.controller
+			world.fetch[rid(301)] = "Success"
+			world.fetch[rid(1004)] = "Success"
+			world.fetch[rid(901)] = "Success"
+			S.Init()
+			S.Start()
+			world.advance(0.3)
+			S.Prewarm("Victory")
+			S.Prewarm("Dash")
+			world.advance(0.3)
+			T.eq(S.IdState(rid(1004)) .. "," .. S.IdState(rid(901)), "good,good", "Prewarm music + SFX")
+		end)
+	end,
+
+	-- fix 2: longer music timeout while the download goes on, never two candidates of a track at once, a late answer
+	-- never switches songs mid-play, and a bad verdict is "retry later" (except an empty asset)
+	sound_probe_retry_later = function(T, Loader)
+		local Audio = Loader.require(AUDIO)
+		withPatch(Audio, {
+			Menu = { Ids = { "1001" } },
+			Shop = { Ids = { "1002" } },
+			Lobby = { Ids = { "301", "302" } },
+			VerdictBox = { Ids = { "701", "702" } },
+		}, function()
+			local world = loadSoundWithMocks(Loader)
+			local S = world.controller
+			for n, answer in
+				{ [1001] = "Success", [1002] = "Success", [301] = "Hang", [302] = "Success", [701] = "Empty", [702] = "Success" }
+			do
+				world.fetch[rid(n)] = answer
+			end
+			world.fetchStatus[rid(301)] = "Loading" -- a slow phone download the engine is still working on
+			S.Init()
+			S.Start()
+			world.advance(S.MUSIC_PROBE_TIMEOUT + 1)
+			T.eq(S.IdState(rid(301)), "pending", "still downloading after MUSIC_PROBE_TIMEOUT: more time")
+			T.eq(world.probes(rid(302)), 0, "the next candidate is not downloaded next to it")
+			T.eq(world.probes(rid(1001)), 0, "nor is anything warmed up meanwhile")
+			world.advance(S.MUSIC_PROBE_MAX - S.MUSIC_PROBE_TIMEOUT)
+			T.eq(S.IdState(rid(301)), "bad", "given up at MUSIC_PROBE_MAX")
+			world.advance(0.5)
+			T.eq(world.audible(), rid(302), "the next candidate plays")
+			-- the slow first candidate finally answers: good, but the playing song is not switched
+			world.release(rid(301), "Success")
+			world.advance(2)
+			T.eq(S.IdState(rid(301)), "good", "the late answer counts")
+			T.eq(world.audible(), rid(302), "no song switch mid-play")
+			T.eq(S.NowPlaying().Id, rid(302), "NowPlaying: the id that plays")
+			-- the next start of the lobby track uses the better candidate
+			S.PreviewMusic("VerdictBox")
+			world.advance(2)
+			S.PreviewMusic(nil)
+			world.advance(2)
+			T.eq(world.audible(), rid(301), "next start: the best candidate")
+
+			-- an empty asset is final: never checked again
+			T.eq(S.IdState(rid(701)), "bad", "701 is empty")
+			world.advance(S.RETRY_AFTER + 1)
+			S.PreviewMusic("VerdictBox")
+			world.advance(1)
+			S.PreviewMusic(nil)
+			world.advance(1)
+			T.eq(world.probes(rid(701)), 1, "an empty asset is not re-checked")
+		end)
+
+		-- SFX (a world of its own: plays before the background batch): a failure is "retry later" - re-checked in the
+		-- background when the entry plays again, staying bad meanwhile, with a doubling backoff
+		withPatch(Audio, {
+			Menu = { Ids = { "1001" } },
+			Shop = { Ids = { "1002" } },
+			Lobby = { Ids = { "301" } },
+			VerdictBox = { Ids = { "701" } },
+			Hit = { Ids = { "801", "802" } },
+			Dash = { Ids = { "811" } },
+		}, function()
+			local world = loadSoundWithMocks(Loader)
+			local S = world.controller
+			for n, answer in
+				{ [1001] = "Success", [1002] = "Success", [301] = "Success", [701] = "Success", [801] = "Failure", [802] = "Success", [811] = "Hang" }
+			do
+				world.fetch[rid(n)] = answer
+			end
+			world.fetchStatus[rid(811)] = "Loading"
+			S.Init()
+			S.Start()
+			world.advance(0.3)
+			local hit = S.Play("Hit")
+			T.eq(hit and hit.SoundId, rid(802), "801 failed -> 802")
+			T.eq(world.probes(rid(801)), 1, "801 checked once")
+			S.Play("Dash") -- 811 never answers (the engine says Loading: short files get no extension)
+			world.advance(S.RETRY_AFTER - 5)
+			S.Play("Hit")
+			T.eq(world.probes(rid(801)), 1, "not before RETRY_AFTER")
+			T.eq(S.Status("Dash"), "dead", "no answer within PROBE_TIMEOUT: Dash is dead")
+			world.release(rid(811), "Failure")
+			world.advance(6)
+			S.Play("Hit")
+			T.eq(world.probes(rid(801)), 2, "re-checked in the background when Hit plays again")
+			T.eq(S.IdState(rid(801)), "bad", "still failing")
+			T.eq(world.count(world.warnings, "failed to load: " .. rid(801)), 1, "warned once")
+			world.advance(S.RETRY_AFTER + 1)
+			S.Play("Hit")
+			T.eq(world.probes(rid(801)), 2, "the backoff doubles after a failed re-check")
+			world.advance(S.RETRY_AFTER)
+			world.fetch[rid(801)] = "Success"
+			S.Play("Hit")
+			T.eq(world.probes(rid(801)), 3, "re-checked again")
+			T.eq(S.IdState(rid(801)), "good", "the connection came back: 801 is good")
+			world.advance(1)
+			hit = S.Play("Hit")
+			T.eq(hit and hit.SoundId, rid(801), "the best candidate is used again")
+			-- a dead entry is re-checked when it is wanted again
+			world.fetch[rid(811)] = "Success"
+			S.Play("Dash")
+			T.eq(S.Status("Dash"), "ok", "Dash is back")
+			T.eq(world.probes(rid(811)), 2, "811 checked twice in all")
+		end)
+
+		-- no signal at join: the lobby track and the boss theme fail; nothing else happens, yet each comes back on its
+		-- own once its re-check is due (the music selection looks again then)
+		withPatch(Audio, {
+			Menu = { Ids = { "1001" } },
+			Shop = { Ids = { "1002" } },
+			Lobby = { Ids = { "301" } },
+			VerdictBox = { Ids = { "701" } },
+			Theme_ClassicSans = { Ids = { "601" } },
+			Theme_ClassicSans_Final = { Ids = { "611" } },
+			Map_HallOfVerdicts = { Ids = { "201" } },
+			CollapsePhase = { Ids = { "1003" } },
+			Victory = { Ids = { "1004" } },
+			Defeat = { Ids = { "1005" } },
+		}, function()
+			local world = loadSoundWithMocks(Loader)
+			local S = world.controller
+			for _, n in { 1001, 1002, 701, 201, 611, 1003, 1004, 1005 } do
+				world.fetch[rid(n)] = "Success"
+			end
+			world.fetch[rid(301)] = "Failure"
+			world.fetch[rid(601)] = "Failure"
+			S.Init()
+			S.Start()
+			world.advance(1)
+			T.eq(S.Status("Lobby"), "dead", "the lobby track failed")
+			T.eq(world.audible(), nil, "silence")
+			world.fetch[rid(301)] = "Success" -- the signal is back
+			world.advance(S.RETRY_AFTER + 2)
+			T.eq(S.Status("Lobby"), "ok", "re-checked when due, without any other trigger")
+			T.eq(world.audible(), rid(301), "the lobby track plays")
+			world.setRound("MapId", "HallOfVerdicts")
+			world.setRound("MonsterKit", "ClassicSans")
+			world.setRound("Phase", "Round")
+			world.advance(2)
+			T.eq(world.audible(), rid(201), "the theme is dead: the map track")
+			world.fetch[rid(601)] = "Success"
+			world.advance(S.RETRY_AFTER)
+			T.eq(S.Status("Theme_ClassicSans"), "ok", "the preferred theme is re-checked during the fight")
+			world.advance(2)
+			T.eq(world.audible(), rid(601), "and takes over")
+		end)
+	end,
+
+	-- fix 3: a looped track resumes where it was (the boss theme after a Verdict Box); the box track starts from the
+	-- top; fix 4: a stinger that has played is never restarted by later refreshes
+	sound_resume_and_stinger = function(T, Loader)
+		local Audio = Loader.require(AUDIO)
+		withPatch(Audio, {
+			Menu = { Ids = { "1001" } },
+			Shop = { Ids = { "1002" } },
+			Lobby = { Ids = { "301" } },
+			Theme_ClassicSans = { Ids = { "601" } },
+			Theme_ClassicSans_Final = { Ids = { "611" } },
+			Map_HallOfVerdicts = { Ids = { "201" } },
+			VerdictBox = { Ids = { "701" } },
+			CollapsePhase = { Ids = { "1003" } },
+			Victory = { Ids = { "1004" } },
+			Defeat = { Ids = { "1005" } },
+			Hit = { Ids = { "801" } },
+		}, function()
+			local world = loadSoundWithMocks(Loader)
+			local S = world.controller
+			for _, n in { 1001, 1002, 301, 601, 611, 201, 701, 1003, 1004, 1005 } do
+				world.fetch[rid(n)] = "Success"
+			end
+			world.fetch[rid(801)] = "Hang"
+			world.lengths[rid(601)] = 150
+			S.Init()
+			S.Start()
+			world.advance(1)
+			world.setRound("MapId", "HallOfVerdicts")
+			world.setRound("MonsterKit", "ClassicSans")
+			world.setRound("Phase", "Round")
+			world.advance(3)
+			local theme = world.deckOf(rid(601))
+			T.ok(theme ~= nil, "the boss theme plays")
+			theme.TimePosition = 75 -- 75 s into the theme
+			world.setContext("Box", true)
+			world.advance(1)
+			local box = world.deckOf(rid(701))
+			T.eq(box and box.TimePosition, 0, "the box track from the top")
+			box.TimePosition = 6
+			world.setContext("Box", false)
+			world.advance(1.5)
+			theme = world.deckOf(rid(601))
+			T.eq(theme and theme.TimePosition, 75, "the boss theme resumes where it was after the box")
+			-- the next box: its track starts from the top again
+			theme.TimePosition = 90
+			world.setContext("Box", true)
+			world.advance(1)
+			T.eq(world.deckOf(rid(701)).TimePosition, 0, "every box starts its track from the top")
+			-- the engine drops the position while loading: put back once loaded
+			world.resetPositionOnLoad = true
+			world.setContext("Box", false)
+			world.advance(1.5)
+			T.eq(world.deckOf(rid(601)).TimePosition, 90, "resume position held through the load")
+			world.resetPositionOnLoad = false
+			-- longer than RESUME_WINDOW: the theme starts over
+			world.deckOf(rid(601)).TimePosition = 120
+			world.setContext("Box", true)
+			world.advance(S.RESUME_WINDOW + 1)
+			world.setContext("Box", false)
+			world.advance(1.5)
+			T.eq(world.deckOf(rid(601)).TimePosition, 0, "after RESUME_WINDOW s: from the top")
+
+			-- the stinger: plays once; after it ended, refreshes (a probe answer, round attributes) never restart it
+			world.setRound("Phase", "Ending")
+			world.roundEvents.RoundEnd({ winner = "Humans" })
+			world.advance(1)
+			local stinger = world.deckOf(rid(1004))
+			T.ok(stinger ~= nil, "the Victory stinger")
+			stinger.Playing = false -- it ended
+			S.Play("Hit") -- a first play: its id check answers during the results
+			world.advance(1)
+			world.release(rid(801), "Success")
+			world.advance(0.5)
+			world.setRound("MapId", "HallOfVerdicts")
+			S.SetMusicOverride(nil)
+			world.advance(0.5)
+			T.eq(world.deckOf(rid(1004)), nil, "the ended stinger is not replayed")
+			-- the next round's Ending plays it again (a new request)
+			world.setRound("Phase", "Intermission")
+			world.advance(2)
+			T.eq(world.audible(), rid(301), "the lobby between rounds")
+			world.setRound("Phase", "Round")
+			world.advance(2)
+			world.setRound("Phase", "Ending")
+			world.roundEvents.RoundEnd({ winner = "Humans" })
+			world.advance(0.5)
+			T.ok(world.deckOf(rid(1004)) ~= nil, "a new Ending: the stinger again")
 		end)
 	end,
 

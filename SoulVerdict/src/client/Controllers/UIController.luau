@@ -17,19 +17,26 @@
 --     jump button (GuiService.TouchControlsEnabled) while any menu or photo mode is up;
 --   * Admin (owner test panel): "Admin" screen + Title button, only for the Player attribute "Admin" = true.
 --   * PLAY / PRACTICE go through the loading screen (UI/Overlays/Loading: fade to black, spinning pixel Sans head,
---     "LOADING"); the menus close (and the practice request is sent) once the screen is black. If that module is
---     missing or fails, both fall back to the instant switch.
+--     "LOADING"); the menus close (and the practice request is sent) once the screen is black. The full screen is for
+--     the session's first PLAY (or while the character has not spawned); a later PLAY from a reopened Title dips
+--     through black (~0.6 s, Menu -> lobby crossfade). PRACTICE reveals as soon as the round leaves "Waiting" (its
+--     Intro is seen), ends at once on a refusal, and skips the screen while a round runs. If the module is missing
+--     or fails, both fall back to the instant switch; no path leaves the "Silence" music override behind.
+--   * menu music: the Title plays "Menu", the Shop on top plays "Shop" (SoundController.SetMusicOverride; this is
+--     its only caller, see wantedMusic).
 --
 -- API
 --   UIController.Open(name, opts?) -> ScreenHandle?   names: Title, Play (= Loadout), Loadout, Shop, Quests, Profile,
 --       Settings, StyleLab, Admin, Results, Gallery. opts are merged into that screen's deps ({Replace = true} replaces
 --       the top screen instead of pushing). StyleLab / Admin need the Player attribute of the same name.
 --   UIController.Practice(side?)     loading screen, close the menus and ask for a practice round vs bots (Request
---                                    StartPractice); the screen stays black until the round leaves "Waiting", the
---                                    character is teleported or the server refuses (7 s cap)
+--                                    StartPractice); the screen stays black until the round leaves "Waiting" (+0.3 s),
+--                                    the character is teleported or the server refuses (at once; 7 s cap). While a
+--                                    round runs: only the request (the server's answer is toasted).
 --   UIController.Close(name?)        nil: close every menu (back to the game); name: remove that screen
 --   UIController.Toggle(name)        UIController.Back() -> boolean
---   UIController.Play()              loading screen, then close the menus (enter the lobby)
+--   UIController.Play()              loading screen, then close the menus (enter the lobby); later PLAYs: a short dip
+--   UIController._Harness(env)       Lune tests only (fakes instead of Init / Start)
 --   UIController.IsOpen(name?) -> boolean       UIController.Top() -> string?
 --   UIController.SetVisible(visible)            hide/show every UI layer (photo mode)
 --   UIController.PhotoMode(on)                  Camera "Photo" + hidden UI; Back / tap returns
@@ -138,6 +145,9 @@ local persistVersion: { [string]: number } = {}
 local pendingResult: any = nil
 local pendingRewards: any = nil
 local resultsDeps: { [string]: any }? = nil
+-- the player has left the join Title once (PLAY, PRACTICE, the Menu key or the round's Intro emptied the menu stack):
+-- a later PLAY from a reopened Title only dips through black
+local entered = false
 
 ------------------------------------------------------------------------------------------------ helpers
 
@@ -247,6 +257,9 @@ end
 -- keep InputController context, camera mode, the HUD and listeners in sync with the stack
 local function sync()
 	local open = #stack > 0
+	if not open then
+		entered = true
+	end
 	if open ~= menuContext then
 		menuContext = open
 		if open then
@@ -583,6 +596,41 @@ end
 
 ------------------------------------------------------------------------------------------------ loading screen
 
+-- PLAY / PRACTICE go through the loading screen (UI/Overlays/Loading, owner's wish):
+--   * the session's first PLAY (and any PLAY while the local character has not spawned): fade to black, spinning
+--     Sans head, the menu track fades out into the black and the lobby track starts PLAY_MUSIC_LEAD s before the
+--     light (at least PLAY_MIN_VISIBLE s; the black also waits for the character, at most PLAY_MAX_WAIT s);
+--   * a later PLAY (back from a Title reopened in the lobby; on phones PLAY is its only way out): a short dip through
+--     black without the head, the menu track crossfades into the lobby track;
+--   * PRACTICE: the same black + head; the request goes out once the screen is black and the black lifts as soon as
+--     the round leaves "Waiting" (+ Settle), so the practice Intro (VS splash, 3-2-1, flyover) is seen; the round's
+--     track starts at that moment. A refusal (busy / disabled / rate limit) ends the black at once, so the server's
+--     toast is seen (it is toasted again if the reveal still came late). While a round runs there is no loading
+--     screen at all: the request goes out and the server's answer is toasted right away.
+-- No path leaves the music override behind: the overlay owns the music only once it is live, and its end (or a
+-- failure to show it) hands the music back to syncMenuMusic.
+local PLAY_MIN_VISIBLE = 4.0 -- s: long enough for the lead below to be heard under the black
+local PLAY_MUSIC_LEAD = 2.0 -- s
+local PLAY_MAX_WAIT = 7 -- s: a character that never spawns does not keep the first PLAY black longer than this
+local PRACTICE_MIN_VISIBLE = 1.2 -- s: the head is seen, the round's Intro is not hidden
+local PRACTICE_MAX_WAIT = 7 -- s: a practice round that never starts
+-- a later PLAY: a plain dip (Loading timing overrides; ~0.6 s in all)
+local QUICK_TIMING = { FadeIn = 0.2, MinVisible = 0.3, Settle = 0, ContentOut = 0, FadeOut = 0.3 }
+local MENU_FADE_OUT = 1.2 -- s
+local NEXT_FADE_IN = 1.5 -- s
+local QUICK_MUSIC_FADE = 1.0 -- s: the Menu -> lobby crossfade of a later PLAY
+local RETOAST_AFTER = 2.5 -- s from a practice refusal to the reveal after which its toast is shown again
+local MENU_MUSIC = "Menu"
+local SHOP_MUSIC = "Shop"
+local SILENCE = "Silence"
+
+local loadingMusic: string? = nil -- "Out" | "In" while a loading screen owns the music (see wantedMusic)
+local appliedMusic: string? = nil -- the override SoundController was given last (nil = automatic selection)
+local loadingKind: string? = nil -- "Play" | "Practice" | "Quick" while a loading screen started here is up
+local loadingToken: any = nil -- that screen: callbacks of any other one never touch the music
+local showDefaults: { [string]: any }? = nil -- Lune harness: merged into every Loading.Show (Driver, Parent)
+local clock: () -> number = os.clock
+
 local function loadingOverlay(): any
 	if LoadingOverlay == nil then
 		LoadingOverlay = false
@@ -600,45 +648,6 @@ local function loadingOverlay(): any
 	return if LoadingOverlay then LoadingOverlay else nil
 end
 
--- Shows the loading screen (opts.OnCovered runs once the screen is black). false = not shown: the caller does the
--- old instant switch itself. A second call while it runs joins the running screen (true, its opts are ignored).
-local function showLoading(opts: { [string]: any }): boolean
-	local overlay = if started then loadingOverlay() else nil
-	if overlay == nil then
-		return false
-	end
-	opts.Sound = Sound
-	opts.Theme = if ThemeService then ThemeService.Current() else nil
-	local ok, handle = pcall(overlay.Show, opts)
-	if not ok then
-		warn("[UIController] loading screen failed: " .. tostring(handle))
-		return false
-	end
-	return handle ~= nil
-end
-
-local function characterRoot(): (Model?, Vector3?)
-	local player = Players.LocalPlayer
-	local character = player and player.Character
-	if character == nil then
-		return nil, nil
-	end
-	local root = character.PrimaryPart or character:FindFirstChild("HumanoidRootPart")
-	return character, if root and root:IsA("BasePart") then root.Position else nil
-end
-
--- Music around the loading screen (owner's wish): the title plays its own "Menu" track (the Shop its "Shop" track);
--- on PLAY / PRACTICE the menu
--- track fades out into the black, and the next track (lobby, or the practice round's music) starts PLAY_MUSIC_LEAD s
--- before the screen lights up again.
-local PLAY_MIN_VISIBLE = 4.0 -- s: long enough for the lead below to be heard under the black
-local PLAY_MUSIC_LEAD = 2.0 -- s
-local MENU_FADE_OUT = 1.2 -- s
-local NEXT_FADE_IN = 1.5 -- s
-local MENU_MUSIC = "Menu"
-local SILENCE = "Silence"
-local loadingMusic = false -- true while the loading screen owns the music
-
 local function setMusic(key: string?, fade: number?)
 	if Sound and type(Sound.SetMusicOverride) == "function" then
 		pcall(Sound.SetMusicOverride, key, fade)
@@ -653,68 +662,195 @@ local function musicUsable(key: string): boolean
 	return ok and def ~= nil
 end
 
--- screens with their own track while open: the Shop on top plays "Shop" (sleepy Sans's shop), else an open Title
--- plays "Menu"; nothing = automatic selection. Called on every menu change (sync).
-local SHOP_MUSIC = "Shop"
-local screenMusic: string? = nil
-local function syncMenuMusic()
-	if loadingMusic then
-		return
+-- The music override (UIController is SoundController.SetMusicOverride's only caller):
+--   loading screen "Out" -> "Silence": the menu (or lobby) track fades out into the black;
+--   loading screen "In"  -> automatic selection (after its music cue, or a later PLAY): the lobby / round track;
+--   otherwise the Shop on top -> "Shop" (sleepy Sans's shop), an open Title -> "Menu", nothing -> automatic.
+local function wantedMusic(): string?
+	if loadingMusic == "Out" then
+		return SILENCE
+	elseif loadingMusic == "In" then
+		return nil
 	end
 	local top = topEntry()
-	local want: string? = nil
 	if top and top.name == "Shop" and musicUsable(SHOP_MUSIC) then
-		want = SHOP_MUSIC
+		return SHOP_MUSIC
 	elseif hasScreen("Title") and musicUsable(MENU_MUSIC) then
-		want = MENU_MUSIC
+		return MENU_MUSIC
 	end
-	if want ~= screenMusic then
-		screenMusic = want
-		setMusic(want)
+	return nil
+end
+
+-- Applies wantedMusic() when it changed (fade nil = SoundController's default). Runs on every menu change (sync)
+-- and on every loading-screen step, so the override always matches the current state.
+local function syncMenuMusic(fade: number?)
+	local want = wantedMusic()
+	if want ~= appliedMusic then
+		appliedMusic = want
+		setMusic(want, fade)
 	end
 end
 UIController._SyncMenuMusic = syncMenuMusic
 
-local function loadingMusicOpts(opts: { [string]: any }): { [string]: any }
-	loadingMusic = true
-	screenMusic = nil
-	setMusic(SILENCE, MENU_FADE_OUT) -- the menu track fades out into the black
-	opts.MusicLead = PLAY_MUSIC_LEAD
-	opts.OnMusicCue = function()
-		setMusic(nil, NEXT_FADE_IN) -- automatic selection again: the lobby track (or the round's) fades in
-	end
-	local onDone = opts.OnDone
-	opts.OnDone = function()
-		if loadingMusic then
-			loadingMusic = false
-			setMusic(nil, NEXT_FADE_IN)
+local function setLoadingMusic(state: string?, fade: number?)
+	loadingMusic = state
+	syncMenuMusic(fade)
+end
+
+-- the loading screen that is up (whoever started it), nil when none
+local function runningLoading(): any?
+	local overlay = if started then loadingOverlay() else nil
+	if overlay and type(overlay.Active) == "function" then
+		local ok, handle = pcall(overlay.Active)
+		if ok and handle ~= nil then
+			return handle
 		end
-		syncMenuMusic()
+	end
+	return nil
+end
+
+-- Shows a NEW loading screen of `kind` (callers check runningLoading() first: Loading.Show would hand back the
+-- running one and ignore these opts). nil = not shown: nothing was changed, the caller switches instantly. Once it is
+-- live it owns the music: "Out" (a quick dip: "In" at once), its music cue -> "In", its end -> the menus decide.
+local function showLoading(kind: string, opts: { [string]: any }): any?
+	local overlay = if started then loadingOverlay() else nil
+	if overlay == nil then
+		return nil
+	end
+	local quick = kind == "Quick"
+	local token = {}
+	local onCue, onDone = opts.OnMusicCue, opts.OnDone
+	opts.OnMusicCue = function()
+		if loadingToken == token then
+			setLoadingMusic("In", NEXT_FADE_IN) -- automatic selection again: the lobby track (or the round's) fades in
+		end
+		if type(onCue) == "function" then
+			onCue()
+		end
+	end
+	opts.OnDone = function()
+		if loadingToken == token then
+			loadingToken = nil
+			loadingKind = nil
+			setLoadingMusic(nil, NEXT_FADE_IN)
+		end
 		if type(onDone) == "function" then
 			onDone()
 		end
 	end
-	return opts
+	opts.Sound = if quick then nil else Sound -- a dip plays no transition sound and ducks nothing
+	opts.Theme = if ThemeService then ThemeService.Current() else nil
+	if showDefaults then
+		for key, value in showDefaults do
+			opts[key] = value
+		end
+	end
+	loadingToken = token
+	loadingKind = kind
+	local ok, handle = pcall(overlay.Show, opts)
+	if not ok or handle == nil then
+		if not ok then
+			warn("[UIController] loading screen failed: " .. tostring(handle))
+		end
+		if loadingToken == token then
+			loadingToken = nil
+			loadingKind = nil
+		end
+		return nil
+	end
+	-- a dead frame loop finishes inside Show (its OnDone already handed the music back): only a live one takes it
+	if loadingToken == token and not handle.Done then
+		if quick then
+			setLoadingMusic("In", QUICK_MUSIC_FADE) -- Menu -> lobby crossfade while the screen dips
+		else
+			setLoadingMusic("Out", MENU_FADE_OUT) -- the menu track fades out into the black
+		end
+	end
+	return handle
+end
+
+-- no loading screen (missing / failed): the music follows with `fade`, then the menus close at once
+local function closeMenusNow(fade: number)
+	setLoadingMusic("In", fade)
+	UIController.Close()
+	setLoadingMusic(nil, fade)
+end
+
+local function localPlayer(): Player?
+	local ok, player = pcall(function()
+		return Players.LocalPlayer
+	end)
+	return if ok then player else nil
+end
+
+local function characterRoot(): (Model?, Vector3?)
+	local character: Model? = nil
+	local okState, model = call(State, "LocalCharacter")
+	if okState and typeof(model) == "Instance" and (model :: Instance):IsA("Model") then
+		character = model :: Model
+	else
+		local player = localPlayer()
+		character = if player then player.Character else nil
+	end
+	if character == nil then
+		return nil, nil
+	end
+	local root = character.PrimaryPart or character:FindFirstChild("HumanoidRootPart")
+	return character, if root and root:IsA("BasePart") then root.Position else nil
+end
+
+-- the local character is in the world (spawned, with a root part)
+local function characterReady(): boolean
+	local character, position = characterRoot()
+	return character ~= nil and position ~= nil
 end
 
 function UIController.Play()
-	-- the menus close while the screen is black, so the reveal shows the lobby
-	local shown = showLoading(loadingMusicOpts({
+	if runningLoading() ~= nil then
+		return -- a loading screen is up already (it closes the menus itself): a second press changes nothing
+	end
+	if entered and characterReady() then
+		-- back to the lobby from a Title reopened there: nothing to load, just a short dip through black
+		local handle = showLoading("Quick", {
+			FadeIn = QUICK_TIMING.FadeIn,
+			MinVisible = QUICK_TIMING.MinVisible,
+			Settle = QUICK_TIMING.Settle,
+			ContentOut = QUICK_TIMING.ContentOut,
+			FadeOut = QUICK_TIMING.FadeOut,
+			Content = false,
+			OnCovered = function()
+				UIController.Close()
+			end,
+		})
+		if handle == nil then
+			closeMenusNow(QUICK_MUSIC_FADE)
+		end
+		return
+	end
+	-- the session's first PLAY (or the character is not there yet): the full loading screen; the menus close while
+	-- the screen is black, so the reveal shows the lobby
+	local handle = showLoading("Play", {
 		MinVisible = PLAY_MIN_VISIBLE,
+		MusicLead = PLAY_MUSIC_LEAD,
+		MaxWait = PLAY_MAX_WAIT,
+		Until = characterReady,
 		OnCovered = function()
 			UIController.Close()
 		end,
-	}))
-	if not shown then
-		loadingMusic = false
-		UIController.Close()
-		syncMenuMusic()
+	})
+	if handle == nil then
+		closeMenusNow(NEXT_FADE_IN)
 	end
 end
 
 function UIController.Practice(side: string?)
 	local data = { side = if side == "Monster" then "Monster" else "Human" }
+	local requested = false
 	local function request()
+		if requested then
+			return
+		end
+		requested = true
 		if State and type(State.Request) == "function" then
 			call(State, "Request", "StartPractice", data)
 		else
@@ -724,29 +860,49 @@ function UIController.Practice(side: string?)
 			end)
 		end
 	end
+	-- a round is running (Intermission, a match, its Ending): no practice round can start, so no loading screen - the
+	-- request goes out and the server's answer is toasted right away
+	if phase() ~= "Waiting" then
+		request()
+		return
+	end
+	if runningLoading() ~= nil then
+		-- PLAY's screen is up (e.g. gamepad A on PRACTICE during its fade-in): just ask, that screen closes the menus;
+		-- a second PRACTICE while practice is loading changes nothing (the first request stands)
+		if loadingKind ~= "Practice" then
+			request()
+		end
+		return
+	end
 	-- the screen stays black until the round leaves "Waiting" (map built, Intro), the local character is teleported
 	-- or the server refuses; the loading screen caps it at MaxWait
-	local refused = false
+	local handle: any = nil
+	local refusal: { [string]: any }? = nil
 	local notifyConn: any = nil
 	local lastCharacter: Model? = nil
 	local lastPosition: Vector3? = nil
-	local shown = showLoading(loadingMusicOpts({
-		MaxWait = 7,
-		MinVisible = PLAY_MIN_VISIBLE,
+	handle = showLoading("Practice", {
+		MaxWait = PRACTICE_MAX_WAIT,
+		MinVisible = PRACTICE_MIN_VISIBLE,
+		-- the round's track starts as soon as the round is known; the lead never delays the reveal
+		MusicLead = PLAY_MUSIC_LEAD,
 		OnCovered = function()
 			UIController.Close()
 			lastCharacter, lastPosition = characterRoot()
 			if State and State.Notify then
-				notifyConn = State.Notify:Connect(function(key: any)
-					if PRACTICE_REFUSED[key] then
-						refused = true
+				notifyConn = State.Notify:Connect(function(key: any, args: any)
+					if refusal == nil and PRACTICE_REFUSED[key] then
+						refusal = { Key = key, Args = if type(args) == "table" then args else nil, At = clock() }
+						if handle and type(handle.Finish) == "function" then
+							pcall(handle.Finish) -- no practice round is coming: the black ends now
+						end
 					end
 				end)
 			end
 			request()
 		end,
 		Until = function(): boolean
-			if refused or phase() ~= "Waiting" then
+			if refusal ~= nil or phase() ~= "Waiting" then
 				return true
 			end
 			local character, position = characterRoot()
@@ -760,14 +916,34 @@ function UIController.Practice(side: string?)
 				notifyConn:Disconnect()
 				notifyConn = nil
 			end
+			-- the server's toast went up under the black; the black ends right after a refusal, so it is seen - only
+			-- when the reveal still came late (a stalled frame loop) is the reason shown again
+			local r = refusal
+			if r and clock() - r.At >= RETOAST_AFTER then
+				UIController.Notify(r.Key, r.Args, "Warning")
+			end
 		end,
-	}))
-	if not shown then
-		loadingMusic = false
-		UIController.Close()
-		syncMenuMusic()
+	})
+	if handle == nil then
+		closeMenusNow(NEXT_FADE_IN)
 		request()
 	end
+end
+
+-- Lune tests only (tools/lune/tests/loading_screen.spec.luau): stands in for Init / Start with fakes so PLAY /
+-- PRACTICE and the menu music run offline. env: { UIRoot, Sound, State, ShowOpts: {[string]: any}? (merged into
+-- every Loading.Show: Driver, Parent), Clock: (() -> number)? }. Never called by the game.
+function UIController._Harness(env: { [string]: any })
+	UIFolder = (script.Parent :: Instance).Parent:WaitForChild("UI")
+	ScreensFolder = UIFolder:FindFirstChild("Screens")
+	UIRoot = env.UIRoot
+	Sound = env.Sound
+	State = env.State
+	showDefaults = env.ShowOpts
+	if type(env.Clock) == "function" then
+		clock = env.Clock
+	end
+	started = true
 end
 
 function UIController.IsOpen(name: string?): boolean
@@ -904,6 +1080,9 @@ local function onMenuKey()
 	if photo then
 		UIController.PhotoMode(false)
 		return
+	end
+	if runningLoading() ~= nil then
+		return -- no menu pops up under the loading screen (the reveal would show it instead of the lobby / arena)
 	end
 	if #stack > 0 then
 		UIController.Close()

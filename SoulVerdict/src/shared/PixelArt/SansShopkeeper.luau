@@ -23,8 +23,11 @@
 --                                                  the left eye (x -> 40 - x, rows 14..19); the cheek marks stay
 --   SansShopkeeper.HeadParts() -> { Base, Awake, Asleep }  40 x 37 grids: Base = cells both heads share, Awake /
 --                                                  Asleep = only the cells that differ (eye overlays, toggled)
---   SansShopkeeper.Z : { Small, Medium, Big }      glyph rows ('z' / ' '), 3x3, 4x4, 5x5
---   SansShopkeeper.ZStart, .ZEnd : { x, y }        path of a floating Z (cell of its top-left corner), bottom -> top
+--   SansShopkeeper.Z : { Small, Medium, Big }      glyph rows ('z' / ' '), 4x4, 5x5, 6x6 (a Z needs 4 cells for its
+--                                                  diagonal to read); drawn on the bottom-left of a ZSize slot
+--   SansShopkeeper.ZSize = 6                       cells of that square slot
+--   SansShopkeeper.ZStart, .ZEnd : { x, y }        path of a floating Z (cell of its slot's top-left corner), bottom
+--                                                  -> top: up the gap between his head and the right post
 --   SansShopkeeper.Sign : { X, Y, W, H }           inner area of the counter-front board (the "SHOP" label sits there)
 --   SansShopkeeper.CounterFrontY = 59              first row of the counter front (a dialogue box may cover it)
 --   SansShopkeeper.Runs(rows) -> {Run}             horizontal runs of one key: Run = { x, y, length, color }
@@ -232,26 +235,30 @@ SansShopkeeper.Layers = {
 
 SansShopkeeper.Z = {
 	Small = {
-		"zzz",
-		" z ",
-		"zzz",
-	},
-	Medium = {
 		"zzzz",
 		"  z ",
 		" z  ",
 		"zzzz",
 	},
-	Big = {
+	Medium = {
 		"zzzzz",
 		"   z ",
 		"  z  ",
 		" z   ",
 		"zzzzz",
 	},
+	Big = {
+		"zzzzzz",
+		"    z ",
+		"   z  ",
+		"  z   ",
+		" z    ",
+		"zzzzzz",
+	},
 }
-SansShopkeeper.ZStart = { x = 57, y = 22 }
-SansShopkeeper.ZEnd = { x = 61, y = 9 }
+SansShopkeeper.ZSize = 6 -- cells of the square slot a Z letter is drawn in (glyphs sit on its bottom-left)
+SansShopkeeper.ZStart = { x = 55, y = 30 }
+SansShopkeeper.ZEnd = { x = 60, y = 9 }
 SansShopkeeper.Sign = { X = 19, Y = 62, W = 34, H = 7 }
 
 ------------------------------------------------------------------------------------------------ the sleeping head
@@ -467,6 +474,14 @@ function SansShopkeeper.Validate(): { string }
 	end
 	for name, glyph in SansShopkeeper.Z do
 		checkRows(problems, "Z." .. name, glyph, #glyph, #glyph)
+		if #glyph > SansShopkeeper.ZSize then
+			table.insert(problems, "Z." .. name .. ": larger than ZSize")
+		end
+	end
+	for _, p in { SansShopkeeper.ZStart, SansShopkeeper.ZEnd } do
+		if p.x < 0 or p.y < 0 or p.x + SansShopkeeper.ZSize > W or p.y + SansShopkeeper.ZSize > H then
+			table.insert(problems, "Z path outside the scene")
+		end
 	end
 	local s = SansShopkeeper.Sign
 	if s.X < 0 or s.Y < 0 or s.X + s.W > W or s.Y + s.H > H then

@@ -3,17 +3,33 @@
 -- SoundGroups (SV_Music / SV_SFX / SV_UI under SoundService) scaled by the player's MusicVolume / SfxVolume settings,
 -- two-deck music crossfades with ducking, automatic checking of every audio id and automatic music selection.
 --
--- Audio ids: every entry has candidates (Audio.Candidates = {Id, ...Ids}, best first). Each id is probed at most ONCE
--- with ContentProvider:PreloadAsync({sound}, callback): AssetFetchStatus.Success = good; Failure / TimedOut / any other
--- final status / no answer within PROBE_TIMEOUT s = bad; a Sound that reports IsLoaded with TimeLength 0 (or a music
--- deck that never loads its id) = bad too. Every bad id is reported once in the Output window:
+-- Audio ids: every entry has candidates (Audio.Candidates = {Id, ...Ids}, best first). Each id is checked with
+-- ContentProvider:PreloadAsync({sound}, callback) (which also downloads it into the cache): AssetFetchStatus.Success =
+-- good; Failure / TimedOut / any other final status / no answer in time = bad; a Sound that reports IsLoaded with
+-- TimeLength 0 (or a Sound / music deck that never loads its id) = bad too. Every bad id is reported once in the
+-- Output window:
 --     [Sound] audio id failed to load: <id> (<entry>)
 -- Built-in rbxasset:// files are trusted without a probe. Per-id state: pending / good / bad.
+--   Time allowed: PROBE_TIMEOUT s for SFX / UI ids; music ids (big files on a phone) MUSIC_PROBE_TIMEOUT s, extended
+--     by MUSIC_PROBE_EXTEND s while the engine still reports the download as Loading, up to MUSIC_PROBE_MAX s.
+--   A bad verdict is not final unless the asset is empty: a failed / timed-out / never-loaded id is checked again in
+--     the background (RETRY_AFTER s later, doubling up to RETRY_MAX) when its entry is wanted again and it ranks
+--     before the candidate in use (or the entry is dead). It stays bad until that check answers Success; a late
+--     Success never switches a track that is already playing (the next start of that track uses it).
 --   SFX / UI: play the first candidate that is not known bad (an untested one optimistically while its probe runs;
---     short files are also probed in a small background batch after Start); when it turns bad, the pool switches to
---     the next candidate.
---   Music: the requested track starts on its first GOOD candidate (probed in order; the previous track keeps playing
---     meanwhile), then the usual crossfade.
+--     short files are also probed in a small background batch after Start, one at a time while a music id is being
+--     downloaded); when it turns bad, the pool switches to the next candidate.
+--   Music: the requested track starts on its first GOOD candidate (probed in order, never two candidates of one entry
+--     at once), then the usual crossfade. While it is still being checked, the track that plays goes on only if it is
+--     an acceptable stand-in for the new request (MusicChoices: e.g. the normal boss theme while the Phase 2 theme
+--     loads, the arena track while the box track loads); else the first stand-in that is ready plays; else the music
+--     fades out (never a stale track: the box loop after the box, a stinger after the round, the menu track...).
+--   Warm-up: music that will be needed soon is checked (= downloaded) in the background, one id at a time and never
+--     while a track the player is waiting for downloads: at Start the title / lobby / box / shop tracks, and for a
+--     round the fight track, the box track, the Phase 2 track, CollapsePhase, Victory and Defeat (PrefetchOrder), so
+--     those switches are instant.
+--   A looped track that comes back within RESUME_WINDOW s (the boss theme after a Verdict Box, the lobby after the
+--     shop) resumes where it was (the box track itself always starts from the top).
 --   An entry whose candidates all failed is "dead": plays follow its Fallback chain, and the automatic music
 --   selection moves on to its next option as soon as a key dies.
 -- Automatic music selection (MusicFor, pure; picks the first USABLE key = a candidate along its Fallback chain that
@@ -22,7 +38,8 @@
 --   Intro / Round / Collapse -> (Collapse only: CollapsePhase) Theme_<RoundState.MonsterKit>, then the map's track (Maps/Registry Music key);
 --     while RoundState.FinalPhase: Theme_<kit>_Final, Theme_<kit>, "<map>_Final" (-> FinalPhase), FinalPhase, then
 --     the map's track (nothing usable -> the map's track, silent);
---   Ending -> "Victory" / "Defeat" stinger (from RoundEnd);
+--   Ending -> "Victory" / "Defeat" stinger (from RoundEnd; a stinger that has played is not restarted by later
+--     refreshes);
 --   InputController context "Box" (the local player is inside the Verdict Box) -> "VerdictBox";
 --   a local player who is not a round participant (StateController.Role() "Lobby": waiting in the lobby during a
 --   round, mid-match joiners) keeps "Lobby" in every phase (no arena track, no Victory/Defeat stinger);
@@ -57,13 +74,23 @@
 --   SoundController.Duck(amount 0..1, duration, fadeTime?)   temporarily lowers music (big moments)
 --   SoundController.Resolve(name) -> (SoundDef?, string?)    first live entry along the Fallback chain
 --   SoundController.Groups() -> { Music: SoundGroup?, SFX: SoundGroup?, UI: SoundGroup? }
+--   SoundController.Prewarm(name)       checks (downloads) an entry's candidate ahead of time in the background, the
+--                                       next one after a bad one; music one id at a time, after the first track and
+--                                       what is already queued. Safe to call repeatedly.
+--   SoundController.BOX_FADE_IN / BOX_FADE_OUT   music fades into / out of the Verdict Box ("Box" context)
 -- Pure helpers (Lune tests)
 --   SoundController.PickCandidate(candidates, stateOf) -> (id?, status)   stateOf(id) -> "good"|"bad"|"pending"|nil
 --   SoundController.ResolveChain(name, defOf, stateOf, candidatesOf?) -> (entry?, id?, status)
 --   SoundController.ArenaMusicOrder(round) -> {string}                     Intro / Round / Collapse preference order
---   SoundController.MusicFor(round, ctx) -> string?   ctx = { Override, Box, Stinger, Current, Participant (false =
---                                                    lobby viewer), Usable(key) -> boolean (default: the key has
---                                                    candidates in Shared/Audio) }
+--   SoundController.MusicFor(round, ctx) -> string?   ctx = { Override, Box, Stinger, Current, Playing (the key on
+--                                                    the playing deck), Participant (false = lobby viewer),
+--                                                    Usable(key) -> boolean (default: the key has candidates in
+--                                                    Shared/Audio) }
+--   SoundController.MusicChoices(round, ctx) -> {string}   MusicFor's answer first, then the stand-ins accepted
+--                                                    while it is still being checked (the context it sits on:
+--                                                    override -> box -> phase track(s))
+--   SoundController.PrefetchOrder(round, ctx) -> {string}  music a round will soon need, most urgent first
+--                                                    (ctx = { Participant, Usable }; nothing outside a round)
 
 local SoundService = game:GetService("SoundService")
 local RunService = game:GetService("RunService")
@@ -86,10 +113,25 @@ SoundController.MusicChanged = Signal.new()
 
 SoundController.DEFAULT_MUSIC_FADE = 1.6
 SoundController.MAX_EMITTERS = 40
-SoundController.PROBE_TIMEOUT = 10 -- s without a final answer from PreloadAsync = bad id
+SoundController.PROBE_TIMEOUT = 10 -- s without a final answer from PreloadAsync = bad id (SFX / UI: short files)
+SoundController.MUSIC_PROBE_TIMEOUT = 20 -- s for a music id (a 3-5 MB download on a phone)...
+SoundController.MUSIC_PROBE_EXTEND = 10 -- ...plus this, again and again, while the engine still reports it Loading...
+SoundController.MUSIC_PROBE_MAX = 60 -- ...up to this in total
 SoundController.LOAD_TIMEOUT = 15 -- s a music deck may take to load a checked id before that id counts as bad
 SoundController.PROBE_BATCH = 3 -- concurrent background probes (SFX / UI)
 SoundController.PROBE_BATCH_DELAY = 4 -- s after Start before the background batch begins
+SoundController.RETRY_AFTER = 60 -- s before a failed / timed-out id may be checked again (in the background)...
+SoundController.RETRY_MAX = 600 -- ...doubling after every failed check, up to this
+SoundController.RESUME_WINDOW = 60 -- s: a looped track that comes back this soon resumes where it was
+-- Verdict Box: the box track starts on the first frame of the victim's pull-in (its ids are warmed up at Start), so
+-- the switch INTO the box is a short fade; the way back out keeps a normal one.
+SoundController.BOX_FADE_IN = 0.15
+SoundController.BOX_FADE_OUT = 1.0
+
+-- music warmed up at Start (after the first track): the title, the lobby, the Verdict Box, the shop
+local START_MUSIC = { "Menu", "Lobby", "VerdictBox", "Shop" }
+-- tracks that always start from the top (each box is a new fight)
+local RESTART_KEYS: { [string]: boolean } = { VerdictBox = true }
 
 export type PlayOpts = {
 	Volume: number?,
@@ -128,6 +170,7 @@ type Deck = {
 	Rate: number,
 	StartedAt: number,
 	Checked: boolean, -- the load check (IsLoaded with TimeLength > 0) is done for this id
+	Resume: number?, -- TimePosition to make sure of once the id has loaded (a resumed track)
 }
 
 local custom: { [string]: SoundDef } = {}
@@ -141,7 +184,9 @@ local volumes = { Music = 1, SFX = 1 }
 local decks: { Deck } = {}
 local activeDeck = 1
 local requestedMusic: string? = nil
+local requestedChoices: { string } = {} -- requestedMusic + the stand-ins accepted while it is being checked
 local requestedFade: number? = nil
+local resumeAt: { [string]: { Position: number, At: number } } = {} -- looped ids stopped mid-play
 local musicOverride: string? = nil
 local previewKey: string? = nil
 local stingerKey: string? = nil
@@ -157,10 +202,17 @@ local idState: { [string]: IdState } = {}
 local idEntry: { [string]: string } = {} -- the first entry that used an id (for messages)
 local idBadReason: { [string]: string } = {}
 local idWarned: { [string]: boolean } = {}
+local idRetryAt: { [string]: number } = {} -- bad ids that may be checked again from this os.clock() on (nil = never)
+local idFailures: { [string]: number } = {} -- failed checks per id (retry backoff)
+local idRetrying: { [string]: boolean } = {} -- bad ids being checked again right now (they stay bad until Success)
 local probeQueue: { string } = {}
 local probeQueued: { [string]: boolean } = {}
 local backgroundProbes = 0
+local musicProbes: { [string]: boolean } = {} -- music ids being checked right now (big downloads)
+local musicQueue: { string } = {} -- music entries to warm up, most urgent first
+local musicQueued: { [string]: boolean } = {}
 local refreshQueued = false
+local warmupOpen = false -- the background music warm-up starts once the first track has been asked for
 type CacheEntry = { Id: string, Ids: any, List: { string } }
 local candidateCache: { [SoundDef]: CacheEntry } = setmetatable({}, { __mode = "k" }) :: any
 
@@ -310,16 +362,45 @@ end
 
 local onIdChanged: (string) -> () -- (forward) pools + music react to a new id state
 local pumpProbes: () -> () -- (forward) starts queued background probes
+local pumpMusic: () -> () -- (forward) starts the next music warm-up
+local prefetchMusic: (string, boolean?) -> () -- (forward) queues a music entry for the warm-up
+local scheduleMusicRefresh: () -> () -- (forward) re-runs the music selection on the next resumption point
+
+local function isMusicEntry(name: string?): boolean
+	local def = if name ~= nil then defOf(name) else nil
+	return def ~= nil and def.Group == "Music"
+end
+
+local function fetchStatus(id: string): Enum.AssetFetchStatus?
+	local ok, status = pcall(function(): Enum.AssetFetchStatus
+		return ContentProvider:GetAssetFetchStatus(id)
+	end)
+	return if ok then status else nil
+end
 
 local function markBad(id: string, reason: string?)
+	local why = reason or "failed"
+	local failures = (idFailures[id] or 0) + 1
+	idFailures[id] = failures
+	-- an empty asset is broken for good; anything else (a failure, no answer, a load that never finished) may be a bad
+	-- connection: the id may be checked again later (backoff doubles with every failed check)
+	local wait = math.min(SoundController.RETRY_AFTER * 2 ^ (failures - 1), SoundController.RETRY_MAX)
+	idRetryAt[id] = if why == EMPTY_REASON then nil else os.clock() + wait
+	if why ~= EMPTY_REASON and isMusicEntry(idEntry[id]) then
+		-- the music selection looks again when the re-check is due (a dead track that is wanted gets it then)
+		task.delay(wait + 0.05, function()
+			scheduleMusicRefresh()
+		end)
+	end
 	if idState[id] == "bad" then
+		idBadReason[id] = why -- a failed re-check: still bad, nothing switches
 		return
 	end
 	idState[id] = "bad"
-	idBadReason[id] = reason or "failed"
+	idBadReason[id] = why
 	if not idWarned[id] then
 		idWarned[id] = true
-		local suffix = if reason and reason ~= "" then " - " .. reason else ""
+		local suffix = if why ~= "" then " - " .. why else ""
 		warn(("[Sound] audio id failed to load: %s (%s)%s"):format(id, idEntry[id] or "?", suffix))
 	end
 	onIdChanged(id)
@@ -332,6 +413,7 @@ local function markGood(id: string)
 	end
 	idState[id] = "good"
 	idBadReason[id] = nil
+	idRetryAt[id] = nil
 	if before == "bad" then
 		print(("[Sound] audio id loaded after all (slow network): %s (%s)"):format(id, idEntry[id] or "?"))
 	end
@@ -355,22 +437,43 @@ local function isFinalStatus(status: Enum.AssetFetchStatus?): boolean
 	return status ~= nil and status ~= Enum.AssetFetchStatus.None and status ~= Enum.AssetFetchStatus.Loading
 end
 
--- Checks one id once: PreloadAsync on a throwaway Sound in its own thread, with a timeout. Never yields the caller.
-local function startProbe(id: string, entry: string?, background: boolean?)
+type ProbeOpts = {
+	batch: boolean?, -- one of the SFX / UI background batch slots
+	warm: string?, -- a music warm-up of this entry (its next candidate is queued after a bad answer)
+	retry: boolean?, -- a background re-check of a bad id (it stays bad until Success)
+}
+
+-- Checks one id: PreloadAsync on a throwaway Sound in its own thread, with a timeout. Never yields the caller. An id
+-- is checked once, except for the background re-checks of a bad id (`retry`) that retryDue starts.
+local function startProbe(id: string, entry: string?, opts: ProbeOpts?)
+	local o: ProbeOpts = opts or {}
 	if entry ~= nil and idEntry[id] == nil then
 		idEntry[id] = entry
 	end
-	if idState[id] ~= nil then
-		return
+	if o.retry then
+		if idState[id] ~= "bad" or idRetrying[id] then
+			return
+		end
+		idRetrying[id] = true
+	else
+		if idState[id] ~= nil then
+			return
+		end
+		if isBuiltin(id) then
+			idState[id] = "good"
+			return
+		end
+		idState[id] = "pending"
 	end
-	if isBuiltin(id) then
-		idState[id] = "good"
-		return
+	local music = isMusicEntry(entry or idEntry[id])
+	if music then
+		musicProbes[id] = true
 	end
-	idState[id] = "pending"
-	if background then
+	local batch = o.batch == true
+	if batch then
 		backgroundProbes += 1
 	end
+	local started = os.clock()
 	local done = false
 	local function finish(good: boolean, reason: string?)
 		if done then
@@ -381,27 +484,40 @@ local function startProbe(id: string, entry: string?, background: boolean?)
 			return
 		end
 		done = true
-		if background then
+		if batch then
 			backgroundProbes -= 1
 		end
+		musicProbes[id] = nil
+		idRetrying[id] = nil
 		if good then
 			markGood(id)
 		else
 			markBad(id, reason)
 		end
-		if background then
-			local name = idEntry[id]
-			if not good and name ~= nil then
-				queueEntry(name) -- that entry's next candidate
+		if not good and not o.retry then
+			if o.warm ~= nil then
+				prefetchMusic(o.warm, true) -- that entry's next candidate, first in line
+			elseif batch and idEntry[id] ~= nil then
+				queueEntry(idEntry[id]) -- that entry's next candidate
 			end
-			pumpProbes()
 		end
+		pumpMusic()
+		pumpProbes()
 	end
-	task.delay(SoundController.PROBE_TIMEOUT, function()
-		if not done then
-			finish(false, TIMEOUT_REASON)
+	-- no final answer in time = bad (and checked again later); a music download the engine still reports as Loading
+	-- gets more time, up to MUSIC_PROBE_MAX
+	local function onTimeout()
+		if done then
+			return
 		end
-	end)
+		local left = SoundController.MUSIC_PROBE_MAX - (os.clock() - started)
+		if music and left > 0.05 and fetchStatus(id) == Enum.AssetFetchStatus.Loading then
+			task.delay(math.min(SoundController.MUSIC_PROBE_EXTEND, left), onTimeout)
+			return
+		end
+		finish(false, TIMEOUT_REASON)
+	end
+	task.delay(if music then SoundController.MUSIC_PROBE_TIMEOUT else SoundController.PROBE_TIMEOUT, onTimeout)
 	task.spawn(function()
 		local probe: Sound? = nil
 		local result: Enum.AssetFetchStatus? = nil
@@ -428,10 +544,8 @@ local function startProbe(id: string, entry: string?, background: boolean?)
 		else
 			-- no final status from the callback yet: ask ContentProvider until it has one (or the timeout hits)
 			while not done and not isFinalStatus(result) do
-				local okStatus, status = pcall(function(): Enum.AssetFetchStatus
-					return ContentProvider:GetAssetFetchStatus(id)
-				end)
-				if okStatus and isFinalStatus(status) then
+				local status = fetchStatus(id)
+				if isFinalStatus(status) then
 					result = status
 					break
 				end
@@ -458,11 +572,98 @@ local function startProbe(id: string, entry: string?, background: boolean?)
 	end)
 end
 
+-- Starts a background re-check of the first bad id of `name` (along its Fallback chain) whose retry time has come,
+-- when it ranks before the candidate in use or the entry is dead. One per call; a music id only when no other music
+-- download runs. The id stays bad until the check answers Success: nothing switches meanwhile.
+local function retryDue(name: string)
+	local now = os.clock()
+	local seen: { [string]: boolean } = {}
+	local current: string? = canonical(name)
+	while current ~= nil and not seen[current] do
+		seen[current] = true
+		local def = defOf(current)
+		if def == nil then
+			return
+		end
+		for _, id in candidatesOf(def) do
+			if stateOf(id) ~= "bad" then
+				return -- this candidate is in use (or being checked): nothing better to re-check
+			end
+			local at = idRetryAt[id]
+			if at ~= nil and now >= at and not idRetrying[id] then
+				if def.Group == "Music" and next(musicProbes) ~= nil then
+					return -- one music download at a time: next time
+				end
+				startProbe(id, current, { retry = true })
+				return
+			end
+		end
+		current = def.Fallback
+	end
+end
+
 pumpProbes = function()
-	while backgroundProbes < SoundController.PROBE_BATCH and #probeQueue > 0 do
+	-- a music download in flight gets the bandwidth: the short-sound batch then checks one id at a time
+	local limit = if next(musicProbes) ~= nil then 1 else SoundController.PROBE_BATCH
+	while backgroundProbes < limit and #probeQueue > 0 do
 		local id = table.remove(probeQueue, 1) :: string
 		if idState[id] == nil then
-			startProbe(id, nil, true)
+			startProbe(id, nil, { batch = true })
+		end
+	end
+end
+
+-- Queues a music entry for the warm-up (`urgent`: first in line). Entries already queued are not duplicated.
+prefetchMusic = function(name: string, urgent: boolean?)
+	local key = canonical(name)
+	if not isMusicEntry(key) then
+		return
+	end
+	if musicQueued[key] then
+		if not urgent then
+			return
+		end
+		local at = table.find(musicQueue, key)
+		if at then
+			table.remove(musicQueue, at)
+		end
+	end
+	musicQueued[key] = true
+	if urgent then
+		table.insert(musicQueue, 1, key)
+	else
+		table.insert(musicQueue, key)
+	end
+end
+
+-- several entries, most urgent first; `front` = ahead of everything already queued (keeping this order)
+local function prefetchList(names: { string }, front: boolean?)
+	if front then
+		for i = #names, 1, -1 do
+			prefetchMusic(names[i], true)
+		end
+	else
+		for _, name in names do
+			prefetchMusic(name)
+		end
+	end
+end
+
+-- The music warm-up: one id at a time, and only while no music id is being checked (the track the player waits for
+-- always has the connection to itself). A bad answer queues the entry's next candidate; a dead entry gets a re-check
+-- when one is due.
+pumpMusic = function()
+	if not started or not warmupOpen then
+		return
+	end
+	while next(musicProbes) == nil and #musicQueue > 0 do
+		local key = table.remove(musicQueue, 1) :: string
+		musicQueued[key] = nil
+		local entry, id, status = resolveLive(key)
+		if status == "pending" and entry ~= nil and id ~= nil and idState[id] == nil then
+			startProbe(id, entry, { warm = key })
+		elseif status == "dead" then
+			retryDue(key)
 		end
 	end
 end
@@ -726,6 +927,7 @@ local function emitterFor(voice: Voice, position: Vector3): Attachment?
 end
 
 local function playNow(name: string, at: any?, opts: PlayOpts?): Sound?
+	retryDue(name) -- a failed better candidate (or a dead entry) may be checked again, in the background
 	local entry, id, status = resolveLive(name)
 	if entry == nil or id == nil then
 		return nil
@@ -863,8 +1065,6 @@ function SoundController.StopAll(name: string)
 	end
 end
 
-local scheduleMusicRefresh: () -> () -- (forward) re-runs the music selection on the next resumption point
-
 function SoundController.Register(name: string, soundId: any, opts: { [string]: any }?)
 	local base: SoundDef? = custom[name] or Audio.Get(name)
 	local o = opts or {}
@@ -925,8 +1125,31 @@ local function ensureDecks()
 			Rate = 1,
 			StartedAt = 0,
 			Checked = true,
+			Resume = nil,
 		})
 	end
+end
+
+-- a looped track about to stop mid-play: remember where it was (resumed if it comes back within RESUME_WINDOW s)
+local function rememberPosition(deck: Deck)
+	local id, key = deck.Id, deck.Key
+	if id == nil or key == nil or RESTART_KEYS[key] or not deck.Sound.Looped then
+		return
+	end
+	local position = deck.Sound.TimePosition
+	if type(position) == "number" and position > 0.5 then
+		resumeAt[id] = { Position = position, At = os.clock() }
+	end
+end
+
+-- where a track starts: the remembered position of a looped id stopped less than RESUME_WINDOW s ago, else 0
+local function resumePosition(key: string, id: string, looped: boolean): number
+	local saved = resumeAt[id]
+	resumeAt[id] = nil
+	if saved == nil or not looped or RESTART_KEYS[key] or os.clock() - saved.At > SoundController.RESUME_WINDOW then
+		return 0
+	end
+	return saved.Position
 end
 
 local function faderStep(dt: number)
@@ -958,6 +1181,16 @@ local function faderStep(dt: number)
 				busy = true
 			end
 		end
+		local resume = deck.Resume
+		if resume ~= nil and deck.Sound.IsLoaded then
+			-- a resumed track: make sure the position held through the load (and fits the file)
+			deck.Resume = nil
+			local length = deck.Sound.TimeLength
+			local want = if length > 0 then resume % length else resume
+			if math.abs(deck.Sound.TimePosition - want) > 1 then
+				deck.Sound.TimePosition = want
+			end
+		end
 		if deck.Current < deck.Target and not deck.Sound.IsLoaded then
 			-- hold the fade-in until the asset has loaded (no full-volume pop after a slow load)
 			busy = true
@@ -972,10 +1205,12 @@ local function faderStep(dt: number)
 		end
 		deck.Sound.Volume = deck.Current * duckLevel
 		if deck.Current <= 0 and deck.Target <= 0 and (deck.Sound.Playing or deck.Id ~= nil) then
+			rememberPosition(deck)
 			deck.Sound:Stop()
 			deck.Key = nil
 			deck.Entry = nil
 			deck.Id = nil
+			deck.Resume = nil
 		end
 	end
 	if not busy and faderConnection then
@@ -995,56 +1230,108 @@ local function setDeck(deck: Deck, target: number, fade: number)
 	deck.Rate = math.max(math.abs(target - deck.Current), 0.001) / math.max(fade, 0.05)
 end
 
--- Puts the requested track's best id on a deck: good -> (cross)fade to it; pending -> check it while the current
--- track keeps playing; dead / empty -> fade out (the selection has already moved on if it could).
+local function fadeOutDeck(deck: Deck, fade: number)
+	setDeck(deck, 0, fade)
+	runFader()
+end
+
+-- the id on a deck is still fine to keep playing (not found bad)
+local function deckAlive(deck: Deck): boolean
+	local id = deck.Id
+	return id ~= nil and deck.Target > 0 and stateOf(id) ~= "bad"
+end
+
+-- Plays `key` (resolved to `entry` / `id`) on the decks: crossfade from the current deck, or keep going when the
+-- current deck already holds that audio.
+local function playOn(key: string, entry: string, id: string, fade: number)
+	local def = defOf(entry)
+	if def == nil then
+		return
+	end
+	local current = decks[activeDeck]
+	local oneShotPlayed = current.Key == key and not current.Sound.Looped and current.Target > 0
+	if current.Id == id and (current.Sound.Playing or oneShotPlayed) then
+		-- already on this audio (e.g. "<map>_Final" -> FinalPhase while FinalPhase plays): keep it going; a one-shot
+		-- (the Victory / Defeat stinger) that has already played for this request is never started again
+		current.Key = key
+		current.Entry = entry
+		if current.Target ~= def.Volume then
+			setDeck(current, def.Volume, fade)
+			runFader()
+		end
+		return
+	end
+	local nextIndex = 3 - activeDeck
+	local deck = decks[nextIndex]
+	setDeck(current, 0, fade)
+	local looped = def.Looped ~= false
+	if not (deck.Id == id and deck.Sound.Playing and deck.Current > 0) then
+		-- (otherwise: back to the track that is still fading out -> fade it back in without a restart)
+		rememberPosition(deck)
+		deck.Sound:Stop()
+		deck.Sound.SoundId = id
+		deck.Sound.Looped = looped
+		local resume = resumePosition(key, id, looped)
+		deck.Sound.TimePosition = resume
+		deck.Resume = if resume > 0 then resume else nil
+		deck.Current = 0
+		deck.Sound.Volume = 0
+		deck.StartedAt = os.clock()
+		deck.Checked = false
+		deck.Sound:Play()
+	end
+	deck.Sound.Looped = looped
+	deck.Key = key
+	deck.Entry = entry
+	deck.Id = id
+	setDeck(deck, def.Volume, fade)
+	activeDeck = nextIndex
+	runFader()
+end
+
+-- Puts the requested track on the decks: a good id -> (cross)fade to it; still being checked -> the playing track
+-- goes on only if it is an acceptable stand-in (requestedChoices), else the first ready stand-in plays, else the music
+-- fades out; dead / empty -> fade out (the selection has already moved on if it could).
 local function syncDeck(fade: number)
 	ensureDecks()
 	local current = decks[activeDeck]
 	local key = requestedMusic
 	if key == nil then
-		setDeck(current, 0, fade)
-		runFader()
+		fadeOutDeck(current, fade)
 		return
 	end
+	retryDue(key) -- a failed better candidate (or a dead entry) may be checked again, in the background
 	local entry, id, status = resolveLive(key)
-	local def = if entry ~= nil then defOf(entry) else nil
-	if status == "ok" and entry ~= nil and id ~= nil and def ~= nil then
-		if current.Id == id and current.Sound.Playing then
-			-- already on this audio (e.g. "<map>_Final" -> FinalPhase while FinalPhase plays): keep it going
-			current.Key = key
-			current.Entry = entry
-			if current.Target ~= def.Volume then
-				setDeck(current, def.Volume, fade)
-				runFader()
-			end
-			return
+	if status == "ok" and entry ~= nil and id ~= nil then
+		local keepEntry = if current.Key == key and current.Entry ~= nil then defOf(current.Entry :: string) else nil
+		if
+			keepEntry ~= nil
+			and current.Id ~= id
+			and deckAlive(current)
+			and table.find(candidatesOf(keepEntry), current.Id) ~= nil
+		then
+			-- this track already plays on another good candidate (a better one answered late): keep it, no song
+			-- switch mid-play; its next start uses the better one
+			entry, id = current.Entry :: string, current.Id :: string
 		end
-		local nextIndex = 3 - activeDeck
-		local deck = decks[nextIndex]
-		setDeck(current, 0, fade)
-		if not (deck.Id == id and deck.Sound.Playing and deck.Current > 0) then
-			-- (otherwise: back to the track that is still fading out -> fade it back in without a restart)
-			deck.Sound:Stop()
-			deck.Sound.SoundId = id
-			deck.Sound.TimePosition = 0
-			deck.Current = 0
-			deck.Sound.Volume = 0
-			deck.StartedAt = os.clock()
-			deck.Checked = false
-			deck.Sound:Play()
-		end
-		deck.Sound.Looped = def.Looped ~= false
-		deck.Key = key
-		deck.Entry = entry
-		deck.Id = id
-		setDeck(deck, def.Volume, fade)
-		activeDeck = nextIndex
-		runFader()
+		playOn(key, entry, id, fade)
 	elseif status == "pending" and id ~= nil then
 		startProbe(id, entry) -- its answer re-runs the selection (onIdChanged)
+		if current.Key ~= nil and deckAlive(current) and table.find(requestedChoices, current.Key) ~= nil then
+			return -- an acceptable stand-in keeps playing meanwhile
+		end
+		for _, alt in requestedChoices do
+			if alt ~= key then
+				local altEntry, altId, altStatus = resolveLive(alt)
+				if altStatus == "ok" and altEntry ~= nil and altId ~= nil then
+					playOn(alt, altEntry, altId, fade)
+					return
+				end
+			end
+		end
+		fadeOutDeck(current, fade) -- nothing ready: silence rather than a stale track
 	else
-		setDeck(current, 0, fade)
-		runFader()
+		fadeOutDeck(current, fade)
 	end
 end
 
@@ -1053,7 +1340,8 @@ function SoundController.CurrentMusic(): string?
 	return if deck then deck.Key else nil
 end
 
-function SoundController.PlayMusic(key: string?, fadeTime: number?)
+-- the request behind PlayMusic and the automatic selection: `choices` = stand-ins accepted while `key` is checked
+local function request(key: string?, choices: { string }?, fadeTime: number?)
 	ensureDecks()
 	local fade = if type(fadeTime) == "number" then math.max(0, fadeTime) else SoundController.DEFAULT_MUSIC_FADE
 	local wanted = if type(key) == "string" and key ~= "" then canonical(key) else nil
@@ -1062,10 +1350,25 @@ function SoundController.PlayMusic(key: string?, fadeTime: number?)
 		requestedMusic = wanted
 		requestedFade = fade
 	end
+	local list: { string } = {}
+	if wanted ~= nil then
+		table.insert(list, wanted)
+	end
+	for _, choice in choices or {} do
+		local c = canonical(choice)
+		if table.find(list, c) == nil then
+			table.insert(list, c)
+		end
+	end
+	requestedChoices = list
 	syncDeck(fade)
 	if changed then
 		SoundController.MusicChanged:Fire(wanted)
 	end
+end
+
+function SoundController.PlayMusic(key: string?, fadeTime: number?)
+	request(key, nil, fadeTime)
 end
 
 function SoundController.StopMusic(fadeTime: number?)
@@ -1185,31 +1488,103 @@ local function staticUsable(key: string): boolean
 	return Audio.Resolve(key) ~= nil
 end
 
--- Pure: the track the automatic selection wants for a RoundState snapshot.
-function SoundController.MusicFor(round: { [string]: any }, ctx: { [string]: any }): string?
-	if ctx.Override then
-		return ctx.Override
+-- The automatic selection's choices, most preferred first: an override, then the box track, then the phase's track(s)
+-- (a lobby viewer: the lobby; the arena: every usable key of ArenaMusicOrder; Ending: the stinger, else the track
+-- that was on - never the box track). `firstOnly` stops at the first key (MusicFor: no Usable calls past it).
+local function musicChoices(round: { [string]: any }, ctx: { [string]: any }, firstOnly: boolean): { string }
+	local out: { string } = {}
+	local seen: { [string]: boolean } = {}
+	local function add(key: any): boolean -- true = done (firstOnly and a key is in)
+		if type(key) == "string" and key ~= "" and not seen[key] then
+			seen[key] = true
+			table.insert(out, key)
+		end
+		return firstOnly and #out > 0
 	end
-	if ctx.Box then
-		return "VerdictBox"
+	if ctx.Override and add(ctx.Override) then
+		return out
+	end
+	if ctx.Box and add("VerdictBox") then
+		return out
 	end
 	if ctx.Participant == false then
-		return "Lobby" -- waiting in the lobby while a round runs elsewhere
+		add("Lobby") -- waiting in the lobby while a round runs elsewhere
+		return out
 	end
 	local phase = round.Phase
 	if phase == "Intro" or phase == "Round" or phase == "Collapse" then
 		local usable: (string) -> boolean = if type(ctx.Usable) == "function" then ctx.Usable else staticUsable
 		local order = SoundController.ArenaMusicOrder(round)
+		local any = false
+		for _, key in order do
+			if usable(key) then
+				any = true
+				if add(key) then
+					return out
+				end
+			end
+		end
+		if not any then
+			add(order[#order]) -- nothing playable: the map's track (silent), as without themes
+		end
+	elseif phase == "Ending" then
+		if ctx.Stinger then
+			add(ctx.Stinger)
+		else
+			for _, key in { ctx.Current, ctx.Playing } do
+				if key ~= "VerdictBox" and add(key) then
+					return out
+				end
+			end
+		end
+	else
+		add("Lobby")
+	end
+	return out
+end
+
+-- Pure: the track the automatic selection wants for a RoundState snapshot.
+function SoundController.MusicFor(round: { [string]: any }, ctx: { [string]: any }): string?
+	return musicChoices(round, ctx, true)[1]
+end
+
+-- Pure: MusicFor's answer first, then the stand-ins that may play while it is still being checked.
+function SoundController.MusicChoices(round: { [string]: any }, ctx: { [string]: any }): { string }
+	return musicChoices(round, ctx, false)
+end
+
+-- Pure: the music a round will soon need, most urgent first: the fight track, the box track, the Phase 2 track,
+-- CollapsePhase, Victory, Defeat. Nothing for a lobby viewer or outside Intro / Round / Collapse.
+function SoundController.PrefetchOrder(round: { [string]: any }, ctx: { [string]: any }?): { string }
+	local c = ctx or {}
+	local out: { string } = {}
+	local phase = round.Phase
+	if c.Participant == false or (phase ~= "Intro" and phase ~= "Round" and phase ~= "Collapse") then
+		return out
+	end
+	local usable: (string) -> boolean = if type(c.Usable) == "function" then c.Usable else staticUsable
+	local function add(key: string?)
+		if key ~= nil and table.find(out, key) == nil then
+			table.insert(out, key)
+		end
+	end
+	local function firstUsable(final: boolean): string?
+		local order =
+			SoundController.ArenaMusicOrder({ Phase = "Round", MapId = round.MapId, MonsterKit = round.MonsterKit, FinalPhase = final })
 		for _, key in order do
 			if usable(key) then
 				return key
 			end
 		end
-		return order[#order] -- nothing playable: the map's track (silent), as without themes
-	elseif phase == "Ending" then
-		return ctx.Stinger or ctx.Current
+		return nil
 	end
-	return "Lobby"
+	add(firstUsable(false))
+	add("VerdictBox")
+	add(firstUsable(true))
+	add("CollapsePhase")
+	add("Victory")
+	add("Defeat")
+	return out
 end
 
 -- false only when we know the local player is waiting in the lobby (Role "Lobby"); unknown = participant
@@ -1224,20 +1599,44 @@ local function isParticipant(): boolean
 	return true
 end
 
-local function desiredMusic(): string?
-	return SoundController.MusicFor(stateRound(), {
+local function musicCtx(): { [string]: any }
+	local deck = decks[activeDeck]
+	return {
 		Override = previewKey or musicOverride,
 		Box = boxActive,
 		Stinger = stingerKey,
 		Current = requestedMusic,
+		Playing = if deck and deck.Target > 0 then deck.Key else nil,
 		Participant = isParticipant(),
 		Usable = usableKey,
-	})
+	}
 end
 
 local function refreshMusic(fadeTime: number?)
-	-- PlayMusic is a no-op when the key and its id are unchanged
-	SoundController.PlayMusic(desiredMusic(), fadeTime)
+	-- a no-op when the key and its id are unchanged
+	local round = stateRound()
+	local ctx = musicCtx()
+	local choices = SoundController.MusicChoices(round, ctx)
+	request(choices[1], choices, fadeTime)
+	local phase = round.Phase
+	if ctx.Participant ~= false and (phase == "Intro" or phase == "Round" or phase == "Collapse") then
+		-- the arena tracks preferred over the one chosen are dead right now: each gets its re-check when due
+		for _, key in SoundController.ArenaMusicOrder(round) do
+			if key == choices[1] or table.find(choices, key) ~= nil then
+				break
+			end
+			retryDue(key)
+		end
+	end
+end
+
+-- warms up what the current round will need (front of the queue); nothing outside a round
+local function prefetchRound()
+	local order = SoundController.PrefetchOrder(stateRound(), { Participant = isParticipant(), Usable = usableKey })
+	if #order > 0 then
+		prefetchList(order, true)
+		pumpMusic()
+	end
 end
 
 scheduleMusicRefresh = function()
@@ -1340,8 +1739,10 @@ local function hookState()
 					stingerKey = nil
 				end
 				refreshMusic()
+				prefetchRound()
 			elseif attr == "MapId" or attr == "FinalPhase" or attr == "MonsterKit" then
 				refreshMusic(if attr == "FinalPhase" then 0.8 else nil)
+				prefetchRound()
 			end
 		end)
 	end
@@ -1349,6 +1750,7 @@ local function hookState()
 		-- joining / leaving the round (or waiting in the lobby during one) switches between arena and lobby music
 		State.RoleChanged:Connect(function()
 			refreshMusic()
+			prefetchRound()
 		end)
 	end
 	if type(State.OnRoundEvent) == "function" then
@@ -1363,19 +1765,21 @@ local function hookState()
 	end
 end
 
--- Verdict Box: the box track starts on the first frame of the victim's pull-in (VerdictBoxController warms its ids
--- up with Prewarm at Start), so the switch INTO the box is a short fade; the way back out keeps a normal one.
-SoundController.BOX_FADE_IN = 0.15
-SoundController.BOX_FADE_OUT = 1.0
-
--- Prewarm(name): checks an entry's candidates ahead of time (background probes, the next candidate after a bad one),
--- so a later PlayMusic / Play of it starts at once instead of waiting for its first check. Safe to call repeatedly.
+-- Prewarm(name): checks (downloads) an entry's candidate ahead of time in the background, the next one after a bad
+-- one, so a later PlayMusic / Play of it starts at once instead of waiting for its first check. Music joins the
+-- one-at-a-time warm-up queue (after what already waits there). Safe to call repeatedly.
 function SoundController.Prewarm(name: string)
 	if type(name) ~= "string" or name == "" then
 		return
 	end
-	queueEntry(canonical(name))
-	pumpProbes()
+	local key = canonical(name)
+	if isMusicEntry(key) then
+		prefetchMusic(key)
+		pumpMusic()
+	else
+		queueEntry(key)
+		pumpProbes()
+	end
 end
 
 local function hookInput()
@@ -1410,7 +1814,18 @@ function SoundController.Start()
 	applyGroupVolumes()
 	hookState()
 	hookInput()
-	refreshMusic(2.5)
+	prefetchList(START_MUSIC)
+	-- the first track one resumption later: a title screen that opens at once asks for its own track first, so the
+	-- lobby track is not downloaded in the foreground next to it (it is warmed up right after)
+	task.defer(function()
+		local ok, err = pcall(refreshMusic, 2.5)
+		if not ok then
+			warn("[SoundController] music: " .. tostring(err))
+		end
+		warmupOpen = true
+		prefetchRound() -- joined during a round
+		pumpMusic()
+	end)
 	task.delay(SoundController.PROBE_BATCH_DELAY, probeShortSounds)
 end
 

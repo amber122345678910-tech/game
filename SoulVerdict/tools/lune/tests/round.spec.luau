@@ -532,16 +532,29 @@ local function buildSim(Loader)
 		end
 	end
 
+	-- statuses: Apply / Remove are recorded; Has(model, name) is true only for what a test set with sim.setStatus
+	-- (until a Remove clears it), so the round loop sees no status by default
 	local SS = {}
+	sim.statuses = {}
+	function sim.setStatus(model, name, on)
+		local list = sim.statuses[model] or {}
+		sim.statuses[model] = list
+		list[name] = if on then true else nil
+	end
 	function SS.Apply(model, name, duration, data)
 		record("StatusApply", { model = model, name = name, duration = duration, data = data })
 		return true
 	end
 	function SS.Remove(model, name)
 		record("StatusRemove", { model = model, name = name })
+		local list = sim.statuses[model]
+		if list then
+			list[name] = nil
+		end
 	end
-	function SS.Has()
-		return false
+	function SS.Has(model, name)
+		local list = sim.statuses[model]
+		return list ~= nil and list[name] == true
 	end
 
 	local DS = { Damaged = Signal.new(), Healed = Signal.new(), Parried = Signal.new(), Dodged = Signal.new() }

@@ -6,11 +6,20 @@
 --     carries one). Countdown to the next UTC day.
 --   * All skins by kit: kit rail (owned counts) + skin tiles with rarity colours, OWNED / EQUIPPED states,
 --     mastery locks, kit unlock tile for locked kits. G balance in the header.
+--   * Sleepy Sans, the shopkeeper (Screens/ShopKeeper, owner's request): a pixel-art column at the LEFT of the body
+--     (phone and desktop; ShopKeeper.Plan sizes it so the goods keep their room; no column when there is none, e.g.
+--     portrait). He sleeps, wakes up when the shop opens and greets you (shop.keeper.greet, Sans's text blips).
+--     A purchase the server confirms (Notify "prog.notify.bought"/"boughtKit", or the item owned in the next profile)
+--     -> shop.keeper.thanks; not enough G -> shop.keeper.poor (with the keeper there is no "not enough" pop-up: the
+--     button shakes + the error sound, like an Undertale shop; the server's "prog.err.gold" says it too).
 -- ShopToday shapes accepted: { Day?, Items = {Item} } | {Item};  Item = "kitId:skinId" |
 --   { KitId|Kit|kitId, SkinId|Skin|skinId, Price?|price?, Discount?|discount? (percent), Featured?|featured? }
 --
---   Shop.Create(theme, deps) -> { Root, Destroy, DefaultSelection, OnAction(action) }
---   deps: State, UI, Layout (+ offline: Profile, Kit = rail selection, Tab = "Daily"|"All" on phones, Now)
+--   Shop.Create(theme, deps) -> { Root, Destroy, DefaultSelection, OnAction(action), Keeper (ShopKeeper handle?),
+--       Press(kitId, skinId?) -> boolean (what that item's price button does), Confirm() -> boolean (the purchase
+--       modal's Buy button) }
+--   deps: State, UI, Layout (+ offline: Profile, Kit = rail selection, Tab = "Daily"|"All" on phones, Now,
+--         Keeper = false (no shopkeeper column), KeeperAt = seconds (pose that moment of his wake-up), ReducedMotion)
 -- Requests: Buy {kind="Skin", kitId, skinId} | {kind="Kit", kitId}; EquipSkin {kitId, skinId}.
 
 local Themes = require(script.Parent.Parent.Themes)
@@ -18,10 +27,15 @@ local UIKit = require(script.Parent.Parent.UIKit)
 local Icons = require(script.Parent.Parent.Icons)
 local Motion = require(script.Parent.Parent.Motion)
 local Common = require(script.Parent.Common)
+local ShopKeeper = require(script.Parent.ShopKeeper)
 
 type Theme = Themes.Theme
 
 local Shop = {}
+
+-- server notifications (ShopService / Progression.Shop) the shopkeeper answers
+local BOUGHT_KEYS: { [string]: boolean } = { ["prog.notify.bought"] = true, ["prog.notify.boughtKit"] = true }
+local POOR_KEY = "prog.err.gold"
 
 local L = Common.L
 local pick = Common.Pick
@@ -149,11 +163,66 @@ function Shop.Create(theme: Theme, deps: any): any
 	local pendingSkin: { [string]: string } = {}
 	local defaultSel: GuiObject? = nil
 
+	-- sleepy Sans's column on the left, the goods on the right (the whole body when there is no room for him)
+	local layoutScale: number = (screen.Layout and screen.Layout.Scale) or 1
+	local keeper: any = nil
+	local goodsX = 0
+	if d.Keeper ~= false then
+		local plan = ShopKeeper.Plan(bodyW, bodyH, layoutScale, phone, screen.Gap)
+		if plan then
+			keeper = ShopKeeper.Create(theme, {
+				Name = "Keeper",
+				Size = Vector2.new(plan.Width, plan.Height),
+				Scale = layoutScale,
+				Phone = phone,
+				Deps = d,
+				At = if type(d.KeeperAt) == "number" then d.KeeperAt else nil,
+				ReducedMotion = if type(d.ReducedMotion) == "boolean" then d.ReducedMotion else nil,
+			})
+			if keeper then
+				keeper.Root.Parent = body
+				goodsX = plan.Width + screen.Gap
+			end
+		end
+	end
+	local goodsW = bodyW - goodsX
+	local goods = frame({ Name = "Goods", Position = UDim2.fromOffset(goodsX, 0), Size = UDim2.new(0, goodsW, 1, 0), Parent = body })
+
+	-- what the shopkeeper answers: the purchase in flight (thanks once the server confirms it)
+	local pendingBuy: { kitId: string, skinId: string? }? = nil
+	local function keeperSay(key: string)
+		if keeper then
+			keeper.Say(key)
+		end
+	end
+	-- one shake at a time per button (a second shake would start from the shaken position and end there)
+	local shakenAt: { [GuiObject]: number } = setmetatable({}, { __mode = "k" }) :: any
+	local function shake(gui: GuiObject?)
+		local now = os.clock()
+		if gui and now - (shakenAt[gui] or -1) > 0.3 then
+			shakenAt[gui] = now
+			Motion.Shake(gui, 4, 0.25)
+		end
+	end
+	local function bought(p: any, item: { kitId: string, skinId: string? }): boolean
+		local kit = kits and kits.Get(item.kitId)
+		if kit == nil or p == nil then
+			return false
+		end
+		if item.skinId then
+			local skin = kits.Skin(item.kitId, item.skinId)
+			return skin ~= nil and Common.SkinOwned(p, kit, skin)
+		end
+		return Common.KitOwned(p, kit)
+	end
+
+	local confirmPurchase: (() -> ())? = nil -- the open purchase modal's Buy action
 	local function closeModal()
 		if modal then
 			modal.Destroy()
 			modal = nil
 		end
+		confirmPurchase = nil
 	end
 
 	local function notice(titleText: string, text: string)
@@ -169,15 +238,33 @@ function Shop.Create(theme: Theme, deps: any): any
 		modal.Root.Parent = root
 	end
 
-	local function buy(kit: any, skin: any?, price: number)
+	local function buy(kit: any, skin: any?, price: number, pressed: GuiObject?)
 		local gold = profile and profile.Gold or 0
 		local name = if skin then pick(skin.Name) else pick(kit.Name)
 		if gold < price then
+			if keeper then
+				-- Undertale-style: the shopkeeper says it (no pop-up; the G balance sits in the header)
+				closeModal()
+				keeperSay("shop.keeper.poor")
+				Motion.Sound(theme.Sounds.Error)
+				shake(pressed)
+				return
+			end
 			notice(L("scr.shop.confirmTitle", name), L("scr.shop.notEnough", Common.Num(price - gold)))
 			return
 		end
 		closeModal()
 		local text = if skin then L("scr.shop.confirmText", Common.Num(price), pick(skin.Name), pick(kit.Name)) else L("scr.shop.confirmKit", Common.Num(price), pick(kit.Name))
+		local function confirm()
+			closeModal()
+			-- the shopkeeper thanks you once the server confirms it (Notify / the next profile)
+			pendingBuy = { kitId = kit.Id, skinId = if skin then skin.Id else nil }
+			if skin then
+				Common.Request(d, "Buy", { kind = "Skin", kitId = kit.Id, skinId = skin.Id })
+			else
+				Common.Request(d, "Buy", { kind = "Kit", kitId = kit.Id })
+			end
+		end
 		modal = UIKit.Modal(theme, {
 			Title = L("scr.shop.confirmTitle", name),
 			PanelSize = UDim2.fromOffset(if phone then 520 else 620, if phone then 230 else 270),
@@ -190,19 +277,13 @@ function Shop.Create(theme: Theme, deps: any): any
 					Variant = "Primary",
 					Icon = "Gold",
 					Width = 220,
-					OnActivated = function()
-						closeModal()
-						if skin then
-							Common.Request(d, "Buy", { kind = "Skin", kitId = kit.Id, skinId = skin.Id })
-						else
-							Common.Request(d, "Buy", { kind = "Kit", kitId = kit.Id })
-						end
-					end,
+					OnActivated = confirm,
 				},
 			},
 		})
 		UIKit.Label(theme, { Text = text, Role = "Body", Dialogue = true, Wrap = true, YAlign = "Top", Size = UDim2.fromScale(1, 1), Parent = modal.Content })
 		modal.Root.Parent = root
+		confirmPurchase = confirm
 	end
 
 	-- one skin tile ------------------------------------------------------------------------------------
@@ -322,6 +403,7 @@ function Shop.Create(theme: Theme, deps: any): any
 		local icon: string? = "Gold"
 		local disabled = false
 		local action: (() -> ())? = nil
+		local pressed: GuiObject? = nil -- the action button (shakes when the G is not enough)
 		if equipped then
 			text, variant, icon, disabled = L("scr.shop.equipped"), "Secondary", "Check", true
 		elseif owned then
@@ -338,7 +420,7 @@ function Shop.Create(theme: Theme, deps: any): any
 		else
 			text = L("common.gold", Common.Num(price))
 			action = function()
-				buy(kit, skin, price)
+				buy(kit, skin, price, pressed)
 			end
 		end
 		local bh = if phone then 32 elseif featured then 46 else 38
@@ -355,6 +437,7 @@ function Shop.Create(theme: Theme, deps: any): any
 		})
 		btn.Root.Size = UDim2.new(1, -pad * 2, 0, bh)
 		btn.Root.Parent = tile
+		pressed = btn.Root
 		if discount > 0 and not owned and base > price then
 			-- struck-through original price above the button
 			UIKit.Label(theme, {
@@ -378,8 +461,9 @@ function Shop.Create(theme: Theme, deps: any): any
 	end
 
 	-- sections -----------------------------------------------------------------------------------------
-	local dailyHolder = frame({ Name = "DailyHolder", Size = UDim2.new(1, 0, 0, 0), Parent = body })
-	local allHolder = frame({ Name = "AllHolder", Size = UDim2.new(1, 0, 0, 0), Parent = body })
+	local todayPrice: { [string]: number } = {} -- "kitId:skinId" -> today's price (daily rotation)
+	local dailyHolder = frame({ Name = "DailyHolder", Size = UDim2.new(1, 0, 0, 0), Parent = goods })
+	local allHolder = frame({ Name = "AllHolder", Size = UDim2.new(1, 0, 0, 0), Parent = goods })
 	local refresh: () -> ()
 
 	local function buildDaily(parent: Frame, w: number, h: number)
@@ -405,6 +489,10 @@ function Shop.Create(theme: Theme, deps: any): any
 			cd.Text = L("scr.shop.resets", Common.Clock(86400 - (Common.Now(d) % 86400)))
 		end))
 		local offers = if kits then dailyOffers(d, profile, kits) else {}
+		table.clear(todayPrice)
+		for _, o in offers do
+			todayPrice[o.kit.Id .. ":" .. o.skin.Id] = o.price
+		end
 		if #offers == 0 then
 			Common.Empty(theme, L("scr.shop.empty"), { Parent = panel.Content })
 			return
@@ -531,6 +619,7 @@ function Shop.Create(theme: Theme, deps: any): any
 			UIKit.Label(theme, { Text = pick(kit.Title), Role = "Caption", Tone = "Dim", XAlign = "Center", AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0.58, 24), Size = UDim2.new(1, -16, 0, 16), Parent = tile })
 			local level = profile and profile.Level or 1
 			local needLv = kit.Unlock.Level or 0
+			local unlockButton: GuiObject? = nil
 			local b = UIKit.Button(theme, {
 				Text = if needLv > level then L("common.requiresLevel", needLv) else L("common.gold", Common.Num(kit.Unlock.Gold)),
 				Icon = if needLv > level then "Lock" else "Gold",
@@ -540,11 +629,12 @@ function Shop.Create(theme: Theme, deps: any): any
 				AnchorPoint = Vector2.new(0.5, 1),
 				Position = UDim2.new(0.5, 0, 1, -12),
 				OnActivated = function()
-					buy(kit, nil, kit.Unlock.Gold)
+					buy(kit, nil, kit.Unlock.Gold, unlockButton)
 				end,
 			})
 			b.Root.Size = UDim2.new(1, -24, 0, if phone then 32 else 38)
 			b.Root.Parent = tile
+			unlockButton = b.Root
 			grid.Add(tile)
 		end
 		for _, skin in kit.Skins do
@@ -563,25 +653,27 @@ function Shop.Create(theme: Theme, deps: any): any
 		defaultSel = nil
 		if phone then
 			local tabsH = 34
-			dailyHolder.Position = UDim2.fromOffset(0, tabsH + 8)
-			allHolder.Position = UDim2.fromOffset(0, tabsH + 8)
-			local h = bodyH - tabsH - 8
+			-- (Classic panel titles sit ON the top border, half above it: keep them clear of the tab underline)
+			local below = tabsH + (if theme.Id == "Classic" then 16 else 8)
+			dailyHolder.Position = UDim2.fromOffset(0, below)
+			allHolder.Position = UDim2.fromOffset(0, below)
+			local h = bodyH - below
 			dailyHolder.Size = UDim2.new(1, 0, 0, h)
 			allHolder.Size = UDim2.new(1, 0, 0, h)
 			dailyHolder.Visible = phoneTab == "Daily"
 			allHolder.Visible = phoneTab == "All"
 			if phoneTab == "Daily" then
-				buildDaily(dailyHolder, bodyW, h)
+				buildDaily(dailyHolder, goodsW, h)
 			else
-				buildAll(allHolder, bodyW, h)
+				buildAll(allHolder, goodsW, h)
 			end
 		else
 			local dailyH = math.floor(bodyH * 0.5)
 			dailyHolder.Size = UDim2.new(1, 0, 0, dailyH)
 			allHolder.Position = UDim2.fromOffset(0, dailyH + screen.Gap)
 			allHolder.Size = UDim2.new(1, 0, 0, bodyH - dailyH - screen.Gap)
-			buildDaily(dailyHolder, bodyW, dailyH)
-			buildAll(allHolder, bodyW, bodyH - dailyH - screen.Gap)
+			buildDaily(dailyHolder, goodsW, dailyH)
+			buildAll(allHolder, goodsW, bodyH - dailyH - screen.Gap)
 		end
 	end
 	if phone then
@@ -595,7 +687,7 @@ function Shop.Create(theme: Theme, deps: any): any
 				refresh()
 			end,
 		})
-		tabs.Root.Parent = body
+		tabs.Root.Parent = goods
 	end
 	refresh()
 
@@ -604,12 +696,66 @@ function Shop.Create(theme: Theme, deps: any): any
 		bag.Connect(state.ProfileChanged, function(p: any)
 			profile = p or Common.Profile(d)
 			table.clear(pendingSkin)
+			local item = pendingBuy
+			if item and bought(profile, item) then
+				pendingBuy = nil
+				keeperSay("shop.keeper.thanks")
+			end
 			refresh()
+		end)
+	end
+	if state and state.Notify then
+		bag.Connect(state.Notify, function(key: any)
+			if type(key) ~= "string" then
+				return
+			end
+			if BOUGHT_KEYS[key] then
+				if pendingBuy then
+					pendingBuy = nil
+					keeperSay("shop.keeper.thanks")
+				end
+			elseif key == POOR_KEY then
+				pendingBuy = nil
+				keeperSay("shop.keeper.poor")
+			elseif string.sub(key, 1, 9) == "prog.err." then
+				pendingBuy = nil -- refused for another reason (the toast says why)
+			end
 		end)
 	end
 
 	return {
 		Root = root,
+		Keeper = keeper,
+		-- what pressing an item's price button does (tests / shortcuts): false = no such item for sale to you
+		Press = function(kitId: string, skinId: string?): boolean
+			local kit = kits and kits.Get(kitId)
+			if kit == nil then
+				return false
+			end
+			if skinId then
+				local skin = kits.Skin(kitId, skinId)
+				if skin == nil or skin.Mastery or Common.SkinOwned(profile, kit, skin) or not Common.KitOwned(profile, kit) then
+					return false
+				end
+				buy(kit, skin, todayPrice[kitId .. ":" .. skinId] or skin.Price or 0)
+				return true
+			end
+			local level = profile and profile.Level or 1
+			if Common.KitOwned(profile, kit) or (kit.Unlock.Level or 0) > level then
+				return false
+			end
+			buy(kit, nil, kit.Unlock.Gold)
+			return true
+		end,
+		-- the open purchase modal's Buy button (false = no purchase modal open)
+		Confirm = function(): boolean
+			local confirm = confirmPurchase
+			if confirm then
+				confirm()
+				return true
+			end
+			return false
+		end,
 		DefaultSelection = defaultSel or screen.Back,
 		OnAction = function(action: string): boolean
 			if modal then
@@ -644,6 +790,10 @@ function Shop.Create(theme: Theme, deps: any): any
 		end,
 		Destroy = function()
 			closeModal()
+			if keeper then
+				keeper.Destroy()
+				keeper = nil
+			end
 			screen.Destroy()
 		end,
 	}

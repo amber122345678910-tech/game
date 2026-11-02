@@ -97,11 +97,11 @@ ShopKeeper.Timing = {
 ShopKeeper.BlipSound = "SansTextBlip"
 ShopKeeper.MaxPixel = 12
 ShopKeeper.MinGoods = { Phone = 640, Desktop = 1080 } -- design px the goods (daily + all skins) keep beside the column
-ShopKeeper.MinBox = { Phone = 84, Desktop = 150 }
-ShopKeeper.MaxBox = { Phone = 150, Desktop = 210 }
+ShopKeeper.MinBox = { Phone = 84, Desktop = 120 }
+ShopKeeper.MaxBox = { Phone = 150, Desktop = 136 }
 ShopKeeper.Pad = { Phone = 8, Desktop = 12 }
 ShopKeeper.Gap = { Phone = 6, Desktop = 10 }
-ShopKeeper.TextSize = { Phone = 16, Desktop = 22 }
+ShopKeeper.TextSize = { Phone = 24, Desktop = 28 }
 
 local SNOWFLAKES = 9
 local SIGN_COLOR = Color3.fromRGB(74, 40, 18)
@@ -472,20 +472,24 @@ function ShopKeeper.Create(theme: Theme, opts: { [string]: any }): any
 	stage.Parent = content
 	local stageW, stageH = innerW, math.floor(fit.StageH)
 
+	-- the scene: W x H cells; every cell is Pixel screen px, so once its top-left corner sits on a whole screen pixel
+	-- (Snap) every cell edge does too (crisp, no seams)
 	local scene = newFrame("Scene", nil, 2)
 	scene.Size = UDim2.fromScale(fit.SceneW / stageW, fit.SceneH / stageH)
 	scene.Position = UDim2.fromScale(fit.SceneX / stageW, fit.SceneTop / stageH)
 	scene.Parent = stage
 
-	-- falling snow in the sky above the roof (only where there is sky)
+	-- falling snow in the sky above the roof (only where there is sky): scene cells above row 0, on the same pixel
+	-- grid as the art, behind the snowy roof (they vanish into it)
 	local flakes: { Frame } = {}
 	local skyCells = math.floor(fit.SceneTop / u)
+	local sideCells = math.floor(fit.SceneX / u)
 	if skyCells >= 6 then
 		for i = 1, SNOWFLAKES do
 			local flake = newFrame("Snow" .. i, sprite.Colors.s, 1)
 			flake.BackgroundTransparency = 0.25 + (i % 3) * 0.2
-			flake.Size = UDim2.fromScale(u / stageW, u / stageH)
-			flake.Parent = stage
+			flake.Size = UDim2.fromScale(1 / W, 1 / H)
+			flake.Parent = scene
 			table.insert(flakes, flake)
 		end
 	end
@@ -548,9 +552,10 @@ function ShopKeeper.Create(theme: Theme, opts: { [string]: any }): any
 	-- floating Z letters: three slots, each with the three glyph sizes (one shown at a time)
 	type ZSlot = { Root: Frame, Glyphs: { [string]: Frame }, Cells: { [string]: { Frame } } }
 	local zSlots: { ZSlot } = {}
+	local zSize = sprite.ZSize
 	for i = 1, 3 do
 		local slot = newFrame("Z" .. i, nil, z + 2)
-		slot.Size = UDim2.fromScale(5 / W, 5 / H)
+		slot.Size = UDim2.fromScale(zSize / W, zSize / H)
 		slot.Visible = false
 		local glyphs, cells = {}, {}
 		for glyphName, rows in sprite.Z do
@@ -558,7 +563,7 @@ function ShopKeeper.Create(theme: Theme, opts: { [string]: any }): any
 			holder.Size = UDim2.fromScale(1, 1)
 			holder.Visible = false
 			local list = {}
-			paint(holder, rows, 5, 5, 0, 5 - #rows, 1, list)
+			paint(holder, rows, zSize, zSize, 0, zSize - #rows, 1, list)
 			holder.Parent = slot
 			glyphs[glyphName] = holder
 			cells[glyphName] = list
@@ -618,15 +623,13 @@ function ShopKeeper.Create(theme: Theme, opts: { [string]: any }): any
 			return
 		end
 		lastSnow = tick
-		local skyTop = 0
-		local skyBottom = math.max(skyCells + 2, 1) -- flakes vanish behind the snowy roof
-		local span = skyBottom - skyTop
-		local cols = math.floor(stageW / u)
+		local span = skyCells + 2 -- from the top of the stage to 2 cells into the roof (hidden behind it)
+		local cols = W + sideCells * 2
 		for i, flake in flakes do
-			local col = (i * 37 + 11) % math.max(cols, 1)
+			local col = (i * 37 + 11) % math.max(cols, 1) - sideCells
 			local fall = (tick + i * 7) % span
 			local sway = if reduced then 0 else math.round(math.sin((tick + i * 3) * 0.5))
-			flake.Position = UDim2.fromScale(((col + sway) * u) / stageW, ((skyTop + fall) * u) / stageH)
+			flake.Position = UDim2.fromScale((col + sway) / W, (fall - skyCells) / H)
 		end
 	end
 
@@ -684,6 +687,34 @@ function ShopKeeper.Create(theme: Theme, opts: { [string]: any }): any
 		Head = head,
 	}
 
+	-- puts the scene's top-left corner on a whole screen pixel: stageAbs = the stage's AbsolutePosition (screen px;
+	-- default: read from the engine). Re-snaps only when the stage moved.
+	local layoutScale = if type(opts.Scale) == "number" and opts.Scale > 0 then opts.Scale else 1
+	local snappedAt: Vector2? = nil
+	function keeper.Snap(stageAbs: Vector2?)
+		local abs = stageAbs
+		if abs == nil then
+			local ok, value = pcall(function()
+				return stage.AbsolutePosition
+			end)
+			if not ok or typeof(value) ~= "Vector2" then
+				return
+			end
+			abs = value
+		end
+		local at = abs :: Vector2
+		if snappedAt and math.abs(at.X - snappedAt.X) < 1e-4 and math.abs(at.Y - snappedAt.Y) < 1e-4 then
+			return
+		end
+		snappedAt = at
+		-- (UDim offsets are whole design px, so the sub-pixel nudge goes into the Scale part)
+		local ax = at.X + fit.SceneX * layoutScale
+		local ay = at.Y + fit.SceneTop * layoutScale
+		local nx = (math.round(ax) - ax) / layoutScale
+		local ny = (math.round(ay) - ay) / layoutScale
+		scene.Position = UDim2.fromScale((fit.SceneX + nx) / stageW, (fit.SceneTop + ny) / stageH)
+	end
+
 	function keeper.Pose(t: number)
 		apply(timeline.PoseAt(t, reduced))
 		applySnow(t)
@@ -705,29 +736,45 @@ function ShopKeeper.Create(theme: Theme, opts: { [string]: any }): any
 		end
 	end
 
+	-- graphemes of the current line already voiced (reset when a new line starts: its Times table changes)
+	local voiced = 0
+	local voicedTimes: { number }? = nil
+
 	function keeper.Step(dt: number)
 		local d = if type(dt) == "number" and dt == dt then math.clamp(dt, 0, 0.25) else 0
-		local before = if clock >= timeline.LineAt then ShopKeeper.Shown(timeline.Times, clock - timeline.LineAt) else 0
 		clock += d
 		local pose = timeline.PoseAt(clock, reduced)
+		if voicedTimes ~= timeline.Times then
+			voicedTimes = timeline.Times
+			voiced = 0
+		end
 		if clock >= timeline.LineAt then
 			local now = ShopKeeper.Shown(timeline.Times, clock - timeline.LineAt)
-			-- one blip per step at most (MinInterval drops the rest anyway)
-			for i = before + 1, now do
+			-- one blip per step at most (MinInterval drops the rest anyway); the first letter is voiced too
+			local every = ShopKeeper.Timing.BlipEvery
+			for i = voiced + 1, now do
 				local g = timeline.Graphemes[i]
-				if g and not SILENT[g] and (i % ShopKeeper.Timing.BlipEvery == 1 or ShopKeeper.Timing.BlipEvery <= 1) then
+				if g and not SILENT[g] and (every <= 1 or i % every == 1) then
 					blip()
 					break
 				end
 			end
+			voiced = math.max(voiced, now)
 		end
 		apply(pose)
 		applySnow(clock)
+		if Motion.IsLive() then
+			keeper.Snap()
+		end
 	end
 
 	function keeper.Say(key: string, ...: any)
-		timeline.Say(Common.L(key, ...), clock)
-		if not Motion.IsLive() then
+		local line = Common.L(key, ...)
+		if line == timeline.Line and clock >= timeline.LineAt and clock < timeline.EndAt() then
+			return -- he is saying exactly that right now (a second tap does not restart the line)
+		end
+		timeline.Say(line, clock)
+		if not Motion.IsLive() and type(opts.At) ~= "number" then
 			keeper.Settle()
 		else
 			apply(timeline.PoseAt(clock, reduced))

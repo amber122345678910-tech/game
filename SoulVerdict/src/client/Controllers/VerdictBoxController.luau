@@ -68,7 +68,7 @@ local TUNING = {
 	StickDeadzone = 0.2,
 	DisplayOrder = 25,
 	EntryZIndex = 60, -- the entry layer above the box overlay and the touch controls (same ScreenGui)
-	EntryStep = "SV_VerdictBoxEntry", -- render step right after CameraController's (Camera + 1)
+	EntryStep = "SV_VerdictBoxEntry", -- render step Camera + 2: right after CameraController's (Camera + 1)
 	ImplodeVolume = 0.45, -- the pull-in sound, quiet under the box music
 }
 VerdictBoxController.Tuning = TUNING
@@ -1012,7 +1012,13 @@ local function openOverlay(box: Box)
 		end
 	end
 	victimBox = box
-	startEntry(box, gui)
+	local okEntry, errEntry = pcall(startEntry, box, gui)
+	if not okEntry then
+		-- no transition (the box still opens, at t0, and the fight is unchanged)
+		warn("[VerdictBoxController] entry transition unavailable: " .. tostring(errEntry))
+		stopEntry(box)
+		box.stages = nil
+	end
 	gui.Parent = playerGui
 	-- the pull-in, the box music (SoundController follows the "Box" context) and the implosion start together
 	call("InputController", "PushContext", "Box")

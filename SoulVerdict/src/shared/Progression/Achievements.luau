@@ -172,8 +172,9 @@ end)
 feat("no_mercy", "Epic", function(ctx)
 	return ctx.won and ctx.role == "Monster" and ctx.reason == "Eliminated" and not ctx.collapse
 end)
+-- the humans never pushed the monster to the Phase 2 HP threshold (its own first ultimate does not count)
 feat("unshaken", "Rare", function(ctx)
-	return ctx.won and ctx.role == "Monster" and not ctx.finalPhase
+	return ctx.won and ctx.role == "Monster" and not ctx.monsterBroken
 end)
 feat("big_damage", "Rare", function(ctx)
 	return (tonumber(ctx.row.damage) or 0) >= 1000

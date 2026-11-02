@@ -4,7 +4,9 @@
 --   Rewards.ShouldReward(result) -> boolean      false for reason "Aborted" (Style Lab stop) / malformed results
 --   Rewards.Context(result, row, extras?) -> RoundContext
 --        result = RoundService.RoundEnded payload {winner, reason, rows, mvpUserId, practice, durations, ...}
---        row    = this player's RoundStatRow; extras = {finalPhase?, boxesSurvived?, boxHits?, firstWinAvailable?}
+--        row    = this player's RoundStatRow; extras = {monsterBroken?, boxesSurvived?, boxHits?, firstWinAvailable?}
+--        (monsterBroken = RoundEnded.monsterBroken: the humans pushed the monster to the Phase 2 HP threshold; Phase 2
+--        itself is no input - the monster's own first ultimate starts it too)
 --        (a win by reason "Left" counts only when durations.round >= MinLeftWinTime)
 --   Rewards.Compute(ctx) -> Breakdown            per-player EXP/G breakdown:
 --        Participation, Win, Damage x PerDamage, Healing x PerHealing, Kill, Save, Revive, Parry, MVP
@@ -51,7 +53,7 @@ export type RoundContext = {
 	won: boolean,
 	practice: boolean,
 	mvp: boolean,
-	finalPhase: boolean, -- the monster reached its Final Phase this round
+	monsterBroken: boolean, -- the humans pushed the monster to Config.Round.FinalPhaseHpFraction HP this round
 	collapse: boolean, -- the round went into Collapse overtime
 	humans: number, -- human rows in the round
 	humanSurvivors: number,
@@ -131,7 +133,7 @@ function Rewards.Context(result: any, row: Row, extras: { [string]: any }?): Rou
 		won = won,
 		practice = result.practice == true,
 		mvp = type(result.mvpUserId) == "number" and result.mvpUserId == row.userId,
-		finalPhase = ex.finalPhase == true,
+		monsterBroken = ex.monsterBroken == true,
 		collapse = num(durations.collapse) > 0 or reason == "Survived",
 		humans = humans,
 		humanSurvivors = survivors,

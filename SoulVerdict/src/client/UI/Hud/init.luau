@@ -16,6 +16,8 @@
 --       deps.Backdrop = false to skip the painted preview scene.
 --   Hud.Visible(name, snapshot) -> boolean          the per-phase / per-role / open-menu visibility rules (pure)
 --   Hud.MenuHidesHud(menuName?) -> boolean           a menu owns the screen: the HUD hides under it (pure)
+--   Hud.ShowsCallout(kind, role?) -> boolean         arena call-outs (Hud.ARENA_CALLOUTS: Fight, FinalPhase, Surge,
+--       SecondWind, Collapse, SaveLit) only for round participants - role ~= "Lobby" (pure)
 --   Hud.PIECES : { {Name, Z} }                       every piece module (children of this folder)
 --   Hud.EXTRA_PIECES : { {Name, Z, Own?} }           optional pieces (AdminButton: owner test panel button, only for
 --       the Player attribute "Admin"); Own = the piece shows/hides its own Root, the HUD toggles a holder instead
@@ -69,6 +71,20 @@ Hud.TOUCH_PIECES = { MobileControls = true, EmoteWheel = true, AdminButton = tru
 
 function Hud.MenuHidesHud(menu: string?): boolean
 	return type(menu) == "string" and menu ~= "" and not Hud.MENU_KEEPS_HUD[menu]
+end
+
+-- Arena call-outs: the announcements the running match's RoundEvents trigger. Only round participants see them -
+-- fighters and spectators (Role "Human" / "Monster" / "Spectator"); a player waiting in the lobby during someone
+-- else's match (a late joiner, a second player during a solo practice) gets none, just as SoundController plays the
+-- arena's stingers to participants only. Other kinds (Exhausted, Custom, HudHandle.Announce previews) always show.
+Hud.ARENA_CALLOUTS =
+	{ Fight = true, FinalPhase = true, Surge = true, SecondWind = true, Collapse = true, SaveLit = true }
+
+function Hud.ShowsCallout(kind: string, role: string?): boolean
+	if not Hud.ARENA_CALLOUTS[kind] then
+		return true
+	end
+	return (role or "Lobby") ~= "Lobby"
 end
 
 -- Where the optional AdminButton pill goes (pure): inside the Roblox top-bar strip, right of the Roblox / menu / chat
@@ -618,6 +634,18 @@ function Hud.Mount(screenGui: Instance, deps: any?): any
 		end
 	end
 
+	-- the local player's role right now (deps.State = StateController.Role(); else the last snapshot's)
+	local function currentRole(): string
+		local st = d.State
+		if type(st) == "table" and type(st.Role) == "function" then
+			local ok, role = pcall(st.Role)
+			if ok and type(role) == "string" and role ~= "" then
+				return role
+			end
+		end
+		return snap.Role or "Lobby"
+	end
+
 	rebuild()
 	refresh()
 	local phaseSeen: string = snap.Phase or "Waiting"
@@ -632,7 +660,14 @@ function Hud.Mount(screenGui: Instance, deps: any?): any
 		end
 		data = if type(data) == "table" then data else {}
 		local now = source:Now()
-		local monsterSide = snap.Role == "Monster"
+		local role = currentRole()
+		local monsterSide = role == "Monster"
+		-- an arena call-out, for round participants only (Hud.ShowsCallout)
+		local function callout(kind: string, payload: any)
+			if Hud.ShowsCallout(kind, role) then
+				announce(kind, payload)
+			end
+		end
 		if name == "MapVote" then
 			source:SetVotes(data.votes)
 		elseif name == "MonsterChosen" then
@@ -653,24 +688,24 @@ function Hud.Mount(screenGui: Instance, deps: any?): any
 				pcall(pieces.IntroSplash.Play, data, source)
 			end
 		elseif name == "PhaseChanged" then
-			if data.phase == "Round" and phaseSeen ~= "Round" and phaseSeen ~= "Collapse" and snap.Role ~= "Lobby" then
-				announce("Fight", { Monster = monsterSide })
+			if data.phase == "Round" and phaseSeen ~= "Round" and phaseSeen ~= "Collapse" then
+				callout("Fight", { Monster = monsterSide })
 			elseif data.phase == "Intermission" or data.phase == "Waiting" then
 				source:SetMyVote(nil)
 				source:SetVotes({})
 				source:SetKiller(nil)
 			end
 		elseif name == "FinalPhase" then
-			-- the monster's Phase 2; cause "Ult" = started by its own first ultimate (no ult refill)
-			announce("FinalPhase", { Monster = monsterSide, Ult = type(data) == "table" and data.cause == "Ult" })
+			-- the monster's Phase 2; cause "Ult" = started by its own first ultimate (nothing refilled)
+			callout("FinalPhase", { Monster = monsterSide, Ult = data.cause == "Ult" })
 		elseif name == "Surge" then
-			announce("Surge", { Monster = monsterSide })
+			callout("Surge", { Monster = monsterSide })
 		elseif name == "SecondWind" then
-			announce("SecondWind", { Self = isLocalModel(data.model), Name = data.name })
+			callout("SecondWind", { Self = isLocalModel(data.model), Name = data.name })
 		elseif name == "Collapse" then
-			announce("Collapse", {})
+			callout("Collapse", {})
 		elseif name == "SaveLit" then
-			announce("SaveLit", { Lit = data.lit, Total = data.total })
+			callout("SaveLit", { Lit = data.lit, Total = data.total })
 		elseif name == "Kill" then
 			if isLocalModel(data.victim) then
 				source:SetKiller(nameOf(data.killer, data.killerName))

@@ -79,11 +79,15 @@ Win conditions:
   once per round, Round/Collapse only. Started by the monster's FIRST ultimate: AbilityService calls
   `RoundService.TriggerFinalPhase("Ult", caster)` while the cast commits (after validation, before the bar is
   spent); the ultimate itself still runs as the transformation's opening move and the bar stays spent.
-  Safety net (unchanged): if HP reaches ≤30 % before any ultimate, it starts by itself (`"Hp"`, ult set to 100);
-  until Phase 2 the monster cannot drop below 1 HP. Admin / Style Lab may force it (ult set to 100).
-  Effects: 1.2 s invulnerable transformation (blocks hits only, never moving or casting), eye blazes, dodges
-  refilled, Exhausted cleared, dodge regen ×`Config.Monster.FinalPhaseDodgeRegenMult`, music switch to
-  `Theme_<kit>_Final`, map lighting switches to the map's `FinalPreset`.
+  Safety net (unchanged): if HP reaches ≤30 % before any ultimate, it starts by itself (`"Hp"`);
+  until Phase 2 the monster cannot drop below 1 HP. Admin / Style Lab may force it (same as `"Hp"`).
+  Always: eye blazes (`FinalForm`), dodge regen ×`Config.Monster.FinalPhaseDodgeRegenMult`, music switch to
+  `Theme_<kit>_Final`, map lighting switches to the map's `FinalPreset`. `"Ult"` is NO reset button: Exhausted,
+  dodges and the ult bar stay as they are, and the 1.2 s invulnerable transformation (blocks hits only, never
+  moving or casting) applies only while the monster is not Exhausted (never eats the SAVE Surge / exhaustion window).
+  `"Hp"` / forced = the comeback refresh: 1.2 s invulnerable, Exhausted cleared, dodges refilled, ult set to 100.
+  The Unshaken quest / "Not Even Sweating" achievement = win without ever being pushed to ≤30 % HP
+  (`RoundEnded.monsterBroken`), not "without Phase 2".
 
 ### 1.3 Human core (all SOUL classes)
 - HP per class 95–150. **Guard** meter for blocking (`Guard`/`MaxGuard`).
@@ -297,9 +301,12 @@ HP uses `Humanoid.Health/MaxHealth` (server-authoritative; replicated by engine)
 `"PhaseChanged" {phase, endsAt}`, `"MapVote" {options, votes}`, `"MonsterChosen" {userId, kitId, name}`,
 `"Intro" {mapId, monster, humans: {{userId, kitId, name}}}`, `"Kill" {victim, killer, ability, victimName, killerName}`,
 `"Downed" {victim}`, `"Revived" {victim, by}`, `"SaveLit" {index, by}`, `"Surge" {}`,
-`"FinalPhase" {monster, kitId, duration, cause: "Ult"|"Hp"|"Forced"}` (the monster's Phase 2),
+`"FinalPhase" {monster, kitId, duration, cause: "Ult"|"Hp"|"Forced"}` (the monster's Phase 2; duration = its
+invulnerable window, 0 = none),
 `"SecondWind" {userId}`, `"Collapse" {}`, `"RoundEnd" {winner, reason, stats: {RoundStatRow}, mvpUserId, lastHit: {victim: Model?, position: Vector3?}}`,
 `"Rewards" {exp, gold, levelUp: boolean, unlocked: {string}, questProgress}`.
+The HUD turns PhaseChanged→Round (FIGHT!), SaveLit, Surge, FinalPhase, SecondWind and Collapse into big call-outs
+for round participants only (Role ≠ "Lobby": fighters + spectators; `Hud.ShowsCallout`), like the arena stingers.
 
 ---------------------------------------------------------------------------------------------------
 ## 5. Characters & rigs
@@ -736,9 +743,11 @@ is routed to VerdictBoxService.Start(monster, target) with `Config.VerdictBox.Co
 `RecordRound(monsterPlayer?, humanPlayers, stats)`.
 **ObjectiveService** (P45) — `Setup(mapInfo)`, `Clear()`, `SaveLit: Signal(index, players)`, `Surge: Signal()`.
 **RoundService** (P50) — `Phase() -> string`, `PhaseChanged: Signal(phase)`, `RoundStarted: Signal(info)`,
-`RoundEnded: Signal(result {winner, reason, rows, mvpUserId, practice, durations})`, `GetMonster() -> Model?`,
+`RoundEnded: Signal(result {winner, reason, rows, mvpUserId, practice, durations, finalPhase, monsterBroken})`
+(monsterBroken = the monster's HP reached ≤30 % in the fight), `GetMonster() -> Model?`,
 `IsRoundCharacter(model) -> boolean`, `TriggerFinalPhase(cause?: "Ult"|"Hp", caster?: Model) -> boolean` (Phase 2, §1.2:
-"Ult" needs caster = the round's monster and keeps its ult bar; nil = forced), `FinalPhaseStarted: Signal(monster, cause)`,
+"Ult" needs caster = the round's monster and keeps its ult bar, dodges and Exhausted; nil = forced),
+`FinalPhaseStarted: Signal(monster, cause)`,
 `StartPractice(player, side)`, `ForceNextMap(mapId)`.
 **BotService** (P60) — `SpawnPracticeBots(side, count)`, `SpawnDummies(cframes)`, `Clear()`.
 **RewardService, QuestService, AchievementService, ShopService, MasteryService, LeaderboardService, LoginService** (P70+) —
@@ -805,28 +814,45 @@ actions: "M1","Q","E","R","T","F","G","Shift","Jump","Menu","Emote","CameraLock"
 **MovementController** (P22) — `Facing(on)`, `ApplyForceMove(packet)`, `IsDashing()`; handles Net "ForceMove",
 double jump, blue-soul gravity, local dash prediction, AlignOrientation facing toward camera yaw when locked.
 **SoundController** (P10) — `Play(name, at?: Vector3|BasePart|Attachment, opts?) -> Sound?`, `PlayMusic(key, fadeTime?)`,
-`StopMusic(fadeTime?)`, `SetVolumes(music, sfx)`, `Register(name, soundId | {ids}, opts)`, `Prewarm(name)` (checks an
-entry's candidates ahead of time in the background, next candidate after a bad one; VerdictBoxController prewarms
-"VerdictBox" at Start), `BOX_FADE_IN` 0.15 / `BOX_FADE_OUT` 1.0 (music fades of the "Box" context); registry of built-in rbxasset
+`StopMusic(fadeTime?)`, `SetVolumes(music, sfx)`, `Register(name, soundId | {ids}, opts)`, `Prewarm(name)` (checks =
+downloads an entry's candidate ahead of time in the background, next candidate after a bad one; music joins the warm-up
+queue; VerdictBoxController prewarms "VerdictBox" at Start), `BOX_FADE_IN` 0.15 / `BOX_FADE_OUT` 1.0 (music fades of the
+"Box" context); registry of built-in rbxasset
 sounds + owner-provided ids in `Shared/Audio.luau`. Every entry has CANDIDATES `Audio.Candidates(name)` = normalized,
 de-duplicated `{Id, ...Ids}` (best first; `SoundDef.Ids: {string}?`); an entry without candidates is silent and never warns.
-- Id checks: each id is probed at most once with `ContentProvider:PreloadAsync({sound}, cb)`: `AssetFetchStatus.Success` =
-  good; Failure / TimedOut / no final answer within `PROBE_TIMEOUT` (10 s) = bad; a Sound that reports IsLoaded with
-  TimeLength 0, or a music deck that does not load a checked id within `LOAD_TIMEOUT` (15 s), = bad. Built-in rbxasset://
-  files are trusted. Every bad id warns once: `[Sound] audio id failed to load: <id> (<entry>)`. SFX/UI play the first
-  candidate not known bad (an untested one optimistically; a background batch probes SFX/UI after Start, 3 at a time) and
-  switch the pool's SoundId when it turns bad; music waits for its first GOOD candidate (the old track keeps playing).
-  An entry whose candidates all failed is dead: plays follow its Fallback chain.
+- Id checks: `ContentProvider:PreloadAsync({sound}, cb)` (also downloads the file): `AssetFetchStatus.Success` = good;
+  Failure / TimedOut / no final answer in time = bad; a Sound that reports IsLoaded with TimeLength 0, or a Sound / music
+  deck that does not load a checked id within `LOAD_TIMEOUT` (15 s), = bad. Time allowed: `PROBE_TIMEOUT` (10 s) for
+  SFX/UI; music `MUSIC_PROBE_TIMEOUT` (20 s), extended by `MUSIC_PROBE_EXTEND` (10 s) while `GetAssetFetchStatus` says
+  Loading, up to `MUSIC_PROBE_MAX` (60 s); never two candidates of one track at once. Bad = "retry later" (not final;
+  except an empty asset): re-checked in the background `RETRY_AFTER` (60 s) later, doubling up to `RETRY_MAX` (600 s),
+  when its entry is wanted again and the id ranks before the one in use (or the entry is dead; a wanted dead music track
+  is looked at again when its re-check is due). It stays bad until Success; a late Success never switches a track that
+  is playing (its next start uses it). Built-in rbxasset:// files are trusted. Every bad id warns once:
+  `[Sound] audio id failed to load: <id> (<entry>)`. SFX/UI play the first candidate not known bad (an untested one
+  optimistically; a background batch probes SFX/UI after Start, 3 at a time, 1 while a music id downloads) and switch
+  the pool's SoundId when it turns bad. An entry whose candidates all failed is dead: plays follow its Fallback chain.
+- Music: the requested track starts on its first GOOD candidate, then the crossfade. While it is being checked, the
+  playing track goes on only if it is a stand-in of the request (`MusicChoices(round, ctx)`: MusicFor's answer, then the
+  context it sits on — override -> box -> the phase's usable tracks; e.g. the normal theme while the Phase 2 theme
+  loads, the arena track while the box track loads, the lobby while the Shop track loads); else the first ready stand-in;
+  else silence — never a stale track (the box loop after the box, the arena over the results, a menu track). Warm-up
+  (one music id at a time, after the first track, never next to a track the player waits for): at Start Menu, Lobby,
+  VerdictBox, Shop; for a round `PrefetchOrder(round, ctx)` = the fight track, VerdictBox, the Phase 2 track,
+  CollapsePhase, Victory, Defeat (participants only). A looped track that comes back within `RESUME_WINDOW` (60 s)
+  resumes where it was (the boss theme after a box, the lobby after the shop; VerdictBox always starts from the top).
+  A Victory/Defeat stinger that has played is never restarted by later refreshes in the same Ending.
 - Music selection, pure `MusicFor(round, ctx)` with `ctx.Usable(key)` (= a candidate along the Fallback chain that is not
   dead; default: has candidates in Shared/Audio): Waiting/Intermission `Lobby`; Intro/Round/Collapse the first usable of
   `Theme_<RoundState.MonsterKit>`, the map track; while FinalPhase `Theme_<kit>_Final`, `Theme_<kit>`, `<map>_Final`
   (-> FinalPhase), `FinalPhase`, the map track (nothing usable -> the map track, silent); Ending the Victory/Defeat
-  stinger; Box `VerdictBox`; lobby viewers `Lobby`; `PreviewMusic` > `SetMusicOverride` > everything. A key that dies
-  re-runs the selection. Theme keys: `Audio.MonsterTheme(kitId, final?)`, kits with themes `Audio.ThemeKits`.
+  stinger (before RoundEnd: the track that was on, never the box loop); Box `VerdictBox`; lobby viewers `Lobby`;
+  `PreviewMusic` > `SetMusicOverride` > everything. A key that dies re-runs the selection. Theme keys: `Audio.MonsterTheme(kitId, final?)`, kits with themes `Audio.ThemeKits`.
 - Test / admin API: `ActiveId(name) -> string?` (the id in use; music: the playing deck's), `Status(name) ->
   "ok"|"pending"|"dead"|"empty"`, `PreviewMusic(key?)` (sticky test override; nil = automatic again), `NowPlaying() ->
   {Key, Entry, Id, Status, Index, Count, Preview, Playing}`, `IdState(id)`; pure helpers `PickCandidate(candidates,
-  stateOf)`, `ResolveChain(name, defOf, stateOf, candidatesOf?)`, `ArenaMusicOrder(round)`. Admin panel TEST -> MUSIC
+  stateOf)`, `ResolveChain(name, defOf, stateOf, candidatesOf?)`, `ArenaMusicOrder(round)`, `MusicChoices(round, ctx)`,
+  `PrefetchOrder(round, ctx)`. Admin panel TEST -> MUSIC
   (client only) previews the 6 themes, Lobby, VerdictBox and FinalPhase and shows key -> entry, id and status.
 **FxController** (P30) — dispatches AbilityFx/DamageFx/Hazard packets to client kits/HazardVisuals/VFX; builds FxContext.
 **CombatController** (P35) — input → Cast/Block/Dash; local cooldowns `Cooldowns() -> {[abilityId]: endsAt}`,
@@ -835,7 +861,10 @@ de-duplicated `{Id, ...Ids}` (best first; `SoundDef.Ids: {string}?`); an entry w
 reduced?)`, `At(stages, now)`, `CameraPose`, `CameraFx`, `Runner`), **SpectateController** (P45), **GraphicsController**
 (P12), **RigStyleController** (P50).
 **UIController** (P90) — mounts UIRoot, title screen, menus, results; calls `Hud.Mount(screenGui, deps)` once
-(`src/client/UI/Hud/init.luau` owns per-phase HUD visibility).
+(`src/client/UI/Hud/init.luau` owns per-phase HUD visibility). PLAY / PRACTICE use `UI/Overlays/Loading`: the session's
+first PLAY (or no character yet) = full screen (≥4 s, menu track out, lobby track 2 s before the light); later PLAYs =
+~0.6 s black dip + Menu→lobby crossfade; PRACTICE reveals 0.3 s after the round leaves Waiting (its Intro is seen),
+ends at once on a refusal, no screen while a round runs. It is the only caller of `SoundController.SetMusicOverride`.
 UI deps table passed to screens/HUD: `{ Theme = ThemeService, State = StateController, Input = InputController,
 Camera = CameraController, Sound = SoundController, Combat = CombatController, Graphics = GraphicsController,
 UI = UIController, Kits = Kits, Strings = Strings }` (any may be nil under Lune previews).
