@@ -130,3 +130,13 @@ Next: adversarial review of all of it, tools/check.sh, tools/build.sh, commit + 
   After both: review the shop part, then check/build/commit/push/send.
 - 13:20 UTC: shop agents DONE (436 tests, committed). Running: review-batch-2 (wf_811a40e5-d2c) and review-shop (wf_ef79027a-b92).
   After both: tools/check.sh, tools/build.sh, commit + push, send rbxl + summary (previews already sent).
+
+## 17:50 UTC — shipped (commit 3b68011)
+- Shipped to the owner: difficulty (Easy/Normal/Hard, DifficultyService + HintController), slimmer Sans (SansCommon) and
+  Soft as the default rig style, global lighting dim (Apply.DIM), accessory-only human skins, every confirmed review fix
+  (box re-entry, sound fallbacks/download gating, loading/menu camera + music, shop prices/G/booth perf, ult Phase 2
+  invulnerability lifted on Exhausted). tools/check.sh: 0 errors. Also gave the owner ChatGPT prompts for the
+  thumbnail/icon plus title and description options.
+- Owner asked that further work be done by the lead directly (not by spawning many agents) to save the usage limit.
+- Next: owner republishes and tests on the phone; possible follow-ups: English store description, further Sans art passes,
+  HD skull meshes (owner imports assets/meshes into ReplicatedStorage/SV_Meshes, see README).
