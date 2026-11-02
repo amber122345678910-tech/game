@@ -103,3 +103,14 @@ Journals: /root/.claude/projects/-home-user-game/f493f3e8-eb29-53b3-b677-a9d1a3d
   Roblox-licensed Pro Sound Effects / classic Roblox sounds as fallbacks). Crit falls back to Hit.
 - tools/check.sh: 0 errors, 371 tests. Commits 8477bf2 (music), e7fffa0 (SFX).
 - Next: owner republishes and listens on the phone; swap or re-level sounds he dislikes (volumes are unverified).
+
+## Owner-driven batch (in progress) — resume notes
+Owner's IDs are all in src/shared/Audio.luau (first candidate of each entry): Menu, Lobby, Shop, Theme_* (Classic/Fell/Eclipse,
+phase 1 + 2), VerdictBox, CollapsePhase, UiClick/UiConfirm, SoulShatter/SoulBreak, Slam, BlasterFire. No defeat track (owner found
+none; current APM candidates stay). Offered: on defeat play the soul shatter first, then the sting (waiting for his answer).
+Running workflows (when they finish: tools/check.sh, tools/build.sh, commit + push, send previews + rbxl with a short RU summary):
+- review-audio-loading-phase2 (wf_e0b13628-ccd): review -> verify -> fix for sound / loading / phase2.
+- verdict-box-entry (wf_f65aaf80-120): pull-in + darken + sharp flash, instant box music, fair fight start; previews/verdictbox/entry.gif.
+- sleepy-sans-shop (wf_d2216278-df6): pixel sleepy Sans in Screens/Shop (wakes, "zzz... oh. hi, kid. what do you want?") +
+  3D sleeping Sans at the lobby ShopBooth (wakes when the player comes near); previews/ui/shop_keeper_*.png, previews/maps/lobby_shop_sans.png.
+If a workflow died (usage limit): Workflow({scriptPath, resumeFromRunId}) re-runs only the unfinished agents (paths in the transcript).
