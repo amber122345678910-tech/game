@@ -101,7 +101,7 @@ function EmoteWheel.Create(theme: any, deps: any): any
 	local D = EmoteWheel.Size(layout)
 	local slotSize = math.floor(D * 0.23)
 	local ringRadius = math.floor(D * 0.37)
-	local hubSize = math.floor(D * 0.34)
+	local hubSize = math.floor(D * (if skin.Battle then 0.27 else 0.34)) -- square battle hub must clear the slots
 	local accent = if battle then Style.UT_YELLOW else (C.Accent or Style.WHITE)
 
 	local isOpen = false
@@ -150,23 +150,8 @@ function EmoteWheel.Create(theme: any, deps: any): any
 	local wheelScale = Instance.new("UIScale")
 	wheelScale.Parent = wheel
 
-	-- ring behind the slots: a round glass disc (Modern) / a dotted battle-box ring (Battle)
-	if battle then
-		local dots = math.max(24, math.floor(ringRadius / 6))
-		for k = 1, dots do
-			local p = EmoteWheel.SlotPosition(k, dots, ringRadius)
-			Style.Frame({
-				Name = "Dot",
-				BackgroundTransparency = 0.35,
-				BackgroundColor3 = Style.WHITE,
-				AnchorPoint = Vector2.new(0.5, 0.5),
-				Position = UDim2.new(0.5, p.X, 0.5, p.Y),
-				Size = UDim2.fromOffset(3, 3),
-				ZIndex = 2,
-				Parent = wheel,
-			})
-		end
-	else
+	-- ring behind the slots: a round glass disc (Modern); the battle style keeps plain boxes on black
+	if not battle then
 		local disc = Style.Box(skin, {
 			Name = "Disc",
 			AnchorPoint = Vector2.new(0.5, 0.5),
@@ -189,6 +174,7 @@ function EmoteWheel.Create(theme: any, deps: any): any
 		Size = UDim2.fromOffset(hubSize, hubSize),
 		Corner = UDim.new(0.5, 0),
 		Transparency = if battle then 0 else 0.25,
+		Sheen = false, -- a half-height sheen pokes out of a round box
 		ZIndex = 3,
 		Parent = wheel,
 	})
@@ -356,6 +342,7 @@ function EmoteWheel.Create(theme: any, deps: any): any
 				Size = UDim2.fromScale(1, 1),
 				Corner = UDim.new(0.5, 0),
 				Transparency = if battle then 0 else 0.15,
+				Sheen = false,
 				ZIndex = 5,
 				Parent = button,
 			})
@@ -388,12 +375,18 @@ function EmoteWheel.Create(theme: any, deps: any): any
 			button.Parent = wheel
 			local index = i
 			if live then
-				table.insert(conns, button.MouseEnter:Connect(function()
-					setHighlight(index)
-				end))
-				table.insert(conns, button.Activated:Connect(function()
-					pick(index)
-				end))
+				table.insert(
+					conns,
+					button.MouseEnter:Connect(function()
+						setHighlight(index)
+					end)
+				)
+				table.insert(
+					conns,
+					button.Activated:Connect(function()
+						pick(index)
+					end)
+				)
 			end
 			table.insert(slots, {
 				Root = button,

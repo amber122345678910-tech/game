@@ -230,15 +230,23 @@ local function processPlayer(player: Player, row: any, result: any, finalPhase: 
 	end
 end
 
+local BOT_ID_BASE = -1000000 -- mirrors StatsService.BOT_ID_BASE (used when StatsService is unavailable)
+local function isBotId(userId: number): boolean
+	if StatsService and type(StatsService.IsBotId) == "function" then
+		return StatsService.IsBotId(userId) == true
+	end
+	return userId <= BOT_ID_BASE
+end
+
 function RewardService.Process(result: any, resolvePlayer: ((number) -> Player?)?)
 	if DataService == nil or not Rewards.ShouldReward(result) then
 		return
 	end
 	local finalPhase = finalPhaseReached()
 	for _, row in result.rows do
-		-- real players only: bot rows never resolve to a Player (StatsService ids <= -1000000); NOT "> 0" —
-		-- Studio test players (Test -> Local Server) have negative UserIds and must get their rewards too
-		if type(row) == "table" and type(row.userId) == "number" and row.userId ~= 0 and row.userId > -1000000 then
+		-- real players only — NOT "userId > 0": Studio test players (Test -> Local Server) have negative UserIds and
+		-- must get their rewards too; bot rows use StatsService's id range (<= BOT_ID_BASE) and are skipped
+		if type(row) == "table" and type(row.userId) == "number" and row.userId ~= 0 and not isBotId(row.userId) then
 			local player = if resolvePlayer then resolvePlayer(row.userId) else Players:GetPlayerByUserId(row.userId)
 			if player and DataService.Get(player) then
 				local ok, err = pcall(processPlayer, player, row, result, finalPhase)

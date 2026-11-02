@@ -560,7 +560,10 @@ local function hasKitIndicator(ability: Map): boolean
 		return false
 	end
 	local ok, kit = pcall(fx.Kit, char:GetAttribute("KitId"))
-	return ok and type(kit) == "table" and type(kit.Indicator) == "table" and type(kit.Indicator[ability.Id]) == "function"
+	return ok
+		and type(kit) == "table"
+		and type(kit.Indicator) == "table"
+		and type(kit.Indicator[ability.Id]) == "function"
 end
 
 local function makeIndicator(ability: Map): Map?

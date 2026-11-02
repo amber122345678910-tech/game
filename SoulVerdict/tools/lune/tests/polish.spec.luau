@@ -60,7 +60,8 @@ local function body(source, header)
 	if start == nil then
 		return ""
 	end
-	local stop = string.find(source, "\nAbilities%.", start + #header) or string.find(source, "\nfunction ", start + #header)
+	local stop = string.find(source, "\nAbilities%.", start + #header)
+		or string.find(source, "\nfunction ", start + #header)
 	return string.sub(source, start, stop or #source)
 end
 
@@ -117,11 +118,24 @@ return {
 		T.ok(normalW > 2, "normal skull drawn (" .. normalW .. ")")
 		T.ok(hugeW > normalW * 1.8 and hugeW > 7, ("huge skull %.2f vs %.2f studs"):format(hugeW, normalW))
 		-- camera occlusion fade
-		T.near(HV.SkullOcclusion(Vector3.zero, Vector3.new(0, 0, -1), Vector3.new(0, 0, -1), 5, false), 1, 1e-9, "inside")
+		T.near(
+			HV.SkullOcclusion(Vector3.zero, Vector3.new(0, 0, -1), Vector3.new(0, 0, -1), 5, false),
+			1,
+			1e-9,
+			"inside"
+		)
 		T.near(HV.SkullOcclusion(Vector3.zero, Vector3.new(0, 0, -1), Vector3.new(0, 0, -40), 5, false), 0, 1e-9, "far")
 		local ahead = Vector3.new(0, 0, -9) -- in front of the camera, outside 1.6 radii
-		T.near(HV.SkullOcclusion(Vector3.zero, Vector3.new(0, 0, -1), ahead, 5, false), 0, 1e-9, "enemy skull in view stays")
-		T.ok(HV.SkullOcclusion(Vector3.zero, Vector3.new(0, 0, -1), ahead, 5, true) > 0.9, "own skull covering the view fades")
+		T.near(
+			HV.SkullOcclusion(Vector3.zero, Vector3.new(0, 0, -1), ahead, 5, false),
+			0,
+			1e-9,
+			"enemy skull in view stays"
+		)
+		T.ok(
+			HV.SkullOcclusion(Vector3.zero, Vector3.new(0, 0, -1), ahead, 5, true) > 0.9,
+			"own skull covering the view fades"
+		)
 	end,
 
 	polish_fell_crimson_huge_skull = function(T, Loader)
@@ -132,11 +146,17 @@ return {
 		T.eq(client.Constants.CrimsonSkullScale, s, "client indicator ghost uses the same skull scale")
 		local N = load(Loader, SHARED .. "Kits").Ability("FellSans", "CrimsonBlaster").Numbers
 		local HV = load(Loader, CLIENT .. "Controllers.HazardVisuals")
-		T.ok(HV.SkullScale({ width = N.Width, skullScale = s }, 3) > HV.BlasterScale(N.Width, 3) * 1.8, "far bigger than width-derived")
+		T.ok(
+			HV.SkullScale({ width = N.Width, skullScale = s }, 3) > HV.BlasterScale(N.Width, 3) * 1.8,
+			"far bigger than width-derived"
+		)
 		local fn = body(read("src/server/Kits/FellSans.luau"), "Abilities.CrimsonBlaster = function")
 		T.ok(string.find(fn, "skullScale = C.CrimsonSkullScale", 1, true) ~= nil, "CrimsonBlaster passes skullScale")
 		local HazardDefs = load(Loader, SHARED .. "Combat.HazardDefs")
-		T.ok(HazardDefs.Validate("BlasterBeam", { origin = CFrame.new(), skullScale = s }), "skullScale is valid plain data")
+		T.ok(
+			HazardDefs.Validate("BlasterBeam", { origin = CFrame.new(), skullScale = s }),
+			"skullScale is valid plain data"
+		)
 	end,
 
 	------------------------------------------------------------------------------------- 2. invisible humans
@@ -164,17 +184,34 @@ return {
 		v.invisible = true
 		local ok, reason = VBS.Rules.CheckPair(m, v, true)
 		T.ok(not ok and reason == "invisible", "invisible victim refused")
-		T.ok(string.find(read("src/server/Services/VerdictBoxService.luau"), "invisible = victim:GetAttribute", 1, true) ~= nil, "Open passes it")
+		T.ok(
+			string.find(read("src/server/Services/VerdictBoxService.luau"), "invisible = victim:GetAttribute", 1, true)
+				~= nil,
+			"Open passes it"
+		)
 		local ability = read("src/server/Services/AbilityService.luau")
-		T.ok(string.find(body(ability, "local function castVerdictBox"), "isInvisible(m)", 1, true) ~= nil, "Verdict pre-check")
-		T.ok(string.find(body(ability, "local function autoTarget"), "not isInvisible(m)", 1, true) ~= nil, "auto target")
-		T.ok(string.find(body(ability, "local function validTarget"), "isInvisible(target)", 1, true) ~= nil, "explicit target")
+		T.ok(
+			string.find(body(ability, "local function castVerdictBox"), "isInvisible(m)", 1, true) ~= nil,
+			"Verdict pre-check"
+		)
+		T.ok(
+			string.find(body(ability, "local function autoTarget"), "not isInvisible(m)", 1, true) ~= nil,
+			"auto target"
+		)
+		T.ok(
+			string.find(body(ability, "local function validTarget"), "isInvisible(target)", 1, true) ~= nil,
+			"explicit target"
+		)
 		-- nameplates
 		local Plates = load(Loader, CLIENT .. "UI.Hud.Nameplates")
 		local enemy = { Team = "Humans", Invisible = true }
 		T.eq(Plates.Visibility(enemy, "Monster", 0), "Hidden", "the monster sees nothing")
 		T.eq(Plates.Visibility(enemy, "Humans", 0), "Ghost", "allies see a faded plate")
-		T.eq(Plates.Visibility({ Team = "Humans", Statuses = { Invisible = 5 } }, "Monster", 4), "Hidden", "status-based")
+		T.eq(
+			Plates.Visibility({ Team = "Humans", Statuses = { Invisible = 5 } }, "Monster", 4),
+			"Hidden",
+			"status-based"
+		)
 		T.eq(Plates.Visibility({ Team = "Humans", Statuses = { Invisible = 5 } }, "Monster", 6), "Plate", "expired")
 		T.eq(Plates.Visibility({ Team = "Humans" }, "Monster", 0), "Plate", "visible enemy")
 		local Themes = Loader.requirePath("src/client/UI/Themes")
@@ -194,7 +231,10 @@ return {
 		local Movement = load(Loader, CLIENT .. "Controllers.MovementController")
 		T.eq(Movement.Tuning.ImpulseDecay, k, "client mover reads it")
 		local bravery = read("src/server/Kits/Bravery.luau")
-		T.ok(string.find(bravery, "IMPULSE_DECAY: number = Config.Human.LeapArcFactor", 1, true) ~= nil, "server leap reads it")
+		T.ok(
+			string.find(bravery, "IMPULSE_DECAY: number = Config.Human.LeapArcFactor", 1, true) ~= nil,
+			"server leap reads it"
+		)
 		T.ok(string.find(bravery, "IMPULSE_DECAY = 1.6", 1, true) == nil, "no duplicated literal left")
 	end,
 
@@ -252,7 +292,11 @@ return {
 		T.near(E.Duration("Human", "Emote_Shrug"), shrug.Length + 0.1, 1e-6, "one-shot shrug")
 		T.ok(E.Duration("Skeleton", "Wink") < 1.5, "wink is short")
 		-- registered with RequestService + rate gap
-		T.ok(string.find(read("src/server/Services/EmoteService.luau"), 'RequestService.Register, "Emote"', 1, true) ~= nil, "Request action")
+		T.ok(
+			string.find(read("src/server/Services/EmoteService.luau"), 'RequestService.Register, "Emote"', 1, true)
+				~= nil,
+			"Request action"
+		)
 		T.ok(string.find(read("src/server/Services/RequestService.luau"), "Emote = 0.25", 1, true) ~= nil, "rate gap")
 	end,
 
@@ -290,7 +334,8 @@ return {
 			for _, hud in { "Battle", "Modern" } do
 				for _, layout in { desktop, phone } do
 					local label = ("%s %s %s"):format(theme.Id, hud, if layout.Phone then "phone" else "desktop")
-					local ok, h = pcall(Wheel.Create, theme, { Hud = hud, Layout = layout, Open = true, Family = "Skeleton" })
+					local ok, h =
+						pcall(Wheel.Create, theme, { Hud = hud, Layout = layout, Open = true, Family = "Skeleton" })
 					if T.ok(ok and h and h.Root, "wheel builds " .. label .. ": " .. tostring(h)) then
 						T.ok(h.IsOpen(), "opened " .. label)
 						local wheel = h.Root:FindFirstChild("Wheel")
@@ -365,7 +410,10 @@ return {
 		local Schema = load(Loader, SHARED .. "Progression.ProfileSchema")
 		local specs = Schema.Settings()
 		for key, default in { QuickCast = true, InvertY = false } do
-			T.ok(specs[key] ~= nil and specs[key].Type == "boolean" and specs[key].Default == default, key .. " whitelisted")
+			T.ok(
+				specs[key] ~= nil and specs[key].Type == "boolean" and specs[key].Default == default,
+				key .. " whitelisted"
+			)
 			T.ok(Schema.ValidateSetting(key, not default), key .. " accepts a boolean")
 			T.ok(not Schema.ValidateSetting(key, "yes"), key .. " rejects a string")
 		end
@@ -379,7 +427,10 @@ return {
 		local combat = read("src/client/Controllers/CombatController.luau")
 		T.ok(string.find(combat, 'Setting, "QuickCast", true', 1, true) ~= nil, "reads QuickCast (default on)")
 		T.ok(string.find(combat, "input.Cancelled:Connect", 1, true) ~= nil, "Esc / right-click cancel an aim")
-		T.ok(string.find(read("src/client/Controllers/CameraController.luau"), 'setting("InvertY"', 1, true) ~= nil, "camera reads InvertY")
+		T.ok(
+			string.find(read("src/client/Controllers/CameraController.luau"), 'setting("InvertY"', 1, true) ~= nil,
+			"camera reads InvertY"
+		)
 	end,
 
 	------------------------------------------------------------------------------------------ 6. dash clip
@@ -387,13 +438,25 @@ return {
 		local movement = read("src/client/Controllers/MovementController.luau")
 		local predict = body(movement, "function MovementController.PredictDash")
 		T.ok(string.find(predict, "Anim.MarkPredicted, r.Model, castId", 1, true) ~= nil, "marks the castId predicted")
-		T.ok(string.find(predict, 'Anim.PlayAbility, r.Model, r.Model:GetAttribute("KitId"), "Dash"', 1, true) ~= nil, "plays Dash now")
+		T.ok(
+			string.find(predict, 'Anim.PlayAbility, r.Model, r.Model:GetAttribute("KitId"), "Dash"', 1, true) ~= nil,
+			"plays Dash now"
+		)
 		local combat = read("src/client/Controllers/CombatController.luau")
-		T.ok(string.find(combat, 'call("MovementController", "PredictDash", dir, castId)', 1, true) ~= nil, "castId passed")
+		T.ok(
+			string.find(combat, 'call("MovementController", "PredictDash", dir, castId)', 1, true) ~= nil,
+			"castId passed"
+		)
 		T.ok(string.find(combat, 'Net.Client.Fire("Dash", dir, castId)', 1, true) ~= nil, "castId sent")
 		local ability = read("src/server/Services/AbilityService.luau")
-		T.ok(string.find(ability, "AbilityService.DashAs(model, direction, true, id)", 1, true) ~= nil, "server forwards it")
-		T.ok(string.find(body(ability, "function AbilityService.DashAs"), "castId = castId or 0", 1, true) ~= nil, "echoed")
+		T.ok(
+			string.find(ability, "AbilityService.DashAs(model, direction, true, id)", 1, true) ~= nil,
+			"server forwards it"
+		)
+		T.ok(
+			string.find(body(ability, "function AbilityService.DashAs"), "castId = castId or 0", 1, true) ~= nil,
+			"echoed"
+		)
 	end,
 
 	---------------------------------------------------------------------------- 7. menu camera / 8. lobby view
@@ -418,20 +481,33 @@ return {
 		T.ok(string.find(camera, "if not participant(listed) then", 1, true) ~= nil, "intro skipped for the lobby")
 		-- graphics
 		local Graphics = load(Loader, CLIENT .. "Controllers.GraphicsController")
-		local round = { GraphicsPreset = "SnowNight", FinalPreset = "SnowNightFinal", MapId = "SnowdinCrossroads", FinalPhase = true, LobbyPreset = "GoldenHall" }
+		local round = {
+			GraphicsPreset = "SnowNight",
+			FinalPreset = "SnowNightFinal",
+			MapId = "SnowdinCrossroads",
+			FinalPhase = true,
+			LobbyPreset = "GoldenHall",
+		}
 		local lobby = Graphics.MapState(round, false)
 		T.eq(lobby.MapPreset, "GoldenHall", "lobby look")
 		T.ok(lobby.FinalPhase == false and lobby.MapId == nil, "no final variant / map fallback in the lobby")
 		local arena = Graphics.MapState(round, true)
 		T.ok(arena.MapPreset == "SnowNight" and arena.FinalPhase == true, "participants see the arena")
 		T.eq(Graphics.MapState({}, false).MapPreset, "Lobby", "default lobby preset")
-		T.ok(not Graphics.IsParticipant("Lobby", nil) and Graphics.IsParticipant("Monster", nil), "graphics participant rule")
+		T.ok(
+			not Graphics.IsParticipant("Lobby", nil) and Graphics.IsParticipant("Monster", nil),
+			"graphics participant rule"
+		)
 		-- music
 		local Sound = load(Loader, CLIENT .. "Controllers.SoundController")
 		local fight = { Phase = "Round", MapId = "SnowdinCrossroads" }
 		T.eq(Sound.MusicFor(fight, { Participant = false }), "Lobby", "lobby music while a round runs")
 		T.ok(Sound.MusicFor(fight, { Participant = true }) ~= "Lobby", "arena music for fighters")
-		T.eq(Sound.MusicFor({ Phase = "Ending" }, { Participant = false, Stinger = "Victory" }), "Lobby", "no stinger in the lobby")
+		T.eq(
+			Sound.MusicFor({ Phase = "Ending" }, { Participant = false, Stinger = "Victory" }),
+			"Lobby",
+			"no stinger in the lobby"
+		)
 		T.eq(Sound.MusicFor({ Phase = "Ending" }, { Participant = true, Stinger = "Defeat" }), "Defeat", "stinger")
 		T.eq(Sound.MusicFor(fight, { Override = "Title", Participant = false }), "Title", "override wins")
 	end,

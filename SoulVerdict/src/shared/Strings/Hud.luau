@@ -165,8 +165,17 @@ return {
 	["hud.emote.Taunt"] = { en = "Taunt", ru = "Дразнить" },
 	["hud.emote.Victory"] = { en = "Cheer", ru = "Ликовать" },
 	["hud.emote.Wink"] = { en = "Wink", ru = "Подмигнуть" },
-	["hud.emote.hint.KeyboardMouse"] = { en = "Click or 1-{1}  ·  {2} / Esc to close", ru = "Клик или 1-{1}  ·  {2} / Esc — закрыть" },
-	["hud.emote.hint.Gamepad"] = { en = "Right stick + {1} to play  ·  B to close", ru = "Правый стик + {1}  ·  B — закрыть" },
+	["hud.emote.hint.KeyboardMouse"] = {
+		en = "Click or 1-{1}  ·  {2} / Esc to close",
+		ru = "Клик или 1-{1}  ·  {2} / Esc — закрыть",
+	},
+	["hud.emote.hint.Gamepad"] = {
+		en = "Right stick + {1} to play  ·  B to close",
+		ru = "Правый стик + {1}  ·  B — закрыть",
+	},
 	["hud.emote.hint.Touch"] = { en = "Tap an emote", ru = "Нажми на эмоцию" },
-	["hud.emote.busy"] = { en = "You can't emote right now", ru = "Сейчас нельзя использовать эмоцию" },
+	["hud.emote.busy"] = {
+		en = "You can't emote right now",
+		ru = "Сейчас нельзя использовать эмоцию",
+	},
 }

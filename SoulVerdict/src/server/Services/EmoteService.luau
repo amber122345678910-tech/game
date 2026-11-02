@@ -39,9 +39,10 @@ local AIRBORNE_SPEED = 6 -- studs/s of vertical root speed = jumping / falling
 
 type Active = { Clip: string, EndsAt: number, Player: Player? }
 
-local active: { [Model]: Active } = {}
+-- weak keys: a respawned / destroyed character never pins its old model here
+local active: { [Model]: Active } = setmetatable({}, { __mode = "k" }) :: any
 local lastAccepted: { [Player]: number } = {}
-local switchToken: { [Model]: number } = {}
+local switchToken: { [Model]: number } = setmetatable({}, { __mode = "k" }) :: any
 
 local Validation: any = nil
 local StatusService: any = nil
@@ -231,7 +232,7 @@ local function begin(model: Model, clip: string, player: Player?)
 	local token = (switchToken[model] or 0) + 1
 	switchToken[model] = token
 	local function apply()
-		if switchToken[model] ~= token or model.Parent == nil then
+		if switchToken[model] ~= token or model.Parent == nil or not isUp(model) then
 			return
 		end
 		active[model] = { Clip = clip, EndsAt = now() + EmoteService.Duration(family, clip), Player = player }
