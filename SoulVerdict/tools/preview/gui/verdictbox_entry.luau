@@ -50,6 +50,7 @@ Loader.quietWarnings = true
 local roblox = Loader.roblox
 local Instance, UDim2, UDim, Vector2, Vector3, Color3, Enum, CFrame =
 	roblox.Instance, roblox.UDim2, roblox.UDim, roblox.Vector2, roblox.Vector3, roblox.Color3, roblox.Enum, roblox.CFrame
+local Font = roblox.Font
 local ColorSequence, ColorSequenceKeypoint, NumberSequence, NumberSequenceKeypoint =
 	roblox.ColorSequence, roblox.ColorSequenceKeypoint, roblox.NumberSequence, roblox.NumberSequenceKeypoint
 SIZE_PX = Vector2.new(W, H)
