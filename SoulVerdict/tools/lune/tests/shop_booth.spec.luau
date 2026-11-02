@@ -65,7 +65,13 @@ return {
 		end
 		T.eq(model:GetAttribute("Shopkeeper"), true, "Shopkeeper attribute")
 		T.eq(model:GetAttribute("BlueprintId"), "ClassicSans", "a Classic Sans rig")
-		T.ok(model.Parent and model.Parent.Name == "ShopBooth" and model.Parent.Parent and model.Parent.Parent.Name == "Decor", "lives in Decor/ShopBooth")
+		T.ok(
+			model.Parent
+				and model.Parent.Name == "ShopBooth"
+				and model.Parent.Parent
+				and model.Parent.Parent.Name == "Decor",
+			"lives in Decor/ShopBooth"
+		)
 		T.eq(info.Model:GetAttribute("ShopkeeperError"), nil, "no build error recorded on the lobby")
 		local parts, bad = 0, {}
 		for _, inst in model:GetDescendants() do
@@ -82,7 +88,10 @@ return {
 		T.ok(parts > 100, "a full rig (" .. parts .. " parts)")
 		T.eq(#bad, 0, "anchored ghost parts (no collide / query / touch): " .. table.concat(bad, ", "))
 		T.eq(model:GetAttribute("PartCount"), parts, "PartCount attribute matches")
-		T.ok(model.PrimaryPart ~= nil and model.PrimaryPart.Name == "HumanoidRootPart", "PrimaryPart = HumanoidRootPart")
+		T.ok(
+			model.PrimaryPart ~= nil and model.PrimaryPart.Name == "HumanoidRootPart",
+			"PrimaryPart = HumanoidRootPart"
+		)
 		-- not a round character: no Bots folder, no Humanoid anywhere in the map's decor
 		T.ok(find(info.Model, "Bots") == nil, "the lobby has no Bots folder for him to join")
 		-- the booth prompt still opens the Shop screen
@@ -139,7 +148,10 @@ return {
 		-- skull low, resting on the arms, tipped sideways, eyes shut
 		local head = limb(model, "Head")
 		local h = inv * head.CFrame.Position
-		T.ok(h.Y - topY < 2.2 and h.Y - topY > 1.2, "skull rests low on the arms (" .. (h.Y - topY) .. " above the counter)")
+		T.ok(
+			h.Y - topY < 2.2 and h.Y - topY > 1.2,
+			"skull rests low on the arms (" .. (h.Y - topY) .. " above the counter)"
+		)
 		T.ok(h.Z < -0.3 and h.Z > -3, "skull above the counter top")
 		local roll = math.deg(math.acos(math.clamp(head.CFrame.UpVector.Y, -1, 1)))
 		T.ok(roll > 15 and roll < 60, "skull tipped onto the arms (" .. math.floor(roll) .. " deg)")
@@ -233,12 +245,20 @@ return {
 			return
 		end
 		table.sort(pr.UpperBody)
-		T.eq(table.concat(pr.UpperBody, ","), "Head,LeftHand,LeftLowerArm,LeftUpperArm,RightHand,RightLowerArm,RightUpperArm,UpperTorso", "only the upper body moves")
+		T.eq(
+			table.concat(pr.UpperBody, ","),
+			"Head,LeftHand,LeftLowerArm,LeftUpperArm,RightHand,RightLowerArm,RightUpperArm,UpperTorso",
+			"only the upper body moves"
+		)
 		local asleep = C.Pose(pr, 0)
 		local worst = 0
 		for name, cf in asleep do
 			local part = model:FindFirstChild(name)
-			worst = math.max(worst, (cf.Position - part.CFrame.Position).Magnitude, (cf.LookVector - part.CFrame.LookVector).Magnitude)
+			worst = math.max(
+				worst,
+				(cf.Position - part.CFrame.Position).Magnitude,
+				(cf.LookVector - part.CFrame.LookVector).Magnitude
+			)
 		end
 		T.ok(worst < 1e-3, "alpha 0 = the built sleep pose (err " .. worst .. ")")
 		local function neckGap(limbs)
@@ -248,22 +268,38 @@ return {
 		end
 		for _, a in { 0, 0.3, 0.7, 1 } do
 			for _, look in { { 0, 0 }, { 0.8, 0.3 }, { -1.1, -0.35 } } do
-				T.ok(neckGap(C.Pose(pr, a, 0.02, look[1], look[2])) < 1e-3, "the skull stays on its neck (alpha " .. a .. ")")
+				T.ok(
+					neckGap(C.Pose(pr, a, 0.02, look[1], look[2])) < 1e-3,
+					"the skull stays on its neck (alpha " .. a .. ")"
+				)
 			end
 		end
 		local up = C.Pose(pr, 1)
 		T.ok(up.Head.UpVector.Y > 0.95, "awake: upright skull")
 		T.ok((up.Head.LookVector - pr.LookFrame.LookVector).Magnitude < 1e-4, "awake without look-at = the awake pose")
 		local half = C.Pose(pr, 0.5)
-		T.ok(half.Head.Position.Y > asleep.Head.Position.Y and half.Head.Position.Y < up.Head.Position.Y + 0.05, "halfway lift")
+		T.ok(
+			half.Head.Position.Y > asleep.Head.Position.Y and half.Head.Position.Y < up.Head.Position.Y + 0.05,
+			"halfway lift"
+		)
 		local turned = C.Pose(pr, 1, 0, math.rad(40), 0)
 		local a1 = math.atan2(-pr.LookFrame.LookVector.X, -pr.LookFrame.LookVector.Z)
 		local a2 = math.atan2(-turned.Head.LookVector.X, -turned.Head.LookVector.Z)
 		T.near(math.deg(a2 - a1), 40, 1.5, "yaw turns the skull to his left")
 		local breathing = C.Pose(pr, 0, math.rad(2))
-		T.ok((breathing.Head.LookVector - asleep.Head.LookVector).Magnitude < 1e-4, "asleep: the skull keeps resting while he breathes")
-		T.ok((breathing.UpperTorso.UpVector - asleep.UpperTorso.UpVector).Magnitude > 0.02, "...and the torso rises and falls")
-		T.ok(breathing.LeftFoot.Position == asleep.LeftFoot.Position and up.RightFoot.Position == asleep.RightFoot.Position, "legs never move")
+		T.ok(
+			(breathing.Head.LookVector - asleep.Head.LookVector).Magnitude < 1e-4,
+			"asleep: the skull keeps resting while he breathes"
+		)
+		T.ok(
+			(breathing.UpperTorso.UpVector - asleep.UpperTorso.UpVector).Magnitude > 0.02,
+			"...and the torso rises and falls"
+		)
+		T.ok(
+			breathing.LeftFoot.Position == asleep.LeftFoot.Position
+				and up.RightFoot.Position == asleep.RightFoot.Position,
+			"legs never move"
+		)
 	end,
 
 	shop_booth_state_machine = function(T, Loader)
@@ -377,6 +413,175 @@ return {
 		T.eq(C.Typing(line, 100), utf8.len(line), "fully typed")
 		T.ok(C.Typing("abcdef", 0.1) > C.Typing("a.....", 0.1), "punctuation types slower")
 		T.eq(C.Typing("привет", 100), 6, "Cyrillic counted per letter")
+	end,
+
+	shop_booth_guis = function(T, Loader)
+		local C = Loader.require(CONTROLLER)
+		local roblox = Loader.roblox
+		local anchor = roblox.Instance.new("Attachment")
+		local bubble = C.BuildBubble(anchor, "* zzz... oh. hi, kid. what do you want?")
+		T.ok(bubble:IsA("BillboardGui") and bubble.Adornee == anchor, "bubble: a BillboardGui on the anchor")
+		T.eq(bubble.LightInfluence, 0, "unlit")
+		T.ok(bubble.AlwaysOnTop, "never hidden behind the booth posts")
+		T.ok(bubble.MaxDistance > C.Tuning.LEAVE_RADIUS + 10, "still readable while the player walks off (bye)")
+		T.near(bubble.SizeOffset.Y, 0.5, 1e-6, "sits above its anchor")
+		local box = bubble:FindFirstChild("Box", true)
+		T.ok(
+			box ~= nil and box.BackgroundColor3 == roblox.Color3.new(0, 0, 0) and box.BackgroundTransparency == 0,
+			"black box"
+		)
+		local stroke = box and box:FindFirstChildOfClass("UIStroke")
+		T.ok(
+			stroke ~= nil and stroke.Color == roblox.Color3.new(1, 1, 1) and stroke.Thickness >= 2,
+			"white pixel border"
+		)
+		local line = box and box:FindFirstChild("Line")
+		T.ok(line ~= nil and string.find(line.FontFace.Family, "PressStart2P", 1, true) ~= nil, "the pixel menu font")
+		T.eq(line and line.Text, "* zzz... oh. hi, kid. what do you want?", "the line")
+		T.eq(line and line.MaxVisibleGraphemes, -1, "shown in full")
+		T.ok(line and line.TextWrapped, "wraps")
+		local tail = 0
+		for _, child in bubble:GetDescendants() do
+			if string.sub(child.Name, 1, 4) == "Tail" then
+				tail += 1
+			end
+		end
+		T.ok(tail >= 6, "pixel tail")
+		local hidden = C.BuildBubble(roblox.Instance.new("Attachment"))
+		T.eq(hidden.Enabled, false, "an empty bubble starts hidden")
+		local zzz = C.BuildZzz(anchor, 1.35)
+		local letters = 0
+		for _, child in zzz:GetChildren() do
+			if child:IsA("TextLabel") and child.Text == "Z" then
+				letters += 1
+				T.ok(child.TextTransparency < 1, "letter visible mid-cycle")
+				T.ok(string.find(child.FontFace.Family, "PressStart2P", 1, true) ~= nil, "pixel Z")
+			end
+		end
+		T.eq(letters, 3, "three Zs")
+		T.ok(zzz.AlwaysOnTop, "the Zzz show over the booth's low awning")
+		T.ok(zzz.MaxDistance <= 120, "...but only near the booth")
+	end,
+
+	shop_booth_controller_runtime = function(T, Loader)
+		-- the real frame step on a fresh NPC, with a fake workspace (camera + BulkMoveTo) and a fake local character
+		local C = Loader.require(CONTROLLER)
+		local Shopkeeper = Loader.require(SHOPKEEPER)
+		local Strings = Loader.require(STRINGS)
+		local roblox = Loader.roblox
+		local CFrame, Vector3 = roblox.CFrame, roblox.Vector3
+		local G = getfenv(C.Step) -- the controller module's own environment (its `workspace` global)
+		local Players = G.game:GetService("Players")
+		local oldWorkspace, oldPlayer, oldLang =
+			rawget(G, "workspace"), rawget(Players, "LocalPlayer"), Strings.Language()
+		local camera = { CFrame = CFrame.new(0, 8, -20) }
+		local moves = 0
+		G.workspace = {
+			CurrentCamera = camera,
+			BulkMoveTo = function(_, parts, cframes)
+				moves += 1
+				for i, part in parts do
+					part.CFrame = cframes[i]
+				end
+			end,
+		}
+		local function fakePart()
+			return {
+				Position = Vector3.zero,
+				IsA = function(_, class)
+					return class == "BasePart"
+				end,
+			}
+		end
+		local body, head = fakePart(), fakePart()
+		local function standAt(x, z)
+			body.Position = Vector3.new(x, 3, z)
+			head.Position = Vector3.new(x, 4.6, z)
+		end
+		local character = {
+			FindFirstChild = function(_, name)
+				return if name == "HumanoidRootPart" then body elseif name == "Head" then head else nil
+			end,
+		}
+		rawset(Players, "LocalPlayer", { Name = "Kid", Character = character })
+		Strings.SetLanguage("en")
+		local ok, err = pcall(function()
+			local folder = roblox.Instance.new("Folder")
+			local model = Shopkeeper.Build(CFrame.new(0, 3.39, 0))
+			model.Parent = folder
+			local root = model.PrimaryPart
+			local skull = model.Head:FindFirstChild("Cranium")
+			local pupil = model.Head:FindFirstChild("LeftPupil")
+			local rest = skull.CFrame
+			T.ok(C.Attach(model), "attaches to the frozen NPC")
+			T.eq(C.State(), "Asleep", "asleep")
+			local zzzGui = root:FindFirstChild("ShopkeeperZzzAnchor"):FindFirstChild("ShopkeeperZzz")
+			local bubbleGui = root:FindFirstChild("ShopkeeperBubbleAnchor"):FindFirstChild("ShopkeeperBubble")
+			local line = bubbleGui:FindFirstChild("Line", true)
+			local function run(seconds, dt)
+				for _ = 1, math.floor(seconds / dt + 0.5) do
+					C.Step(dt)
+				end
+			end
+			-- far player, camera nearby: asleep, breathing, Zzz
+			standAt(0, -40)
+			run(2, 0.1)
+			T.eq(C.State(), "Asleep", "a far player does not wake him")
+			T.ok(moves > 0 and moves <= 31, "breathes at ~15 Hz (" .. moves .. " moves in 2 s)")
+			T.ok(zzzGui.Enabled, "Zzz shown")
+			T.ok(not bubbleGui.Enabled, "no bubble")
+			T.eq(pupil.Transparency, 1, "eyes shut")
+			-- comes near: wakes, eyes open, greets letter by letter
+			standAt(0, -8)
+			run(0.05, 0.05)
+			T.eq(C.State(), "Waking", "wakes up")
+			run(0.25, 0.05)
+			T.eq(pupil.Transparency, 0, "eyes open")
+			T.eq(line.Text, "* " .. Strings.L("shop.keeper.greet"), "greets with shop.keeper.greet")
+			T.ok(line.MaxVisibleGraphemes > 0 and line.MaxVisibleGraphemes < utf8.len(line.Text), "typing")
+			T.ok(bubbleGui.Enabled, "bubble up")
+			run(1, 0.05)
+			T.eq(C.State(), "Awake", "awake")
+			T.ok(skull.CFrame.Position.Y > rest.Position.Y + 0.15, "the skull lifted off his arms")
+			local function facing()
+				local to = (head.Position - skull.CFrame.Position).Unit
+				return skull.CFrame.LookVector:Dot(to)
+			end
+			T.ok(facing() > 0.85, "looks at the player (" .. facing() .. ")")
+			run(3, 0.05)
+			T.eq(line.MaxVisibleGraphemes, -1, "the whole greeting is shown")
+			standAt(-9, -6)
+			run(1.5, 0.05)
+			T.ok(facing() > 0.85, "turns to follow the player (" .. facing() .. ")")
+			-- walks away: bye, then back to sleep
+			standAt(0, -30)
+			run(2.2, 0.05)
+			T.eq(C.State(), "Bye", "bye after 2 s away")
+			T.eq(line.Text, "* " .. Strings.L("shop.keeper.bye"), "says shop.keeper.bye")
+			run(5, 0.05)
+			T.eq(C.State(), "Asleep", "dozed off again")
+			T.eq(pupil.Transparency, 1, "eyes shut again")
+			T.ok((skull.CFrame.Position - rest.Position).Magnitude < 0.1, "the skull back on his arms")
+			-- everyone far away: snaps to the exact built pose, guis off, no more moves
+			standAt(0, -300)
+			camera.CFrame = CFrame.new(0, 8, -300)
+			C.Step(0.1)
+			T.ok((skull.CFrame.Position - rest.Position).Magnitude < 1e-4, "idle: exactly the built pose")
+			T.ok(not zzzGui.Enabled and not bubbleGui.Enabled, "idle: guis off")
+			local idleMoves = moves
+			run(1, 0.1)
+			T.eq(moves, idleMoves, "idle: nothing moves")
+			C.Detach()
+			T.eq(C.State(), nil, "detached")
+			T.eq(root:FindFirstChild("ShopkeeperZzzAnchor"), nil, "its guis are gone")
+		end)
+		C.Detach()
+		G.workspace = oldWorkspace
+		rawset(Players, "LocalPlayer", oldPlayer)
+		Strings.SetLanguage(oldLang)
+		if not ok then
+			error(err, 0)
+		end
 	end,
 
 	shop_booth_strings = function(T, Loader)

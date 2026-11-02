@@ -23,6 +23,9 @@
 --   ShopkeeperController.Priority = 62
 --   ShopkeeperController.State() -> string?       state of the local shopkeeper ("Asleep", "Waking", "Awake",
 --                                                 "Bye", "Dozing"), nil while there is none
+--   ShopkeeperController.Attach(model) -> boolean / Detach() / Step(dt)   attach to a shopkeeper model (Start finds
+--                                                 the lobby's by itself), let go (parts back to the sleep pose),
+--                                                 advance one frame (Start drives it from RunService.Heartbeat)
 --   ShopkeeperController.Tuning                   radii (studs) and times (s), see below
 --   ShopkeeperController.Machine                  the pure state machine (no engine access; tests):
 --     Machine.new() -> Machine                    { State = "Asleep", Time = 0, Far = 0, From = 0 }
@@ -36,6 +39,13 @@
 --       (+yaw = his left, +pitch = up), clamped to Tuning.MAX_YAW / MAX_PITCH_UP / MAX_PITCH_DOWN
 --   ShopkeeperController.Typing(text, elapsed, interval?, pause?) -> number   graphemes shown after `elapsed`
 --       seconds of typing (punctuation pauses longer)
+--   ShopkeeperController.PoseRig(model) -> PoseRig?   reads the frozen NPC (joint attributes, root) for Pose
+--   ShopkeeperController.Pose(poseRig, alpha, breath?, yaw?, pitch?, into?) -> { [limbName]: CFrame }   every limb
+--       for a sleep (0) .. awake (1) blend + breathing (rad on the Waist) + look-at; alpha 0 = the built model
+--       exactly; `into` = a table to fill instead of a new one
+--   ShopkeeperController.BuildBubble(anchor: Attachment, text?) -> BillboardGui   the speech bubble (text shown in
+--       full when given); ShopkeeperController.BuildZzz(anchor, clock?) -> BillboardGui   the Zzz at a moment
+--       (offline tests / previews; the runtime builds the same guis)
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -70,7 +80,7 @@ local Tuning = {
 	ZZZ_CYCLE = 2.7, -- seconds for one "Z" to rise and fade
 	BUBBLE_WIDTH = 252, -- px
 	BUBBLE_MAX_DISTANCE = 70,
-	ZZZ_MAX_DISTANCE = 110,
+	ZZZ_MAX_DISTANCE = 90,
 }
 ShopkeeperController.Tuning = Tuning
 
@@ -175,10 +185,13 @@ function ShopkeeperController.LookAngles(neck: CFrame, target: Vector3): (number
 	end
 	local yaw = math.atan2(-rel.X, -rel.Z)
 	local pitch = math.atan2(rel.Y, flat)
-	return math.clamp(yaw, -Tuning.MAX_YAW, Tuning.MAX_YAW), math.clamp(pitch, -Tuning.MAX_PITCH_DOWN, Tuning.MAX_PITCH_UP)
+	return math.clamp(yaw, -Tuning.MAX_YAW, Tuning.MAX_YAW),
+		math.clamp(pitch, -Tuning.MAX_PITCH_DOWN, Tuning.MAX_PITCH_UP)
 end
 
-local PUNCTUATION: { [string]: boolean } = { ["."] = true, [","] = true, ["?"] = true, ["!"] = true, [":"] = true, [";"] = true }
+local TYPE_BEAT = 0.12 -- a beat between the bubble popping up and the first letter
+local PUNCTUATION: { [string]: boolean } =
+	{ ["."] = true, [","] = true, ["?"] = true, ["!"] = true, [":"] = true, [";"] = true }
 
 local function graphemes(text: string): { string }
 	local out: { string } = {}
@@ -188,12 +201,13 @@ local function graphemes(text: string): { string }
 	return out
 end
 
-function ShopkeeperController.Typing(text: string, elapsed: number, interval: number?, pause: number?): number
+-- Graphemes shown `elapsed` seconds into typing `chars` (the first one at 0; a punctuation mark holds longer).
+local function typedCount(chars: { string }, elapsed: number, interval: number?, pause: number?): number
 	local step = interval or Tuning.TYPE_INTERVAL
 	local stop = pause or Tuning.TYPE_PAUSE
 	local t = 0
 	local shown = 0
-	for _, char in graphemes(text) do
+	for _, char in chars do
 		if t > elapsed then
 			break
 		end
@@ -201,6 +215,10 @@ function ShopkeeperController.Typing(text: string, elapsed: number, interval: nu
 		t += if PUNCTUATION[char] then stop else step
 	end
 	return shown
+end
+
+function ShopkeeperController.Typing(text: string, elapsed: number, interval: number?, pause: number?): number
+	return typedCount(graphemes(text), elapsed, interval, pause)
 end
 
 ------------------------------------------------------------------------------------------------ pure pose maths
@@ -284,7 +302,14 @@ end
 -- Every limb's CFrame for a blend between the sleep pose (alpha 0) and the awake pose (alpha 1; clamped), plus
 -- breathing (radians on the Waist) and the look-at (yaw / pitch, radians, relative to the awake skull). The skull
 -- blends its WORLD rotation (so asleep it stays put on the arms while the torso breathes) about the neck pivot.
-function ShopkeeperController.Pose(pr: PoseRig, alpha: number, breath: number?, yaw: number?, pitch: number?): { [string]: CFrame }
+function ShopkeeperController.Pose(
+	pr: PoseRig,
+	alpha: number,
+	breath: number?,
+	yaw: number?,
+	pitch: number?,
+	into: { [string]: CFrame }?
+): { [string]: CFrame }
 	local a = clamp01(alpha)
 	local transforms = pr.Transforms
 	for _, joint in pr.Joints do
@@ -296,7 +321,7 @@ function ShopkeeperController.Pose(pr: PoseRig, alpha: number, breath: number?, 
 	if breath and breath ~= 0 then
 		transforms.Waist = (transforms.Waist or IDENTITY) * CFrame.Angles(breath, 0, 0)
 	end
-	local limbs = Shopkeeper.Solve(pr.RootCF, pr.Joints, transforms)
+	local limbs = Shopkeeper.Solve(pr.RootCF, pr.Joints, transforms, into)
 	local torso = limbs.UpperTorso
 	if torso then
 		local look = pr.HeadAwake * CFrame.Angles(0, yaw or 0, 0) * CFrame.Angles(pitch or 0, 0, 0)
@@ -318,7 +343,7 @@ type Bubble = {
 	Tail: { Frame },
 	Chars: { string },
 	Shown: number,
-	Timer: number,
+	Clock: number, -- seconds since the line started typing
 	Hold: number, -- seconds left on screen after typing (math.huge = until replaced)
 	Alpha: number, -- current opacity 0..1
 	Visible: boolean, -- wanted on screen
@@ -332,6 +357,7 @@ type Rig = {
 	Root: BasePart,
 	Pose: PoseRig,
 	Limbs: { Limb },
+	LimbCFrames: { [string]: CFrame }, -- scratch: solved limbs, reused every frame
 	MoveParts: { BasePart },
 	MoveCFrames: { CFrame },
 	Pupils: { BasePart },
@@ -349,6 +375,7 @@ type Rig = {
 	BlinkAt: number,
 	BlinkUntil: number,
 	Clock: number,
+	Breath: number, -- breathing phase (radians)
 	SleepAccum: number,
 	Idle: boolean,
 	Connections: { RBXScriptConnection },
@@ -436,10 +463,10 @@ local function buildZzz(anchor: Attachment): (BillboardGui, { TextLabel }, { UIS
 	local gui = Instance.new("BillboardGui")
 	gui.Name = "ShopkeeperZzz"
 	gui.Adornee = anchor
-	gui.Size = UDim2.fromScale(4.2, 4.2) -- studs: shrinks with distance like a world effect
-	gui.SizeOffset = Vector2.new(0.32, 0.42) -- rise up and to the right of the skull
+	gui.Size = UDim2.fromScale(3.4, 3.4) -- studs: shrinks with distance like a world effect
+	gui.SizeOffset = Vector2.new(0.3, 0.38) -- rise up and to the right of the skull, under the booth's awning
 	gui.LightInfluence = 0
-	gui.AlwaysOnTop = false
+	gui.AlwaysOnTop = true -- the booth's low awning would hide most of the rise from the plaza
 	gui.MaxDistance = Tuning.ZZZ_MAX_DISTANCE
 	gui.ClipsDescendants = false
 	gui.ResetOnSpawn = false
@@ -576,7 +603,7 @@ local function buildBubble(anchor: Attachment): Bubble
 		Tail = tail,
 		Chars = {},
 		Shown = 0,
-		Timer = 0,
+		Clock = 0,
 		Hold = 0,
 		Alpha = 0,
 		Visible = false,
@@ -606,7 +633,7 @@ end
 local function say(r: Rig, key: string, hold: number)
 	local bubble = r.Bubble
 	setLine(bubble, "* " .. L(key), 0)
-	bubble.Timer = 0.12 -- a beat before the first letter
+	bubble.Clock = 0
 	bubble.Hold = hold
 	bubble.Visible = true
 	bubble.Pop = 0
@@ -616,18 +643,31 @@ local function stepBubble(r: Rig, dt: number, reduced: boolean)
 	local bubble = r.Bubble
 	-- typing
 	if bubble.Visible and bubble.Shown < #bubble.Chars then
-		bubble.Timer -= dt
-		while bubble.Timer <= 0 and bubble.Shown < #bubble.Chars do
-			bubble.Shown += 1
-			local char = bubble.Chars[bubble.Shown]
-			bubble.Label.MaxVisibleGraphemes = bubble.Shown
-			if char ~= " " and not PUNCTUATION[char] and bubble.Shown > 2 and bubble.Shown % Tuning.BLIP_EVERY == 1 then
-				playBlip()
-			end
-			bubble.Timer += if PUNCTUATION[char] then Tuning.TYPE_PAUSE else Tuning.TYPE_INTERVAL
-		end
-		if bubble.Shown >= #bubble.Chars then
+		if shopOpen() then
+			-- the Shop screen's own pixel shopkeeper talks now: finish silently and get out of the way
+			bubble.Shown = #bubble.Chars
 			bubble.Label.MaxVisibleGraphemes = -1
+			bubble.Visible = false
+		else
+			bubble.Clock += dt
+			local target = if bubble.Clock < TYPE_BEAT then 0 else typedCount(bubble.Chars, bubble.Clock - TYPE_BEAT)
+			local blipped = false
+			while bubble.Shown < target do
+				bubble.Shown += 1
+				local char = bubble.Chars[bubble.Shown]
+				-- one blip every BLIP_EVERY letters (not for the "* " prefix, spaces or punctuation), one per frame
+				if
+					not blipped
+					and char ~= " "
+					and not PUNCTUATION[char]
+					and bubble.Shown > 2
+					and bubble.Shown % Tuning.BLIP_EVERY == 1
+				then
+					blipped = true
+					playBlip()
+				end
+			end
+			bubble.Label.MaxVisibleGraphemes = if bubble.Shown >= #bubble.Chars then -1 else bubble.Shown
 		end
 	elseif bubble.Visible and bubble.Hold < math.huge then
 		bubble.Hold -= dt
@@ -669,11 +709,14 @@ local function layoutZzz(letters: { TextLabel }, strokes: { UIStroke }, clock: n
 end
 
 local function stepZzz(r: Rig, dt: number, reduced: boolean)
-	local asleep = r.Machine.State == "Asleep" or (r.Machine.State == "Dozing" and r.Machine.Time > Tuning.DOZE_TIME * 0.6)
+	local asleep = r.Machine.State == "Asleep"
+		or (r.Machine.State == "Dozing" and r.Machine.Time > Tuning.DOZE_TIME * 0.6)
 	local target = if asleep then 1 else 0
 	if r.ZzzAlpha ~= target then
 		local rate = if target > r.ZzzAlpha then 1.2 else 6
-		r.ZzzAlpha = if target > r.ZzzAlpha then math.min(1, r.ZzzAlpha + dt * rate) else math.max(0, r.ZzzAlpha - dt * rate)
+		r.ZzzAlpha = if target > r.ZzzAlpha
+			then math.min(1, r.ZzzAlpha + dt * rate)
+			else math.max(0, r.ZzzAlpha - dt * rate)
 	end
 	local visible = r.ZzzAlpha > 0.01
 	r.Zzz.Enabled = visible
@@ -722,7 +765,7 @@ end
 -- Pose -------------------------------------------------------------------------------------------------------
 
 local function applyPose(r: Rig, alpha: number, breath: number, extraPitch: number)
-	local limbs = ShopkeeperController.Pose(r.Pose, alpha, breath, r.Yaw, r.Pitch + extraPitch)
+	local limbs = ShopkeeperController.Pose(r.Pose, alpha, breath, r.Yaw, r.Pitch + extraPitch, r.LimbCFrames)
 	local n = 0
 	for _, limb in r.Limbs do
 		local cf = limbs[limb.Name]
@@ -810,9 +853,16 @@ local function setup(model: Model): boolean
 
 	local zzzOffset = model:GetAttribute("ZzzOffset")
 	local bubbleOffset = model:GetAttribute("BubbleOffset")
-	local zzzAnchor = newAnchor(root, "ShopkeeperZzzAnchor", if typeof(zzzOffset) == "Vector3" then zzzOffset else Vector3.new(0, 3.2, -1.5))
-	local bubbleAnchor =
-		newAnchor(root, "ShopkeeperBubbleAnchor", if typeof(bubbleOffset) == "Vector3" then bubbleOffset else Vector3.new(0, 4, -1.3))
+	local zzzAnchor = newAnchor(
+		root,
+		"ShopkeeperZzzAnchor",
+		if typeof(zzzOffset) == "Vector3" then zzzOffset else Vector3.new(0, 3.2, -1.5)
+	)
+	local bubbleAnchor = newAnchor(
+		root,
+		"ShopkeeperBubbleAnchor",
+		if typeof(bubbleOffset) == "Vector3" then bubbleOffset else Vector3.new(0, 4, -1.3)
+	)
 	local zzz, letters, strokes = buildZzz(zzzAnchor)
 	local bubble = buildBubble(bubbleAnchor)
 	setBubbleAlpha(bubble, 0)
@@ -822,6 +872,7 @@ local function setup(model: Model): boolean
 		Root = root,
 		Pose = pose,
 		Limbs = limbs,
+		LimbCFrames = {},
 		MoveParts = {},
 		MoveCFrames = {},
 		Pupils = pupils,
@@ -839,18 +890,21 @@ local function setup(model: Model): boolean
 		BlinkAt = 0,
 		BlinkUntil = 0,
 		Clock = random:NextNumber(0, 10),
+		Breath = random:NextNumber(0, 2 * math.pi),
 		SleepAccum = 0,
 		Idle = true,
 		Connections = {},
 	}
-	table.insert(
-		r.Connections,
-		model.AncestryChanged:Connect(function(_, parent)
-			if parent == nil and rig == r then
-				teardown()
-			end
-		end)
-	)
+	pcall(function()
+		table.insert(
+			r.Connections,
+			model.AncestryChanged:Connect(function(_, parent)
+				if parent == nil and rig == r then
+					teardown()
+				end
+			end)
+		)
+	end)
 	rig = r
 	return true
 end
@@ -880,11 +934,8 @@ local function consider(lobby: Instance?)
 				break
 			end
 			local model = findShopkeeper(lobby)
-			if model then
-				teardown()
-				if setup(model) then
-					break
-				end
+			if model and ShopkeeperController.Attach(model) then
+				break
 			end
 			task.wait(1)
 		end
@@ -955,10 +1006,15 @@ local function step(dt: number)
 	stepZzz(r, dt, reduced)
 	stepBubble(r, dt, reduced)
 
+	-- breathing: slow and deep asleep, light awake; the phase is integrated so changing pace never jumps
+	local up = clamp01(alpha)
+	local sleepBreath, awakeBreath = Tuning.SLEEP_BREATH, Tuning.AWAKE_BREATH
+	local period = sleepBreath.Period + (awakeBreath.Period - sleepBreath.Period) * up
+	local amp = (sleepBreath.Amp + (awakeBreath.Amp - sleepBreath.Amp) * up) * (if reduced then 0.5 else 1)
+	r.Breath = (r.Breath + dt * 2 * math.pi / period) % (2 * math.pi)
+	local breath = math.sin(r.Breath) * amp
+
 	-- pose: every frame while anything moves; ~15 Hz while he only breathes in his sleep
-	local breathing = if m.State == "Asleep" then Tuning.SLEEP_BREATH else Tuning.AWAKE_BREATH
-	local amp = breathing.Amp * (if reduced then 0.5 else 1)
-	local breath = math.sin(r.Clock * 2 * math.pi / breathing.Period) * amp
 	if m.State == "Asleep" then
 		r.SleepAccum += dt
 		if r.SleepAccum < 1 / Tuning.SLEEP_HZ then
@@ -989,6 +1045,21 @@ function ShopkeeperController.BuildZzz(anchor: Attachment, clock: number?): Bill
 	layoutZzz(letters, strokes, clock or 0, 1, false)
 	gui.Enabled = true
 	return gui
+end
+
+-- Attaches the controller to a shopkeeper model (Start finds the lobby's one by itself); false while the model is
+-- incomplete. Detach() lets go of it (the parts return to the sleep pose); Step(dt) advances one frame (Heartbeat).
+function ShopkeeperController.Attach(model: Model): boolean
+	teardown()
+	return setup(model)
+end
+
+function ShopkeeperController.Detach()
+	teardown()
+end
+
+function ShopkeeperController.Step(dt: number)
+	step(dt)
 end
 
 function ShopkeeperController.State(): string?

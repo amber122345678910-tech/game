@@ -112,7 +112,18 @@ local SNOWFLAKES = 9
 local SIGN_COLOR = Color3.fromRGB(74, 40, 18)
 local PAUSE: { [string]: boolean } = { ["."] = true, ["!"] = true, ["?"] = true, ["…"] = true }
 local COMMA: { [string]: boolean } = { [","] = true, [";"] = true, [":"] = true }
-local SILENT: { [string]: boolean } = { [" "] = true, ["."] = true, [","] = true, ["!"] = true, ["?"] = true, ["…"] = true, [";"] = true, [":"] = true, ["-"] = true, ["*"] = true }
+local SILENT: { [string]: boolean } = {
+	[" "] = true,
+	["."] = true,
+	[","] = true,
+	["!"] = true,
+	["?"] = true,
+	["…"] = true,
+	[";"] = true,
+	[":"] = true,
+	["-"] = true,
+	["*"] = true,
+}
 
 local spriteModule: any = nil
 local function Sprite(): any
@@ -364,7 +375,9 @@ function ShopKeeper.NewTimeline(greet: string, zzz: string, timing: { [string]: 
 		if t < tl.WakeAt then
 			pose.State = "Asleep"
 			pose.Head = "Asleep"
-			local bob = if calm then 0 else math.round((1 - math.cos(2 * math.pi * t / math.max(cfg.BobPeriod, 1e-3))) / 2)
+			local bob = if calm
+				then 0
+				else math.round((1 - math.cos(2 * math.pi * t / math.max(cfg.BobPeriod, 1e-3))) / 2)
 			pose.HeadY = asleepY + bob
 			pose.Z = zPoses(t, cfg, calm)
 		elseif t < tl.WakeAt + cfg.Hop then
@@ -409,7 +422,16 @@ local function newFrame(name: string, color: Color3?, z: number): Frame
 end
 
 -- every merged rect of `rows` as a Frame inside `parent` (a frame exactly cols x rowsN cells big)
-local function paint(parent: Frame, rows: { string }, cols: number, rowsN: number, ox: number, oy: number, z: number, out: { Frame }?)
+local function paint(
+	parent: Frame,
+	rows: { string },
+	cols: number,
+	rowsN: number,
+	ox: number,
+	oy: number,
+	z: number,
+	out: { Frame }?
+)
 	local sprite = Sprite()
 	for i, r in sprite.Rects(rows) do
 		local f = newFrame(r.color .. i, sprite.Colors[r.color], z)
@@ -473,7 +495,10 @@ function ShopKeeper.Create(theme: Theme, opts: { [string]: any }): any
 	if theme.Id ~= "Classic" then
 		Common.Gradient(stage, ColorSequence.new(c.PanelInset:Lerp(c.Accent, 0.12), c.PanelInset), nil, 90)
 	end
-	Common.Corner(stage, if theme.Id == "Void" then UDim.new(0, 8) elseif theme.Id == "Royal" then UDim.new(0, 4) else UDim.new(0, 0))
+	Common.Corner(
+		stage,
+		if theme.Id == "Void" then UDim.new(0, 8) elseif theme.Id == "Royal" then UDim.new(0, 4) else UDim.new(0, 0)
+	)
 	stage.Parent = content
 	local stageW, stageH = innerW, math.floor(fit.StageH)
 
@@ -581,7 +606,10 @@ function ShopKeeper.Create(theme: Theme, opts: { [string]: any }): any
 	local box = newFrame("Dialogue", c.PanelInset, 5)
 	box.Position = UDim2.fromOffset(0, innerH - fit.BoxH)
 	box.Size = UDim2.fromOffset(innerW, fit.BoxH)
-	Common.Corner(box, if theme.Id == "Void" then UDim.new(0, 10) elseif theme.Id == "Royal" then UDim.new(0, 6) else theme.SmallCorner)
+	Common.Corner(
+		box,
+		if theme.Id == "Void" then UDim.new(0, 10) elseif theme.Id == "Royal" then UDim.new(0, 6) else theme.SmallCorner
+	)
 	local stroke = Common.Stroke(box, c.Stroke, if theme.Id == "Classic" then 3 else 2, 0, theme.LineJoin)
 	if theme.Gradients.Stroke then
 		Common.Gradient(stroke, theme.Gradients.Stroke, nil, 45)

@@ -64,7 +64,8 @@ Loader.isServer = false
 Loader.quietWarnings = true
 local roblox = Loader.roblox
 local Vector2, UDim2, UDim, Color3 = roblox.Vector2, roblox.UDim2, roblox.UDim, roblox.Color3
-local Instance, Enum, ColorSequence, ColorSequenceKeypoint = roblox.Instance, roblox.Enum, roblox.ColorSequence, roblox.ColorSequenceKeypoint
+local Instance, Enum, ColorSequence, ColorSequenceKeypoint =
+	roblox.Instance, roblox.Enum, roblox.ColorSequence, roblox.ColorSequenceKeypoint
 
 local Strings = Loader.require("ReplicatedStorage.Shared.Strings")
 Strings.SetLanguage(if args.lang and args.lang ~= true then args.lang else "en")
@@ -195,7 +196,12 @@ if keeper then
 	local size = keeper.Root.Size
 	local x = inset.L + m.Margin * layout.Scale
 	local y = inset.T + bodyTop * layout.Scale
-	crop = { math.floor(x), math.floor(y), math.ceil(size.X.Offset * layout.Scale), math.ceil(size.Y.Offset * layout.Scale) }
+	crop = {
+		math.floor(x),
+		math.floor(y),
+		math.ceil(size.X.Offset * layout.Scale),
+		math.ceil(size.Y.Offset * layout.Scale),
+	}
 	keeper.Snap(Vector2.new(x + keeper.Fit.Pad * layout.Scale, y + keeper.Fit.Pad * layout.Scale))
 end
 
@@ -219,28 +225,87 @@ end
 -- serialization (same format as tools/lune/dump_gui.luau) ----------------------------------------------------
 local PROPS = {
 	GuiObject = {
-		"Position", "Size", "AnchorPoint", "Rotation", "ZIndex", "LayoutOrder", "Visible", "ClipsDescendants",
-		"BackgroundColor3", "BackgroundTransparency", "BorderSizePixel", "BorderColor3", "AutomaticSize", "SizeConstraint",
+		"Position",
+		"Size",
+		"AnchorPoint",
+		"Rotation",
+		"ZIndex",
+		"LayoutOrder",
+		"Visible",
+		"ClipsDescendants",
+		"BackgroundColor3",
+		"BackgroundTransparency",
+		"BorderSizePixel",
+		"BorderColor3",
+		"AutomaticSize",
+		"SizeConstraint",
 	},
 	Text = {
-		"Text", "TextColor3", "TextSize", "TextScaled", "TextWrapped", "RichText", "FontFace", "TextXAlignment",
-		"TextYAlignment", "TextTransparency", "TextStrokeColor3", "TextStrokeTransparency", "LineHeight",
-		"MaxVisibleGraphemes", "TextTruncate",
+		"Text",
+		"TextColor3",
+		"TextSize",
+		"TextScaled",
+		"TextWrapped",
+		"RichText",
+		"FontFace",
+		"TextXAlignment",
+		"TextYAlignment",
+		"TextTransparency",
+		"TextStrokeColor3",
+		"TextStrokeTransparency",
+		"LineHeight",
+		"MaxVisibleGraphemes",
+		"TextTruncate",
 	},
 	Image = { "Image", "ImageColor3", "ImageTransparency", "ScaleType", "SliceCenter", "ResampleMode" },
 	ScreenGui = { "DisplayOrder", "IgnoreGuiInset", "Enabled", "ZIndexBehavior", "ScreenInsets" },
 	CanvasGroup = { "GroupTransparency", "GroupColor3" },
 	ScrollingFrame = {
-		"CanvasSize", "CanvasPosition", "AutomaticCanvasSize", "ScrollingDirection", "ScrollBarThickness",
-		"ScrollBarImageColor3", "ScrollBarImageTransparency", "VerticalScrollBarInset",
+		"CanvasSize",
+		"CanvasPosition",
+		"AutomaticCanvasSize",
+		"ScrollingDirection",
+		"ScrollBarThickness",
+		"ScrollBarImageColor3",
+		"ScrollBarImageTransparency",
+		"VerticalScrollBarInset",
 	},
 	ViewportFrame = { "Ambient", "LightColor", "LightDirection", "ImageColor3", "ImageTransparency" },
-	UIStroke = { "Color", "Thickness", "Transparency", "ApplyStrokeMode", "LineJoinMode", "Enabled", "BorderStrokePosition", "BorderOffset", "StrokeSizingMode" },
+	UIStroke = {
+		"Color",
+		"Thickness",
+		"Transparency",
+		"ApplyStrokeMode",
+		"LineJoinMode",
+		"Enabled",
+		"BorderStrokePosition",
+		"BorderOffset",
+		"StrokeSizingMode",
+	},
 	UICorner = { "CornerRadius" },
 	UIGradient = { "Color", "Transparency", "Rotation", "Offset", "Enabled" },
 	UIPadding = { "PaddingLeft", "PaddingRight", "PaddingTop", "PaddingBottom" },
-	UIListLayout = { "FillDirection", "Padding", "SortOrder", "HorizontalAlignment", "VerticalAlignment", "Wraps", "HorizontalFlex", "VerticalFlex", "ItemLineAlignment" },
-	UIGridLayout = { "CellSize", "CellPadding", "FillDirection", "FillDirectionMaxCells", "SortOrder", "HorizontalAlignment", "VerticalAlignment", "StartCorner" },
+	UIListLayout = {
+		"FillDirection",
+		"Padding",
+		"SortOrder",
+		"HorizontalAlignment",
+		"VerticalAlignment",
+		"Wraps",
+		"HorizontalFlex",
+		"VerticalFlex",
+		"ItemLineAlignment",
+	},
+	UIGridLayout = {
+		"CellSize",
+		"CellPadding",
+		"FillDirection",
+		"FillDirectionMaxCells",
+		"SortOrder",
+		"HorizontalAlignment",
+		"VerticalAlignment",
+		"StartCorner",
+	},
 	UIAspectRatioConstraint = { "AspectRatio", "AspectType", "DominantAxis" },
 	UISizeConstraint = { "MinSize", "MaxSize" },
 	UITextSizeConstraint = { "MinTextSize", "MaxTextSize" },
@@ -359,7 +424,12 @@ local summary = ("shop_keeper: %s %dx%d %s (scale %.3f, canvas %dx%d, keeper %s)
 	layout.Scale,
 	math.floor(layout.Canvas.X),
 	math.floor(layout.Canvas.Y),
-	if keeper then ("%dpx/cell, %s"):format(keeper.Fit.Pixel, if keeper.Fit.Covered then "box over the counter" else "box below") else "none"
+	if keeper
+		then ("%dpx/cell, %s"):format(
+			keeper.Fit.Pixel,
+			if keeper.Fit.Covered then "box over the counter" else "box below"
+		)
+		else "none"
 )
 if framesN then
 	assert(keeper, "no keeper column at this size")

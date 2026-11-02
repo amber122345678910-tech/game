@@ -24,9 +24,10 @@
 --   Shopkeeper.Joints(model) -> { JointInfo }   { Name, Limb, Parent, C0, C1, C1Inv } read from the limb
 --       attributes, parents first (empty when the attributes are missing)
 --   Shopkeeper.Transforms(pose, scale?) -> { [jointName]: CFrame }   (RigBuilder.PoseToCFrame per joint)
---   Shopkeeper.Solve(rootCF, joints, transforms) -> { [limbName]: CFrame }
+--   Shopkeeper.Solve(rootCF, joints, transforms, into?) -> { [limbName]: CFrame }
 --       limb = parent * C0 * Transform * C1^-1 (Motor6D maths); HumanoidRootPart = rootCF; a joint missing from
---       transforms = identity. Solving SleepPose reproduces the built model exactly.
+--       transforms = identity; `into` = a table to fill (no allocation per frame). Solving SleepPose reproduces the
+--       built model exactly.
 -- Model attributes: Shopkeeper = true, BlueprintId, RigScale, RigFamily, PartCount, ZzzOffset / BubbleOffset
 --   (Vector3 in HumanoidRootPart space: where the Zzz rise from above the sleeping skull / where the speech bubble
 --   sits above the awake skull). Limb attributes (physics parts): Joint, JointParent, JointC0, JointC1 (CFrame).
@@ -152,8 +153,16 @@ function Shopkeeper.Joints(model: Model): { JointInfo }
 		if limb:IsA("BasePart") then
 			local name, parent = limb:GetAttribute("Joint"), limb:GetAttribute("JointParent")
 			local c0, c1 = limb:GetAttribute("JointC0"), limb:GetAttribute("JointC1")
-			if type(name) == "string" and type(parent) == "string" and typeof(c0) == "CFrame" and typeof(c1) == "CFrame" then
-				table.insert(list, { Name = name, Limb = limb.Name, Parent = parent, C0 = c0, C1 = c1, C1Inv = c1:Inverse() })
+			if
+				type(name) == "string"
+				and type(parent) == "string"
+				and typeof(c0) == "CFrame"
+				and typeof(c1) == "CFrame"
+			then
+				table.insert(
+					list,
+					{ Name = name, Limb = limb.Name, Parent = parent, C0 = c0, C1 = c1, C1Inv = c1:Inverse() }
+				)
 			end
 		end
 	end
@@ -174,8 +183,14 @@ function Shopkeeper.Joints(model: Model): { JointInfo }
 	return ordered
 end
 
-function Shopkeeper.Solve(rootCF: CFrame, joints: { JointInfo }, transforms: { [string]: CFrame }): { [string]: CFrame }
-	local out: { [string]: CFrame } = { HumanoidRootPart = rootCF }
+function Shopkeeper.Solve(
+	rootCF: CFrame,
+	joints: { JointInfo },
+	transforms: { [string]: CFrame },
+	into: { [string]: CFrame }?
+): { [string]: CFrame }
+	local out: { [string]: CFrame } = into or {}
+	out.HumanoidRootPart = rootCF
 	for _, joint in joints do
 		local parentCF = out[joint.Parent]
 		if parentCF then

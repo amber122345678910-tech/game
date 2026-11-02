@@ -37,7 +37,10 @@ local function setup(Loader, lang)
 	Loader.quietWarnings = true
 	local Strings = Loader.require("ReplicatedStorage.Shared.Strings")
 	Strings.SetLanguage(lang or "en")
-	return Strings, Loader.requirePath("src/client/UI/Themes"), Loader.requirePath("src/client/UI/UIRoot"), Loader.roblox
+	return Strings,
+		Loader.requirePath("src/client/UI/Themes"),
+		Loader.requirePath("src/client/UI/UIRoot"),
+		Loader.roblox
 end
 
 -- paints merged rects into a w x h grid; nil + message when a cell is painted twice or out of bounds
@@ -106,7 +109,12 @@ end
 
 local function mockState(profile)
 	local requests = {}
-	local state = { ProfileChanged = fakeSignal(), SettingChanged = fakeSignal(), RoundChanged = fakeSignal(), Notify = fakeSignal() }
+	local state = {
+		ProfileChanged = fakeSignal(),
+		SettingChanged = fakeSignal(),
+		RoundChanged = fakeSignal(),
+		Notify = fakeSignal(),
+	}
 	function state.Profile()
 		return profile
 	end
@@ -259,8 +267,16 @@ return restoringFlags({
 		local row = 16
 		local face = Sprite.AwakeHead[row + 1]
 		local sleepFace = Sprite.SleepHead[row + 1]
-		T.eq(string.sub(awake[Sprite.HeadAwakeY + row + 1], Sprite.HeadX + 1, Sprite.HeadX + 40), face, "awake face row")
-		T.eq(string.sub(asleep[Sprite.HeadAsleepY + row + 1], Sprite.HeadX + 1, Sprite.HeadX + 40), sleepFace, "asleep face row")
+		T.eq(
+			string.sub(awake[Sprite.HeadAwakeY + row + 1], Sprite.HeadX + 1, Sprite.HeadX + 40),
+			face,
+			"awake face row"
+		)
+		T.eq(
+			string.sub(asleep[Sprite.HeadAsleepY + row + 1], Sprite.HeadX + 1, Sprite.HeadX + 40),
+			sleepFace,
+			"asleep face row"
+		)
 		T.ok(Sprite.HeadAsleepY > Sprite.HeadAwakeY, "he slumps when asleep")
 	end,
 
@@ -412,7 +428,8 @@ return restoringFlags({
 				for _, case in cases do
 					local label = ("%s %s %s"):format(theme.Id, case[1], lang)
 					local layout = case[2]
-					local ok, k = pcall(SK.Create, theme, { Size = case[3], Scale = layout.Scale, Phone = layout.Phone })
+					local ok, k =
+						pcall(SK.Create, theme, { Size = case[3], Scale = layout.Scale, Phone = layout.Phone })
 					if T.ok(ok and k ~= nil, label .. ": " .. tostring(k)) then
 						local fit = k.Fit
 						-- whole screen pixels per cell
@@ -421,13 +438,19 @@ return restoringFlags({
 						T.ok(fit.Pixel >= (if layout.Phone then 2 else 4), label .. ": big enough: " .. fit.Pixel)
 						-- the scene fits the stage, the box fits the panel
 						T.ok(fit.SceneW <= fit.InnerW + 1e-6 and fit.SceneTop >= -1e-6, label .. ": scene inside")
-						T.ok(fit.BoxH >= SK.MinBox[if layout.Phone then "Phone" else "Desktop"], label .. ": box height")
+						T.ok(
+							fit.BoxH >= SK.MinBox[if layout.Phone then "Phone" else "Desktop"],
+							label .. ": box height"
+						)
 						T.ok(k.Box.Parent ~= nil and k.Stage.Parent ~= nil, label .. ": parts parented")
 						-- the settled offline state: awake, the whole greeting shown
 						T.eq(k.State(), "Idle", label .. ": settled")
 						T.eq(k.Line(), Strings.L("shop.keeper.greet"), label .. ": greeting")
 						T.eq(k.Text.MaxVisibleGraphemes, -1, label .. ": all shown")
-						T.ok(string.find(k.Text.Text, Strings.L("shop.keeper.greet"), 1, true) ~= nil, label .. ": text")
+						T.ok(
+							string.find(k.Text.Text, Strings.L("shop.keeper.greet"), 1, true) ~= nil,
+							label .. ": text"
+						)
 						-- ru uses a Cyrillic-capable face
 						if lang == "ru" then
 							T.ok(string.find(k.Text.FontFace.Family, "Jura", 1, true) ~= nil, label .. ": Jura in ru")
@@ -466,7 +489,8 @@ return restoringFlags({
 		local _, Themes, UIRoot, roblox = setup(Loader)
 		local SK = Loader.requirePath(KEEPER)
 		local layout = deviceLayout(UIRoot, roblox, 1920, 1080)
-		local k = SK.Create(Themes.Get("Royal"), { Size = roblox.Vector2.new(468, 722), Scale = layout.Scale, Phone = false })
+		local k =
+			SK.Create(Themes.Get("Royal"), { Size = roblox.Vector2.new(468, 722), Scale = layout.Scale, Phone = false })
 		local stageW = k.Stage.Size.X.Offset
 		local stageH = k.Stage.Size.Y.Offset
 		for _, origin in { { 54.5088, 221.5264 }, { 10.25, 3.75 }, { 0, 0 }, { 99.5, 99.5 } } do
@@ -516,7 +540,10 @@ return restoringFlags({
 		T.eq(SK.BlipSound, "SansTextBlip", "the SoundController entry")
 		T.ok(firstBlipAt ~= nil and firstBlipAt <= k.Timeline.LineAt + dt * 1.5, "the first letter is voiced")
 		local graphemes = #k.Timeline.Graphemes
-		T.ok(#played >= graphemes / 4 and #played <= graphemes, ("about every other letter: %d of %d"):format(#played, graphemes))
+		T.ok(
+			#played >= graphemes / 4 and #played <= graphemes,
+			("about every other letter: %d of %d"):format(#played, graphemes)
+		)
 		T.eq(k.Blips(), #played, "Blips() counts them")
 		T.eq(k.State(), "Idle", "done after 6 s")
 		-- a new line: typed again with blips; the same line while it is being typed is not restarted
@@ -562,11 +589,24 @@ return restoringFlags({
 							if T.ok(k ~= nil, label .. ": keeper column") then
 								T.ok(k.Root.Parent == body, label .. ": in the body")
 								local colW = k.Root.Size.X.Offset
-								local m = case[2].Canvas.X - 2 * (if case[2].Phone then 18 elseif case[2].Compact then 24 else 36)
-								T.eq(goods.Position.X.Offset, colW + (if case[2].Phone then 10 elseif case[2].Compact then 14 else 22), label .. ": goods right of the column")
+								local m = case[2].Canvas.X
+									- 2 * (if case[2].Phone then 18 elseif case[2].Compact then 24 else 36)
+								T.eq(
+									goods.Position.X.Offset,
+									colW + (if case[2].Phone then 10 elseif case[2].Compact then 14 else 22),
+									label .. ": goods right of the column"
+								)
 								local goodsW = goods.Size.X.Offset
-								T.ok(goodsW >= SK.MinGoods[if case[2].Phone then "Phone" else "Desktop"] - 1, label .. ": goods keep their room: " .. goodsW)
-								T.near(colW + goodsW + goods.Position.X.Offset - colW, m, 1.5, label .. ": column + gap + goods = body")
+								T.ok(
+									goodsW >= SK.MinGoods[if case[2].Phone then "Phone" else "Desktop"] - 1,
+									label .. ": goods keep their room: " .. goodsW
+								)
+								T.near(
+									colW + goodsW + goods.Position.X.Offset - colW,
+									m,
+									1.5,
+									label .. ": column + gap + goods = body"
+								)
 							end
 							-- the shop still holds the daily rotation (phone tab or desktop) and the kit rail on desktop
 							T.ok(goods:FindFirstChild("DailyHolder") ~= nil, label .. ": daily")
@@ -692,7 +732,9 @@ return restoringFlags({
 	stringsExistInBothLanguages = function(T, Loader)
 		local Strings = setup(Loader)
 		local raw = Loader.require("ReplicatedStorage.Shared.Strings.ShopKeeper")
-		for _, key in { "shop.keeper.zzz", "shop.keeper.greet", "shop.keeper.thanks", "shop.keeper.poor", "shop.keeper.bye" } do
+		for _, key in
+			{ "shop.keeper.zzz", "shop.keeper.greet", "shop.keeper.thanks", "shop.keeper.poor", "shop.keeper.bye" }
+		do
 			local entry = raw[key]
 			if T.ok(type(entry) == "table", key) then
 				T.ok(type(entry.en) == "string" and #entry.en > 0, key .. " en")

@@ -191,6 +191,7 @@ Anim/Clips/Skeleton.luau, Anim/Clips/Human.luau, Anim/Clips/Kits/*.luau         
 Maps/MapKit.luau       map building helpers                                          [Lune-safe]
 Maps/Registry.luau     list of maps + metadata                                       [Lune-safe]
 Maps/*.luau            HallOfVerdicts, SnowdinCrossroads, WaterfallGrotto, VoidRift, CoreReactor, Lobby [Lune-safe]
+Maps/Shopkeeper.luau   "sleepy Sans" at the lobby ShopBooth: Build(seat) frozen rig + Joints/Transforms/Solve FK [Lune-safe]
 Graphics/Presets.luau  lighting/post presets                                         [Lune-safe]
 Graphics/Apply.luau    apply a preset to a Lighting instance (+ children)            [Lune-safe]
 Progression/Levels.luau, Quests.luau, Achievements.luau, Shop.luau, Mastery.luau     [Lune-safe]
@@ -623,6 +624,18 @@ fx.Part(character, name) -> BasePart?, fx.EyeGlow(character, side: "Left"|"Right
   Notifications, Nameplates`.
 - Each screen module: `Create(theme: Theme, deps: ScreenDeps) -> ScreenHandle` with
   `{ Root: GuiObject, Destroy: () -> () }`; must be buildable in Lune for previews when deps are mocks.
+- **Shop keeper** (owner's request): the Shop body is split into a left column with sleepy Sans
+  (`Screens/ShopKeeper`, pixel art `Shared/PixelArt/SansShopkeeper`: 72x72 cells, snowy booth, hoodie, counter,
+  coins, ketchup, "SHOP" board; the head is the owner's 40x37 sprite, both eyes closed while asleep) and the goods
+  (daily rotation, all skins by kit, kit unlocks) on the right. `ShopKeeper.Plan` picks the largest whole
+  screen-pixel cell that keeps the goods ≥ 640 (phone) / 1080 (desktop) design px; no column when there is no room
+  (portrait). Every cell is whole screen px and the scene corner is snapped to a whole pixel (`Snap`, from the
+  stage's AbsolutePosition). Sequence: asleep ~0.8 s (bob, "Z z z" rise and fade, dim "Zzz...") → wakes (sprite swap
+  + 1-cell hop) → types `shop.keeper.greet` with `SansTextBlip` blips → idle blinks; Reduced Motion: no bob/hop,
+  standing Z letters. A purchase the server confirms (Notify `prog.notify.bought`/`boughtKit`, or the item owned in
+  the next profile) → `shop.keeper.thanks` (once); not enough G → `shop.keeper.poor` (no pop-up, the button shakes;
+  also on the server's `prog.err.gold`). Shop handle extras: `Keeper`, `Press(kitId, skinId?)`, `Confirm()`;
+  deps `Keeper = false`, `KeeperAt` (offline pose). Preview: `tools/preview/gui/shop_keeper.luau`.
 - **Style Lab** (owner / Studio / private-server owner): live switch of Graphics preset, Map (server),
   Menu theme, HUD style, Rig style, Skin, camera style, particle density, Photo mode.
   This exists so the owner can compare variants and pick defaults.
@@ -860,6 +873,14 @@ de-duplicated `{Id, ...Ids}` (best first; `SoundDef.Ids: {string}?`); an entry w
 **VerdictBoxController** (P40; victim entry transition §11.2 via `UI/VerdictBoxEntry`: `Stages(start, t0, introEnd,
 reduced?)`, `At(stages, now)`, `CameraPose`, `CameraFx`, `Runner`), **SpectateController** (P45), **GraphicsController**
 (P12), **RigStyleController** (P50).
+**ShopkeeperController** (P62) — client-only life of the lobby ShopBooth NPC (Maps/Shopkeeper: a frozen ClassicSans rig
+in Decor/ShopBooth, anchored ghost parts, no Humanoid/joints; limb joints kept as attributes for pure FK). Asleep:
+breathing and a rising "Z" BillboardGui. Local player within 12 studs -> wakes (eyes open, skull lifts and turns to him), a
+Classic-style bubble (black box, white pixel border, PressStart2P) types `shop.keeper.greet` with "SansTextBlip" blips;
+beyond 18 studs for 2 s -> `shop.keeper.bye`, dozes off again. No server state; idle (nothing moves) when camera and
+player are > 80 studs away; upper body moved with `workspace:BulkMoveTo`. API: `State()`, `Attach(model)/Detach()/
+Step(dt)` (Start finds the lobby NPC and drives Step from Heartbeat), `Tuning`; pure (tests): `Machine.new/Step/Alpha`,
+`LookAngles`, `Typing`, `PoseRig/Pose`, `BuildBubble/BuildZzz`.
 **UIController** (P90) — mounts UIRoot, title screen, menus, results; calls `Hud.Mount(screenGui, deps)` once
 (`src/client/UI/Hud/init.luau` owns per-phase HUD visibility). PLAY / PRACTICE use `UI/Overlays/Loading`: the session's
 first PLAY (or no character yet) = full screen (≥4 s, menu track out, lobby track 2 s before the light); later PLAYs =

@@ -87,7 +87,17 @@ local function localRotation(kits: any, day: number, count: number): { Offer }
 		seed = (seed * 1103515245 + 12345) % 2147483648
 		local idx = (seed % #pool) + 1
 		local entry = table.remove(pool, idx) :: { any }
-		table.insert(out, { kit = entry[1], skin = entry[2], price = entry[2].Price, base = entry[2].Price, discount = 0, featured = false })
+		table.insert(
+			out,
+			{
+				kit = entry[1],
+				skin = entry[2],
+				price = entry[2].Price,
+				base = entry[2].Price,
+				discount = 0,
+				featured = false,
+			}
+		)
 	end
 	return out
 end
@@ -199,7 +209,12 @@ function Shop.Create(theme: Theme, deps: any): any
 		end
 	end
 	local goodsW = bodyW - goodsX
-	local goods = frame({ Name = "Goods", Position = UDim2.fromOffset(goodsX, 0), Size = UDim2.new(0, goodsW, 1, 0), Parent = body })
+	local goods = frame({
+		Name = "Goods",
+		Position = UDim2.fromOffset(goodsX, 0),
+		Size = UDim2.new(0, goodsW, 1, 0),
+		Parent = body,
+	})
 
 	-- what the shopkeeper answers: the purchase in flight (thanks once the server confirms it)
 	local pendingBuy: { kitId: string, skinId: string? }? = nil
@@ -247,7 +262,18 @@ function Shop.Create(theme: Theme, deps: any): any
 			OnClose = closeModal,
 			Buttons = { { Text = L("common.ok"), Variant = "Primary", Width = 160, OnActivated = closeModal } },
 		})
-		UIKit.Label(theme, { Text = text, Role = "Body", Dialogue = true, Wrap = true, YAlign = "Top", Size = UDim2.fromScale(1, 1), Parent = modal.Content })
+		UIKit.Label(
+			theme,
+			{
+				Text = text,
+				Role = "Body",
+				Dialogue = true,
+				Wrap = true,
+				YAlign = "Top",
+				Size = UDim2.fromScale(1, 1),
+				Parent = modal.Content,
+			}
+		)
 		modal.Root.Parent = root
 	end
 
@@ -267,7 +293,9 @@ function Shop.Create(theme: Theme, deps: any): any
 			return
 		end
 		closeModal()
-		local text = if skin then L("scr.shop.confirmText", Common.Num(price), pick(skin.Name), pick(kit.Name)) else L("scr.shop.confirmKit", Common.Num(price), pick(kit.Name))
+		local text = if skin
+			then L("scr.shop.confirmText", Common.Num(price), pick(skin.Name), pick(kit.Name))
+			else L("scr.shop.confirmKit", Common.Num(price), pick(kit.Name))
 		local function confirm()
 			closeModal()
 			-- the shopkeeper thanks you once the server confirms it (Notify / the next profile)
@@ -294,7 +322,18 @@ function Shop.Create(theme: Theme, deps: any): any
 				},
 			},
 		})
-		UIKit.Label(theme, { Text = text, Role = "Body", Dialogue = true, Wrap = true, YAlign = "Top", Size = UDim2.fromScale(1, 1), Parent = modal.Content })
+		UIKit.Label(
+			theme,
+			{
+				Text = text,
+				Role = "Body",
+				Dialogue = true,
+				Wrap = true,
+				YAlign = "Top",
+				Size = UDim2.fromScale(1, 1),
+				Parent = modal.Content,
+			}
+		)
 		modal.Root.Parent = root
 		confirmPurchase = confirm
 	end
@@ -330,13 +369,26 @@ function Shop.Create(theme: Theme, deps: any): any
 			ClipsDescendants = true,
 			Parent = tile,
 		})
-		Common.Corner(show, if theme.Id == "Void" then UDim.new(0, 10) elseif theme.Id == "Royal" then UDim.new(0, 6) else theme.SmallCorner)
-		local showTop = if (0.2126 * colors[1].R + 0.7152 * colors[1].G + 0.0722 * colors[1].B) < 0.18 then colors[2] else colors[1]
-		Common.Gradient(show, ColorSequence.new({
-			ColorSequenceKeypoint.new(0, showTop:Lerp(c.PanelInset, 0.35)),
-			ColorSequenceKeypoint.new(0.65, showTop:Lerp(c.PanelInset, 0.72)),
-			ColorSequenceKeypoint.new(1, c.PanelInset),
-		}), nil, 90)
+		Common.Corner(
+			show,
+			if theme.Id == "Void"
+				then UDim.new(0, 10)
+				elseif theme.Id == "Royal" then UDim.new(0, 6)
+				else theme.SmallCorner
+		)
+		local showTop = if (0.2126 * colors[1].R + 0.7152 * colors[1].G + 0.0722 * colors[1].B) < 0.18
+			then colors[2]
+			else colors[1]
+		Common.Gradient(
+			show,
+			ColorSequence.new({
+				ColorSequenceKeypoint.new(0, showTop:Lerp(c.PanelInset, 0.35)),
+				ColorSequenceKeypoint.new(0.65, showTop:Lerp(c.PanelInset, 0.72)),
+				ColorSequenceKeypoint.new(1, c.PanelInset),
+			}),
+			nil,
+			90
+		)
 		-- rarity glow rings
 		for k = 1, 2 do
 			local ring = frame({
@@ -356,32 +408,78 @@ function Shop.Create(theme: Theme, deps: any): any
 		-- keep dark palettes readable: lift the emblem and the glow toward white
 		local lum = 0.2126 * colors[1].R + 0.7152 * colors[1].G + 0.0722 * colors[1].B
 		local emblemColor = colors[1]:Lerp(Color3.new(1, 1, 1), if lum < 0.22 then 0.42 else 0.1)
-		local emblem = Icons.Create(Common.KitIcon(kit), emblemColor, UDim2.fromScale(if featured then 0.62 else 0.58, if featured then 0.62 else 0.58), colors[2])
+		local emblem = Icons.Create(
+			Common.KitIcon(kit),
+			emblemColor,
+			UDim2.fromScale(if featured then 0.62 else 0.58, if featured then 0.62 else 0.58),
+			colors[2]
+		)
 		emblem.Position = UDim2.fromScale(0.5, 0.48)
 		emblem.Parent = show
 		-- palette dots
-		local dots = frame({ Name = "Palette", AnchorPoint = Vector2.new(0.5, 1), Position = UDim2.new(0.5, 0, 1, -6), Size = UDim2.fromOffset(70, 14), Parent = show })
+		local dots = frame({
+			Name = "Palette",
+			AnchorPoint = Vector2.new(0.5, 1),
+			Position = UDim2.new(0.5, 0, 1, -6),
+			Size = UDim2.fromOffset(70, 14),
+			Parent = show,
+		})
 		local dl = UIKit.ListLayout(dots, { Horizontal = true, Gap = 6, HAlign = Enum.HorizontalAlignment.Center })
 		dl.HorizontalAlignment = Enum.HorizontalAlignment.Center
 		for i, col in colors do
-			local dot = frame({ Name = "Dot", BackgroundTransparency = 0, BackgroundColor3 = col, Size = UDim2.fromOffset(12, 12), LayoutOrder = i, Parent = dots })
+			local dot = frame({
+				Name = "Dot",
+				BackgroundTransparency = 0,
+				BackgroundColor3 = col,
+				Size = UDim2.fromOffset(12, 12),
+				LayoutOrder = i,
+				Parent = dots,
+			})
 			Common.Corner(dot, if theme.Id == "Classic" or theme.Id == "Fell" then UDim.new(0, 0) else UDim.new(0.5, 0))
 			Common.Stroke(dot, Color3.new(0, 0, 0), 1, 0.4)
 		end
 		-- rarity + discount badges
-		local rb = UIKit.Badge(theme, { Text = L("scr.rarity." .. (skin.Rarity or "Common")), Color = rarity, Style = "Solid", Height = 18, TextSize = if theme.Id == "Classic" then 7 else 10 })
+		local rb = UIKit.Badge(
+			theme,
+			{
+				Text = L("scr.rarity." .. (skin.Rarity or "Common")),
+				Color = rarity,
+				Style = "Solid",
+				Height = 18,
+				TextSize = if theme.Id == "Classic" then 7 else 10,
+			}
+		)
 		rb.Position = UDim2.fromOffset(6, 6)
 		rb.ZIndex = 3
 		rb.Parent = show
 		if discount > 0 and not owned then
-			local db = UIKit.Badge(theme, { Text = L("scr.shop.discount", discount), Color = c.Danger, Style = "Solid", Height = if featured then 26 else 20, TextSize = if theme.Id == "Classic" then 9 else (if featured then 15 else 12) })
+			local db = UIKit.Badge(
+				theme,
+				{
+					Text = L("scr.shop.discount", discount),
+					Color = c.Danger,
+					Style = "Solid",
+					Height = if featured then 26 else 20,
+					TextSize = if theme.Id == "Classic" then 9 else (if featured then 15 else 12),
+				}
+			)
 			db.AnchorPoint = Vector2.new(1, 0)
 			db.Position = UDim2.new(1, -6, 0, 6)
 			db.ZIndex = 3
 			db.Parent = show
 		end
 		if featured then
-			local fb = UIKit.Badge(theme, { Text = L("scr.shop.featured"), Icon = "Star", Color = c.Gold, Style = "Soft", Height = 22, TextSize = if theme.Id == "Classic" then 8 else 12 })
+			local fb = UIKit.Badge(
+				theme,
+				{
+					Text = L("scr.shop.featured"),
+					Icon = "Star",
+					Color = c.Gold,
+					Style = "Soft",
+					Height = 22,
+					TextSize = if theme.Id == "Classic" then 8 else 12,
+				}
+			)
 			fb.Position = UDim2.fromOffset(6, 30)
 			fb.ZIndex = 3
 			fb.Parent = show
@@ -396,7 +494,9 @@ function Shop.Create(theme: Theme, deps: any): any
 			Position = UDim2.fromOffset(pad, infoY),
 			Size = UDim2.new(1, -pad * 2, 0, if featured then 26 else 20),
 			Scaled = true,
-			MaxTextSize = if theme.Id == "Classic" then (if featured then 13 else 10) else (if featured then 20 else 16),
+			MaxTextSize = if theme.Id == "Classic"
+				then (if featured then 13 else 10)
+				else (if featured then 20 else 16),
 			Parent = tile,
 		})
 		UIKit.Label(theme, {
@@ -482,7 +582,16 @@ function Shop.Create(theme: Theme, deps: any): any
 
 	local function buildDaily(parent: Frame, w: number, h: number)
 		parent:ClearAllChildren()
-		local panel = UIKit.Panel(theme, { Name = "Daily", Title = L("scr.shop.daily"), TitleIcon = "Clock", Size = UDim2.fromOffset(w, h), Padding = if phone then 10 else 16 })
+		local panel = UIKit.Panel(
+			theme,
+			{
+				Name = "Daily",
+				Title = L("scr.shop.daily"),
+				TitleIcon = "Clock",
+				Size = UDim2.fromOffset(w, h),
+				Padding = if phone then 10 else 16,
+			}
+		)
 		panel.Root.Parent = parent
 		-- countdown to the next UTC day (top right of the panel)
 		local now = Common.Now(d)
@@ -512,7 +621,9 @@ function Shop.Create(theme: Theme, deps: any): any
 			return
 		end
 		local contentW = w - (if phone then 20 else 32)
-		local contentH = h - (if theme.Id == "Royal" then 58 elseif theme.Id == "Classic" then 42 else 46) - (if phone then 10 else 16)
+		local contentH = h
+			- (if theme.Id == "Royal" then 58 elseif theme.Id == "Classic" then 42 else 46)
+			- (if phone then 10 else 16)
 		local gap = if phone then 10 else 16
 		local row = frame({ Name = "Row", Size = UDim2.fromScale(1, 1), Parent = panel.Content })
 		UIKit.ListLayout(row, { Horizontal = true, Gap = gap, VAlign = Enum.VerticalAlignment.Top })
@@ -532,7 +643,8 @@ function Shop.Create(theme: Theme, deps: any): any
 				Refresh = function()
 					refresh()
 				end,
-			}).Parent = row
+			}).Parent =
+				row
 		end
 	end
 
@@ -540,7 +652,10 @@ function Shop.Create(theme: Theme, deps: any): any
 		parent:ClearAllChildren()
 		local railW = if phone then 210 else 270
 		local gap = screen.Gap
-		local rail = UIKit.Panel(theme, { Name = "KitRail", Size = UDim2.fromOffset(railW, h), Padding = if phone then 8 else 12, Ornaments = false })
+		local rail = UIKit.Panel(
+			theme,
+			{ Name = "KitRail", Size = UDim2.fromOffset(railW, h), Padding = if phone then 8 else 12, Ornaments = false }
+		)
 		rail.Root.Parent = parent
 		local list = UIKit.List(theme, { Gap = if phone then 4 else 6 })
 		list.Root.Size = UDim2.fromScale(1, 1)
@@ -569,7 +684,12 @@ function Shop.Create(theme: Theme, deps: any): any
 				StrokeTransparency = if isSel then 0 else 0.6,
 			})
 			well.Parent = b
-			local ic = Icons.Create(Common.KitIcon(kit), kit.Color, if phone then 22 else 26, kit.Color:Lerp(Color3.new(1, 1, 1), 0.7))
+			local ic = Icons.Create(
+				Common.KitIcon(kit),
+				kit.Color,
+				if phone then 22 else 26,
+				kit.Color:Lerp(Color3.new(1, 1, 1), 0.7)
+			)
 			ic.Position = UDim2.new(0, if phone then 18 else 22, 0.5, 0)
 			ic.Parent = well
 			UIKit.Label(theme, {
@@ -614,28 +734,87 @@ function Shop.Create(theme: Theme, deps: any): any
 		if kit == nil then
 			return
 		end
-		local contentH = h - (if theme.Id == "Royal" then 58 elseif theme.Id == "Classic" then 42 else 46) - (if phone then 10 else 16)
+		local contentH = h
+			- (if theme.Id == "Royal" then 58 elseif theme.Id == "Classic" then 42 else 46)
+			- (if phone then 10 else 16)
 		local tileW = if phone then 170 else 214
-		local grid = UIKit.Grid(theme, { CellSize = UDim2.fromOffset(tileW, contentH - 6), CellPadding = UDim2.fromOffset(14, 10), Scroll = true })
+		local grid = UIKit.Grid(
+			theme,
+			{ CellSize = UDim2.fromOffset(tileW, contentH - 6), CellPadding = UDim2.fromOffset(14, 10), Scroll = true }
+		)
 		grid.Root.Size = UDim2.fromScale(1, 1)
 		grid.Root.Parent = panel.Content
 		local order = 0
 		if not Common.KitOwned(profile, kit) then
 			-- kit unlock tile
 			order += 1
-			local tile = Common.Well(theme, { Name = "KitUnlock", Size = UDim2.fromOffset(tileW, contentH - 6), StrokeColor = kit.Color, StrokeTransparency = 0.1, LayoutOrder = order })
+			local tile = Common.Well(
+				theme,
+				{
+					Name = "KitUnlock",
+					Size = UDim2.fromOffset(tileW, contentH - 6),
+					StrokeColor = kit.Color,
+					StrokeTransparency = 0.1,
+					LayoutOrder = order,
+				}
+			)
 			tile.BackgroundColor3 = kit.Color:Lerp(c.Panel, 0.82)
-			local ic = Icons.Create(Common.KitIcon(kit), kit.Color, UDim2.fromScale(0.5, 0.5), kit.Color:Lerp(Color3.new(1, 1, 1), 0.7))
+			local ic = Icons.Create(
+				Common.KitIcon(kit),
+				kit.Color,
+				UDim2.fromScale(0.5, 0.5),
+				kit.Color:Lerp(Color3.new(1, 1, 1), 0.7)
+			)
 			ic.Position = UDim2.fromScale(0.5, 0.3)
 			ic.Parent = tile
-			UIKit.Badge(theme, { Text = L("scr.shop.kitUnlock"), Icon = "Lock", Color = kit.Color, Style = "Solid", Height = 20, TextSize = if theme.Id == "Classic" then 7 else 11, Position = UDim2.fromOffset(10, 10), Parent = tile })
-			UIKit.Label(theme, { Text = pick(kit.Name), Role = "Heading", TextSize = if theme.Id == "Classic" then 11 else 18, XAlign = "Center", AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0.58, 0), Size = UDim2.new(1, -16, 0, 22), Scaled = true, MaxTextSize = if theme.Id == "Classic" then 11 else 18, Parent = tile })
-			UIKit.Label(theme, { Text = pick(kit.Title), Role = "Caption", Tone = "Dim", XAlign = "Center", AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0.58, 24), Size = UDim2.new(1, -16, 0, 16), Parent = tile })
+			UIKit.Badge(
+				theme,
+				{
+					Text = L("scr.shop.kitUnlock"),
+					Icon = "Lock",
+					Color = kit.Color,
+					Style = "Solid",
+					Height = 20,
+					TextSize = if theme.Id == "Classic" then 7 else 11,
+					Position = UDim2.fromOffset(10, 10),
+					Parent = tile,
+				}
+			)
+			UIKit.Label(
+				theme,
+				{
+					Text = pick(kit.Name),
+					Role = "Heading",
+					TextSize = if theme.Id == "Classic" then 11 else 18,
+					XAlign = "Center",
+					AnchorPoint = Vector2.new(0.5, 0),
+					Position = UDim2.new(0.5, 0, 0.58, 0),
+					Size = UDim2.new(1, -16, 0, 22),
+					Scaled = true,
+					MaxTextSize = if theme.Id == "Classic" then 11 else 18,
+					Parent = tile,
+				}
+			)
+			UIKit.Label(
+				theme,
+				{
+					Text = pick(kit.Title),
+					Role = "Caption",
+					Tone = "Dim",
+					XAlign = "Center",
+					AnchorPoint = Vector2.new(0.5, 0),
+					Position = UDim2.new(0.5, 0, 0.58, 24),
+					Size = UDim2.new(1, -16, 0, 16),
+					Parent = tile,
+				}
+			)
 			local level = profile and profile.Level or 1
 			local needLv = kit.Unlock.Level or 0
 			local unlockButton: GuiObject? = nil
 			local b = UIKit.Button(theme, {
-				Text = if needLv > level then L("common.requiresLevel", needLv) else L("common.gold", Common.Num(kit.Unlock.Gold)),
+				Text = if needLv > level
+					then L("common.requiresLevel", needLv)
+					else L("common.gold", Common.Num(kit.Unlock.Gold)),
 				Icon = if needLv > level then "Lock" else "Gold",
 				Variant = if needLv > level then "Secondary" else "Primary",
 				Disabled = needLv > level,
@@ -749,7 +928,12 @@ function Shop.Create(theme: Theme, deps: any): any
 			end
 			if skinId then
 				local skin = kits.Skin(kitId, skinId)
-				if skin == nil or skin.Mastery or Common.SkinOwned(profile, kit, skin) or not Common.KitOwned(profile, kit) then
+				if
+					skin == nil
+					or skin.Mastery
+					or Common.SkinOwned(profile, kit, skin)
+					or not Common.KitOwned(profile, kit)
+				then
 					return false
 				end
 				buy(kit, skin, todayPrice[kitId .. ":" .. skinId] or skin.Price or 0)
