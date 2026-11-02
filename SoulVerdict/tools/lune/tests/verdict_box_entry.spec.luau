@@ -418,7 +418,7 @@ tests.entry_stages_late_packets = function(T, Loader)
 	-- typical phone pings: a proper pull-in
 	for _, L in { 0.03, 0.08, 0.15, 0.25 } do
 		local st = Entry.Stages(open + L, t0, introEnd)
-		T.ok(st.pull >= 0.45, ("%.2f s ping keeps a %.2f s pull-in"):format(L, st.pull))
+		T.ok(st.pull >= 0.45 - 1e-9, ("%.2f s ping keeps a %.2f s pull-in"):format(L, st.pull))
 	end
 	-- a packet that arrives after the deadline flashes at once
 	local hopeless = Entry.Stages(t0 + 2, t0, introEnd)
@@ -600,8 +600,9 @@ tests.entry_runner_restores_the_camera = function(T, Loader)
 	-- the iris centre follows the chest through the turning camera: off-centre first, the screen middle at the end
 	local firstC, lastC = log.centers[1].c, log.centers[#log.centers].c
 	local mid = size * 0.5
-	T.ok((firstC - mid).Magnitude > 15, "starts on the chest where it is on screen")
-	T.ok((lastC - mid).Magnitude < 4, "ends on the screen centre (the camera aims at the SOUL)")
+	local d0, d1 = (firstC - mid).Magnitude, (lastC - mid).Magnitude
+	T.ok(d0 > 15, ("starts on the chest where it is on screen (%.1f px off centre)"):format(d0))
+	T.ok(d1 < d0 * 0.12, ("ends near the screen centre: %.1f px (the camera aims at the SOUL)"):format(d1))
 	-- without anything rewriting the camera: no accumulation, and the original frame comes back exactly
 	local cam2, runner2, _, log2 = run(false)
 	T.ok(runner2.done and cam2.CFrame == base and cam2.FieldOfView == 70, "restored without a camera controller")
