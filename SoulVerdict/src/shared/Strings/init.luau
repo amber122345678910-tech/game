@@ -39,6 +39,7 @@ local SOURCES = {
 	"Loading",
 	"ShopKeeper",
 	"Difficulty",
+	"Phase2",
 }
 
 local merged: { [string]: Localized } = {}

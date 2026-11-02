@@ -789,6 +789,8 @@ return {
 		local CS = sim.CS
 		local Stats = sim.load("StatsService")
 		local RS = sim.load("RoundService")
+		-- this test checks TriggerFinalPhase's own statuses: the Phase 2 cinematic (tested separately) is switched off
+		RS.CinematicTime = {}
 		Stats.Init()
 		RS.Init()
 		Stats.Start()
@@ -1324,5 +1326,23 @@ return {
 		end)
 		Loader.isServer, Loader.quietWarnings = isServer, quiet
 		T.ok(ok, "HUD mounted and ran: " .. tostring(err))
+	end,
+
+	phase2_cinematic_freezes_and_pauses = function(T, Loader)
+		local saved = Loader.isServer
+		Loader.isServer = false
+		local P2 = Loader.requirePath("src/client/Controllers/Phase2CinematicController")
+		for _, kit in { "ClassicSans", "FellSans", "EclipseSans", "LastBreathSans" } do
+			local tl = P2.Timeline(kit)
+			local names, last = {}, 0
+			for _, c in tl do
+				names[c[2]] = true
+				T.ok(c[1] >= last, kit .. " cues in time order")
+				last = c[1]
+			end
+			T.ok(names.Flash and names.End, kit .. " ends with a flash")
+		end
+		T.ok(P2.Timeline("ClassicSans")[6][2] == "Miss", "Classic: MISS after the black")
+		Loader.isServer = saved
 	end,
 }

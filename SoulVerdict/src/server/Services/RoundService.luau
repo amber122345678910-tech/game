@@ -1427,7 +1427,44 @@ function RoundService.TriggerFinalPhase(cause: string?, caster: Model?): boolean
 		cause = reason,
 	})
 	RoundService.FinalPhaseStarted:Fire(monster, reason)
+	RoundService.StartCinematic(monster, reason)
 	return true
+end
+
+-- Phase 2 cinematic (owner's design, played by every client's Phase2CinematicController from RoundState
+-- CinematicKit / CinematicCause / CinematicEndsAt): everyone in the round is frozen (Rooted + Silenced, as in the Intro)
+-- and Invulnerable, every attack on the field is cleared, and the round timer is paused for the scene.
+RoundService.CinematicTime = { ClassicSans = 6.4, FellSans = 9.2, EclipseSans = 4.0, LastBreathSans = 8.6 }
+
+function RoundService.StartCinematic(monster: Model, reason: string?): number
+	local kitId = monster:GetAttribute("KitId")
+	local d = if type(kitId) == "string" then RoundService.CinematicTime[kitId] or 0 else 0
+	if d <= 0 or not isFightPhase() then
+		return 0
+	end
+	local models: { Model } = {}
+	for m in state.RoundModels do
+		if m.Parent ~= nil then
+			table.insert(models, m)
+		end
+	end
+	freeze(models, d)
+	for _, m in models do
+		call(StatusService, "Apply", m, "Invulnerable", d + 0.3)
+	end
+	call(HazardService, "Clear")
+	if state.PhaseEndsAt > 0 then
+		state.PhaseEndsAt += d
+		setState("PhaseEndsAt", state.PhaseEndsAt)
+	end
+	setState("CinematicCause", reason or "Forced")
+	setState("CinematicEndsAt", now() + d)
+	setState("CinematicKit", kitId)
+	task.delay(d, function()
+		unfreezeFallback()
+		setState("CinematicKit", "")
+	end)
+	return d
 end
 
 -- StatusService.Applied: the monster becoming Exhausted inside an ult-started Phase 2's Invulnerable window (the SAVE

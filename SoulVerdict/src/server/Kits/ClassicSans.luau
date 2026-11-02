@@ -108,7 +108,33 @@ Abilities.GasterBlaster = function(ctx: any)
 		table.insert(ids, id)
 		table.insert(origins, cf)
 	end
-	ctx:Fx("Summon", { count = count, hazards = ids, origins = origins })
+	-- Phase 2 (owner's design): a ring of blasters closes around the target right after the main volley
+	local caster = ctx.Caster
+	if caster and caster:GetAttribute("FinalForm") == true then
+		local ringN = N.Phase2Ring or 6
+		local ringR = N.Phase2Radius or 15
+		local base = Random.new():NextNumber(0, math.pi * 2)
+		for k = 1, ringN do
+			local a = base + (k - 1) * (2 * math.pi / ringN)
+			local pos = target + Vector3.new(math.cos(a) * ringR, 6, math.sin(a) * ringR)
+			local cf = LookAlong(pos, (target + Vector3.new(0, 1.5, 0)) - pos)
+			local id = ctx:Hazard("BlasterBeam", {
+				origin = cf,
+				length = ringR * 2 + 8,
+				width = 4,
+				delay = delay + 0.35 + (k - 1) * 0.07,
+				duration = 0.45,
+				damage = math.floor((N.Damage or 18) * 0.7),
+				kr = N.KR or 0,
+				color = "White",
+				style = "Classic",
+				spawnFrom = origin,
+			})
+			table.insert(ids, id)
+			table.insert(origins, cf)
+		end
+	end
+	ctx:Fx("Summon", { count = #ids, hazards = ids, origins = origins })
 end
 
 Abilities.BlueSoul = function(ctx: any)

@@ -339,6 +339,31 @@ Abilities.CrimsonBlaster = function(ctx: any)
 		spawnFrom = origin + Vector3.new(0, 1.5, 0),
 	})
 	ctx:Fx("Summon", { hazard = id, origin = cf })
+	-- Phase 2 (owner's design): a crimson ring of blasters closes around where he aimed
+	if ctx.Caster and ctx.Caster:GetAttribute("FinalForm") == true then
+		local centre = chestAim(ctx)
+		local ringN, ringR = N.Phase2Ring or 5, N.Phase2Radius or 13
+		local base = Random.new():NextNumber(0, math.pi * 2)
+		for k = 1, ringN do
+			local a = base + (k - 1) * (2 * math.pi / ringN)
+			local p = centre + Vector3.new(math.cos(a) * ringR, 5, math.sin(a) * ringR)
+			local rcf = LookAlong(p, centre - p)
+			local rid = ctx:Hazard("BlasterBeam", {
+				origin = rcf,
+				length = ringR * 2 + 6,
+				width = 3,
+				delay = delay + 0.3 + (k - 1) * 0.08,
+				duration = 0.35,
+				damage = math.floor((N.Damage or 26) * 0.6),
+				kr = N.KR or 0,
+				color = "Red",
+				style = "Fell",
+				skullScale = C.CrimsonSkullScale,
+				spawnFrom = origin + Vector3.new(0, 1.5, 0),
+			})
+			ctx:Fx("Summon", { hazard = rid, origin = rcf })
+		end
+	end
 	-- counterplay: interrupting Fell during the short charge cancels the shot
 	if not ctx:Wait(math.max(0, delay - 0.05)) then
 		if id ~= 0 then

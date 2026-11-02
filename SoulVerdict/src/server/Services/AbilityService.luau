@@ -640,6 +640,11 @@ local function tryCast(model: Model, player: Player?, abilityId: string, payload
 	if ability.Ult then
 		phaseTwo = startPhaseTwo(model) -- before the bar is spent; the cast still runs below as Phase 2's opener
 		model:SetAttribute("Ult", 0)
+		local scene = Validation.RoundAttr("CinematicKit")
+		if phaseTwo and type(scene) == "string" and scene ~= "" then
+			-- the Phase 2 cinematic replaces the opener: everyone is frozen while it plays (owner's design)
+			return true
+		end
 	end
 	if model:GetAttribute("Blocking") == true then
 		setBlocking(model, false)
