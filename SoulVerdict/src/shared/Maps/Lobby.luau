@@ -59,7 +59,7 @@ local L = {
 	QuestAngle = 270 - GAP / 2 + 5 * GAP, -- 167.14
 	TrainingAngle = 270 - GAP / 2 + 6 * GAP, -- 218.57
 	NotesAngle = 270 + GAP, -- 321.43
-	ShopSeat = { Z = 0.6, Top = 3.36 }, -- the shopkeeper's stool seat (booth-local: z behind the counter, y = seat top)
+	ShopSeat = { Z = 0.73, Top = 3.39 }, -- the shopkeeper's stool seat (booth-local: z behind the counter, y = seat top)
 }
 Lobby.Layout = L
 

@@ -626,15 +626,35 @@ Monster slot F, cooldown 40 s, range 28, needs line-of-sight to a human in a 35�
 1. Server: validates target, sets target `Status_Boxed` + `Invulnerable` (to everything except box),
    `SoulMode="Boxed"`, freezes target, spawns `VerdictBox3D` above them (server-side anchored model),
    picks `seed` and `patternSet` (kit's `VerdictBox` field), fires `BoxStart {boxId, victim, monster,
-   seed, patternSet, duration, t0, damagePerHit, krPerHit}` to all.
-2. Victim client: full-screen overlay (black, battle box in the middle, heart soul, colour rules, gravity
+   seed, patternSet, duration, t0, damagePerHit, krPerHit}` to all. **t0 = server open +
+   `Config.VerdictBox.IntroTime` (0.8 s)**: the victim's entry transition plays before the deterministic
+   timeline starts (t = now − t0 on every client, negative until then). The fight still lasts `duration`
+   (BoxEnd at t0 + duration); the statuses cover IntroTime + duration (+0.25 s); hit acceptance, bot hits and
+   the end are all measured from t0. `VerdictBoxService.Get` also returns `opened`.
+2. Victim client — ENTRY transition (`UI/VerdictBoxEntry`, started the moment BoxStart arrives): pull-in
+   ~0.65 s (camera pushed toward the victim's chest/SOUL: FOV ×0.5, ≤45 % of the distance, 10° roll, blur +
+   desaturation; a dark iris closes from the screen edges onto the chest, pale streaks rush inward, the red
+   SOUL heart appears at the chest), ~0.1 s full black with the heart, then a SHARP white flash (full white
+   ~2 frames, fades in 0.25 s) revealing the battle box. The flash lands on t0 when the packet arrives in time
+   (one-way latency ≤ 0.4 s: the pull-in takes what is left, ≥ 0.3 s); a late packet runs the shortest
+   transition and a very late one is compressed so the flash has faded ≥ 0.2 s before the first attack (box
+   time `introEnd`). The SOUL is not simulated before the box is revealed (`Sim.SkipTo`: no unseen hits).
+   The camera is post-processed in render step `SV_VerdictBoxEntry` (Camera + 2, right after CameraController)
+   and put back exactly afterwards (from the black on). Reduced Motion: no zoom/roll/iris/streaks — the
+   screen darkens, black, the same flash. Audio: the InputController "Box" context is pushed with the first
+   frame of the pull-in → SoundController switches to the `VerdictBox` music with a 0.15 s fade (its ids are
+   checked at client start via `SoundController.Prewarm("VerdictBox")`; back out of the box: 1.0 s fade);
+   a quiet `Implode` at the start, `BoxOpen` at the flash. The touch controls appear with the box.
+   Then the full-screen overlay (black, battle box in the middle, heart soul, colour rules, gravity
    "blue mode" sections, Undertale-like dialogue line at start), deterministic patterns from seed;
    movement: WASD/arrows/left stick/touch-drag; reports hits via `BoxReport` (incremental) and
    `BoxSoul` position at 15 Hz.
-3. Watchers: SurfaceGui on the 3D box shows the same patterns + the relayed heart position.
-4. Server: applies `damagePerHit`/`krPerHit` per reported hit (rate-limited to 1 per 0.45 s; min HP 1
-   inside box), ends at duration: removes statuses, `BoxEnd`. Survived with ≤1 hit → victim gets
-   `DamageUp 1.2` for 6 s and +25 ult. Bots auto-resolve (random 1–4 hits).
+3. Watchers: SurfaceGui on the 3D box shows the same patterns + the relayed heart position (before t0: the
+   empty dialogue box).
+4. Server: applies `damagePerHit`/`krPerHit` per reported hit (rate-limited to 1 per 0.45 s; none before
+   t0 + introEnd − 0.35 s latency slack, i.e. never while the box flashes in; min HP 1 inside box), ends at
+   t0 + duration: removes statuses, `BoxEnd`. Survived with ≤1 hit → victim gets `DamageUp 1.2` for 6 s and
+   +25 ult. Bots auto-resolve (random 1–4 hits at box times after introEnd + 0.3 s).
 
 ---------------------------------------------------------------------------------------------------
 ## 12. Data & progression (server)
@@ -785,7 +805,9 @@ actions: "M1","Q","E","R","T","F","G","Shift","Jump","Menu","Emote","CameraLock"
 **MovementController** (P22) — `Facing(on)`, `ApplyForceMove(packet)`, `IsDashing()`; handles Net "ForceMove",
 double jump, blue-soul gravity, local dash prediction, AlignOrientation facing toward camera yaw when locked.
 **SoundController** (P10) — `Play(name, at?: Vector3|BasePart|Attachment, opts?) -> Sound?`, `PlayMusic(key, fadeTime?)`,
-`StopMusic(fadeTime?)`, `SetVolumes(music, sfx)`, `Register(name, soundId | {ids}, opts)`; registry of built-in rbxasset
+`StopMusic(fadeTime?)`, `SetVolumes(music, sfx)`, `Register(name, soundId | {ids}, opts)`, `Prewarm(name)` (checks an
+entry's candidates ahead of time in the background, next candidate after a bad one; VerdictBoxController prewarms
+"VerdictBox" at Start), `BOX_FADE_IN` 0.15 / `BOX_FADE_OUT` 1.0 (music fades of the "Box" context); registry of built-in rbxasset
 sounds + owner-provided ids in `Shared/Audio.luau`. Every entry has CANDIDATES `Audio.Candidates(name)` = normalized,
 de-duplicated `{Id, ...Ids}` (best first; `SoundDef.Ids: {string}?`); an entry without candidates is silent and never warns.
 - Id checks: each id is probed at most once with `ContentProvider:PreloadAsync({sound}, cb)`: `AssetFetchStatus.Success` =
@@ -809,7 +831,9 @@ de-duplicated `{Id, ...Ids}` (best first; `SoundDef.Ids: {string}?`); an entry w
 **FxController** (P30) — dispatches AbilityFx/DamageFx/Hazard packets to client kits/HazardVisuals/VFX; builds FxContext.
 **CombatController** (P35) — input → Cast/Block/Dash; local cooldowns `Cooldowns() -> {[abilityId]: endsAt}`,
 `CooldownChanged: Signal(abilityId, endsAt)`, `Charge() -> (abilityId?, 0..1)`, ammo/combo state for HUD.
-**VerdictBoxController** (P40), **SpectateController** (P45), **GraphicsController** (P12), **RigStyleController** (P50).
+**VerdictBoxController** (P40; victim entry transition §11.2 via `UI/VerdictBoxEntry`: `Stages(start, t0, introEnd,
+reduced?)`, `At(stages, now)`, `CameraPose`, `CameraFx`, `Runner`), **SpectateController** (P45), **GraphicsController**
+(P12), **RigStyleController** (P50).
 **UIController** (P90) — mounts UIRoot, title screen, menus, results; calls `Hud.Mount(screenGui, deps)` once
 (`src/client/UI/Hud/init.luau` owns per-phase HUD visibility).
 UI deps table passed to screens/HUD: `{ Theme = ThemeService, State = StateController, Input = InputController,

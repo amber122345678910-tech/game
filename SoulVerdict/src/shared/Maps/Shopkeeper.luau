@@ -17,6 +17,8 @@
 --   Shopkeeper.HEAD_LIMBS / UPPER_LIMBS   physics limbs whose sub-trees the client turns (head) / breathes
 --                                      (upper body); every visual part is parented under its limb part
 --   Shopkeeper.EYES                    { "LeftPupil", "RightPupil" } (Head descendants; shown while awake)
+--   Shopkeeper.LIDS                    closed-eye lids + lash lines over the sockets (Head descendants; shown
+--                                      while asleep, hidden while awake)
 --   Shopkeeper.Build(seat: CFrame, opts?) -> Model
 --       seat = top centre of the stool seat; LookVector = the way he faces (towards the customers).
 --       opts = { Scale: number? }
@@ -40,6 +42,7 @@ Shopkeeper.SEAT_TO_ROOT = 0.55
 Shopkeeper.HEAD_LIMBS = { "Head" }
 Shopkeeper.UPPER_LIMBS = { "UpperTorso", "LeftUpperArm", "LeftLowerArm", "LeftHand", "RightUpperArm", "RightLowerArm", "RightHand" }
 Shopkeeper.EYES = { "LeftPupil", "RightPupil" }
+Shopkeeper.LIDS = { "LeftLid", "RightLid", "LeftLidLine", "RightLidLine" }
 
 -- Asleep on the counter. Sitting (hips 90, knees -90), the upper body slumped forward over the counter,
 -- upper arms reaching down onto the counter top, forearms folded inwards under the chin, skull tipped
@@ -47,20 +50,24 @@ Shopkeeper.EYES = { "LeftPupil", "RightPupil" }
 Shopkeeper.SleepPose = {
 	Root = { 0, 0, 0 },
 	Waist = { -55, 0, 0 },
-	Neck = { -22, 14, 10 },
-	LeftShoulder = { 75, 0, -12 },
-	LeftElbow = { 10, 0, 92 },
-	LeftWrist = { 0, 0, 8 },
-	RightShoulder = { 75, 0, 12 },
-	RightElbow = { 14, 0, -92 },
-	RightWrist = { 0, 0, -8 },
-	LeftHip = { 88, 0, -8 },
-	LeftKnee = { -84, 0, 0 },
-	LeftAnkle = { 10, 0, 0 },
-	RightHip = { 88, 0, 8 },
-	RightKnee = { -84, 0, 0 },
-	RightAnkle = { 10, 0, 0 },
+	Neck = { 15, 10, 18 },
+	LeftShoulder = { 65, 0, -8 },
+	LeftElbow = { 0, 40, 90 },
+	LeftWrist = { 0, 0, 0 },
+	RightShoulder = { 65, 0, 8 },
+	RightElbow = { 0, -40, -90 },
+	RightWrist = { 0, 0, 0 },
+	LeftHip = { 80, 0, -6 },
+	LeftKnee = { -115, 0, 0 },
+	LeftAnkle = { 15, 0, 0 },
+	RightHip = { 80, 0, 6 },
+	RightKnee = { -115, 0, 0 },
+	RightAnkle = { 15, 0, 0 },
 }
+
+-- Parts the sleeping shopkeeper does without: the attack-eye glow ring (a dozing shopkeeper has no glowing
+-- eye) and the open-jacket hem flaps, which stick out of his back once the torso leans over the counter.
+local DROP: { [string]: boolean } = { LeftIris = true, LeftHem = true, RightHem = true }
 
 local function motorPivot(motor: Motor6D): CFrame?
 	local part1 = motor.Part1
@@ -71,6 +78,51 @@ local function motorPivot(motor: Motor6D): CFrame?
 	return part1.CFrame * motor.C1
 end
 
+-- Closed eyes: a bone-coloured lid over each (black) socket and a dark lash line across it. Built in the
+-- rest pose (before forward kinematics) so they follow the head like every other Head part.
+local function addLids(rig: Model)
+	local head = rig:FindFirstChild("Head")
+	local cranium = head and head:FindFirstChild("Cranium")
+	if head == nil or cranium == nil or not cranium:IsA("BasePart") then
+		return
+	end
+	for _, side in { "Left", "Right" } do
+		local socket = head:FindFirstChild(side .. "Socket")
+		if socket and socket:IsA("BasePart") then
+			local size = socket.Size
+			local lid = socket:Clone()
+			lid:ClearAllChildren()
+			local mesh = socket:FindFirstChildOfClass("SpecialMesh")
+			if mesh then
+				mesh:Clone().Parent = lid
+			end
+			lid.Name = side .. "Lid"
+			lid.Size = Vector3.new(size.X * 1.08, size.Y * 1.1, size.Z)
+			lid.CFrame = socket.CFrame * CFrame.new(0, 0, -0.035)
+			lid.Color = cranium.Color
+			lid.Material = cranium.Material
+			lid:SetAttribute("Role", "Bone")
+			lid:SetAttribute("HDGroup", nil)
+			lid.Parent = head
+			local line = lid:Clone()
+			line.Name = side .. "LidLine"
+			line.Size = Vector3.new(size.X * 0.92, size.Y * 0.16, size.Z * 1.04)
+			line.CFrame = lid.CFrame * CFrame.new(0, -size.Y * 0.08, -0.004)
+			line.Color = Color3.fromRGB(34, 30, 34)
+			line.Material = Enum.Material.SmoothPlastic
+			line:SetAttribute("Role", "Line")
+			line.Parent = head
+			for _, part in { lid, line } do -- welded like every visual part, so forward kinematics carries them
+				local weld = Instance.new("WeldConstraint")
+				weld.Name = "Weld"
+				weld.Part0 = head :: BasePart
+				weld.Part1 = part
+				weld.Parent = part
+			end
+		end
+	end
+end
+
 function Shopkeeper.Build(seat: CFrame, opts: { [string]: any }?): Model
 	local options = opts or {}
 	local scale = if type(options.Scale) == "number" and options.Scale > 0 then options.Scale else Shopkeeper.SCALE
@@ -79,6 +131,7 @@ function Shopkeeper.Build(seat: CFrame, opts: { [string]: any }?): Model
 	local s = if type(rigScale) == "number" then rigScale else scale
 	local root = rig:FindFirstChild("HumanoidRootPart") :: BasePart
 	local rootCF = seat * CFrame.new(0, Shopkeeper.SEAT_TO_ROOT * s, 0)
+	addLids(rig)
 
 	-- forward kinematics straight into world space
 	for _, entry in RigBuilder.ComputeWorldCFrameList(rig, Shopkeeper.SleepPose, { RootCFrame = rootCF }) do
@@ -104,8 +157,8 @@ function Shopkeeper.Build(seat: CFrame, opts: { [string]: any }?): Model
 			inst.CanCollide = false
 			inst.CanQuery = false
 			inst.CanTouch = false
-			if inst.Name == "LeftIris" then
-				table.insert(doomed, inst) -- the attack-eye glow ring: a sleepy shopkeeper has no glowing eye
+			if DROP[inst.Name] then
+				table.insert(doomed, inst)
 			elseif table.find(Shopkeeper.EYES, inst.Name) then
 				inst.Transparency = 1 -- eyes shut (ShopkeeperController opens them)
 				parts += 1

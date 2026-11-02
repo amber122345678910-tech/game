@@ -143,9 +143,9 @@ function VerdictBoxEntry.At(st: Stages, now: number, out: Frame?): Frame
 			f.iris = 0
 			f.dark = e2 * (3 - 2 * p) -- smoothstep: a plain fade to black
 		else
-			f.iris = p ^ 1.5
+			f.iris = p ^ 1.4
 			f.dark = T.DarkMax * e2
-			f.camera = p ^ 2.2
+			f.camera = p ^ 1.8
 			f.roll = T.Roll * f.camera
 			f.swirl = T.Swirl * e2
 			f.streaks = clamp01(p / 0.25) * (1 - clamp01((p - 0.85) / 0.15))
@@ -249,7 +249,7 @@ local BLACK = Color3.new(0, 0, 0)
 local WHITE = Color3.new(1, 1, 1)
 local SOUL_RED = Color3.fromRGB(255, 0, 0)
 local STREAK = Color3.fromRGB(236, 228, 255)
-local RING_ALPHA = { 0.82, 0.6, 0.34 } -- soft inner edge of the iris (3 steps), then the hard black
+local RING_ALPHA = { 0.93, 0.82, 0.68, 0.51, 0.33, 0.16 } -- soft inner edge of the iris (6 steps), then hard black
 local STREAKS = 14
 
 local function new(className: string, props: { [string]: any }, parent: Instance?): any
@@ -346,7 +346,7 @@ function VerdictBoxEntry.new(parent: Instance?, opts: { [string]: any }?): Entry
 		})
 	end
 	local glows: { Frame } = {}
-	local glowAlpha = { 0.86, 0.72 } -- outer, inner (transparency at full heart)
+	local glowAlpha = { 0.94, 0.88, 0.78 } -- outer -> inner (transparency at full heart): a soft red halo
 	for i in glowAlpha do
 		local g = new("Frame", {
 			Name = "Glow" .. i,
@@ -421,20 +421,21 @@ function VerdictBoxEntry.Render(self: Entry, f: Frame, center: Vector2, size: Ve
 	self.dim.Visible = f.dark > 0.001
 	self.dim.BackgroundTransparency = 1 - f.dark
 
-	-- iris: a hole around the chest that shrinks to nothing; soft inner edge (3 rings) + hard black beyond
-	local feather = math.clamp(unit * 0.24, 24, 180)
+	-- iris: a hole around the chest that shrinks to nothing; soft inner edge (adjacent rings) + hard black beyond
+	local feather = math.clamp(unit * 0.22, 24, 170)
 	local radius = (1 - f.iris) * (far + feather)
 	local soft = math.min(feather, radius * 0.8 + 3)
 	local showIris = f.iris > 0.001 and (f.stage == "Pull" or f.stage == "Black")
 	local n = #self.rings
+	local step = soft / (n - 1)
 	for i, r in self.rings do
-		local inner = if i < n then radius + (i - 1) * soft / 3 else radius + soft
+		local inner = radius + (i - 1) * step
 		local frame = r.frame
 		frame.Visible = showIris and inner < far
 		if frame.Visible then
 			frame.Position = UDim2.fromOffset(cx, cy)
 			frame.Size = UDim2.fromOffset(inner * 2, inner * 2)
-			r.stroke.Thickness = if i < n then soft / 3 + 1 else far + 8
+			r.stroke.Thickness = if i < n then step + 1 else far + 8
 		end
 	end
 
@@ -479,7 +480,7 @@ function VerdictBoxEntry.Render(self: Entry, f: Frame, center: Vector2, size: Ve
 			end
 		end
 		for i, g in self.glows do
-			local d = hs * (if i == 1 then 3.4 else 2.1)
+			local d = hs * (3.6 - 0.8 * i) -- 2.8x, 2.0x, 1.2x the heart
 			g.Position = UDim2.fromOffset(cx, cy)
 			g.Size = UDim2.fromOffset(d, d)
 			g.BackgroundTransparency = 1 - (1 - self.glowAlpha[i]) * f.heart

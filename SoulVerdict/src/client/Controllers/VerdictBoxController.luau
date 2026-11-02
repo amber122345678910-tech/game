@@ -243,6 +243,7 @@ type Box = {
 	entry: any?, -- VerdictBoxEntry Runner while the transition plays
 	chest: Instance?,
 	flashed: boolean,
+	touchControls: { { any } }, -- {GuiObject, visible}: hidden until the flash
 }
 
 local boxes: { [number]: Box } = {}
@@ -799,6 +800,9 @@ local function stepVictim(box: Box, wall: number)
 	if not box.flashed and wall >= (if stages then stages.flashAt else box.t0) then
 		box.flashed = true -- the white flash: the box is open underneath from now on
 		sound("BoxOpen", nil, { Force2D = true })
+		for _, entry in box.touchControls do
+			entry[1].Visible = entry[2]
+		end
 	end
 	if not box.closing and sim then
 		local cfg = Config.VerdictBox
@@ -971,6 +975,7 @@ local function newBox(packet: { [string]: any }, isVictim: boolean): Box
 		entry = nil,
 		chest = nil,
 		flashed = false,
+		touchControls = {},
 	}
 end
 
@@ -999,6 +1004,13 @@ local function openOverlay(box: Box)
 	box.gui = gui
 	box.sim = Sim.new(box.timeline, { hitInterval = Config.VerdictBox.MinHitInterval })
 	connectInput(gui)
+	for _, name in { "SteerPad", "Jump" } do
+		local control = gui:FindFirstChild(name)
+		if control and control:IsA("GuiObject") then
+			table.insert(box.touchControls, { control, control.Visible })
+			control.Visible = false -- shown with the box at the flash, not over the world during the pull-in
+		end
+	end
 	victimBox = box
 	startEntry(box, gui)
 	gui.Parent = playerGui
