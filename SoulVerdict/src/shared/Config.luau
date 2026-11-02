@@ -125,6 +125,9 @@ Config.VerdictBox = {
 	SurviveUlt = 25,
 	Height = 9, -- studs above the victim for the 3D box
 	MonsterUltPerHit = 4,
+	-- s from the box opening (server) to its timeline start t0 = open + IntroTime: the victim's entry transition
+	-- (UI/VerdictBoxEntry: pull-in, black, flash) plays first; the fight still lasts Duration (BoxEnd at t0 + Duration)
+	IntroTime = 0.8,
 }
 
 Config.Rewards = {

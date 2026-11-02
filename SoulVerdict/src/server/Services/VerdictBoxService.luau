@@ -10,6 +10,11 @@
 --     workspace.VerdictBoxes, attributes BoxId / VictimName / Verdict ("" until the end);
 --   * picks a seed and the kit's pattern set (KitDef.VerdictBox -> VerdictBox/Patterns, fallback "Classic") and
 --     fires BoxStart {boxId, victim, monster, seed, patternSet, duration, t0, damagePerHit, krPerHit, box, bot} to all.
+--   * t0 (the start of the deterministic timeline, box time 0) = open + Config.VerdictBox.IntroTime: the victim's
+--     client plays its entry transition (pull-in, black, flash: UI/VerdictBoxEntry) before the timeline starts, so
+--     the first attack (box time introEnd) can only reach a SOUL that is already on screen. The fight itself still
+--     lasts `duration` (BoxEnd at t0 + duration); the statuses cover IntroTime + duration (+ pad). Every timing below
+--     (hit acceptance, bot hits, the end) is measured from t0, so it is negative during the transition.
 -- Net "BoxReport" (victim client, incremental hits, finished): accepted hits are capped by Rules.AcceptHits (no hit
 --   before the first attack, at most one per Config.VerdictBox.MinHitInterval + latency slack); each accepted hit is
 --   DamageService.Apply{Kind = "Box", Amount = DamagePerHit, KR = KRPerHit} (Box damage never drops HP below 1) and
@@ -35,7 +40,8 @@
 -- Extras
 --   VerdictBoxService.Started: Signal(boxId, monster, victim)
 --   VerdictBoxService.BoxOf(model) -> number?        active box id of a victim (or of a monster's box)
---   VerdictBoxService.Get(boxId) -> BoxInfo?         { id, monster, victim, seed, set, t0, duration, hits, bot, model }
+--   VerdictBoxService.Get(boxId) -> BoxInfo?         { id, monster, victim, seed, set, opened, t0, duration, hits, bot,
+--                                                    model }   (opened = server time of Open; t0 = opened + IntroTime)
 --   VerdictBoxService.Active() -> {BoxInfo}
 --   VerdictBoxService.SetSeedSource(fn?)             tests: deterministic seeds (nil restores the default)
 --   VerdictBoxService.Rules                          pure helpers (Lune-tested): CheckPair, AcceptHits, Verdict,
@@ -83,6 +89,7 @@ type Box = {
 	bot: boolean,
 	seed: number,
 	set: string,
+	opened: number,
 	t0: number,
 	duration: number,
 	introEnd: number,
@@ -169,7 +176,8 @@ function Rules.CheckPair(m: PairInfo, v: PairInfo, los: boolean, c: any?): (bool
 end
 
 -- How many of `reported` new hits to accept. `accepted` = hits accepted so far, `elapsed` = server time since the
--- box opened. An honest client cannot be hit before the first attack (introEnd) nor more often than MinHitInterval.
+-- timeline start t0 (negative during the entry transition). An honest client cannot be hit before the first attack
+-- (introEnd) nor more often than MinHitInterval.
 function Rules.AcceptHits(accepted: number, reported: any, elapsed: number, introEnd: number, c: any?): number
 	local conf = c or cfg()
 	if type(reported) ~= "number" or reported ~= reported or reported < 1 then
@@ -330,6 +338,7 @@ local function info(box: Box): { [string]: any }
 		victim = box.victim,
 		seed = box.seed,
 		set = box.set,
+		opened = box.opened,
 		t0 = box.t0,
 		duration = box.duration,
 		hits = box.hits,
@@ -505,7 +514,9 @@ function VerdictBoxService.Open(monster: Model, victim: Model): boolean
 	local duration = c.Duration
 	local timeline = Patterns.Build(set, seed, duration)
 	local player = Validation.GetPlayer(victim)
-	local t0 = now()
+	local intro = math.max(tonumber(c.IntroTime) or 0, 0)
+	local opened = now()
+	local t0 = opened + intro -- the victim's entry transition plays first (SPEC §11)
 	nextId += 1
 	local box: Box = {
 		id = nextId,
@@ -515,6 +526,7 @@ function VerdictBoxService.Open(monster: Model, victim: Model): boolean
 		bot = player == nil or victim:GetAttribute("IsBot") == true,
 		seed = seed,
 		set = set,
+		opened = opened,
 		t0 = t0,
 		duration = duration,
 		introEnd = timeline.introEnd,
@@ -530,8 +542,8 @@ function VerdictBoxService.Open(monster: Model, victim: Model): boolean
 	if box.bot then
 		box.botHits = Rules.BotHits(Rng.new(seed), timeline.introEnd)
 	end
-	StatusService.Apply(victim, "Boxed", duration + STATUS_PAD)
-	StatusService.Apply(victim, "Invulnerable", duration + STATUS_PAD)
+	StatusService.Apply(victim, "Boxed", intro + duration + STATUS_PAD)
+	StatusService.Apply(victim, "Invulnerable", intro + duration + STATUS_PAD)
 	box.model = spawnModel(box, mPos :: Vector3, vPos :: Vector3)
 	boxes[box.id] = box
 	byVictim[victim] = box

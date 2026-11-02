@@ -627,7 +627,8 @@ local function characterRoot(): (Model?, Vector3?)
 	return character, if root and root:IsA("BasePart") then root.Position else nil
 end
 
--- Music around the loading screen (owner's wish): the title plays its own "Menu" track; on PLAY / PRACTICE the menu
+-- Music around the loading screen (owner's wish): the title plays its own "Menu" track (the Shop its "Shop" track);
+-- on PLAY / PRACTICE the menu
 -- track fades out into the black, and the next track (lobby, or the practice round's music) starts PLAY_MUSIC_LEAD s
 -- before the screen lights up again.
 local PLAY_MIN_VISIBLE = 4.0 -- s: long enough for the lead below to be heard under the black
@@ -644,31 +645,39 @@ local function setMusic(key: string?, fade: number?)
 	end
 end
 
-local function menuMusicUsable(): boolean
+local function musicUsable(key: string): boolean
 	local ok, def = pcall(function()
 		local Audio = require(Shared:WaitForChild("Audio")) :: any
-		return Audio.Resolve(MENU_MUSIC)
+		return Audio.Resolve(key)
 	end)
 	return ok and def ~= nil
 end
 
--- the title's own track while it is open; called by syncMenuMusic on every menu change
-local menuMusicOn = false
+-- screens with their own track while open: the Shop on top plays "Shop" (sleepy Sans's shop), else an open Title
+-- plays "Menu"; nothing = automatic selection. Called on every menu change (sync).
+local SHOP_MUSIC = "Shop"
+local screenMusic: string? = nil
 local function syncMenuMusic()
 	if loadingMusic then
 		return
 	end
-	local want = hasScreen("Title") and menuMusicUsable()
-	if want ~= menuMusicOn then
-		menuMusicOn = want
-		setMusic(if want then MENU_MUSIC else nil)
+	local top = topEntry()
+	local want: string? = nil
+	if top and top.name == "Shop" and musicUsable(SHOP_MUSIC) then
+		want = SHOP_MUSIC
+	elseif hasScreen("Title") and musicUsable(MENU_MUSIC) then
+		want = MENU_MUSIC
+	end
+	if want ~= screenMusic then
+		screenMusic = want
+		setMusic(want)
 	end
 end
 UIController._SyncMenuMusic = syncMenuMusic
 
 local function loadingMusicOpts(opts: { [string]: any }): { [string]: any }
 	loadingMusic = true
-	menuMusicOn = false
+	screenMusic = nil
 	setMusic(SILENCE, MENU_FADE_OUT) -- the menu track fades out into the black
 	opts.MusicLead = PLAY_MUSIC_LEAD
 	opts.OnMusicCue = function()

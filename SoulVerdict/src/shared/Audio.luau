@@ -151,6 +151,7 @@ local SOUNDS: { [string]: SoundDef } = {
 	-- Keys match Maps/Registry `Music` fields ("Lobby", "Map_<MapId>").
 	Menu = music("title screen (main menu with PLAY): owner's pick", 0.5, { "120586834968743" }),
 	Silence = music("intentional silence: the loading screen fades the menu track out before the lobby track", 0.5, {}),
+	Shop = music("shop screen (sleepy Sans's shop): owner's pick", 0.5, { "116521081775417" }),
 	Lobby = music("calm, mysterious lobby loop (piano / music box, ~90 BPM)", 0.45, { "133849870887812", "328964090", "314069452", "1848363318", "1838649967", "1848354536" }),
 	Map_HallOfVerdicts = music("solemn golden-hall battle loop: organ / strings, building tension", 0.5, { "746812937", "1844758350", "1839290228", "1837835644" }),
 	Map_SnowdinCrossroads = music("cozy-but-tense snowy town battle loop: bells, pizzicato, light drums", 0.5, { "14264872551", "98223235470761", "6390779289", "1836542585", "1836595204" }),
@@ -188,7 +189,7 @@ local SOUNDS: { [string]: SoundDef } = {
 
 	-------------------------------------------------------------------------------------------- combat
 	BlasterCharge = sfx({ "3140269034", "9069975578", "6645293593", "9125973984" }, 0.75, { 0.97, 1.03 }, true, "rising laser/energy charge-up (~0.6-1 s)"),
-	BlasterFire = sfx({ "345052019", "332223043", "71716604434885", "9116231442" }, 0.9, { 0.95, 1.02 }, true, "big laser beam blast"),
+	BlasterFire = sfx({ "111643143254253", "345052019", "332223043", "71716604434885", "9116231442" }, 0.9, { 0.95, 1.02 }, true, "big laser beam blast"),
 	BoneRise = sfx({ "8862481350", "82284970220669" }, 0.55, { 0.92, 1.08 }, true, "quick rattling rise / wooden clack"),
 	BoneHit = sfx({ "9120907213", "9113964719" }, 0.6, { 0.9, 1.1 }, true, "bony clack impact"),
 	BoneThrow = sfx({ "4264104024", "9126284289" }, 0.5, { 0.95, 1.1 }, true, "light whoosh with a rattle"),
@@ -215,7 +216,7 @@ local SOUNDS: { [string]: SoundDef } = {
 	Shield = sfx({ "9125975059", "9116386540" }, 0.55, nil, true, "magic barrier hum-up"),
 	Stun = sfx({ "266278159" }, 0.55, nil, true, "dizzy stars / stun ring"),
 	Downed = sfx({ "129978441932803", "7521666726" }, 0.7, nil, true, "heart crack (SOUL cracked)"),
-	SoulBreak = sfx({ "5193339590", "18786129148" }, 0.8, nil, true, "heart shatter (Undertale-like, original)"),
+	SoulBreak = sfx({ "76767190975277", "5193339590", "18786129148" }, 0.8, nil, true, "heart shatter (Undertale-like, original)"),
 	Revive = sfx({ "130363919513154", "8807795651" }, 0.65, nil, true, "uplifting revive swell"),
 	Kill = sfx({ "8864069181", "9086371917" }, 0.7, nil, false, "kill confirm sting (2D)"),
 	HitConfirm = sfx({ "160432334" }, 0.5, { 1.0, 1.05 }, false, "2D hit-marker tick for the attacker (very short)"),
@@ -224,14 +225,14 @@ local SOUNDS: { [string]: SoundDef } = {
 	Implode = sfx({ "9125626784", "9126139357", "9113081793" }, 0.7, { 0.95, 1.05 }, true, "reverse whoosh into a dark implosion"),
 	SoulAppear = sfx({ "7047238398", "9114365649", "9126072433" }, 0.55, { 1.0, 1.04 }, true, "SOUL heart appears: soft shimmer"),
 	SoulCrack = sfx({ "129978441932803", "7521666726", "5193339590" }, 0.7, nil, true, "heart crack (SOUL cracked / downed)"),
-	SoulShatter = sfx({ "5193339590", "18786129148", "18633296261", "7521666726" }, 0.8, nil, true, "heart shatters into pieces"),
+	SoulShatter = sfx({ "76767190975277", "5193339590", "18786129148", "18633296261", "7521666726" }, 0.8, nil, true, "heart shatters into pieces"),
 	Dust = sfx({ "5416548293", "17615543215" }, 0.6, nil, true, "a monster turns to dust: soft sandy crumble"),
 	-- kit-specific (Classic Sans client kit)
 	BlasterSummon = sfx({ "9125517246", "9116410978" }, 0.75, { 0.97, 1.03 }, true, "Gaster Blaster materialising: deep magical whoom"),
 	BlasterTick = sfx({ "4612384434", "9114479860", "9126109935" }, 0.45, { 1.0, 1.08 }, true, "short tick while a blaster locks on"),
 	BoneSummon = sfx({ "8862481350", "18430580696", "9120856267" }, 0.7, { 0.95, 1.05 }, true, "a field of bones erupting from the ground"),
 	SoulGrab = sfx({ "7149373060", "7128958209", "9126073011" }, 0.7, nil, true, "blue SOUL grab: magical whoosh + chime"),
-	Slam = sfx({ "6866657635", "9113476681" }, 0.85, { 0.92, 1.0 }, true, "body slammed into the ground: heavy thud"),
+	Slam = sfx({ "1653352386", "6866657635", "9113476681" }, 0.85, { 0.92, 1.0 }, true, "body slammed into the ground: heavy thud"),
 	Shortcut = sfx({ "8184327494", "18388189427" }, 0.6, { 0.98, 1.04 }, true, "the monster takes a shortcut: quick blink"),
 	BadTime = sfx({ "17230188731", "4836187667", "1841700487" }, 0.9, nil, true, "ominous low sting for the monster's ultimate"),
 	-- kit-specific (Determination client kit)
