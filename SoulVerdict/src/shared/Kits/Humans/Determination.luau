@@ -97,18 +97,18 @@ local kit: Types.KitDef = {
 		{ Id = "Default", Name = { en = "Striped Sweater", ru = "Полосатый свитер" }, Price = 0, Rarity = "Common", Palette = {} },
 		{
 			Id = "Storyshift",
-			Name = { en = "Royal Cape", ru = "Королевский плащ" },
+			Name = { en = "Worn Dagger", ru = "Потёртый кинжал" },
 			Price = 900,
 			Rarity = "Rare",
-			Palette = { Sweater = Color3.fromRGB(120, 40, 160), Stripe = Color3.fromRGB(240, 200, 80), Pants = Color3.fromRGB(40, 30, 60) },
+			Palette = { Blade = Color3.fromRGB(150, 140, 128), Handle = Color3.fromRGB(70, 50, 40) },
 		},
 		{
 			Id = "Crimson",
-			Name = { en = "Crimson Resolve", ru = "Багровая воля" },
+			Name = { en = "Crimson Knife", ru = "Багровый нож" },
 			Price = 0,
 			Rarity = "Legendary",
 			Mastery = 10,
-			Palette = { Sweater = Color3.fromRGB(30, 10, 12), Stripe = Color3.fromRGB(220, 20, 40), Accent = Color3.fromRGB(255, 40, 60) },
+			Palette = { Blade = Color3.fromRGB(220, 20, 40), Handle = Color3.fromRGB(30, 10, 12) },
 		},
 	},
 }

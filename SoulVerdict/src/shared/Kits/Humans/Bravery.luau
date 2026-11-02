@@ -101,10 +101,10 @@ local kit: Types.KitDef = {
 		{ Id = "Default", Name = { en = "Manly Bandanna", ru = "Мужественная бандана" }, Price = 0, Rarity = "Common", Palette = {} },
 		{
 			Id = "Champion",
-			Name = { en = "Champion", ru = "Чемпион" },
+			Name = { en = "Champion Gloves", ru = "Перчатки чемпиона" },
 			Price = 900,
 			Rarity = "Rare",
-			Palette = { Glove = Color3.fromRGB(240, 200, 60), Bandanna = Color3.fromRGB(30, 30, 30), Sweater = Color3.fromRGB(200, 60, 30) },
+			Palette = { Glove = Color3.fromRGB(240, 200, 60), Bandanna = Color3.fromRGB(30, 30, 30) },
 		},
 	},
 }

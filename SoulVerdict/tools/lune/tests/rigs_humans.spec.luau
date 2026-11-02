@@ -198,7 +198,8 @@ return {
 							diff += 1
 						end
 					end
-					T.ok(diff >= 10, ("%s skin %s recolours %d parts"):format(id, skin.Id, diff))
+					-- human skins are accessory-only (owner rule, see human_accessories.spec): a few parts, but visible
+					T.ok(diff >= 3, ("%s skin %s recolours %d parts"):format(id, skin.Id, diff))
 				end
 			end
 		end

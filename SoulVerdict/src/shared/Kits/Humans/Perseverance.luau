@@ -101,10 +101,10 @@ local kit: Types.KitDef = {
 		{ Id = "Default", Name = { en = "Cloudy Glasses", ru = "Мутные очки" }, Price = 0, Rarity = "Common", Palette = {} },
 		{
 			Id = "Midnight",
-			Name = { en = "Night Owl", ru = "Сова" },
+			Name = { en = "Night Notebook", ru = "Ночной блокнот" },
 			Price = 800,
 			Rarity = "Rare",
-			Palette = { Sweater = Color3.fromRGB(30, 30, 70), Stripe = Color3.fromRGB(200, 170, 255), Book = Color3.fromRGB(60, 20, 90) },
+			Palette = { Book = Color3.fromRGB(60, 20, 90), BookTrim = Color3.fromRGB(200, 170, 255), Page = Color3.fromRGB(235, 230, 255) },
 		},
 	},
 }

@@ -96,10 +96,10 @@ local kit: Types.KitDef = {
 		{ Id = "Default", Name = { en = "Cowboy Hat", ru = "Ковбойская шляпа" }, Price = 0, Rarity = "Common", Palette = {} },
 		{
 			Id = "Sheriff",
-			Name = { en = "Sheriff", ru = "Шериф" },
+			Name = { en = "Sheriff's Revolver", ru = "Револьвер шерифа" },
 			Price = 1000,
 			Rarity = "Epic",
-			Palette = { Hat = Color3.fromRGB(30, 24, 20), Sweater = Color3.fromRGB(240, 220, 120), Accent = Color3.fromRGB(230, 200, 60) },
+			Palette = { Gun = Color3.fromRGB(60, 60, 66), GunTrim = Color3.fromRGB(230, 200, 60), GunGrip = Color3.fromRGB(90, 50, 30), Hat = Color3.fromRGB(30, 24, 20) },
 		},
 	},
 }

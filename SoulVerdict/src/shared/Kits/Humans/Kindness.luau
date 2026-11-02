@@ -101,10 +101,10 @@ local kit: Types.KitDef = {
 		{ Id = "Default", Name = { en = "Stained Apron", ru = "Запачканный фартук" }, Price = 0, Rarity = "Common", Palette = {} },
 		{
 			Id = "Chef",
-			Name = { en = "Head Chef", ru = "Шеф-повар" },
+			Name = { en = "Chef's Pan", ru = "Сковорода шефа" },
 			Price = 900,
 			Rarity = "Rare",
-			Palette = { Apron = Color3.fromRGB(250, 250, 250), Sweater = Color3.fromRGB(220, 60, 60), Pan = Color3.fromRGB(160, 160, 170) },
+			Palette = { Pan = Color3.fromRGB(160, 160, 170), PanHandle = Color3.fromRGB(30, 30, 34) },
 		},
 	},
 }

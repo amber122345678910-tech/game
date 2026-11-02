@@ -101,10 +101,10 @@ local kit: Types.KitDef = {
 		{ Id = "Default", Name = { en = "Faded Ribbon", ru = "Выцветшая лента" }, Price = 0, Rarity = "Common", Palette = {} },
 		{
 			Id = "Frost",
-			Name = { en = "Frostbite", ru = "Обморожение" },
+			Name = { en = "Frost Ribbon", ru = "Ледяная лента" },
 			Price = 800,
 			Rarity = "Rare",
-			Palette = { Sweater = Color3.fromRGB(210, 240, 255), Stripe = Color3.fromRGB(90, 180, 230), Ribbon = Color3.fromRGB(40, 120, 200) },
+			Palette = { Ribbon = Color3.fromRGB(40, 120, 200), ToyBlade = Color3.fromRGB(210, 240, 255), ToyHandle = Color3.fromRGB(90, 180, 230) },
 		},
 	},
 }

@@ -98,10 +98,10 @@ local kit: Types.KitDef = {
 		{ Id = "Default", Name = { en = "Old Tutu", ru = "Старая пачка" }, Price = 0, Rarity = "Common", Palette = {} },
 		{
 			Id = "Swan",
-			Name = { en = "Black Swan", ru = "Чёрный лебедь" },
-			Price = 1100,
-			Rarity = "Epic",
-			Palette = { Tutu = Color3.fromRGB(25, 25, 35), Sweater = Color3.fromRGB(40, 40, 60), Shoes = Color3.fromRGB(200, 40, 80) },
+			Name = { en = "Black Swan Shoes", ru = "Пуанты чёрного лебедя" },
+			Price = 800,
+			Rarity = "Rare",
+			Palette = { Shoes = Color3.fromRGB(25, 25, 35) },
 		},
 	},
 }
