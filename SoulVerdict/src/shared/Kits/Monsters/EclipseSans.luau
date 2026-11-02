@@ -80,7 +80,7 @@ local kit: Types.KitDef = {
 			Clip = "Point",
 			Windup = 1.1,
 			Tags = { "Beam", "KR" },
-			Numbers = { Damage = 24, KR = 6, Delay = 1.1, BeamTime = 0.5, Width = 5, Length = 60 },
+			Numbers = { Damage = 24, KR = 6, Delay = 1.1, BeamTime = 0.5, Width = 5, Length = 60, Offset = 13 },
 		},
 		{
 			Id = "GravityWell",
@@ -97,7 +97,7 @@ local kit: Types.KitDef = {
 			Clip = "Throw",
 			Windup = 0.35,
 			Tags = { "Control", "Area" },
-			Numbers = { Radius = 14, Duration = 2.5, Pull = 14, Damage = 18, KR = 5 },
+			Numbers = { Radius = 14, Duration = 2.5, Pull = 14, Damage = 18, KR = 5, ImplodeRadius = 8 },
 		},
 		{
 			Id = "Starfall",
@@ -131,7 +131,7 @@ local kit: Types.KitDef = {
 			Clip = "Summon",
 			Windup = 0.3,
 			Tags = { "Trap", "Control" },
-			Numbers = { MaxTraps = 2, Radius = 3.5, Root = 1.0, Lifetime = 45, RevealDistance = 10 },
+			Numbers = { MaxTraps = 2, Radius = 3.5, Root = 1.0, Lifetime = 45, RevealDistance = 10, ArmTime = 0.75 },
 		},
 		{
 			Id = "VoidStep",
@@ -165,7 +165,20 @@ local kit: Types.KitDef = {
 			Clip = "CastUp",
 			Windup = 0.9,
 			Tags = { "Ultimate", "Buff" },
-			Numbers = { Duration = 8, SpeedMult = 1.25, VisionRadius = 26, FireDamage = 6 },
+			-- Fire*: void-fire zones left by his attacks during the eclipse. Aura*/DarkDrain: Void Karma passive
+			-- (humans within AuraRadius of him always, or VisionRadius during the eclipse, lose Ult per second).
+			Numbers = {
+				Duration = 8,
+				SpeedMult = 1.25,
+				VisionRadius = 26,
+				FireDamage = 6,
+				FireRadius = 4.5,
+				FireTime = 3.5,
+				FireTick = 0.5,
+				AuraRadius = 10,
+				AuraDrain = 0.75,
+				DarkDrain = 2.5,
+			},
 		},
 	},
 	VerdictBox = "Eclipse",

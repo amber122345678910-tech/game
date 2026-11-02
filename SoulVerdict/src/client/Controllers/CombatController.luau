@@ -628,7 +628,11 @@ local function cast(ability: Map, charge: number?, forcedTarget: Model?): boolea
 		pcall(fx.MarkPredicted, castId, id)
 		local okClip, c = pcall(fx.CastClip, ability, comboIndex)
 		clip = if okClip then c else nil
-		pcall(fx.PlayCastClip, char, ability, comboIndex)
+		-- PlayCastClip returns the clip it really played (AnimController kit overrides): stop that one on rollback
+		local okPlay, played = pcall(fx.PlayCastClip, char, ability, comboIndex)
+		if okPlay and type(played) == "string" then
+			clip = played
+		end
 		pcall(fx.Predict, id, payload)
 	end
 	pending[castId] = { Ability = id, T = os.clock(), Prev = prev, Predicted = predictedEnd, Clip = clip }

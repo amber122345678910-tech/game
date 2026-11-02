@@ -444,11 +444,24 @@ end
 local predicted: { [number]: { Ability: string?, T: number } } = {}
 local lastLocalDash = -math.huge
 
+-- AnimController owns clip playback for casts (its own AbilityFx "Start" listener, skipping casts marked
+-- predicted) and for DamageFx hit reactions (directional Hit / Dodge / Parry + springs). FxController plays
+-- those clips itself only while AnimController is missing (integration fix: both used to play them, so the
+-- caster's predicted clip restarted on the server echo and the two versions overrode each other).
+local function animOwnsClips(): boolean
+	local anim = controller("AnimController")
+	return anim ~= nil and type(anim.PlayAbility) == "function" and type(anim.MarkPredicted) == "function"
+end
+
 function FxController.MarkPredicted(castId: number, abilityId: string?)
 	if type(castId) ~= "number" or castId == 0 then
 		return
 	end
 	predicted[castId] = { Ability = abilityId, T = os.clock() }
+	local localChar = FxController.LocalCharacter()
+	if localChar and animOwnsClips() then
+		call("AnimController", "MarkPredicted", localChar, castId)
+	end
 	-- forget old entries
 	for id, e in predicted do
 		if os.clock() - e.T > 6 then
@@ -520,11 +533,23 @@ function FxController.CastClip(ability: Map?, combo: number?): string?
 	return clip
 end
 
-function FxController.PlayCastClip(character: Model, ability: Map?, combo: number?)
+-- Plays the cast clip and returns its name (CombatController stops it on a rejected cast). Uses
+-- AnimController.PlayAbility when available so the prediction matches what other clients play (kit clip
+-- overrides, windup-matched speed).
+function FxController.PlayCastClip(character: Model, ability: Map?, combo: number?): string?
+	if ability and type(ability.Id) == "string" and animOwnsClips() then
+		local kitId = character:GetAttribute("KitId")
+		local kit = if type(kitId) == "string" and kitId ~= "" then kitId else nil
+		local data = { combo = combo }
+		local resolved = call("AnimController", "ResolveAbilityClip", character, kit, ability.Id, data)
+		call("AnimController", "PlayAbility", character, kit, ability.Id, data)
+		return if type(resolved) == "string" then resolved else nil
+	end
 	local clip = FxController.CastClip(ability, combo)
 	if clip then
 		AnimProxy.Play(character, clip, { FadeIn = 0.06 })
 	end
+	return clip
 end
 
 ---------------------------------------------------------------------------------------------------
@@ -592,10 +617,11 @@ local function onAbilityFx(packet: Map)
 	local data: Map = if type(packet.data) == "table" then packet.data else {}
 
 	if phase == "Start" then
+		local animOwns = animOwnsClips() -- AnimController plays the cast clip from this same packet
 		if abilityId == "Dash" then
 			FxController.PlayDash(char, packet.dir)
 		elseif abilityId == "VerdictBox" then
-			if not wasPredicted then
+			if not wasPredicted and not animOwns then
 				AnimProxy.Play(char, "Point", { FadeIn = 0.05 })
 			end
 			local target = data.target
@@ -604,7 +630,7 @@ local function onAbilityFx(packet: Map)
 				Lib.EmitBurst(pos, 6, Color3.new(1, 1, 1), 0.3)
 				Lib.Ring(CFrame.new(pos), 3.5, Color3.new(1, 1, 1), 0.35, 0.16)
 			end
-		elseif not wasPredicted then
+		elseif not wasPredicted and not animOwns then
 			local ability = Kits.Ability(kitId, abilityId)
 			if ability then
 				FxController.PlayCastClip(char, ability, data.combo)
@@ -820,7 +846,9 @@ local function onDamageFx(packet: Map)
 		-- MISS: lazy side-step (Undertale: slide ~0.4 s, hold, return); the ghost marks where the hit went
 		if packet.dodged then
 			Lib.Afterimage(target, Lib.Colors.Grey, 0.35, { Transparency = 0.5, MaxParts = 20 })
-			AnimProxy.Play(target, "Dodge", { FadeIn = 0.04 })
+			if not animOwnsClips() then
+				AnimProxy.Play(target, "Dodge", { FadeIn = 0.04 })
+			end
 			FxController.Sound("Dodge", target:FindFirstChild("HumanoidRootPart"))
 		end
 		Lib.Emit("Mote", pos, 4, { Color = Lib.Colors.Grey })
@@ -830,7 +858,9 @@ local function onDamageFx(packet: Map)
 		Lib.Sparks(pos, if dir then -dir else nil, gold, 18, 34)
 		Lib.Ring(CFrame.new(pos) * CFrame.Angles(math.pi / 2, 0, 0), 3.2, gold, 0.25, 0.14)
 		FxController.Sound("Parry", pos)
-		AnimProxy.Play(target, "Parry", { FadeIn = 0.03 })
+		if not animOwnsClips() then
+			AnimProxy.Play(target, "Parry", { FadeIn = 0.03 })
+		end
 		FxController.HitStop(target, 0.12)
 		if attacker then
 			FxController.HitStop(attacker, 0.12)
@@ -886,7 +916,9 @@ local function onDamageFx(packet: Map)
 			FxController.Sound("Kill", pos)
 		end
 		if amount > 0 then
-			flinch(target, packet)
+			if not animOwnsClips() then
+				flinch(target, packet)
+			end
 			if kind == "Melee" then
 				local stop = if heavy
 					then (Config.Combat.HitStopHeavy or 0.12)

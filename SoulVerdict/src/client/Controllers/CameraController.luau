@@ -611,7 +611,8 @@ local function readSettings()
 	fovSetting = if type(fov) == "number" then math.clamp(fov, 50, 100) else TUNING.BaseFov
 	local shake = setting("CameraShake", Config.Defaults.CameraShake)
 	shakeSetting = if type(shake) == "number" then math.clamp(shake, 0, 2) elseif shake == false then 0 else 1
-	local sens = setting("CameraSensitivity", 1)
+	-- the Settings screen / ProfileSchema whitelist key is "Sensitivity" (integration fix)
+	local sens = setting("Sensitivity", setting("CameraSensitivity", 1))
 	sensitivityMult = if type(sens) == "number" then math.clamp(sens, 0.1, 4) else 1
 	invertY = setting("InvertY", false) == true
 end

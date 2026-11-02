@@ -18,3 +18,10 @@ Offline-checkable contracts are pinned by `tools/lune/tests/integration.spec.lua
 | 8 | Round end → rewards → results → lobby | pending | |
 | 9 | Settings & Style Lab | pending | |
 | 10 | Practice / TryKit / bots | pending | |
+
+## Findings log (appended while auditing)
+- FIXED `src/client/Controllers/StateController.luau` readLeaderboards: LeaderboardService publishes
+  `ReplicatedStorage.Leaderboards/<Board>` as a **StringValue whose Value is JSON**; the client only read folder
+  attributes / per-entry children, so the lobby boards stayed empty. Now parses the StringValue JSON.
+- FIXED `src/client/Controllers/CameraController.luau` readSettings: read `"CameraSensitivity"`, but the Settings
+  screen + ProfileSchema whitelist use `"Sensitivity"` → the slider did nothing. Now reads `Sensitivity`.

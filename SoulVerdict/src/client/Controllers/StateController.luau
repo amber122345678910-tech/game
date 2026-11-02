@@ -24,7 +24,8 @@
 --   StateController.SettingChanged: Signal(key, value)
 --   StateController.RoundStateInstance() -> Instance?
 --   StateController.LastCombatRole() -> string?        "Human"/"Monster" of the last round the player fought in
--- Leaderboards contract (until LeaderboardService exists): ReplicatedStorage.Leaderboards (any Instance) with either
+-- Leaderboards contract: ReplicatedStorage.Leaderboards (any Instance) with either
+--   * child StringValue "<Board>" whose Value = JSON [{rank, userId, name, value}] (LeaderboardService), or
 --   * attribute "<Board>" = JSON string of [{name, value}] / [{Name, Value}], or
 --   * child "<Board>" whose children carry attributes Name (string) and Value (number), sorted by attribute Rank
 --     (else by Value descending).  Boards read: "Wins", "Level".
@@ -407,7 +408,10 @@ local function readLeaderboards()
 		end
 		if rows == nil then
 			local child = root:FindFirstChild(board)
-			if child then
+			if child and child:IsA("StringValue") then
+				-- LeaderboardService format: StringValue "<Board>".Value = JSON [{rank, userId, name, value}]
+				rows = rowsFromJson(child.Value)
+			elseif child then
 				rows = rowsFromChildren(child)
 			end
 		end
