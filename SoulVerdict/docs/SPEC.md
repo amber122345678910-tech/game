@@ -49,7 +49,8 @@ Waiting (≥2 players needed; solo player may start PRACTICE vs bots)
   → Intermission (25 s): map vote (3 random maps), loadout changes, monster pick at the end
   → Intro (7 s): map built, players spawned & frozen, cinematic flyover + VS splash
   → Round (240 s): fight
-       FinalPhase when Monster HP ≤ 30 %  (desperation: new visuals, faster dodge regen, ult refilled once)
+       Phase 2 (code: FinalPhase) when the monster casts its FIRST ultimate of the round; if its HP reaches
+       ≤ 30 % first, Phase 2 starts by itself (own music, new visuals, faster dodge regen; see §1.2)
        Collapse (overtime 40 s) when timer hits 0 and both sides alive: a closing ring of void
   → Ending (10 s): kill-cam/slow-mo on last hit (client), results + rewards
   → back to Intermission
@@ -70,11 +71,19 @@ Win conditions:
 - **KR (Karma)**: monster hits add KR to humans (`KR` attribute, cap 40). KR drains HP over time,
   faster with more KR, **cannot reduce HP below 1**. Landing a hit removes `Config.KR.CleanseOnHit` KR
   from the attacker (rewards aggression).
-- **Ultimate** meter `Ult` 0..100: +damage dealt, +time. Ult ability needs 100.
+- **Ultimate** meter `Ult` 0..100: +damage dealt, +time. Ult ability needs 100. The first ultimate of a
+  round also starts Phase 2 (below); later ones are normal ultimates.
 - **Verdict Box** (slot F, every monster): pulls one human's SOUL into a 2D Undertale-style bullet-hell
   box for ~7 s (see §11). Signature feature of the game.
-- **FinalPhase**: at ≤30 % HP once per round: 1.2 s invulnerable transformation, eye blazes, dodges
-  refilled, ult set to 100, music switch, map lighting switches to the map's `FinalPreset`.
+- **Phase 2** (player-facing name; in code `FinalPhase` / `TriggerFinalPhase` / `FinalForm` / `Theme_<kit>_Final`),
+  once per round, Round/Collapse only. Started by the monster's FIRST ultimate: AbilityService calls
+  `RoundService.TriggerFinalPhase("Ult", caster)` while the cast commits (after validation, before the bar is
+  spent); the ultimate itself still runs as the transformation's opening move and the bar stays spent.
+  Safety net (unchanged): if HP reaches ≤30 % before any ultimate, it starts by itself (`"Hp"`, ult set to 100);
+  until Phase 2 the monster cannot drop below 1 HP. Admin / Style Lab may force it (ult set to 100).
+  Effects: 1.2 s invulnerable transformation (blocks hits only, never moving or casting), eye blazes, dodges
+  refilled, Exhausted cleared, dodge regen ×`Config.Monster.FinalPhaseDodgeRegenMult`, music switch to
+  `Theme_<kit>_Final`, map lighting switches to the map's `FinalPreset`.
 
 ### 1.3 Human core (all SOUL classes)
 - HP per class 95–150. **Guard** meter for blocking (`Guard`/`MaxGuard`).
@@ -247,7 +256,7 @@ Net.Client.On(name, fn(...)) ; Net.Client.Fire(name, ...) ; Net.Client.Invoke(na
 | MonsterKit | string | kit id |
 | HumansAlive, HumansTotal | number | |
 | SavesLit, SavesTotal | number | |
-| FinalPhase | boolean | |
+| FinalPhase | boolean | the monster's Phase 2 is on (§1.2) |
 | Winner | string | "", "Monster", "Humans" |
 | WinReason | string | "Defeated", "Survived", "Eliminated", "Left" |
 | Practice | boolean | practice round with bots |
@@ -281,13 +290,14 @@ Net.Client.On(name, fn(...)) ; Net.Client.Fire(name, ...) ; Net.Client.Invoke(na
 | Status_<Name> | number | server time when status ends (see §7.4); absent/0 = inactive |
 | Buff_DamageMult | number | current multiplier (computed by StatusService) |
 | Invisible | boolean | stealth (Patience) |
-| FinalForm | boolean | monster final phase visuals |
+| FinalForm | boolean | monster Phase 2 visuals |
 HP uses `Humanoid.Health/MaxHealth` (server-authoritative; replicated by engine).
 
 ### 4.2 RoundEvent names
 `"PhaseChanged" {phase, endsAt}`, `"MapVote" {options, votes}`, `"MonsterChosen" {userId, kitId, name}`,
 `"Intro" {mapId, monster, humans: {{userId, kitId, name}}}`, `"Kill" {victim, killer, ability, victimName, killerName}`,
-`"Downed" {victim}`, `"Revived" {victim, by}`, `"SaveLit" {index, by}`, `"Surge" {}`, `"FinalPhase" {}`,
+`"Downed" {victim}`, `"Revived" {victim, by}`, `"SaveLit" {index, by}`, `"Surge" {}`,
+`"FinalPhase" {monster, kitId, duration, cause: "Ult"|"Hp"|"Forced"}` (the monster's Phase 2),
 `"SecondWind" {userId}`, `"Collapse" {}`, `"RoundEnd" {winner, reason, stats: {RoundStatRow}, mvpUserId, lastHit: {victim: Model?, position: Vector3?}}`,
 `"Rewards" {exp, gold, levelUp: boolean, unlocked: {string}, questProgress}`.
 
@@ -417,6 +427,9 @@ return X
    caster's kit, cooldown ready, ult ≥ 100 if `Ult`, `charge ∈ [0,1]`, `aim` within `Range+10` of caster
    (clamp), rate-limit. Then sets cooldown (fires "Cooldown" to caster), increments Ult cost, broadcasts
    `AbilityFx {phase="Start"}` to all, and runs `ServerKits[kitId].Abilities[abilityId](ctx)` in `task.spawn` + pcall.
+   A Monster-team ultimate during Round/Collapse while `RoundState.FinalPhase` is false first calls
+   `RoundService.TriggerFinalPhase("Ult", caster)` (before the bar is set to 0; the Start packet then carries
+   `data.phase2 = true`): the monster's first ultimate opens its Phase 2 (§1.2). Players and bots share this path.
 3. Kit server logic calls `ctx` helpers (below) which handle damage, hazards and FX broadcasts.
 
 ### 7.3 CastContext (server, passed to kit handlers)
@@ -704,7 +717,9 @@ is routed to VerdictBoxService.Start(monster, target) with `Config.VerdictBox.Co
 **ObjectiveService** (P45) — `Setup(mapInfo)`, `Clear()`, `SaveLit: Signal(index, players)`, `Surge: Signal()`.
 **RoundService** (P50) — `Phase() -> string`, `PhaseChanged: Signal(phase)`, `RoundStarted: Signal(info)`,
 `RoundEnded: Signal(result {winner, reason, rows, mvpUserId, practice, durations})`, `GetMonster() -> Model?`,
-`IsRoundCharacter(model) -> boolean`, `TriggerFinalPhase()`, `StartPractice(player, side)`, `ForceNextMap(mapId)`.
+`IsRoundCharacter(model) -> boolean`, `TriggerFinalPhase(cause?: "Ult"|"Hp", caster?: Model) -> boolean` (Phase 2, §1.2:
+"Ult" needs caster = the round's monster and keeps its ult bar; nil = forced), `FinalPhaseStarted: Signal(monster, cause)`,
+`StartPractice(player, side)`, `ForceNextMap(mapId)`.
 **BotService** (P60) — `SpawnPracticeBots(side, count)`, `SpawnDummies(cframes)`, `Clear()`.
 **RewardService, QuestService, AchievementService, ShopService, MasteryService, LeaderboardService, LoginService** (P70+) —
 consume RoundService.RoundEnded / StatsService.StatEvent; no public API needed beyond what RequestService routes.

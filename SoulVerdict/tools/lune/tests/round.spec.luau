@@ -675,7 +675,7 @@ local function waitFor(pred, timeout)
 	return pred()
 end
 
-return {
+local tests = {
 	-- QueueMath ------------------------------------------------------------------------------------
 	queue_empty_and_single = function(T, Loader)
 		local Q = Loader.require("ReplicatedStorage.Shared.Round.QueueMath")
@@ -1438,3 +1438,7 @@ return {
 		task.wait(0.15)
 	end,
 }
+
+-- The round-loop simulation is shared with ult_phase.spec.luau. Metatable fields are not test entries: the runner
+-- only walks the table's own keys.
+return setmetatable(tests, { __index = { BuildSim = buildSim, WaitFor = waitFor } })
