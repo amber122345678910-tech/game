@@ -137,7 +137,7 @@ local function commonPad(): { [string]: { string } }
 		T = { "DPadUp" },
 		F = { "ButtonL1" },
 		Jump = { "ButtonA" },
-		Menu = { "ButtonSelect", "ButtonStart" },
+		Menu = { "ButtonSelect" }, -- ButtonStart is reserved: it also opens the Roblox system menu
 		Emote = { "DPadDown" },
 		CameraLock = { "ButtonR3" },
 		Interact = { "DPadRight" },
@@ -169,7 +169,7 @@ InputController.Bindings = {
 		G = { "G" },
 		Shift = { "LeftShift", "RightShift" },
 		Jump = { "Space" },
-		Menu = { "M", "Tab" },
+		Menu = { "M" }, -- not Tab: Tab also toggles the Roblox player list
 		Emote = { "B" },
 		CameraLock = { "LeftControl", "LeftAlt", "RightControl" },
 		Interact = { "G" },

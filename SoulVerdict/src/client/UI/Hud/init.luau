@@ -668,6 +668,7 @@ function Hud.Mount(screenGui: Instance, deps: any?): any
 
 	-- frame loop: snapshot at 10 Hz, per-frame Tick for timers / cooldown wipes / markers
 	local acc = 0
+	local warnedTicks: { [string]: boolean } = {}
 	local function step(dt: number)
 		if destroyed or not visible then
 			return
@@ -682,7 +683,12 @@ function Hud.Mount(screenGui: Instance, deps: any?): any
 			if piece.Tick and piece.Root.Visible then
 				local ok, err = pcall(piece.Tick, now, dt)
 				if not ok then
-					warn("[Hud] " .. name .. ".Tick: " .. tostring(err))
+					-- warn once per piece+message so a persistent error cannot flood Output every frame
+					local key = name .. "|" .. tostring(err)
+					if not warnedTicks[key] then
+						warnedTicks[key] = true
+						warn("[Hud] " .. name .. ".Tick: " .. tostring(err))
+					end
 				end
 			end
 		end

@@ -126,7 +126,9 @@ return {
 		T.ok(has(Input.ActionsForKey("KeyboardMouse", nil, "Q"), "Prev"), "Q -> Prev (spectate)")
 		T.ok(has(Input.ActionsForKey("KeyboardMouse", nil, "LeftShift"), "Shift"), "LeftShift -> Shift")
 		T.ok(has(Input.ActionsForKey("KeyboardMouse", nil, "Space"), "Jump"), "Space -> Jump")
-		T.ok(has(Input.ActionsForKey("KeyboardMouse", nil, "Tab"), "Menu"), "Tab -> Menu")
+		-- Tab is intentionally NOT bound (it also toggles the Roblox player list); M opens the menu
+		T.ok(not has(Input.ActionsForKey("KeyboardMouse", nil, "Tab"), "Menu"), "Tab must not open Menu")
+		T.ok(has(Input.ActionsForKey("KeyboardMouse", nil, "M"), "Menu"), "M -> Menu")
 		T.ok(has(Input.ActionsForKey("KeyboardMouse", nil, "LeftControl"), "CameraLock"), "Ctrl -> CameraLock")
 		T.ok(not has(Input.ActionsForKey("KeyboardMouse", nil, "G"), "Interact"), "Interact is hint-only")
 		T.ok(has(Input.ActionsForKey("Gamepad", "Monster", "ButtonB"), "R"), "monster B -> R")

@@ -1212,6 +1212,7 @@ function CombatController.Start()
 			end)
 		end
 	end
+	local warnedStepErrors: { [string]: boolean } = {}
 	local lp = Players.LocalPlayer
 	if lp then
 		lp.CharacterAdded:Connect(function(c)
@@ -1227,7 +1228,12 @@ function CombatController.Start()
 		end
 		local ok, err = pcall(step)
 		if not ok then
-			warn("[CombatController] step failed: " .. tostring(err))
+			-- warn once per distinct message so a persistent error cannot flood Output every frame
+			local msg = tostring(err)
+			if not warnedStepErrors[msg] then
+				warnedStepErrors[msg] = true
+				warn("[CombatController] step failed: " .. msg)
+			end
 		end
 	end)
 end
