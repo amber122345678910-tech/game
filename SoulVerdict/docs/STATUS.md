@@ -70,3 +70,11 @@ Journals: /root/.claude/projects/-home-user-game/f493f3e8-eb29-53b3-b677-a9d1a3d
   (owner picks saved in db collection "picks", doc id = owner's user id; read with ArtifactData list "picks").
   Source copy: docs/style_board.html (images from previews/). dump_model --style now applies RigStyles.
 - Final polish workflow wf_b83a4615-efa running (gameplay/UX polish + Studio-readiness review).
+
+## 04:00 UTC — release candidate
+- Final polish done (QuickCast/hold-to-aim, InvertY, emote wheel + EmoteService, invisible-target filtering, huge Crimson
+  skull, LeapArcFactor in Config, dash anim prediction, MenuCamera, lobby waiters keep lobby look/music, MapKit windows).
+- Studio-readiness review: no High issues; 7 Medium fixed (Studio test rewards, Reset disabled, click-to-move off,
+  test pollution, highlight budget...), R1-R3 fixed by lead (Tab/Start bindings, warn-once). See docs/STUDIO_REVIEW.md.
+- tools/check.sh: 0 errors, 339 tests. tools/build.sh → SoulVerdict.rbxl (232 scripts, 2.4 MB).
+- Next (needs owner): first Studio run (checklist in README), music/SFX ids, style picks on the board.
