@@ -59,6 +59,7 @@ local L = {
 	QuestAngle = 270 - GAP / 2 + 5 * GAP, -- 167.14
 	TrainingAngle = 270 - GAP / 2 + 6 * GAP, -- 218.57
 	NotesAngle = 270 + GAP, -- 321.43
+	ShopSeat = { Z = 0.6, Top = 3.36 }, -- the shopkeeper's stool seat (booth-local: z behind the counter, y = seat top)
 }
 Lobby.Layout = L
 
@@ -102,6 +103,18 @@ local function kitList(): { any }
 		end
 	end
 	return {}
+end
+
+-- Maps/Shopkeeper (the sleepy Sans NPC); a missing/broken module only removes the shopkeeper.
+local function shopkeeperModule(): any
+	local module = (script.Parent :: any):FindFirstChild("Shopkeeper")
+	if module then
+		local ok, result = pcall(require, module)
+		if ok and type(result) == "table" and type((result :: any).Build) == "function" then
+			return result
+		end
+	end
+	return nil
 end
 
 local function pick(loc: any): string
@@ -424,6 +437,37 @@ local function buildBoards(B: MapKit.Builder): { Light }
 	return if l then { l } else {}
 end
 
+-- Sleepy Sans behind the counter (Maps/Shopkeeper), perched on a tall stool and slumped over the counter top.
+-- The rig is built into the map frozen (anchored ghost parts, no Humanoid); ShopkeeperController animates it.
+local function buildShopkeeper(B: MapKit.Builder, frame: CFrame)
+	local seat = L.ShopSeat
+	local floorY = 0.5
+	-- tall wooden bar stool: round seat, four splayed legs, a brass foot ring
+	B:Disc("Decor", "StoolSeat", (frame * CFrame.new(0, seat.Top - 0.14, seat.Z)).Position, 1.7, 0.28, C.WoodDark, M.Wood)
+	B:Disc("Decor", "StoolSeatTrim", (frame * CFrame.new(0, seat.Top - 0.31, seat.Z)).Position, 1.45, 0.08, C.GoldDark, M.Metal, { Shadow = false })
+	for k = 0, 3 do
+		local a = math.rad(45 + k * 90)
+		local top = frame * CFrame.new(math.cos(a) * 0.5, seat.Top - 0.3, seat.Z + math.sin(a) * 0.5)
+		local foot = frame * CFrame.new(math.cos(a) * 0.78, floorY, seat.Z + math.sin(a) * 0.78)
+		local mid = (top.Position + foot.Position) / 2
+		local length = (top.Position - foot.Position).Magnitude
+		B:Deco("Block", "StoolLeg", V(0.16, 0.16, length), MapKit.LookAt(mid, top.Position), C.WoodDark, M.Wood, { Shadow = false })
+	end
+	B:Ring("Decor", "StoolRing", (frame * CFrame.new(0, floorY + 1.15, seat.Z)).Position, 0.66, 0.1, 0.1, 8, C.Gold, M.Metal, { Shadow = false })
+	local Shopkeeper = shopkeeperModule()
+	if Shopkeeper == nil then
+		return
+	end
+	local ok, npc = pcall(Shopkeeper.Build, frame * CFrame.new(0, seat.Top, seat.Z))
+	if not ok or typeof(npc) ~= "Instance" then
+		B.Model:SetAttribute("ShopkeeperError", tostring(npc))
+		return
+	end
+	npc.Parent = B:_folder("Decor")
+	local count = npc:GetAttribute("PartCount")
+	B.PartCount += if type(count) == "number" then count else 0
+end
+
 local function buildShop(B: MapKit.Builder): { Light }
 	B:Group("ShopBooth")
 	local base = polar(52, L.ShopAngle)
@@ -475,6 +519,7 @@ local function buildShop(B: MapKit.Builder): { Light }
 	})
 	local marker = B:Marker("ShopBooth", frame * CFrame.new(0, 3, -3.2), { Size = V(8, 4, 1), Attributes = { Action = "Shop" } })
 	B:Prompt(marker, { Action = "Shop", ActionKey = "maps.lobby.shop.action", ObjectKey = "maps.lobby.shop.object", Distance = 11 })
+	buildShopkeeper(B, frame)
 	local _ = rng
 	B:Group(nil)
 	return if l then { l } else {}

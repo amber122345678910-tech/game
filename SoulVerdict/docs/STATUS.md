@@ -114,3 +114,6 @@ Running workflows (when they finish: tools/check.sh, tools/build.sh, commit + pu
 - sleepy-sans-shop (wf_d2216278-df6): pixel sleepy Sans in Screens/Shop (wakes, "zzz... oh. hi, kid. what do you want?") +
   3D sleeping Sans at the lobby ShopBooth (wakes when the player comes near); previews/ui/shop_keeper_*.png, previews/maps/lobby_shop_sans.png.
 If a workflow died (usage limit): Workflow({scriptPath, resumeFromRunId}) re-runs only the unfinished agents (paths in the transcript).
+Resume rule (quality): do not blindly re-run a dead agent's prompt. Re-run it as a CONTINUATION: same prompt plus "an earlier agent
+was cut off mid-task; first read `git diff` / `git log -5` for your files, keep what is good, finish the rest, then run the tests".
+Then run the adversarial review on the finished part before shipping (as done for audio/loading/phase2).
