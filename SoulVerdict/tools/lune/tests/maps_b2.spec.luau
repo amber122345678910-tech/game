@@ -160,6 +160,41 @@ tests.arenaShape = function(T, Loader)
 	end)
 end
 
+tests.layoutRules = function(T, Loader)
+	local MapKit = Loader.require("ReplicatedStorage.Shared.Maps.MapKit")
+	local Config = Loader.require("ReplicatedStorage.Shared.Config")
+	each(T, function(id)
+		local info = build(Loader, id, 1)
+		local probe = MapKit.Ground(info.Model)
+		-- head-room: nothing solid within 6 studs above spawns and SAVE channel areas (5 rays each)
+		local function clear(label, p, spread)
+			for _, off in { Vector3.new(0, 0, 0), Vector3.new(spread, 0, 0), Vector3.new(-spread, 0, 0), Vector3.new(0, 0, spread), Vector3.new(0, 0, -spread) } do
+				local y = probe(p + off, 6, 7)
+				T.ok(y ~= nil and y <= p.Y + 0.8, ("%s clear at %s (hit %s)"):format(label, tostring(p + off), tostring(y)))
+			end
+		end
+		for i, cf in info.HumanSpawns do
+			clear("HumanSpawn " .. i, cf.Position, 1.5)
+			T.ok((cf.Position - info.MonsterSpawn.Position).Magnitude >= 100, "human spawn " .. i .. " >= 100 studs from the monster")
+		end
+		clear("MonsterSpawn", info.MonsterSpawn.Position, 2)
+		local r = Config.Objectives.SaveRadius
+		for i, p in info.SavePoints do
+			clear("SAVE " .. i, p, r * 0.6)
+			T.ok(flatDist(p, info.Center) <= info.Radius - r, "SAVE " .. i .. " inside the Collapse ring")
+			for _, cf in info.HumanSpawns do
+				T.ok(flatDist(p, cf.Position) >= 30, "SAVE " .. i .. " away from the human spawns")
+			end
+		end
+		-- the intro is a sweeping flight
+		local span = 0
+		for _, cf in info.IntroPath do
+			span = math.max(span, (cf.Position - info.IntroPath[1].Position).Magnitude)
+		end
+		T.ok(span >= 80, ("IntroPath sweeps >= 80 studs (%.0f)"):format(span))
+	end)
+end
+
 tests.deterministic = function(T, Loader)
 	local MapKit = Loader.require("ReplicatedStorage.Shared.Maps.MapKit")
 	each(T, function(id)
@@ -187,13 +222,17 @@ tests.decorAndFolders = function(T, Loader)
 		local model = info.Model
 		local badDecor, badMarker, badLight, unanchored = 0, 0, 0, 0
 		for _, p in parts(model.Decor) do
-			-- MapKit B:Stairs keeps its visual steps queryable on purpose (ground probes hit the steps while
-			-- physics uses the invisible ramp); everything else in Decor is inert
-			local stairStep = string.find(p.Name, "_Step%d+$") ~= nil
-			if p.CanCollide or (p.CanQuery and not stairStep) then
+			if p.CanCollide or p.CanQuery then
 				badDecor += 1
 			end
 		end
+		local badGeo = 0
+		for _, p in parts(model.Geometry) do
+			if not p.CanCollide then
+				badGeo += 1
+			end
+		end
+		T.eq(badGeo, 0, "geometry is collidable")
 		for _, p in parts(model.Markers) do
 			if p.CanCollide or p.CanQuery or p.Transparency < 1 then
 				badMarker += 1
@@ -261,6 +300,18 @@ tests.strings = function(T, Loader)
 	end
 	T.ok(n > 0, "Maps3 has keys")
 	T.eq(Strings.L("maps.voidrift.name"), "Void Rift", "Maps3 merged into Strings")
+	for key in raw do
+		T.ok(Strings.Has(key), "merged: " .. key)
+	end
+	-- every sign a map builds carries a TextKey that exists in Strings
+	each(T, function(id)
+		for _, d in build(Loader, id, 1).Model:GetDescendants() do
+			if d:IsA("TextLabel") then
+				local key = d:GetAttribute("TextKey")
+				T.ok(key ~= nil and Strings.Has(key), "sign key exists: " .. tostring(key))
+			end
+		end
+	end)
 	each(T, function(id)
 		local def = mapModule(Loader, id)
 		local key = "maps." .. string.lower(id) .. ".name"

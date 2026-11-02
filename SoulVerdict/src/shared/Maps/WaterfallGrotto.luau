@@ -428,7 +428,7 @@ local function mushroom(B: Builder, name: string, base: Vector3, height: number,
 end
 
 local function crystalCluster(B: Builder, name: string, base: Vector3, height: number, color: Color3, withLight: boolean): number
-	local light = B:Crystal(name, base, height, { Color = color, Count = 5, Light = withLight, Brightness = 1.6, Range = 18 })
+	local light = B:Crystal(name, base, height, { Color = color, Count = 5, Light = withLight, Brightness = 1.8, Range = 20, Transparency = 0.35 })
 	-- the glass shards are decor: a solid rock foot + an invisible core make the cluster real cover
 	B:Rock(name .. "_Foot", base, height * 0.32, { Collide = true, Chunks = 1, Color = C.RockDark, Material = M.Slate })
 	B:Solid("Block", name .. "_Core", V(height * 0.26, height * 0.85, height * 0.26), CFrame.new(base + V(0, height * 0.42, 0)), color, M.SmoothPlastic, {
@@ -604,10 +604,16 @@ local function buildCave(B: Builder, cutaway: boolean): number
 	end
 	-- the moonbeam through the skylight onto the Echo Isle
 	local s = L.Skylight
-	B:Shaft("Moonbeam", s + V(0, L.CeilingY + 4, 0), V(0.12, -1, 0.08), L.SkylightR * 0.8, L.SkylightR * 0.8, L.CeilingY + 5, rgb(70, 110, 150), { Transparency = 0.965 })
+	-- (a soft translucent cylinder: no hard box edges when a player walks through it)
+	local beamTop = s + V(0, L.CeilingY + 4, 0)
+	local beamDir = V(0.12, -1, 0.08).Unit
+	B:Rod("Decor", "Moonbeam", beamTop, beamTop + beamDir * (L.CeilingY + 4.5), L.SkylightR * 0.85, rgb(70, 110, 150), M.Neon, {
+		Transparency = 0.965,
+		Shadow = false,
+	})
 	-- broad, dim teal fill so the island floors stay readable between the glowing landmarks
-	for _, p in { V(0, 30, 74), V(-60, 30, -4), V(60, 30, -6), V(0, 30, -66), V(0, 26, 38), V(0, 26, -30) } do
-		B:Light("Point", p, { Name = "CaveFill", Brightness = 0.7, Range = 60, Color = rgb(90, 170, 200) })
+	for _, p in { V(0, 22, 76), V(-60, 22, -4), V(60, 22, -6), V(0, 22, -66), V(0, 20, 38), V(0, 20, -30) } do
+		B:Light("Point", p, { Name = "CaveFill", Brightness = 1.3, Range = 55, Color = rgb(90, 170, 200) })
 		lights += 1
 	end
 	B:Light("Spot", MapKit.LookAt(s + V(0, L.CeilingY - 2, 0), s), { Name = "MoonbeamLight", Brightness = 2, Range = 70, Angle = 38, Color = rgb(170, 215, 255) })
@@ -671,8 +677,49 @@ local function buildIsle(B: Builder)
 	B:Group(nil)
 end
 
-local function buildLedge(B: Builder)
+-- Soft bioluminescent lichen on the island floors (dim Neon smears, kept off SAVE rings and walkways).
+local LICHEN = {
+	V(-80, 0, -20),
+	V(-70, 0, 20),
+	V(-46, 0, -32),
+	V(-84, 0, 26),
+	V(-40, 0, 14),
+	V(48, 0, -8),
+	V(82, 0, 10),
+	V(70, 0, -38),
+	V(56, 0, 34),
+	V(84, 0, -18),
+	V(-10, 0, -4),
+	V(12, 0, 16),
+	V(-36, 0, 86),
+	V(36, 0, 88),
+	V(-18, 0, -70),
+	V(18, 0, -72),
+}
+
+local function buildLichen(B: Builder)
+	B:Group("Lichen")
+	local rng = B.Rng
+	for _, p in LICHEN do
+		local g = V(p.X, groundY(p), p.Z)
+		for k = 1, 3 do
+			local x, z = rng:InCircle(3.5)
+			local size = rng:Number(2.5, 5)
+			B:Deco("Ellipsoid", "Lichen", V(size, 0.08, size * rng:Number(0.5, 0.9)), CFrame.new(g + V(x, 0.03 + k * 0.004, z)) * CFrame.Angles(0, rng:Number(0, 6.28), 0), MapKit.Shade(rgb(24, 96, 92), rng:Number(-0.1, 0.1)), M.Neon, {
+				Transparency = 0.45,
+				Shadow = false,
+			})
+		end
+	end
+	B:Group(nil)
+end
+
+local function buildLedge(B: Builder): number
 	B:Group("Ledge")
+	local lights = 0
+	for _, sx in { -1, 1 } do
+		lights += lantern(B, "LedgeLantern", V(sx * 24, L.LedgeTop, -72), false)
+	end
 	-- the monster's perch: two broken pillars and a fallen slab framing the falls
 	for _, sx in { -1, 1 } do
 		local p = V(sx * 14, L.LedgeTop, -76)
@@ -682,6 +729,7 @@ local function buildLedge(B: Builder)
 	end
 	B:Solid("Block", "FallenSlab", V(9, 1.6, 3.4), CFrame.new(-6, L.LedgeTop + 0.6, -64) * CFrame.Angles(0, math.rad(28), math.rad(8)), C.RockLight, M.Slate)
 	B:Group(nil)
+	return lights
 end
 
 local function buildBoundary(B: Builder)
@@ -708,7 +756,8 @@ function WaterfallGrotto.Build(seed: number?, opts: { [string]: any }?): MapInfo
 	lights += buildCave(B, cutaway)
 	lights += buildLanding(B)
 	buildIsle(B)
-	buildLedge(B)
+	lights += buildLedge(B)
+	buildLichen(B)
 	buildBoundary(B)
 
 	-- objectives: the Echo Isle (centre), the Echo Garden (west), the Crystal Grove (east)
