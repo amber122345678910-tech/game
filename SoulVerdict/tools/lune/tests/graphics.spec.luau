@@ -696,6 +696,10 @@ return {
 		local high = Apply.ForQuality(gold, "High")
 		T.eq(high.DepthOfField.Enabled, true, "High keeps DOF")
 		T.eq(high.Bloom.Size, gold.Bloom.Size, "High as authored")
+		-- the global dim (owner: too bright) applies to every tier
+		T.near(high.Lighting.ExposureCompensation, gold.Lighting.ExposureCompensation + Apply.DIM.Exposure, 1e-9, "dimmer exposure")
+		T.ok(high.Lighting.Brightness < gold.Lighting.Brightness, "dimmer brightness")
+		T.ok(high.Bloom.Intensity < gold.Bloom.Intensity, "softer bloom")
 		T.eq(gold.Bloom.Size, 30, "ForQuality does not mutate the preset")
 		local lighting, terrain, ws = scene(Loader)
 		T.eq(#Apply.ToLighting(lighting, low, { Terrain = terrain, Workspace = ws }), 0, "Low applies")
@@ -1074,7 +1078,7 @@ return {
 		world.frames(0.4)
 		T.eq(world.runService.PreRender:Count(), 0, "PreRender disconnected after the fade")
 		T.near(lighting.ClockTime, 17.35, 1e-3, "GoldenHall applied")
-		T.near(lighting:FindFirstChild("SV_Bloom").Intensity, 0.6, 1e-4, "bloom applied")
+		T.near(lighting:FindFirstChild("SV_Bloom").Intensity, 0.6 * Loader.require(APPLY).DIM.Bloom, 1e-4, "bloom applied (globally dimmed)")
 		T.ok(world.terrain:FindFirstChild("SV_Clouds") ~= nil, "clouds under Terrain")
 		T.ok(world.workspace.GlobalWind.X > 0, "wind applied")
 

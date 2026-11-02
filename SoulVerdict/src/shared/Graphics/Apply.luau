@@ -24,7 +24,8 @@
 --       effect enabled on either side stays enabled mid-way and fades through its neutral value
 --       (Bloom.Intensity 0 ...), so effects never pop. `out` (a previous Lerp result) is reused to avoid
 --       per-frame allocations. alpha <= 0 / >= 1 return exact copies of a / b.
---   Apply.ForQuality(preset, "Low"|"Medium"|"High"|"Ultra") -> GraphicsPreset   (normalized copy)
+--   Apply.ForQuality(preset, "Low"|"Medium"|"High"|"Ultra") -> GraphicsPreset   (normalized copy, with the global
+--       Apply.DIM trim: every tier is dimmer than the authored preset)
 --       Low: no DOF, no SunRays, no Clouds, smaller/weaker Bloom, half the stars.
 --       Medium: no DOF, SunRays ×0.8, Bloom size ×0.8.  High/Ultra: as authored.
 --   Apply.Copy(preset) -> GraphicsPreset        deep copy (normalized)
@@ -533,8 +534,25 @@ end
 
 ---------------------------------------------------------------------------------------------- quality
 
+-- Owner feedback (phone): the lighting was too bright everywhere. Every preset the game applies goes through
+-- ForQuality, so this global trim dims all maps, menus and presets the same way (tune here, not per preset):
+-- exposure in EV stops (-0.35 = about 22 % less light), the rest are multipliers / offsets.
+Apply.DIM = {
+	Exposure = -0.35,
+	Brightness = 0.85,
+	Bloom = 0.65,
+	SunRays = 0.6,
+	ColorBrightness = -0.03,
+}
+
 function Apply.ForQuality(preset: GraphicsPreset, quality: Quality | string): GraphicsPreset
 	local p = Apply.Copy(preset) :: any
+	local dim = Apply.DIM
+	p.Lighting.ExposureCompensation += dim.Exposure
+	p.Lighting.Brightness *= dim.Brightness
+	p.Bloom.Intensity *= dim.Bloom
+	p.SunRays.Intensity *= dim.SunRays
+	p.ColorCorrection.Brightness += dim.ColorBrightness
 	if quality == "Low" then
 		p.DepthOfField.Enabled = false
 		p.SunRays.Enabled = false
