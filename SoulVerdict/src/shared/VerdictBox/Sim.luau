@@ -122,6 +122,7 @@ export type Bullet = {
 	a0: number,
 	va: number,
 	rmin: number,
+	delay: number, -- Bone / Star: spawn-in telegraph (translucent, harmless, motionless) for `delay` s
 	-- Stab: rises from `wall` over [a, b] (along the wall), box size bw x bh at spawn
 	wall: string,
 	a: number,
@@ -253,6 +254,7 @@ local DEFAULTS: { [string]: any } = {
 	a0 = 0,
 	va = 0,
 	rmin = -1,
+	delay = 0,
 	wall = "Bottom",
 	a = 0,
 	b = 0,
@@ -362,7 +364,9 @@ function Sim.IntroChars(tl: Timeline, t: number, total: number): number
 	if t >= tl.introEnd then
 		return total
 	end
-	return clamp(math.floor((t - T.TextDelay) * T.TextSpeed), 0, total)
+	-- long (translated) lines type faster so they always finish 0.2 s before the first attack
+	local speed = math.max(T.TextSpeed, total / math.max(tl.introEnd - T.TextDelay - 0.2, 0.3))
+	return clamp(math.floor((t - T.TextDelay) * speed), 0, total)
 end
 
 function Sim.SoulAngle(gravity: string): number
@@ -566,12 +570,14 @@ function Sim.Pose(b: Bullet, t: number, out: Pose?): Pose?
 	p.hurt, p.shape, p.hangle = false, "None", 0
 	local kind = b.kind
 	if kind == "Bone" or kind == "Star" then
-		if not motion(b, dt, p) then
+		local early = dt < b.delay
+		if not motion(b, if early then 0 else dt - b.delay, p) then
 			return nil
 		end
-		p.phase = "Move"
+		p.phase = if early then "Warn" else "Move"
 		p.len, p.thick = b.len, b.thick
-		p.hurt = true
+		p.alpha = if early then 0.3 + 0.45 * dt / math.max(b.delay, 1e-3) else 1
+		p.hurt = not early
 		p.hx, p.hy = p.x, p.y
 		if kind == "Bone" then
 			p.shape = "Rect"

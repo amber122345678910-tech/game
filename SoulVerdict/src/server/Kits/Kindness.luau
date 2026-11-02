@@ -81,8 +81,8 @@ local function installTick()
 				nurturers[model] = 0
 			else
 				local total = acc + dt
-				if total >= NURTURE_PERIOD then
-					total -= NURTURE_PERIOD
+				if total >= NURTURE_PERIOD - 1e-6 then
+					total = math.max(0, total - NURTURE_PERIOD)
 					nurture(model)
 				end
 				nurturers[model] = math.min(total, NURTURE_PERIOD)

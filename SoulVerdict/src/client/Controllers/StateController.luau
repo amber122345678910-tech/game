@@ -23,6 +23,7 @@
 --   StateController.SetSetting(key, value)              optimistic + Request("SetSetting", {key = key, value = value})
 --   StateController.SettingChanged: Signal(key, value)
 --   StateController.RoundStateInstance() -> Instance?
+--   StateController.ReadBoard(root, board) -> {{name, value}}   one leaderboard from ReplicatedStorage.Leaderboards
 --   StateController.LastCombatRole() -> string?        "Human"/"Monster" of the last round the player fought in
 -- Leaderboards contract: ReplicatedStorage.Leaderboards (any Instance) with either
 --   * child StringValue "<Board>" whose Value = JSON [{rank, userId, name, value}] (LeaderboardService), or
@@ -395,27 +396,32 @@ local function rowsFromChildren(folder: Instance): { Row }
 	return rows
 end
 
+-- Rows of one board under the Leaderboards root (every supported format; see the header). Pure, Lune-tested.
+function StateController.ReadBoard(root: Instance, board: string): { Row }
+	local rows: { Row }? = nil
+	local attr = root:GetAttribute(board)
+	if type(attr) == "string" and attr ~= "" then
+		rows = rowsFromJson(attr)
+	end
+	if rows == nil then
+		local child = root:FindFirstChild(board)
+		if child and child:IsA("StringValue") then
+			-- LeaderboardService format: StringValue "<Board>".Value = JSON [{rank, userId, name, value}]
+			rows = rowsFromJson(child.Value)
+		elseif child then
+			rows = rowsFromChildren(child)
+		end
+	end
+	return rows or {}
+end
+
 local function readLeaderboards()
 	local root = ReplicatedStorage:FindFirstChild("Leaderboards")
 	if root == nil then
 		return
 	end
 	for _, board in StateController.BOARDS do
-		local rows: { Row }? = nil
-		local attr = root:GetAttribute(board)
-		if type(attr) == "string" and attr ~= "" then
-			rows = rowsFromJson(attr)
-		end
-		if rows == nil then
-			local child = root:FindFirstChild(board)
-			if child and child:IsA("StringValue") then
-				-- LeaderboardService format: StringValue "<Board>".Value = JSON [{rank, userId, name, value}]
-				rows = rowsFromJson(child.Value)
-			elseif child then
-				rows = rowsFromChildren(child)
-			end
-		end
-		leaderboards[board] = rows or {}
+		leaderboards[board] = StateController.ReadBoard(root, board)
 	end
 	StateController.LeaderboardsChanged:Fire()
 end

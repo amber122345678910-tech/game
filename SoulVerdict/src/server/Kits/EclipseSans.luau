@@ -5,8 +5,8 @@
 -- Abilities (AbilityFx phases sent with ctx:Fx, after the automatic "Start"):
 --   VoidLash (M1)      3-hit long whip: box Range long in front (hits 1-2 wide sweeps, hit 3 a narrow crack that
 --                      Slows SlowMult for SlowTime). Purple-tinted hits.           Fx "Lash" {combo, last, hits, reach}
---   RiftBlaster (Q)    a rift opens Offset studs to the SIDE of the aim point (the side with more room; alternates
---                      when both are open), a void-wolf skull (BlasterBeam style "Eclipse") emerges from it and
+--   RiftBlaster (Q)    a rift opens Offset studs to the SIDE of the aim point (the caster's right unless the left
+--                      has more room: same rule as the client indicator), a void-wolf skull (BlasterBeam style "Eclipse") emerges from it and
 --                      fires ACROSS the aim point after Delay (Length, Width, BeamTime, Damage, KR).
 --                      Fx "Rift" {pos, dir, hazard, delay, beamTime, width, length}
 --   GravityWell (E)    after Windup the black star is thrown (Fx "Throw" {from, to, time}); on landing an Orb hazard
@@ -68,6 +68,7 @@ local FIRE_PER_TARGET = 1.0 -- one void fire per victim per second at most
 local TRAP_IMMUNE = 2.0 -- a human just pulled through cannot trip another trap for this long
 local TRAP_FEET_TOLERANCE = 2.5 -- feet within this height of the trap plane (jumping high clears it)
 local PULL_DISTANCE = 4.5 -- the victim lands this far in front of Eclipse
+local MAX_SWEEP = 14 -- studs per tick; a longer jump is a teleport (not swept across the traps between)
 
 type Trap = { Id: number, Pos: Vector3, Radius: number, ArmAt: number, Expires: number }
 type Fire = { Id: number, Pos: Vector3, Ends: number }
@@ -78,7 +79,6 @@ type CasterState = {
 	Traps: { Trap },
 	Fires: { Fire },
 	EclipseUntil: number,
-	RiftSide: number,
 	LastPos: { [Model]: Vector3 },
 	TrapImmune: { [Model]: number },
 	FireCooldown: { [Model]: number },
@@ -108,7 +108,6 @@ local function newState(model: Model): CasterState
 		Traps = {},
 		Fires = {},
 		EclipseUntil = 0,
-		RiftSide = 1,
 		LastPos = setmetatable({}, { __mode = "k" }) :: any,
 		TrapImmune = setmetatable({}, { __mode = "k" }) :: any,
 		FireCooldown = setmetatable({}, { __mode = "k" }) :: any,
@@ -330,6 +329,7 @@ local function springTrap(st: CasterState, trap: Trap, victim: Model, now: numbe
 	})
 	if dest then
 		S.MovementService.Teleport(victim, dest)
+		st.LastPos[victim] = dest.Position
 	end
 	S.StatusService.Apply(victim, "Rooted", N.Root or 1)
 end
@@ -353,6 +353,9 @@ local function checkTraps(st: CasterState, now: number)
 			local pos = Validation.RootPosition(m)
 			if pos then
 				local prev = st.LastPos[m] or pos
+				if (pos - prev).Magnitude > MAX_SWEEP then
+					prev = pos
+				end
 				st.LastPos[m] = pos
 				local safe = (st.TrapImmune[m] or 0) > now
 					or SS.Has(m, "Boxed")
@@ -471,8 +474,9 @@ Abilities.VoidLash = function(ctx: any)
 	ctx:Fx("Lash", { combo = index, last = last, hits = #hits, reach = range })
 end
 
--- Rift position + beam direction for a Rift Blaster cast (the side of the aim with more room).
-local function riftPlacement(ctx: any, st: CasterState): (Vector3, Vector3, Vector3)
+-- Rift position + beam direction for a Rift Blaster cast: the caster's right of the aim point unless the left
+-- has more room (walls). The client indicator mirrors this rule.
+local function riftPlacement(ctx: any): (Vector3, Vector3, Vector3)
 	local N = ctx.N
 	local ground = Common.GroundAim(ctx)
 	local origin = ctx:RootPosition()
@@ -480,10 +484,8 @@ local function riftPlacement(ctx: any, st: CasterState): (Vector3, Vector3, Vect
 	local right = Common.Right(fwd)
 	local offset = math.max(4, N.Offset or 13)
 	local chest = ground + Vector3.new(0, CHEST, 0)
-	st.RiftSide = -st.RiftSide
-	local first = st.RiftSide
-	local bestSide, bestClear = first, -1
-	for _, s in { first, -first } do
+	local bestSide, bestClear = 1, -1
+	for _, s in { 1, -1 } do
 		local clear = Common.ClampPath(chest, right * s, offset)
 		if clear > bestClear + 0.5 then
 			bestSide, bestClear = s, clear
@@ -498,8 +500,8 @@ Kit.RiftPlacement = riftPlacement
 
 Abilities.RiftBlaster = function(ctx: any)
 	local N = ctx.N
-	local st = stateOf(ctx.Caster)
-	local pos, dir, ground = riftPlacement(ctx, st)
+	stateOf(ctx.Caster)
+	local pos, dir, ground = riftPlacement(ctx)
 	local delay = N.Delay or 1.1
 	local beamTime = N.BeamTime or 0.5
 	local width = N.Width or 5

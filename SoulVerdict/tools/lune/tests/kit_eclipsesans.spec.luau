@@ -151,6 +151,12 @@ local function harness(Loader)
 	end
 	H.HazardDefs = Loader.require("ReplicatedStorage.Shared.Combat.HazardDefs")
 	H.Kits = Loader.require("ReplicatedStorage.Shared.Kits")
+	-- Lune models have no PivotTo: teleports move the root directly (and are recorded)
+	H.teleports = {}
+	H.S.MovementService.Teleport = function(m, cf)
+		table.insert(H.teleports, { model = m, cframe = cf })
+		m.PrimaryPart.CFrame = cf
+	end
 
 	local world = Instance.new("Folder")
 	world.Name = "World"
@@ -229,19 +235,17 @@ local function harness(Loader)
 		end
 		return out
 	end
-	-- Runs the hazard simulation for `seconds` in `step` increments (StatusService ticks every 0.1 s).
-	function H.simulate(seconds, step)
-		step = step or 0.02
-		local acc = 0
+	-- Runs the hazard simulation for `seconds` in 0.02 s steps (no StatusService ticks: KR drain would blur the
+	-- damage numbers; tests that need the 10 Hz tick call StatusService._Step themselves).
+	function H.simulate(seconds)
+		local step = 0.02
 		for _ = 1, math.ceil(seconds / step) do
 			H.advance(step)
 			H.S.HazardService._Step(step)
-			acc += step
-			if acc >= 0.1 - 1e-9 then
-				acc = 0
-				H.S.StatusService._Step(0.1)
-			end
 		end
+	end
+	function H.pos(m)
+		return m.PrimaryPart.CFrame.Position
 	end
 	function H.cleanup()
 		Validation.SetScheduler(nil)
@@ -338,6 +342,7 @@ return {
 			local chest = Vector3.new(0, 2.6, -30)
 			T.near(Vector3.new(pos.X, 0, pos.Z - -30).Magnitude, N.Offset, 0.01, "rift opens Offset to the side")
 			T.ok(math.abs(pos.Z + 30) < 0.01, "beside the aim point (perpendicular to the cast line)")
+			T.ok(pos.X > 10, "on the caster's right by default")
 			-- the beam runs through the aim point
 			local look = p.origin.LookVector
 			local toChest = chest - pos
@@ -352,7 +357,7 @@ return {
 			H.simulate(0.4)
 			T.eq(H.hp(human), hp0 - N.Damage, "beam hit")
 			T.eq(human:GetAttribute("KR"), N.KR, "beam KR")
-			-- a wall on the preferred side: the rift opens on the open side
+			-- a wall on the caster's right: the rift opens on the open (left) side
 			AS.SetCooldown(eclipse, "RiftBlaster", 0)
 			H.wallX = 5
 			T.ok(AS.CastAs(eclipse, "RiftBlaster", { aim = Vector3.new(0, 0, -30) }), "cast 2")
@@ -382,7 +387,7 @@ return {
 			T.eq(orb.params.visual, "EclipseWell", "custom visual")
 			T.ok(near(orb.params.center, throw.data.to, 1e-3), "lands where thrown")
 			T.ok(#H.fx("Land", "GravityWell") == 1, "Land fx")
-			H.simulate(0.4)
+			H.simulate(0.5)
 			local mover = edge.PrimaryPart:FindFirstChild("SV_Mover")
 			T.ok(mover ~= nil and mover.VectorVelocity.Z > 5, "edge human pulled toward the centre")
 			H.simulate(N.Duration + 0.2)
@@ -459,16 +464,17 @@ return {
 			SS._Step(0.1)
 			T.eq(#H.fx("Spring", "RiftTrap"), 0, "dash i-frames pass safely")
 			SS.Remove(human, "IFrames")
-			-- a fast crossing between two ticks is still caught (swept test)
+			-- a long jump between ticks is a teleport, not a crossing; a fast run across is still caught (swept)
 			H.place(human, Vector3.new(14, 0, -20))
 			SS._Step(0.1)
+			T.eq(#H.fx("Spring", "RiftTrap"), 0, "teleport-sized jumps are not swept")
 			H.place(human, Vector3.new(6, 0, -20))
 			SS._Step(0.1)
 			local spring = H.fx("Spring", "RiftTrap")
 			T.eq(#spring, 1, "trap sprung")
 			T.eq(spring[1].data.victim, human, "victim in fx")
-			local pos = human.PrimaryPart.Position
-			T.ok(near(pos, Vector3.new(0, 3.05, -4.5), 0.1), "pulled through to the front of Eclipse")
+			local pos = H.pos(human)
+			T.ok(near(pos, Vector3.new(0, 3.05, -4.5), 0.1), "pulled through to the front of Eclipse " .. tostring(pos))
 			T.ok(SS.Has(human, "Rooted"), "rooted")
 			T.eq(#H.kit._State(eclipse).Traps, 1, "sprung trap is used up")
 			-- lifetime
@@ -491,7 +497,7 @@ return {
 			local N = H.Kits.Ability(KIT, "VoidStep").Numbers
 			local eclipse = H.eclipse(Vector3.zero)
 			T.ok(AS.CastAs(eclipse, "VoidStep", { aim = Vector3.new(0, 0, -80), dir = Vector3.new(0, 0, -1) }), "cast")
-			local pos = eclipse.PrimaryPart.Position
+			local pos = H.pos(eclipse)
 			T.near(pos.Z, -N.Distance, 0.1, "stepped Distance through the portal")
 			T.ok(SS.Has(eclipse, "Invisible") and eclipse:GetAttribute("Invisible") == true, "invisible")
 			T.eq(#H.fx("Enter", "VoidStep"), 1, "Enter fx")
@@ -525,7 +531,7 @@ return {
 				DS.Apply({ Attacker = eclipse, Target = human, Amount = 5, Kind = "Melee" })
 			end)
 			T.ok(AS.CastAs(eclipse, "TotalEclipse", {}), "ult cast")
-			T.eq(eclipse:GetAttribute("Ult"), 0, "ult consumed")
+			T.ok(eclipse:GetAttribute("Ult") < 5, "ult consumed (only the hit's gain since)")
 			T.ok(during.active and during.hasted and during.status, "eclipse statuses")
 			T.eq(during.mult, N.SpeedMult, "speed bonus")
 			local ec = H.fx("Eclipse", "TotalEclipse")[1]

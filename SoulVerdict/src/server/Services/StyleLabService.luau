@@ -19,6 +19,7 @@
 --   Abort                         stop the match without results
 --   Heal                          full health for your character
 --   ResetCooldowns                clear your ability cooldowns
+--   SetSkin {kitId, skinId}       lobby only: respawn your lobby body in place with that skin (preview, not saved)
 -- Handler returns (ok, errKey?) as RequestService expects; successes answer Notify "round.lab.done".
 -- Chat commands (TextChatService, same permission check) so the owner can test solo even without menus:
 --   /practice [human|monster] [allies]   /skip   /final   /collapse   /end [monster]   /abort
@@ -208,6 +209,36 @@ local ACTIONS: { [string]: (Player, any) -> (boolean, string?) } = {
 		end
 		model:SetAttribute("KR", 0)
 		return true, nil
+	end,
+
+	-- Preview any skin of a kit on your lobby body without owning / equipping it (the Style Lab skin cycler sends
+	-- this for skins you do not own; integration fix: the action did not exist). The next lobby respawn or
+	-- equipment change restores the equipped look.
+	SetSkin = function(player: Player, data: any): (boolean, string?)
+		local Kits = require(Shared:WaitForChild("Kits")) :: any
+		local kitId = str(data.kitId, 40)
+		local skinId = str(data.skinId, 40)
+		if kitId == nil or skinId == nil or Kits.Get(kitId) == nil or Kits.Skin(kitId, skinId) == nil then
+			return false, "round.lab.unknown"
+		end
+		local model = ownModel(player)
+		local root = model and model:FindFirstChild("HumanoidRootPart")
+		local humanoid = model and model:FindFirstChildOfClass("Humanoid")
+		if model == nil or root == nil or humanoid == nil or not root:IsA("BasePart") or model:GetAttribute("Dead") == true then
+			return false, "round.lab.noCharacter"
+		end
+		if model:GetAttribute("Team") ~= "Lobby" then
+			return false, "round.trykit.notLobby"
+		end
+		local feet = root.Position - Vector3.new(0, humanoid.HipHeight + root.Size.Y / 2, 0)
+		local ok = call(CharacterService, "SpawnPlayer", player, kitId, CFrame.new(feet) * root.CFrame.Rotation, {
+			Team = "Lobby",
+			SkinId = skinId,
+		})
+		if ok then
+			player:SetAttribute("Role", "Lobby")
+		end
+		return ok, if ok then nil else "round.lab.unknown"
 	end,
 
 	ResetCooldowns = function(player: Player, _data: any): (boolean, string?)

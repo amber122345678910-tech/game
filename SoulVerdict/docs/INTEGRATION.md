@@ -45,3 +45,7 @@ Offline-checkable contracts are pinned by `tools/lune/tests/integration.spec.lua
   HUD warning once you were already outside and taking True damage). New
   `src/client/Controllers/CollapseController.luau`: 48 translucent void wall segments + ground band at the safe
   radius during Phase "Collapse" (eased, non-colliding, CanQuery off, removed after the phase).
+- FIXED Style Lab skin preview: `Screens/StyleLab.luau` sends `Request("StyleLab", {action = "SetSkin", kitId,
+  skinId})` for skins you don't own, but `StyleLabService` had no `SetSkin` action (warning toast, nothing
+  happened). Added `SetSkin` (lobby only: respawns your lobby body in place with that skin; not saved).
+  Caught by `integration_stylelab_actions_exist`.
