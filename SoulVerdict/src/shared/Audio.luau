@@ -269,6 +269,8 @@ local SOUNDS: { [string]: SoundDef } = {
 	SansTextBlip = ui({ "5417004822", "5416485881", "358280695", "928210219" }, 0.3, { 0.98, 1.02 }, "lower, rounder text blip for the monster's lines"),
 	Notify = ui({ "9125397532", "2375539277", "7383525713" }, 0.4, nil, "notification pop"),
 	Denied = ui({ "9113401879" }, 0.4, nil, "short 'not ready' buzz (ability on cooldown / no target)"),
+	-- Client/UI/Overlays/Loading: starts with the fade to black, fades out (0.4 s) when the loading screen ends
+	PlayTransition = ui({ "120586834968743" }, 0.6, nil, "PLAY loading-screen sound (owner's pick)"),
 }
 
 -- defaults that are fallbacks of other generic entries
