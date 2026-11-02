@@ -140,3 +140,16 @@ Next: adversarial review of all of it, tools/check.sh, tools/build.sh, commit + 
 - Owner asked that further work be done by the lead directly (not by spawning many agents) to save the usage limit.
 - Next: owner republishes and tests on the phone; possible follow-ups: English store description, further Sans art passes,
   HD skull meshes (owner imports assets/meshes into ReplicatedStorage/SV_Meshes, see README).
+
+## 19:30 UTC — shipped (owner asked the lead to work directly, no agents)
+- Owner's 112 ChatGPT pixel icons sliced to 32x32 (PixelArt/IconData, PixelArt/Icons, docs/ICON_SHEETS.md) and used in
+  the shop (skins/accessories), kit portraits, ability buttons and UI icons (Icons.Create pixel keys + aliases).
+- PRACTICE asks "play as Sans / as a human" (UIController.Practice() without a side); lobby "SANS QUEUE" table (phone:
+  tap the strip).
+- Phase 2 cinematics: RoundService.StartCinematic (freeze + invulnerable + attacks cleared + timer paused) and
+  Phase2CinematicController (Classic MISS scene, Fell wounded scene with two lines, Eclipse pulse, Last Breath scene);
+  the ult that starts Phase 2 plays the scene instead of its opener; Phase 2 blaster rings for Classic and Fell.
+- New monster kit LastBreathSans (shares Classic's kit modules; blueprint with crack + burning cyan eye; music falls
+  back to Classic's candidates until the owner sends ids).
+- tools/check.sh 0 errors; build sent to the owner. Not tested in real Roblox: camera/animation timing of the scenes
+  may need tuning after the owner's feedback.
