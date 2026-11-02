@@ -773,8 +773,6 @@ function VerdictBoxView.Hit(self: View, t: number, damage: number?, kr: number?)
 		if not f.active or t - f.t0 > 0.7 then
 			f.active = true
 			f.t0 = t
-			f.x = soul.Position.X.Offset + self.inner.AbsolutePosition.X * 0
-			f.y = 0
 			if placed == 0 then
 				f.label.Text = "-" .. tostring(damage or 0)
 				f.label.TextColor3 = Color3.fromRGB(255, 70, 70)
@@ -930,38 +928,6 @@ function VerdictBoxView._warn(self: View, cx: number, cy: number, hw: number, hh
 	o.stroke.Thickness = math.max(1, s * 1.2)
 	o.stroke.Transparency = if math.floor(t * 12) % 2 == 0 then 0 else 0.45
 	setVisible(o.root, true)
-end
-
-function VerdictBoxView._stab(self: View, p: any, b: any, t: number, dark: boolean)
-	if p.phase == "Warn" then
-		self:_warn(p.fx, p.fy, p.fw, p.fh, t)
-		return
-	end
-	local h = p.height
-	if h <= 0.5 then
-		return
-	end
-	local wall = p.wall
-	local span = math.abs(b.b - b.a)
-	local thick = 10
-	local count = math.max(math.floor(span / 11 + 0.5), 1)
-	local step = span / count
-	local embed = 8
-	local len = h + embed
-	for i = 0, count - 1 do
-		local along = math.min(b.a, b.b) + step * (i + 0.5)
-		local x, y, angle
-		if wall == "Bottom" then
-			x, y, angle = along, b.bh / 2 - h + len / 2, 0
-		elseif wall == "Top" then
-			x, y, angle = along, -b.bh / 2 + h - len / 2, 0
-		elseif wall == "Left" then
-			x, y, angle = -b.bw / 2 + h - len / 2, along, math.pi / 2
-		else
-			x, y, angle = b.bw / 2 - h + len / 2, along, math.pi / 2
-		end
-		self:_bone(x, y, len, thick, angle, p.color, p.style, 1, dark)
-	end
 end
 
 function VerdictBoxView._blaster(self: View, p: any, t: number)
@@ -1137,11 +1103,9 @@ function VerdictBoxView.Render(self: View, t: number, soul: SoulView?, hudData: 
 	self.border.BackgroundTransparency = if isDark then 0.8 else 0
 	self.inner.Size = UDim2.fromOffset(w * s, h * s)
 	self.darkVeil.BackgroundTransparency = 1 - dark
-	local overX, overY = self.cx - w * s / 2 - bpx, self.cy - h * s / 2 - bpx
-	-- `over` is positioned so that its origin is the box centre too
+	-- `over` (blasters, beams, rifts: not clipped by the box) has its origin at the box centre
 	self.over.Position = UDim2.fromOffset(self.cx, self.cy)
 	self.over.Size = UDim2.fromOffset(0, 0)
-	local _ = overX + overY
 
 	-- timer bar
 	local remain = math.clamp(1 - (t - tl.introEnd) / math.max(tl.duration - tl.introEnd, 0.1), 0, 1)
@@ -1173,19 +1137,10 @@ function VerdictBoxView.Render(self: View, t: number, soul: SoulView?, hudData: 
 					self:_star(pose.x + half.X / s, pose.y + half.Y / s, pose.len, pose.angle, pose.color, pose.alpha, isDark)
 				elseif kind == "Stab" then
 					-- stab geometry is box-centred; shift into inner-frame space
-					local shifted = pose
-					shifted.fx += half.X / s
-					shifted.fy += half.Y / s
-					local bb = {
-						a = b.a,
-						b = b.b,
-						bw = b.bw,
-						bh = b.bh,
-					}
-					if shifted.phase == "Warn" then
-						self:_warn(shifted.fx, shifted.fy, shifted.fw, shifted.fh, t)
+					if pose.phase == "Warn" then
+						self:_warn(pose.fx + half.X / s, pose.fy + half.Y / s, pose.fw, pose.fh, t)
 					else
-						self:_stabShifted(shifted, bb, half.X / s, half.Y / s, isDark)
+						self:_stab(pose, b, half.X / s, half.Y / s, isDark)
 					end
 				elseif kind == "Platform" then
 					pose.x += half.X / s
@@ -1287,7 +1242,7 @@ function VerdictBoxView.Render(self: View, t: number, soul: SoulView?, hudData: 
 end
 
 -- stab drawing in inner-frame space (box geometry + half-size offset)
-function VerdictBoxView._stabShifted(self: View, p: any, b: any, ox: number, oy: number, dark: boolean)
+function VerdictBoxView._stab(self: View, p: any, b: any, ox: number, oy: number, dark: boolean)
 	local h = p.height
 	if h <= 0.5 then
 		return

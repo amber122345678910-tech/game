@@ -58,3 +58,8 @@ Journals: /root/.claude/projects/-home-user-game/f493f3e8-eb29-53b3-b677-a9d1a3d
 - CombatController: optional aim preview for press-cast Direction abilities (Fell has 5 Indicators that never show). Consider "hold to aim, release to cast" option in Settings.
 - FellSans Lunge reads Humanoid.MoveDirection server-side (may not replicate) — falls back to aim; consider sending move dir in CastPayload.
 - Kits done 02:55 UTC: FellSans, EclipseSans (EclipseSans data Numbers extended: Offset, ImplodeRadius, ArmTime, Fire*).
+- Kits done 02:55 UTC: Patience, Bravery, Integrity, Perseverance, Kindness, Justice → ALL 10 KITS COMPLETE.
+- Invisible humans (Patience stealth, Eclipse VoidStep) must be skipped by: BotService monster targeting, CombatController soft-target, VerdictBox target picking, nameplates for enemies.
+- Leap distance constant (1.6) duplicated client/server (Bravery/Integrity leaps) → move to Config.
+- Page hazard hook applies its own damage (i-frames consume page) — acceptable.
+- Indicators only shown for Hold/Ground/Target/Ally aim modes; Direction press-casts have none (Fell, Justice).
