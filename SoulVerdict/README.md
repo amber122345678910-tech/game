@@ -137,7 +137,7 @@ Roblox Studio работает только на **Windows или Mac**.
   Готовность к Studio: `docs/STUDIO_REVIEW.md`. Графика: `docs/GRAPHICS.md`. HD-меши: `docs/HD_MESHES.md`.
   Исследования: `docs/research/`.
 - Все проверки офлайн (без Roblox): `tools/check.sh` — компиляция, линтер, сверка с API Roblox, контракты,
-  339 тестов, сборка места. Полная сборка: `tools/build.sh`.
+  360 тестов, сборка места. Полная сборка: `tools/build.sh`.
 - Превью: `previews/` (персонажи, карты, меню, HUD, Коробка Вердикта, пропсы). Рендер моделей:
   `tools/lune/dump_model.luau` + `tools/preview/render.mjs`, рендер интерфейса: `tools/lune/dump_gui.luau` +
   `tools/preview/gui/render.mjs`.
