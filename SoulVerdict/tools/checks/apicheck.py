@@ -533,7 +533,14 @@ class FileChecker:
             if name is not None:
                 self.check_class_name(name, stok, "class-name")
         receiver_known = field and i >= 2 and t[i - 2].kind == "name" and not self.is_field(i - 2) and scope.get(t[i - 2].value) is not None
-        if field and t[i - 1].is_op(".") and tk.value in TYPO_MEMBERS and tk.value not in api.all_member_names:
+        # a call (`Nameplates.Visibility(unit)`) is a module function, never a mistyped Roblox property
+        if (
+            field
+            and t[i - 1].is_op(".")
+            and tk.value in TYPO_MEMBERS
+            and tk.value not in api.all_member_names
+            and not nxt.is_op("(")
+        ):
             self.err(tk, f".{tk.value} is not a Roblox member — did you mean .{TYPO_MEMBERS[tk.value]}?", "mistake")
         if not receiver_known:  # known receivers get the precise member/deprecation check below
             if field and t[i - 1].is_op(":") and tk.value in LOWERCASE_METHODS and nxt.is_op("("):

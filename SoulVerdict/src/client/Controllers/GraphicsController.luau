@@ -7,9 +7,11 @@
 --      pushes "EclipseDark" for humans, the Style Lab pushes whatever the owner picks;
 --   2. else the player's own choice from Settings (SetOverride; nil / "MapDefault" = follow the map);
 --   3. else the map preset: ReplicatedStorage.RoundState attribute "GraphicsPreset" (fallback: "MapId");
+--      a local player who is NOT a round participant (Player attribute Role "Lobby" - players waiting in the lobby
+--      during a round, mid-match joiners; fallback: character Team "Lobby") gets RoundState "LobbyPreset" instead;
 --   4. else "Lobby".
 --   While RoundState.FinalPhase is true, 2–4 use the "<Id>Final" variant when it exists (or an explicit
---   RoundState "FinalPreset" attribute, if the server ever sets one).
+--   RoundState "FinalPreset" attribute, if the server ever sets one) - participants only.
 -- Changes cross-fade with Apply.Lerp, driven by RunService.PreRender, only while a transition runs
 -- (default 1.5 s, smoothstep). The result is then adjusted to the quality tier (Apply.ForQuality).
 --
@@ -37,6 +39,8 @@
 --   Signals: Changed(quality) — Quality() or ParticleScale() changed; PresetChanged(presetId, source);
 --            ReducedMotionChanged(enabled)
 --   GraphicsController.PRIORITY = { User = 0, StyleLab = 50, Gameplay = 100, Cinematic = 200 }
+--   GraphicsController.MapState(round, participant) -> {MapPreset, FinalPreset, MapId, FinalPhase}   (pure)
+--   GraphicsController.IsParticipant(role?, team?) -> boolean                                         (pure)
 -- Saved settings are also read from StateController.Profile().Settings (keys GraphicsPreset,
 -- ParticleDensity, GraphicsQuality) when StateController exists.
 
@@ -144,6 +148,9 @@ local mapPreset: string? = nil
 local finalPreset: string? = nil
 local mapId: string? = nil
 local finalPhase = false
+local lobbyPreset: string? = nil
+-- the local player takes part in the running round (else: the lobby look); unknown (no local player) = follow the map
+local participant = true
 
 local userOverride: string? = nil
 local overrides: { [string]: OverrideEntry } = {}
@@ -293,16 +300,54 @@ local function startTransition(duration: number)
 	end
 end
 
+-- Pure: Role "Lobby" = waiting in the lobby (not part of the round); Human / Monster / Spectator take part.
+-- Without a role the character's Team decides; knowing neither = follow the round as before.
+function GraphicsController.IsParticipant(role: string?, team: string?): boolean
+	if type(role) == "string" and role ~= "" then
+		return role ~= "Lobby"
+	end
+	if type(team) == "string" and team ~= "" then
+		return team ~= "Lobby"
+	end
+	return true
+end
+
+-- Pure: the map-side inputs of Presets.Resolve. Non-participants see the lobby preset (no arena / final look).
+-- round = { GraphicsPreset?, FinalPreset?, MapId?, FinalPhase?, LobbyPreset? }
+function GraphicsController.MapState(round: { [string]: any }, isParticipant: boolean): { [string]: any }
+	if not isParticipant then
+		return {
+			MapPreset = round.LobbyPreset or "Lobby",
+			FinalPreset = nil,
+			MapId = nil,
+			FinalPhase = false,
+		}
+	end
+	return {
+		MapPreset = round.GraphicsPreset,
+		FinalPreset = round.FinalPreset,
+		MapId = round.MapId,
+		FinalPhase = round.FinalPhase == true,
+	}
+end
+
 local function resolveState(): any
 	local list: { OverrideEntry } = {}
 	for _, entry in overrides do
 		table.insert(list, entry)
 	end
-	return {
-		MapPreset = mapPreset,
+	local map = GraphicsController.MapState({
+		GraphicsPreset = mapPreset,
 		FinalPreset = finalPreset,
 		MapId = mapId,
 		FinalPhase = finalPhase,
+		LobbyPreset = lobbyPreset,
+	}, participant)
+	return {
+		MapPreset = map.MapPreset,
+		FinalPreset = map.FinalPreset,
+		MapId = map.MapId,
+		FinalPhase = map.FinalPhase,
 		UserOverride = userOverride,
 		Overrides = list,
 	}
@@ -413,6 +458,7 @@ local function readRoundState()
 	finalPreset = stringAttribute(rs, "FinalPreset")
 	mapId = stringAttribute(rs, "MapId")
 	finalPhase = rs:GetAttribute("FinalPhase") == true
+	lobbyPreset = stringAttribute(rs, "LobbyPreset")
 end
 
 -- `quiet` = only read the attributes (Start applies the first preset itself).
@@ -421,7 +467,7 @@ local function bindRoundState(rs: Instance, quiet: boolean?)
 		return
 	end
 	roundState = rs
-	for _, name in { "GraphicsPreset", "FinalPreset", "MapId", "FinalPhase" } do
+	for _, name in { "GraphicsPreset", "FinalPreset", "MapId", "FinalPhase", "LobbyPreset" } do
 		rs:GetAttributeChangedSignal(name):Connect(function()
 			readRoundState()
 			retarget(false)
@@ -448,6 +494,40 @@ local function watchRoundState()
 			bindRoundState(child)
 		end
 	end)
+end
+
+------------------------------------------------------------------------------------ local participant
+
+-- Role (Player attribute, the same value StateController.Role() reads) + character Team; retargets on change.
+local function watchParticipant()
+	local Players = game:GetService("Players")
+	local player = Players.LocalPlayer
+	if player == nil then
+		return
+	end
+	local charConn: RBXScriptConnection? = nil
+	local function refresh()
+		local character = player.Character
+		local team = if character then character:GetAttribute("Team") else nil
+		local now = GraphicsController.IsParticipant(player:GetAttribute("Role"), team)
+		if now ~= participant then
+			participant = now
+			retarget(false)
+		end
+	end
+	local function bindCharacter(character: Model?)
+		if charConn then
+			charConn:Disconnect()
+			charConn = nil
+		end
+		if character then
+			charConn = character:GetAttributeChangedSignal("Team"):Connect(refresh)
+		end
+		refresh()
+	end
+	player:GetAttributeChangedSignal("Role"):Connect(refresh)
+	player.CharacterAdded:Connect(bindCharacter)
+	bindCharacter(player.Character)
 end
 
 --------------------------------------------------------------------------------------- saved settings
@@ -534,6 +614,7 @@ function GraphicsController.Start()
 		displayed = Apply.Copy(snapshot)
 	end
 	watchRoundState() -- reads RoundState (if it already exists) before the first preset is chosen
+	pcall(watchParticipant)
 	retarget(true, FIRST_TRANSITION)
 	task.spawn(hookSavedSettings)
 

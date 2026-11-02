@@ -29,7 +29,9 @@ RigStyleController.Priority = 50
 RigStyleController.StyleChanged = Signal.new()
 
 local TUNING = {
-	MaxOutlines = 24,
+	-- the engine renders at most 31 Highlights at once (extra ones silently vanish): 20 outlines + FxController's
+	-- 10 hit highlights + 1 kit aura (FellSans rage) stay inside that budget
+	MaxOutlines = 20,
 	OutlineRange = 180,
 	CullInterval = 0.5,
 	ReapplyDelay = 0.15,

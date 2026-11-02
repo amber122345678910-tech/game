@@ -356,8 +356,9 @@ function CameraMath.MenuDrift(base: CFrame, t: number): CFrame
 end
 
 -- Is the local player part of the running round? `role` = Player attribute Role (StateController.Role()):
--- Human / Monster / Spectator (a fallen participant) yes, Lobby no; without a role the character's Team decides.
--- `listed` = the player appears in the round's Intro data (covers a Role attribute that has not replicated yet).
+-- Human / Monster / Spectator (a fallen participant) yes, Lobby no; without a role the character's Team decides;
+-- knowing neither = yes (behave as before). `listed` = the player appears in the round's Intro data (covers a Role
+-- attribute that has not replicated yet).
 function CameraMath.IsParticipant(role: string?, team: string?, listed: boolean?): boolean
 	if listed == true then
 		return true
@@ -365,7 +366,10 @@ function CameraMath.IsParticipant(role: string?, team: string?, listed: boolean?
 	if type(role) == "string" and role ~= "" then
 		return role ~= "Lobby"
 	end
-	return type(team) == "string" and team ~= "" and team ~= "Lobby"
+	if type(team) == "string" and team ~= "" then
+		return team ~= "Lobby"
+	end
+	return true
 end
 
 ---------------------------------------------------------------------------------------------- state

@@ -25,7 +25,9 @@
         "CharacterJumpPower": 50,
         "AutoJumpEnabled": false,
         "LoadCharacterAppearance": false,
-        "AvatarJointUpgrade": "Disabled"
+        "AvatarJointUpgrade": "Disabled",
+        "DevComputerMovementMode": "KeyboardMouse",
+        "DevTouchMovementMode": "DynamicThumbstick"
       },
       "StarterPlayerScripts": {
         "$className": "StarterPlayerScripts",

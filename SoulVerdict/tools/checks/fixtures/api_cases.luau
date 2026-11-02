@@ -66,6 +66,9 @@ end
 local label = Instance.new("TextLabel")
 label.TextColor = BrickColor.new("Bright red") -- expect: deprecated
 label.Colour = Color3.new() -- expect: member, mistake
+local _vis = label.Visibility -- expect: mistake
+local Plates = { Visibility = function(_x: any): string return "Plate" end }
+local _shown = Plates.Visibility(label)
 label.Text = "a" .. tostring(1)
 local bf = Instance.new("BindableFunction")
 bf.OnInvoke = function() end

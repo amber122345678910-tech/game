@@ -5,6 +5,8 @@
 --   Waiting / Intermission -> "Lobby";  Intro / Round / Collapse -> the map's track (Maps/Registry Music key; while
 --   RoundState.FinalPhase: "<key>_Final" -> "FinalPhase");  Ending -> "Victory" / "Defeat" stinger (from RoundEnd);
 --   InputController context "Box" (the local player is inside the Verdict Box) -> "VerdictBox";
+--   a local player who is not a round participant (StateController.Role() "Lobby": waiting in the lobby during a
+--   round, mid-match joiners) keeps "Lobby" in every phase (no arena track, no Victory/Defeat stinger);
 --   SetMusicOverride(key) beats everything (title screen, Style Lab...).
 -- Empty ids (Audio entries the owner has not filled yet) play nothing and never warn.
 -- Voices: one pool per resolved entry (max Audio MaxInstances, oldest voice is stolen when full); 3D sounds at a
@@ -27,6 +29,8 @@
 --   SoundController.Duck(amount 0..1, duration, fadeTime?)   temporarily lowers music (big moments)
 --   SoundController.Resolve(name) -> (SoundDef?, string?)    runtime registry + Shared/Audio
 --   SoundController.Groups() -> { Music: SoundGroup?, SFX: SoundGroup?, UI: SoundGroup? }
+--   SoundController.MusicFor(round, ctx) -> string?   pure automatic selection; ctx = { Override, Box, Stinger,
+--                                                    Current, Participant (false = lobby viewer) }
 
 local SoundService = game:GetService("SoundService")
 local RunService = game:GetService("RunService")
@@ -630,21 +634,46 @@ local function mapMusicKey(mapId: any): string
 	return "Lobby"
 end
 
-local function desiredMusic(): string?
-	if musicOverride then
-		return musicOverride
+-- Pure: the track the automatic selection wants for a RoundState snapshot.
+function SoundController.MusicFor(round: { [string]: any }, ctx: { [string]: any }): string?
+	if ctx.Override then
+		return ctx.Override
 	end
-	if boxActive then
+	if ctx.Box then
 		return "VerdictBox"
 	end
-	local round = stateRound()
+	if ctx.Participant == false then
+		return "Lobby" -- waiting in the lobby while a round runs elsewhere
+	end
 	local phase = round.Phase
 	if phase == "Intro" or phase == "Round" or phase == "Collapse" then
 		return Audio.MapMusic(mapMusicKey(round.MapId), round.FinalPhase == true)
 	elseif phase == "Ending" then
-		return stingerKey or requestedMusic
+		return ctx.Stinger or ctx.Current
 	end
 	return "Lobby"
+end
+
+-- false only when we know the local player is waiting in the lobby (Role "Lobby"); unknown = participant
+local function isParticipant(): boolean
+	local State = controller("StateController")
+	if State and type(State.Role) == "function" then
+		local ok, role = pcall(State.Role)
+		if ok and type(role) == "string" and role ~= "" then
+			return role ~= "Lobby"
+		end
+	end
+	return true
+end
+
+local function desiredMusic(): string?
+	return SoundController.MusicFor(stateRound(), {
+		Override = musicOverride,
+		Box = boxActive,
+		Stinger = stingerKey,
+		Current = requestedMusic,
+		Participant = isParticipant(),
+	})
 end
 
 local function refreshMusic(fadeTime: number?)
@@ -717,9 +746,18 @@ local function hookState()
 			end
 		end)
 	end
+	if State.RoleChanged then
+		-- joining / leaving the round (or waiting in the lobby during one) switches between arena and lobby music
+		State.RoleChanged:Connect(function()
+			refreshMusic()
+		end)
+	end
 	if type(State.OnRoundEvent) == "function" then
 		State.OnRoundEvent("RoundEnd", onRoundEnd)
 		State.OnRoundEvent("FinalPhase", function()
+			if not isParticipant() then
+				return -- the lobby does not hear the arena's stinger
+			end
 			SoundController.Play("FinalPhaseStinger")
 			SoundController.Duck(0.6, 1.2, 0.15)
 		end)
