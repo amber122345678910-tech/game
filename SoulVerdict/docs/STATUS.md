@@ -52,3 +52,9 @@ Journals: /root/.claude/projects/-home-user-game/f493f3e8-eb29-53b3-b677-a9d1a3d
   - wf_944ad1be-aa3: verdict-box, integration-audit (docs/INTEGRATION.md)
   - wf_cd0df11e-83b: maps-snow-waterfall, maps-void-core (+ previews of Hall/Lobby)
 - Next: review results, fix leftovers, final check + build SoulVerdict.rbxl, style board artifact, screenshots + RU summary to owner.
+
+## Follow-ups collected from agent reports (for the final integration pass)
+- HazardVisuals: add a visual-only `skullScale` param for BlasterBeam so FellSans CrimsonBlaster can have a huge skull with a narrow beam (now skull size derives from beam width).
+- CombatController: optional aim preview for press-cast Direction abilities (Fell has 5 Indicators that never show). Consider "hold to aim, release to cast" option in Settings.
+- FellSans Lunge reads Humanoid.MoveDirection server-side (may not replicate) — falls back to aim; consider sending move dir in CastPayload.
+- Kits done 02:55 UTC: FellSans, EclipseSans (EclipseSans data Numbers extended: Offset, ImplodeRadius, ArmTime, Fire*).

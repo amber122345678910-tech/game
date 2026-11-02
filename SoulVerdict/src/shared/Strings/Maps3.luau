@@ -17,4 +17,24 @@ return {
 	["maps.voidrift.area.drift"] = { en = "Drifting Isle", ru = "Дрейфующий Остров" },
 	["maps.voidrift.area.shards"] = { en = "Crystal Scar", ru = "Кристальный Шрам" },
 	["maps.voidrift.area.ribway"] = { en = "The Ribway", ru = "Рёберный Путь" },
+
+	-- Core Reactor -----------------------------------------------------------------------------------------
+	["maps.corereactor.name"] = { en = "Core Reactor", ru = "Реактор Ядра" },
+	["maps.corereactor.desc"] = {
+		en = "Catwalks over a roaring heart of magma and machinery.",
+		ru = "Мостки над ревущим сердцем из магмы и машин.",
+	},
+	["maps.corereactor.sign.core"] = { en = "REACTOR CONTROL", ru = "УПРАВЛЕНИЕ РЕАКТОРОМ" },
+	["maps.corereactor.sign.bay"] = { en = "LOADING BAY 03", ru = "ПОГРУЗОЧНЫЙ ДОК 03" },
+	["maps.corereactor.sign.heat"] = { en = "DANGER: EXTREME HEAT", ru = "ОПАСНО: СИЛЬНЫЙ ЖАР" },
+	["maps.corereactor.sign.coolant"] = { en = "COOLANT", ru = "ОХЛАДИТЕЛЬ" },
+	["maps.corereactor.sign.turbine"] = { en = "TURBINE HALL", ru = "ТУРБИННЫЙ ЗАЛ" },
+	["maps.corereactor.sign.gantry"] = { en = "HEAT GANTRY", ru = "ТЕПЛОВАЯ ЭСТАКАДА" },
+	["maps.corereactor.area.ring"] = { en = "Reactor Ring", ru = "Кольцо Реактора" },
+	["maps.corereactor.area.bay"] = { en = "Loading Bay", ru = "Погрузочный док" },
+	["maps.corereactor.area.control"] = { en = "Control Deck", ru = "Пульт управления" },
+	["maps.corereactor.area.turbine"] = { en = "Turbine Hall", ru = "Турбинный зал" },
+	["maps.corereactor.area.coolant"] = { en = "Coolant Station", ru = "Станция охлаждения" },
+	["maps.corereactor.area.gantry"] = { en = "Heat Gantry", ru = "Тепловая эстакада" },
+	["maps.corereactor.area.crane"] = { en = "Crane Gantry", ru = "Крановая эстакада" },
 }
