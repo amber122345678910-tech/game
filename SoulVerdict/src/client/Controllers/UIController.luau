@@ -16,14 +16,20 @@
 --     lobby/round HUD and the touch controls hide while a menu owns the screen) and hides Roblox's touch thumbstick /
 --     jump button (GuiService.TouchControlsEnabled) while any menu or photo mode is up;
 --   * Admin (owner test panel): "Admin" screen + Title button, only for the Player attribute "Admin" = true.
+--   * PLAY / PRACTICE go through the loading screen (UI/Overlays/Loading: fade to black, spinning pixel Sans head,
+--     "LOADING"); the menus close (and the practice request is sent) once the screen is black. If that module is
+--     missing or fails, both fall back to the instant switch.
 --
 -- API
 --   UIController.Open(name, opts?) -> ScreenHandle?   names: Title, Play (= Loadout), Loadout, Shop, Quests, Profile,
 --       Settings, StyleLab, Admin, Results, Gallery. opts are merged into that screen's deps ({Replace = true} replaces
 --       the top screen instead of pushing). StyleLab / Admin need the Player attribute of the same name.
---   UIController.Practice(side?)     close the menus and ask for a practice round vs bots (Request StartPractice)
+--   UIController.Practice(side?)     loading screen, close the menus and ask for a practice round vs bots (Request
+--                                    StartPractice); the screen stays black until the round leaves "Waiting", the
+--                                    character is teleported or the server refuses (7 s cap)
 --   UIController.Close(name?)        nil: close every menu (back to the game); name: remove that screen
---   UIController.Toggle(name)        UIController.Back() -> boolean      UIController.Play()  (close menus, enter lobby)
+--   UIController.Toggle(name)        UIController.Back() -> boolean
+--   UIController.Play()              loading screen, then close the menus (enter the lobby)
 --   UIController.IsOpen(name?) -> boolean       UIController.Top() -> string?
 --   UIController.SetVisible(visible)            hide/show every UI layer (photo mode)
 --   UIController.PhotoMode(on)                  Camera "Photo" + hidden UI; Back / tap returns
@@ -66,6 +72,18 @@ local Combat: any = nil
 local Graphics: any = nil
 local RigStyle: any = nil
 local Spectate: any = nil
+
+-- loading screen module (UI/Overlays/Loading), required on first use; false = unavailable (instant switch)
+local LoadingOverlay: any = nil
+-- server answers to StartPractice that mean "no practice round is coming" (the loading screen ends early)
+local PRACTICE_REFUSED: { [string]: boolean } = {
+	["round.practice.busy"] = true,
+	["round.practice.disabled"] = true,
+	["round.practice.unavailable"] = true,
+	["prog.err.rateLimited"] = true,
+	["prog.err.badRequest"] = true,
+}
+local TELEPORT_STEP = 25 -- studs the local character moves between two loading-screen checks = it was teleported
 
 local SCREEN_MODULES: { [string]: string } = {
 	Title = "Title",
@@ -560,20 +578,116 @@ function UIController.Back(): boolean
 	return true
 end
 
+------------------------------------------------------------------------------------------------ loading screen
+
+local function loadingOverlay(): any
+	if LoadingOverlay == nil then
+		LoadingOverlay = false
+		local folder = UIFolder and UIFolder:FindFirstChild("Overlays")
+		local module = folder and folder:FindFirstChild("Loading")
+		if module and module:IsA("ModuleScript") then
+			local ok, result = pcall(require, module)
+			if ok and type(result) == "table" and type((result :: any).Show) == "function" then
+				LoadingOverlay = result
+			else
+				warn("[UIController] loading screen failed to load: " .. tostring(result))
+			end
+		end
+	end
+	return if LoadingOverlay then LoadingOverlay else nil
+end
+
+-- Shows the loading screen (opts.OnCovered runs once the screen is black). false = not shown: the caller does the
+-- old instant switch itself. A second call while it runs joins the running screen (true, its opts are ignored).
+local function showLoading(opts: { [string]: any }): boolean
+	local overlay = if started then loadingOverlay() else nil
+	if overlay == nil then
+		return false
+	end
+	opts.Sound = Sound
+	opts.Theme = if ThemeService then ThemeService.Current() else nil
+	local ok, handle = pcall(overlay.Show, opts)
+	if not ok then
+		warn("[UIController] loading screen failed: " .. tostring(handle))
+		return false
+	end
+	return handle ~= nil
+end
+
+local function characterRoot(): (Model?, Vector3?)
+	local player = Players.LocalPlayer
+	local character = player and player.Character
+	if character == nil then
+		return nil, nil
+	end
+	local root = character.PrimaryPart or character:FindFirstChild("HumanoidRootPart")
+	return character, if root and root:IsA("BasePart") then root.Position else nil
+end
+
 function UIController.Play()
-	UIController.Close()
+	-- the menus close while the screen is black, so the reveal shows the lobby
+	local shown = showLoading({
+		OnCovered = function()
+			UIController.Close()
+		end,
+	})
+	if not shown then
+		UIController.Close()
+	end
 end
 
 function UIController.Practice(side: string?)
-	UIController.Close()
 	local data = { side = if side == "Monster" then "Monster" else "Human" }
-	if State and type(State.Request) == "function" then
-		call(State, "Request", "StartPractice", data)
-	else
-		pcall(function()
-			local Net = require(Shared:WaitForChild("Net")) :: any
-			Net.Client.Fire("Request", "StartPractice", data)
-		end)
+	local function request()
+		if State and type(State.Request) == "function" then
+			call(State, "Request", "StartPractice", data)
+		else
+			pcall(function()
+				local Net = require(Shared:WaitForChild("Net")) :: any
+				Net.Client.Fire("Request", "StartPractice", data)
+			end)
+		end
+	end
+	-- the screen stays black until the round leaves "Waiting" (map built, Intro), the local character is teleported
+	-- or the server refuses; the loading screen caps it at MaxWait
+	local refused = false
+	local notifyConn: any = nil
+	local lastCharacter: Model? = nil
+	local lastPosition: Vector3? = nil
+	local shown = showLoading({
+		MaxWait = 7,
+		OnCovered = function()
+			UIController.Close()
+			lastCharacter, lastPosition = characterRoot()
+			if State and State.Notify then
+				notifyConn = State.Notify:Connect(function(key: any)
+					if PRACTICE_REFUSED[key] then
+						refused = true
+					end
+				end)
+			end
+			request()
+		end,
+		Until = function(): boolean
+			if refused or phase() ~= "Waiting" then
+				return true
+			end
+			local character, position = characterRoot()
+			local moved = character ~= lastCharacter
+				or (position ~= nil and lastPosition ~= nil and (position - lastPosition).Magnitude > TELEPORT_STEP)
+			lastCharacter, lastPosition = character, position
+			return moved
+		end,
+		OnDone = function()
+			if notifyConn then
+				notifyConn:Disconnect()
+				notifyConn = nil
+			end
+		end,
+	})
+	if not shown then
+		UIController.Close()
+		request()
 	end
 end
 
