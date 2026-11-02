@@ -2223,7 +2223,7 @@ function Builder.House(self: Builder, name: string, cf: CFrame, opts: { [string]
 		end
 	end
 	for _, sx in { -1, 1 } do
-		local sideCF = cf * CFrame.new(sx * w / 2, winY, 0) * CFrame.Angles(0, sx * HALF_PI, 0)
+		local sideCF = cf * CFrame.new(sx * w / 2, winY, 0) * CFrame.Angles(0, -sx * HALF_PI, 0)
 		window(sideCF, false)
 	end
 	-- chimney + smoke

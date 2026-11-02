@@ -60,6 +60,9 @@ Config.Human = {
 	SecondWindHealFraction = 0.35,
 	HarmonyPerClass = 0.04,
 	HarmonyMax = 0.20,
+	-- horizontal decay exponent k of "Impulse" ForceMoves: MovementController holds the horizontal speed at
+	-- v0 x (1 - t / T)^k and the Bravery / Integrity leaps solve their launch speed with the same k
+	LeapArcFactor = 1.6,
 }
 
 Config.KR = {
@@ -198,6 +201,8 @@ Config.Defaults = {
 	ParticleDensity = 1,
 	DamageNumbers = true,
 	CameraLock = true,
+	QuickCast = true, -- aimed abilities fire on press; false = hold to aim (indicator), release to cast
+	InvertY = false, -- camera pitch inverted
 }
 
 Config.CollisionGroups = {
@@ -217,6 +222,15 @@ Config.Camera = {
 	PitchMin = -70,
 	PitchMax = 65,
 	FollowStiffness = 28,
+}
+
+-- Emotes (EmoteService validates against these; Hud/EmoteWheel shows them). Clip names from Shared/Anim/Clips.
+Config.Emote = {
+	Cooldown = 1.2, -- seconds between accepted emote requests per player
+	MaxLoopTime = 30, -- looping clips (Wave, Sit, Laugh, Cheer) end on their own after this long
+	MoveSpeed = 2.5, -- studs/s of horizontal movement that cancels the emote
+	Common = { "Emote_Wave", "Emote_Shrug", "Emote_Sit", "Emote_Laugh", "Taunt", "Victory" },
+	Family = { Skeleton = { "Wink" } }, -- extras per RigFamily
 }
 
 return Config

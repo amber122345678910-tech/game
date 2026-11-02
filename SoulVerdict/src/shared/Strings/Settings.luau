@@ -23,6 +23,8 @@ return {
 	["set.FieldOfView"] = { en = "Field of view", ru = "Поле зрения" },
 	["set.Sensitivity"] = { en = "Sensitivity", ru = "Чувствительность" },
 	["set.CameraLock"] = { en = "Shoulder lock", ru = "Фиксация камеры" },
+	["set.InvertY"] = { en = "Invert camera Y", ru = "Инверсия камеры по Y" },
+	["set.QuickCast"] = { en = "Quick cast", ru = "Быстрое применение" },
 	["set.ColorblindPatterns"] = { en = "Colorblind aid", ru = "Для дальтоников" },
 	["set.ReducedFlashes"] = { en = "Reduced flashes", ru = "Меньше вспышек" },
 	["set.desc.ColorblindPatterns"] = {
@@ -70,6 +72,14 @@ return {
 	["set.desc.Sensitivity"] = {
 		en = "Camera turn speed for mouse, touch and gamepad.",
 		ru = "Скорость поворота камеры для мыши, касаний и геймпада.",
+	},
+	["set.desc.InvertY"] = {
+		en = "Moving the mouse or stick up looks down, like a flight stick.",
+		ru = "Мышь или стик вверх — взгляд вниз, как у штурвала.",
+	},
+	["set.desc.QuickCast"] = {
+		en = "On: abilities fire on press. Off: hold to aim with a preview, release to cast, Esc or right-click cancels.",
+		ru = "Вкл: умения срабатывают сразу. Выкл: держи для прицела с подсказкой, отпусти — применить, Esc/ПКМ — отмена.",
 	},
 	["set.desc.CameraLock"] = {
 		en = "Start every round with the over-the-shoulder lock on. Toggle it any time in battle.",

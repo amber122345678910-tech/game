@@ -332,6 +332,8 @@ function Settings.Create(theme: Theme, deps: any): any
 			return L("set.mult", string.format("%.2f", v))
 		end, 3)
 		toggle(content, "CameraLock", 4)
+		toggle(content, "InvertY", 5)
+		toggle(content, "QuickCast", 6)
 	end
 
 	local descH = if phone then 0 else 86

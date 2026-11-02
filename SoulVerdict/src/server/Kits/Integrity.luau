@@ -5,7 +5,8 @@
 -- Abilities (AbilityFx phases after the automatic "Start"):
 --   BalletKicks (M1)   three kicks: Common.ComboStrike with a wide sweeping box; kick 3 = Knockback.
 --                                                                                     Fx "Strike" {combo, last, hits}
---   GrandJete (Q)      leap to the ground aim (<= Distance, AirTime s; Bravery.Leap) and land with a kick shockwave:
+--   GrandJete (Q)      leap to the ground aim (<= Distance, AirTime s; Bravery.Leap, whose Impulse arc uses
+--                      Config.Human.LeapArcFactor like the client's MovementController) and land with a kick shockwave:
 --                      enemies within Radius take Damage (Area, dodgeable) + Knockback outward.
 --                      Fx "Leap" {from, to, time, radius}, "Land" {center, radius}
 --   Pirouette (E)      spin for Duration: enemy Melee and Projectile hits on the dancer are negated (DamageService

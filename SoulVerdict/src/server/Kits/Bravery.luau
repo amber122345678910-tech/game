@@ -23,7 +23,7 @@
 -- Shared helpers (also used by the Integrity kit):
 --   Kit.Leap(ctx, rootTarget, airTime, apex, slamFrac?) -> boolean   leap arc to a ROOT position; false if the caster
 --       died / was stunned meanwhile. Players: one Impulse (vertical pop + decaying horizontal mover, client
---       MovementController; IMPULSE_DECAY mirrors MovementController.Tuning.ImpulseDecay) and an optional Slam at
+--       MovementController; both sides read the decay exponent Config.Human.LeapArcFactor) and an optional Slam at
 --       slamFrac x airTime; bots (server movers): two straight Dash segments (up, then down).
 --   Kit.LandingCenter(ctx, landing) -> Vector3   ground point of the impact: the planned landing point when the
 --       caster is near it (replication lag), else the ground under the caster.
@@ -53,7 +53,8 @@ local SLAM_FRAC = 0.75 -- the descent turns into a slam at this fraction of the 
 local SLAM_SPEED = 160
 local LAND_TOLERANCE = 9
 local GRAVITY = 196.2 -- Workspace.Gravity (default.project.json)
-local IMPULSE_DECAY = 1.6 -- MovementController.Tuning.ImpulseDecay (horizontal mover (1 - x)^k)
+-- horizontal Impulse mover (1 - x)^k: the same k MovementController applies (Config, shared with the client)
+local IMPULSE_DECAY: number = Config.Human.LeapArcFactor
 
 ---------------------------------------------------------------------------------------------------
 -- Leap helpers (shared with Integrity)
