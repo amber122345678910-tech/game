@@ -636,16 +636,13 @@ function VerdictBoxView.new(parent: Instance?, timeline: any, opts: { [string]: 
 	local timerFill =
 		frame({ Name = "Fill", Size = UDim2.fromScale(1, 1), BackgroundColor3 = theme.border, ZIndex = 3 }, timer)
 
-	local flash = frame(
-		{
-			Name = "Flash",
-			Size = UDim2.fromScale(1, 1),
-			BackgroundColor3 = WHITE,
-			BackgroundTransparency = 1,
-			ZIndex = 20,
-		},
-		root
-	)
+	local flash = frame({
+		Name = "Flash",
+		Size = UDim2.fromScale(1, 1),
+		BackgroundColor3 = WHITE,
+		BackgroundTransparency = 1,
+		ZIndex = 20,
+	}, root)
 	local verdict = label({
 		Name = "Verdict",
 		AnchorPoint = Vector2.new(0.5, 0.5),
@@ -1391,14 +1388,11 @@ function VerdictBoxView.Create(_theme: any, deps: { [string]: any }?): { Root: G
 	local tl = Patterns.Build(set, seed, d.Duration)
 	local layout = d.Layout
 	local canvas: Vector2 = if layout and layout.Canvas then layout.Canvas else Vector2.new(1600, 900)
-	local root = frame(
-		{
-			Name = "VerdictBoxPreview",
-			Size = UDim2.fromOffset(canvas.X, canvas.Y),
-			BackgroundColor3 = Color3.fromRGB(14, 14, 18),
-		},
-		nil
-	)
+	local root = frame({
+		Name = "VerdictBoxPreview",
+		Size = UDim2.fromOffset(canvas.X, canvas.Y),
+		BackgroundColor3 = Color3.fromRGB(14, 14, 18),
+	}, nil)
 	local kind = d.Kind or "Sheet"
 	if kind == "Overlay" then
 		local view = VerdictBoxView.new(root, tl, { Mode = "Overlay", Size = canvas, Title = d.Title })
@@ -1451,15 +1445,11 @@ function VerdictBoxView.Create(_theme: any, deps: { [string]: any }?): { Root: G
 				Size = UDim2.fromOffset(cell, cell),
 				BackgroundColor3 = BLACK,
 			}, root)
-			local view = VerdictBoxView.new(
-				holder,
-				tl,
-				{
-					Mode = if kind == "Overlay" then "Overlay" else "Mirror",
-					Size = Vector2.new(cell, cell),
-					Name = d.Name or "Frisk",
-				}
-			)
+			local view = VerdictBoxView.new(holder, tl, {
+				Mode = if kind == "Overlay" then "Overlay" else "Mirror",
+				Size = Vector2.new(cell, cell),
+				Name = d.Name or "Frisk",
+			})
 			view:Render(t, previewSoul(tl, t))
 			local segName = "intro"
 			for _, sg in tl.segments do

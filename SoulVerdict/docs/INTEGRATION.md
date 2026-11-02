@@ -93,15 +93,15 @@ Verdict Box (`VerdictBoxService`, `VerdictBoxController`, `Shared/VerdictBox/**`
 | `integration_intro_freeze_is_not_stun` | RoundService intro freeze uses Rooted, not Stunned |
 | `integration_cast_clips_single_owner` | FxController forwards MarkPredicted; AnimController API present |
 
-## Verification (2026-11-02 ~03:00 UTC)
+## Verification (2026-11-02 ~03:10 UTC)
 
-- `tools/check.sh -q`: compile / selene / apicheck / conventions / contracts / place all 0 errors. Lune suites touched
-  by this audit pass on their own: integration (12), round (17), combat_client (14), client_core (20).
-- Remaining test failures in a full run belong to work in progress of the agents running in parallel:
-  `kit_humans_b` (Justice/Kindness/Perseverance client kits not written yet), `maps_b2` (CoreReactor module
-  missing), `verdictbox` (Classic `SlamStab` segment), and `ui_screens` — which passes alone and after
-  `integration`; it only fails after the kit suites because `kit_humans_a.spec` mocks `Players.LocalPlayer` with a
-  plain table (`{Character, Name}`) and that mock leaks into later suites (`Screens/Common.luau:261` calls
-  `GetAttribute` on it).
+- `tools/check.sh -q` (last run): compile / selene / apicheck / conventions / contracts / place 0 errors; tests: 8
+  failures, all in `maps_b1.spec.luau` (WaterfallGrotto HumanSpawns 7 / 12 blocked or off the ground — the maps
+  agent's work in progress; maps are outside this audit). Every suite touched here passes: integration (12),
+  round (17), combat_client (14), client_core (20).
+- Earlier full runs also showed transient failures from in-progress suites (`kit_humans_b`, `maps_b2`,
+  `verdictbox`) and a cascade in `ui_screens` caused by `kit_humans_a.spec` mocking `Players.LocalPlayer` with a
+  plain table that leaked into later suites (`Screens/Common.luau:261` calls `GetAttribute` on it). If that cascade
+  comes back: make sure the kit suite always runs its `E.restore()` (e.g. in a pcall/finally).
 - Foundation files (Config, Types, Net, Strings, Kits data, SPEC) were not edited. `tools/lune/tests/round.spec.luau`
   was updated for the new intro freeze (Rooted + Silenced).

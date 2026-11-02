@@ -60,16 +60,16 @@ local C = {
 	RockDark = rgb(30, 38, 50),
 	RockLight = rgb(70, 86, 102),
 	Basalt = rgb(50, 58, 76),
-	Floor = rgb(76, 94, 110),
-	Moss = rgb(46, 102, 98),
-	Sand = rgb(90, 102, 112),
+	Floor = rgb(92, 112, 130),
+	Moss = rgb(52, 118, 110),
+	Sand = rgb(106, 118, 128),
 	Bed = rgb(14, 36, 46),
-	Water = rgb(40, 130, 150),
+	Water = rgb(26, 118, 132),
 	Wood = rgb(104, 78, 58),
 	WoodDark = rgb(66, 50, 40),
 	Cyan = rgb(90, 232, 255),
-	CrystalCyan = rgb(46, 176, 212),
-	CrystalViolet = rgb(124, 86, 206),
+	CrystalCyan = rgb(36, 150, 190),
+	CrystalViolet = rgb(110, 74, 190),
 	CyanLight = rgb(120, 220, 255),
 	Teal = rgb(70, 255, 210),
 	Violet = rgb(176, 124, 255),
@@ -99,7 +99,7 @@ local ISLANDS: { Island } = {
 		Top = 0,
 		Color = C.Sand,
 		Material = M.Ground,
-		Slabs = { { 0, 82, 118, 30, 0 }, { -54, 74, 32, 26, 16 }, { 54, 74, 32, 26, -16 }, { 0, 67, 64, 12, 0 } },
+		Slabs = { { 0, 79, 118, 36, 0 }, { -54, 74, 32, 26, 16 }, { 54, 74, 32, 26, -16 } },
 	},
 	{
 		Name = "EchoIsle",
@@ -202,8 +202,8 @@ local function buildLake(B: Builder)
 	B:Group("Lake")
 	B:Solid("Block", "LakeBed", V(320, 6, 320), CFrame.new(0, L.BedY - 3, 0), C.Bed, M.Slate)
 	B:Deco("Block", "Water", V(300, 0.3, 300), CFrame.new(0, L.WaterY - 0.15, 0), C.Water, M.Glass, {
-		Transparency = 0.38,
-		Reflectance = 0.12,
+		Transparency = 0.3,
+		Reflectance = 0.15,
 		Shadow = false,
 	})
 	B:Group(nil)

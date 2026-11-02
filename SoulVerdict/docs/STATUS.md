@@ -63,3 +63,6 @@ Journals: /root/.claude/projects/-home-user-game/f493f3e8-eb29-53b3-b677-a9d1a3d
 - Leap distance constant (1.6) duplicated client/server (Bravery/Integrity leaps) → move to Config.
 - Page hazard hook applies its own damage (i-frames consume page) — acceptable.
 - Indicators only shown for Hold/Ground/Target/Ally aim modes; Direction press-casts have none (Fell, Justice).
+- 03:10 UTC: Verdict Box complete (Sim, Patterns (Classic/Fell/Eclipse, 8 segments each), service, controller, view, previews/verdictbox).
+- Integration audit fixed 7 seams (leaderboards JSON, Sensitivity key, double cast anims, revive prompt visibility/G key, intro "dizzy" freeze, Collapse ring visuals, StyleLab SetSkin). See docs/INTEGRATION.md.
+- Remaining from audit: Emote (B) has no handler; own dash anim waits for server echo; title camera ignores Lobby MenuCamera marker; mid-match joiners get arena lighting/music; InvertY/QuickCast have no Settings UI.
