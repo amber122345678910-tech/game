@@ -1700,7 +1700,7 @@ function UIKit.KeyHint(theme: Theme, props: Props): Frame
 		local t = UIKit.Label(theme, {
 			Text = UIKit.Upper(text),
 			Role = "Caption",
-			TextSize = math.floor(h * (if #text > 1 then 0.42 else 0.5)),
+			TextSize = math.floor(h * (if (utf8.len(text) or #text) > 1 then 0.42 else 0.5)),
 			Color = c.Text,
 			XAlign = "Center",
 			AutoSize = "X",
@@ -2877,7 +2877,7 @@ function UIKit.Tabs(theme: Theme, props: Props): { Root: Frame, Select: (string)
 		if id == "Classic" then
 			local heart = UIKit.Heart(c.SoulRed, 14)
 			heart.AnchorPoint = Vector2.new(1, 0.5)
-			heart.Position = UDim2.new(0.5, -(#text * (theme.TextSize.Small + 1)) / 2 - 8, 0.5, 0)
+			heart.Position = UDim2.new(0.5, -((utf8.len(text) or #text) * (theme.TextSize.Small + 1)) / 2 - 8, 0.5, 0) -- characters, not bytes (Cyrillic is 2 bytes/char)
 			heart.Visible = false
 			heart.Parent = tab
 			entry.cursor = heart

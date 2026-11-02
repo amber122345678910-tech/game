@@ -78,3 +78,17 @@ Journals: /root/.claude/projects/-home-user-game/f493f3e8-eb29-53b3-b677-a9d1a3d
   test pollution, highlight budget...), R1-R3 fixed by lead (Tab/Start bindings, warn-once). See docs/STUDIO_REVIEW.md.
 - tools/check.sh: 0 errors, 339 tests. tools/build.sh → SoulVerdict.rbxl (232 scripts, 2.4 MB).
 - Next (needs owner): first Studio run (checklist in README), music/SFX ids, style picks on the board.
+
+## 08:00 UTC — owner feedback: phone menu broken + needs an admin panel
+- Owner published the game and played on a phone (landscape). Screenshot: Title, lobby HUD and touch buttons all
+  overlapping, menu laid out for portrait. Reproduced offline with tools/preview/gui/composite.luau --legacy --stale
+  (previews/ui/phone_before_*.png).
+- Fixed (mobile-ui-fix): UIRoot layers on CoreUISafeInsets below the Roblox top bar, UI rebuilt on viewport size change
+  (rotation) + LayoutChanged signal; UIController hides the HUD while a menu is open; Title phone layout with
+  PRACTICE/ADMIN; LobbyHud phone layout; lobby PRACTICE opened a non-existent screen → UIController.Practice().
+  Lead: UIKit cursor/text sizing uses utf8.len (Cyrillic tab labels). Previews: previews/ui/phone_after_*.png.
+- Added (admin-panel): AdminService (owner/Studio/private-server owner/Config.Admins) + Screens/Admin (МАТЧ/Я/ПРОГРЕСС/ТЕСТ)
+  + Hud/AdminButton (crown) + "/admin". Solo testing = practice rounds vs bots (no 1-player normal round by design).
+  Previews: previews/ui/admin_*.png.
+- README: admin panel section + how to republish over the existing game (Publish to Roblox As → Overwrite).
+- Next: owner republishes and tests on the phone; send the first error/screenshot if anything is off.

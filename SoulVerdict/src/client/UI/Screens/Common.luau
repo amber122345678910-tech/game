@@ -29,6 +29,8 @@
 --       props: Kit, Skin, Size, Position, AnchorPoint, Style (rig style id), Styler (fn(model), e.g.
 --       RigStyleController.ApplyTo), Spin (deg/s), Parent
 --       handle: { Root, Set(kitId, skinId?), Destroy }
+--   Common.Bleed(gui, layout) -> gui    stretches a full-screen background (direct child of the screen root, at 0,0
+--       size 1,1) over the top bar / notch strips the CoreUISafeInsets layer leaves out (layout.Bleed, design px)
 --   Common.Bag() -> { Add(x), Connect(signal, fn), Clean() }    connection/cleanup bag
 --   Common.Empty(theme, text, props) -> Frame                   centred "nothing here" note
 -- Samples (offline previews / tests): Common.SampleProfile(), Common.SampleRound(), Common.SampleResult(),
@@ -196,6 +198,19 @@ end
 
 function Common.Layout(deps: any): any
 	return (deps and deps.Layout) or { Canvas = Vector2.new(1600, 900), Compact = false, Phone = false, Scale = 1 }
+end
+
+function Common.Bleed(gui: GuiObject, layout: any): GuiObject
+	local b = if type(layout) == "table" then layout.Bleed else nil
+	if type(b) == "table" then
+		-- (UDim offsets are integers: round outwards so the strip is fully covered)
+		local l, t = math.ceil(b.Left or 0), math.ceil(b.Top or 0)
+		local r, bottom = math.ceil(b.Right or 0), math.ceil(b.Bottom or 0)
+		local p, z = gui.Position, gui.Size
+		gui.Position = UDim2.new(p.X.Scale, p.X.Offset - l, p.Y.Scale, p.Y.Offset - t)
+		gui.Size = UDim2.new(z.X.Scale, z.X.Offset + l + r, z.Y.Scale, z.Y.Offset + t + bottom)
+	end
+	return gui
 end
 
 function Common.Profile(deps: any): any
@@ -510,7 +525,13 @@ function Common.Corner(parent: Instance, radius: UDim)
 	end
 end
 
-function Common.Stroke(parent: Instance, color: Color3, thickness: number, transparency: number?, join: Enum.LineJoinMode?): UIStroke
+function Common.Stroke(
+	parent: Instance,
+	color: Color3,
+	thickness: number,
+	transparency: number?,
+	join: Enum.LineJoinMode?
+): UIStroke
 	local s = Instance.new("UIStroke")
 	s.Color = color
 	s.Thickness = thickness
@@ -521,7 +542,12 @@ function Common.Stroke(parent: Instance, color: Color3, thickness: number, trans
 	return s
 end
 
-function Common.Gradient(parent: Instance, color: ColorSequence?, transparency: NumberSequence?, rotation: number?): UIGradient
+function Common.Gradient(
+	parent: Instance,
+	color: ColorSequence?,
+	transparency: NumberSequence?,
+	rotation: number?
+): UIGradient
 	local g = Instance.new("UIGradient")
 	g.Rotation = rotation or 0
 	if color then
@@ -565,9 +591,18 @@ function Common.Well(theme: Theme, props: { [string]: any }): Frame
 		LayoutOrder = props.LayoutOrder or 0,
 		ZIndex = props.ZIndex or 1,
 	})
-	Common.Corner(f, if theme.Id == "Void" then UDim.new(0, 10) elseif theme.Id == "Royal" then UDim.new(0, 6) else theme.SmallCorner)
+	Common.Corner(
+		f,
+		if theme.Id == "Void" then UDim.new(0, 10) elseif theme.Id == "Royal" then UDim.new(0, 6) else theme.SmallCorner
+	)
 	local strokeColor: Color3 = props.StrokeColor or c.StrokeDim
-	Common.Stroke(f, strokeColor, if theme.Id == "Classic" then 2 else 1, props.StrokeTransparency or (if theme.Id == "Classic" then 0 else 0.45), theme.LineJoin)
+	Common.Stroke(
+		f,
+		strokeColor,
+		if theme.Id == "Classic" then 2 else 1,
+		props.StrokeTransparency or (if theme.Id == "Classic" then 0 else 0.45),
+		theme.LineJoin
+	)
 	if props.Parent then
 		f.Parent = props.Parent
 	end
@@ -587,11 +622,22 @@ function Common.Chip(theme: Theme, props: { [string]: any }): Frame
 		LayoutOrder = props.LayoutOrder or 0,
 	})
 	Common.Corner(root, Common.ChipCorner(theme))
-	Common.Stroke(root, if theme.Id == "Classic" then c.Stroke else color, if theme.Id == "Classic" then 2 else 1.5, if theme.Id == "Classic" then 0 else 0.35, theme.LineJoin)
+	Common.Stroke(
+		root,
+		if theme.Id == "Classic" then c.Stroke else color,
+		if theme.Id == "Classic" then 2 else 1.5,
+		if theme.Id == "Classic" then 0 else 0.35,
+		theme.LineJoin
+	)
 	UIKit.Padding(root, math.floor(h * 0.3), 0, math.floor(h * 0.42), 0)
 	UIKit.ListLayout(root, { Horizontal = true, Gap = math.floor(h * 0.22), VAlign = Enum.VerticalAlignment.Center })
 	if props.Icon then
-		local holder = frame({ Name = "IconHolder", Size = UDim2.fromOffset(math.floor(h * 0.62), math.floor(h * 0.62)), LayoutOrder = 1, Parent = root })
+		local holder = frame({
+			Name = "IconHolder",
+			Size = UDim2.fromOffset(math.floor(h * 0.62), math.floor(h * 0.62)),
+			LayoutOrder = 1,
+			Parent = root,
+		})
 		local icon = Icons.Create(props.Icon, color, UDim2.fromScale(1, 1), props.Accent)
 		icon.Parent = holder
 	end
@@ -643,7 +689,13 @@ function Common.Currency(theme: Theme, profile: any, props: { [string]: any }): 
 		Parent = row,
 	})
 	Common.Corner(lv, Common.ChipCorner(theme))
-	Common.Stroke(lv, if theme.Id == "Classic" then c.Stroke else c.Exp, if theme.Id == "Classic" then 2 else 1.5, if theme.Id == "Classic" then 0 else 0.4, theme.LineJoin)
+	Common.Stroke(
+		lv,
+		if theme.Id == "Classic" then c.Stroke else c.Exp,
+		if theme.Id == "Classic" then 2 else 1.5,
+		if theme.Id == "Classic" then 0 else 0.4,
+		theme.LineJoin
+	)
 	UIKit.Label(theme, {
 		Name = "Lv",
 		Text = Common.L("common.level", level),
@@ -690,7 +742,12 @@ end
 
 function Common.Empty(theme: Theme, text: string, props: { [string]: any }?): Frame
 	local p = props or {}
-	local root = frame({ Name = "Empty", Size = p.Size or UDim2.fromScale(1, 1), Position = p.Position or UDim2.new(), LayoutOrder = p.LayoutOrder or 0 })
+	local root = frame({
+		Name = "Empty",
+		Size = p.Size or UDim2.fromScale(1, 1),
+		Position = p.Position or UDim2.new(),
+		LayoutOrder = p.LayoutOrder or 0,
+	})
 	local heart = UIKit.Heart(theme.Colors.StrokeDim, 26)
 	heart.Position = UDim2.new(0.5, 0, 0.5, -22)
 	heart.Parent = root
@@ -718,7 +775,11 @@ function Common.Swatch(theme: Theme, kit: any, skin: any, props: { [string]: any
 	local size: number = props.Size or 44
 	local colors = Common.SkinColors(kit, skin)
 	local rarity = Themes.Rarity(theme, skin and skin.Rarity or "Common")
-	local root = frame({ Name = props.Name or ("Swatch_" .. tostring(skin and skin.Id)), Size = UDim2.fromOffset(size, size), LayoutOrder = props.LayoutOrder or 0 })
+	local root = frame({
+		Name = props.Name or ("Swatch_" .. tostring(skin and skin.Id)),
+		Size = UDim2.fromOffset(size, size),
+		LayoutOrder = props.LayoutOrder or 0,
+	})
 	local round = theme.Id ~= "Classic" and theme.Id ~= "Fell"
 	local well = frame({
 		Name = "Well",
@@ -755,7 +816,8 @@ function Common.Swatch(theme: Theme, kit: any, skin: any, props: { [string]: any
 	})
 	Common.Corner(dot, if round then UDim.new(0.5, 0) else UDim.new(0, 0))
 	Common.Gradient(well, nil, nil, 45).Color = ColorSequence.new(WHITE, Color3.fromRGB(200, 200, 200))
-	local ring = Common.Stroke(well, rarity, if props.Selected then 3 else 2, if props.Locked then 0.45 else 0, theme.LineJoin)
+	local ring =
+		Common.Stroke(well, rarity, if props.Selected then 3 else 2, if props.Locked then 0.45 else 0, theme.LineJoin)
 	ring.Name = "Rarity"
 	if props.Selected then
 		local sel = frame({
@@ -895,7 +957,15 @@ function Common.Hints(theme: Theme, deps: any, hints: { { [string]: any } }, pro
 		Position = props.Position or UDim2.fromScale(1, 1),
 		Size = props.Size or UDim2.new(1, 0, 0, 26),
 	})
-	local list = UIKit.ListLayout(row, { Horizontal = true, Gap = 14, HAlign = props.HAlign or Enum.HorizontalAlignment.Right, VAlign = Enum.VerticalAlignment.Center })
+	local list = UIKit.ListLayout(
+		row,
+		{
+			Horizontal = true,
+			Gap = 14,
+			HAlign = props.HAlign or Enum.HorizontalAlignment.Right,
+			VAlign = Enum.VerticalAlignment.Center,
+		}
+	)
 	list.HorizontalAlignment = props.HAlign or Enum.HorizontalAlignment.Right
 	for i, h in hints do
 		local key = h.Key or Common.KeyFor(deps, h.Action or "Back")
@@ -935,9 +1005,17 @@ function Common.Screen(theme: Theme, deps: any, opts: { [string]: any }): Screen
 	if backdropMode == "Full" then
 		local bd = UIKit.Backdrop(theme, { Parent = root })
 		bd.BackgroundTransparency = BACKDROP_ALPHA[theme.Id] or 0.08
+		Common.Bleed(bd, layout)
 	elseif backdropMode == "Dim" then
-		local dim = frame({ Name = "Dim", BackgroundTransparency = 0.35, BackgroundColor3 = c.Overlay, Size = UDim2.fromScale(1, 1), Parent = root })
+		local dim = frame({
+			Name = "Dim",
+			BackgroundTransparency = 0.35,
+			BackgroundColor3 = c.Overlay,
+			Size = UDim2.fromScale(1, 1),
+			Parent = root,
+		})
 		Common.Gradient(dim, nil, Common.NSeq({ { 0, 0.15 }, { 0.5, 0.55 }, { 1, 0.15 } }), 0)
+		Common.Bleed(dim, layout)
 	end
 
 	-- header
@@ -960,7 +1038,13 @@ function Common.Screen(theme: Theme, deps: any, opts: { [string]: any }): Screen
 			Size = UDim2.fromOffset(iconBox, iconBox),
 			Parent = header,
 		})
-		Common.Corner(tile, if theme.Id == "Void" then UDim.new(0.5, 0) elseif theme.Id == "Royal" then UDim.new(0, 8) else theme.SmallCorner)
+		Common.Corner(
+			tile,
+			if theme.Id == "Void"
+				then UDim.new(0.5, 0)
+				elseif theme.Id == "Royal" then UDim.new(0, 8)
+				else theme.SmallCorner
+		)
 		local s = Common.Stroke(tile, c.Stroke, if theme.Id == "Classic" then 3 else 2, 0, theme.LineJoin)
 		if theme.Gradients.Stroke then
 			Common.Gradient(s, theme.Gradients.Stroke, nil, 45)
@@ -977,25 +1061,53 @@ function Common.Screen(theme: Theme, deps: any, opts: { [string]: any }): Screen
 		end
 		textX = iconBox + (if phone then 12 else 18)
 	end
-	local titleSize = if phone then math.floor(theme.TextSize.Title * 0.72) elseif compact then math.floor(theme.TextSize.Title * 0.85) else theme.TextSize.Title
+	local titleSize = if phone
+		then math.floor(theme.TextSize.Title * 0.72)
+		elseif compact then math.floor(theme.TextSize.Title * 0.85)
+		else theme.TextSize.Title
 	local title = UIKit.Title(theme, {
 		Text = opts.Title or "",
 		Role = "Title",
 		TextSize = titleSize,
 		Subtitle = if phone then nil else opts.Subtitle,
 		Size = UDim2.new(0.5, -textX, 0, math.ceil(titleSize * 1.2)),
-		Position = UDim2.new(0, textX, 0, if phone then math.floor((m.HeaderH - titleSize * 1.2) / 2) else (if opts.Subtitle then 2 else math.floor((m.HeaderH - titleSize * 1.2) / 2))),
+		Position = UDim2.new(
+			0,
+			textX,
+			0,
+			if phone
+				then math.floor((m.HeaderH - titleSize * 1.2) / 2)
+				else (if opts.Subtitle then 2 else math.floor((m.HeaderH - titleSize * 1.2) / 2))
+		),
 		Glow = false,
 	})
 	title.Root.Parent = header
 
 	-- right side: currency + close
-	local right = frame({ Name = "Right", AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, 0, 0.5, if phone then 0 else -4), Size = UDim2.new(0.5, 0, 1, 0), Parent = header })
-	local rl = UIKit.ListLayout(right, { Horizontal = true, Gap = if phone then 8 else 14, HAlign = Enum.HorizontalAlignment.Right, VAlign = Enum.VerticalAlignment.Center })
+	local right = frame({
+		Name = "Right",
+		AnchorPoint = Vector2.new(1, 0.5),
+		Position = UDim2.new(1, 0, 0.5, if phone then 0 else -4),
+		Size = UDim2.new(0.5, 0, 1, 0),
+		Parent = header,
+	})
+	local rl = UIKit.ListLayout(
+		right,
+		{
+			Horizontal = true,
+			Gap = if phone then 8 else 14,
+			HAlign = Enum.HorizontalAlignment.Right,
+			VAlign = Enum.VerticalAlignment.Center,
+		}
+	)
 	rl.HorizontalAlignment = Enum.HorizontalAlignment.Right
 	if opts.Currency ~= false then
 		local profile = Common.Profile(deps)
-		Common.Currency(theme, profile, { Height = if phone then 30 else 38, Compact = phone, LayoutOrder = 1, Parent = right })
+		Common.Currency(
+			theme,
+			profile,
+			{ Height = if phone then 30 else 38, Compact = phone, LayoutOrder = 1, Parent = right }
+		)
 	end
 	if opts.Extra then
 		opts.Extra.LayoutOrder = 2
@@ -1113,7 +1225,8 @@ local function buildRig(kit: any, skinId: string?, style: string?, styler: ((Mod
 	end
 	local family = if kit.Family == "Skeleton" then "Skeleton" else "Human"
 	local poseName = if family == "Skeleton" then "Pockets" else "Ready"
-	local pose = rigBuilder.GetPose(model:GetAttribute("RigFamily") or family, poseName) or rigBuilder.GetPose(family, poseName)
+	local pose = rigBuilder.GetPose(model:GetAttribute("RigFamily") or family, poseName)
+		or rigBuilder.GetPose(family, poseName)
 	if pose then
 		pcall(rigBuilder.Pose, model, pose)
 		pcall(rigBuilder.ApplyPose, model, pose)
@@ -1262,8 +1375,20 @@ function Common.SampleProfile(): any
 			["ClassicSans:Midnight"] = true,
 			["Determination:Storyshift"] = true,
 		},
-		Equipped = { Human = "Determination", Monster = "ClassicSans", Skins = { ClassicSans = "Midnight" }, Title = "wins_25" },
-		Mastery = { ClassicSans = 2950, Determination = 1500, Bravery = 900, Kindness = 300, FellSans = 1250, Patience = 120 },
+		Equipped = {
+			Human = "Determination",
+			Monster = "ClassicSans",
+			Skins = { ClassicSans = "Midnight" },
+			Title = "wins_25",
+		},
+		Mastery = {
+			ClassicSans = 2950,
+			Determination = 1500,
+			Bravery = 900,
+			Kindness = 300,
+			FellSans = 1250,
+			Patience = 120,
+		},
 		MonsterChance = 3,
 		RoundsSinceMonster = 2,
 		RolePreference = "Either",
@@ -1279,7 +1404,14 @@ function Common.SampleProfile(): any
 		Achievements = { first_round = true, rounds_25 = true, first_win = true, monster_win = true, wins_25 = true },
 		Login = { LastDay = 0, Streak = 4 },
 		Settings = {},
-		Titles = { first_round = true, rounds_25 = true, first_win = true, monster_win = true, wins_25 = true, m_ClassicSans_3 = true },
+		Titles = {
+			first_round = true,
+			rounds_25 = true,
+			first_win = true,
+			monster_win = true,
+			wins_25 = true,
+			m_ClassicSans_3 = true,
+		},
 		ShopToday = {
 			Day = 0,
 			Items = {
@@ -1354,11 +1486,81 @@ function Common.SampleResult(): any
 		practice = false,
 		mapId = "HallOfVerdicts",
 		stats = {
-			{ userId = 1, name = "Frisk", team = "Humans", kitId = "Determination", damage = 1840, healing = 0, kills = 1, downs = 0, parries = 6, dodgesForced = 9, saves = 2, revives = 1, survived = true },
-			{ userId = 2, name = "TemmieFlakes", team = "Humans", kitId = "Kindness", damage = 410, healing = 920, kills = 0, downs = 1, parries = 2, dodgesForced = 3, saves = 1, revives = 2, survived = true },
-			{ userId = 3, name = "NapstaHook", team = "Humans", kitId = "Justice", damage = 1210, healing = 0, kills = 0, downs = 1, parries = 0, dodgesForced = 7, saves = 0, revives = 0, survived = false },
-			{ userId = 4, name = "papyrus_fan", team = "Humans", kitId = "Bravery", damage = 960, healing = 0, kills = 0, downs = 2, parries = 4, dodgesForced = 5, saves = 0, revives = 0, survived = true },
-			{ userId = 5, name = "bad_time_bob", team = "Monster", kitId = "ClassicSans", damage = 2630, healing = 0, kills = 1, downs = 5, parries = 0, dodgesForced = 0, saves = 0, revives = 0, survived = false },
+			{
+				userId = 1,
+				name = "Frisk",
+				team = "Humans",
+				kitId = "Determination",
+				damage = 1840,
+				healing = 0,
+				kills = 1,
+				downs = 0,
+				parries = 6,
+				dodgesForced = 9,
+				saves = 2,
+				revives = 1,
+				survived = true,
+			},
+			{
+				userId = 2,
+				name = "TemmieFlakes",
+				team = "Humans",
+				kitId = "Kindness",
+				damage = 410,
+				healing = 920,
+				kills = 0,
+				downs = 1,
+				parries = 2,
+				dodgesForced = 3,
+				saves = 1,
+				revives = 2,
+				survived = true,
+			},
+			{
+				userId = 3,
+				name = "NapstaHook",
+				team = "Humans",
+				kitId = "Justice",
+				damage = 1210,
+				healing = 0,
+				kills = 0,
+				downs = 1,
+				parries = 0,
+				dodgesForced = 7,
+				saves = 0,
+				revives = 0,
+				survived = false,
+			},
+			{
+				userId = 4,
+				name = "papyrus_fan",
+				team = "Humans",
+				kitId = "Bravery",
+				damage = 960,
+				healing = 0,
+				kills = 0,
+				downs = 2,
+				parries = 4,
+				dodgesForced = 5,
+				saves = 0,
+				revives = 0,
+				survived = true,
+			},
+			{
+				userId = 5,
+				name = "bad_time_bob",
+				team = "Monster",
+				kitId = "ClassicSans",
+				damage = 2630,
+				healing = 0,
+				kills = 1,
+				downs = 5,
+				parries = 0,
+				dodgesForced = 0,
+				saves = 0,
+				revives = 0,
+				survived = false,
+			},
 		},
 	}
 end
@@ -1382,7 +1584,9 @@ function Common.SampleRewards(): any
 		expInto = 0,
 		expToNext = 520,
 		unlocked = { "title:first_win", "skin:FellSans:Ash", "achievement:first_win" },
-		questProgress = { { id = "DealDamage", key = "prog.quest.DealDamage", progress = 1200, goal = 1200, completed = true } },
+		questProgress = {
+			{ id = "DealDamage", key = "prog.quest.DealDamage", progress = 1200, goal = 1200, completed = true },
+		},
 		mastery = { kitId = "Determination", from = 4, to = 5, exp = 1640, into = 40, need = 400 },
 		firstWin = true,
 		practice = false,
@@ -1394,16 +1598,88 @@ function Common.SampleAchievements(): { any }
 		return { Id = id, Icon = icon, Name = { en = en, ru = ru }, Desc = { en = den, ru = dru }, Title = title }
 	end
 	return {
-		a("FirstTrial", "Flag", "First Trial", "Первый суд", "Play your first round.", "Сыграй первый раунд."),
-		a("FirstWin", "Trophy", "Not Guilty", "Невиновен", "Win a round.", "Выиграй раунд.", "Judged"),
-		a("Parry25", "Shield", "Steel Nerves", "Стальные нервы", "Land 25 perfect parries.", "Сделай 25 идеальных парирований.", "Unbreakable"),
-		a("SaveAll", "Star", "Full Determination", "Полная решимость", "Light all 3 SAVE points in one round.", "Зажги все 3 SAVE за раунд."),
-		a("Judge10", "Skull", "Hanging Judge", "Суровый судья", "Win 10 rounds as the Monster.", "Выиграй 10 раундов монстром."),
-		a("Box10", "Box", "Out of the Box", "Вне коробки", "Survive 10 Verdict Boxes.", "Выживи в 10 Коробках Приговора."),
-		a("Revive20", "Heart", "Good Samaritan", "Добрая душа", "Revive allies 20 times.", "Подними союзников 20 раз."),
-		a("Mastery10", "Crown", "Master of One", "Мастер своего дела", "Reach mastery 10 with any kit.", "Достигни 10 мастерства с любым набором."),
-		a("Streak7", "Clock", "Regular", "Завсегдатай", "Log in 7 days in a row.", "Заходи 7 дней подряд."),
-		a("Dodge100", "Dash", "Not Today", "Не сегодня", "Force 100 dodges.", "Вызови 100 уклонений."),
+		a(
+			"FirstTrial",
+			"Flag",
+			"First Trial",
+			"Первый суд",
+			"Play your first round.",
+			"Сыграй первый раунд."
+		),
+		a(
+			"FirstWin",
+			"Trophy",
+			"Not Guilty",
+			"Невиновен",
+			"Win a round.",
+			"Выиграй раунд.",
+			"Judged"
+		),
+		a(
+			"Parry25",
+			"Shield",
+			"Steel Nerves",
+			"Стальные нервы",
+			"Land 25 perfect parries.",
+			"Сделай 25 идеальных парирований.",
+			"Unbreakable"
+		),
+		a(
+			"SaveAll",
+			"Star",
+			"Full Determination",
+			"Полная решимость",
+			"Light all 3 SAVE points in one round.",
+			"Зажги все 3 SAVE за раунд."
+		),
+		a(
+			"Judge10",
+			"Skull",
+			"Hanging Judge",
+			"Суровый судья",
+			"Win 10 rounds as the Monster.",
+			"Выиграй 10 раундов монстром."
+		),
+		a(
+			"Box10",
+			"Box",
+			"Out of the Box",
+			"Вне коробки",
+			"Survive 10 Verdict Boxes.",
+			"Выживи в 10 Коробках Приговора."
+		),
+		a(
+			"Revive20",
+			"Heart",
+			"Good Samaritan",
+			"Добрая душа",
+			"Revive allies 20 times.",
+			"Подними союзников 20 раз."
+		),
+		a(
+			"Mastery10",
+			"Crown",
+			"Master of One",
+			"Мастер своего дела",
+			"Reach mastery 10 with any kit.",
+			"Достигни 10 мастерства с любым набором."
+		),
+		a(
+			"Streak7",
+			"Clock",
+			"Regular",
+			"Завсегдатай",
+			"Log in 7 days in a row.",
+			"Заходи 7 дней подряд."
+		),
+		a(
+			"Dodge100",
+			"Dash",
+			"Not Today",
+			"Не сегодня",
+			"Force 100 dodges.",
+			"Вызови 100 уклонений."
+		),
 	}
 end
 

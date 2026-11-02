@@ -5,10 +5,17 @@
 --   * map vote cards (RoundState VoteOptions + RoundEvent "MapVote" counts; a click sends Request "Vote")
 --     with a mini landscape painted from the map's graphics preset, vote bar, YOUR VOTE / LEADING badges,
 --   * monster-chance list (Player attributes MonsterChance / RolePreference / RoundsSinceMonster pity),
---   * PRACTICE / LOADOUT / SHOP / QUESTS quick buttons (deps.UI.Open(name); Practice falls back to
---     Request "StartPractice"),
+--   * PRACTICE / LOADOUT / SHOP / QUESTS quick buttons (deps.UI.Open(name); PRACTICE -> deps.UI.Practice() or
+--     Request "StartPractice" {side = "Human"}),
 --   * the monster announcement (RoundEvent "MonsterChosen") as a centre banner.
+--   Phones (layout.Phone): everything stays in the top band and the left column so the thumbstick (bottom-left) and
+--   the touch cluster (bottom-right + camera-lock / emote column on the right edge) stay free: a compact banner, a
+--   big PRACTICE call-to-action while waiting for players, LOADOUT / SHOP / QUESTS / MENU (re-opens the Title: touch
+--   has no Menu key), a short monster-chance list and a vote panel left of the right-edge buttons.
 --   LobbyHud.Create(theme, deps) -> { Root, Update(snapshot), Tick(now), ShowChosen({Name, KitId, IsLocal}), Destroy }
+--   LobbyHud.PhoneRects(canvas, top?) -> {[name] = {X, Y, W, H}}   the phone layout boxes (pure; tests check overlaps)
+--       top = where the left column starts (under RoundHud's compact stats on touch phones, LobbyHud.PhoneTop)
+--   LobbyHud.PhoneTop(touch, battle) -> number
 local Style = require(script.Parent.Style)
 local UIKit = require(script.Parent.Parent.UIKit)
 local Icons = require(script.Parent.Parent.Icons)
@@ -121,124 +128,258 @@ local function mapArt(mapId: string, size: Vector2, corner: UDim): Frame
 	return art
 end
 
+-- On touch phones RoundHud's compact stats own the top-left corner: Battle rows end at y ~50, the Modern card at ~92.
+function LobbyHud.PhoneTop(touch: boolean, battle: boolean): number
+	if not touch then
+		return 10
+	end
+	return if battle then 58 else 100
+end
+
+-- Phone layout boxes in design px.
+function LobbyHud.PhoneRects(
+	canvas: Vector2,
+	top: number?
+): { [string]: { X: number, Y: number, W: number, H: number } }
+	local margin = 12
+	local colW = 300
+	local top = top or 10
+	local practiceH = 46
+	local cellH = 36
+	local buttonsY = top + practiceH + 8
+	local buttonsH = cellH * 2 + 8
+	-- one-line "your monster chance" strip; everything ends well above the thumbstick corner
+	local chanceY = buttonsY + buttonsH + 10
+	-- right edge: camera-lock / emote column (MobileControls / EmoteWheel at canvas.X - 40, 46 wide); the vote
+	-- panel ends above the touch cluster's top button (~canvas.Y - 270)
+	local rightCol = canvas.X - 72
+	local bannerW = math.min(440, rightCol - (margin + colW + 16) - 12)
+	local bannerX = math.max(math.floor(canvas.X / 2 - bannerW / 2), margin + colW + 16)
+	local voteW = 300
+	return {
+		Practice = { X = margin, Y = top, W = colW, H = practiceH },
+		Buttons = { X = margin, Y = buttonsY, W = colW, H = buttonsH },
+		Chances = { X = margin, Y = chanceY, W = colW, H = 34 },
+		Banner = { X = bannerX, Y = 8, W = bannerW, H = 62 },
+		Vote = { X = rightCol - 8 - voteW, Y = 76, W = voteW, H = math.min(124, canvas.Y - 276 - 76) },
+	}
+end
+
 function LobbyHud.Create(theme: any, deps: any): any
-	local _skin, layout, root = Style.Context(theme, deps, "LobbyHud")
+	local skin, layout, root = Style.Context(theme, deps, "LobbyHud")
 	local d = if type(deps) == "table" then deps else {}
 	local c = theme.Colors
 	local phone = layout.Phone
 	local margin = if phone then 12 else 28
 	local top = if phone then 96 else 150
+	local initialSnap = Style.Initial(deps, "Lobby")
+	local touch = (initialSnap and initialSnap.Device == "Touch") or d.Device == "Touch"
+	local pr = LobbyHud.PhoneRects(layout.Canvas, LobbyHud.PhoneTop(touch, skin.Battle))
+	local function place(gui: GuiObject, r: { X: number, Y: number, W: number, H: number })
+		gui.AnchorPoint = Vector2.new(0, 0)
+		gui.Position = UDim2.fromOffset(r.X, r.Y)
+		gui.Size = UDim2.fromOffset(r.W, r.H)
+	end
 
 	-- banner ------------------------------------------------------------------------------------------------
-	local bannerW = if phone then 470 else 660
+	local bannerW = if phone then pr.Banner.W else 660
 	local banner = UIKit.Panel(theme, {
 		Name = "Banner",
 		Variant = "Default",
-		Padding = if phone then 10 else 16,
+		Padding = if phone then 8 else 16,
 		AnchorPoint = Vector2.new(0.5, 0),
-		Position = UDim2.new(0.5, 0, 0, if phone then 8 else 20),
-		Size = UDim2.fromOffset(bannerW, if phone then 78 else 108),
+		Position = UDim2.new(0.5, 0, 0, 20),
+		Size = UDim2.fromOffset(bannerW, 108),
 		Parent = root,
 	})
+	if phone then
+		place(banner.Root, pr.Banner)
+	end
+	local timerW = if phone then 120 else 150
 	local phaseLabel = UIKit.Label(theme, {
 		Name = "Phase",
 		Text = "",
 		Role = "Heading",
-		TextSize = if phone then math.floor(theme.TextSize.Heading * 0.72) else theme.TextSize.Heading,
+		TextSize = if phone then math.floor(theme.TextSize.Heading * 0.66) else theme.TextSize.Heading,
 		Upper = true,
-		Size = UDim2.new(1, -150, 0, if phone then 26 else 36),
+		Truncate = phone,
+		Size = UDim2.new(1, -timerW, 0, if phone then 22 else 36),
 		Parent = banner.Content,
 	})
 	local timer = UIKit.Label(theme, {
 		Name = "Timer",
 		Text = "",
 		Role = "Number",
-		TextSize = if phone then 26 else 38,
+		TextSize = if phone then 22 else 38,
 		Tone = "Accent",
 		XAlign = "Right",
 		AnchorPoint = Vector2.new(1, 0),
 		Position = UDim2.fromScale(1, 0),
-		Size = UDim2.new(0, 150, 1, 0),
+		Size = UDim2.new(0, timerW, 0, if phone then 22 else 36),
 		Parent = banner.Content,
 	})
 	local subLine = UIKit.Label(theme, {
 		Name = "Line",
 		Text = "",
 		Role = "Body",
-		TextSize = if phone then theme.TextSize.Caption else theme.TextSize.Small,
+		TextSize = if phone then math.max(theme.TextSize.Caption - 1, 9) else theme.TextSize.Small,
 		Tone = "Dim",
 		Dialogue = theme.Id == "Classic",
+		Truncate = phone,
+		Wrap = not phone,
+		YAlign = "Bottom",
 		AnchorPoint = Vector2.new(0, 1),
 		Position = UDim2.fromScale(0, 1),
-		Size = UDim2.new(1, -150, 0, 22),
+		-- under the phase / timer row, full width (it used to stop 150 px short and still overflow the panel)
+		Size = UDim2.new(1, 0, 0, if phone then 16 else 36),
 		Parent = banner.Content,
 	})
 
 	-- quick buttons -----------------------------------------------------------------------------------------
-	local buttons = Style.Frame({
-		Name = "Buttons",
-		Position = UDim2.fromOffset(margin, top),
-		Size = UDim2.fromOffset(if phone then 300 else 330, if phone then 92 else 232),
-		Parent = root,
-	})
-	local grid = Instance.new("UIGridLayout")
-	grid.CellSize = if phone then UDim2.fromOffset(146, 40) else UDim2.fromOffset(330, 50)
-	grid.CellPadding = if phone then UDim2.fromOffset(8, 8) else UDim2.fromOffset(0, 10)
-	grid.SortOrder = Enum.SortOrder.LayoutOrder
-	grid.Parent = buttons
 	local function open(name: string)
 		local ui = d.UI
-		if type(ui) == "table" and type(ui.Open) == "function" then
-			local ok = pcall(ui.Open, name)
-			if ok then
-				return
+		if name == "Practice" then
+			-- (UI.Open("Practice") is not a screen: it returned nil without error and the tap did nothing)
+			if type(ui) == "table" and type(ui.Practice) == "function" then
+				pcall(ui.Practice, "Human")
+			elseif type(d.State) == "table" and type(d.State.Request) == "function" then
+				pcall(d.State.Request, "StartPractice", { side = "Human" })
 			end
+			return
 		end
-		if name == "Practice" and type(d.State) == "table" and type(d.State.Request) == "function" then
-			pcall(d.State.Request, "StartPractice", "Human")
+		if type(ui) == "table" and type(ui.Open) == "function" then
+			pcall(ui.Open, name)
 		end
 	end
 	local practiceButton: any = nil
-	for i, b in
-		{
+	local practiceHolder: Frame? = nil
+	local buttons = Style.Frame({
+		Name = "Buttons",
+		Position = UDim2.fromOffset(margin, top),
+		Size = UDim2.fromOffset(330, 232),
+		Parent = root,
+	})
+	local grid = Instance.new("UIGridLayout")
+	grid.CellSize = if phone then UDim2.fromOffset(146, 36) else UDim2.fromOffset(330, 50)
+	grid.CellPadding = if phone then UDim2.fromOffset(8, 8) else UDim2.fromOffset(0, 10)
+	grid.SortOrder = Enum.SortOrder.LayoutOrder
+	grid.Parent = buttons
+	local entries = if phone
+		then {
+			{ "Loadout", "Soul", "lobby.btn.loadout" },
+			{ "Shop", "Shop", "lobby.btn.shop" },
+			{ "Quests", "Quests", "lobby.btn.quests" },
+			{ "Title", "Settings", "mobile.lobby.menu" },
+		}
+		else {
 			{ "Practice", "Swords", "lobby.btn.practice" },
 			{ "Loadout", "Soul", "lobby.btn.loadout" },
 			{ "Shop", "Shop", "lobby.btn.shop" },
 			{ "Quests", "Quests", "lobby.btn.quests" },
 		}
-	do
+	if phone then
+		place(buttons, pr.Buttons)
+		-- the call-to-action: one big PRACTICE button while waiting for players
+		local holder = Style.Frame({ Name = "PracticeCta", Parent = root })
+		place(holder, pr.Practice)
+		local cta = UIKit.Button(theme, {
+			Name = "Practice",
+			Text = Style.L("lobby.btn.practice"),
+			Icon = "Swords",
+			Variant = "Primary",
+			Height = pr.Practice.H,
+			Width = pr.Practice.W,
+			OnActivated = function()
+				open("Practice")
+			end,
+			Parent = holder,
+		})
+		UIKit.Label(theme, {
+			Name = "Sub",
+			Text = Style.L("mobile.lobby.practice.sub"),
+			Role = "Caption",
+			TextSize = math.max(theme.TextSize.Caption - 1, 9),
+			Tone = "Dim",
+			XAlign = "Right",
+			AnchorPoint = Vector2.new(1, 0.5),
+			Position = UDim2.new(1, -12, 0.5, 0),
+			Size = UDim2.fromOffset(90, 16),
+			ZIndex = 5,
+			Parent = cta.Root,
+		})
+		practiceButton = cta
+		practiceHolder = holder
+	end
+	for i, b in entries do
+		local text = Style.L(b[3])
 		local button = UIKit.Button(theme, {
 			Name = b[1],
-			Text = Style.L(b[3]),
+			Text = text,
 			Icon = b[2],
 			Variant = "Secondary",
-			Height = if phone then 40 else 50,
+			Height = if phone then 36 else 50,
 			LayoutOrder = i,
 			OnActivated = function()
 				open(b[1])
 			end,
 			Parent = buttons,
 		})
-		if i == 1 then
+		if phone then
+			-- PressStart2P / display fonts are wide: keep the 146-px cells readable
+			button.Label.TextSize = math.min(button.Label.TextSize, if theme.Id == "Classic" then 11 else 15)
+		end
+		if b[1] == "Practice" then
 			practiceButton = button
 		end
 	end
 
 	-- monster chances ---------------------------------------------------------------------------------------
-	local chanceTop = top + (if phone then 100 else 246)
-	local chanceHeight = if phone
-		then layout.Canvas.Y - chanceTop - 12
-		else math.min(330, layout.Canvas.Y - chanceTop - 190)
+	-- phones: one compact strip with YOUR chance (a titled list would eat the thumbstick corner)
+	local chanceTop = top + 246
+	local chanceHeight = if phone then pr.Chances.H else math.min(330, layout.Canvas.Y - chanceTop - 190)
 	local chancePanel = UIKit.Panel(theme, {
 		Name = "Chances",
-		Title = Style.L("lobby.chance.title"),
-		TitleIcon = "Skull",
-		Padding = if phone then 10 else 14,
+		Title = if phone then nil else Style.L("lobby.chance.title"),
+		TitleIcon = if phone then nil else "Skull",
+		Padding = if phone then 6 else 14,
 		Position = UDim2.fromOffset(margin, chanceTop),
-		Size = UDim2.fromOffset(if phone then 300 else 330, chanceHeight),
+		Size = UDim2.fromOffset(330, chanceHeight),
 		Parent = root,
 	})
 	local chanceRows = Style.Frame({ Name = "Rows", Size = UDim2.new(1, 0, 1, -24), Parent = chancePanel.Content })
+	local chanceValue: TextLabel? = nil
+	if phone then
+		place(chancePanel.Root, pr.Chances)
+		chanceRows.Visible = false
+		local icon = Style.Icon("Skull", c.Danger, 16)
+		icon.AnchorPoint = Vector2.new(0, 0.5)
+		icon.Position = UDim2.new(0, 2, 0.5, 0)
+		icon.Parent = chancePanel.Content
+		UIKit.Label(theme, {
+			Name = "Caption",
+			Text = Style.L("lobby.chance.title"),
+			Role = "Caption",
+			TextSize = math.max(theme.TextSize.Caption - 1, 9),
+			Tone = "Dim",
+			Upper = true,
+			Truncate = true,
+			Position = UDim2.fromOffset(24, 0),
+			Size = UDim2.new(1, -24 - 96, 1, 0),
+			Parent = chancePanel.Content,
+		})
+		chanceValue = UIKit.Label(theme, {
+			Name = "Value",
+			Text = "",
+			Role = "Number",
+			TextSize = if theme.Id == "Classic" then 12 else 16,
+			Tone = "Accent",
+			XAlign = "Right",
+			AnchorPoint = Vector2.new(1, 0),
+			Position = UDim2.fromScale(1, 0),
+			Size = UDim2.new(0, 96, 1, 0),
+			Parent = chancePanel.Content,
+		})
+	end
 	UIKit.Label(theme, {
 		Name = "Hint",
 		Text = Style.L("lobby.chance.hint"),
@@ -246,6 +387,7 @@ function LobbyHud.Create(theme: any, deps: any): any
 		TextSize = theme.TextSize.Caption,
 		Tone = "Muted",
 		Wrap = true,
+		Visible = not phone,
 		AnchorPoint = Vector2.new(0, 1),
 		Position = UDim2.fromScale(0, 1),
 		Size = UDim2.new(1, 0, 0, 22),
@@ -253,22 +395,49 @@ function LobbyHud.Create(theme: any, deps: any): any
 	})
 
 	-- vote ----------------------------------------------------------------------------------------------------
-	local voteW = if phone then 330 else 400
-	local cardH = if phone then 70 else 112
+	-- phones: a compact panel between the banner and the touch cluster (left of the camera-lock / emote column)
+	local voteW = if phone then pr.Vote.W else 400
+	local cardH = if phone then 28 else 112
 	local votePanel = UIKit.Panel(theme, {
 		Name = "Vote",
-		Title = Style.L("lobby.vote.title"),
-		TitleIcon = "Map",
-		Padding = if phone then 10 else 14,
+		Title = if phone then nil else Style.L("lobby.vote.title"),
+		TitleIcon = if phone then nil else "Map",
+		Padding = if phone then 6 else 14,
 		AnchorPoint = Vector2.new(1, 0),
 		Position = UDim2.new(1, -margin, 0, top),
-		Size = UDim2.fromOffset(voteW, (if phone then 44 else 60) + 3 * (cardH + 10) + 6),
+		Size = UDim2.fromOffset(voteW, 60 + 3 * (cardH + 10) + 6),
 		Parent = root,
 	})
-	local voteList = Style.Frame({ Name = "Cards", Size = UDim2.fromScale(1, 1), Parent = votePanel.Content })
+	local voteList: Frame
+	if phone then
+		place(votePanel.Root, pr.Vote)
+		local headerIcon = Style.Icon("Map", c.Accent, 14)
+		headerIcon.AnchorPoint = Vector2.new(0, 0.5)
+		headerIcon.Position = UDim2.new(0, 2, 0, 8)
+		headerIcon.Parent = votePanel.Content
+		UIKit.Label(theme, {
+			Name = "Header",
+			Text = Style.L("lobby.vote.title"),
+			Role = "Caption",
+			TextSize = math.max(theme.TextSize.Caption - 1, 9),
+			Tone = "Dim",
+			Upper = true,
+			Position = UDim2.fromOffset(22, 0),
+			Size = UDim2.new(1, -22, 0, 16),
+			Parent = votePanel.Content,
+		})
+		voteList = Style.Frame({
+			Name = "Cards",
+			Position = UDim2.fromOffset(0, 20),
+			Size = UDim2.new(1, 0, 1, -20),
+			Parent = votePanel.Content,
+		})
+	else
+		voteList = Style.Frame({ Name = "Cards", Size = UDim2.fromScale(1, 1), Parent = votePanel.Content })
+	end
 	local vl = Instance.new("UIListLayout")
 	vl.SortOrder = Enum.SortOrder.LayoutOrder
-	vl.Padding = UDim.new(0, 10)
+	vl.Padding = UDim.new(0, if phone then 4 else 10)
 	vl.Parent = voteList
 
 	-- chosen banner ---------------------------------------------------------------------------------------
@@ -391,23 +560,24 @@ function LobbyHud.Create(theme: any, deps: any): any
 				0,
 				theme.Id == "Classic" or theme.Id == "Fell"
 			)
+			local artW = if phone then 40 else 150
 			local art = mapArt(
 				mapId,
-				Vector2.new(if phone then 96 else 150, cardH - 12),
+				Vector2.new(artW, cardH - (if phone then 8 else 12)),
 				UDim.new(0, math.max(0, theme.CornerRadius.Offset - 4))
 			)
-			art.Position = UDim2.fromOffset(6, 6)
+			art.Position = UDim2.fromOffset(if phone then 4 else 6, if phone then 4 else 6)
 			art.Parent = button
-			local x0 = (if phone then 96 else 150) + 18
+			local x0 = artW + (if phone then 10 else 18)
 			UIKit.Label(theme, {
 				Name = "Name",
 				Text = if meta then Style.Pick(meta.Name) else mapId,
 				Role = "Heading",
-				TextSize = if phone then theme.TextSize.Caption else theme.TextSize.Small,
+				TextSize = if phone then math.max(theme.TextSize.Caption - 1, 9) else theme.TextSize.Small,
 				Upper = true,
 				Truncate = true,
-				Position = UDim2.fromOffset(x0, if phone then 6 else 9),
-				Size = UDim2.new(1, -x0 - 10, 0, if phone then 18 else 22),
+				Position = UDim2.fromOffset(x0, if phone then 3 else 9),
+				Size = UDim2.new(1, -x0 - (if phone then 40 else 10), 0, if phone then 13 else 22),
 				Parent = button,
 			})
 			if not phone and meta then
@@ -429,8 +599,8 @@ function LobbyHud.Create(theme: any, deps: any): any
 				BackgroundTransparency = 0,
 				BackgroundColor3 = c.PanelInset,
 				AnchorPoint = Vector2.new(0, 1),
-				Position = UDim2.new(0, x0, 1, if phone then -10 else -14),
-				Size = UDim2.new(1, -x0 - 96, 0, 8),
+				Position = UDim2.new(0, x0, 1, if phone then -5 else -14),
+				Size = UDim2.new(1, -x0 - (if phone then 40 else 96), 0, if phone then 4 else 8),
 				Parent = button,
 			})
 			Style.Corner(track, if theme.Id == "Classic" then UDim.new(0, 0) else UDim.new(0.5, 0))
@@ -445,13 +615,15 @@ function LobbyHud.Create(theme: any, deps: any): any
 			local count = UIKit.Label(theme, {
 				Name = "Count",
 				Text = "",
-				Role = "Caption",
+				Role = if phone then "Number" else "Caption",
+				TextSize = if phone then 12 else nil,
 				XAlign = "Right",
-				AnchorPoint = Vector2.new(1, 1),
-				Position = UDim2.new(1, -10, 1, if phone then -4 else -8),
-				Size = UDim2.fromOffset(84, 20),
+				AnchorPoint = if phone then Vector2.new(1, 0.5) else Vector2.new(1, 1),
+				Position = if phone then UDim2.new(1, -6, 0.5, 0) else UDim2.new(1, -10, 1, -8),
+				Size = UDim2.fromOffset(if phone then 32 else 84, 20),
 				Parent = button,
 			})
+			-- (phones: no badges - the accent stroke marks YOUR vote, the count says who leads)
 			local mine = UIKit.Badge(theme, {
 				Text = Style.L("lobby.vote.mine"),
 				Color = c.Accent,
@@ -459,7 +631,8 @@ function LobbyHud.Create(theme: any, deps: any): any
 				Icon = "Check",
 				AnchorPoint = Vector2.new(0, 1),
 				Position = UDim2.new(0, 12, 1, -12),
-				Height = if phone then 18 else 22,
+				Height = 22,
+				Visible = not phone,
 				Parent = button,
 			})
 			local lead = UIKit.Badge(theme, {
@@ -469,7 +642,8 @@ function LobbyHud.Create(theme: any, deps: any): any
 				Icon = "Crown",
 				AnchorPoint = Vector2.new(0, 0),
 				Position = UDim2.fromOffset(12, 12),
-				Height = if phone then 18 else 22,
+				Height = 22,
+				Visible = not phone,
 				Parent = button,
 			})
 			lead.ZIndex = 3
@@ -487,7 +661,7 @@ function LobbyHud.Create(theme: any, deps: any): any
 	local function buildChances(list: { any })
 		chanceRows:ClearAllChildren()
 		local rowH = if phone then 22 else 28
-		local maxRows = math.max(1, math.floor((chanceHeight - (if phone then 70 else 96)) / rowH))
+		local maxRows = math.max(1, math.floor((chanceHeight - (if phone then 48 else 96)) / rowH))
 		if #list == 0 then
 			UIKit.Label(theme, {
 				Name = "Empty",
@@ -619,8 +793,8 @@ function LobbyHud.Create(theme: any, deps: any): any
 		phaseLabel.Text = UIKit.Upper(Style.L("round.phase." .. (if inRound then "Round" else phase)))
 		if waiting then
 			timer.Text = Style.L("lobby.waiting.players", s.PlayerCount or 1, s.MinPlayers or 2)
-			timer.TextSize = if phone then 13 else 18
-			subLine.Text = Style.L("lobby.waiting.line")
+			timer.TextSize = if phone then 12 else 18
+			subLine.Text = Style.L(if phone then "mobile.lobby.waiting.short" else "lobby.waiting.line")
 		elseif inRound then
 			timer.Text = if (s.EndsAt or 0) > 0 then Style.FormatClock((s.EndsAt or 0) - (s.Now or 0)) else ""
 			timer.TextSize = if phone then 26 else 38
@@ -630,6 +804,13 @@ function LobbyHud.Create(theme: any, deps: any): any
 		end
 		if practiceButton then
 			practiceButton.SetSelected(waiting)
+		end
+		if practiceHolder then
+			-- phones: the call-to-action only while waiting; the column slides up when it is gone
+			practiceHolder.Visible = waiting
+			local shift = if waiting then 0 else -(pr.Practice.H + 8)
+			buttons.Position = UDim2.fromOffset(pr.Buttons.X, pr.Buttons.Y + shift)
+			chancePanel.Root.Position = UDim2.fromOffset(pr.Chances.X, pr.Chances.Y + shift)
 		end
 		-- votes
 		local options = s.VoteOptions or {}
@@ -648,9 +829,11 @@ function LobbyHud.Create(theme: any, deps: any): any
 		for _, card in cards do
 			local n = (s.Votes or {})[card.Id] or 0
 			card.Bar.Size = UDim2.fromScale(if total > 0 then n / total else 0, 1)
-			card.Count.Text = UIKit.Upper(if n == 1 then Style.L("lobby.vote.one") else Style.L("lobby.vote.votes", n))
-			card.Mine.Visible = s.MyVote == card.Id
-			card.Lead.Visible = n > 0 and n == best
+			card.Count.Text = if phone
+				then tostring(n)
+				else UIKit.Upper(if n == 1 then Style.L("lobby.vote.one") else Style.L("lobby.vote.votes", n))
+			card.Mine.Visible = not phone and s.MyVote == card.Id
+			card.Lead.Visible = not phone and n > 0 and n == best
 			if card.Stroke then
 				card.Stroke.Color = if s.MyVote == card.Id then c.Accent else c.StrokeDim
 				card.Stroke.Thickness = if s.MyVote == card.Id
@@ -675,7 +858,21 @@ function LobbyHud.Create(theme: any, deps: any): any
 		local ck = table.concat(parts, "|")
 		if ck ~= chanceKey then
 			chanceKey = ck
-			buildChances(s.Chances or {})
+			if chanceValue then
+				local mine: any = nil
+				for _, entry in s.Chances or {} do
+					if entry.IsLocal then
+						mine = entry
+					end
+				end
+				chanceValue.Text = if mine == nil or mine.Pref == "Human"
+					then "—"
+					else UIKit.Upper(Style.L("lobby.chance.you")) .. " " .. math.floor(
+						(mine.Chance or 0) * 100 + 0.5
+					) .. "%"
+			else
+				buildChances(s.Chances or {})
+			end
 		end
 		if s.Chosen then
 			showChosen(s.Chosen)

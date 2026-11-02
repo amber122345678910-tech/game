@@ -14,13 +14,23 @@
 --   Hud.Create(theme, deps) -> { Root, Destroy }  offline composite preview of a mock scenario:
 --       deps.Scenario = Hud/Mock.Names (default "HumanRound"), deps.Hud = "Battle"|"Modern", deps.Layout,
 --       deps.Backdrop = false to skip the painted preview scene.
---   Hud.Visible(name, snapshot) -> boolean          the per-phase / per-role visibility rules (pure)
+--   Hud.Visible(name, snapshot) -> boolean          the per-phase / per-role / open-menu visibility rules (pure)
+--   Hud.MenuHidesHud(menuName?) -> boolean           a menu owns the screen: the HUD hides under it (pure)
 --   Hud.PIECES : { {Name, Z} }                       every piece module (children of this folder)
+--   Hud.EXTRA_PIECES : { {Name, Z, Own?} }           optional pieces (AdminButton: owner test panel button, only for
+--       the Player attribute "Admin"); Own = the piece shows/hides its own Root, the HUD toggles a holder instead
+--   HudHandle.SetMenu(menuName?)                     UIController reports the top menu (nil = none); while a menu
+--       is open the HUD hides (Hud.Visible) and touch controls drop their bindings
 --   Hud.FeedFromEvent(name, data, unitOf?) -> FeedEntry?   RoundEvent -> kill-feed entry (pure)
+--   Hud.AdminButtonSpot(layout, topbarLeftPt?) -> (UDim2?, Vector2?)   AdminButton pill inside the top-bar strip (pure)
+--   Hud.BleedBackdrops(pieceRoot, layout)            stretches full-screen backdrops / vignettes over layout.Bleed
 -- Pieces (each: Create(theme, deps) -> { Root, Update(snapshot), Tick(now)?, Destroy } + extras):
 --   LobbyHud, TopStrip, BossBar, RoundHud, AbilityBar, TeamPanel, Objectives, KillFeed, Notifications,
 --   Announcements, IntroSplash, SpectateHud, DeathScreen, MobileControls, Nameplates, EmoteWheel (B / D-pad down
---   radial emote menu, whenever the local player has a body outside the intro). Snapshot contract: Hud/Mock.
+--   radial emote menu, whenever the local player has a body outside the intro), AdminButton (optional module).
+--   Snapshot contract: Hud/Mock (+ Menu: the open menu's name, set by SetMenu / previews).
+-- Layout: mounted on UIRoot.Layer("Hud") the HUD follows UIRoot.LayoutChanged (usable area after the top bar /
+-- notch insets, rotation); mounted on its own ScreenGui it measures the camera viewport itself.
 local Style = require(script.Style)
 local Mock = require(script.Mock)
 local Data = require(script.Data)
@@ -45,6 +55,38 @@ Hud.PIECES = {
 	{ Name = "IntroSplash", Z = 12 },
 	{ Name = "Nameplates", Z = 0 },
 }
+-- optional pieces owned by other areas: mounted when the module exists (pcall require / Create)
+Hud.EXTRA_PIECES = {
+	{ Name = "AdminButton", Z = 9, Own = true },
+}
+
+-- Menu exclusivity: a menu owns the screen. While one is open the HUD hides (toasts then go through UIRoot's Toast
+-- layer, UIController.Notify) - except Style Lab, a live tuning panel that previews HUD styles. The interactive
+-- touch pieces hide under ANY menu (they would steal taps), world-space nameplates always stay.
+Hud.MENU_KEEPS_HUD = { StyleLab = true }
+Hud.MENU_KEEPS = { Nameplates = true }
+Hud.TOUCH_PIECES = { MobileControls = true, EmoteWheel = true, AdminButton = true }
+
+function Hud.MenuHidesHud(menu: string?): boolean
+	return type(menu) == "string" and menu ~= "" and not Hud.MENU_KEEPS_HUD[menu]
+end
+
+-- Where the optional AdminButton pill goes (pure): inside the Roblox top-bar strip, right of the Roblox / menu / chat
+-- buttons (GuiService.TopbarInset.Min.X = `topbarLeftPt`, screen points) - the HUD layer itself starts below the
+-- bar (CoreUISafeInsets), so this spot never competes with HUD pieces. nil when the layer has no strip above it.
+-- Returns (Position, AnchorPoint) for deps.AdminButtonPosition / deps.AdminButtonAnchor.
+function Hud.AdminButtonSpot(layout: any, topbarLeftPt: number?): (UDim2?, Vector2?)
+	local bleed = if type(layout) == "table" then layout.Bleed else nil
+	local scale = if type(layout) == "table" and type(layout.Scale) == "number" then layout.Scale else 1
+	if type(bleed) ~= "table" or (bleed.Top or 0) * scale < 30 then
+		return nil, nil
+	end
+	local leftPt = if type(topbarLeftPt) == "number" and topbarLeftPt > 0
+		then topbarLeftPt
+		else (bleed.Left or 0) * scale + 214 -- three 44-pt core buttons + gaps
+	local x = math.floor(leftPt / scale - (bleed.Left or 0) + 6)
+	return UDim2.fromOffset(x, -math.floor((bleed.Top or 0) / 2)), Vector2.new(0, 0.5)
+end
 
 local DEATH_SCREEN_TIME = 3.6
 
@@ -54,6 +96,12 @@ end
 
 -- Per-phase / per-role visibility (pure; unit-tested).
 function Hud.Visible(name: string, s: { [string]: any }): boolean
+	local menu = s.Menu
+	if type(menu) == "string" and menu ~= "" and not Hud.MENU_KEEPS[name] then
+		if Hud.TOUCH_PIECES[name] or Hud.MenuHidesHud(menu) then
+			return false
+		end
+	end
 	local phase = s.Phase or "Waiting"
 	local role = s.Role or "Lobby"
 	local me = s.Me
@@ -93,6 +141,8 @@ function Hud.Visible(name: string, s: { [string]: any }): boolean
 		return true
 	elseif name == "EmoteWheel" then
 		return hasBody and phase ~= "Intro" and not deathScreen
+	elseif name == "AdminButton" then
+		return phase ~= "Intro" and not deathScreen
 	end
 	return true -- Announcements, Notifications
 end
@@ -211,6 +261,39 @@ function Hud.FeedFromEvent(name: string, data: any, now: number?, unitOf: any?):
 	return nil
 end
 
+-- Full-screen backgrounds (intro backdrop, death / downed dim, edge vignettes) used to be full-bleed; the HUD layer
+-- now stops under the top bar and at notches (CoreUISafeInsets), so stretch them over layout.Bleed. Only frames that
+-- cover the whole canvas through full-size ancestors are touched, so panels and content never move.
+local BLEED_NAMES: { [string]: boolean } = { Backdrop = true, Dim = true, Vignette = true, LowHp = true }
+local FULL = UDim2.fromScale(1, 1)
+local ORIGIN = UDim2.new()
+
+local function bleedBackdrops(root: Instance, layout: any)
+	local b = if type(layout) == "table" then layout.Bleed else nil
+	if type(b) ~= "table" then
+		return
+	end
+	local l, t = math.ceil(b.Left or 0), math.ceil(b.Top or 0)
+	local r, btm = math.ceil(b.Right or 0), math.ceil(b.Bottom or 0)
+	if l + t + r + btm <= 0 then
+		return
+	end
+	local function walk(node: Instance, depth: number)
+		for _, child in node:GetChildren() do
+			if child:IsA("GuiObject") and child.Size == FULL and child.Position == ORIGIN then
+				if BLEED_NAMES[child.Name] then
+					child.Position = UDim2.fromOffset(-l, -t)
+					child.Size = UDim2.new(1, l + r, 1, t + btm)
+				elseif depth < 3 then
+					walk(child, depth + 1)
+				end
+			end
+		end
+	end
+	walk(root, 0)
+end
+Hud.BleedBackdrops = bleedBackdrops
+
 -- builds every piece into `container`; returns name -> handle
 local function buildPieces(
 	theme: any,
@@ -219,7 +302,11 @@ local function buildPieces(
 	only: { [string]: boolean }?
 ): { [string]: any }
 	local pieces: { [string]: any } = {}
-	for _, entry in Hud.PIECES do
+	local all = table.clone(Hud.PIECES)
+	for _, entry in Hud.EXTRA_PIECES do
+		table.insert(all, entry)
+	end
+	for _, entry in all do
 		if only == nil or only[entry.Name] then
 			local module = script:FindFirstChild(entry.Name)
 			if module then
@@ -227,6 +314,26 @@ local function buildPieces(
 				if okReq and type(mod) == "table" and type((mod :: any).Create) == "function" then
 					local okCreate, handle = pcall((mod :: any).Create, theme, pdeps)
 					if okCreate and type(handle) == "table" and handle.Root then
+						if not entry.Own then
+							bleedBackdrops(handle.Root, pdeps.Layout)
+						end
+						if entry.Own then
+							-- the piece owns its Root.Visible; phase / menu rules toggle this holder
+							local holder = Style.Frame({ Name = entry.Name .. "Holder", Size = UDim2.fromScale(1, 1) })
+							handle.Root.Parent = holder
+							local inner = handle
+							handle = {
+								Root = holder,
+								Inner = inner,
+								Update = inner.Update,
+								Tick = inner.Tick,
+								SetActive = inner.SetActive,
+								Destroy = function()
+									pcall(inner.Destroy)
+									holder:Destroy()
+								end,
+							}
+						end
 						handle.Root.ZIndex = entry.Z
 						handle.Root.Parent = container
 						pieces[entry.Name] = handle
@@ -301,13 +408,20 @@ function Hud.Create(theme: any, deps: any): any
 	end
 	local container = Style.Frame({ Name = "Pieces", Size = UDim2.fromScale(1, 1), ZIndex = 1, Parent = root })
 	local only: { [string]: boolean } = {}
-	for _, entry in Hud.PIECES do
+	local all = table.clone(Hud.PIECES)
+	for _, entry in Hud.EXTRA_PIECES do
+		table.insert(all, entry)
+	end
+	for _, entry in all do
 		only[entry.Name] = Hud.Visible(entry.Name, snap) and entry.Name ~= "Nameplates"
 	end
 	if d.Pieces then
-		for _, entry in Hud.PIECES do
+		for _, entry in all do
 			only[entry.Name] = table.find(d.Pieces, entry.Name) ~= nil
 		end
+	end
+	if d.AdminButtonPosition == nil then
+		d.AdminButtonPosition, d.AdminButtonAnchor = Hud.AdminButtonSpot(d.Layout, nil)
 	end
 	local pieces = buildPieces(theme, d, container, only)
 	return {
@@ -369,6 +483,9 @@ function Hud.Mount(screenGui: Instance, deps: any?): any
 	end
 	local function computeLayout(): any
 		if okRoot and UIRoot then
+			if UIRoot.IsInitialized and UIRoot.IsInitialized() then
+				return UIRoot.Layout() -- the usable area (top bar / notch insets) measured by UIRoot
+			end
 			return UIRoot.ComputeLayout(viewport())
 		end
 		return { Canvas = Vector2.new(1600, 900), Phone = false, Compact = false, Scale = 1, Viewport = viewport() }
@@ -403,6 +520,8 @@ function Hud.Mount(screenGui: Instance, deps: any?): any
 	local pieces: { [string]: any } = {}
 	local feedHistory: { any } = {}
 	local snap: { [string]: any } = source:Build()
+	local menu: string? = nil -- the open menu (UIController -> SetMenu); drives Hud.Visible
+	snap.Menu = menu
 	local visible = true
 	local destroyed = false
 	local conns: { any } = {}
@@ -416,6 +535,13 @@ function Hud.Mount(screenGui: Instance, deps: any?): any
 		p.Snapshot = snap
 		p.OnVote = function(mapId: string)
 			source:SetMyVote(mapId)
+		end
+		if d.AdminButtonPosition == nil then
+			local okTop, topbarLeft = pcall(function()
+				local rect = (game:GetService("GuiService") :: any).TopbarInset
+				return if typeof(rect) == "Rect" and rect.Width > 0 then rect.Min.X else nil
+			end)
+			p.AdminButtonPosition, p.AdminButtonAnchor = Hud.AdminButtonSpot(layout, if okTop then topbarLeft else nil)
 		end
 		return p
 	end
@@ -464,6 +590,7 @@ function Hud.Mount(screenGui: Instance, deps: any?): any
 
 	local function refresh()
 		snap = source:Build()
+		snap.Menu = menu
 		applyVisibility(snap)
 		for name, piece in pieces do
 			if piece.Root.Visible and piece.Update then
@@ -614,7 +741,8 @@ function Hud.Mount(screenGui: Instance, deps: any?): any
 		table.insert(
 			conns,
 			connect(state.Notify, function(key: string, args: any, style: any)
-				if pieces.Notifications then
+				-- hidden under a menu: UIController toasts it on the Toast layer instead (no duplicates later)
+				if pieces.Notifications and pieces.Notifications.Root.Visible then
 					pcall(pieces.Notifications.Notify, key, args, style)
 				end
 			end)
@@ -642,7 +770,21 @@ function Hud.Mount(screenGui: Instance, deps: any?): any
 		)
 	end
 	local cam = camera()
-	if cam then
+	local followRoot = not ownRoot and okRoot and type(UIRoot) == "table" and type(UIRoot.LayoutChanged) == "table"
+	if followRoot then
+		-- UIRoot measured a new usable area (rotation, resize, top bar): rebuild every piece for it
+		table.insert(
+			conns,
+			connect(UIRoot.LayoutChanged, function(newLayout: any)
+				if destroyed or type(newLayout) ~= "table" then
+					return
+				end
+				layout = newLayout
+				rebuild()
+				refresh()
+			end)
+		)
+	elseif cam then
 		table.insert(
 			conns,
 			connect((cam :: any):GetPropertyChangedSignal("ViewportSize"), function()
@@ -652,9 +794,7 @@ function Hud.Mount(screenGui: Instance, deps: any?): any
 					or math.abs(newLayout.Scale - layout.Scale) > 0.01
 					or newLayout.Canvas ~= layout.Canvas
 				then
-					if ownRoot or d.Layout == nil then
-						layout = newLayout
-					end
+					layout = newLayout -- (the old guard kept a stale layout forever when deps.Layout was given)
 					if uiScale then
 						uiScale.Scale = layout.Scale
 						base.Size = UDim2.fromScale(1 / layout.Scale, 1 / layout.Scale)
@@ -738,6 +878,17 @@ function Hud.Mount(screenGui: Instance, deps: any?): any
 		else
 			applyVisibility(snap) -- hides every piece (SetActive(false): touch bindings, nameplates)
 		end
+	end
+	handle.SetMenu = function(name: string?)
+		if name == "" then
+			name = nil
+		end
+		if name == menu then
+			return
+		end
+		menu = name
+		snap.Menu = name
+		applyVisibility(snap)
 	end
 	handle.Refresh = refresh
 	handle.Rebuild = function()

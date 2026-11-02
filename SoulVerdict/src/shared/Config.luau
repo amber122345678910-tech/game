@@ -233,4 +233,9 @@ Config.Emote = {
 	Family = { Skeleton = { "Wink" } }, -- extras per RigFamily
 }
 
+-- Admin panel (server AdminService, client Screens/Admin): EXTRA admins by Roblox UserId. Studio, the place owner
+-- (or the group owner, rank 255) and the private-server owner are always admins without being listed here.
+-- Find a UserId in the profile link roblox.com/users/<UserId>/profile, e.g. Config.Admins = { 123456789, 987654321 }
+Config.Admins = {} :: { number }
+
 return Config

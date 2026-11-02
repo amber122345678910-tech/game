@@ -3,17 +3,32 @@
 -- toasts, the menu blur, gamepad focus and the responsive scale. Lune-safe at require time; everything
 -- that touches the engine starts in UIRoot.Init(playerGui).
 --
--- Pure (usable offline, e.g. tools/lune/dump_gui.luau):
---   UIRoot.ComputeLayout(viewport: Vector2) -> Layout   { Viewport, Scale, Canvas, Compact, Phone }
+-- Insets: every layer is a ScreenGui with ScreenInsets = CoreUISafeInsets (IgnoreGuiInset = false: with true the
+-- engine downgrades CoreUISafeInsets to DeviceSafeInsets), so nothing we draw sits under the Roblox top bar
+-- (Roblox / menu / chat buttons, 58 px) or a notch. The layout is computed from the layer's own AbsoluteSize
+-- (the usable rect), never from the camera viewport. Full-bleed backgrounds reach the real screen edges through
+-- Layout.Bleed (ClipToDeviceSafeArea = false; see Screens/Common.Bleed).
+--
+-- Pure (usable offline, e.g. tools/lune/dump_gui.luau, tools/preview/gui/composite.luau):
+--   UIRoot.ComputeLayout(usable: Vector2, safe: Insets?) -> Layout
+--       { Viewport (= usable px), Scale, Canvas (design px), Compact, Phone, Portrait, Bleed (design px) }
 --       design canvas is ~1600x900 on desktop (1920x1080 -> scale 1.2, 1366x768 -> 0.853);
---       phones get a larger relative scale (844x390 -> 0.8125, canvas ~1039x480)
---   UIRoot.CreateLayer(name, displayOrder, layout) -> (ScreenGui, Frame root, UIScale)
---       ScreenGui: ResetOnSpawn=false, IgnoreGuiInset=true, ScreenInsets=DeviceSafeInsets, ZIndexBehavior=Sibling;
---       root Frame is sized 1/scale so children live in design px.
+--       phones fit 480 design px vertically (844x390 -> 0.8125, canvas ~1039x480; never below 0.62);
+--       a portrait viewport (transient: the game runs landscape) fits ~820 design px across.
+--       safe = distance in px from the usable rect to the screen edges (Layout.Bleed = safe / Scale).
+--   UIRoot.SafeInsets(full: Vector2, usable: Vector2, topbar: number) -> Insets   splits full - usable into
+--       the top bar (top), an even left/right split and the rest at the bottom (home indicator)
+--   UIRoot.SameLayout(a, b) -> boolean      true when a rebuild is not needed (same flags, ~same canvas/scale)
+--   UIRoot.CreateLayer(name, displayOrder, layout, insets: Enum.ScreenInsets?) -> (ScreenGui, Frame root, UIScale)
+--       ScreenGui: ResetOnSpawn=false, ZIndexBehavior=Sibling, ClipToDeviceSafeArea=false; `insets` given (runtime:
+--       CoreUISafeInsets) -> IgnoreGuiInset=false + those insets; nil (offline previews) -> IgnoreGuiInset=true,
+--       DeviceSafeInsets. The root Frame is sized 1/scale so children live in design px.
 -- Runtime:
 --   UIRoot.Init(playerGui, opts?)        opts: { PlaySound: (key) -> ()?, Deps: table? (merged into every screen's deps) }
 --   UIRoot.Layer(name) -> Frame          "Menu" | "Hud" | "Overlay" | "Toast" | "Cursor"
 --   UIRoot.Layout() -> Layout
+--   UIRoot.LayoutChanged:Connect(fn(layout, previous)) -> { Disconnect }   fired when the usable area changes enough
+--       to need a rebuild (phone rotation, window resize, top bar shown/hidden); every screen is rebuilt first
 --   UIRoot.Push(screenModule, deps?) -> ScreenHandle        hides the previous top screen
 --   UIRoot.Pop() -> boolean
 --   UIRoot.Replace(screenModule, deps?) -> ScreenHandle
@@ -34,7 +49,16 @@ local UIKit = require(script.Parent.UIKit)
 
 type Theme = Themes.Theme
 
-export type Layout = { Viewport: Vector2, Scale: number, Canvas: Vector2, Compact: boolean, Phone: boolean }
+export type Insets = { Left: number, Top: number, Right: number, Bottom: number }
+export type Layout = {
+	Viewport: Vector2,
+	Scale: number,
+	Canvas: Vector2,
+	Compact: boolean,
+	Phone: boolean,
+	Portrait: boolean,
+	Bleed: Insets,
+}
 export type ScreenHandle = {
 	Root: GuiObject,
 	Destroy: () -> (),
@@ -44,41 +68,96 @@ export type ScreenHandle = {
 }
 export type ScreenModule = { Create: (Theme, any) -> ScreenHandle }
 
-type Entry = { module: ScreenModule, deps: any, handle: ScreenHandle?, layer: string, kind: "Screen" | "Modal" | "Hud", id: string? }
+type Entry = {
+	module: ScreenModule,
+	deps: any,
+	handle: ScreenHandle?,
+	layer: string,
+	kind: "Screen" | "Modal" | "Hud",
+	id: string?,
+}
 
 local UIRoot = {}
 
 UIRoot.DesignSize = Vector2.new(1600, 900)
+UIRoot.PhoneHeight = 480 -- design px a landscape phone fits vertically
+UIRoot.TopbarHeight = 58 -- Roblox top bar (fallback when GuiService.TopbarInset is not available)
 UIRoot.DisplayOrder = { Hud = 5, Menu = 10, Overlay = 30, Toast = 40, Cursor = 50 }
 UIRoot.LayerNames = { "Hud", "Menu", "Overlay", "Toast", "Cursor" }
+UIRoot.RebuildDelay = 0.2 -- s: a rotation / window drag reports several sizes; rebuild once it settles
 
 -- pure helpers ------------------------------------------------------------------------------------
-function UIRoot.ComputeLayout(viewport: Vector2): Layout
+local NO_INSETS: Insets = { Left = 0, Top = 0, Right = 0, Bottom = 0 }
+
+function UIRoot.ComputeLayout(viewport: Vector2, safe: Insets?): Layout
 	local w = math.max(viewport.X, 1)
 	local h = math.max(viewport.Y, 1)
+	local portrait = h > w * 1.05
 	local phone = h < 560 or w < 900
 	local scale
-	if phone then
-		scale = math.clamp(h / 480, 0.62, 1)
+	if portrait then
+		scale = math.clamp(w / 820, 0.4, 1)
+	elseif phone then
+		scale = math.clamp(h / UIRoot.PhoneHeight, 0.62, 1)
 	else
 		scale = math.clamp(math.min(w / UIRoot.DesignSize.X, h / UIRoot.DesignSize.Y), 0.6, 2.5)
 	end
 	local canvas = Vector2.new(w / scale, h / scale)
+	local s = safe or NO_INSETS
 	return {
 		Viewport = Vector2.new(w, h),
 		Scale = scale,
 		Canvas = canvas,
 		Compact = canvas.Y < 760,
 		Phone = phone,
+		Portrait = portrait,
+		Bleed = {
+			Left = math.max(s.Left, 0) / scale,
+			Top = math.max(s.Top, 0) / scale,
+			Right = math.max(s.Right, 0) / scale,
+			Bottom = math.max(s.Bottom, 0) / scale,
+		},
 	}
 end
 
-function UIRoot.CreateLayer(name: string, displayOrder: number, layout: Layout): (ScreenGui, Frame, UIScale)
+-- full = the whole screen (camera viewport), usable = the CoreUISafeInsets rect: the top bar takes the top,
+-- notches split evenly left/right, whatever is left goes to the bottom (home indicator).
+function UIRoot.SafeInsets(full: Vector2, usable: Vector2, topbar: number): Insets
+	local dx = math.max(full.X - usable.X, 0)
+	local dy = math.max(full.Y - usable.Y, 0)
+	local top = math.min(math.max(topbar, 0), dy)
+	return { Left = dx / 2, Top = top, Right = dx / 2, Bottom = dy - top }
+end
+
+function UIRoot.SameLayout(a: Layout?, b: Layout?): boolean
+	if a == nil or b == nil then
+		return a == b
+	end
+	return a.Phone == b.Phone
+		and a.Compact == b.Compact
+		and (a.Portrait == true) == (b.Portrait == true)
+		and math.abs(a.Scale - b.Scale) < 0.005
+		and math.abs(a.Canvas.X - b.Canvas.X) < 2
+		and math.abs(a.Canvas.Y - b.Canvas.Y) < 2
+end
+
+function UIRoot.CreateLayer(
+	name: string,
+	displayOrder: number,
+	layout: Layout,
+	insets: Enum.ScreenInsets?
+): (ScreenGui, Frame, UIScale)
 	local gui = Instance.new("ScreenGui")
 	gui.Name = "SV_" .. name
 	gui.ResetOnSpawn = false
-	gui.IgnoreGuiInset = true
-	gui.ScreenInsets = Enum.ScreenInsets.DeviceSafeInsets
+	if insets then
+		gui.IgnoreGuiInset = false -- true would turn CoreUISafeInsets into DeviceSafeInsets (under the top bar)
+		gui.ScreenInsets = insets
+	else
+		gui.IgnoreGuiInset = true
+		gui.ScreenInsets = Enum.ScreenInsets.DeviceSafeInsets
+	end
+	gui.ClipToDeviceSafeArea = false -- full-bleed backdrops may extend into notch strips (content stays in Root)
 	gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 	gui.DisplayOrder = displayOrder
 	local root = Instance.new("Frame")
@@ -94,6 +173,37 @@ function UIRoot.CreateLayer(name: string, displayOrder: number, layout: Layout):
 	return gui, root, scale
 end
 
+-- tiny signal (Util/Signal lives in ReplicatedStorage; UIRoot stays Lune-safe without it)
+type Listener = { fn: (Layout, Layout) -> (), connected: boolean }
+local layoutListeners: { Listener } = {}
+UIRoot.LayoutChanged = {
+	Connect = function(_self: any, fn: (Layout, Layout) -> ()): { Disconnect: () -> (), Connected: boolean }
+		local entry: Listener = { fn = fn, connected = true }
+		table.insert(layoutListeners, entry)
+		local conn = { Connected = true }
+		function conn.Disconnect()
+			entry.connected = false
+			conn.Connected = false
+			local i = table.find(layoutListeners, entry)
+			if i then
+				table.remove(layoutListeners, i)
+			end
+		end
+		return conn :: any
+	end,
+}
+
+local function fireLayoutChanged(layout: Layout, previous: Layout)
+	for _, entry in table.clone(layoutListeners) do
+		if entry.connected then
+			local ok, err = pcall(entry.fn, layout, previous)
+			if not ok then
+				warn("[UIRoot] LayoutChanged listener failed: " .. tostring(err))
+			end
+		end
+	end
+end
+
 -- runtime state -------------------------------------------------------------------------------------
 local initialized = false
 local playerGuiRef: Instance? = nil
@@ -106,12 +216,35 @@ local blur: BlurEffect? = nil
 local toastHolder: Frame? = nil
 local GuiService: any = nil
 local UserInputService: any = nil
+local builtLayout: Layout = currentLayout -- the layout the current screens were built with
+local rebuildToken = 0
+
+local function topbarHeight(): number
+	if GuiService then
+		local ok, rect = pcall(function()
+			return GuiService.TopbarInset
+		end)
+		if ok and typeof(rect) == "Rect" and rect.Height > 0 then
+			return rect.Height
+		end
+	end
+	return UIRoot.TopbarHeight
+end
+
+-- the layout of the usable (CoreUISafeInsets) area, measured on the Menu layer
+local function measureLayout(): Layout
+	local camera = workspace.CurrentCamera
+	local full = if camera then camera.ViewportSize else Vector2.new(1920, 1080)
+	local menu = layers.Menu
+	local usable = if menu then menu.gui.AbsoluteSize else Vector2.zero
+	if usable.X < 2 or usable.Y < 2 then
+		usable = Vector2.new(full.X, math.max(full.Y - topbarHeight(), 1))
+	end
+	return UIRoot.ComputeLayout(usable, UIRoot.SafeInsets(full, usable, topbarHeight()))
+end
 
 local function depsFor(entry: Entry): any
-	local deps: { [string]: any } = {}
-	for k, v in baseDeps do
-		deps[k] = v
-	end
+	local deps: { [string]: any } = table.clone(baseDeps)
 	if type(entry.deps) == "table" then
 		for k, v in entry.deps do
 			deps[k] = v
@@ -236,50 +369,74 @@ function UIRoot.Init(playerGui: Instance, opts: { [string]: any }?)
 	end
 	GuiService = game:GetService("GuiService")
 	UserInputService = game:GetService("UserInputService")
+	-- the usable area is only known once a layer is parented: start from the viewport minus the top bar
 	local camera = workspace.CurrentCamera
-	currentLayout = UIRoot.ComputeLayout(if camera then camera.ViewportSize else Vector2.new(1920, 1080))
+	local viewport0 = if camera then camera.ViewportSize else Vector2.new(1920, 1080)
+	currentLayout = UIRoot.ComputeLayout(Vector2.new(viewport0.X, math.max(viewport0.Y - UIRoot.TopbarHeight, 1)))
 	for _, name in UIRoot.LayerNames do
-		local gui, root, scale = UIRoot.CreateLayer(name, UIRoot.DisplayOrder[name], currentLayout)
+		local gui, root, scale =
+			UIRoot.CreateLayer(name, UIRoot.DisplayOrder[name], currentLayout, Enum.ScreenInsets.CoreUISafeInsets)
 		gui.Parent = playerGui
 		layers[name] = { gui = gui, root = root, scale = scale }
 	end
-	-- toast column (top-right)
+	currentLayout = measureLayout()
+	builtLayout = currentLayout
+	for _, layer in layers do
+		layer.scale.Scale = currentLayout.Scale
+		layer.root.Size = UDim2.fromScale(1 / currentLayout.Scale, 1 / currentLayout.Scale)
+	end
+	-- toast column (top-right, under the top bar thanks to the layer insets)
 	local holder = Instance.new("Frame")
 	holder.Name = "Toasts"
 	holder.BackgroundTransparency = 1
 	holder.AnchorPoint = Vector2.new(1, 0)
-	holder.Position = UDim2.new(1, -24, 0, 24)
+	holder.Position = UDim2.new(1, -16, 0, 12)
 	holder.Size = UDim2.fromOffset(380, 600)
 	UIKit.ListLayout(holder, { Gap = 10, HAlign = Enum.HorizontalAlignment.Right })
 	holder.Parent = layers.Toast.root
 	toastHolder = holder
-	-- responsive scale
-	local function onViewport()
-		local cam = workspace.CurrentCamera
-		if not cam then
-			return
-		end
-		local nextLayout = UIRoot.ComputeLayout(cam.ViewportSize)
-		local categoryChanged = nextLayout.Phone ~= currentLayout.Phone or nextLayout.Compact ~= currentLayout.Compact
+	-- responsive layout: the scale follows at once; screens built for the old canvas are rebuilt once the size
+	-- settles (a phone that boots in portrait and then rotates used to keep a stale portrait layout)
+	local function onResize()
+		local nextLayout = measureLayout()
+		local previous = currentLayout
 		currentLayout = nextLayout
 		for _, layer in layers do
 			layer.scale.Scale = nextLayout.Scale
 			layer.root.Size = UDim2.fromScale(1 / nextLayout.Scale, 1 / nextLayout.Scale)
 		end
-		if categoryChanged then
-			UIRoot.Rebuild()
+		if not UIRoot.SameLayout(previous, nextLayout) and not UIRoot.SameLayout(builtLayout, nextLayout) then
+			rebuildToken += 1
+			local token = rebuildToken
+			task.delay(UIRoot.RebuildDelay, function()
+				if token ~= rebuildToken or UIRoot.SameLayout(builtLayout, currentLayout) then
+					return
+				end
+				local old = builtLayout
+				UIRoot.Rebuild()
+				fireLayoutChanged(currentLayout, old)
+			end)
 		end
 	end
+	layers.Menu.gui:GetPropertyChangedSignal("AbsoluteSize"):Connect(onResize)
+	local cameraConn: RBXScriptConnection? = nil
 	local function bindCamera(cam: Camera?)
+		if cameraConn then
+			cameraConn:Disconnect()
+			cameraConn = nil
+		end
 		if cam then
-			cam:GetPropertyChangedSignal("ViewportSize"):Connect(onViewport)
-			onViewport()
+			cameraConn = cam:GetPropertyChangedSignal("ViewportSize"):Connect(onResize)
+			onResize()
 		end
 	end
 	bindCamera(workspace.CurrentCamera)
 	workspace:GetPropertyChangedSignal("CurrentCamera"):Connect(function()
 		bindCamera(workspace.CurrentCamera)
 		updateBlur()
+	end)
+	pcall(function()
+		GuiService:GetPropertyChangedSignal("TopbarInset"):Connect(onResize)
 	end)
 	-- rebuild on theme / HUD style change
 	ThemeService.Changed:Connect(function()
@@ -409,6 +566,7 @@ function UIRoot.Rebuild()
 	if not initialized then
 		return
 	end
+	builtLayout = currentLayout
 	for _, entry in huds do
 		destroyEntry(entry)
 		build(entry)

@@ -11,12 +11,17 @@
 --     volumes) and persisted through StateController.SetSetting (debounced for sliders; Camera/Sound/RigStyle
 --     controllers react to StateController.SettingChanged); Style Lab previews use ApplySetting (not saved);
 --   * toasts: Notify(key, args, kind) / Toast(text, kind, icon); server Notify events are toasted here only while
---     a full-screen menu covers the HUD (the HUD's Notifications piece handles them otherwise).
+--     a menu hides the HUD (the HUD's Notifications piece handles them otherwise);
+--   * menu exclusivity: every stack change reports the top menu to the HUD (HudHandle.SetMenu -> Hud.Visible: the
+--     lobby/round HUD and the touch controls hide while a menu owns the screen) and hides Roblox's touch thumbstick /
+--     jump button (GuiService.TouchControlsEnabled) while any menu or photo mode is up;
+--   * Admin (owner test panel): "Admin" screen + Title button, only for the Player attribute "Admin" = true.
 --
 -- API
 --   UIController.Open(name, opts?) -> ScreenHandle?   names: Title, Play (= Loadout), Loadout, Shop, Quests, Profile,
---       Settings, StyleLab, Results, Gallery. opts are merged into that screen's deps ({Replace = true} replaces the
---       top screen instead of pushing).
+--       Settings, StyleLab, Admin, Results, Gallery. opts are merged into that screen's deps ({Replace = true} replaces
+--       the top screen instead of pushing). StyleLab / Admin need the Player attribute of the same name.
+--   UIController.Practice(side?)     close the menus and ask for a practice round vs bots (Request StartPractice)
 --   UIController.Close(name?)        nil: close every menu (back to the game); name: remove that screen
 --   UIController.Toggle(name)        UIController.Back() -> boolean      UIController.Play()  (close menus, enter lobby)
 --   UIController.IsOpen(name?) -> boolean       UIController.Top() -> string?
@@ -71,11 +76,32 @@ local SCREEN_MODULES: { [string]: string } = {
 	Profile = "Profile",
 	Settings = "Settings",
 	StyleLab = "StyleLab",
+	Admin = "Admin",
 	Results = "Results",
 }
--- screens with a near-opaque backdrop (they hide the HUD's own toasts)
-local FULLSCREEN: { [string]: boolean } = { Loadout = true, Play = true, Shop = true, Quests = true, Profile = true, Settings = true, Results = true, Gallery = true }
-local SLIDER_KEYS: { [string]: boolean } = { ParticleDensity = true, MusicVolume = true, SfxVolume = true, CameraShake = true, FieldOfView = true, Sensitivity = true }
+-- screens gated by a Player attribute of the same name (set by the server)
+local GATED: { [string]: boolean } = { StyleLab = true, Admin = true }
+-- fallback when the Hud module is missing: screens with a near-opaque backdrop (they hide the HUD's own toasts)
+local FULLSCREEN: { [string]: boolean } = {
+	Title = true,
+	Loadout = true,
+	Play = true,
+	Shop = true,
+	Quests = true,
+	Profile = true,
+	Settings = true,
+	Results = true,
+	Gallery = true,
+	Admin = true,
+}
+local SLIDER_KEYS: { [string]: boolean } = {
+	ParticleDensity = true,
+	MusicVolume = true,
+	SfxVolume = true,
+	CameraShake = true,
+	FieldOfView = true,
+	Sensitivity = true,
+}
 
 type Entry = { name: string, deps: { [string]: any } }
 
@@ -87,6 +113,8 @@ local photo = false
 local menuContext = false
 local menuCamera = false
 local hudHandle: any = nil
+local HudModule: any = nil
+local touchHidden = false
 local settingsCache: { [string]: any } = {}
 local persistVersion: { [string]: number } = {}
 local pendingResult: any = nil
@@ -172,7 +200,33 @@ local function hasScreen(name: string): boolean
 	return false
 end
 
--- keep InputController context, camera mode and listeners in sync with the stack
+-- does the open menu `name` hide the HUD? (Hud.MenuHidesHud is the source of truth)
+local function menuHidesHud(name: string?): boolean
+	if name == nil then
+		return false
+	end
+	if HudModule and type(HudModule.MenuHidesHud) == "function" then
+		local ok, hides = pcall(HudModule.MenuHidesHud, name)
+		if ok then
+			return hides == true
+		end
+	end
+	return FULLSCREEN[name] == true
+end
+
+-- Roblox's thumbstick + jump button would sit on top of the menu buttons (and move the body behind the menu)
+local function syncTouch()
+	local hide = #stack > 0 or photo
+	if hide == touchHidden then
+		return
+	end
+	touchHidden = hide
+	pcall(function()
+		(game:GetService("GuiService") :: any).TouchControlsEnabled = not hide
+	end)
+end
+
+-- keep InputController context, camera mode, the HUD and listeners in sync with the stack
 local function sync()
 	local open = #stack > 0
 	if open ~= menuContext then
@@ -196,7 +250,15 @@ local function sync()
 		end
 	end
 	local top = topEntry()
-	UIController.MenuChanged:Fire(if top then top.name else nil)
+	local topName = if top then top.name else nil
+	if hudHandle and type(hudHandle.SetMenu) == "function" then
+		local ok, err = pcall(hudHandle.SetMenu, topName)
+		if not ok then
+			warn("[UIController] Hud.SetMenu failed: " .. tostring(err))
+		end
+	end
+	syncTouch()
+	UIController.MenuChanged:Fire(topName)
 end
 
 ------------------------------------------------------------------------------------------------ settings
@@ -353,7 +415,9 @@ end
 
 -- apply everything once (startup / first profile) and again when the server's values differ
 local function applyAll(fromProfile: boolean)
-	for _, key in { "Language", "MenuTheme", "HudStyle", "GraphicsPreset", "GraphicsQuality", "ParticleDensity", "MusicVolume" } do
+	for _, key in
+		{ "Language", "MenuTheme", "HudStyle", "GraphicsPreset", "GraphicsQuality", "ParticleDensity", "MusicVolume" }
+	do
 		local value = UIController.Setting(key)
 		if fromProfile then
 			local ok, sv = call(State, "Setting", key)
@@ -388,9 +452,9 @@ function UIController.Open(name: string, opts: { [string]: any }?): any
 		return nil
 	end
 	local o = opts or {}
-	if name == "StyleLab" then
+	if GATED[name] then
 		local player = Players.LocalPlayer
-		if player and player:GetAttribute("StyleLab") ~= true then
+		if player and player:GetAttribute(name) ~= true then
 			return nil
 		end
 	end
@@ -500,6 +564,19 @@ function UIController.Play()
 	UIController.Close()
 end
 
+function UIController.Practice(side: string?)
+	UIController.Close()
+	local data = { side = if side == "Monster" then "Monster" else "Human" }
+	if State and type(State.Request) == "function" then
+		call(State, "Request", "StartPractice", data)
+	else
+		pcall(function()
+			local Net = require(Shared:WaitForChild("Net")) :: any
+			Net.Client.Fire("Request", "StartPractice", data)
+		end)
+	end
+end
+
 function UIController.IsOpen(name: string?): boolean
 	if name == nil then
 		return #stack > 0
@@ -548,6 +625,7 @@ function UIController.PhotoMode(on: boolean)
 		UIController.SetVisible(true)
 		UIController.Toast(Strings.L("lab.photoHint"), "Info", "Camera", 2)
 	end
+	syncTouch()
 end
 
 ------------------------------------------------------------------------------------------------ toasts
@@ -742,6 +820,9 @@ function UIController.Start()
 	local hudModule = UIFolder:FindFirstChild("Hud")
 	if hudModule and hudModule:IsA("ModuleScript") then
 		local ok, Hud = pcall(require, hudModule)
+		if ok and type(Hud) == "table" then
+			HudModule = Hud
+		end
 		if ok and type(Hud) == "table" and type((Hud :: any).Mount) == "function" then
 			local hudDeps = table.clone(deps)
 			hudDeps.Layout = UIRoot.Layout()
@@ -786,8 +867,12 @@ function UIController.Start()
 		if State.Notify then
 			State.Notify:Connect(function(key: string, args: any, style: any)
 				local top = topEntry()
-				if top and FULLSCREEN[top.name] and visible then
-					UIController.Notify(key, if type(args) == "table" then args else nil, if type(style) == "string" then style else nil)
+				if top and menuHidesHud(top.name) and visible then
+					UIController.Notify(
+						key,
+						if type(args) == "table" then args else nil,
+						if type(style) == "string" then style else nil
+					)
 				end
 			end)
 		end
