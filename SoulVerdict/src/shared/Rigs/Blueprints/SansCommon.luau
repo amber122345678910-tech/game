@@ -551,7 +551,7 @@ function SansCommon.Hoodie(rig: RigContext, opts: HoodieOptions): HoodieInfo
 	local neckY = rig.Joint("Neck").Y
 	local spread = opts.Spread or 0
 	local panelC = V(0.56 + spread * 0.5, (neckY + waistY) / 2 - 0.25, -0.07)
-	local panelR = V(0.7 + spread * 0.5, 1.12, 0.9)
+	local panelR = V(0.62 + spread * 0.5, 1.1, 0.8)
 
 	for _, sx in { -1, 1 } do
 		local side = if sx < 0 then "Left" else "Right"
@@ -568,8 +568,8 @@ function SansCommon.Hoodie(rig: RigContext, opts: HoodieOptions): HoodieInfo
 			rig,
 			"UpperTorso",
 			side .. "Hem",
-			V(0.17, 0.98, 1.36),
-			CFrame.new((0.4 + spread * 0.3) * sx, panelC.Y - panelR.Y + 0.13, -0.02) * UPRIGHT,
+			V(0.17, 0.9, 1.22),
+			CFrame.new((0.38 + spread * 0.3) * sx, panelC.Y - panelR.Y + 0.13, -0.02) * UPRIGHT,
 			opts.Dark,
 			trim
 		)
@@ -581,8 +581,8 @@ function SansCommon.Hoodie(rig: RigContext, opts: HoodieOptions): HoodieInfo
 		rig.Ellipsoid(
 			"UpperTorso",
 			side .. "ShoulderPad",
-			V(1.15 + spread, 0.82, 1.2),
-			CFrame.new((0.66 + spread * 0.5) * sx, neckY - 0.3, 0.04) * CFrame.Angles(0, 0, math.rad(-12 * sx)),
+			V(0.96 + spread, 0.66, 1.0),
+			CFrame.new((0.62 + spread * 0.5) * sx, neckY - 0.3, 0.04) * CFrame.Angles(0, 0, math.rad(-14 * sx)),
 			opts.Body,
 			cloth
 		)
@@ -753,8 +753,9 @@ function SansCommon.Pockets(rig: RigContext, info: HoodieInfo, opts: PocketOptio
 		local side = if sx < 0 then "Left" else "Right"
 		local x = 0.72 * sx
 		local z = info.FrontZ(x, y)
-		local cf = CFrame.new(x, y, z + 0.1) * CFrame.Angles(math.rad(-10), math.rad(-16 * sx), math.rad(4 * sx))
-		rig.Ellipsoid("UpperTorso", side .. "Pocket", V(0.86, 0.76, 0.72), cf, opts.Body, {
+		-- the pouch stays where the hands are (Pockets pose) although the slimmer jacket's front sits further back
+		local cf = CFrame.new(x, y, z + 0.02) * CFrame.Angles(math.rad(-10), math.rad(-16 * sx), math.rad(4 * sx))
+		rig.Ellipsoid("UpperTorso", side .. "Pocket", V(0.82, 0.72, 0.68), cf, opts.Body, {
 			Role = "Cloth",
 			Material = mat,
 		})
@@ -851,7 +852,7 @@ export type SleeveOptions = {
 function SansCommon.Sleeves(rig: RigContext, opts: SleeveOptions)
 	local mat = opts.Material or Enum.Material.Fabric
 	local cloth: Props = { Role = "Cloth", Material = mat }
-	local puff = opts.Puff or 1
+	local puff = opts.Puff or 0.8
 	for _, side in { "Left", "Right" } do
 		local sx = if side == "Left" then -1 else 1
 		local ua, la = side .. "UpperArm", side .. "LowerArm"

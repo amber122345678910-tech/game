@@ -22,7 +22,7 @@
 --   RigStyles.Revert(model)                        undo everything this module did to the model
 --   RigStyles.Current(model) -> string?            model attribute "RigStyle"
 --   RigStyles.SetOutlineVisible(model, visible)    e.g. hide the Toon outline while a character is Invisible
---   RigStyles.Default = "Toon"; RigStyles.OUTLINE_NAME / EYE_LIGHT_NAME / MAX_EYE_LIGHTS
+--   RigStyles.Default = "Soft"; RigStyles.OUTLINE_NAME / EYE_LIGHT_NAME / MAX_EYE_LIGHTS
 
 local Types = require(script.Parent.Parent.Types)
 
@@ -39,7 +39,7 @@ type StyleDef = StyleInfo & {
 
 local RigStyles = {}
 
-RigStyles.Default = "Toon"
+RigStyles.Default = "Soft" -- owner: the outlined Toon look read as cheap; Soft = fabric cloth, smooth bone
 RigStyles.OUTLINE_NAME = "SV_StyleOutline"
 RigStyles.EYE_LIGHT_NAME = "SV_StyleEyeLight"
 RigStyles.MAX_EYE_LIGHTS = 2
