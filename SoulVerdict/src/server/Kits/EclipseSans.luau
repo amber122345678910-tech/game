@@ -747,5 +747,4 @@ function Kit.OnDespawn(model: Model)
 	states[model] = nil
 end
 
-
 return Kit

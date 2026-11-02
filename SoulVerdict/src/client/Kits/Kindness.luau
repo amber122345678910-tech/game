@@ -250,14 +250,18 @@ local function dizzyStars(fx: any, target: Model, duration: number)
 	Lib.Animate(duration, function(a, _dt, elapsed)
 		local head = fx.Part(target, "Head")
 		local r = fx.Root(target)
-		local top = if head then head.Position + Vector3.new(0, 1.1, 0) elseif r then r.Position + Vector3.new(0, 3.4, 0) else nil
+		local top = if head
+			then head.Position + Vector3.new(0, 1.1, 0)
+			elseif r then r.Position + Vector3.new(0, 3.4, 0)
+			else nil
 		if top == nil then
 			return true
 		end
 		for k, s in stars do
 			local ang = elapsed * 7 + k * math.pi * 2 / 3
-			s.CFrame = CFrame.new(top + Vector3.new(math.cos(ang) * 1.1, math.sin(elapsed * 9 + k) * 0.15, math.sin(ang) * 1.1))
-				* CFrame.Angles(0, -ang, math.rad(45) + elapsed * 6)
+			s.CFrame = CFrame.new(
+				top + Vector3.new(math.cos(ang) * 1.1, math.sin(elapsed * 9 + k) * 0.15, math.sin(ang) * 1.1)
+			) * CFrame.Angles(0, -ang, math.rad(45) + elapsed * 6)
 			s.Transparency = if a > 0.75 then (a - 0.75) / 0.25 else 0
 		end
 		return nil
@@ -282,7 +286,12 @@ Effects.PanBonk = function(fx: any, packet: Map)
 			local head = if target then (fx.Part(target, "Head") or fx.Root(target)) else nil
 			if target and head then
 				local pos = head.Position + Vector3.new(0, 0.6, 0)
-				Lib.Text(pos + Vector3.new(0, 1.8, 0), Strings.L("fx.kindness.bonk"), GOLD, { Kind = "Alert", Scale = 1.5 })
+				Lib.Text(
+					pos + Vector3.new(0, 1.8, 0),
+					Strings.L("fx.kindness.bonk"),
+					GOLD,
+					{ Kind = "Alert", Scale = 1.5 }
+				)
 				Lib.Ring(CFrame.new(pos), 2.6, WHITE, 0.22, 0.2)
 				Lib.Flash(pos, CREAM, 3, 0.12)
 				Lib.Emit("Star", pos, 6, { Color = GOLD, Speed = { 4, 9 } })
@@ -509,7 +518,12 @@ Effects.KindShield = function(fx: any, packet: Map)
 			Lib.Emit("Heal", to, 4, { Color = LEAF })
 		end
 		if to then
-			Lib.Text(to + Vector3.new(0, 2.6, 0), Strings.L("fx.kindness.shield"), LEAF, { Kind = "Alert", Scale = 0.9 })
+			Lib.Text(
+				to + Vector3.new(0, 2.6, 0),
+				Strings.L("fx.kindness.shield"),
+				LEAF,
+				{ Kind = "Alert", Scale = 0.9 }
+			)
 			fx.Sound("Shield", to)
 		end
 		shieldBubble(fx, target, duration)
@@ -613,7 +627,12 @@ Effects.ButterscotchFeast = function(fx: any, packet: Map)
 			Lib.EmitBurst(burstAt, 9, GOLD, 0.3)
 			Lib.Emit("Heal", burstAt, 18, { Color = LEAF, Speed = { 4, 12 } })
 			Lib.Emit("Star", burstAt, 10, { Color = GOLD, Speed = { 6, 14 } })
-			Lib.Text(burstAt + Vector3.new(0, 2, 0), Strings.L("fx.kindness.feast"), GOLD, { Kind = "Alert", Scale = 1.3 })
+			Lib.Text(
+				burstAt + Vector3.new(0, 2, 0),
+				Strings.L("fx.kindness.feast"),
+				GOLD,
+				{ Kind = "Alert", Scale = 1.3 }
+			)
 			fx.Sound("Heal", burstAt, { Pitch = 0.9 })
 		end
 		if r then
@@ -644,7 +663,12 @@ Effects.ButterscotchFeast = function(fx: any, packet: Map)
 			local feet = rr.Position - Vector3.new(0, 2.8, 0)
 			Lib.Beam(feet, feet + Vector3.new(0, 18, 0), 2.6, GOLD, 0.7)
 			Lib.Flash(rr.Position, CREAM, 6, 0.3)
-			Lib.Text(rr.Position + Vector3.new(0, 3.5, 0), Strings.L("fx.revived"), GOLD, { Kind = "Alert", Scale = 1.2 })
+			Lib.Text(
+				rr.Position + Vector3.new(0, 3.5, 0),
+				Strings.L("fx.revived"),
+				GOLD,
+				{ Kind = "Alert", Scale = 1.2 }
+			)
 			fx.Sound("Revive", rr.Position)
 		end
 		if fx.IsLocal then
@@ -697,7 +721,11 @@ local function nurturing(fx: any, character: Model)
 		if acc >= 1 then
 			acc = 0
 			for _, other in Lib.Characters() do
-				if other ~= character and other:GetAttribute("Downed") ~= true and Teams.AreAllies(character, other) then
+				if
+					other ~= character
+					and other:GetAttribute("Downed") ~= true
+					and Teams.AreAllies(character, other)
+				then
 					local orr = fx.Root(other)
 					if orr and (orr.Position - pos).Magnitude <= NURTURE_RADIUS then
 						Lib.Emit("Heal", orr.Position + Vector3.new(0, 0.5, 0), 2, { Color = LEAF })

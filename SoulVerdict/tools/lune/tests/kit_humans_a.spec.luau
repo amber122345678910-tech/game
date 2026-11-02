@@ -359,7 +359,10 @@ tests.patience_waiting_game_and_calm = function(T, Loader)
 		T.ok(hz and hz.type == "Zone" and hz.params.visual == "PatienceClock", "clock zone")
 		T.eq(hz.params.radius, 16, "Radius from data")
 		T.eq(hz.params.effect, "Slow")
-		T.ok(math.abs(hz.params.center.Z + 20) < 1e-3 and math.abs(hz.params.center.Y) < 1e-3, "on the ground at the aim")
+		T.ok(
+			math.abs(hz.params.center.Z + 20) < 1e-3 and math.abs(hz.params.center.Y) < 1e-3,
+			"on the ground at the aim"
+		)
 		T.ok(pat:GetAttribute("UltActiveUntil") > H.now() + 5, "ult heart attribute")
 		T.eq(#H.fx("Field", "WaitingGame"), 1, "Field fx")
 		H.simulate(2)
@@ -746,7 +749,10 @@ local function clientEnv(Loader)
 		end,
 		Text = function(_pos, text, _color, _opts)
 			record("Text")
-			assert(type(text) == "string" and text ~= "" and not string.find(text, "^fx%."), "localized text: " .. tostring(text))
+			assert(
+				type(text) == "string" and text ~= "" and not string.find(text, "^fx%."),
+				"localized text: " .. tostring(text)
+			)
 		end,
 	}
 	E.VFX = setmetatable({}, {
@@ -812,7 +818,12 @@ local function clientEnv(Loader)
 				return nil
 			end
 			-- offline parts cannot report velocity: a table stand-in with the fields kits read
-			return { Position = r.CFrame.Position, CFrame = r.CFrame, AssemblyLinearVelocity = Vector3.new(30, 0, 0), Size = r.Size }
+			return {
+				Position = r.CFrame.Position,
+				CFrame = r.CFrame,
+				AssemblyLinearVelocity = Vector3.new(30, 0, 0),
+				Size = r.Size,
+			}
 		end
 		local noop = function() end
 		return {
@@ -870,9 +881,11 @@ local function clientEnv(Loader)
 			HitStop = noop,
 			Highlight = noop,
 			Combat = function()
-				return { ComboIndex = function()
-					return 2
-				end }
+				return {
+					ComboIndex = function()
+						return 2
+					end,
+				}
 			end,
 		}
 	end
@@ -922,7 +935,8 @@ function exerciseBody(E, T, Loader, kitId, phases, visuals)
 						data[k] = { caster, ally }
 					end
 				end
-				local fx = E.fx(caster, { isLocal = view.isLocal, predicted = view.predicted, enemyView = view.enemyView })
+				local fx =
+					E.fx(caster, { isLocal = view.isLocal, predicted = view.predicted, enemyView = view.enemyView })
 				local packet = {
 					caster = caster,
 					kit = kitId,
@@ -941,12 +955,18 @@ function exerciseBody(E, T, Loader, kitId, phases, visuals)
 		end
 		if client.Predict and client.Predict[ability.Id] then
 			T.noerror(function()
-				client.Predict[ability.Id](E.fx(caster, { isLocal = true }), { aim = Vector3.new(0, 0, -10), castId = 2 })
+				client.Predict[ability.Id](
+					E.fx(caster, { isLocal = true }),
+					{ aim = Vector3.new(0, 0, -10), castId = 2 }
+				)
 			end, kitId .. ".Predict." .. ability.Id)
 		end
 		local aimed = ability.Aim == "Ground" or ability.Aim == "Target" or type(ability.Hold) == "table"
 		if aimed then
-			T.ok(client.Indicator and type(client.Indicator[ability.Id]) == "function", kitId .. " Indicator." .. ability.Id)
+			T.ok(
+				client.Indicator and type(client.Indicator[ability.Id]) == "function",
+				kitId .. " Indicator." .. ability.Id
+			)
 		end
 		if client.Indicator and client.Indicator[ability.Id] then
 			T.noerror(function()
@@ -971,7 +991,17 @@ function exerciseBody(E, T, Loader, kitId, phases, visuals)
 	end
 	if client.OnDamageFx then
 		T.noerror(function()
-			client.OnDamageFx(E.fx(caster), { target = caster, attacker = monster, negated = "Pirouette", pos = Vector3.new(0, 3, 0), kind = "Melee", amount = 0 })
+			client.OnDamageFx(
+				E.fx(caster),
+				{
+					target = caster,
+					attacker = monster,
+					negated = "Pirouette",
+					pos = Vector3.new(0, 3, 0),
+					kind = "Melee",
+					amount = 0,
+				}
+			)
 		end, kitId .. ".OnDamageFx")
 	end
 	for _, spec in visuals or {} do
@@ -980,7 +1010,14 @@ function exerciseBody(E, T, Loader, kitId, phases, visuals)
 		if builder then
 			T.noerror(function()
 				local ctx = {
-					Packet = { id = 1, type = spec.kind, t0 = E.clock, owner = caster, team = "Humans", params = spec.params },
+					Packet = {
+						id = 1,
+						type = spec.kind,
+						t0 = E.clock,
+						owner = caster,
+						team = "Humans",
+						params = spec.params,
+					},
 					Params = spec.params,
 					Type = spec.kind,
 					Kind = spec.kind,
@@ -1006,16 +1043,29 @@ end
 tests.patience_client = function(T, Loader)
 	local E = exerciseClientKit(T, Loader, "Patience", {
 		ToyKnife = { { phase = "Strike", data = { combo = 3, last = true, hits = 1 } } },
-		RibbonSnare = { { phase = "Throw", data = { id = 3 } }, { phase = "Snare", data = { target = "$monster", time = 2.5 } } },
+		RibbonSnare = {
+			{ phase = "Throw", data = { id = 3 } },
+			{ phase = "Snare", data = { target = "$monster", time = 2.5 } },
+		},
 		Patience = {
 			{ phase = "Fade", data = { duration = 6 } },
 			{ phase = "Reveal", data = {} },
 			{ phase = "Ambush", data = { target = "$monster", pos = Vector3.new(0, 3, -6), amount = 9.6 } },
 		},
-		WaitingGame = { { phase = "Field", data = { center = Vector3.new(0, 0, -10), radius = 16, duration = 6, delay = 0.25, id = 4 } } },
+		WaitingGame = {
+			{
+				phase = "Field",
+				data = { center = Vector3.new(0, 0, -10), radius = 16, duration = 6, delay = 0.25, id = 4 },
+			},
+		},
 	}, {
 		{ name = "PatienceRibbon", kind = "Projectile", size = 0.9, params = { speed = 80, radius = 0.9 } },
-		{ name = "PatienceClock", kind = "Zone", size = 16, params = { center = Vector3.new(0, 0, -5), radius = 16, delay = 0.25, duration = 6, linger = 0.6 } },
+		{
+			name = "PatienceClock",
+			kind = "Zone",
+			size = 16,
+			params = { center = Vector3.new(0, 0, -5), radius = 16, delay = 0.25, duration = 6, linger = 0.6 },
+		},
 	})
 	T.ok((E.calls.Animate or 0) > 5, "animations ran")
 	local P = Loader.require(CLIENT .. "Kits.Patience")
@@ -1033,8 +1083,14 @@ tests.bravery_client = function(T, Loader)
 		},
 		BraveStand = { { phase = "Stand", data = { duration = 3, radius = 10, allies = "$allies" } } },
 		BurningCourage = {
-			{ phase = "Leap", data = { from = Vector3.new(0, 3, 0), to = Vector3.new(0, 0, -20), time = 0.5, radius = 14 } },
-			{ phase = "Slam", data = { center = Vector3.new(0, 0, -20), radius = 14, allies = "$allies", buffTime = 6 } },
+			{
+				phase = "Leap",
+				data = { from = Vector3.new(0, 3, 0), to = Vector3.new(0, 0, -20), time = 0.5, radius = 14 },
+			},
+			{
+				phase = "Slam",
+				data = { center = Vector3.new(0, 0, -20), radius = 14, allies = "$allies", buffTime = 6 },
+			},
 		},
 	})
 	T.ok((E.calls.GroundCircle or 0) > 0, "telegraphs drawn")
@@ -1044,7 +1100,10 @@ tests.integrity_client = function(T, Loader)
 	exerciseClientKit(T, Loader, "Integrity", {
 		BalletKicks = { { phase = "Strike", data = { combo = 3, last = true, hits = 1 } } },
 		GrandJete = {
-			{ phase = "Leap", data = { from = Vector3.new(0, 3, 0), to = Vector3.new(0, 0, -25), time = 0.6, radius = 7 } },
+			{
+				phase = "Leap",
+				data = { from = Vector3.new(0, 3, 0), to = Vector3.new(0, 0, -25), time = 0.6, radius = 7 },
+			},
 			{ phase = "Land", data = { center = Vector3.new(0, 0, -25), radius = 7 } },
 		},
 		Pirouette = {
@@ -1075,7 +1134,10 @@ tests.strings_complete = function(T, Loader)
 	end
 	T.ok(n >= 7, "keys present")
 	local Strings = Loader.require("ReplicatedStorage.Shared.Strings")
-	T.ok(Strings.Has("fx.patience.ambush") and Strings.Has("fx.bravery.courage") and Strings.Has("fx.integrity.bravo"), "merged")
+	T.ok(
+		Strings.Has("fx.patience.ambush") and Strings.Has("fx.bravery.courage") and Strings.Has("fx.integrity.bravo"),
+		"merged"
+	)
 end
 
 return tests

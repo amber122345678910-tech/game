@@ -535,7 +535,12 @@ Effects.RiftBlaster = function(fx: any, packet: Map)
 						lastSuck = e
 						local a = math.random() * math.pi * 2
 						local p = (cf * CFrame.new(math.cos(a) * radius * 2.2, math.sin(a) * radius * 2.6, -1.5)).Position
-						Lib.Emit("Mote", p, 1, { Color = pal.Glow, Dir = pos - p, Speed = { 6, 9 }, Life = { 0.3, 0.4 } })
+						Lib.Emit(
+							"Mote",
+							p,
+							1,
+							{ Color = pal.Glow, Dir = pos - p, Speed = { 6, 9 }, Life = { 0.3, 0.4 } }
+						)
 					end
 					if l then
 						l.Brightness = 2 * (1 - 0.7 * clamp01(e / delay))
@@ -729,7 +734,8 @@ Indicator.Starfall = function(_fx: any): Map?
 	local N = numbers("Starfall")
 	local radius = N.Radius or 14
 	local area = Lib.GroundCircle(Vector3.zero, radius, WHITE, { Rim = 0.22, Fill = 0.9, Height = 0.14 })
-	local inner = Lib.GroundCircle(Vector3.zero, N.ImpactRadius or 3.5, VIOLET, { Rim = 0.16, Fill = 0.8, Height = 0.16 })
+	local inner =
+		Lib.GroundCircle(Vector3.zero, N.ImpactRadius or 3.5, VIOLET, { Rim = 0.16, Fill = 0.8, Height = 0.16 })
 	local handle = {}
 	function handle.Update(_self: any, aim: Vector3, _charge: number)
 		area:SetCenter(aim)
@@ -1244,7 +1250,8 @@ local function eclipsedSun(fx: any, duration: number)
 			local grow = easeOutBack(clamp01(e / 0.6))
 			local fade = clamp01((a - 0.9) / 0.1)
 			model:PivotTo(
-				LookAlong(center - Vector3.new(0, 12 * (1 - grow), 0), cameraPos() - center) * CFrame.Angles(0, 0, e * 0.15)
+				LookAlong(center - Vector3.new(0, 12 * (1 - grow), 0), cameraPos() - center)
+					* CFrame.Angles(0, 0, e * 0.15)
 			)
 			setAlpha(model, 1 - fade)
 		end
@@ -1309,7 +1316,12 @@ Effects.TotalEclipse = function(fx: any, packet: Map)
 				fx.Delay(i * 0.09, function()
 					local a = i * 0.9
 					local p = cf.Position + Vector3.new(math.cos(a) * 9, 1 + (i % 3), math.sin(a) * 9)
-					Lib.Emit("Mote", p, 3, { Color = pal.Glow, Dir = cf.Position - p, Speed = { 8, 12 }, Life = { 0.5, 0.7 } })
+					Lib.Emit(
+						"Mote",
+						p,
+						3,
+						{ Color = pal.Glow, Dir = cf.Position - p, Speed = { 8, 12 }, Life = { 0.5, 0.7 } }
+					)
 				end)
 			end
 		end
@@ -1433,7 +1445,12 @@ HazardVisuals.RegisterVisual("EclipseStar", function(ctx: Map)
 			end
 			if t - lastEmit > 0.03 then
 				lastEmit = t
-				Lib.Emit("Star", pos, 1, { Color = if math.random() < 0.5 then CYAN else STARLIGHT, Speed = { 0.3, 1.5 } })
+				Lib.Emit(
+					"Star",
+					pos,
+					1,
+					{ Color = if math.random() < 0.5 then CYAN else STARLIGHT, Speed = { 0.3, 1.5 } }
+				)
 			end
 		else
 			if not impacted then
@@ -1536,8 +1553,14 @@ HazardVisuals.RegisterVisual("EclipseVoidFire", function(ctx: Map)
 	local radius = if type(p.radius) == "number" then p.radius else 4.5
 	local delay = if type(p.delay) == "number" then p.delay else 0.3
 	local duration = if type(p.duration) == "number" then p.duration else 3.5
-	local host =
-		Lib.Part("Block", Vector3.new(radius * 1.5, 0.2, radius * 1.5), CFrame.new(center + Vector3.new(0, 0.2, 0)), VOID, Enum.Material.SmoothPlastic, 1)
+	local host = Lib.Part(
+		"Block",
+		Vector3.new(radius * 1.5, 0.2, radius * 1.5),
+		CFrame.new(center + Vector3.new(0, 0.2, 0)),
+		VOID,
+		Enum.Material.SmoothPlastic,
+		1
+	)
 	local scale = Lib.ParticleScale()
 	local area = radius * radius
 	local flames = Lib.Emitter("Ember", host, {
@@ -1552,6 +1575,7 @@ HazardVisuals.RegisterVisual("EclipseVoidFire", function(ctx: Map)
 		LightEmission = 1,
 		Shape = Enum.ParticleEmitterShape.Box,
 		EmissionDirection = Enum.NormalId.Top,
+		Enabled = false, -- lit by Update once the fire starts (after the zone telegraph)
 	})
 	flames.Color = ColorSequence.new({
 		ColorSequenceKeypoint.new(0, CYAN),
@@ -1570,6 +1594,7 @@ HazardVisuals.RegisterVisual("EclipseVoidFire", function(ctx: Map)
 		LightInfluence = 0,
 		Shape = Enum.ParticleEmitterShape.Box,
 		EmissionDirection = Enum.NormalId.Top,
+		Enabled = false, -- lit by Update once the fire starts (after the zone telegraph)
 	})
 	local sparks = Lib.Emitter("Star", host, {
 		Color = STARLIGHT,
@@ -1578,6 +1603,7 @@ HazardVisuals.RegisterVisual("EclipseVoidFire", function(ctx: Map)
 		Speed = NumberRange.new(3, 6),
 		Shape = Enum.ParticleEmitterShape.Box,
 		EmissionDirection = Enum.NormalId.Top,
+		Enabled = false, -- lit by Update once the fire starts (after the zone telegraph)
 	})
 	local v: Map = {}
 	function v.Update(_s: any, _cf: CFrame, t: number, _dt: number)

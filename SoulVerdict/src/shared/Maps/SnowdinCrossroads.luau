@@ -311,6 +311,21 @@ local function bush(B: Builder, name: string, base: Vector3, size: number)
 	B:Deco("Ellipsoid", name .. "_Snow", V(size * 1.15, size * 0.5, size * 0.85), CFrame.new(base + V(0, size * 0.62, 0)) * CFrame.Angles(0, math.rad(rng:Number(0, 180)), 0), C.Snow, M.Snow, { Shadow = false })
 end
 
+-- Sagging string of coloured bulbs between two anchor points (a festive garland).
+local function garland(B: Builder, name: string, a: Vector3, b: Vector3, sag: number, bulbs: number)
+	local colors = { rgb(255, 80, 80), C.Gold, rgb(90, 200, 255), rgb(120, 230, 140) }
+	local last = a
+	for i = 1, bulbs + 1 do
+		local t = i / (bulbs + 1)
+		local p = a:Lerp(b, t) - V(0, sag * 4 * t * (1 - t), 0)
+		B:Rod("Decor", name .. "_Wire", last, p, 0.08, C.Iron, M.SmoothPlastic, { Shadow = false })
+		if i <= bulbs then
+			B:Deco("Ball", name .. "_Bulb", V(0.5, 0.5, 0.5), CFrame.new(p - V(0, 0.3, 0)), colors[i % #colors + 1], M.Neon, { Shadow = false })
+		end
+		last = p
+	end
+end
+
 local function postLamp(B: Builder, name: string, base: Vector3, shadows: boolean?): number
 	local light = B:Lamp(name, base, {
 		Style = "Post",
@@ -536,6 +551,10 @@ local function buildHouses(B: Builder): number
 	bench(B, "InnBench", inn * CFrame.new(-9, 0, -10.4))
 	barrel(B, "Barrel", (bakery * CFrame.new(-12.5, 0, -2)).Position)
 	crate(B, "Crate", bakery * CFrame.new(12.4, 0, 4) * CFrame.Angles(0, math.rad(8), 0), 2.6)
+	-- festive garlands across Main Street, from the shop's eave to the inn's
+	for _, x in { 39.5, 51.5 } do
+		garland(B, "Garland", V(x, 10.2, -22.6), V(x - 1, 13.2, 21.6), 3.2, 12)
+	end
 	-- shop backyard fence + bushes
 	B:Fence("ShopFence", { V(30, 0, -46), V(58, 0, -46), V(62, 0, -40) }, { Snow = true, Color = C.Wood })
 	for _, p in { V(32, 0, -21), V(57, 0, -20.5), V(36, 0, 20), V(61, 0, 19.5), V(-26, 0, -34), V(-25.5, 0, -58) } do
@@ -603,7 +622,7 @@ local function buildPond(B: Builder): number
 	for _, a in { 120, 250 } do
 		local r = math.rad(a)
 		local center = c + V(math.cos(r) * (L.PondR - 0.5), 0, math.sin(r) * (L.PondR - 0.5))
-		for k = 1, 6 do
+		for _ = 1, 6 do
 			local p = center + V(rng:Number(-1.6, 1.6), 0, rng:Number(-1.6, 1.6))
 			local h = rng:Number(2.2, 3.6)
 			B:Rod("Decor", "Reed", p, p + V(rng:Number(-0.4, 0.4), h, rng:Number(-0.4, 0.4)), 0.14, rgb(120, 104, 70), M.SmoothPlastic, { Shadow = false })

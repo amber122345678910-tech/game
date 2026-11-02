@@ -277,7 +277,12 @@ local function shieldBubble(fx: any, model: Model, diameter: number, duration: n
 	local dome = Lib.Part("Ball", Vector3.one * diameter, start, GOLD, FIELD, 0)
 	local glow = Lib.Part("Ball", Vector3.one * diameter * 0.96, start, ORANGE, NEON, 0.92)
 	local ring = if withRing
-		then Lib.GroundCircle(r0.Position - Vector3.new(0, 2.8, 0), diameter * 0.5, GOLD, { Rim = 0.2, Fill = 0.88, Height = 0.18 })
+		then Lib.GroundCircle(
+			r0.Position - Vector3.new(0, 2.8, 0),
+			diameter * 0.5,
+			GOLD,
+			{ Rim = 0.2, Fill = 0.88, Height = 0.18 }
+		)
 		else nil
 	local light = Lib.Light(glow, GOLD, 1.1, diameter * 1.4)
 	Lib.Animate(math.max(0.3, duration), function(_a, _dt, elapsed)
@@ -464,7 +469,8 @@ Effects.BurningCourage = function(fx: any, packet: Map)
 			local ang = k / 10 * TAU
 			fireTongue(Lib, c + Vector3.new(math.cos(ang), 0, math.sin(ang)) * radius * 0.82, 0.45 + 0.1 * (k % 3))
 		end
-		local scorch = Lib.GroundCircle(c, radius * 0.55, SCORCH, { Rim = 0.6, Fill = 0.45, Height = 0.08, Shadow = false })
+		local scorch =
+			Lib.GroundCircle(c, radius * 0.55, SCORCH, { Rim = 0.6, Fill = 0.45, Height = 0.08, Shadow = false })
 		Lib.Animate(2.2, function(a)
 			scorch:SetTransparency(0.3 + 0.7 * a, 0.45 + 0.55 * a)
 			return nil

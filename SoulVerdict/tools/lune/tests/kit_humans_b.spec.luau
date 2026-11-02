@@ -412,9 +412,11 @@ local function clientSmoke(Loader)
 			attrs[k] = v
 		end
 		function m:GetAttributeChangedSignal()
-			return { Connect = function()
-				return { Disconnect = noop }
-			end }
+			return {
+				Connect = function()
+					return { Disconnect = noop }
+				end,
+			}
 		end
 		function m:FindFirstChild(n)
 			return parts[n]
@@ -439,7 +441,19 @@ local function clientSmoke(Loader)
 	S.stubModel = stubModel
 	local function circle()
 		local c = {}
-		for _, k in { "SetCenter", "SetRadius", "SetInner", "SetFill", "SetColor", "SetTransparency", "SetVisible", "SetCFrame", "Destroy" } do
+		for _, k in
+			{
+				"SetCenter",
+				"SetRadius",
+				"SetInner",
+				"SetFill",
+				"SetColor",
+				"SetTransparency",
+				"SetVisible",
+				"SetCFrame",
+				"Destroy",
+			}
+		do
 			c[k] = noop
 		end
 		return c
@@ -450,7 +464,25 @@ local function clientSmoke(Loader)
 		AxisFrame = HazardDefs.AxisFrame,
 		Colors = { White = Color3.new(1, 1, 1) },
 	}
-	for _, k in { "Emit", "EmitRing", "EmitBurst", "Sparks", "Dust", "Flash", "Shockwave", "Ring", "Slash", "Line", "Beam", "Afterimage", "Shatter", "Text", "Debris" } do
+	for _, k in
+		{
+			"Emit",
+			"EmitRing",
+			"EmitBurst",
+			"Sparks",
+			"Dust",
+			"Flash",
+			"Shockwave",
+			"Ring",
+			"Slash",
+			"Line",
+			"Beam",
+			"Afterimage",
+			"Shatter",
+			"Text",
+			"Debris",
+		}
+	do
 		Lib[k] = function()
 			S.calls += 1
 		end
@@ -524,13 +556,19 @@ local function clientSmoke(Loader)
 	local realGet = Props.Get
 	Props.Get = function(name)
 		if name == "GiantBook" then
-			return { Size = Vector3.new(16, 1, 12), Build = function()
-				return stubModel("Book", Vector3.zero)
-			end, SetOpen = noop }
+			return {
+				Size = Vector3.new(16, 1, 12),
+				Build = function()
+					return stubModel("Book", Vector3.zero)
+				end,
+				SetOpen = noop,
+			}
 		elseif name == "Dish" then
-			return { Build = function()
-				return stubModel("Dish", Vector3.zero)
-			end }
+			return {
+				Build = function()
+					return stubModel("Dish", Vector3.zero)
+				end,
+			}
 		end
 		return realGet(name)
 	end
@@ -592,9 +630,11 @@ local function clientSmoke(Loader)
 				return enemies[model] == true
 			end,
 			Combat = function()
-				return { ComboIndex = function()
-					return 3
-				end }
+				return {
+					ComboIndex = function()
+						return 3
+					end,
+				}
 			end,
 		}
 	end
@@ -639,7 +679,7 @@ return {
 			T.ok(AS.CastAs(p, "SpellboundPages", { aim = Vector3.new(0, 3, -20) }), "pages cast")
 			H.advance(1)
 			T.eq(H.count("Hazard"), 5, "5 page projectiles")
-			T.eq(H.last("Hazard").params.visual, "SpellPage", "page visual")
+			T.eq(H.last("Hazard").params.visual, "Page", "page visual")
 			T.eq(hp0 - H.hp(mon), 20, "5 pages x 4")
 			T.ok(SS.Has(mon, "Rooted"), "3+ hits root the monster")
 			local bind = H.fx("SpellboundPages", "Bind")
@@ -968,12 +1008,15 @@ return {
 				T.ok(type(mod.Predict) == "table", id .. " Predict")
 			end
 		end
-		T.ok(HV.HasVisual("SpellPage"), "SpellPage visual registered")
+		T.ok(HV.HasVisual("Page"), "Page visual registered")
 		T.ok(HV.HasVisual("HomeCooking"), "HomeCooking zone visual registered")
 		local P = Loader.require(CLIENT .. "Kits.Perseverance")
 		local K = Loader.require(CLIENT .. "Kits.Kindness")
 		T.ok(type(P.Indicator.FinalChapter) == "function", "FinalChapter indicator")
-		T.ok(type(K.Indicator.HomeCooking) == "function" and type(K.Indicator.KindShield) == "function", "Kindness indicators")
+		T.ok(
+			type(K.Indicator.HomeCooking) == "function" and type(K.Indicator.KindShield) == "function",
+			"Kindness indicators"
+		)
 		local strings = Loader.require("ReplicatedStorage.Shared.Strings.KitHumansB")
 		for key, v in strings do
 			T.ok(type(v.en) == "string" and v.en ~= "" and type(v.ru) == "string" and v.ru ~= "", key .. " en + ru")
@@ -1003,10 +1046,17 @@ return {
 			local cases = {
 				Perseverance = {
 					NotebookSwat = { { "Start", { combo = 3 } }, { "Strike", { combo = 3, last = true, hits = 1 } } },
-					SpellboundPages = { { "Start", {} }, { "Stream", { count = 5, interval = 0.08 } }, { "Bind", { target = mon, duration = 1 } } },
+					SpellboundPages = {
+						{ "Start", {} },
+						{ "Stream", { count = 5, interval = 0.08 } },
+						{ "Bind", { target = mon, duration = 1 } },
+					},
 					Rewrite = {
 						{ "Start", {} },
-						{ "Rewind", { from = from, path = { Vector3.new(5, 3, 0), Vector3.new(3, 3, 0), from }, heal = 20 } },
+						{
+							"Rewind",
+							{ from = from, path = { Vector3.new(5, 3, 0), Vector3.new(3, 3, 0), from }, heal = 20 },
+						},
 						{ "Teleport", { from = from, to = Vector3.new(5, 3, 0) } },
 					},
 					FinalChapter = {
@@ -1020,14 +1070,30 @@ return {
 				},
 				Kindness = {
 					PanBonk = { { "Start", { combo = 2 } }, { "Bonk", { targets = { mon }, daze = 0.4 } } },
-					HomeCooking = { { "Start", {} }, { "Throw", { from = from, to = Vector3.new(0, 0, -12), time = 0.4, radius = 9 } } },
+					HomeCooking = {
+						{ "Start", {} },
+						{ "Throw", { from = from, to = Vector3.new(0, 0, -12), time = 0.4, radius = 9 } },
+					},
 					KindShield = { { "Start", {} }, { "Shield", { target = ally, duration = 5, amount = 40 } } },
-					ButterscotchFeast = { { "Start", {} }, { "Feast", { radius = 30, allies = { me, ally }, revived = ally, heal = 45 } } },
+					ButterscotchFeast = {
+						{ "Start", {} },
+						{ "Feast", { radius = 30, allies = { me, ally }, revived = ally, heal = 45 } },
+					},
 				},
 				Justice = {
-					Revolver = { { "Start", {} }, { "Shot", { from = from, to = to, hit = mon, long = true, primed = true } } },
-					FanTheHammer = { { "Start", {} }, { "Fan", { count = 6, interval = 0.07, cone = 12 } }, { "Shot", { from = from, to = to, fan = true, ammo = 3 } } },
-					QuickRoll = { { "Start", {} }, { "Roll", { from = from, to = from + Vector3.new(12, 0, 0), time = 0.28 } } },
+					Revolver = {
+						{ "Start", {} },
+						{ "Shot", { from = from, to = to, hit = mon, long = true, primed = true } },
+					},
+					FanTheHammer = {
+						{ "Start", {} },
+						{ "Fan", { count = 6, interval = 0.07, cone = 12 } },
+						{ "Shot", { from = from, to = to, fan = true, ammo = 3 } },
+					},
+					QuickRoll = {
+						{ "Start", {} },
+						{ "Roll", { from = from, to = from + Vector3.new(12, 0, 0), time = 0.28 } },
+					},
 					FinalVerdict = {
 						{ "Start", {} },
 						{ "Aim", { dir = Vector3.new(0, 0, -1), time = 1.2, lock = 0.25, length = 120, width = 3 } },
@@ -1039,6 +1105,13 @@ return {
 					},
 				},
 			}
+			-- the offline Workspace mock has no BulkMoveTo / Raycast: add inert ones for this test only
+			local W = getfenv(Loader.require(CLIENT .. "Kits.Justice").OnCharacter).game:GetService("Workspace")
+			rawset(W, "BulkMoveTo", function() end)
+			rawset(W, "Raycast", function()
+				return nil
+			end)
+			S.workspaceMock = W
 			for kitId, abilities in cases do
 				local mod = Loader.require(CLIENT .. "Kits." .. kitId)
 				for _, isLocal in { true, false } do
@@ -1047,12 +1120,23 @@ return {
 						for _, ph in phases do
 							fx.Predicted = false
 							S.run(kitId .. "." .. abilityId .. "." .. ph[1], mod.Effects[abilityId], fx, {
-								caster = me, kit = kitId, ability = abilityId, phase = ph[1], castId = 7, t0 = 99.5, data = ph[2],
+								caster = me,
+								kit = kitId,
+								ability = abilityId,
+								phase = ph[1],
+								castId = 7,
+								t0 = 99.5,
+								data = ph[2],
 							})
 						end
 						local pred = mod.Predict[abilityId]
 						if pred then
-							S.run(kitId .. ".Predict." .. abilityId, pred, fx, { aim = to, dir = Vector3.new(0, 0, -1), castId = 8 })
+							S.run(
+								kitId .. ".Predict." .. abilityId,
+								pred,
+								fx,
+								{ aim = to, dir = Vector3.new(0, 0, -1), castId = 8 }
+							)
 						end
 						local ind = mod.Indicator[abilityId]
 						if ind then
@@ -1068,7 +1152,13 @@ return {
 				end
 				for name, builder in mod.Visuals or {} do
 					S.run(kitId .. ".Visual." .. name, function()
-						local v = builder({ Lib = S.Lib, Color = Color3.new(1, 0, 1), Rule = "Purple", Size = 9, Params = {} })
+						local v = builder({
+							Lib = S.Lib,
+							Color = Color3.new(1, 0, 1),
+							Rule = "Purple",
+							Size = 9,
+							Params = {},
+						})
 						v:Update(CFrame.new(0, 3, -5), 0.5, 1 / 60)
 						v:Update(CFrame.new(0, 3, -6), 0.6, 1 / 60)
 						if v.Impact then
@@ -1080,6 +1170,10 @@ return {
 			end
 		end)
 		S.restore()
+		if S.workspaceMock then
+			rawset(S.workspaceMock, "BulkMoveTo", nil)
+			rawset(S.workspaceMock, "Raycast", nil)
+		end
 		T.ok(ok, "smoke harness: " .. tostring(err))
 		for _, e in S.errors do
 			T.ok(false, e)

@@ -282,7 +282,12 @@ Effects.QuickRoll = function(fx: any, packet: Map)
 			end
 			local chest = fx.Chest(char)
 			if chest then
-				Lib.Text(chest + Vector3.new(0, 2.4, 0), Strings.L("fx.justice.primed"), GOLD, { Kind = "Alert", Scale = 0.85 })
+				Lib.Text(
+					chest + Vector3.new(0, 2.4, 0),
+					Strings.L("fx.justice.primed"),
+					GOLD,
+					{ Kind = "Alert", Scale = 0.85 }
+				)
 			end
 		end)
 	end
@@ -307,6 +312,7 @@ type Laser = {
 	Glow: BasePart,
 	Dot: BasePart,
 	Light: PointLight?,
+	LastTo: Vector3?,
 }
 
 local function stopLaser(fx: any, castId: number): Laser?
@@ -339,6 +345,7 @@ local function startLaser(fx: any, packet: Map)
 		Glow = Lib.Part("Cylinder", Vector3.new(1, 0.32, 0.32), CFrame.new(), GOLD, Enum.Material.Neon, 0.78),
 		Dot = Lib.Part("Ball", Vector3.one * 0.6, CFrame.new(), YELLOW, Enum.Material.Neon, 0),
 		Light = nil,
+		LastTo = nil,
 	}
 	laser.Light = Lib.Light(laser.Dot, YELLOW, 2, 8)
 	local lasers = fx.State.Lasers or {}
@@ -364,6 +371,7 @@ local function startLaser(fx: any, packet: Map)
 		end
 		local hit = W:Raycast(from, dir * length, params)
 		local to = if hit then hit.Position else from + dir * length
+		laser.LastTo = to
 		local len = math.max(0.05, (to - from).Magnitude)
 		local frame = Lib.LookAlong(from:Lerp(to, 0.5), dir) * ROT_X_TO_LOOK
 		local blink = laser.Locked and (math.floor(elapsed * 22) % 2 == 0)
@@ -416,8 +424,16 @@ local function verdictBeam(fx: any, data: Map)
 	local frame = Lib.LookAlong(from:Lerp(to, 0.5), dir) * ROT_X_TO_LOOK
 	local layers = {
 		{ Part = Lib.Part("Cylinder", Vector3.new(len, 0.1, 0.1), frame, HOT, Enum.Material.Neon, 0), W = 0.45, T = 0 },
-		{ Part = Lib.Part("Cylinder", Vector3.new(len, 0.1, 0.1), frame, GOLD, Enum.Material.Neon, 0.2), W = 0.9, T = 0.2 },
-		{ Part = Lib.Part("Cylinder", Vector3.new(len, 0.1, 0.1), frame, YELLOW, Enum.Material.Neon, 0.6), W = 1.4, T = 0.6 },
+		{
+			Part = Lib.Part("Cylinder", Vector3.new(len, 0.1, 0.1), frame, GOLD, Enum.Material.Neon, 0.2),
+			W = 0.9,
+			T = 0.2,
+		},
+		{
+			Part = Lib.Part("Cylinder", Vector3.new(len, 0.1, 0.1), frame, YELLOW, Enum.Material.Neon, 0.6),
+			W = 1.4,
+			T = 0.6,
+		},
 	}
 	local light = Lib.Light(layers[1].Part, GOLD, 4, 30)
 	Lib.Animate(0.55, function(_a, _dt, elapsed)
@@ -461,7 +477,12 @@ local function verdictBeam(fx: any, data: Map)
 		local chest = if m then fx.Chest(m) else nil
 		if m and chest then
 			Lib.Flash(chest, GOLD, 4, 0.2)
-			Lib.Text(chest + Vector3.new(0, 2.8, 0), Strings.L("fx.justice.guilty"), GOLD, { Kind = "Alert", Scale = 1.35 })
+			Lib.Text(
+				chest + Vector3.new(0, 2.8, 0),
+				Strings.L("fx.justice.guilty"),
+				GOLD,
+				{ Kind = "Alert", Scale = 1.35 }
+			)
 			fx.Highlight(m, GOLD, 0.6)
 			fx.HitStop(m, 0.2)
 			if m == fx.LocalCharacter() then
@@ -514,8 +535,8 @@ Effects.FinalVerdict = function(fx: any, packet: Map)
 		verdictBeam(fx, data)
 	elseif packet.phase == "Cancel" then
 		local laser = stopLaser(fx, castId)
-		if laser then
-			fx.VFX.Emit("Spark", laser.Dot.Position, 4, { Color = YELLOW })
+		if laser and laser.LastTo then
+			fx.VFX.Emit("Spark", laser.LastTo, 4, { Color = YELLOW })
 		end
 	end
 end
@@ -531,6 +552,7 @@ local function sharpEye(fx: any, character: Model)
 	local Lib = fx.VFX
 	local longRange = numbers("Revolver").LongRange or 30
 	local marks: { [Model]: BasePart } = {}
+	local seen: { [Model]: boolean } = {} -- reused every frame
 	local st = { Dead = false }
 	local function clear()
 		for m, p in marks do
@@ -554,7 +576,7 @@ local function sharpEye(fx: any, character: Model)
 			clear()
 			return nil
 		end
-		local seen: { [Model]: boolean } = {}
+		table.clear(seen)
 		for _, other in Lib.Characters() do
 			if other ~= character and other:GetAttribute("Dead") ~= true and fx.IsEnemy(other) then
 				local head = fx.Part(other, "Head") or fx.Root(other)
@@ -562,7 +584,14 @@ local function sharpEye(fx: any, character: Model)
 					seen[other] = true
 					local mark = marks[other]
 					if mark == nil then
-						mark = Lib.Part("Block", Vector3.new(0.55, 0.55, 0.12), CFrame.new(), GOLD, Enum.Material.Neon, 0.15)
+						mark = Lib.Part(
+							"Block",
+							Vector3.new(0.55, 0.55, 0.12),
+							CFrame.new(),
+							GOLD,
+							Enum.Material.Neon,
+							0.15
+						)
 						marks[other] = mark
 					end
 					local bob = math.sin(elapsed * 3) * 0.15

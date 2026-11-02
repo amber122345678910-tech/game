@@ -166,7 +166,11 @@ local function installHooks()
 
 	-- the stealth breaks on attack (any cast but the stealth itself; blocking / dashing keep it)
 	AbilityService.Casted:Connect(function(model: Model, abilityId: string)
-		if abilityId ~= "Patience" and model:GetAttribute("KitId") == KIT_ID and StatusService.Has(model, "Invisible") then
+		if
+			abilityId ~= "Patience"
+			and model:GetAttribute("KitId") == KIT_ID
+			and StatusService.Has(model, "Invisible")
+		then
 			reveal(model)
 		end
 	end)

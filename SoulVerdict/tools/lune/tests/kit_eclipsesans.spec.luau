@@ -220,7 +220,12 @@ local function harness(Loader)
 		local out = {}
 		for _, s in H.sent do
 			local p = s.args[1]
-			if s.name == "AbilityFx" and p.kit == KIT and p.phase == phase and (ability == nil or p.ability == ability) then
+			if
+				s.name == "AbilityFx"
+				and p.kit == KIT
+				and p.phase == phase
+				and (ability == nil or p.ability == ability)
+			then
 				table.insert(out, p)
 			end
 		end
@@ -423,7 +428,10 @@ return {
 			local drops = H.HazardDefs.RainDrops(p)
 			T.eq(#drops, N.Count, "drops")
 			for _, d in drops do
-				T.ok((Vector3.new(d.Position.X, 0, d.Position.Z) - Vector3.new(0, 0, -30)).Magnitude <= N.Radius + 1e-6, "in area")
+				T.ok(
+					(Vector3.new(d.Position.X, 0, d.Position.Z) - Vector3.new(0, 0, -30)).Magnitude <= N.Radius + 1e-6,
+					"in area"
+				)
 			end
 			local human = H.spawn("Determination", "Humans", drops[4].Position, { look = Vector3.new(0, 0, 1) })
 			local hp0 = H.hp(human)
@@ -547,7 +555,10 @@ return {
 			local fires = H.hazards("Zone")
 			T.eq(#fires, 1, "void fire under the victim")
 			local fp = fires[1].params
-			T.ok(fp.color == "Purple" and fp.visual == "EclipseVoidFire" and fp.ability == "TotalEclipse", "fire params")
+			T.ok(
+				fp.color == "Purple" and fp.visual == "EclipseVoidFire" and fp.ability == "TotalEclipse",
+				"fire params"
+			)
 			T.eq(fp.damage, N.FireDamage, "fire damage")
 			T.near(fp.radius, N.FireRadius, 1e-6, "fire radius")
 			-- no fire outside the eclipse

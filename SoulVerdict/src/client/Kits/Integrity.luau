@@ -174,7 +174,8 @@ local function footTrails(fx: any, character: Model, duration: number)
 			trail.Attachment0 = a0
 			trail.Attachment1 = a1
 			trail.Color = ColorSequence.new(AZURE, PINK)
-			trail.Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.2), NumberSequenceKeypoint.new(1, 1) })
+			trail.Transparency =
+				NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.2), NumberSequenceKeypoint.new(1, 1) })
 			trail.Lifetime = 0.35
 			trail.LightEmission = 1
 			trail.LightInfluence = 0
@@ -256,11 +257,15 @@ local function spin(fx: any, duration: number, radius: number, ticks: number)
 	local BLADES = 8
 	local parts: { BasePart } = {}
 	for i = 1, BLADES do
-		table.insert(parts, Lib.Part("Block", Vector3.new(0.14, 0.5, 1.3), PARK, if i % 2 == 0 then AZURE else BLUE, NEON, 0.15))
+		table.insert(
+			parts,
+			Lib.Part("Block", Vector3.new(0.14, 0.5, 1.3), PARK, if i % 2 == 0 then AZURE else BLUE, NEON, 0.15)
+		)
 	end
 	local shell = Lib.Part("Cylinder", Vector3.new(4.8, 5.4, 5.4), PARK, AZURE, Enum.Material.ForceField, 0)
 	table.insert(parts, shell)
-	local floor = Lib.GroundCircle(r0.Position - Vector3.new(0, 2.8, 0), radius, AZURE, { Rim = 0.16, Fill = 0.9, Height = 0.14 })
+	local floor =
+		Lib.GroundCircle(r0.Position - Vector3.new(0, 2.8, 0), radius, AZURE, { Rim = 0.16, Fill = 0.9, Height = 0.14 })
 	local cfs: { CFrame } = table.create(#parts)
 	local interval = duration / math.max(1, ticks)
 	local nextTick = 1
@@ -361,7 +366,12 @@ local function spotlight(fx: any, duration: number)
 		return
 	end
 	local beam = Lib.Part("Cylinder", Vector3.new(36, 6.5, 6.5), PARK, PALE, NEON, 1)
-	local disc = Lib.GroundCircle(r0.Position - Vector3.new(0, 2.8, 0), 3.4, PALE, { Rim = 0.25, Fill = 0.55, Height = 0.12, Shadow = false })
+	local disc = Lib.GroundCircle(
+		r0.Position - Vector3.new(0, 2.8, 0),
+		3.4,
+		PALE,
+		{ Rim = 0.25, Fill = 0.55, Height = 0.12, Shadow = false }
+	)
 	local light = Lib.Light(beam, PALE, 2, 16)
 	fx.Sound("Ding", r0, { Pitch = 1.5 })
 	Lib.Animate(duration, function(a, _dt, elapsed)

@@ -125,10 +125,7 @@ end
 -- Gun muzzle for a caster facing `flat` (wall-safe: falls back to the root when the muzzle is behind a wall).
 local function muzzleAt(ctx: any, flat: Vector3): Vector3
 	local root = ctx:RootPosition()
-	local muzzle = root
-		+ Common.Right(flat) * MUZZLE_RIGHT
-		+ Vector3.new(0, MUZZLE_UP, 0)
-		+ flat * MUZZLE_FORWARD
+	local muzzle = root + Common.Right(flat) * MUZZLE_RIGHT + Vector3.new(0, MUZZLE_UP, 0) + flat * MUZZLE_FORWARD
 	if Validation.Raycast(root, muzzle - root) then
 		return root + Vector3.new(0, MUZZLE_UP, 0)
 	end

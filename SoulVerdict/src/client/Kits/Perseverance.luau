@@ -4,7 +4,7 @@
 --   NotebookSwat     Start {combo}: wide purple page-arcs (1 R->L, 2 L->R, 3 overhead slam with a paper burst on the
 --                    ground), predicted locally; Strike {last, hits}: ink burst + shockwave on a landed slam
 --   SpellboundPages  Start: the notebook flares; Stream {count, interval}: a paper puff per page at the hand (the pages
---                    themselves are "SpellPage" projectile hazards registered below); Bind {target, duration}: two
+--                    themselves are "Page" projectile hazards (visual registered below)); Bind {target, duration}: two
 --                    counter-rotating rune rings lock the target in place + BOUND popup + purple outline
 --   Rewrite          Rewind {from, path, heal}: purple afterimage left behind + clock ring; Teleport {from, to}: ghost
 --                    echoes along the recorded path (newest -> oldest), clock hands spinning backwards at the arrival,
@@ -122,7 +122,8 @@ local function ultHeart(fx: any, untilTime: number)
 end
 
 ---------------------------------------------------------------------------------------------------
--- "SpellPage" projectile visual (registered with HazardVisuals when this module loads)
+-- "Page" projectile visual: registered with HazardVisuals when this module loads, replacing the generic
+-- built-in "Page" (still used if this module ever fails to load)
 
 local function spellPageVisual(ctx: Map): Map
 	local Lib = ctx.Lib
@@ -148,9 +149,7 @@ local function spellPageVisual(ctx: Map): Map
 	local v: Map = {}
 	function v.Update(_s: any, cf: CFrame, t: number, _dt: number)
 		-- a thrown page: flat-ish to the flight, rolling and flapping
-		local frame = cf
-			* CFrame.Angles(math.rad(62) + math.sin(t * 17) * 0.35, 0, 0)
-			* CFrame.Angles(0, 0, t * 11)
+		local frame = cf * CFrame.Angles(math.rad(62) + math.sin(t * 17) * 0.35, 0, 0) * CFrame.Angles(0, 0, t * 11)
 		for i = 1, #parts do
 			cfs[i] = frame * offsets[i]
 		end
@@ -176,12 +175,12 @@ local function spellPageVisual(ctx: Map): Map
 	return v
 end
 
-Kit.Visuals = { SpellPage = spellPageVisual } -- exported for tests / previews
+Kit.Visuals = { Page = spellPageVisual } -- exported for tests / previews
 
 pcall(function()
 	local controllers = script.Parent.Parent:WaitForChild("Controllers")
 	local HazardVisuals = require(controllers:WaitForChild("HazardVisuals") :: any) :: any
-	HazardVisuals.RegisterVisual("SpellPage", spellPageVisual)
+	HazardVisuals.RegisterVisual("Page", spellPageVisual)
 end)
 
 ---------------------------------------------------------------------------------------------------
@@ -316,7 +315,12 @@ local function bind(fx: any, target: Model, duration: number)
 			for k = 1, 6 do
 				local part = runes[(ring - 1) * 6 + k]
 				local ang = elapsed * spec.Speed + (k - 1) * math.pi / 3
-				local p = pos + Vector3.new(math.cos(ang) * spec.R, spec.Y + math.sin(elapsed * 4 + k) * 0.1, math.sin(ang) * spec.R)
+				local p = pos
+					+ Vector3.new(
+						math.cos(ang) * spec.R,
+						spec.Y + math.sin(elapsed * 4 + k) * 0.1,
+						math.sin(ang) * spec.R
+					)
 				part.CFrame = Lib.LookAlong(p, Vector3.new(-math.sin(ang), 0, math.cos(ang)))
 					* CFrame.Angles(0, 0, math.rad(45))
 				part.Transparency = 0.1 + 0.9 * fade
@@ -478,7 +482,9 @@ end
 
 local function bookScale(radius: number): number
 	local GiantBook = prop("GiantBook")
-	local size: Vector3 = if GiantBook and typeof(GiantBook.Size) == "Vector3" then GiantBook.Size else Vector3.new(16, 1, 12)
+	local size: Vector3 = if GiantBook and typeof(GiantBook.Size) == "Vector3"
+		then GiantBook.Size
+		else Vector3.new(16, 1, 12)
 	return math.max(0.3, (radius * 2.1) / math.max(1, size.X))
 end
 
@@ -693,7 +699,12 @@ Effects.FinalChapter = function(fx: any, packet: Map)
 			end
 		end
 		if #hits > 0 then
-			Lib.Text(pos + Vector3.new(0, 6, 0), Strings.L("fx.perseverance.theEnd"), PALE, { Kind = "Alert", Scale = 1.4 })
+			Lib.Text(
+				pos + Vector3.new(0, 6, 0),
+				Strings.L("fx.perseverance.theEnd"),
+				PALE,
+				{ Kind = "Alert", Scale = 1.4 }
+			)
 		end
 	elseif packet.phase == "Cancel" then
 		finishBook(fx, castId, true)
@@ -744,7 +755,12 @@ Indicator.FinalChapter = function(fx: any): Map?
 			local me = fx.Root(fx.Character)
 			local d = if me then r.Position - me.Position else Vector3.new(0, 0, -1)
 			local flat = Vector3.new(d.X, 0, d.Z)
-			ghost:PivotTo(Lib.LookAlong(g + Vector3.new(0, BOOK_HEIGHT, 0), if flat.Magnitude > 0.1 then flat.Unit else Vector3.new(0, 0, -1)))
+			ghost:PivotTo(
+				Lib.LookAlong(
+					g + Vector3.new(0, BOOK_HEIGHT, 0),
+					if flat.Magnitude > 0.1 then flat.Unit else Vector3.new(0, 0, -1)
+				)
+			)
 			ghost.Parent = Lib.Folder()
 		end
 	end

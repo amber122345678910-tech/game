@@ -6,7 +6,7 @@
 --   NotebookSwat (M1)     3-hit combo of WIDE notebook swats (box Range deep, Range x SWAT_WIDTH wide); the 3rd is
 --                         an overhead slam (wider, knocks back SLAM_KNOCKBACK).   Fx "Strike" {combo, last, hits}
 --   SpellboundPages (Q)   after Windup a stream of Pages page projectiles (Interval apart, Speed, Damage each,
---                         hazard visual "SpellPage", alternating +-PAGE_WOBBLE deg). A target hit by RootHits
+--                         hazard visual "Page", alternating +-PAGE_WOBBLE deg). A target hit by RootHits
 --                         pages of the SAME stream is Rooted for Root s (dodged pages do not count).
 --                         Fx "Stream" {count, interval}, "Bind" {target, duration}
 --   Rewrite (E)           rewinds the caster to where they stood Seconds ago: a server ring buffer (StatusService
@@ -44,7 +44,7 @@ local SLAM_WIDTH = 1.5
 local SLAM_KNOCKBACK = 16
 local PAGE_RADIUS = 0.7
 local PAGE_WOBBLE = 3 -- degrees: the stream flutters left / right of the aim line
-local PAGE_VISUAL = "SpellPage" -- registered by src/client/Kits/Perseverance.luau
+local PAGE_VISUAL = "Page" -- richer version registered by src/client/Kits/Perseverance.luau
 local SAMPLE_INTERVAL = 0.1
 local HISTORY_SLACK = 1.5 -- seconds of history kept beyond Rewrite.Seconds
 local BOOK_RADIUS = 7.5

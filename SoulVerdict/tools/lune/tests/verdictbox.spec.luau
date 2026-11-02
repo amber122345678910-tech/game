@@ -796,8 +796,17 @@ tests.server_box_lifecycle = function(T, Loader)
 		local VB, SS, DS = H.S.VerdictBoxService, H.S.StatusService, H.S.DamageService
 		local Config = Loader.require("ReplicatedStorage.Shared.Config")
 		local c = Config.VerdictBox
-		local p1 = { Name = "P1", DisplayName = "Frisk", UserId = 1, Parent = true }
-		local p2 = { Name = "P2", DisplayName = "Kris", UserId = 2, Parent = true }
+		local playersFolder = Instance.new("Folder")
+		local function player(name, display, id)
+			local p = Instance.new("Player")
+			p.Name = name
+			p.DisplayName = display
+			p.UserId = id
+			p.Parent = playersFolder
+			return p
+		end
+		local p1 = player("P1", "Frisk", 1)
+		local p2 = player("P2", "Kris", 2)
 		H.players = { p1, p2 }
 		local sans = H.spawn("ClassicSans", "Monster", Vector3.new(0, 0, 0), nil)
 		local human = H.spawn("Determination", "Humans", Vector3.new(0, 0, -10), p1)
@@ -860,7 +869,7 @@ tests.server_box_lifecycle = function(T, Loader)
 		VB.Ended:Connect(function(id, victim, hits, survived)
 			ended = { id = id, victim = victim, hits = hits, survived = survived }
 		end)
-		H.advance(c.Duration)
+		H.advance(c.Duration - (tl.introEnd + 0.6) + 0.15) -- just past the end (the 3D box lingers 0.9 s)
 		local endArgs = H.last("BoxEnd")
 		T.ok(endArgs and endArgs[1] == 1 and endArgs[2].hits == 2 and endArgs[2].survived == false, "BoxEnd {hits, survived}")
 		T.eq(endArgs[2].reason, "Duration", "ended by the clock")
@@ -870,6 +879,8 @@ tests.server_box_lifecycle = function(T, Loader)
 		T.ok(not VB.IsBoxed(human), "no longer boxed")
 		T.eq(pk.box:GetAttribute("Verdict"), "Guilty", "verdict shown on the 3D box")
 		T.ok(not SS.Has(human, "DamageUp"), "2 hits: no survive buff")
+		H.advance(1.0)
+		T.ok(pk.box.Parent == nil, "3D box removed after showing the verdict")
 
 		-- survive: <= SurviveMaxHits -> DamageUp + ult
 		human:SetAttribute("Ult", 0)

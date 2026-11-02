@@ -94,7 +94,10 @@ function Kit.Leap(ctx: any, rootTarget: Vector3, airTime: number, apex: number, 
 	if not ctx:Wait(up) then
 		return false
 	end
-	ctx:ForceMove(ctx.Caster, { kind = "Dash", velocity = vh + Vector3.new(0, (rise - apex) / down, 0), duration = down })
+	ctx:ForceMove(
+		ctx.Caster,
+		{ kind = "Dash", velocity = vh + Vector3.new(0, (rise - apex) / down, 0), duration = down }
+	)
 	return ctx:Wait(down)
 end
 
@@ -119,7 +122,14 @@ function Kit.LeapTarget(ctx: any, maxDistance: number): (Vector3, Vector3)
 end
 
 -- Applies `status` {mult} unless the target already carries a stronger version of it.
-local function applyMult(ctx: any, model: Model, status: string, duration: number, mult: number, stronger: (number, number) -> boolean)
+local function applyMult(
+	ctx: any,
+	model: Model,
+	status: string,
+	duration: number,
+	mult: number,
+	stronger: (number, number) -> boolean
+)
 	local _, data = Common.Services().StatusService.Get(model, status)
 	local current = if data and type(data.mult) == "number" then data.mult else nil
 	if current ~= nil and stronger(current, mult) then

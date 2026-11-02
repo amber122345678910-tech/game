@@ -232,7 +232,12 @@ local function wrap(fx: any, target: Model, time: number)
 		end
 	end
 	local cfs: { CFrame } = table.create(#parts)
-	Lib.Text(r0.Position + Vector3.new(0, 3.4, 0), Strings.L("fx.patience.snared"), CYAN, { Kind = "Alert", Scale = 0.9 })
+	Lib.Text(
+		r0.Position + Vector3.new(0, 3.4, 0),
+		Strings.L("fx.patience.snared"),
+		CYAN,
+		{ Kind = "Alert", Scale = 0.9 }
+	)
 	Lib.EmitBurst(r0.Position, 3.2, CYAN, 0.22)
 	fx.Sound("SoulGrab", r0, { Pitch = 1.3, Volume = 0.6 })
 	Lib.Animate(math.max(0.3, time), function(a, _dt, elapsed)
