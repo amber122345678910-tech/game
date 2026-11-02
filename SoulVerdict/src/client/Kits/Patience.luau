@@ -483,8 +483,7 @@ local function runStealth(fx: any, character: Model)
 		local active = character.Parent ~= nil
 			and character:GetAttribute("Invisible") == true
 			and character:GetAttribute("Dead") ~= true
-		local lc = localCharacter()
-		local isSelf = lc == character
+		local isSelf = fx.LocalCharacter() == character
 		local isEnemy = fx.IsEnemy(character)
 		local goal = if active then Kit.StealthAlpha(isSelf, isEnemy) else 0
 		local stepK = math.max(dt, 1 / 240) / FADE_TIME
@@ -674,7 +673,7 @@ HazardVisuals.RegisterVisual("PatienceClock", function(ctx: Map)
 		if r == nil or not r:IsA("BasePart") then
 			return false
 		end
-		local d = r.Position - center
+		local d = r.CFrame.Position - center
 		return Vector3.new(d.X, 0, d.Z).Magnitude <= radius and d.Y > -4 and d.Y < 12
 	end
 	local function enemy(model: Model): boolean
@@ -713,7 +712,7 @@ HazardVisuals.RegisterVisual("PatienceClock", function(ctx: Map)
 				warned = true
 				local r = lc:FindFirstChild("HumanoidRootPart")
 				if r and r:IsA("BasePart") then
-					Lib.Text(r.Position + Vector3.new(0, 3.6, 0), Strings.L("fx.patience.timeSlows"), CYAN, {
+					Lib.Text(r.CFrame.Position + Vector3.new(0, 3.6, 0), Strings.L("fx.patience.timeSlows"), CYAN, {
 						Kind = "Alert",
 						Scale = 0.8,
 					})

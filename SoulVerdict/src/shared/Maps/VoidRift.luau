@@ -20,7 +20,8 @@
 -- Built around the origin (centre floor top y = 0, forward = -Z); MapService offsets it.
 --
 -- API (Types.MapDef): VoidRift.Id/Name/Desc/Preset/FinalPreset/Music
---   VoidRift.Build(seed?) -> MapInfo        island SHAPES are fixed (layout rng); only decor varies by seed
+--   VoidRift.Build(seed?, opts?) -> MapInfo  island SHAPES are fixed (layout rng); only decor varies by seed
+--        opts = { Overview: boolean? } (skips the far scenery: tight framing for overview renders)
 --   VoidRift.Layout                         layout constants (islands, KillY, radius) for tests/tools
 
 local Types = require(script.Parent.Parent.Types)
@@ -61,8 +62,8 @@ local C = {
 	CrackDeep = rgb(56, 128, 255), -- blue neon
 	Violet = rgb(150, 92, 255),
 	RiftCore = rgb(236, 250, 255),
-	Bridge = rgb(104, 200, 255),
-	BridgeEdge = rgb(186, 244, 255),
+	Bridge = rgb(34, 104, 226),
+	BridgeEdge = rgb(84, 198, 255),
 	Bone = rgb(226, 230, 240),
 	BoneShade = rgb(178, 184, 204),
 	Crystal = rgb(96, 230, 255),
@@ -102,8 +103,8 @@ local L = {
 	BoundaryR = 118,
 	BoundaryBottom = -64,
 	BoundaryHeight = 180,
-	SkullRock = V(0, 14, -134), -- the giant skull's floating rock (top centre)
-	SkullScale = 4.2,
+	SkullRock = V(-40, 12, -104), -- the giant skull's floating rock (top centre), north-west of the Gate
+	SkullScale = 3.6,
 	Saves = { V(-76, -1, -36), V(61, -3, 46), V(70, 12, -38) },
 	MonsterSpawn = V(0, 7, -78),
 }
@@ -296,8 +297,9 @@ end
 local function pylon(B: Builder, name: string, base: Vector3, height: number, glow: Color3)
 	B:Solid("Block", name .. "_Base", V(2.4, 1, 2.4), CFrame.new(base + V(0, 0.5, 0)) * CFrame.Angles(0, math.rad(45), 0), C.StoneSide, M.Slate)
 	B:Solid("Block", name, V(1.4, height, 1.4), CFrame.new(base + V(0, height / 2 + 1, 0)) * CFrame.Angles(0, math.rad(45), 0), C.StoneLight, M.Slate)
-	B:Deco("Block", name .. "_Band", V(1.6, 0.3, 1.6), CFrame.new(base + V(0, height * 0.7 + 1, 0)) * CFrame.Angles(0, math.rad(45), 0), glow, M.Neon, { Shadow = false })
-	B:Cone("Decor", name .. "_Tip", base + V(0, height + 1, 0), 2.2, 1.05, 4, glow, M.Neon, { Phase = 45, Shadow = false })
+	B:Deco("Block", name .. "_Band", V(1.55, 0.22, 1.55), CFrame.new(base + V(0, height * 0.72 + 1, 0)) * CFrame.Angles(0, math.rad(45), 0), glow, M.Neon, { Shadow = false })
+	B:Cone("Decor", name .. "_Cap", base + V(0, height + 1, 0), 1.1, 1.05, 4, C.StoneSide, M.Slate, { Phase = 45, Shadow = false })
+	B:Ball("Decor", name .. "_Gem", base + V(0, height + 2.35, 0), 0.55, glow, M.Neon, { Shadow = false })
 end
 
 -- Islands ----------------------------------------------------------------------------------------------------
@@ -500,14 +502,12 @@ local function lightBridge(B: Builder, name: string, a: Vector3, b: Vector3, wid
 	local deckT = 0.5
 	local a0, b0 = a + UP * 0.04, b + UP * 0.04
 	B:Beam("Geometry", name .. "_Deck", a0 - UP * (deckT / 2), b0 - UP * (deckT / 2), width, deckT, C.Bridge, M.Neon, {
-		Transparency = 0.5,
+		Transparency = 0.66,
 		Shadow = false,
 	})
-	-- under-glow sheet (gives the light some body from below)
-	B:Beam("Decor", name .. "_Underglow", a0 - UP * 0.9, b0 - UP * 0.9, width * 0.7, 0.2, C.CrackDeep, M.Neon, { Transparency = 0.6, Shadow = false })
 	for _, s in { -1, 1 } do
-		local off = side * (s * (width / 2 - 0.15))
-		B:Beam("Decor", name .. "_Edge", a0 + off + UP * 0.03, b0 + off + UP * 0.03, 0.3, 0.1, C.BridgeEdge, M.Neon, { Shadow = false })
+		local off = side * (s * (width / 2 - 0.12))
+		B:Beam("Decor", name .. "_Edge", a0 + off + UP * 0.03, b0 + off + UP * 0.03, 0.22, 0.1, C.BridgeEdge, M.Neon, { Shadow = false })
 	end
 	-- chevrons
 	local count = math.max(2, math.floor(len / 6))
@@ -516,8 +516,8 @@ local function lightBridge(B: Builder, name: string, a: Vector3, b: Vector3, wid
 		local tip = a0:Lerp(b0, t) + UP * 0.05
 		local back = a0:Lerp(b0, t - 1.6 / len) + UP * 0.05
 		for _, s in { -1, 1 } do
-			B:Beam("Decor", name .. "_Chevron", back + side * (s * (width / 2 - 1.1)), tip, 0.32, 0.06, C.BridgeEdge, M.Neon, {
-				Transparency = 0.35,
+			B:Beam("Decor", name .. "_Chevron", back + side * (s * (width / 2 - 1.1)), tip, 0.3, 0.06, C.BridgeEdge, M.Neon, {
+				Transparency = 0.55,
 				Shadow = false,
 			})
 		end
@@ -529,11 +529,11 @@ local function lightBridge(B: Builder, name: string, a: Vector3, b: Vector3, wid
 		local off = side * (s * (width / 2 + 0.1))
 		for k = 0, posts do
 			local p = a0:Lerp(b0, lerp(t0, t1, k / posts)) + off
-			B:Rod("Decor", name .. "_RailPost", p, p + UP * 1.5, 0.22, C.Bridge, M.Neon, { Shadow = false, Transparency = 0.15 })
+			B:Rod("Decor", name .. "_RailPost", p, p + UP * 1.5, 0.2, C.Bridge, M.Neon, { Shadow = false, Transparency = 0.35 })
 		end
 		local r0 = a0:Lerp(b0, t0) + off + UP * 1.5
 		local r1 = a0:Lerp(b0, t1) + off + UP * 1.5
-		B:Rod("Decor", name .. "_Rail", r0, r1, 0.18, C.BridgeEdge, M.Neon, { Shadow = false })
+		B:Rod("Decor", name .. "_Rail", r0, r1, 0.16, C.BridgeEdge, M.Neon, { Shadow = false, Transparency = 0.2 })
 		B:Beam("Geometry", name .. "_Guard", a0 + off + fl * 1.2 + UP * 1.6, b0 + off - fl * 1.2 + UP * 1.6, 0.5, 3.2, C.Bridge, M.SmoothPlastic, {
 			Transparency = 1,
 			Shadow = false,
@@ -541,12 +541,8 @@ local function lightBridge(B: Builder, name: string, a: Vector3, b: Vector3, wid
 		})
 	end
 	-- anchors
-	for _, e in { a, b } do
-		local inward = if e == a then -fl else fl
-		for _, s in { -1, 1 } do
-			pylon(B, name .. "_Pylon", e + side * (s * (width / 2 + 1.4)) + inward * 1.2, 3.4, C.Crack)
-		end
-	end
+	pylon(B, name .. "_Pylon", a + side * (width / 2 + 1.4) - fl * 1.2, 3.4, C.Crack)
+	pylon(B, name .. "_Pylon", b - side * (width / 2 + 1.4) + fl * 1.2, 3.4, C.Crack)
 	return B:Light("Point", a0:Lerp(b0, 0.5) + UP * 2.5, { Name = name .. "_Light", Brightness = 0.9, Range = 18, Color = C.Light })
 end
 
@@ -577,9 +573,9 @@ local function rift(B: Builder, name: string, cf: CFrame, height: number, width:
 	end
 	local center = V(math.sin(0.5 * 7.3) * width * 0.11, height * 0.5, 0)
 	local layers = {
-		{ SX = 1, SY = 1, Color = C.Violet, T = 0.12, Z = 0 },
-		{ SX = 0.64, SY = 0.93, Color = C.Crack, T = 0.05, Z = 0.25 },
-		{ SX = 0.26, SY = 0.84, Color = C.RiftCore, T = 0, Z = 0.5 },
+		{ SX = 1, SY = 1, Color = rgb(112, 60, 236), T = 0.08, Z = 0 },
+		{ SX = 0.58, SY = 0.9, Color = rgb(48, 140, 255), T = 0.2, Z = 0.25 },
+		{ SX = 0.15, SY = 0.78, Color = rgb(190, 236, 255), T = 0.35, Z = 0.5 },
 	}
 	for li, layer in layers do
 		local function map(p: Vector3): Vector3
@@ -627,6 +623,16 @@ local function crackSkull(B: Builder, name: string, head: CFrame, s: number, hol
 			B:Deco("Block", name .. "_FragmentEdge", V(size.X * 1.02, 0.08 * s, 0.08 * s), holeAt * CFrame.new(off + V(0, size.Y * 0.5, 0)), color, M.Neon, { Shadow = false })
 		end
 	end
+end
+
+-- MapKit SkullStatue builds its plinth 4*s*s tall (the height is scaled twice); restore the intended
+-- 6s x 4s x 6s block (a no-op once MapKit is fixed) and dress it in the rift's dark stone.
+local function fixPlinth(plinth: BasePart, base: Vector3, facing: Vector3, s: number)
+	local frame = MapKit.Facing(base, base + facing)
+	plinth.Size = V(6, 4, 6) * s
+	plinth.CFrame = frame * CFrame.new(0, 2 * s, 0)
+	plinth.Color = C.StoneSide
+	plinth.Material = M.Slate
 end
 
 -- Sections ---------------------------------------------------------------------------------------------------
@@ -678,7 +684,7 @@ local function buildGate(B: Builder, gate: Island): number
 	B:Group("Gate")
 	local lights = 0
 	local base = V(0, gate.Top, -93)
-	rift(B, "Rift", CFrame.new(base + V(0, 1.2, 0)), 27, 12)
+	rift(B, "Rift", CFrame.new(base + V(0, 1.2, 0)), 23, 10)
 	-- the rift's foot: a cracked dais
 	B:Disc("Geometry", "RiftDais", base + V(0, 0.3, 1), 11, 0.6, C.StoneLight, M.Slate)
 	B:Disc("Decor", "RiftDaisGlow", base + V(0, 0.62, 1), 8.4, 0.06, C.Violet, M.Neon, { Shadow = false, Transparency = 0.3 })
@@ -709,7 +715,7 @@ local function buildGate(B: Builder, gate: Island): number
 			B:Deco("Block", "RiftShardEdge", V(s * 1.04, 0.12, 0.12), cf * CFrame.new(0, s * 0.8, 0), C.Crack, M.Neon, { Shadow = false })
 		end
 	end
-	local l = B:Light("Point", base + V(0, 12, 4), { Name = "RiftLight", Brightness = 2.4, Range = 44, Color = rgb(170, 226, 255), Shadows = true })
+	local l = B:Light("Point", base + V(0, 12, 4), { Name = "RiftLight", Brightness = 1.8, Range = 44, Color = rgb(170, 226, 255), Shadows = true })
 	local _ = l
 	lights += 1
 	B:Light("Point", base + V(0, 3, 10), { Name = "RiftFloor", Brightness = 1.2, Range = 18, Color = C.LightViolet })
@@ -723,25 +729,38 @@ end
 local function buildGiantSkull(B: Builder): number
 	B:Group("GiantSkull")
 	local rngLayout = Rng.new("VoidRift.SkullRock")
-	local rock = makeIsland({ Name = "SkullRock", Center = L.SkullRock, RX = 21, RZ = 17, Verts = 9, Jitter = { 0.9, 1.05 }, Phase = 10, Depth = 1.6 }, rngLayout)
-	buildIsland(B, rock, { Cracks = 4, Debris = 6, CrackScale = 1.4 })
-	local s = L.SkullScale
 	local base = L.SkullRock
-	B:SkullStatue("GiantSkull", base, {
+	local rock = makeIsland({ Name = "SkullRock", Center = base, RX = 18, RZ = 15, Verts = 9, Jitter = { 0.92, 1.05 }, Phase = 10, Depth = 1.7 }, rngLayout)
+	buildIsland(B, rock, { Cracks = 4, Debris = 6, CrackScale = 1.3 })
+	local s = L.SkullScale
+	local facing = flat(V(0, 0, 0) - base).Unit
+	local plinth = B:SkullStatue("GiantSkull", base, {
 		Scale = s,
-		Facing = V(0, 0, 1),
+		Facing = facing,
 		Color = C.Bone,
 		Dark = rgb(8, 10, 24),
-		Accent = rgb(52, 70, 120),
+		Accent = rgb(44, 58, 104),
 		Eye = C.Crack,
 	})
-	local frame = MapKit.Facing(base, base + V(0, 0, 1))
+	fixPlinth(plinth, base, facing, s)
+	local frame = MapKit.Facing(base, base + facing)
+	-- glowing fractures running down the plinth's front
+	for k, x in { -2.2, 1.4 } do
+		local pts: { Vector3 } = {}
+		for i = 0, 3 do
+			local jig = if i % 2 == 0 then 0.5 else -0.4
+			table.insert(pts, (frame * CFrame.new((x + jig * k) * s * 0.4, 4 * s - 0.8 - i * (4 * s - 1.6) / 3, -3 * s - 0.06)).Position)
+		end
+		for i = 1, #pts - 1 do
+			B:Rod("Decor", "PlinthCrack", pts[i], pts[i + 1], 0.32, if k == 1 then C.Crack else C.Violet, M.Neon, { Shadow = false })
+		end
+	end
 	local head = frame * CFrame.new(0, 4 * s + 3.4 * s, 0)
 	crackSkull(B, "GiantSkull", head, s, -1, C.Crack, 9)
-	-- the left eye burns (Sans' eye): a translucent glow ball + a light
+	-- the left eye burns (Sans' eye): a translucent glow ball + a light that also catches the face
 	local eye = head * CFrame.new(-1.35 * s, 0.15 * s, -2.9 * s)
-	B:Ball("Decor", "GiantSkullEyeGlow", eye.Position, 1.5 * s, C.Crack, M.Neon, { Transparency = 0.55, Shadow = false })
-	B:Light("Point", eye.Position + frame.LookVector * 4, { Name = "SkullEye", Brightness = 2, Range = 30, Color = C.Light })
+	B:Ball("Decor", "GiantSkullEyeGlow", eye.Position, 1.4 * s, C.Crack, M.Neon, { Transparency = 0.6, Shadow = false })
+	B:Light("Point", (head * CFrame.new(0, -1 * s, -6 * s)).Position, { Name = "SkullFace", Brightness = 1.6, Range = 34, Color = C.Light })
 	B:Group(nil)
 	return 1
 end
@@ -766,14 +785,15 @@ local function buildSkullIsle(B: Builder, isle: Island): number
 	local top = isle.Top
 	local plinthPos = V(78, top, 45)
 	local toCore = flat(V(0, 0, 0) - plinthPos).Unit
-	B:SkullStatue("IsleSkull", plinthPos, {
+	local plinth = B:SkullStatue("IsleSkull", plinthPos, {
 		Scale = s,
 		Facing = toCore,
 		Color = C.Bone,
 		Dark = rgb(8, 10, 24),
-		Accent = rgb(52, 70, 120),
+		Accent = rgb(44, 58, 104),
 		Eye = C.Crack,
 	})
+	fixPlinth(plinth, plinthPos, toCore, s)
 	-- the head has fallen off its plinth: move every head part onto the floor, rolled on its side
 	local frame = MapKit.Facing(plinthPos, plinthPos + toCore)
 	local oldHead = frame * CFrame.new(0, 4 * s + 3.4 * s, 0)
@@ -805,7 +825,7 @@ local function buildLanding(B: Builder, landing: Island): number
 	B:Group("Landing")
 	local c = landing.Center
 	-- a faint SOUL-red heart inlay where the humans wake up
-	B:Heart("Decor", "WakingHeart", CFrame.new(c + V(0, 0.04, 0.5)) * CFrame.Angles(-math.pi / 2, 0, 0), 5.2, 0.05, rgb(150, 22, 44), M.Neon, { Shadow = false })
+	B:Heart("Decor", "WakingHeart", CFrame.new(c + V(0, 0.04, 0.5)) * CFrame.Angles(-math.pi / 2, 0, 0), 5.2, 0.05, rgb(120, 26, 46), M.Slate, { Shadow = false })
 	B:Ring("Decor", "WakingRing", c + V(0, 0.03, 0), 8.6, 0.35, 0.05, 32, C.Inlay, M.Metal, { Shadow = false })
 	-- low rim along the back (south) half
 	rim(B, landing, 25, 155)
@@ -879,7 +899,7 @@ local function buildRibway(B: Builder, a: Vector3, b: Vector3): number
 				local zOff = (math.sin(phi) + 1) * 1.3
 				table.insert(pts, V(s * x, y, rz + zOff))
 			end
-			bonePath(B, "Rib", pts, 1.5, if broken then 1.9 else 1.2, C.Bone, not broken)
+			bonePath(B, "Rib", pts, 1.15, if broken then 1.4 else 0.9, C.Bone, not broken)
 			if broken then
 				local tip = pts[#pts]
 				for i = 1, 3 do
@@ -922,7 +942,7 @@ local function buildGateStairs(B: Builder, core: Island, gate: Island)
 end
 
 -- Far scenery: drifting islands, mid-depth debris and sky shards (all decor).
-local function buildVoid(B: Builder, isles: Isles)
+local function buildVoid(B: Builder, isles: Isles, overview: boolean)
 	B:Group("Void")
 	local rng = B.Rng
 	-- mid-depth debris under and between the islands
@@ -936,6 +956,10 @@ local function buildVoid(B: Builder, isles: Isles)
 		if rng:Bool(0.25) then
 			B:Deco("Block", "DebrisGlow", V(s * 1.02, 0.14, 0.14), cf * CFrame.new(0, s * 0.2, s * 0.25), C.Crack, M.Neon, { Shadow = false })
 		end
+	end
+	if overview then
+		B:Group(nil)
+		return
 	end
 	-- distant drifting islands (silhouettes in the haze)
 	for i = 1, 16 do
@@ -981,7 +1005,8 @@ end
 
 -- MapInfo -------------------------------------------------------------------------------------------------------
 
-function VoidRift.Build(seed: number?): MapInfo
+function VoidRift.Build(seed: number?, opts: { [string]: any }?): MapInfo
+	local o = opts or {}
 	local B = MapKit.new("VoidRift", { Seed = seed or 1 })
 	-- island outlines come from a FIXED rng: gameplay geometry never depends on the seed
 	local layoutRng = Rng.new("VoidRift.Layout")
@@ -1041,7 +1066,7 @@ function VoidRift.Build(seed: number?): MapInfo
 	lights += 1
 	B:Group(nil)
 
-	buildVoid(B, isles)
+	buildVoid(B, isles, o.Overview == true)
 	buildBoundary(B)
 
 	-- objectives and spawns

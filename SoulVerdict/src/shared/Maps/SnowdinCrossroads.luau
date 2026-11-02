@@ -139,8 +139,8 @@ local function buildGround(B: Builder)
 	road("RoadCamp", V(0, 0, L.BridgeZ1 - 1), V(0, 0, 190))
 	B:Disc("Decor", "CampClearing", L.Camp + V(0, 0.03, 0), 22, 0.06, C.Path, M.Snow, { Shadow = false })
 	B:Disc("Decor", "Plaza", V(0, 0.035, 0), L.PlazaR * 2, 0.07, C.Path, M.Snow, { Shadow = false })
-	B:Ring("Decor", "PlazaRim", V(0, 0.07, 0), L.PlazaR - 0.6, 1.8, 0.1, 28, C.Stone, M.Cobblestone, { Shadow = false })
-	B:Ring("Decor", "PlazaInlay", V(0, 0.08, 0), 11.5, 0.7, 0.1, 20, C.Stone, M.Cobblestone, { Shadow = false })
+	B:Ring("Decor", "PlazaRim", V(0, 0.07, 0), L.PlazaR - 0.6, 1.8, 0.1, 24, C.Stone, M.Cobblestone, { Shadow = false })
+	B:Ring("Decor", "PlazaInlay", V(0, 0.08, 0), 11.5, 0.7, 0.1, 16, C.Stone, M.Cobblestone, { Shadow = false })
 
 	-- low snowbanks along the roads (decor drifts), skipping SAVE spots and junctions
 	local rng = B.Rng
@@ -450,6 +450,20 @@ local function houseDrifts(B: Builder, name: string, cf: CFrame, w: number, d: n
 	end
 end
 
+-- Extra lit window (same look as MapKit House windows) on a wall plane; cf LookVector = outwards.
+local function extraWindow(B: Builder, name: string, cf: CFrame, trim: Color3, shutter: Color3)
+	local winW, winH = 3, 3.4
+	B:Deco("Block", name .. "_WinFrame", V(winW + 0.8, winH + 0.8, 0.3), cf * CFrame.new(0, 0, -0.1), trim, M.Wood)
+	B:Deco("Block", name .. "_WinGlow", V(winW, winH, 0.3), cf * CFrame.new(0, 0, -0.2), C.Warm, M.Neon, { Shadow = false })
+	B:Deco("Block", name .. "_WinBarV", V(0.22, winH, 0.2), cf * CFrame.new(0, 0, -0.4), trim, M.Wood, { Shadow = false })
+	B:Deco("Block", name .. "_WinBarH", V(winW, 0.22, 0.2), cf * CFrame.new(0, 0, -0.4), trim, M.Wood, { Shadow = false })
+	B:Deco("Block", name .. "_WinSill", V(winW + 1.2, 0.3, 0.8), cf * CFrame.new(0, -winH / 2 - 0.45, -0.35), trim, M.Wood, { Shadow = false })
+	B:Deco("Block", name .. "_SillSnow", V(winW + 1.1, 0.25, 0.75), cf * CFrame.new(0, -winH / 2 - 0.2, -0.35), C.Snow, M.Snow, { Shadow = false })
+	for _, sx in { -1, 1 } do
+		B:Deco("Block", name .. "_Shutter", V(winW * 0.48, winH + 0.4, 0.18), cf * CFrame.new(sx * (winW * 0.74 + 0.4), 0, -0.25), shutter, M.WoodPlanks, { Shadow = false })
+	end
+end
+
 local function buildHouses(B: Builder): number
 	B:Group("Houses")
 	local lights = 0
@@ -506,6 +520,13 @@ local function buildHouses(B: Builder): number
 		ChimneyX = 4,
 	})
 	local _ = cottage
+	-- lit windows on the backs that face the camp / the monster's side
+	local back = CFrame.Angles(0, math.pi, 0)
+	for _, x in { -8.5, 8.5 } do
+		extraWindow(B, "InnBack", inn * CFrame.new(x, 0.5 + 13 * 0.52, 8) * back, rgb(58, 50, 46), rgb(130, 60, 56))
+	end
+	extraWindow(B, "ShopBack", shop * CFrame.new(-5, 0.5 + 10 * 0.52, 7) * back, rgb(84, 58, 42), MapKit.Shade(rgb(124, 52, 50), 0.05))
+	extraWindow(B, "BakeryBack", bakery * CFrame.new(4, 0.5 + 10 * 0.52, 7) * back, rgb(110, 70, 46), rgb(70, 110, 90))
 	-- street dressing: crates/barrels by the shop, a log pile by the inn, benches by the cottage
 	crate(B, "Crate", shop * CFrame.new(12.6, 0, -1) * CFrame.Angles(0, math.rad(12), 0), 3)
 	crate(B, "Crate", shop * CFrame.new(13.1, 3, -1.2) * CFrame.Angles(0, math.rad(-20), 0), 2.2)
@@ -733,6 +754,35 @@ local function pine(B: Builder, name: string, x: number, z: number, h: number, o
 	})
 end
 
+-- Lighter pine for the forest outside the walls (same proportions as MapKit Pine): the sheltered lowest
+-- tier carries no snow, the trunk is optional (hidden behind the nearer ring anyway).
+local function forestPine(B: Builder, name: string, base: Vector3, height: number, sides: number, tiers: number, trunk: boolean, leaf: Color3)
+	local rng = B.Rng
+	local trunkH = height * 0.22
+	if trunk then
+		local d = math.max(0.6, height * 0.06)
+		B:Deco("Cylinder", name .. "_Trunk", V(trunkH + 1, d, d), CFrame.new(base + V(0, (trunkH + 1) / 2 - 0.5, 0)) * UPRIGHT, rgb(70, 50, 40), M.Wood)
+	end
+	local tierH = (height - trunkH) / (tiers * 0.72 + 0.28)
+	local y = trunkH
+	local phase = rng:Number(0, 360)
+	for t = 1, tiers do
+		local k = (t - 1) / math.max(1, tiers - 1)
+		local radius = height * 0.36 * (1 - 0.48 * k)
+		local h = tierH * (1 - 0.08 * k)
+		local tierBase = base + V(0, y, 0)
+		B:Cone("Decor", name .. "_Tier" .. t, tierBase, h, radius, sides, MapKit.Shade(leaf, 0.05 * k), M.SmoothPlastic, { Phase = phase + t * 30 })
+		if t > 1 then
+			local f = 0.5 + 0.08 * k
+			B:Cone("Decor", name .. "_Snow" .. t, tierBase + V(0, h * (1 - f) + 0.06, 0), h * f + 0.08, radius * f + 0.12, sides, C.Snow, M.Snow, {
+				Phase = phase + t * 30,
+				Shadow = false,
+			})
+		end
+		y += h * 0.72
+	end
+end
+
 local INNER_PINES = {
 	{ 64, -54, 24 },
 	{ 80, -36, 20 },
@@ -757,10 +807,10 @@ local INNER_PINES = {
 local function buildPines(B: Builder)
 	B:Group("Pines")
 	for i, t in INNER_PINES do
-		pine(B, "Pine", t[1], t[2], t[3], { Tiers = if t[3] >= 22 then 4 else 3 })
+		pine(B, "Pine", t[1], t[2], t[3], { Width = if t[3] >= 22 then 0.34 else 0.36 })
 		-- a sapling next to some of them
-		if i % 3 == 0 then
-			pine(B, "Sapling", t[1] + 4.5, t[2] + 3, t[3] * 0.42, { Tiers = 2, Collide = false })
+		if i % 5 == 0 then
+			forestPine(B, "Sapling", V(t[1] + 4.5, 0, t[2] + 3), t[3] * 0.42, 4, 2, true, C.Pine)
 		end
 	end
 	B:Group(nil)
@@ -780,16 +830,16 @@ local function buildBackdrop(B: Builder)
 		local r = 113 + rng:Number(-3, 8)
 		local x, z = math.sin(a) * r, -math.cos(a) * r
 		if not exitGap(x, z) then
-			pine(B, "ForestPine", x, z, rng:Number(26, 38), { Collide = false, Leaf = MapKit.Shade(C.PineFar, rng:Number(-0.05, 0.08)) })
+			forestPine(B, "ForestPine", V(x, 0, z), rng:Number(26, 38), 5, 3, true, MapKit.Shade(C.PineFar, rng:Number(-0.05, 0.08)))
 		end
 	end
-	local n2 = 24
+	local n2 = 22
 	for i = 0, n2 - 1 do
 		local a = (i + 0.5 + rng:Number(-0.2, 0.2)) * 2 * math.pi / n2
 		local r = 140 + rng:Number(-4, 10)
 		local x, z = math.sin(a) * r, -math.cos(a) * r
 		if not exitGap(x, z) then
-			pine(B, "ForestPineFar", x, z, rng:Number(38, 50), { Collide = false, Sides = 4, Leaf = MapKit.Shade(C.PineFar, rng:Number(-0.12, 0)) })
+			forestPine(B, "ForestPineFar", V(x, 0, z), rng:Number(38, 50), 4, 3, false, MapKit.Shade(C.PineFar, rng:Number(-0.12, 0)))
 		end
 	end
 	B:Group("Mountains")

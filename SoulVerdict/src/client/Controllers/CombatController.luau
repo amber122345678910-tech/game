@@ -683,12 +683,22 @@ local function castVerdict(): boolean
 	local predictedEnd = now() + (cfg.Cooldown or 40)
 	setCooldown(VERDICT_ID, predictedEnd)
 	local fx = controller("FxController")
+	local clip = "Point"
+	local played = false
 	if fx then
 		pcall(fx.MarkPredicted, castId, VERDICT_ID)
+		-- same clip other clients play for this cast (AnimController: family "Verdict" clip, else "Point")
+		local okPlay, name = pcall(fx.PlayCastClip, char, { Id = VERDICT_ID }, nil)
+		if okPlay and type(name) == "string" then
+			clip = name
+			played = true
+		end
 	end
-	call("AnimController", "Play", char, "Point", { FadeIn = 0.05 })
+	if not played then
+		call("AnimController", "Play", char, "Point", { FadeIn = 0.05 })
+	end
 	call("MovementController", "FaceFor", 0.8)
-	pending[castId] = { Ability = VERDICT_ID, T = os.clock(), Prev = prev, Predicted = predictedEnd, Clip = "Point" }
+	pending[castId] = { Ability = VERDICT_ID, T = os.clock(), Prev = prev, Predicted = predictedEnd, Clip = clip }
 	Net.Client.Fire("Cast", VERDICT_ID, payload)
 	CombatController.Casted:Fire(VERDICT_ID, payload)
 	return true

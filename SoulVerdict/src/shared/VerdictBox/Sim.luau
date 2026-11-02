@@ -74,7 +74,7 @@ Sim.Tuning = {
 	PlatformThick = 8,
 	ResizeTime = 0.2, -- box resize tween
 	TextSpeed = 32, -- typewriter chars per second
-	TextDelay = 0.3, -- the opening line starts typing after the box opened
+	TextDelay = 0.15, -- the opening line starts typing after the box opened
 	MaxCatchUpTicks = 45, -- AdvanceTo work cap per call (0.75 s of simulation)
 }
 local T = Sim.Tuning
@@ -365,7 +365,7 @@ function Sim.IntroChars(tl: Timeline, t: number, total: number): number
 		return total
 	end
 	-- long (translated) lines type faster so they always finish 0.2 s before the first attack
-	local speed = math.max(T.TextSpeed, total / math.max(tl.introEnd - T.TextDelay - 0.2, 0.3))
+	local speed = math.max(T.TextSpeed, total / math.max(tl.introEnd - T.TextDelay - 0.2, 0.25))
 	return clamp(math.floor((t - T.TextDelay) * speed), 0, total)
 end
 

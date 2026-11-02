@@ -34,10 +34,10 @@ type Bullet = Sim.Bullet
 
 local Patterns = {}
 
-Patterns.INTRO = 1.15
+Patterns.INTRO = 1.0
 Patterns.END_PAD = 0.15
 Patterns.SEGMENTS = 8
-local LINGER = 0.35 -- bullets may outlive their segment when the next one keeps the same box/mode/gravity
+local LINGER = 0.35 -- red-mode bullets may outlive their segment when the next one is red in the same box
 
 local T = Sim.Tuning
 local PI = math.pi
@@ -69,6 +69,7 @@ type Gen = {
 	mode: string, -- "Red" | "Blue"
 	box: { number },
 	nominal: number, -- relative duration weight
+	min: number, -- shortest duration the generator needs (blaster volleys, slam + stab)
 	gravity: string?, -- blue: "Down" | "Auto" (Down first, then any other wall)
 	fn: (Ctx, Seg) -> (),
 }
@@ -180,8 +181,12 @@ local function blaster(ctx: Ctx, seg: Seg, t: number, x: number, y: number, angl
 	local appear = o.appear or 0.22
 	local charge = o.charge or 0.4
 	local fire = o.fire or 0.27
-	if t + appear + charge + fire > limitOf(ctx, seg) + 1e-6 then
-		return nil
+	local limit = limitOf(ctx, seg)
+	if t + appear + charge + fire > limit + 1e-6 then
+		charge = limit - t - appear - fire -- fit: shorter charge, never below 0.3 s
+		if charge < 0.3 then
+			return nil
+		end
 	end
 	local back = o.back or 40
 	return add(ctx, seg, "Blaster", {
@@ -323,7 +328,7 @@ local function riftBlaster(ctx: Ctx, seg: Seg, t: number, edge: string, offset: 
 	if b then
 		add(ctx, seg, "Rift", {
 			t0 = t - 0.12,
-			t1 = t + 0.24 + charge + 0.2,
+			t1 = t + 0.24 + b.charge + 0.2,
 			x = px,
 			y = py,
 			angle = math.atan2(ny, nx) + PI / 2,
@@ -348,6 +353,7 @@ GEN.BoneWall = {
 	mode = "Red",
 	box = SQUARE,
 	nominal = 0.7,
+	min = 0.5,
 	fn = function(ctx, seg)
 		local rng = ctx.rng
 		local n = if seg.k > 0.45 then 3 else 2
@@ -374,6 +380,7 @@ GEN.SineWave = {
 	mode = "Red",
 	box = SQUARE,
 	nominal = 0.75,
+	min = 0.5,
 	fn = function(ctx, seg)
 		local rng = ctx.rng
 		local speed = 185 * seg.spd * (1 + 0.25 * seg.k)
@@ -395,6 +402,7 @@ GEN.BoneRain = {
 	mode = "Red",
 	box = SQUARE,
 	nominal = 0.65,
+	min = 0.4,
 	fn = function(ctx, seg)
 		local rng = ctx.rng
 		local interval = 0.1 - 0.025 * seg.k
@@ -428,6 +436,7 @@ GEN.ColorWalls = {
 	mode = "Red",
 	box = SQUARE,
 	nominal = 0.7,
+	min = 0.55,
 	fn = function(ctx, seg)
 		local rng = ctx.rng
 		local speed = 190 * seg.spd * (1 + 0.2 * seg.k)
@@ -462,47 +471,71 @@ end
 GEN.BlasterCross = {
 	mode = "Red",
 	box = SQUARE,
-	nominal = 1.15,
+	nominal = 1.25,
+	min = 1.12,
 	fn = function(ctx, seg)
 		local rng = ctx.rng
 		local fast = seg.params.fast == true
 		local style = seg.params.style or ""
-		local charge = math.max((0.42 - 0.1 * seg.k) * seg.warn, 0.3)
 		local fire = if fast then 0.22 else 0.27
 		local appear = 0.22
+		local gap = 0.1
+		local room = limitOf(ctx, seg) - seg.t0
+		-- both volleys must fit: the second one fires `gap` s after the first beams end
+		local charge = clamp(room - appear - 2 * fire - gap, 0.3, math.max((0.42 - 0.1 * seg.k) * seg.warn, 0.3))
 		local opts = { charge = charge, fire = fire, appear = appear, style = style }
 		local first = if rng:Bool() then "Plus" else "X"
 		local second = if first == "Plus" then "X" else "Plus"
 		crossVolley(ctx, seg, seg.t0, first, opts)
-		-- the second volley fires 0.12 s after the first beams end (wedges between + and x are safe for both)
-		local t2 = seg.t0 + fire + 0.12
+		-- (the wedges between the + and x beams are safe for both volleys)
+		local t2 = seg.t0 + fire + gap
 		crossVolley(ctx, seg, t2, second, opts)
 		if seg.k > 0.6 then
-			crossVolley(ctx, seg, t2 + fire + 0.12, first, opts)
+			crossVolley(ctx, seg, t2 + fire + gap, first, opts)
 		end
 	end,
 }
 
+-- time for a slam to reach the wall from anywhere in the box (+ a beat)
+local function slamTime(seg: Seg, gravity: string): number
+	local extent = if gravity == "Left" or gravity == "Right" then seg.w else seg.h
+	return 0.06 + (extent - 2 * T.SoulHalf) / T.SlamSpeed
+end
+
 GEN.SlamStab = {
 	mode = "Blue",
-	box = WIDE,
-	nominal = 0.8,
+	box = SQUARE,
+	nominal = 0.95,
+	min = 0.88,
 	gravity = "Auto",
 	fn = function(ctx, seg)
 		local rng = ctx.rng
-		local warn = math.max((0.44 - 0.12 * seg.k) * seg.warn, 0.3)
-		local height = if seg.gravity == "Left" or seg.gravity == "Right" then 30 else 32
 		local style = if seg.params.glow then "Glow" else ""
-		stab(ctx, seg, seg.t0 + 0.2, wallOf(seg.gravity), height, warn, { style = style })
-		if seg.params.double and seg.dur >= 0.95 then
+		local double = seg.params.double and seg.dur >= 1.7
+		local g1 = seg.gravity
+		-- the red warning shows while the soul is slammed; the stab rises >= 0.24 s after the worst-case landing
+		local t1 = seg.t0 + 0.1
+		local warn = slamTime(seg, g1) - 0.1 + math.max((0.3 - 0.05 * seg.k) * seg.warn, 0.24)
+		stab(ctx, seg, t1, wallOf(g1), 32, warn, { style = style, hold = if double then 0.16 else 0.28 })
+		if seg.params.flank then
+			-- Fell: a second stab juts from a side wall over the half next to the floor: jump AND drift away
+			local vertical = g1 == "Down" or g1 == "Up"
+			local wall = if vertical
+				then (if rng:Bool() then "Left" else "Right")
+				else (if rng:Bool() then "Top" else "Bottom")
+			local sign = if g1 == "Down" or g1 == "Right" then 1 else -1
+			local along = if vertical then seg.h else seg.w
+			local a, b = 0, sign * (along / 2 + 2)
+			stab(ctx, seg, t1, wall, 40, warn, { style = style, a = math.min(a, b), b = math.max(a, b) })
+		end
+		if double then
 			local tm = seg.t0 + seg.dur * 0.5
 			local walls = { "Down", "Left", "Right", "Up" }
-			local idx = table.find(walls, seg.gravity) or 1
-			table.remove(walls, idx)
+			table.remove(walls, table.find(walls, g1) or 1)
 			local g2 = walls[rng:Integer(1, #walls)]
 			setMode(ctx, tm, "Blue", g2, true, seg.w, seg.h)
-			local h2 = if g2 == "Left" or g2 == "Right" then 30 else 32
-			stab(ctx, seg, tm + 0.2, wallOf(g2), h2, warn, { style = style })
+			local warn2 = slamTime(seg, g2) - 0.1 + math.max((0.3 - 0.05 * seg.k) * seg.warn, 0.24)
+			stab(ctx, seg, tm + 0.1, wallOf(g2), 32, warn2, { style = style })
 		end
 	end,
 }
@@ -511,6 +544,7 @@ GEN.PlatformBlaster = {
 	mode = "Blue",
 	box = WIDE,
 	nominal = 0.9,
+	min = 0.75,
 	gravity = "Down",
 	fn = function(ctx, seg)
 		local rng = ctx.rng
@@ -545,6 +579,7 @@ GEN.BoneSlide = {
 	mode = "Blue",
 	box = WIDE,
 	nominal = 0.8,
+	min = 0.6,
 	gravity = "Down",
 	fn = function(ctx, seg)
 		local rng = ctx.rng
@@ -562,7 +597,7 @@ GEN.BoneSlide = {
 			if roll < 0.28 and prev ~= "Low" then
 				kind = "High"
 			elseif roll > (if fast then 0.66 else 0.78) and seg.k > 0.25 then
-				kind = "Blue"
+				kind = if seg.params.orange and rng:Bool() then "Orange" else "Blue"
 			end
 			prev = kind
 			local t = seg.t0 + 0.05 + i * interval
@@ -572,10 +607,10 @@ GEN.BoneSlide = {
 				len = h - 40 + 12 -- leaves 40 px above the floor: stand, don't jump
 				y = -h / 2 - 12 + len / 2
 				color = "White"
-			elseif kind == "Blue" then
+			elseif kind == "Blue" or kind == "Orange" then
 				len = 46 + 12
 				y = floorY - len / 2
-				color = "Blue"
+				color = kind
 			else
 				len = rng:Number(22, 28) + 12
 				y = floorY - len / 2
@@ -595,10 +630,24 @@ GEN.BoneSlide = {
 	end,
 }
 
+GEN.BoneTunnel = {
+	mode = "Blue",
+	box = WIDE,
+	nominal = 0.8,
+	min = 0.6,
+	gravity = "Down",
+	fn = function(ctx, seg)
+		seg.params.fast = true
+		seg.params.orange = true
+		GEN.BoneSlide.fn(ctx, seg)
+	end,
+}
+
 GEN.Spiral = {
 	mode = "Red",
 	box = SQUARE,
 	nominal = 0.95,
+	min = 0.85,
 	fn = function(ctx, seg)
 		local rng = ctx.rng
 		local limit = limitOf(ctx, seg)
@@ -631,6 +680,7 @@ GEN.RedRush = {
 	mode = "Red",
 	box = SQUARE,
 	nominal = 0.7,
+	min = 0.5,
 	fn = function(ctx, seg)
 		local rng = ctx.rng
 		local speed = 200 * seg.spd * (1 + 0.3 * seg.k)
@@ -653,6 +703,7 @@ GEN.ChainSweep = {
 	mode = "Red",
 	box = SQUARE,
 	nominal = 0.75,
+	min = 0.6,
 	fn = function(ctx, seg)
 		local rng = ctx.rng
 		local speed = 150 * seg.spd * (1 + 0.3 * seg.k)
@@ -666,6 +717,7 @@ GEN.StabBarrage = {
 	mode = "Red",
 	box = SQUARE,
 	nominal = 0.75,
+	min = 0.6,
 	fn = function(ctx, seg)
 		local rng = ctx.rng
 		local n = if seg.k > 0.6 then 4 else 3
@@ -688,6 +740,7 @@ GEN.Execution = {
 	mode = "Red",
 	box = SQUARE,
 	nominal = 1.0,
+	min = 0.9,
 	fn = function(ctx, seg)
 		local rng = ctx.rng
 		local w, h = seg.w, seg.h
@@ -716,6 +769,7 @@ GEN.StarRain = {
 	mode = "Red",
 	box = SQUARE,
 	nominal = 0.7,
+	min = 0.4,
 	fn = function(ctx, seg)
 		local rng = ctx.rng
 		local dark = seg.params.dark == true
@@ -752,6 +806,7 @@ GEN.DarkGap = {
 	mode = "Red",
 	box = SQUARE,
 	nominal = 0.75,
+	min = 0.5,
 	fn = function(ctx, seg)
 		-- darkness flicker: dark, a brief light flash, dark again
 		local mid = seg.t0 + seg.dur * 0.45
@@ -798,6 +853,7 @@ GEN.EclipseRing = {
 	mode = "Red",
 	box = SQUARE,
 	nominal = 0.8,
+	min = 0.6,
 	fn = function(ctx, seg)
 		ring(ctx, seg, seg.t0, true, 150 + 40 * seg.k)
 		if seg.k > 0.45 and seg.dur > 0.75 then
@@ -810,15 +866,22 @@ GEN.RiftBlasters = {
 	mode = "Red",
 	box = SQUARE,
 	nominal = 0.9,
+	min = 1.0,
 	fn = function(ctx, seg)
 		local rng = ctx.rng
 		local edges = rng:Shuffle({ "Left", "Right", "Top", "Bottom" })
 		local n = 3 + math.floor(seg.k * 1.5)
-		local cycle = 0.24 + 0.38 + 0.27
-		local spacing = math.max((limitOf(ctx, seg) - seg.t0 - cycle - 0.02) / math.max(n - 1, 1), 0.16)
+		local room = limitOf(ctx, seg) - seg.t0 - 0.04
+		local spacing = 0.17
+		local charge = clamp(room - 0.24 - 0.27 - (n - 1) * spacing, 0.3, 0.38)
+		while n > 2 and 0.24 + charge + 0.27 + (n - 1) * spacing > room do
+			n -= 1
+		end
 		for i = 0, n - 1 do
 			local edge = edges[i % 4 + 1]
-			riftBlaster(ctx, seg, seg.t0 + 0.04 + i * spacing, edge, rng:Number(-45, 45), rng:Number(-0.3, 0.3))
+			riftBlaster(ctx, seg, seg.t0 + 0.04 + i * spacing, edge, rng:Number(-45, 45), rng:Number(-0.3, 0.3), {
+				charge = charge,
+			})
 		end
 	end,
 }
@@ -827,6 +890,7 @@ GEN.GravityFlip = {
 	mode = "Blue",
 	box = SQUARE,
 	nominal = 0.9,
+	min = 0.7,
 	gravity = "Down",
 	fn = function(ctx, seg)
 		local rng = ctx.rng
@@ -856,13 +920,27 @@ GEN.GravityFlip = {
 GEN.DarkStabs = {
 	mode = "Blue",
 	box = WIDE,
-	nominal = 0.85,
-	gravity = "Auto",
+	nominal = 0.9,
+	min = 0.88,
+	gravity = "Down",
 	fn = function(ctx, seg)
 		effect(ctx, "Dark", seg.t0 + 0.05, seg.t1 + 0.05, 0.9)
 		seg.params.glow = true
-		seg.params.double = true
 		GEN.SlamStab.fn(ctx, seg)
+		-- star-bones drift down through the dark while the floor stab is up
+		local rng = ctx.rng
+		for i = 0, 2 do
+			local t = seg.t0 + 0.3 + i * 0.16
+			local vy = 120 * seg.spd
+			star(ctx, seg, {
+				t0 = t,
+				t1 = t + (seg.h + 40) / vy,
+				x = rng:Number(-seg.w / 2 + 20, seg.w / 2 - 20),
+				y = -seg.h / 2 - 14,
+				vy = vy,
+				spin = rng:Number(-4, 4),
+			})
+		end
 	end,
 }
 
@@ -870,6 +948,7 @@ GEN.RiftCross = {
 	mode = "Red",
 	box = SQUARE,
 	nominal = 0.95,
+	min = 0.85,
 	fn = function(ctx, seg)
 		local rng = ctx.rng
 		local first = if rng:Bool() then 0 else PI / 4
@@ -891,7 +970,7 @@ GEN.RiftCross = {
 				if b then
 					add(ctx, seg, "Rift", {
 						t0 = t - 0.12,
-						t1 = t + 0.24 + 0.38 + 0.2,
+						t1 = t + 0.24 + b.charge + 0.2,
 						x = px,
 						y = py,
 						angle = a + PI / 2,
@@ -913,6 +992,7 @@ GEN.Totality = {
 	mode = "Red",
 	box = SQUARE,
 	nominal = 1.0,
+	min = 0.85,
 	fn = function(ctx, seg)
 		local rng = ctx.rng
 		-- darkness pulses with brief light
@@ -943,8 +1023,7 @@ local SETS: { [string]: SetDef } = {
 			{ pick = 3, from = { "BoneWall", "SineWave", "BoneRain" }, must = { "ColorWalls" } },
 			{ name = "BlasterCross" },
 			{ name = "SlamStab" },
-			{ pick = 1, from = { "PlatformBlaster", "BoneSlide" } },
-			{ name = "SlamStab" },
+			{ pick = 2, from = { "PlatformBlaster", "BoneSlide" } },
 			{ name = "Spiral" },
 		},
 	},
@@ -956,8 +1035,8 @@ local SETS: { [string]: SetDef } = {
 		chain = {
 			{ pick = 3, from = { "RedRush", "ChainSweep", "StabBarrage" } },
 			{ name = "BlasterCross", params = { fast = true } },
-			{ name = "SlamStab", params = { double = true } },
-			{ name = "BoneSlide", params = { fast = true } },
+			{ name = "SlamStab", params = { flank = true } },
+			{ name = "BoneTunnel" },
 			{ pick = 1, from = { "ChainSweep", "StabBarrage" } },
 			{ name = "Execution" },
 		},
@@ -1077,11 +1156,13 @@ function Patterns.Build(setId: string?, seed: number, duration: number?): Timeli
 		assert(gen, "Patterns: unknown generator " .. item.name)
 		local gravity = "Down"
 		if gen.mode == "Blue" then
-			if gen.gravity == "Auto" and lastBlue ~= nil then
+			if gen.gravity == "Auto" then
 				local walls = { "Down", "Left", "Right", "Up" }
-				local idx = table.find(walls, lastBlue)
+				local idx = table.find(walls, lastBlue or "")
 				if idx then
 					table.remove(walls, idx)
+				else
+					table.insert(walls, "Down") -- first slam: down is the most likely
 				end
 				gravity = walls[rng:Integer(1, #walls)]
 			end
@@ -1090,23 +1171,50 @@ function Patterns.Build(setId: string?, seed: number, duration: number?): Timeli
 		table.insert(plans, { gen = gen, item = item, gravity = gravity })
 	end
 
-	local total = 0
-	for _, p in plans do
-		total += p.gen.nominal
-	end
+	-- durations: proportional to `nominal`, but never below a generator's `min` (then renormalised to fill)
 	local avail = D - introEnd - Patterns.END_PAD
-	local scale = avail / total
+	local durs: { number } = {}
+	local fixed: { [number]: boolean } = {}
+	for _ = 1, #plans + 1 do
+		local freeNominal, fixedSum = 0, 0
+		for i, p in plans do
+			if fixed[i] then
+				fixedSum += durs[i]
+			else
+				freeNominal += p.gen.nominal
+			end
+		end
+		local scale = if freeNominal > 0 then (avail - fixedSum) / freeNominal else 0
+		local changed = false
+		for i, p in plans do
+			if not fixed[i] then
+				durs[i] = p.gen.nominal * scale
+				if durs[i] < p.gen.min then
+					durs[i] = p.gen.min
+					fixed[i] = true
+					changed = true
+				end
+			end
+		end
+		if not changed then
+			break
+		end
+	end
+	local sum = 0
+	for _, d in durs do
+		sum += d
+	end
+	for i in durs do
+		durs[i] *= avail / sum
+	end
 	local n = #plans
 	local t = introEnd
 	local prevMode, prevGravity, prevBox = "", "", nil :: { number }?
 	for i, p in plans do
 		local gen = p.gen
-		local dur = gen.nominal * scale
+		local dur = durs[i]
 		local nextPlan = plans[i + 1]
-		local same = nextPlan ~= nil
-			and nextPlan.gen.mode == gen.mode
-			and nextPlan.gen.box == gen.box
-			and (gen.mode ~= "Blue" or nextPlan.gravity == p.gravity)
+		local same = nextPlan ~= nil and gen.mode == "Red" and nextPlan.gen.mode == "Red" and nextPlan.gen.box == gen.box
 		local t1 = if i == n then D - Patterns.END_PAD else t + dur
 		local seg: Seg = {
 			name = p.item.name,
