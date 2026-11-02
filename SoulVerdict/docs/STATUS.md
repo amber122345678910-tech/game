@@ -1,6 +1,6 @@
 # Project status & resume plan (lead's notes)
 
-Last updated: 2026-11-01 ~21:55 UTC. Owner is asleep; usage limit at ~86% of the 5-hour window.
+Last updated: 2026-11-02 02:20 UTC (resumed after limit reset). Owner is asleep; usage limit at ~86% of the 5-hour window.
 Resume after the limit resets (~02:00 UTC = 05:00 owner's time, UTC+3).
 
 ## Done (passing tools/check.sh as of 21:00 UTC)
@@ -42,3 +42,13 @@ Journals: /root/.claude/projects/-home-user-game/f493f3e8-eb29-53b3-b677-a9d1a3d
 ## Owner feedback so far
 - Wants max quality everything, many style variants (menus/graphics/maps/characters) to choose from.
 - Liked progress; asked for screenshots regularly. Sleep window: ~22:00–02:00 UTC.
+
+## 02:20 UTC update
+- Wave 1b finished (cut off at the end, but all deliverables exist): check.sh 0 errors, 196 scripts, 235 Lune tests.
+  Previews: previews/characters, previews/props, previews/hud (27), previews/ui (36). Missing: SnowdinCrossroads.
+- Running now (launched 02:15 UTC):
+  - wf_8885cc8c-eb6: kit-fellsans, kit-eclipsesans
+  - wf_78b0733a-ac8: kits-humans-a (Patience, Bravery, Integrity), kits-humans-b (Perseverance, Kindness, Justice)
+  - wf_944ad1be-aa3: verdict-box, integration-audit (docs/INTEGRATION.md)
+  - wf_cd0df11e-83b: maps-snow-waterfall, maps-void-core (+ previews of Hall/Lobby)
+- Next: review results, fix leftovers, final check + build SoulVerdict.rbxl, style board artifact, screenshots + RU summary to owner.

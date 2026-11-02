@@ -27,6 +27,11 @@ local SOURCES = {
 	"Lobby",
 	"Tutorial",
 	"Controls",
+	"KitFell",
+	"KitEclipse",
+	"KitHumansA",
+	"KitHumansB",
+	"Integration",
 }
 
 local merged: { [string]: Localized } = {}
