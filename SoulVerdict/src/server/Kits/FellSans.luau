@@ -8,7 +8,8 @@
 --                        launches: Knockback x C.LaunchForward along the aim + KnockbackUp [Knockback x C.LaunchUp] up.
 --                        Fx "Strike" {combo, last, hits (landed)}
 --   CrimsonBlaster (Q)   one Fell-style BlasterBeam ("Red") over Fell's right shoulder aimed at the aim point (chest
---                        height above ground): Delay charge, BeamTime, Width, Length, Damage, KR. An interrupted Fell
+--                        height above ground): Delay charge, BeamTime, Width, Length, Damage, KR. The skull is HUGE
+--                        (visual-only skullScale C.CrimsonSkullScale) around the narrow beam. An interrupted Fell
 --                        loses the shot (hazard removed).          Fx "Summon" {hazard, origin}, "Fizzle" {hazard, origin}
 --   ChainGrab (E)        after Windup a Projectile hazard (visual "FellChain", Speed, Range, radius C.ChainRadius; from
 --                        the hand toward the aim at chest height, within C.ChainMaxSlope of level). The
@@ -71,6 +72,7 @@ local C = {
 	ComboHeight = 5.5,
 	FinisherWidth = 7,
 	BlasterSlot = { 2.4, 4.4, 1.8 }, -- CrimsonBlaster muzzle in caster space: right, up, back (studs)
+	CrimsonSkullScale = 3, -- CrimsonBlaster skull = 3x the authored GasterBlaster (~9 studs wide), visual only
 	ChainRadius = 1.1, -- ChainGrab hook radius (the visual hook glow is >= this)
 	ChainMaxSlope = 0.47, -- the throw stays within ~25 degrees of level
 	GrabStop = 3.4, -- the grabbed human ends this far in front of Fell (inside the M1 box)
@@ -333,6 +335,7 @@ Abilities.CrimsonBlaster = function(ctx: any)
 		kr = N.KR or 0,
 		color = "Red",
 		style = "Fell",
+		skullScale = C.CrimsonSkullScale,
 		spawnFrom = origin + Vector3.new(0, 1.5, 0),
 	})
 	ctx:Fx("Summon", { hazard = id, origin = cf })

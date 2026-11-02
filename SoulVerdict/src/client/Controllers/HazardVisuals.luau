@@ -25,12 +25,17 @@
 --   HazardVisuals.HasVisual(name) -> boolean    HazardVisuals.Visuals() -> {string}
 --   HazardVisuals.RegisterRenderer(type, renderer)   renderer = { Create(rec), Update(rec, t, dt) -> boolean,
 --                                               Destroy(rec), EndEarly(rec, t)?, NoTelegraph: boolean? }
---   HazardVisuals.AcquireBlaster(style, width, opts?) -> Blaster   (opts.Ghost: translucent preview, never HD)
+--   HazardVisuals.AcquireBlaster(style, width, opts?) -> Blaster   (opts.Ghost: translucent preview, never HD;
+--        opts.SkullScale: skull model scale independent of `width`, as BlasterBeam params.skullScale)
 --        blaster:Pose(muzzleCFrame, jawAngle) :SetEyes(0..1, color?) :SetTransparency(t) :SetGhost(on)
---        :Release()
+--        :Release()      blaster.SkullWidth: skull width in studs
+-- BlasterBeam params.skullScale (optional, visual only): GasterBlaster prop scale (1 = the authored ~3-stud skull)
+--   instead of the width-derived one, so a narrow beam can come out of a huge skull (FellSans CrimsonBlaster).
+--   Any skull the camera is inside of (or, for your own blasters, one right in front of the camera) ghosts out.
 -- Pure helpers (Lune-tested): BeamLayers(params, t) -> (core, mid, outer, alpha, phase),
 --   BlasterPose(params, t) -> pose {Pos, Look, Jaw, Eyes, Alpha, Recoil, Phase},
---   SpikeFrac(params, t) -> 0..1, RainFall(params, drop, t) -> (state, height), BlasterScale(width, nominal)
+--   SpikeFrac(params, t) -> 0..1, RainFall(params, drop, t) -> (state, height), BlasterScale(width, nominal),
+--   SkullScale(params, nominal) -> number, SkullOcclusion(camPos, camLook, center, radius, own) -> 0..1
 -- Perf: one PreRender loop; pooled parts/bones/blasters (VFX/Lib, VFX/Pool); BulkMoveTo for multi-part movers;
 -- particle counts scaled by GraphicsController.ParticleScale(); lights budgeted by Lib.Light.
 
@@ -188,6 +193,45 @@ function HazardVisuals.BlasterScale(width: number, nominal: number): number
 	return math.clamp(width * 1.25 / math.max(0.1, nominal), 0.4, 6)
 end
 
+local MAX_SKULL_SCALE = 8
+local MINI_NOMINAL = 3 -- skull width of the mini fallback blaster at scale 1 (~ the prop's)
+
+-- A valid explicit skull scale (params.skullScale / opts.SkullScale), clamped, or nil.
+local function explicitSkull(v: any): number?
+	if type(v) == "number" and v == v and v > 0 then
+		return math.clamp(v, 0.4, MAX_SKULL_SCALE)
+	end
+	return nil
+end
+
+-- Model scale of a BlasterBeam skull: params.skullScale (visual only) when given, else derived from the width.
+function HazardVisuals.SkullScale(p: Params, nominal: number): number
+	return explicitSkull(p.skullScale) or HazardVisuals.BlasterScale(num(p, "width", 4), nominal)
+end
+
+-- 0..1: how much a blaster skull (sphere centre / radius) gets in the camera's way. 1 with the camera inside it,
+-- fading out by 1.6 radii. `own` (the local player's blasters) also counts a skull right in front of the camera
+-- that covers the screen centre; other skulls in view are never faded (you must see what is about to fire at you).
+function HazardVisuals.SkullOcclusion(
+	camPos: Vector3,
+	camLook: Vector3,
+	center: Vector3,
+	radius: number,
+	own: boolean?
+): number
+	local r = math.max(0.5, radius)
+	local rel = center - camPos
+	local occl = clamp01((r * 1.6 - rel.Magnitude) / (r * 0.6))
+	if own then
+		local s = rel:Dot(camLook)
+		if s > 0 and s < r * 1.5 + 4 then
+			local q = (rel - camLook * s).Magnitude
+			occl = math.max(occl, clamp01((r - q) / (r * 0.5)))
+		end
+	end
+	return occl
+end
+
 -- Gaster Blaster pose at time t (pure): fly-in from spawnFrom (or from above/behind) in FLY_TIME with an
 -- overshoot, exponential aim ease (Ang += (End-Ang)*dt*10, research §3), jaw opening in frames before the
 -- beam, hollow eyes while firing, recoil accelerating backwards, fade out after the beam.
@@ -336,6 +380,7 @@ type Blaster = {
 	Glow: number,
 	Extra: { BasePart },
 	ExtraT: { number },
+	SkullWidth: number?,
 	Pose: (self: any, muzzleCF: CFrame, jaw: number) -> (),
 	SetEyes: (self: any, glow: number, color: Color3?) -> (),
 	SetTransparency: (self: any, t: number) -> (),
@@ -801,11 +846,18 @@ end
 
 -- opts.Ghost: a translucent preview blaster (kit indicators). Ghosts come from their own pool and are never
 -- upgraded to HD meshes (HDMesh hides the part-built skull that the ghost look relies on).
-function HazardVisuals.AcquireBlaster(style: string, width: number, opts: { Ghost: boolean? }?): Blaster
+-- opts.SkullScale: explicit skull scale (1 = the prop as authored) instead of the one derived from `width`.
+function HazardVisuals.AcquireBlaster(
+	style: string,
+	width: number,
+	opts: { Ghost: boolean?, SkullScale: number? }?
+): Blaster
 	local ghost = opts ~= nil and opts.Ghost == true
+	local skull = explicitSkull(opts and opts.SkullScale)
 	local nominal = propNominal(style) or propNominal("Classic")
 	local kind = if nominal then "Prop" else "Mini"
-	local scale = if nominal then scaleBucket(HazardVisuals.BlasterScale(width, nominal)) else scaleBucket(width * 1.25)
+	local miniScale = scaleBucket(if skull then skull * MINI_NOMINAL else width * 1.25)
+	local scale = if nominal then scaleBucket(skull or HazardVisuals.BlasterScale(width, nominal)) else miniScale
 	local suffix = if ghost then "|Ghost" else ""
 	local key = kind .. "|" .. style .. "|" .. scale .. suffix
 	local pool = blasterPools[key]
@@ -824,7 +876,7 @@ function HazardVisuals.AcquireBlaster(style: string, width: number, opts: { Ghos
 	end
 	if model == nil then
 		kind = "Mini"
-		scale = scaleBucket(width * 1.25)
+		scale = miniScale
 		key = kind .. "|" .. style .. "|" .. scale .. suffix
 		model = buildMiniBlaster(scale)
 	end
@@ -832,6 +884,7 @@ function HazardVisuals.AcquireBlaster(style: string, width: number, opts: { Ghos
 	Lib.PrepModel(m)
 	m.Parent = Lib.Folder()
 	local b = rigBlaster(m, kind, key)
+	b.SkullWidth = if kind == "Prop" then (nominal or MINI_NOMINAL) * scale else scale
 	if ghost then
 		b:SetGhost(true)
 	elseif kind == "Prop" then
@@ -1254,7 +1307,8 @@ renderers.BlasterBeam = {
 		local S = rec.S
 		local width = num(p, "width", 4)
 		S.Colors = styleColors(rec.Style, rec.Rule)
-		S.Blaster = HazardVisuals.AcquireBlaster(rec.Style, width)
+		local skull = explicitSkull(p.skullScale)
+		S.Blaster = HazardVisuals.AcquireBlaster(rec.Style, width, if skull then { SkullScale = skull } else nil)
 		S.Blaster:SetTransparency(1)
 		S.Width = width
 		S.Length = num(p, "length", 60)
@@ -1263,14 +1317,19 @@ renderers.BlasterBeam = {
 		S.Look = origin.LookVector
 		S.Fired = false
 		S.LastEmit = 0
+		-- skull-sized charge FX: a huge skull (params.skullScale) gathers a bigger orb than its narrow beam
+		local skullW = S.Blaster.SkullWidth or width * 1.25
+		S.SkullRadius = skullW * 0.62
+		S.Own = rec.Owner ~= nil and rec.Owner == (Players.LocalPlayer and Players.LocalPlayer.Character)
+		local fxW = math.max(width, skullW * 0.5)
 		-- charge particles converging into the mouth
-		local holder = Lib.Part("Ball", Vector3.one * (width * 2.2), Pool.PARK, S.Colors.Charge, Enum.Material.Neon, 1)
+		local holder = Lib.Part("Ball", Vector3.one * (fxW * 2.2), Pool.PARK, S.Colors.Charge, Enum.Material.Neon, 1)
 		local charge = Lib.Emitter("Mote", holder, {
 			Color = S.Colors.Charge,
 			Shape = Enum.ParticleEmitterShape.Sphere,
 			ShapeStyle = Enum.ParticleEmitterShapeStyle.Surface,
 			ShapeInOut = Enum.ParticleEmitterShapeInOut.Inward,
-			Speed = NumberRange.new(width * 2.4, width * 3),
+			Speed = NumberRange.new(fxW * 2.4, fxW * 3),
 			Lifetime = NumberRange.new(0.32, 0.4),
 			Size = Lib.NS(0, 0.15, 0.5, 0.42, 1, 0.1),
 			Rate = 0,
@@ -1279,11 +1338,11 @@ renderers.BlasterBeam = {
 		})
 		S.ChargeHolder = holder
 		S.Charge = charge
-		S.EyeLight = Lib.Light(holder, S.Colors.Eye, 0, math.min(30, width * 4))
+		S.EyeLight = Lib.Light(holder, S.Colors.Eye, 0, math.min(30, fxW * 4))
 		if rec.T0 + 0.3 > Lib.Now() then
 			playSound("BlasterCharge", origin.Position)
 			local from = if typeof(p.spawnFrom) == "Vector3" then p.spawnFrom else origin.Position
-			Lib.EmitBurst(from + Vector3.new(0, 1.5, 0), width * 1.6, S.Colors.Charge, 0.25)
+			Lib.EmitBurst(from + Vector3.new(0, 1.5, 0), fxW * 1.6, S.Colors.Charge, 0.25)
 		end
 	end,
 	Update = function(rec: Record, t: number, _dt: number): boolean
@@ -1293,7 +1352,15 @@ renderers.BlasterBeam = {
 		local pose = HazardVisuals.BlasterPose(p, t)
 		local muzzleCF = LookAlong(pose.Pos, pose.Look)
 		blaster:Pose(muzzleCF, pose.Jaw)
-		blaster:SetTransparency(1 - pose.Alpha)
+		-- ghost the skull out of the camera's way (huge skulls over the caster's shoulder)
+		local occlusion = 0
+		local cam = game:GetService("Workspace").CurrentCamera
+		if cam then
+			local camCF = cam.CFrame
+			local center = (muzzleCF * CFrame.new(-blaster.Muzzle)).Position
+			occlusion = HazardVisuals.SkullOcclusion(camCF.Position, camCF.LookVector, center, S.SkullRadius, S.Own)
+		end
+		blaster:SetTransparency(math.max(1 - pose.Alpha, occlusion * 0.78))
 		blaster:SetEyes(pose.Eyes, S.Colors.Eye)
 		local holder: BasePart = S.ChargeHolder
 		holder.CFrame = muzzleCF
@@ -2456,9 +2523,10 @@ function HazardVisuals.Snapshot(hazardType: string, params: Params, t: number): 
 	end
 	if hazardType == "BlasterBeam" then
 		local width = num(p, "width", 4)
+		local skull = explicitSkull(p.skullScale)
 		local nominal = propNominal(p.style) or propNominal("Classic")
-		local bm = if nominal then buildProp(p.style, scaleBucket(HazardVisuals.BlasterScale(width, nominal))) else nil
-		bm = bm or buildMiniBlaster(scaleBucket(width * 1.25))
+		local bm = if nominal then buildProp(p.style, scaleBucket(HazardVisuals.SkullScale(p, nominal))) else nil
+		bm = bm or buildMiniBlaster(scaleBucket(if skull then skull * MINI_NOMINAL else width * 1.25))
 		local b = bm :: Model
 		local root = b.PrimaryPart or b:FindFirstChildWhichIsA("BasePart", true) :: BasePart
 		local refInv = CFrame.new(root.CFrame.Position):Inverse()

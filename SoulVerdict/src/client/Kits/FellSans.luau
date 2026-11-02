@@ -63,6 +63,7 @@ local PARK = CFrame.new(0, 25000, 0)
 -- Mirrors src/server/Kits/FellSans.luau Kit.Constants (geometry the client draws).
 local C = {
 	BlasterSlot = { 2.4, 4.4, 1.8 },
+	CrimsonSkullScale = 3,
 	ChainRadius = 1.1,
 	ChainMaxSlope = 0.47,
 	SpikeRadius = 2.6,
@@ -611,7 +612,9 @@ Indicator.CrimsonBlaster = function(fx: any): Map?
 	local width = N.Width or 3.5
 	local length = N.Length or 80
 	local hv = fx.Hazards
-	local ghost = if hv and hv.AcquireBlaster then hv.AcquireBlaster("Fell", width, { Ghost = true }) else nil
+	local ghost = if hv and hv.AcquireBlaster
+		then hv.AcquireBlaster("Fell", width, { Ghost = true, SkullScale = C.CrimsonSkullScale })
+		else nil
 	local line = Lib.Part("Cylinder", Vector3.new(1, 0.12, 0.12), PARK, BLOOD, NEON, 0.35)
 	local shell = Lib.Part("Cylinder", Vector3.new(1, width, width), PARK, CRIMSON, NEON, 0.9)
 	local handle = {}
@@ -623,7 +626,15 @@ Indicator.CrimsonBlaster = function(fx: any): Map?
 		local mcf = blasterFrame(cf.Position, aim, cf.LookVector)
 		if ghost then
 			ghost:Pose(mcf, 0.1 + 0.06 * math.sin(os.clock() * 9))
-			ghost:SetTransparency(0)
+			-- the huge ghost skull sits around the over-the-shoulder camera: fade it out of the way
+			local occlusion = 0
+			local cam = game:GetService("Workspace").CurrentCamera
+			if cam and hv.SkullOcclusion and typeof(ghost.Muzzle) == "Vector3" then
+				local center = (mcf * CFrame.new(-ghost.Muzzle)).Position
+				local radius = (ghost.SkullWidth or 4) * 0.62
+				occlusion = hv.SkullOcclusion(cam.CFrame.Position, cam.CFrame.LookVector, center, radius, true)
+			end
+			ghost:SetTransparency(occlusion * 0.8)
 		end
 		local axis = mcf * CFrame.new(0, 0, -length / 2) * CFrame.Angles(0, math.pi / 2, 0)
 		line.Size = Vector3.new(length, 0.12, 0.12)

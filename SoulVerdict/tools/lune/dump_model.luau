@@ -428,6 +428,13 @@ if kind == "rig" then
 		Scale = flags.scale and tonumber(flags.scale) or nil,
 		Palette = palette,
 	})
+	-- RigBuilder only records the style id; apply the actual RigStyles look so previews show it.
+	if type(flags.style) == "string" then
+		local RigStyles = Loader.requirePath("src/shared/Rigs/RigStyles")
+		if not RigStyles.Apply(model, flags.style) then
+			fail("unknown rig style '" .. flags.style .. "' (available: " .. table.concat(RigStyles.List(), ", ") .. ")")
+		end
+	end
 elseif kind == "skeleton" then
 	local family = id or "Human"
 	model = RigBuilder.BuildFromBlueprint({
