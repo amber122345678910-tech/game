@@ -125,3 +125,6 @@ The 3 workflows above were cut off by the usage limit (partial work committed as
 - wf_e6443210-11b: shop-screen (pixel sleepy Sans in Shop), shop-booth (3D sleeping Sans at the lobby booth)
 - wf_62219af1-12d: phase2 (ult no longer a reset button, Unshaken meaning, Classic eye, lobby viewers' call-outs)
 Next: adversarial review of all of it, tools/check.sh, tools/build.sh, commit + push, send rbxl + previews with a RU summary.
+- 13:05 UTC: phase2, box+sound and loading continuation agents DONE (434 tests, committed). Shop agents still running
+  (wf_e6443210-11b). Review of the finished parts running: review-batch-2 (wf_811a40e5-d2c, review -> verify -> fix).
+  After both: review the shop part, then check/build/commit/push/send.
