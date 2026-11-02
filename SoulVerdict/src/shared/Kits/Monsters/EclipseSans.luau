@@ -157,8 +157,8 @@ local kit: Types.KitDef = {
 			Ult = true,
 			Name = { en = "Total Eclipse", ru = "Полное затмение" },
 			Desc = {
-				en = "Ultimate. For 8s the world goes dark for humans (they see only nearby), you gain speed and your attacks leave void fire.",
-				ru = "Ультимейт. На 8с мир для людей погружается во тьму (видно только рядом), ты ускоряешься, а атаки оставляют пламя пустоты.",
+				en = "Ultimate. For 8s the world goes dark for humans, you speed up and your attacks leave void fire. First use starts Phase 2: new music, you get stronger.",
+				ru = "Ультимейт. На 8с мир людей погружается во тьму, ты ускоряешься, атаки оставляют пламя пустоты. Первая ульта запускает Фазу 2: новая музыка, ты сильнее.",
 			},
 			Cooldown = 3,
 			Aim = "Self",

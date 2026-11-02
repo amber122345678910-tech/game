@@ -661,7 +661,8 @@ function Hud.Mount(screenGui: Instance, deps: any?): any
 				source:SetKiller(nil)
 			end
 		elseif name == "FinalPhase" then
-			announce("FinalPhase", { Monster = monsterSide })
+			-- the monster's Phase 2; cause "Ult" = started by its own first ultimate (no ult refill)
+			announce("FinalPhase", { Monster = monsterSide, Ult = type(data) == "table" and data.cause == "Ult" })
 		elseif name == "Surge" then
 			announce("Surge", { Monster = monsterSide })
 		elseif name == "SecondWind" then

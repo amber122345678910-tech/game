@@ -159,8 +159,8 @@ local kit: Types.KitDef = {
 			Ult = true,
 			Name = { en = "Bad Time", ru = "Плохое время" },
 			Desc = {
-				en = "Ultimate. Your eye blazes: six blasters circle the target area and fire in sequence while bones rain down. KR is doubled.",
-				ru = "Ультимейт. Глаз пылает: шесть бластеров окружают зону и стреляют по очереди, сверху сыплются кости. KR удвоен.",
+				en = "Ultimate. Six blasters ring the target area and fire in turn while bones rain down; KR x2. First use starts Phase 2: new music, you get stronger.",
+				ru = "Ультимейт. Шесть бластеров окружают зону и бьют по очереди, сверху сыплются кости; KR x2. Первая ульта запускает Фазу 2: новая музыка, ты сильнее.",
 			},
 			Cooldown = 3,
 			Range = 70,

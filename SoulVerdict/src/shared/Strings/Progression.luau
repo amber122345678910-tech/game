@@ -122,8 +122,8 @@ return {
 		ru = "Победи за монстра до Обрушения",
 	},
 	["prog.quest.Unshaken"] = {
-		en = "Win as the Monster without reaching your Final Phase",
-		ru = "Победи за монстра, не дойдя до финальной фазы",
+		en = "Win as the Monster without reaching Phase 2",
+		ru = "Победи за монстра, не дойдя до Фазы 2",
 	},
 
 	-- Achievements: name + description -------------------------------------------------------------
@@ -277,8 +277,8 @@ return {
 	},
 	["prog.ach.unshaken"] = { en = "Not Even Sweating", ru = "Ни капли пота" },
 	["prog.ach.unshaken.desc"] = {
-		en = "Win as the Monster without reaching your Final Phase.",
-		ru = "Победи за монстра, не дойдя до финальной фазы.",
+		en = "Win as the Monster without reaching Phase 2.",
+		ru = "Победи за монстра, не дойдя до Фазы 2.",
 	},
 	["prog.ach.big_damage"] = { en = "One-SOUL Army", ru = "Армия из одной ДУШИ" },
 	["prog.ach.big_damage.desc"] = {

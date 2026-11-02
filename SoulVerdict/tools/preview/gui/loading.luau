@@ -14,7 +14,11 @@
 --        [--frames 14 --outdir dir]  one JSON per frame over one full turn: dir/frame_00.json ...
 --        [--no-topbar]
 -- Then: node tools/preview/gui/render.mjs --in /tmp/l.json --out shot.png  (several --in/--out pairs share one browser)
--- GIF: render the frames, then e.g. python3 -c "from PIL import Image; ..." (see the lead's notes / previews/ui).
+-- previews/ui/loading_spin.gif = --frames 15 (one 1.2 s turn), each frame rendered to dir/frame_NN.png, then
+--   python3 -c "from PIL import Image; f=[Image.open('dir/frame_%02d.png' % i).convert('RGB').quantize(16)
+--   for i in range(15)]; f[0].save('loading_spin.gif', save_all=True, append_images=f[1:], duration=80, loop=0)"
+-- Note: the renderer rotates every cell of a Wheel-mode head separately (hairline seams in the PNG); in Roblox the
+-- CanvasGroup turns one pre-drawn image, so those seams are a preview artefact only.
 local fs = require("@lune/fs")
 local process = require("@lune/process")
 local serde = require("@lune/serde")

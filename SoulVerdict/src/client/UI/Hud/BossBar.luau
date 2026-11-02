@@ -1,6 +1,6 @@
 --!strict
 -- Hud/BossBar: the monster's bar for everyone (top centre, under the timer strip): kit name + title in the kit
--- colour, big HP bar with damage flash, dodges pips / EXHAUSTED countdown, FINAL PHASE red flare, and (for
+-- colour, big HP bar with damage flash, dodges pips / EXHAUSTED countdown, PHASE 2 red flare, and (for
 -- Perseverance "Studious" players) the monster's ability cooldowns.
 --   BossBar.Create(theme, deps) -> { Root, Update(snapshot), Tick(now), Destroy }
 -- Data: snapshot.Monster (Unit: KitId, Name, Level, HP/MaxHP, Dodges/MaxDodges, ExhaustedUntil, FinalForm,

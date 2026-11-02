@@ -31,7 +31,7 @@ return {
 	["lab.weather.Glimmer"] = { en = "Glimmer", ru = "Мерцание" },
 	["lab.weather.Rain"] = { en = "Rain", ru = "Дождь" },
 	["lab.kind.Map"] = { en = "map", ru = "карта" },
-	["lab.kind.Final"] = { en = "final", ru = "финал" },
+	["lab.kind.Final"] = { en = "Phase 2", ru = "Фаза 2" },
 	["lab.kind.Style"] = { en = "style", ru = "стиль" },
 	["lab.kind.Special"] = { en = "special", ru = "особый" },
 
@@ -43,7 +43,7 @@ return {
 	["lab.practiceH"] = { en = "Practice: Human", ru = "Тренировка: человек" },
 	["lab.practiceM"] = { en = "Practice: Monster", ru = "Тренировка: монстр" },
 	["lab.giveUlt"] = { en = "Give ult", ru = "Выдать ульту" },
-	["lab.finalPhase"] = { en = "Final phase", ru = "Финальная фаза" },
+	["lab.finalPhase"] = { en = "Phase 2", ru = "Фаза 2" },
 	["lab.collapse"] = { en = "Collapse", ru = "Обрушение" },
 	["lab.endRound"] = { en = "End round", ru = "Завершить" },
 	["lab.dummy"] = { en = "Spawn dummy", ru = "Манекен" },

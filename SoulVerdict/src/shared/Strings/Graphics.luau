@@ -14,7 +14,7 @@ return {
 	["graphics.group.Map"] = { en = "Map looks", ru = "Облик карт" },
 	["graphics.group.Style"] = { en = "Styles", ru = "Стили" },
 	["graphics.group.Special"] = { en = "Special", ru = "Особые" },
-	["graphics.group.Final"] = { en = "Final phase", ru = "Финальная фаза" },
+	["graphics.group.Final"] = { en = "Phase 2", ru = "Фаза 2" },
 
 	["graphics.quality"] = { en = "Effects quality", ru = "Качество эффектов" },
 	["graphics.quality.desc"] = {

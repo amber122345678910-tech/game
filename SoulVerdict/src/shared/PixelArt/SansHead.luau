@@ -160,7 +160,10 @@ function SansHead.Validate(rows: { string }?): { string }
 		end
 		local bad = string.find(row, "[^#%. ]")
 		if bad then
-			table.insert(problems, ("row %d: unexpected character %q at column %d"):format(i, string.sub(row, bad, bad), bad))
+			table.insert(
+				problems,
+				("row %d: unexpected character %q at column %d"):format(i, string.sub(row, bad, bad), bad)
+			)
 		end
 	end
 	return problems

@@ -28,6 +28,7 @@
 -- API
 --   Loading.Show(opts?) -> Handle?   nil = could not show (the caller then does the old instant behaviour)
 --       opts: { OnCovered: (() -> ())?, Until: (() -> boolean)?, OnDone: (() -> ())?, MinVisible: number?,
+--               MusicLead: number?, OnMusicCue: (() -> ())? (fires MusicLead s before the reveal; no ducking then),
 --               MaxWait: number?, Mode: SpinMode?, Theme: Theme?, Sound: SoundController?, Parent: Instance?
 --               (default PlayerGui), ReducedMotion: boolean?, Driver: Driver? }
 --       Driver (tests / tools; default = RunService.Heartbeat + task.delay + the ScreenGui's AbsoluteSize):
@@ -38,10 +39,10 @@
 --             screen is black), Destroy() (remove now; OnCovered / OnDone still run once) }
 --   Loading.Active() -> Handle?
 -- Pure (Lune tests / previews)
---   Loading.PixelSize(viewport) -> integer screen px per sprite pixel     Loading.Metrics(viewport) -> Metrics
+--   Loading.PixelSize(viewport) -> integer screen px per sprite pixel     Loading.Metrics(viewport, mode?) -> Metrics
 --   Loading.TurnPose(t, period?) -> (widthFactor 0..1, mirrored)          Loading.WheelAngle(t, period?) -> degrees
 --   Loading.Bob(t, amplitude) -> integer px    Loading.DotCount(t) -> 0..3    Loading.Text(word, dots, color?) -> RichText
---   Loading.NewSequence(timing?) -> Sequence { Phase, Time, Backdrop 0..1, Content 0..1, CoveredAt, ReadyAt, OutAt,
+--   Loading.NewSequence(timing?) -> Sequence { Stage, Time, Backdrop 0..1, Content 0..1, CoveredAt, ReadyAt, OutAt,
 --       Step(dt, ready) -> (coveredNow, doneNow), Skip() }
 --   Loading.Build(theme?, { Viewport, Mode? }) -> View { Gui, Backdrop, Content, Curtain, Head, Normal, Mirrored?,
 --       Label, Mode, Metrics, Layout(viewport), Pose(t, dots?), Fade(backdrop, content), Destroy() }
@@ -72,7 +73,7 @@ export type Timing = {
 }
 
 export type Sequence = {
-	Phase: string, -- "FadeIn" | "Hold" | "FadeOut" | "Done"
+	Stage: string, -- "FadeIn" | "Hold" | "FadeOut" | "Done"
 	Time: number,
 	Backdrop: number,
 	Content: number,
@@ -142,6 +143,7 @@ Loading.Timing = {
 	MinVisible = 2.2, -- s from Show before the fade-out may start
 	Settle = 0.3, -- s held after opts.Until turns true (teleport / camera settle under the black)
 	MaxWait = 7, -- s from Show: hard cap (a practice round that never starts)
+	MusicLead = 0, -- s: opts.OnMusicCue fires this long BEFORE the fade-out starts (0 = no cue, release at once)
 	ContentOut = 0.15, -- s: head + text sink into the black
 	FadeOut = 0.4, -- s: the black lifts
 }
@@ -176,23 +178,24 @@ function Loading.PixelSize(viewport: Vector2): number
 	return math.clamp(math.round(short * HEAD_SHARE / SansHead.Height), MIN_PIXEL, MAX_PIXEL)
 end
 
-function Loading.Metrics(viewport: Vector2): Metrics
+function Loading.Metrics(viewport: Vector2, mode: SpinMode?): Metrics
 	local w = math.max(math.round(viewport.X), 1)
 	local h = math.max(math.round(viewport.Y), 1)
 	local p = Loading.PixelSize(viewport)
 	local headW = SansHead.Width * p
 	local headH = SansHead.Height * p
 	local textSize = 8 * math.max(1, math.round(p / 2)) -- PressStart2P is drawn on an 8 px grid
-	local gap = 3 * p
+	-- a wheel-turning head reaches ~2.5 cells further down at 45 degrees than upright: more room above the text
+	local gap = (if mode == "Wheel" then 6 else 3) * p
 	local headTop = math.floor((h - (headH + gap + textSize)) / 2)
-	local centerX = w // 2
+	local centerX = math.floor(w / 2)
 	local grid = GRID * p
 	return {
 		Viewport = Vector2.new(w, h),
 		Pixel = p,
 		Grid = grid,
 		CenterX = centerX,
-		Left = centerX - grid // 2,
+		Left = centerX - math.floor(grid / 2),
 		Top = headTop - OFFSET_Y * p,
 		HeadTop = headTop,
 		HeadW = headW,
@@ -230,13 +233,15 @@ local function hex(c: Color3): string
 end
 
 local function escapeRich(s: string): string
-	return (string.gsub(s, "[&<>\"']", {
-		["&"] = "&amp;",
-		["<"] = "&lt;",
-		[">"] = "&gt;",
-		['"'] = "&quot;",
-		["'"] = "&apos;",
-	}))
+	return (
+		string.gsub(s, "[&<>\"']", {
+			["&"] = "&amp;",
+			["<"] = "&lt;",
+			[">"] = "&gt;",
+			['"'] = "&quot;",
+			["'"] = "&apos;",
+		})
+	)
 end
 
 local HIDE = '<font transparency="1">'
@@ -253,28 +258,32 @@ function Loading.Text(word: string, dots: number, color: Color3?): string
 	return HIDE .. string.rep(".", MAX_DOTS) .. "</font>" .. escapeRich(word) .. shown .. hidden
 end
 
+local MAX_CAP = 30 -- s: no caller can keep the black screen up longer than this
+
 local function mergedTiming(over: { [string]: any }?): Timing
 	local t = table.clone(Loading.Timing) :: any
 	if over then
 		for key in Loading.Timing do
 			local v = over[key]
-			if type(v) == "number" and v == v and v >= 0 then
+			if type(v) == "number" and v == v and v >= 0 and v < math.huge then
 				t[key] = v
 			end
 		end
 	end
+	t.MaxWait = math.min(t.MaxWait, MAX_CAP)
 	return t :: Timing
 end
 
 function Loading.NewSequence(timing: { [string]: any }?): Sequence
 	local cfg = mergedTiming(timing)
 	local seq = {
-		Phase = "FadeIn",
+		Stage = "FadeIn",
 		Time = 0,
 		Backdrop = 0,
 		Content = 0,
 		CoveredAt = nil :: number?,
 		ReadyAt = nil :: number?,
+		CueAt = nil :: number?,
 		OutAt = nil :: number?,
 		Timing = cfg,
 	} :: any
@@ -286,38 +295,49 @@ function Loading.NewSequence(timing: { [string]: any }?): Sequence
 	end
 
 	-- Advances by dt seconds; `ready` = the caller's Until() (only read while holding). Returns (coveredNow,
-	-- doneNow): coveredNow on the step the screen turned fully black, doneNow on the step the overlay finished.
-	function seq.Step(dt: number, ready: boolean): (boolean, boolean)
-		if seq.Phase == "Done" then
-			return false, false
+	-- doneNow, cueNow): coveredNow on the step the screen turned fully black, doneNow on the step the overlay finished,
+	-- cueNow on the step the music cue fires (Timing.MusicLead s before the fade-out; with MusicLead 0 on the step the
+	-- fade-out starts).
+	function seq.Step(dt: number, ready: boolean): (boolean, boolean, boolean)
+		if seq.Stage == "Done" then
+			return false, false, false
 		end
 		local d = if type(dt) == "number" and dt == dt then math.clamp(dt, 0, MAX_STEP) else 0
 		seq.Time += d
 		local t = seq.Time
-		local coveredNow, doneNow = false, false
-		if seq.Phase == "FadeIn" then
+		local coveredNow, doneNow, cueNow = false, false, false
+		if seq.Stage == "FadeIn" then
 			seq.Backdrop = smooth(t / math.max(cfg.FadeIn, 1e-3))
 			if t >= cfg.FadeIn then
-				seq.Phase = "Hold"
+				seq.Stage = "Hold"
 				seq.Backdrop = 1
 				seq.CoveredAt = t
 				coveredNow = true
 			end
-		elseif seq.Phase == "Hold" then
+		elseif seq.Stage == "Hold" then
 			seq.Content = smooth((t - (seq.CoveredAt :: number)) / math.max(cfg.ContentIn, 1e-3))
 			if ready and seq.ReadyAt == nil then
 				seq.ReadyAt = t
 			end
 			local readyAt = seq.ReadyAt
-			local release = skipped
-				or t >= cfg.MaxWait
-				or (readyAt ~= nil and t >= cfg.MinVisible and t - readyAt >= cfg.Settle)
+			local lead = math.max(cfg.MusicLead or 0, 0)
+			if seq.CueAt == nil then
+				local cue = skipped
+					or t >= cfg.MaxWait - lead
+					or (readyAt ~= nil and t >= cfg.MinVisible - lead and t - readyAt >= cfg.Settle)
+				if cue then
+					seq.CueAt = t
+					cueNow = true
+				end
+			end
+			local cueAt = seq.CueAt
+			local release = skipped or t >= cfg.MaxWait or (cueAt ~= nil and t - cueAt >= lead)
 			if release then
-				seq.Phase = "FadeOut"
+				seq.Stage = "FadeOut"
 				seq.OutAt = t
 				contentAtOut = seq.Content
 			end
-		elseif seq.Phase == "FadeOut" then
+		elseif seq.Stage == "FadeOut" then
 			local u = t - (seq.OutAt :: number)
 			if u < cfg.ContentOut then
 				seq.Content = contentAtOut * (1 - smooth(u / math.max(cfg.ContentOut, 1e-3)))
@@ -326,13 +346,13 @@ function Loading.NewSequence(timing: { [string]: any }?): Sequence
 				seq.Backdrop = 1 - smooth((u - cfg.ContentOut) / math.max(cfg.FadeOut, 1e-3))
 			end
 			if u >= cfg.ContentOut + cfg.FadeOut then
-				seq.Phase = "Done"
+				seq.Stage = "Done"
 				seq.Backdrop = 0
 				seq.Content = 0
 				doneNow = true
 			end
 		end
-		return coveredNow, doneNow
+		return coveredNow, doneNow, cueNow
 	end
 
 	return seq :: Sequence
@@ -356,7 +376,8 @@ local function buildSprite(name: string, rows: { string }): Frame
 	local holder = newFrame(name, BLACK, 1, 1)
 	for i, run in SansHead.LayeredRuns(rows) do
 		local white = run.color == "."
-		local cell = newFrame((if white then "W" else "B") .. i, SansHead.Colors[run.color] or WHITE, 0, if white then 1 else 2)
+		local cell =
+			newFrame((if white then "W" else "B") .. i, SansHead.Colors[run.color] or WHITE, 0, if white then 1 else 2)
 		cell.Position = UDim2.fromScale((run.x + OFFSET_X) / GRID, (run.y + OFFSET_Y) / GRID)
 		cell.Size = UDim2.fromScale(run.length / GRID, 1 / GRID)
 		cell.Parent = holder
@@ -395,7 +416,8 @@ function Loading.Build(theme: Theme?, opts: { [string]: any }?): View
 	local content = newFrame("Content", BLACK, 1, 2)
 	content.Visible = false
 
-	-- Wheel: a CanvasGroup turns its whole content as one image (a rotated Frame would not rotate its children)
+	-- Wheel: a CanvasGroup draws the sprite into one image and turns that image (seam-free); ~170 separately
+	-- rotated cell Frames would each get anti-aliased edges and show hairline seams
 	local head: GuiObject = if mode == "Wheel" then Instance.new("CanvasGroup") else Instance.new("Frame")
 	head.Name = "Head"
 	head.BackgroundTransparency = 1
@@ -446,18 +468,18 @@ function Loading.Build(theme: Theme?, opts: { [string]: any }?): View
 		Mode = mode,
 	} :: any
 
-	local metrics: Metrics = Loading.Metrics(viewport)
+	local metrics: Metrics = Loading.Metrics(viewport, mode)
 	local shownDots = -1
 	local lastWidth = -1
 	local lastFlip: boolean? = nil
 
 	local function placeHead(width: number, bob: number)
 		head.Size = UDim2.fromOffset(width, metrics.Grid)
-		head.Position = UDim2.fromOffset(metrics.CenterX - width // 2, metrics.Top + bob)
+		head.Position = UDim2.fromOffset(metrics.CenterX - math.floor(width / 2), metrics.Top + bob)
 	end
 
 	function view.Layout(size: Vector2)
-		metrics = Loading.Metrics(size)
+		metrics = Loading.Metrics(size, mode)
 		view.Metrics = metrics
 		lastWidth = -1
 		lastFlip = nil
@@ -558,8 +580,11 @@ local function runtimeDriver(): Driver
 end
 
 local function defaultParent(): Instance?
-	local player = game:GetService("Players").LocalPlayer
-	return if player then player:FindFirstChildOfClass("PlayerGui") else nil
+	local ok, gui = pcall(function()
+		local player = game:GetService("Players").LocalPlayer
+		return if player then player:FindFirstChildOfClass("PlayerGui") else nil
+	end)
+	return if ok then gui else nil
 end
 
 local function reducedMotion(): boolean
@@ -599,7 +624,16 @@ function Loading.Show(opts: { [string]: any }?): Handle?
 		return nil
 	end
 	local view: View = built
-	local seq = Loading.NewSequence({ MinVisible = o.MinVisible, MaxWait = o.MaxWait })
+	local seq = Loading.NewSequence({ MinVisible = o.MinVisible, MaxWait = o.MaxWait, MusicLead = o.MusicLead })
+	-- with a music cue the caller hands the music over itself (menu track out, lobby track in): no ducking then
+	local duckMusic = not (type(o.MusicLead) == "number" and o.MusicLead > 0)
+	local cued = false
+	local function musicCue()
+		if not cued then
+			cued = true
+			safeCall("OnMusicCue", o.OnMusicCue)
+		end
+	end
 	local timing = seq.Timing
 	local handle = {
 		Covered = false,
@@ -636,6 +670,7 @@ function Loading.Show(opts: { [string]: any }?): Handle?
 			disconnect = nil
 		end
 		cover() -- the caller's switch (close the Title, send the request) happens even if we died early
+		musicCue() -- and the music hand-over too
 		pcall(view.Destroy)
 		if voice ~= nil and soundCtl ~= nil then
 			local okPlaying, playing = pcall(function()
@@ -654,7 +689,7 @@ function Loading.Show(opts: { [string]: any }?): Handle?
 		end
 		local ok, err = pcall(function()
 			local ready = false
-			if seq.Phase == "Hold" then
+			if seq.Stage == "Hold" then
 				if type(o.Until) == "function" then
 					local okUntil, result = pcall(o.Until)
 					ready = (not okUntil) or result == true -- a broken condition never keeps the screen black
@@ -662,7 +697,7 @@ function Loading.Show(opts: { [string]: any }?): Handle?
 					ready = true
 				end
 			end
-			local coveredNow, doneNow = seq.Step(dt, ready)
+			local coveredNow, doneNow, cueNow = seq.Step(dt, ready)
 			local size = measure(view.Gui)
 			if math.abs(size.X - laidOut.X) >= 1 or math.abs(size.Y - laidOut.Y) >= 1 then
 				view.Layout(size)
@@ -675,7 +710,10 @@ function Loading.Show(opts: { [string]: any }?): Handle?
 			if coveredNow then
 				cover()
 			end
-			if soundCtl ~= nil and (seq.Phase == "FadeIn" or seq.Phase == "Hold") then
+			if cueNow then
+				musicCue()
+			end
+			if duckMusic and soundCtl ~= nil and (seq.Stage == "FadeIn" or seq.Stage == "Hold") then
 				sinceDuck += math.max(dt, 0)
 				if sinceDuck >= DUCK_EVERY then
 					sinceDuck = 0
@@ -731,16 +769,12 @@ function Loading.Show(opts: { [string]: any }?): Handle?
 	local schedule = driver.Delay or function(seconds: number, fn: () -> ())
 		task.delay(seconds, fn)
 	end
-	pcall(
-		schedule,
-		timing.MaxWait + timing.ContentOut + timing.FadeOut + Loading.FailsafeMargin,
-		function()
-			if not finished then
-				warn("[Loading] failsafe: the loading screen was still up, removing it")
-				finish()
-			end
+	pcall(schedule, timing.MaxWait + timing.ContentOut + timing.FadeOut + Loading.FailsafeMargin, function()
+		if not finished then
+			warn("[Loading] failsafe: the loading screen was still up, removing it")
+			finish()
 		end
-	)
+	end)
 	return handle :: Handle
 end
 

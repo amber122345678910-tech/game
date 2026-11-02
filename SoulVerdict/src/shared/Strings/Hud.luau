@@ -14,7 +14,7 @@ return {
 	},
 	["hud.exhausted"] = { en = "EXHAUSTED", ru = "ВЫДОХСЯ" },
 	["hud.exhaustedFor"] = { en = "EXHAUSTED {1}s", ru = "ВЫДОХСЯ {1}с" },
-	["hud.final"] = { en = "FINAL PHASE", ru = "ФИНАЛ" },
+	["hud.final"] = { en = "PHASE 2", ru = "ФАЗА 2" },
 	["hud.dash"] = { en = "DASH", ru = "РЫВОК" },
 	["hud.ready"] = { en = "READY", ru = "ГОТОВО" },
 	["hud.ultReady"] = { en = "ULT READY", ru = "УЛЬТА ГОТОВА" },
@@ -98,6 +98,11 @@ return {
 	["hud.ann.final.monster"] = {
 		en = "* Your eye blazes. Dodges and ultimate restored.",
 		ru = "* Твой глаз пылает. Уклонения и ульта восстановлены.",
+	},
+	-- Phase 2 started by the monster's own first ultimate (RoundEvent "FinalPhase" cause "Ult": no ult refill)
+	["hud.ann.final.monsterUlt"] = {
+		en = "* Your eye blazes. Dodges restored and recharging faster.",
+		ru = "* Твой глаз пылает. Уклонения восстановлены и копятся быстрее.",
 	},
 	["hud.ann.surge.line"] = {
 		en = "* Three stars burn as one. The monster falters!",

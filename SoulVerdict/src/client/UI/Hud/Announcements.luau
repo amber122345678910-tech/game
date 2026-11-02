@@ -1,10 +1,11 @@
 --!strict
--- Hud/Announcements: big centred Undertale-style call-outs — FIGHT!, FINAL PHASE, DETERMINATION SURGE,
+-- Hud/Announcements: big centred Undertale-style call-outs — FIGHT!, PHASE 2, DETERMINATION SURGE,
 -- SECOND WIND, COLLAPSE, SAVE n/3, EXHAUSTED! — a huge title with a coloured glow/underline and a typed
 -- "* ..." line. Live: pops in (UIScale overshoot), holds ~2.6 s, fades; queued one at a time.
 --   Announcements.Create(theme, deps) -> { Root, Show(kind, data?), Update(snapshot), Tick(now), Destroy }
 --   kind: "Fight" | "FinalPhase" | "Surge" | "SecondWind" | "Collapse" | "SaveLit" | "Exhausted" | "Custom"
---   data: { Monster: boolean? (local player is the monster), Self: boolean?, Name: string?, Lit: number?,
+--   data: { Monster: boolean? (local player is the monster), Ult: boolean? (FinalPhase = the monster's Phase 2,
+--           started by its first ultimate), Self: boolean?, Name: string?, Lit: number?,
 --           Total: number?, Title: string?, Line: string?, Color: Color3? }
 -- Previews render snapshot.Announcement = { Kind, ... }.
 local Style = require(script.Parent.Style)
@@ -21,7 +22,12 @@ local function spec(skin: any, kind: string, data: { [string]: any }): Spec
 	if kind == "FinalPhase" then
 		return {
 			Title = Style.L("round.hud.final"),
-			Line = Style.L(if data.Monster then "hud.ann.final.monster" else "hud.ann.final.line"),
+			Line = Style.L(
+				if not data.Monster
+					then "hud.ann.final.line"
+					elseif data.Ult then "hud.ann.final.monsterUlt"
+					else "hud.ann.final.monster"
+			),
 			Color = C.Danger,
 			Icon = "Eye",
 		}

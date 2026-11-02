@@ -8,7 +8,9 @@
 --   (MaxAimRange for range-less abilities), Aim "Target"/"Ally" target checks (living enemy/ally within
 --   range + slack, roughly in front, enemies not Invisible; "Target" falls back to the nearest visible enemy in a
 --   cone, "Ally" to self),
---   M1 combos (ComboIndex 1..Combo while casts follow within Numbers.ComboWindow)). Then: cooldown set
+--   M1 combos (ComboIndex 1..Combo while casts follow within Numbers.ComboWindow)). Then: the monster's first
+--   ultimate of a round starts its Phase 2 (startPhaseTwo -> RoundService.TriggerFinalPhase("Ult", model), before
+--   the bar is spent; the Start packet then carries data.phase2 = true and the ult runs normally), cooldown set
 --   (Net "Cooldown" to the caster + model attribute "Cooldown_<abilityId>" = endsAt for spectator/Studious
 --   UI), AbilityFx {phase = "Start"} to everyone, Casted signal, and the kit handler
 --   ServerKits[kitId].Abilities[abilityId](ctx) in its own thread (xpcall). A rejected cast answers the
@@ -443,6 +445,31 @@ local function runHandler(handler: (any) -> (), ctx: any, st: ModelState)
 	end
 end
 
+-- The monster's FIRST ultimate of a round starts its Phase 2: RoundService.TriggerFinalPhase("Ult", model), called
+-- while the cast commits (after every check passed, before the ult bar is set to 0). Cheap pre-checks here (monster
+-- team, Round/Collapse, RoundState.FinalPhase still false); RoundService checks that `model` is the round's monster.
+-- Phase 2 neither refills this bar nor stops the caster (its Invulnerable window only blocks incoming hits), so the
+-- ultimate below runs unchanged as the transformation's opening move. Human ultimates, casts outside fight phases
+-- and every ultimate after Phase 2 began are untouched; the HP threshold (DamageService) stays the safety net.
+local function startPhaseTwo(model: Model): boolean
+	if Teams.TeamOf(model) ~= "Monster" or not Validation.InCombatPhase() then
+		return false
+	end
+	if Validation.RoundAttr("FinalPhase") ~= false then
+		return false
+	end
+	local rs = Validation.Service("RoundService")
+	if rs == nil or type(rs.TriggerFinalPhase) ~= "function" then
+		return false
+	end
+	local ok, started = pcall(rs.TriggerFinalPhase, "Ult", model)
+	if not ok then
+		warn("[AbilityService] TriggerFinalPhase failed: " .. tostring(started))
+		return false
+	end
+	return started == true
+end
+
 local function castVerdictBox(model: Model, player: Player?, payload: Payload): (boolean, string?)
 	if Teams.TeamOf(model) ~= "Monster" then
 		return false, "role"
@@ -608,7 +635,9 @@ local function tryCast(model: Model, player: Player?, abilityId: string, payload
 
 	-- commit
 	setCooldownInternal(model, player, abilityId, ability.Cooldown)
+	local phaseTwo = false
 	if ability.Ult then
+		phaseTwo = startPhaseTwo(model) -- before the bar is spent; the cast still runs below as Phase 2's opener
 		model:SetAttribute("Ult", 0)
 	end
 	if model:GetAttribute("Blocking") == true then
@@ -636,7 +665,7 @@ local function tryCast(model: Model, player: Player?, abilityId: string, payload
 		aim = aim,
 		dir = ctx.AimDir,
 		charge = charge,
-		data = { combo = comboIndex, target = target },
+		data = { combo = comboIndex, target = target, phase2 = if phaseTwo then true else nil },
 	})
 	AbilityService.Casted:Fire(model, abilityId)
 	local handler = handlerFor(kit, ability)

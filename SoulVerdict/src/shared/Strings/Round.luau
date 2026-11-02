@@ -213,7 +213,7 @@ return {
 	-- HUD helpers
 	["round.hud.alive"] = { en = "{1}/{2} alive", ru = "Живы: {1}/{2}" },
 	["round.hud.saves"] = { en = "SAVES {1}/{2}", ru = "СОХР. {1}/{2}" },
-	["round.hud.final"] = { en = "FINAL PHASE", ru = "ФИНАЛЬНАЯ ФАЗА" },
+	["round.hud.final"] = { en = "PHASE 2", ru = "ФАЗА 2" },
 	["round.hud.harmony"] = { en = "Harmony x{1}", ru = "Гармония x{1}" },
 	["round.hud.downed"] = { en = "DOWNED — hold on! {1}s", ru = "ПОВЕРЖЕН — держись! {1}с" },
 	["round.hud.spectator"] = { en = "SPECTATING", ru = "НАБЛЮДЕНИЕ" },

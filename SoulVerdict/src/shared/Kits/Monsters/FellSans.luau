@@ -155,8 +155,8 @@ local kit: Types.KitDef = {
 			Ult = true,
 			Name = { en = "Execution", ru = "Казнь" },
 			Desc = {
-				en = "Ultimate. Mark every human within 40 studs. After 1.2s a blaster drops from above on each mark — double damage to the weakened.",
-				ru = "Ультимейт. Метит всех людей в радиусе 40. Через 1.2с над каждой меткой падает бластер — двойной урон по ослабленным.",
+				en = "Ultimate. Mark humans within 40 studs; 1.2s later a blaster hits each mark (x2 to the weakened). First use starts Phase 2: new music, you get stronger.",
+				ru = "Ультимейт. Метит людей в радиусе 40; через 1.2с в каждую метку бьёт бластер (x2 по ослабленным). Первая ульта запускает Фазу 2: новая музыка, ты сильнее.",
 			},
 			Cooldown = 3,
 			Range = 40,

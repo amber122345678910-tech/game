@@ -255,6 +255,9 @@ local function sync()
 			call(Input, "PopContext", "Menu")
 		end
 	end
+	if type(UIController._SyncMenuMusic) == "function" then
+		pcall(UIController._SyncMenuMusic) -- the title's own track (defined further down)
+	end
 	local wantMenuCamera = hasScreen("Title") and inLobby()
 	if wantMenuCamera ~= menuCamera then
 		menuCamera = wantMenuCamera
@@ -624,15 +627,79 @@ local function characterRoot(): (Model?, Vector3?)
 	return character, if root and root:IsA("BasePart") then root.Position else nil
 end
 
+-- Music around the loading screen (owner's wish): the title plays its own "Menu" track; on PLAY / PRACTICE the menu
+-- track fades out into the black, and the next track (lobby, or the practice round's music) starts PLAY_MUSIC_LEAD s
+-- before the screen lights up again.
+local PLAY_MIN_VISIBLE = 4.0 -- s: long enough for the lead below to be heard under the black
+local PLAY_MUSIC_LEAD = 2.0 -- s
+local MENU_FADE_OUT = 1.2 -- s
+local NEXT_FADE_IN = 1.5 -- s
+local MENU_MUSIC = "Menu"
+local SILENCE = "Silence"
+local loadingMusic = false -- true while the loading screen owns the music
+
+local function setMusic(key: string?, fade: number?)
+	if Sound and type(Sound.SetMusicOverride) == "function" then
+		pcall(Sound.SetMusicOverride, key, fade)
+	end
+end
+
+local function menuMusicUsable(): boolean
+	local ok, def = pcall(function()
+		local Audio = require(Shared:WaitForChild("Audio")) :: any
+		return Audio.Resolve(MENU_MUSIC)
+	end)
+	return ok and def ~= nil
+end
+
+-- the title's own track while it is open; called by syncMenuMusic on every menu change
+local menuMusicOn = false
+local function syncMenuMusic()
+	if loadingMusic then
+		return
+	end
+	local want = hasScreen("Title") and menuMusicUsable()
+	if want ~= menuMusicOn then
+		menuMusicOn = want
+		setMusic(if want then MENU_MUSIC else nil)
+	end
+end
+UIController._SyncMenuMusic = syncMenuMusic
+
+local function loadingMusicOpts(opts: { [string]: any }): { [string]: any }
+	loadingMusic = true
+	menuMusicOn = false
+	setMusic(SILENCE, MENU_FADE_OUT) -- the menu track fades out into the black
+	opts.MusicLead = PLAY_MUSIC_LEAD
+	opts.OnMusicCue = function()
+		setMusic(nil, NEXT_FADE_IN) -- automatic selection again: the lobby track (or the round's) fades in
+	end
+	local onDone = opts.OnDone
+	opts.OnDone = function()
+		if loadingMusic then
+			loadingMusic = false
+			setMusic(nil, NEXT_FADE_IN)
+		end
+		syncMenuMusic()
+		if type(onDone) == "function" then
+			onDone()
+		end
+	end
+	return opts
+end
+
 function UIController.Play()
 	-- the menus close while the screen is black, so the reveal shows the lobby
-	local shown = showLoading({
+	local shown = showLoading(loadingMusicOpts({
+		MinVisible = PLAY_MIN_VISIBLE,
 		OnCovered = function()
 			UIController.Close()
 		end,
-	})
+	}))
 	if not shown then
+		loadingMusic = false
 		UIController.Close()
+		syncMenuMusic()
 	end
 end
 
@@ -654,8 +721,9 @@ function UIController.Practice(side: string?)
 	local notifyConn: any = nil
 	local lastCharacter: Model? = nil
 	local lastPosition: Vector3? = nil
-	local shown = showLoading({
+	local shown = showLoading(loadingMusicOpts({
 		MaxWait = 7,
+		MinVisible = PLAY_MIN_VISIBLE,
 		OnCovered = function()
 			UIController.Close()
 			lastCharacter, lastPosition = characterRoot()
@@ -684,9 +752,11 @@ function UIController.Practice(side: string?)
 				notifyConn = nil
 			end
 		end,
-	})
+	}))
 	if not shown then
+		loadingMusic = false
 		UIController.Close()
+		syncMenuMusic()
 		request()
 	end
 end

@@ -36,7 +36,7 @@ return {
 	["admin.startNow"] = { en = "Start now", ru = "Старт сейчас" },
 	["admin.sec.round"] = { en = "Round control", ru = "Управление раундом" },
 	["admin.skip"] = { en = "Skip phase", ru = "Пропуск фазы" },
-	["admin.final"] = { en = "Final phase", ru = "Финал" },
+	["admin.final"] = { en = "Phase 2", ru = "Фаза 2" },
 	["admin.collapse"] = { en = "Collapse", ru = "Коллапс" },
 	["admin.endHumans"] = { en = "Humans win", ru = "Победа людей" },
 	["admin.endMonster"] = { en = "Monster wins", ru = "Победа монстра" },
@@ -89,10 +89,10 @@ return {
 
 	-- TEST tab -------------------------------------------------------------------------------------------------
 	["admin.sec.music"] = { en = "Music", ru = "Музыка" },
-	["admin.music.final"] = { en = "{1}: final", ru = "{1}: финал" },
+	["admin.music.final"] = { en = "{1}: Phase 2", ru = "{1}: Фаза 2" },
 	["admin.music.lobby"] = { en = "Lobby", ru = "Лобби" },
 	["admin.music.box"] = { en = "Verdict Box", ru = "Коробка" },
-	["admin.music.finalPhase"] = { en = "Shared final", ru = "Общий финал" },
+	["admin.music.finalPhase"] = { en = "Phase 2 (shared)", ru = "Фаза 2 (общая)" },
 	["admin.music.collapse"] = { en = "Collapse", ru = "Коллапс" },
 	["admin.music.stop"] = {
 		en = "Stop preview (normal music)",
@@ -181,7 +181,7 @@ return {
 	},
 	["admin.solo.soon"] = { en = "Solo round in {1} s…", ru = "Соло-раунд через {1} с…" },
 	["admin.ok.skip"] = { en = "Phase skipped.", ru = "Фаза пропущена." },
-	["admin.ok.final"] = { en = "Final phase!", ru = "Финальная фаза!" },
+	["admin.ok.final"] = { en = "Phase 2!", ru = "Фаза 2!" },
 	["admin.ok.collapse"] = { en = "Collapse started.", ru = "Коллапс начался." },
 	["admin.ok.end"] = { en = "Round ended: {1} win.", ru = "Раунд окончен: победа — {1}." },
 	["admin.ok.map"] = { en = "Next map: {1}", ru = "Следующая карта: {1}" },

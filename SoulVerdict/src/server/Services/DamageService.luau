@@ -21,7 +21,8 @@
 --   7 Shielded absorb   8 health (Determined / Box -> min HP 1; monster before FinalPhase -> min HP 1)
 --   9 HP <= 0: human -> Downed (CharacterService.SetDowned) when RoundState.TeamRevives > 0 during
 --                Round/Collapse and not already downed, else CharacterService.Kill; others -> Kill.
---                Monster crossing Config.Round.FinalPhaseHpFraction -> RoundService.TriggerFinalPhase()
+--                Monster crossing Config.Round.FinalPhaseHpFraction -> RoundService.TriggerFinalPhase("Hp")
+--                (its Phase 2 safety net: normally the monster's first ultimate starts it, see AbilityService)
 --  10 KR: humans hit by an attacker gain info.KR (x attacker KRBoost data.mult [2], x(1-BlockReduction) when
 --                blocked), cap Config.KR.Max; a human attacker landing a hit loses Config.KR.CleanseOnHit KR
 --  11 stun (not when blocked) / knockback (halved when blocked) via StatusService / MovementService
@@ -167,8 +168,8 @@ local function canBeDowned(target: Model): boolean
 	return type(revives) == "number" and revives > 0
 end
 
--- True while `monster` is the round's monster and its desperation phase has not started yet: it cannot die
--- before RoundService.TriggerFinalPhase (HP floor 1).
+-- True while `monster` is the round's monster and its Phase 2 (RoundState.FinalPhase) has not started yet: it
+-- cannot die before RoundService.TriggerFinalPhase (HP floor 1).
 local function finalPhasePending(monster: Model): boolean
 	if not Validation.InCombatPhase() or Validation.RoundAttr("FinalPhase") ~= false then
 		return false
@@ -574,7 +575,7 @@ function DamageService.Apply(info: any): any
 			local rs = Validation.Service("RoundService")
 			if rs and type(rs.TriggerFinalPhase) == "function" then
 				task.spawn(function()
-					local ok, err = pcall(rs.TriggerFinalPhase)
+					local ok, err = pcall(rs.TriggerFinalPhase, "Hp")
 					if not ok then
 						warn("[DamageService] TriggerFinalPhase failed: " .. tostring(err))
 					end

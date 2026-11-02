@@ -149,7 +149,9 @@ local SOUNDS: { [string]: SoundDef } = {
 	------------------------------------------------------------------------------------------------- music
 	-- OWNER: candidate ids go into the `{}` of each entry, best first, e.g. music("...", 0.5, { "123", "456" }).
 	-- Keys match Maps/Registry `Music` fields ("Lobby", "Map_<MapId>").
-	Lobby = music("calm, mysterious lobby loop (piano / music box, ~90 BPM)", 0.45, { "328964090", "314069452", "1848363318", "1838649967", "1848354536" }),
+	Menu = music("title screen (main menu with PLAY): owner's pick", 0.5, { "120586834968743" }),
+	Silence = music("intentional silence: the loading screen fades the menu track out before the lobby track", 0.5, {}),
+	Lobby = music("calm, mysterious lobby loop (piano / music box, ~90 BPM)", 0.45, { "133849870887812", "328964090", "314069452", "1848363318", "1838649967", "1848354536" }),
 	Map_HallOfVerdicts = music("solemn golden-hall battle loop: organ / strings, building tension", 0.5, { "746812937", "1844758350", "1839290228", "1837835644" }),
 	Map_SnowdinCrossroads = music("cozy-but-tense snowy town battle loop: bells, pizzicato, light drums", 0.5, { "14264872551", "98223235470761", "6390779289", "1836542585", "1836595204" }),
 	Map_WaterfallGrotto = music("echoing cave battle loop: plucks, pads, water ambience, mid tempo", 0.5, { "99649859652828", "126038262761422", "10728729976", "1839824117", "1846767914" }),
@@ -163,11 +165,11 @@ local SOUNDS: { [string]: SoundDef } = {
 	-- Monster themes, picked by RoundState.MonsterKit (kit id): "Theme_<kit>" plays during the fight and
 	-- "Theme_<kit>_Final" in the final phase (else the normal theme). When a theme has no candidates or every
 	-- candidate failed, the map's track plays (SoundController music selection, SPEC §20).
-	Theme_ClassicSans = music("Sans boss theme: fast, jazzy electronic loop, playful but deadly", 0.5, { "3745550364", "101598365847186", "98142057415884", "128830409645703", "3813059729", "137220025405002" }),
-	Theme_ClassicSans_Final = music("Sans final phase: the same theme, harder and faster (optional)", 0.55, { "85617271533620", "5119156054", "5956427401", "137220025405002" }),
+	Theme_ClassicSans = music("Sans boss theme: fast, jazzy electronic loop, playful but deadly", 0.5, { "135232798563643", "3745550364", "98142057415884", "128830409645703", "3813059729", "137220025405002" }),
+	Theme_ClassicSans_Final = music("Sans final phase: the same theme, harder and faster (optional)", 0.55, { "101598365847186", "85617271533620", "5119156054", "5956427401", "137220025405002" }),
 	Theme_FellSans = music("Fell Sans (Underfell): aggressive, distorted, heavy boss loop", 0.5, { "120838650095309", "101730223568557", "1837853076", "9043754347" }),
-	Theme_FellSans_Final = music("Fell Sans final phase: harsher, faster, darker remix (optional)", 0.55, { "120928193831867", "137220025405002", "1837880957" }),
-	Theme_EclipseSans = music("Eclipse Sans (original void AU): eerie cosmic dark-synth boss loop", 0.5, { "114505147154737", "9045683296", "9045934037", "1847456615" }),
+	Theme_FellSans_Final = music("Fell Sans final phase: harsher, faster, darker remix (optional)", 0.55, { "134453206423714", "120928193831867", "137220025405002", "1837880957" }),
+	Theme_EclipseSans = music("Eclipse Sans (original void AU): eerie cosmic dark-synth boss loop", 0.5, { "88059047994896", "114505147154737", "9045683296", "9045934037", "1847456615" }),
 	Theme_EclipseSans_Final = music("Eclipse Sans final phase: darker, glitchier, faster (optional)", 0.55, { "103167351125844", "78368445861935", "1837779548" }),
 
 	------------------------------------------------------------------------------------------- movement
@@ -270,7 +272,7 @@ local SOUNDS: { [string]: SoundDef } = {
 	Notify = ui({ "9125397532", "2375539277", "7383525713" }, 0.4, nil, "notification pop"),
 	Denied = ui({ "9113401879" }, 0.4, nil, "short 'not ready' buzz (ability on cooldown / no target)"),
 	-- Client/UI/Overlays/Loading: starts with the fade to black, fades out (0.4 s) when the loading screen ends
-	PlayTransition = ui({ "120586834968743" }, 0.6, nil, "PLAY loading-screen sound (owner's pick)"),
+	PlayTransition = ui("", 0.6, nil, "optional one-shot when PLAY starts the loading screen (the owner's id is the Menu track)"),
 }
 
 -- defaults that are fallbacks of other generic entries

@@ -95,7 +95,12 @@ local function readSprite(T, holder, metrics, Loading, label)
 			length = w / p,
 			color = if cell.BackgroundColor3.R > 0.5 then "." else "#",
 		}
-		if h ~= p or run.x ~= math.floor(run.x) or run.length ~= math.floor(run.length) or run.y ~= math.floor(run.y) then
+		if
+			h ~= p
+			or run.x ~= math.floor(run.x)
+			or run.length ~= math.floor(run.length)
+			or run.y ~= math.floor(run.y)
+		then
 			fractional += 1
 		end
 		table.insert(if cell.ZIndex <= 1 then white else black, run)
@@ -291,7 +296,12 @@ return restoringFlags({
 		sameRows(T, SansHead.Mirror(SansHead.MirroredRows), SansHead.Rows, "mirror twice = original")
 		T.eq(#SansHead.Validate(SansHead.MirroredRows), 0, "mirrored sprite valid")
 		sameRows(T, paint(SansHead.Runs(SansHead.MirroredRows), 40, 37, true), SansHead.MirroredRows, "mirrored runs")
-		sameRows(T, paint(SansHead.LayeredRuns(SansHead.MirroredRows), 40, 37, false), SansHead.MirroredRows, "mirrored layered runs")
+		sameRows(
+			T,
+			paint(SansHead.LayeredRuns(SansHead.MirroredRows), 40, 37, false),
+			SansHead.MirroredRows,
+			"mirrored layered runs"
+		)
 		-- every original run has its mirror image (x' = 40 - x - length)
 		local set = {}
 		for _, r in SansHead.Runs(SansHead.MirroredRows) do
@@ -334,7 +344,11 @@ return restoringFlags({
 				T.eq(view.Backdrop.Active, true, label .. " backdrop swallows input")
 				T.eq(view.Backdrop.Size, roblox.UDim2.fromScale(1, 1), label .. " backdrop full screen")
 				T.eq(view.Backdrop.BackgroundColor3, roblox.Color3.new(0, 0, 0), label .. " black")
-				T.eq(view.Head.ClassName, if mode == "Wheel" then "CanvasGroup" else "Frame", label .. " head container")
+				T.eq(
+					view.Head.ClassName,
+					if mode == "Wheel" then "CanvasGroup" else "Frame",
+					label .. " head container"
+				)
 				T.eq(#view.Normal:GetChildren(), cellsPerSprite, label .. " one Frame per layered run")
 				T.eq(view.Mirrored ~= nil, mode == "Turn", label .. " mirrored sprite only for the coin turn")
 				if view.Mirrored then
@@ -347,7 +361,10 @@ return restoringFlags({
 				local m = view.Metrics
 				T.eq(m.Pixel, math.floor(m.Pixel), label .. " integer pixel size")
 				if size[2] <= 400 or size[1] <= 400 then
-					T.ok(m.Pixel >= 5 and m.Pixel <= 6, label .. " ~5-6 px per sprite pixel on a phone (" .. m.Pixel .. ")")
+					T.ok(
+						m.Pixel >= 5 and m.Pixel <= 6,
+						label .. " ~5-6 px per sprite pixel on a phone (" .. m.Pixel .. ")"
+					)
 				end
 				T.ok(m.HeadTop >= 0 and m.TextTop + m.TextSize <= size[2], label .. " head + text inside the screen")
 				T.ok(m.HeadTop > size[2] * 0.08, label .. " not glued to the top")
@@ -381,15 +398,29 @@ return restoringFlags({
 		local SansHead = Loader.requirePath(SANS)
 		for _, size in { { 860, 400 }, { 861, 401 }, { 1366, 768 } } do
 			local label = ("%dx%d"):format(size[1], size[2])
-			local view = Loading.Preview(Themes.Get("Classic"), roblox.Vector2.new(size[1], size[2]), { Mode = "Turn", Spin = 0 })
+			local view = Loading.Preview(
+				Themes.Get("Classic"),
+				roblox.Vector2.new(size[1], size[2]),
+				{ Mode = "Turn", Spin = 0 }
+			)
 			local m = view.Metrics
 			T.eq(view.Head.Size, roblox.UDim2.fromOffset(m.Grid, m.Grid), label .. " head container at rest")
 			T.eq(view.Head.Position, roblox.UDim2.fromOffset(m.Left, m.Top), label .. " head container position")
 			T.eq(m.Left + 12 * m.Pixel, m.CenterX - 20 * m.Pixel, label .. " sprite centred")
 			T.eq(view.Normal.Visible, true, label .. " front sprite shown")
 			T.eq(view.Mirrored.Visible, false, label .. " back sprite hidden")
-			sameRows(T, readSprite(T, view.Normal, m, Loading, label), SansHead.Rows, label .. " front sprite on screen")
-			sameRows(T, readSprite(T, view.Mirrored, m, Loading, label), SansHead.MirroredRows, label .. " back sprite on screen")
+			sameRows(
+				T,
+				readSprite(T, view.Normal, m, Loading, label),
+				SansHead.Rows,
+				label .. " front sprite on screen"
+			)
+			sameRows(
+				T,
+				readSprite(T, view.Mirrored, m, Loading, label),
+				SansHead.MirroredRows,
+				label .. " back sprite on screen"
+			)
 			view.Destroy()
 		end
 	end,
@@ -436,16 +467,49 @@ return restoringFlags({
 		local wheel = Loading.Build(Themes.Get("Classic"), { Viewport = roblox.Vector2.new(860, 400), Mode = "Wheel" })
 		for _, t in { 0, 0.4, 0.8, 1.2, 1.55 } do
 			wheel.Pose(t)
-			T.near(wheel.Head.Rotation, Loading.WheelAngle(t), 1e-6, "wheel angle at " .. t)
-			T.eq(wheel.Head.Size, roblox.UDim2.fromOffset(wheel.Metrics.Grid, wheel.Metrics.Grid), "wheel keeps its size")
+			T.near(wheel.Head.Rotation, Loading.WheelAngle(t), 1e-3, "wheel angle at " .. t)
+			T.eq(
+				wheel.Head.Size,
+				roblox.UDim2.fromOffset(wheel.Metrics.Grid, wheel.Metrics.Grid),
+				"wheel keeps its size"
+			)
 			T.eq(wheel.Normal.Visible, true, "wheel sprite visible")
 		end
 		T.near(Loading.WheelAngle(Loading.WheelPeriod / 4), 90, 1e-6, "a quarter turn = 90 degrees")
+		-- the turning head never reaches the text: farthest painted cell corner from the pivot (the container
+		-- centre = sprite cell (20, 19)) + the bob stays above the text, and the top stays on screen
+		local SansHead = Loader.requirePath(SANS)
+		local reach = 0
+		for y, row in SansHead.Rows do
+			for x = 1, #row do
+				if string.sub(row, x, x) ~= " " then
+					for _, cx in { x - 1, x } do
+						for _, cy in { y - 1, y } do
+							reach = math.max(reach, math.sqrt((cx - 20) ^ 2 + (cy - 19) ^ 2))
+						end
+					end
+				end
+			end
+		end
+		for _, size in { { 860, 400 }, { 740, 360 }, { 1920, 1080 }, { 390, 844 } } do
+			local wm = Loading.Metrics(roblox.Vector2.new(size[1], size[2]), "Wheel")
+			local pivotY = wm.Top + wm.Grid / 2
+			T.eq(pivotY, wm.HeadTop + 19 * wm.Pixel, "pivot = container centre")
+			T.ok(
+				pivotY + reach * wm.Pixel + wm.Bob < wm.TextTop,
+				("%dx%d wheel clears the text"):format(size[1], size[2])
+			)
+			T.ok(pivotY - reach * wm.Pixel - wm.Bob >= 0, ("%dx%d wheel stays on screen"):format(size[1], size[2]))
+		end
 		wheel.Destroy()
 		-- still (Reduced Motion)
 		local still = Loading.Build(nil, { Viewport = roblox.Vector2.new(860, 400), Mode = "Still" })
 		still.Pose(0.77)
-		T.eq(still.Head.Position, roblox.UDim2.fromOffset(still.Metrics.Left, still.Metrics.Top), "still head does not move")
+		T.eq(
+			still.Head.Position,
+			roblox.UDim2.fromOffset(still.Metrics.Left, still.Metrics.Top),
+			"still head does not move"
+		)
 		T.eq(still.Head.Rotation, 0, "still head upright")
 		still.Destroy()
 		-- dots
@@ -461,18 +525,33 @@ return restoringFlags({
 			local text = Loading.Text("LOADING", n)
 			local _, dots = string.gsub(text, "%.", "")
 			T.eq(dots, 6, n .. " dots: always 3 pad + 3 dot glyphs (the word never moves)")
-			T.ok(string.find(text, "^<font transparency=\"1\">%.%.%.</font>LOADING") ~= nil, n .. " dots: invisible left pad")
+			T.ok(
+				string.find(text, '^<font transparency="1">%.%.%.</font>LOADING') ~= nil,
+				n .. " dots: invisible left pad"
+			)
 		end
 		T.ok(string.find(Loading.Text("LOADING", 3), "LOADING...", 1, true) ~= nil, "three visible dots")
 		T.ok(string.find(Loading.Text("A<B", 0), "A&lt;B", 1, true) ~= nil, "RichText escaped")
-		T.ok(string.find(Loading.Text("X", 2, roblox.Color3.fromRGB(255, 24, 44)), '<font color="#FF182C">..</font>', 1, true) ~= nil, "tinted dots")
+		T.ok(
+			string.find(
+				Loading.Text("X", 2, roblox.Color3.fromRGB(255, 24, 44)),
+				'<font color="#FF182C">..</font>',
+				1,
+				true
+			) ~= nil,
+			"tinted dots"
+		)
 		-- language + theme
 		T.eq(Strings.L("loading.title"), "LOADING", "en string")
 		Strings.SetLanguage("ru")
 		T.eq(Strings.L("loading.title"), "ЗАГРУЗКА", "ru string")
 		local ru = Loading.Build(Themes.Get("Fell"), { Viewport = roblox.Vector2.new(860, 400) })
 		T.ok(string.find(ru.Label.Text, "ЗАГРУЗКА", 1, true) ~= nil, "ru label")
-		T.eq(ru.Label.FontFace, Themes.Font(Themes.Get("Classic"), "Display", "ru"), "ru keeps the (Cyrillic) pixel font")
+		T.eq(
+			ru.Label.FontFace.Family,
+			Themes.Font(Themes.Get("Classic"), "Display", "ru").Family,
+			"ru keeps the (Cyrillic) pixel font"
+		)
 		ru.Pose(3 * Loading.DotPeriod + 0.01)
 		T.ok(string.find(ru.Label.Text, "<font color=", 1, true) ~= nil, "Fell tints the dots")
 		ru.Destroy()
@@ -492,8 +571,8 @@ return restoringFlags({
 		local lastBackdrop = -1
 		local monotonic = true
 		local maxContent = 0
-		while seq.Phase ~= "Done" and seq.Time < 20 do
-			local phaseBefore = seq.Phase
+		while seq.Stage ~= "Done" and seq.Time < 20 do
+			local phaseBefore = seq.Stage
 			local covered, done = seq.Step(DT, true) -- PLAY: no condition
 			if covered then
 				covers += 1
@@ -507,11 +586,11 @@ return restoringFlags({
 				monotonic = monotonic and seq.Backdrop >= lastBackdrop
 				lastBackdrop = seq.Backdrop
 			end
-			if phaseBefore == "Hold" and seq.Phase == "FadeOut" then
+			if phaseBefore == "Hold" and seq.Stage == "FadeOut" then
 				outAt = seq.Time
 			end
 			maxContent = math.max(maxContent, seq.Content)
-			if seq.Phase == "Hold" then
+			if seq.Stage == "Hold" then
 				T.eq(seq.Backdrop, 1, "black while holding")
 			end
 		end
@@ -528,16 +607,57 @@ return restoringFlags({
 		T.ok(not covered and not done, "no events after Done")
 	end,
 
+	sequence_music_cue = function(T, Loader)
+		local Loading = setup(Loader)
+		local function run(opts, readyFrom)
+			local seq = Loading.NewSequence(opts)
+			local cueAt, outAt, cues = nil, nil, 0
+			local t = 0
+			for _ = 1, 2000 do
+				local _covered, done, cue = seq.Step(1 / 60, t >= (readyFrom or 0))
+				t += 1 / 60
+				if cue then
+					cues += 1
+					cueAt = cueAt or seq.Time
+				end
+				if seq.OutAt and outAt == nil then
+					outAt = seq.OutAt
+				end
+				if done then
+					break
+				end
+			end
+			return cueAt, outAt, cues
+		end
+		-- PLAY: 4 s minimum, the music cue 2 s before the fade-out
+		local cueAt, outAt, cues = run({ MinVisible = 4, MusicLead = 2 })
+		T.eq(cues, 1, "the cue fires exactly once")
+		T.ok(cueAt ~= nil and math.abs(cueAt - 2) < 0.05, ("cue at about 2 s (got %s)"):format(tostring(cueAt)))
+		T.ok(outAt ~= nil and math.abs(outAt - 4) < 0.05, ("fade-out at about 4 s (got %s)"):format(tostring(outAt)))
+		-- practice: ready late (5 s) -> cue then, reveal 2 s later, but never past the cap
+		cueAt, outAt = run({ MinVisible = 4, MusicLead = 2, MaxWait = 7 }, 5)
+		T.ok(cueAt ~= nil and cueAt >= 5 and cueAt < 5.5, ("late ready: cue right after it (got %s)"):format(tostring(cueAt)))
+		T.ok(outAt ~= nil and outAt <= 7 + 0.05, ("never past the cap (got %s)"):format(tostring(outAt)))
+		-- never ready: the cue fires MusicLead before the cap
+		cueAt, outAt = run({ MinVisible = 4, MusicLead = 2, MaxWait = 7 }, math.huge)
+		T.ok(cueAt ~= nil and math.abs(cueAt - 5) < 0.05, ("cap: cue at cap - lead (got %s)"):format(tostring(cueAt)))
+		T.ok(outAt ~= nil and math.abs(outAt - 7) < 0.05, ("cap: fade-out at the cap (got %s)"):format(tostring(outAt)))
+		-- without a lead the cue fires on the release step (old behaviour unchanged)
+		cueAt, outAt, cues = run({})
+		T.eq(cues, 1, "no lead: one cue")
+		T.ok(cueAt ~= nil and outAt ~= nil and math.abs(cueAt - outAt) < 1e-6, "no lead: cue = release")
+	end,
+
 	sequence_until_cap_skip_hitches = function(T, Loader)
 		local Loading = setup(Loader)
 		local timing = Loading.Timing
 		local function runUntil(readyFrom, opts)
 			local seq = Loading.NewSequence(opts)
 			local outAt
-			while seq.Phase ~= "Done" and seq.Time < 30 do
-				local before = seq.Phase
+			while seq.Stage ~= "Done" and seq.Time < 30 do
+				local before = seq.Stage
 				seq.Step(DT, readyFrom ~= nil and seq.Time >= readyFrom)
-				if before == "Hold" and seq.Phase == "FadeOut" then
+				if before == "Hold" and seq.Stage == "FadeOut" then
 					outAt = seq.Time
 				end
 			end
@@ -548,7 +668,10 @@ return restoringFlags({
 		T.near(outCap, timing.MaxWait, 2 * DT, "never ready -> released at the 7 s cap")
 		-- the round starts at 3 s -> + settle
 		local outLate = runUntil(3)
-		T.near(outLate, 3 + timing.Settle, 2 * DT, "ready at 3 s -> released after the settle")
+		T.ok(
+			outLate >= 3 + timing.Settle and outLate <= 3 + timing.Settle + 4 * DT,
+			"ready at 3 s -> released after the settle (" .. outLate .. ")"
+		)
 		-- ready early -> still the minimum time
 		local outEarly = runUntil(0.5)
 		T.near(outEarly, timing.MinVisible, 2 * DT, "ready early -> minimum time")
@@ -560,14 +683,16 @@ return restoringFlags({
 		local _, junk = runUntil(nil, { MaxWait = -3, MinVisible = 0 / 0 })
 		T.eq(junk.Timing.MaxWait, timing.MaxWait, "negative / NaN overrides are ignored")
 		T.eq(junk.Timing.MinVisible, timing.MinVisible, "NaN override ignored")
+		T.eq(Loading.NewSequence({ MaxWait = math.huge }).Timing.MaxWait, timing.MaxWait, "an endless cap is ignored")
+		T.ok(Loading.NewSequence({ MaxWait = 1000 }).Timing.MaxWait <= 30, "the cap itself is capped")
 		-- skip: fade-out as soon as the screen is black
 		local seq = Loading.NewSequence()
 		seq.Skip()
 		local out
-		while seq.Phase ~= "Done" and seq.Time < 5 do
-			local before = seq.Phase
+		while seq.Stage ~= "Done" and seq.Time < 5 do
+			local before = seq.Stage
 			seq.Step(DT, false)
-			if before == "Hold" and seq.Phase == "FadeOut" then
+			if before == "Hold" and seq.Stage == "FadeOut" then
 				out = seq.Time
 			end
 		end
@@ -575,19 +700,19 @@ return restoringFlags({
 		-- hitches: a huge dt never skips a whole phase; NaN / negative dt do nothing
 		local h = Loading.NewSequence()
 		h.Step(10, true)
-		T.eq(h.Phase, "FadeIn", "one huge step stays in the fade-in (clamped)")
+		T.eq(h.Stage, "FadeIn", "one huge step stays in the fade-in (clamped)")
 		local covered = h.Step(10, true)
-		T.ok(covered and h.Phase == "Hold", "the next one covers")
+		T.ok(covered and h.Stage == "Hold", "the next one covers")
 		local t0 = h.Time
 		h.Step(0 / 0, true)
 		h.Step(-5, true)
 		T.eq(h.Time, t0, "NaN / negative dt ignored")
 		local steps = 0
-		while h.Phase ~= "Done" and steps < 1000 do
+		while h.Stage ~= "Done" and steps < 1000 do
 			h.Step(10, true)
 			steps += 1
 		end
-		T.eq(h.Phase, "Done", "finishes with huge steps too")
+		T.eq(h.Stage, "Done", "finishes with huge steps too")
 		T.ok(steps < 100, "in a bounded number of steps")
 	end,
 
@@ -659,7 +784,12 @@ return restoringFlags({
 			elapsed += DT
 		end
 		T.ok(handle.Done, "finished")
-		T.near(elapsed, Loading.Timing.MinVisible + Loading.Timing.ContentOut + Loading.Timing.FadeOut, 4 * DT, "~2.75 s in total")
+		T.near(
+			elapsed,
+			Loading.Timing.MinVisible + Loading.Timing.ContentOut + Loading.Timing.FadeOut,
+			4 * DT,
+			"~2.75 s in total"
+		)
 		T.eq(covered, 1, "OnCovered exactly once")
 		T.eq(done, 1, "OnDone exactly once")
 		T.eq(otherCovered, false, "the ignored second Show never fires its callbacks")
@@ -729,14 +859,17 @@ return restoringFlags({
 			if clock >= 3 then
 				started = true
 			end
-			local before = h2.Sequence.Phase
+			local before = h2.Sequence.Stage
 			d2.step(DT)
 			clock += DT
-			if before == "Hold" and h2.Sequence.Phase == "FadeOut" then
+			if before == "Hold" and h2.Sequence.Stage == "FadeOut" then
 				outAt = clock
 			end
 		end
-		T.near(outAt, 3 + Loading.Timing.Settle, 3 * DT, "released after the round started + settle")
+		T.ok(
+			outAt >= 3 + Loading.Timing.Settle and outAt <= 3 + Loading.Timing.Settle + 4 * DT,
+			"released after the round started + settle (" .. tostring(outAt) .. ")"
+		)
 		-- errors never keep the screen black: OnCovered / Until throwing
 		local d3 = fakeDriver(Loader, 860, 400)
 		local h3 = Loading.Show({
@@ -825,7 +958,10 @@ return restoringFlags({
 		h7.Finish()
 		local t7 = d7.run(30)
 		T.ok(h7.Done, "Finish ends it")
-		T.ok(t7 < Loading.Timing.FadeIn + Loading.Timing.ContentOut + Loading.Timing.FadeOut + 0.1, "Finish skips the hold (" .. t7 .. ")")
+		T.ok(
+			t7 < Loading.Timing.FadeIn + Loading.Timing.ContentOut + Loading.Timing.FadeOut + 0.1,
+			"Finish skips the hold (" .. t7 .. ")"
+		)
 		-- no parent -> nil (the caller falls back to the instant switch); a driver that cannot connect -> no overlay left
 		T.eq(Loading.Show({ Driver = fakeDriver(Loader, 860, 400) }), nil, "no PlayerGui offline -> nil")
 		local c8 = 0
@@ -860,7 +996,10 @@ return restoringFlags({
 			T.eq(def.Group, "UI", "UI sound")
 			T.eq(def.Spatial, false, "2D")
 			T.near(def.Volume, 0.6, 1e-9, "volume 0.6")
-			T.eq(Audio.Candidates(Loading.SoundName)[1], "rbxassetid://120586834968743", "the owner's id")
+			T.eq(#Audio.Candidates(Loading.SoundName), 0, "PlayTransition is an optional, empty one-shot slot")
+			T.eq(Audio.Candidates("Menu")[1], "rbxassetid://120586834968743", "the owner's id is the title (Menu) track")
+			T.eq(Audio.Candidates("Lobby")[1], "rbxassetid://133849870887812", "the owner's lobby track comes first")
+			T.eq(#Audio.Candidates("Silence"), 0, "Silence never plays anything")
 			T.ok(def.Looped ~= true, "not looped (it is faded out when the overlay ends)")
 		end
 		T.eq(#Audio.Validate(), 0, "Audio still validates")

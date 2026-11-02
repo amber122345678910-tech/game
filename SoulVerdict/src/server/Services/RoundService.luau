@@ -2,7 +2,8 @@
 -- RoundService (P50): the round state machine (SPEC §1.1) and everything that happens around it.
 --   Waiting (< MinPlayers; a solo player may start PRACTICE vs bots)
 --   -> Intermission (map vote, 3 random options) -> monster picked by QueueService -> map loaded
---   -> Intro (everyone spawned + frozen) -> Round (timer; FinalPhase at <= 30 % monster HP; Second Wind)
+--   -> Intro (everyone spawned + frozen) -> Round (timer; the monster's Phase 2 = "FinalPhase" in code: started by its
+--      first ultimate of the round, or at <= 30 % monster HP if it never used one; Second Wind)
 --   -> Collapse (overtime ring shrinking to CollapseMinRadius, True damage outside each second)
 --   -> Ending (results, MVP, RoundEnded for rewards) -> cleanup (everyone back to the lobby) -> Intermission
 -- Drives ReplicatedStorage.RoundState (Configuration, created in Init with every SPEC §4.1 attribute) and
@@ -12,10 +13,12 @@
 --
 -- API (SPEC §17)
 --   Phase() -> string, PhaseChanged: Signal(phase), RoundStarted: Signal(info), RoundEnded: Signal(result)
---   GetMonster() -> Model?, IsRoundCharacter(model) -> boolean, TriggerFinalPhase() -> boolean
+--   GetMonster() -> Model?, IsRoundCharacter(model) -> boolean, TriggerFinalPhase(cause?, caster?) -> boolean
 --   StartPractice(player, side "Human"|"Monster", allies?) -> (boolean, errKey?), ForceNextMap(mapId) -> boolean
 -- Extra: SkipPhase(), EndRound(winner?, reason?), ForceCollapse(), Abort(), IsPractice(), InMatch(),
---   State() -> Configuration, FinalPhaseStarted: Signal(monster)
+--   State() -> Configuration, FinalPhaseStarted: Signal(monster, cause "Ult"|"Hp"|"Forced")
+--   (TriggerFinalPhase cause: "Ult" from AbilityService for the monster's first ultimate - no ult refill;
+--    "Hp" from the HP threshold; nil = forced by admin / Style Lab)
 -- RoundEnded result = { winner, reason, rows, mvpUserId, practice, durations = {round, collapse, total},
 --   mapId, roundId, monsterUserId, humanUserIds }   (reason "Aborted" = stopped by Style Lab)
 -- Extra RoundState attributes: Harmony (team damage multiplier), RoundId, MonsterName, FinalPreset,
@@ -412,7 +415,7 @@ local function checkFinalPhase()
 	end
 	local humanoid = humanoidOf(state.Monster)
 	if humanoid and RoundRules.ShouldTriggerFinalPhase(humanoid.Health, humanoid.MaxHealth, state.FinalPhase) then
-		RoundService.TriggerFinalPhase()
+		RoundService.TriggerFinalPhase("Hp")
 	end
 end
 
@@ -1334,7 +1337,17 @@ function RoundService.IsRoundCharacter(model: Model?): boolean
 	return model ~= nil and state.RoundModels[model] ~= nil
 end
 
-function RoundService.TriggerFinalPhase(): boolean
+-- Starts the monster's Phase 2 ("FinalPhase" in code), once per round and only during Round/Collapse:
+-- Invulnerable for Config.Round.FinalPhaseInvulnerable s (nothing that stops moving or casting), Exhausted cleared,
+-- dodges refilled, FinalForm attribute (x Config.Monster.FinalPhaseDodgeRegenMult dodge regen, blazing eye),
+-- RoundState.FinalPhase (clients switch to Theme_<kit>_Final + the map's final lighting), RoundEvent "FinalPhase"
+-- {monster, kitId, duration, cause}, FinalPhaseStarted:Fire(monster, cause). `cause`:
+--   "Ult"  the monster's first ultimate of the round (AbilityService, while that cast commits). `caster` must be
+--          the round's monster. The ult bar is NOT refilled: that cast spends it and still runs as the opening move.
+--   "Hp"   HP crossed Config.Round.FinalPhaseHpFraction before any ultimate (DamageService / checkFinalPhase).
+--   nil    forced (admin / Style Lab), reported as "Forced".
+-- "Hp" and forced starts refill the ult to 100. Returns true when Phase 2 started now.
+function RoundService.TriggerFinalPhase(cause: string?, caster: Model?): boolean
 	if state.FinalPhase or not isFightPhase() then
 		return false
 	end
@@ -1342,6 +1355,11 @@ function RoundService.TriggerFinalPhase(): boolean
 	if monster == nil or not isAlive(monster) then
 		return false
 	end
+	local byUlt = cause == "Ult"
+	if byUlt and caster ~= monster then
+		return false
+	end
+	local reason = if byUlt then "Ult" elseif cause == "Hp" then "Hp" else "Forced"
 	state.FinalPhase = true
 	call(StatusService, "Apply", monster, "Invulnerable", Config.Round.FinalPhaseInvulnerable)
 	call(StatusService, "Remove", monster, "Exhausted")
@@ -1350,15 +1368,18 @@ function RoundService.TriggerFinalPhase(): boolean
 		monster:SetAttribute("Dodges", maxDodges)
 	end
 	monster:SetAttribute("Exhausted", 0)
-	monster:SetAttribute("Ult", 100)
+	if not byUlt then
+		monster:SetAttribute("Ult", 100)
+	end
 	monster:SetAttribute("FinalForm", true)
 	setState("FinalPhase", true)
 	fireRoundEvent("FinalPhase", {
 		monster = monster,
 		kitId = monster:GetAttribute("KitId"),
 		duration = Config.Round.FinalPhaseInvulnerable,
+		cause = reason,
 	})
-	RoundService.FinalPhaseStarted:Fire(monster)
+	RoundService.FinalPhaseStarted:Fire(monster, reason)
 	return true
 end
 
