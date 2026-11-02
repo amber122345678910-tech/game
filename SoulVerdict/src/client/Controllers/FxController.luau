@@ -1,6 +1,7 @@
 --!strict
 -- FxController (client controller, Priority 30): every piece of combat feedback on this client.
---   * Net "AbilityFx"  -> cast clip on the caster (unless predicted locally) + client kit Effects[ability](fx, packet)
+--   * Net "AbilityFx"  -> client kit Effects[ability](fx, packet) (cast clips: AnimController's own AbilityFx
+--                         listener; FxController.MarkPredicted forwards to AnimController.MarkPredicted)
 --                         (src/client/Kits/<KitId>.luau, SPEC §9.1); built-in Dash / Teleport visuals.
 --   * Net "Hazard" / "HazardEnd" -> HazardVisuals.Spawn / End.
 --   * Net "DamageFx"   -> hit sparks + flash (colour rule / kit colour), damage numbers, MISS (grey) for dodges with
@@ -21,7 +22,7 @@
 --   FxController.Predict(abilityId, payload) -> boolean (local character's kit Predict)
 --   FxController.Indicator(abilityId) -> indicator?     (local character's kit Indicator)
 --   FxController.CastClip(ability, combo?) -> string?   (PURE: "Slash1" + combo 3 -> "Slash3")
---   FxController.PlayCastClip(character, ability, combo?)   FxController.PlayDash(character, dir, predicted?)
+--   FxController.PlayCastClip(character, ability, combo?) -> clip?   FxController.PlayDash(character, dir, predicted?)
 --   FxController.Shake(intensity, duration)  .ShakeAt(pos, intensity, duration, radius?)  .Kick(fov, duration)
 --   FxController.Flash(color, alpha, duration)  .Sound(name, at?, opts?)  .HitStop(model, duration)
 --   FxController.EyeGlow(character, side, color?, on)   FxController.Death(model)

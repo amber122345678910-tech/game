@@ -423,11 +423,14 @@ local function afterRosterChange()
 	evaluate()
 end
 
--- Freeze for the intro: StatusService "Stunned"; anchored roots if StatusService is missing.
+-- Freeze for the intro: StatusService "Rooted" (no move / jump / dash) + "Silenced" (no abilities; the client also
+-- suppresses casts while Phase is "Intro"); anchored roots if StatusService is missing. Not "Stunned": every client
+-- renders that as stun stars + a dizzy pose, which ruined the VS intro (integration fix).
 local function freeze(models: { Model }, seconds: number)
 	table.clear(state.FrozenFallback)
 	for _, model in models do
-		local ok = call(StatusService, "Apply", model, "Stunned", seconds)
+		local ok = call(StatusService, "Apply", model, "Rooted", seconds)
+		call(StatusService, "Apply", model, "Silenced", seconds)
 		if not ok then
 			local root = rootOf(model)
 			if root then

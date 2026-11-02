@@ -25,3 +25,23 @@ Offline-checkable contracts are pinned by `tools/lune/tests/integration.spec.lua
   attributes / per-entry children, so the lobby boards stayed empty. Now parses the StringValue JSON.
 - FIXED `src/client/Controllers/CameraController.luau` readSettings: read `"CameraSensitivity"`, but the Settings
   screen + ProfileSchema whitelist use `"Sensitivity"` → the slider did nothing. Now reads `Sensitivity`.
+- FIXED cast / hit clips played twice (`FxController` + `AnimController` both listen to AbilityFx "Start" and
+  DamageFx). Nobody called `AnimController.MarkPredicted`, so the caster's predicted clip restarted on the server
+  echo, and for everyone the two controllers' clip choices (kit overrides/windup speed vs plain `Clip`; directional
+  Hit vs plain Hit) overrode each other. Now AnimController owns clips: `FxController.MarkPredicted` forwards to
+  `AnimController.MarkPredicted`, `FxController.PlayCastClip` uses `AnimController.PlayAbility` (returns the clip
+  name; `CombatController` stops that one on rollback) and FxController's own Start/Hit/Dodge/Parry clips are a
+  fallback only when AnimController is missing. VFX/sounds/hit-stop unchanged.
+- FIXED revive prompt (CharacterService `RevivePrompt`, key G) was shown to everyone: the monster saw "Revive" on
+  downed humans and the prompt captured **G = the monster's ultimate** (InputController ignores gameProcessed
+  input) whenever it stood next to a downed human; the victim saw its own prompt; texts were server-language only.
+  New `src/client/Controllers/PromptController.luau` consumes the prompt's documented attributes (HumansOnly,
+  VictimUserId, ActionKey, ObjectKey): hides it locally (MaxActivationDistance 0) for non-eligible viewers and
+  re-localises it.
+- FIXED intro freeze used status `Stunned` (`RoundService.freeze`): every client renders Stunned as stun stars +
+  "Stun" sound + the dizzy Stunned pose, so the 7 s VS intro showed everyone dizzy. Now `Rooted` + `Silenced`
+  (same lock: no move/jump/dash/abilities; casts are also suppressed client-side during Intro).
+- ADDED Collapse wall: nothing rendered the server's `RoundState.CollapseCenter/CollapseRadius` in the world (only a
+  HUD warning once you were already outside and taking True damage). New
+  `src/client/Controllers/CollapseController.luau`: 48 translucent void wall segments + ground band at the safe
+  radius during Phase "Collapse" (eased, non-colliding, CanQuery off, removed after the phase).

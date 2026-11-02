@@ -32,6 +32,7 @@ local SOURCES = {
 	"KitHumansA",
 	"KitHumansB",
 	"Integration",
+	"Maps3",
 }
 
 local merged: { [string]: Localized } = {}
