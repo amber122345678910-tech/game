@@ -10,6 +10,8 @@ local roblox = require("@lune/roblox")
 local Vector3 = roblox.Vector3
 local CFrame = roblox.CFrame
 local Instance = roblox.Instance
+local Color3 = roblox.Color3
+local Enum = roblox.Enum
 
 local FRAME = 1 / 60
 
@@ -333,6 +335,277 @@ local function near(a, b, eps)
 end
 
 local CLIENT = "StarterPlayer.StarterPlayerScripts.Client."
+
+---------------------------------------------------------------------------------------------------
+-- Client smoke harness: runs every client Effects phase / Predict / Indicator / OnCharacter / visual builder
+-- with stub characters (tables that pass typeof == "Instance") and a stub VFX layer whose Animate / fx.Delay run
+-- synchronously, so every code path executes under Lune (no engine). Real Lune Parts receive the property writes,
+-- so wrong property names still fail.
+
+local function clientSmoke(Loader)
+	local G = getfenv(Loader.requirePath)
+	local realTypeof = typeof
+	local S = { errors = {}, calls = 0 }
+	local oldTypeof, oldRP = G.typeof, G.RaycastParams
+	G.typeof = function(v)
+		if type(v) == "table" and rawget(v, "__stub") then
+			return "Instance"
+		end
+		return realTypeof(v)
+	end
+	G.RaycastParams = {
+		new = function()
+			return {}
+		end,
+	}
+	function S.restore()
+		G.typeof = oldTypeof
+		G.RaycastParams = oldRP
+	end
+	local HazardDefs = Loader.require("ReplicatedStorage.Shared.Combat.HazardDefs")
+	local function noop() end
+	-- a real Lune Part behind a proxy (Lune cannot read BasePart.Position): writes are validated by the real part
+	local function proxyPart(real)
+		return setmetatable({ __real = real }, {
+			__index = function(_, k)
+				if k == "Position" then
+					return real.CFrame.Position
+				end
+				local v = real[k]
+				if type(v) == "function" then
+					return function(_, ...)
+						return v(real, ...)
+					end
+				end
+				return v
+			end,
+			__newindex = function(_, k, v)
+				if k == "Position" then
+					real.CFrame = CFrame.new(v)
+				else
+					real[k] = v
+				end
+			end,
+		})
+	end
+	local function stubModel(name, pos)
+		local function part(n, at)
+			local q = Instance.new("Part")
+			q.Name = n
+			q.CFrame = CFrame.new(at)
+			return proxyPart(q)
+		end
+		local root = part("HumanoidRootPart", pos)
+		local parts = { HumanoidRootPart = root }
+		for _, n in { "Head", "RightHand" } do
+			parts[n] = part(n, pos + Vector3.new(0.5, 1.5, -0.5))
+		end
+		local attrs = {}
+		local m = { __stub = true, Name = name, Parent = true, PrimaryPart = root, _pivot = CFrame.new(pos) }
+		function m:IsA(c)
+			return c == "Model" or c == "Instance" or c == "PVInstance"
+		end
+		function m:GetAttribute(k)
+			return attrs[k]
+		end
+		function m:SetAttribute(k, v)
+			attrs[k] = v
+		end
+		function m:GetAttributeChangedSignal()
+			return { Connect = function()
+				return { Disconnect = noop }
+			end }
+		end
+		function m:FindFirstChild(n)
+			return parts[n]
+		end
+		function m:FindFirstChildWhichIsA()
+			return root
+		end
+		function m:GetDescendants()
+			return { parts.HumanoidRootPart, parts.Head, parts.RightHand }
+		end
+		function m:PivotTo(cf)
+			self._pivot = cf
+		end
+		function m:GetPivot()
+			return self._pivot
+		end
+		function m:Destroy()
+			self.Parent = nil
+		end
+		return m
+	end
+	S.stubModel = stubModel
+	local function circle()
+		local c = {}
+		for _, k in { "SetCenter", "SetRadius", "SetInner", "SetFill", "SetColor", "SetTransparency", "SetVisible", "SetCFrame", "Destroy" } do
+			c[k] = noop
+		end
+		return c
+	end
+	local folder = Instance.new("Folder")
+	local Lib = {
+		LookAlong = HazardDefs.LookAlong,
+		AxisFrame = HazardDefs.AxisFrame,
+		Colors = { White = Color3.new(1, 1, 1) },
+	}
+	for _, k in { "Emit", "EmitRing", "EmitBurst", "Sparks", "Dust", "Flash", "Shockwave", "Ring", "Slash", "Line", "Beam", "Afterimage", "Shatter", "Text", "Debris" } do
+		Lib[k] = function()
+			S.calls += 1
+		end
+	end
+	function Lib.Folder()
+		return folder
+	end
+	function Lib.Now()
+		return 100
+	end
+	function Lib.ParticleScale()
+		return 1
+	end
+	function Lib.Ground(pos)
+		return pos - Vector3.new(0, 3, 0)
+	end
+	function Lib.Characters()
+		return S.chars or {}
+	end
+	function Lib.Part(shape, size, cf, color, material, transparency)
+		local p = Instance.new("Part")
+		if shape == "Ball" then
+			p.Shape = Enum.PartType.Ball
+		elseif shape == "Cylinder" then
+			p.Shape = Enum.PartType.Cylinder
+		end
+		p.Size = size
+		p.CFrame = cf
+		p.Color = color
+		p.Material = material or Enum.Material.Neon
+		p.Transparency = transparency or 0
+		return proxyPart(p)
+	end
+	function Lib.Release(p)
+		p:Destroy()
+	end
+	function Lib.Light(parent, color, brightness, range)
+		local l = Instance.new("PointLight")
+		l.Color, l.Brightness, l.Range = color, brightness, range
+		return l
+	end
+	function Lib.Emitter(_kind, _parent, props)
+		local e = Instance.new("ParticleEmitter")
+		for k, v in props or {} do
+			if k ~= "Color" then
+				e[k] = v
+			end
+		end
+		return e
+	end
+	function Lib.GroundCircle()
+		return circle()
+	end
+	function Lib.Soul(_color, _size)
+		return stubModel("Soul", Vector3.zero)
+	end
+	function Lib.Animate(duration, step, done)
+		for _, a in { 0, 0.3, 0.6, 1 } do
+			if step(a, 1 / 30, a * math.min(duration, 2)) == true then
+				break
+			end
+		end
+		if done then
+			done()
+		end
+		return { Cancel = noop }
+	end
+	S.Lib = Lib
+	-- props: stub GiantBook / Dish builders (Lune Models have no PivotTo)
+	local Props = Loader.require("ReplicatedStorage.Shared.Rigs.Props")
+	local realGet = Props.Get
+	Props.Get = function(name)
+		if name == "GiantBook" then
+			return { Size = Vector3.new(16, 1, 12), Build = function()
+				return stubModel("Book", Vector3.zero)
+			end, SetOpen = noop }
+		elseif name == "Dish" then
+			return { Build = function()
+				return stubModel("Dish", Vector3.zero)
+			end }
+		end
+		return realGet(name)
+	end
+	local oldRestore = S.restore
+	function S.restore()
+		oldRestore()
+		Props.Get = realGet
+	end
+	function S.fx(character, isLocal, enemies)
+		local anim = {}
+		for _, k in { "Play", "Stop", "SetAim", "HitStop" } do
+			anim[k] = noop
+		end
+		local screen = {}
+		for _, k in { "Pulse", "Tint", "Flash", "Desaturate", "Vignette" } do
+			screen[k] = noop
+		end
+		return {
+			Character = character,
+			IsLocal = isLocal,
+			Predicted = false,
+			State = {},
+			Trove = { Add = noop, Connect = noop },
+			Now = function()
+				return 100
+			end,
+			Anim = anim,
+			VFX = Lib,
+			Screen = screen,
+			Shake = noop,
+			ShakeAt = noop,
+			Kick = noop,
+			Flash = noop,
+			Sound = noop,
+			Debris = noop,
+			Delay = function(_s, fn)
+				fn()
+			end,
+			Attachment = function(model, _name)
+				local r = model and model.PrimaryPart
+				return if r then { WorldPosition = r.Position } else nil
+			end,
+			Part = function(model, name)
+				return model and model:FindFirstChild(name)
+			end,
+			Root = function(model)
+				return model and model.PrimaryPart
+			end,
+			Chest = function(model)
+				return model and model.PrimaryPart and model.PrimaryPart.Position + Vector3.new(0, 1, 0)
+			end,
+			Highlight = noop,
+			HitStop = noop,
+			EyeGlow = noop,
+			LocalCharacter = function()
+				return character
+			end,
+			IsEnemy = function(model)
+				return enemies[model] == true
+			end,
+			Combat = function()
+				return { ComboIndex = function()
+					return 3
+				end }
+			end,
+		}
+	end
+	function S.run(label, fn, ...)
+		local ok, err = pcall(fn, ...)
+		if not ok then
+			table.insert(S.errors, label .. ": " .. tostring(err))
+		end
+	end
+	return S
+end
 
 return {
 	---------------------------------------------------------------------------------------------
@@ -707,5 +980,110 @@ return {
 		end
 		local Strings = Loader.require("ReplicatedStorage.Shared.Strings")
 		T.eq(Strings.L("fx.kindness.bonk"), "BONK!", "merged into Strings")
+	end,
+
+	client_effects_smoke = function(T, Loader)
+		local S = clientSmoke(Loader)
+		local ok, err = pcall(function()
+			local me = S.stubModel("Me", Vector3.new(0, 3, 0))
+			local mon = S.stubModel("Mon", Vector3.new(0, 3, -20))
+			local ally = S.stubModel("Ally", Vector3.new(4, 3, 0))
+			S.chars = { me, mon, ally }
+			me:SetAttribute("Team", "Humans")
+			ally:SetAttribute("Team", "Humans")
+			mon:SetAttribute("Team", "Monster")
+			me:SetAttribute("Status_Chapter", 105)
+			me:SetAttribute("Status_Feast", 105)
+			me:SetAttribute("Status_Verdict", 105)
+			me:SetAttribute("Status_Primed", 105)
+			ally:SetAttribute("Status_Shielded", 104)
+			ally:SetAttribute("Shield", 40)
+			local enemies = { [mon] = true }
+			local from, to = Vector3.new(0.8, 3.6, -1.4), Vector3.new(0, 3, -20)
+			local cases = {
+				Perseverance = {
+					NotebookSwat = { { "Start", { combo = 3 } }, { "Strike", { combo = 3, last = true, hits = 1 } } },
+					SpellboundPages = { { "Start", {} }, { "Stream", { count = 5, interval = 0.08 } }, { "Bind", { target = mon, duration = 1 } } },
+					Rewrite = {
+						{ "Start", {} },
+						{ "Rewind", { from = from, path = { Vector3.new(5, 3, 0), Vector3.new(3, 3, 0), from }, heal = 20 } },
+						{ "Teleport", { from = from, to = Vector3.new(5, 3, 0) } },
+					},
+					FinalChapter = {
+						{ "Start", {} },
+						{ "Summon", { target = mon, pos = to, delay = 0.8, lockAt = 0.48, radius = 7.5 } },
+						{ "Lock", { pos = to } },
+						{ "Slam", { pos = to - Vector3.new(0, 3, 0), hits = { mon }, silence = 3 } },
+						{ "Summon", { target = mon, pos = to, delay = 0.8, lockAt = 0.48, radius = 7.5 } },
+						{ "Cancel", {} },
+					},
+				},
+				Kindness = {
+					PanBonk = { { "Start", { combo = 2 } }, { "Bonk", { targets = { mon }, daze = 0.4 } } },
+					HomeCooking = { { "Start", {} }, { "Throw", { from = from, to = Vector3.new(0, 0, -12), time = 0.4, radius = 9 } } },
+					KindShield = { { "Start", {} }, { "Shield", { target = ally, duration = 5, amount = 40 } } },
+					ButterscotchFeast = { { "Start", {} }, { "Feast", { radius = 30, allies = { me, ally }, revived = ally, heal = 45 } } },
+				},
+				Justice = {
+					Revolver = { { "Start", {} }, { "Shot", { from = from, to = to, hit = mon, long = true, primed = true } } },
+					FanTheHammer = { { "Start", {} }, { "Fan", { count = 6, interval = 0.07, cone = 12 } }, { "Shot", { from = from, to = to, fan = true, ammo = 3 } } },
+					QuickRoll = { { "Start", {} }, { "Roll", { from = from, to = from + Vector3.new(12, 0, 0), time = 0.28 } } },
+					FinalVerdict = {
+						{ "Start", {} },
+						{ "Aim", { dir = Vector3.new(0, 0, -1), time = 1.2, lock = 0.25, length = 120, width = 3 } },
+						{ "Track", { dir = Vector3.new(0.2, 0, -0.98).Unit } },
+						{ "Lock", { dir = Vector3.new(0.2, 0, -0.98).Unit } },
+						{ "Fire", { from = from, to = to, width = 3, hits = { mon } } },
+						{ "Aim", { dir = Vector3.new(0, 0, -1), time = 1.2, lock = 0.25, length = 120, width = 3 } },
+						{ "Cancel", {} },
+					},
+				},
+			}
+			for kitId, abilities in cases do
+				local mod = Loader.require(CLIENT .. "Kits." .. kitId)
+				for _, isLocal in { true, false } do
+					local fx = S.fx(me, isLocal, enemies)
+					for abilityId, phases in abilities do
+						for _, ph in phases do
+							fx.Predicted = false
+							S.run(kitId .. "." .. abilityId .. "." .. ph[1], mod.Effects[abilityId], fx, {
+								caster = me, kit = kitId, ability = abilityId, phase = ph[1], castId = 7, t0 = 99.5, data = ph[2],
+							})
+						end
+						local pred = mod.Predict[abilityId]
+						if pred then
+							S.run(kitId .. ".Predict." .. abilityId, pred, fx, { aim = to, dir = Vector3.new(0, 0, -1), castId = 8 })
+						end
+						local ind = mod.Indicator[abilityId]
+						if ind then
+							S.run(kitId .. ".Indicator." .. abilityId, function()
+								local h = ind(fx)
+								h:Update(to, 0.5, mon)
+								h:Update(to, 0.5, nil)
+								h:Destroy()
+							end)
+						end
+					end
+					S.run(kitId .. ".OnCharacter", mod.OnCharacter, fx, me)
+				end
+				for name, builder in mod.Visuals or {} do
+					S.run(kitId .. ".Visual." .. name, function()
+						local v = builder({ Lib = S.Lib, Color = Color3.new(1, 0, 1), Rule = "Purple", Size = 9, Params = {} })
+						v:Update(CFrame.new(0, 3, -5), 0.5, 1 / 60)
+						v:Update(CFrame.new(0, 3, -6), 0.6, 1 / 60)
+						if v.Impact then
+							v:Impact(Vector3.new(0, 3, -6))
+						end
+						v:Destroy()
+					end)
+				end
+			end
+		end)
+		S.restore()
+		T.ok(ok, "smoke harness: " .. tostring(err))
+		for _, e in S.errors do
+			T.ok(false, e)
+		end
+		T.ok(S.calls > 50, "effects drew something (" .. S.calls .. " VFX calls)")
 	end,
 }

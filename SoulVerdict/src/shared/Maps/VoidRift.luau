@@ -463,15 +463,14 @@ local function causeway(B: Builder, name: string, a: Vector3, b: Vector3, opts: 
 		if k < slabs - 1 then
 			local g0 = a:Lerp(b, (d1 - 0.3) / len)
 			local g1 = a:Lerp(b, (d1 + gap + 0.3) / len)
-			B:Beam("Geometry", name .. "_LightSeam", g0 - UP * 0.55, g1 - UP * 0.55, w * 0.96, 1.1, C.Crack, M.Neon, { Transparency = 0.2, Shadow = false })
-			B:Beam("Decor", name .. "_SeamGlow", g0 - UP * 2.2, g1 - UP * 2.2, w * 0.8, 2.2, C.CrackDeep, M.Neon, { Transparency = 0.55, Shadow = false })
+			B:Beam("Geometry", name .. "_LightSeam", g0 - UP * 0.55, g1 - UP * 0.55, w * 0.96, 1.1, C.CrackDeep, M.Neon, { Transparency = 0.3, Shadow = false })
 		end
 	end
 	-- glowing seam lines along both side faces
 	if opts.Seams ~= false then
 		for _, s in { -1, 1 } do
 			local off = side * (s * (width / 2 + 0.03))
-			B:Beam("Decor", name .. "_Seam", a + off - UP * 0.75, b + off - UP * 0.75, 0.14, 0.2, C.CrackDeep, M.Neon, { Shadow = false })
+			B:Beam("Decor", name .. "_Seam", a + off - UP * 0.75, b + off - UP * 0.75, 0.1, 0.16, C.CrackDeep, M.Neon, { Shadow = false })
 		end
 	end
 	-- rims (visible low curb + invisible guard), with short gaps every 10 studs on "Broken" rims
@@ -573,9 +572,9 @@ local function rift(B: Builder, name: string, cf: CFrame, height: number, width:
 	end
 	local center = V(math.sin(0.5 * 7.3) * width * 0.11, height * 0.5, 0)
 	local layers = {
-		{ SX = 1, SY = 1, Color = rgb(112, 60, 236), T = 0.08, Z = 0 },
-		{ SX = 0.58, SY = 0.9, Color = rgb(48, 140, 255), T = 0.2, Z = 0.25 },
-		{ SX = 0.15, SY = 0.78, Color = rgb(190, 236, 255), T = 0.35, Z = 0.5 },
+		{ SX = 1, SY = 1, Color = rgb(112, 60, 236), T = 0.05, Z = 0, Mat = M.Neon },
+		{ SX = 0.8, SY = 0.95, Color = rgb(70, 200, 255), T = 0, Z = 0.2, Mat = M.Neon },
+		{ SX = 0.62, SY = 0.88, Color = rgb(4, 5, 14), T = 0, Z = 0.4, Mat = M.SmoothPlastic },
 	}
 	for li, layer in layers do
 		local function map(p: Vector3): Vector3
@@ -585,8 +584,17 @@ local function rift(B: Builder, name: string, cf: CFrame, height: number, width:
 		local cw = map(center)
 		for i = 1, #poly do
 			local p, q = poly[i], poly[i % #poly + 1]
-			B:Triangle("Decor", name .. "_Layer" .. li, cw, map(p), map(q), 0.24, layer.Color, M.Neon, { Transparency = layer.T, Shadow = false })
+			B:Triangle("Decor", name .. "_Layer" .. li, cw, map(p), map(q), 0.24, layer.Color, layer.Mat, { Transparency = layer.T, Shadow = false })
 		end
+	end
+	-- stars seen through the tear
+	local rng = B.Rng
+	for i = 1, 9 do
+		local t = rng:Number(0.18, 0.82)
+		local half = (math.sin(t * math.pi) ^ 0.8) * width / 2 * 0.5
+		local xc = math.sin(t * 7.3) * width * 0.11
+		local p = cf * CFrame.new(xc + rng:Number(-half, half), t * height, 0.62)
+		B:Ball("Decor", name .. "_Star", p.Position, if i % 3 == 0 then 0.5 else 0.28, if i % 4 == 0 then C.Violet else C.RiftCore, M.Neon, { Shadow = false })
 	end
 end
 
@@ -618,10 +626,7 @@ local function crackSkull(B: Builder, name: string, head: CFrame, s: number, hol
 	for i = 1, fragments do
 		local off = V(holeSide * rng:Number(1.5, 4.5), rng:Number(1.2, 4.5), rng:Number(-1.6, 1.6)) * s
 		local size = V(rng:Number(0.5, 1.2), rng:Number(0.3, 0.7), rng:Number(0.5, 1.1)) * s
-		B:Deco("Block", name .. "_Fragment", size, holeAt * CFrame.new(off) * CFrame.Angles(rng:Number(0, 6.28), rng:Number(0, 6.28), rng:Number(0, 6.28)), C.Bone, M.Marble)
-		if i % 2 == 0 then
-			B:Deco("Block", name .. "_FragmentEdge", V(size.X * 1.02, 0.08 * s, 0.08 * s), holeAt * CFrame.new(off + V(0, size.Y * 0.5, 0)), color, M.Neon, { Shadow = false })
-		end
+		B:Deco("Block", name .. "_Fragment", size, holeAt * CFrame.new(off) * CFrame.Angles(rng:Number(0, 6.28), rng:Number(0, 6.28), rng:Number(0, 6.28)), if i % 3 == 0 then C.BoneShade else C.Bone, M.Marble)
 	end
 end
 
@@ -656,9 +661,27 @@ local function buildCore(B: Builder, core: Island): number
 	monolith(B, "Monolith", V(-18, 0, 9), V(3.8, 7.5, 2.8), -62, -8, C.Crack)
 	monolith(B, "Monolith", V(-9, 0, -21), V(3, 6, 2.4), 12, 10, C.CrackDeep)
 	monolith(B, "Monolith", V(19, 0, 15), V(3.2, 6.8, 2.6), 118, -5, C.CrackDeep)
-	B:Rock("Rubble", V(-25, 0, -6), 3.4, { Color = C.StoneSide, Material = M.Slate, Collide = true })
+	-- fallen pillar drums and a broken wall: low cover between the spokes
+	for k, d in { { V(-9, 0, 17), 18 }, { V(24, 0, -19), -40 } } do
+		local p: Vector3, yaw: number = d[1], d[2]
+		local frame = CFrame.new(p) * CFrame.Angles(0, math.rad(yaw), 0)
+		for j = -1, 1 do
+			local drum = frame * CFrame.new(j * 3.7, 1.6, j * 0.4) * CFrame.Angles(0, math.rad(j * 9), 0)
+			B:Solid("Cylinder", "FallenDrum", V(3.4, 3.2, 3.2), drum, MapKit.Shade(C.StoneLight, j * 0.05), M.Slate)
+			B:Deco("Cylinder", "FallenDrumRing", V(0.2, 3.3, 3.3), drum * CFrame.new(1.72, 0, 0), C.StoneSide, M.Slate, { Shadow = false })
+		end
+		if k == 1 then
+			B:Rod("Decor", "FallenDrumCrack", (frame * CFrame.new(-4, 3.25, 0)).Position, (frame * CFrame.new(3, 3.25, 0.3)).Position, 0.14, C.Crack, M.Neon, { Shadow = false })
+		end
+	end
+	B:Solid("Block", "BrokenWall", V(9, 4.2, 1.6), CFrame.new(-26, 2.1, -14) * CFrame.Angles(0, math.rad(64), 0), C.StoneLight, M.Slate)
+	B:Deco("Wedge", "BrokenWallTop", V(1.6, 2.4, 5), CFrame.new(-26, 0, -14) * CFrame.Angles(0, math.rad(64), 0) * CFrame.new(2, 5.4, 0) * CFrame.Angles(0, math.rad(90), 0), C.StoneLight, M.Slate)
+	B:Rock("Rubble", V(-27, 0, -2), 3.4, { Color = C.StoneSide, Material = M.Slate, Collide = true })
 	B:Rock("Rubble", V(5, 0, 26), 3, { Color = C.StoneSide, Material = M.Slate, Collide = true })
 	B:Rock("Rubble", V(27, 0, -2), 3.2, { Color = C.StoneSide, Material = M.Slate, Collide = true })
+	-- low rims on two stretches of the rim (the rest of the duel ring's edge stays open and dangerous)
+	rim(B, core, 122, 168)
+	rim(B, core, 302, 346)
 	-- spoke heads: pylons pairs at the four ramps
 	for _, deg in { 90, 270, 31.7, 204.7 } do
 		local d = polar(deg, 1)

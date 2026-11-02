@@ -176,6 +176,8 @@ local function spellPageVisual(ctx: Map): Map
 	return v
 end
 
+Kit.Visuals = { SpellPage = spellPageVisual } -- exported for tests / previews
+
 pcall(function()
 	local controllers = script.Parent.Parent:WaitForChild("Controllers")
 	local HazardVisuals = require(controllers:WaitForChild("HazardVisuals") :: any) :: any

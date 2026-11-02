@@ -150,19 +150,19 @@ local function buildGround(B: Builder)
 		for i = 0, n do
 			local p = from + delta * (i / math.max(1, n)) + side * (L.RoadW / 2 + 1.2 + rng:Number(0, 1.2))
 			if inside(p.X, p.Z, 2) and (p - V(66, 0, 0)).Magnitude > 10 then
-				B:Mound("RoadDrift", p, rng:Number(1.6, 2.8), rng:Number(0.5, 0.9), {
+				B:Mound("RoadDrift", p, rng:Number(1.1, 1.8), rng:Number(0.3, 0.55), {
 					Collide = false,
 					Color = C.SnowShade,
-					Stretch = rng:Number(1.6, 2.4),
+					Stretch = rng:Number(1.8, 2.8),
 					Yaw = math.deg(math.atan2(-delta.Z, delta.X)) + rng:Number(-8, 8),
 				})
 			end
 		end
 	end
 	for _, s in { -1, 1 } do
-		bankRow(V(-30, 0, 0), V(-96, 0, 0), V(0, 0, s), 9)
-		bankRow(V(30, 0, 0), V(52, 0, 0), V(0, 0, s), 9)
-		bankRow(V(0, 0, -30), V(0, 0, -66), V(s, 0, 0), 9)
+		bankRow(V(-30, 0, 0), V(-96, 0, 0), V(0, 0, s), 11)
+		bankRow(V(30, 0, 0), V(52, 0, 0), V(0, 0, s), 11)
+		bankRow(V(0, 0, -30), V(0, 0, -66), V(s, 0, 0), 12)
 	end
 	B:Group(nil)
 end

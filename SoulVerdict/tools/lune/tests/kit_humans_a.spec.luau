@@ -129,6 +129,7 @@ local function harness(Loader)
 	})
 
 	local Net = Loader.require("ReplicatedStorage.Shared.Net")
+	local netOriginal = { FireAll = Net.Server.FireAll, Fire = Net.Server.Fire, On = Net.Server.On }
 	Net.Server.FireAll = function(name, ...)
 		table.insert(H.sent, { name = name, args = table.pack(...) })
 	end
@@ -243,8 +244,15 @@ local function harness(Loader)
 	function H.cleanup()
 		H.S.HazardService.Clear()
 		Validation.SetScheduler(nil)
+		for _, name in { "CharacterService", "StatsService", "RoundService" } do
+			Validation.SetService(name, nil)
+		end
+		for k, fn in netOriginal do
+			Net.Server[k] = fn
+		end
 		G.workspace = nil
 		G.RaycastParams = nil
+		Loader.reset() -- later specs get fresh modules (no kit hooks / fakes left behind)
 	end
 	return H
 end
@@ -606,16 +614,36 @@ local function clientEnv(Loader)
 		E.captured[name] = builder
 		return register(name, builder)
 	end
+	local restores = {}
 	local RealLib = Loader.require(CLIENT .. "VFX.Lib")
 	local HazardDefs = Loader.require("ReplicatedStorage.Shared.Combat.HazardDefs")
 	-- offline Workspace: BulkMoveTo / Raycast are no-ops
+	-- (the loader's service mocks are shared by every spec: everything set here is undone by E.restore)
 	local gameMock = getfenv(RealLib.Color).game
 	local W = gameMock:GetService("Workspace")
-	rawset(W, "BulkMoveTo", function() end)
-	rawset(W, "Raycast", function()
+	local PlayersSvc = gameMock:GetService("Players")
+	local function mock(tbl, key, value)
+		local before = rawget(tbl, key)
+		rawset(tbl, key, value)
+		table.insert(restores, function()
+			rawset(tbl, key, before)
+		end)
+	end
+	mock(W, "BulkMoveTo", function() end)
+	mock(W, "Raycast", function()
 		return nil
 	end)
-	rawset(gameMock:GetService("Players"), "LocalPlayer", { Character = nil, Name = "Viewer" })
+	mock(PlayersSvc, "LocalPlayer", { Character = nil, Name = "Viewer" })
+	table.insert(restores, function()
+		HV.RegisterVisual = register
+	end)
+	function E.restore()
+		for i = #restores, 1, -1 do
+			restores[i]()
+		end
+		table.clear(restores)
+		Loader.reset()
+	end
 	E.folder = Instance.new("Folder")
 	local function record(name)
 		E.calls[name] = (E.calls[name] or 0) + 1
@@ -853,8 +881,19 @@ end
 
 -- Runs every listed phase of every ability (as caster / observer, predicted or not), Predict, Indicator,
 -- OnCharacter and the kit's registered hazard visuals.
+local exerciseBody
+
 local function exerciseClientKit(T, Loader, kitId, phases, visuals)
 	local E = clientEnv(Loader)
+	local ok, err = pcall(exerciseBody, E, T, Loader, kitId, phases, visuals)
+	E.restore()
+	if not ok then
+		error(err, 0)
+	end
+	return E
+end
+
+function exerciseBody(E, T, Loader, kitId, phases, visuals)
 	local Kits = Loader.require("ReplicatedStorage.Shared.Kits")
 	local client = Loader.require(CLIENT .. "Kits." .. kitId)
 	local caster = E.model(kitId, "Humans", Vector3.zero)
@@ -962,7 +1001,6 @@ local function exerciseClientKit(T, Loader, kitId, phases, visuals)
 			end, "visual " .. spec.name)
 		end
 	end
-	return E
 end
 
 tests.patience_client = function(T, Loader)
@@ -1000,6 +1038,44 @@ tests.bravery_client = function(T, Loader)
 		},
 	})
 	T.ok((E.calls.GroundCircle or 0) > 0, "telegraphs drawn")
+end
+
+tests.integrity_client = function(T, Loader)
+	exerciseClientKit(T, Loader, "Integrity", {
+		BalletKicks = { { phase = "Strike", data = { combo = 3, last = true, hits = 1 } } },
+		GrandJete = {
+			{ phase = "Leap", data = { from = Vector3.new(0, 3, 0), to = Vector3.new(0, 0, -25), time = 0.6, radius = 7 } },
+			{ phase = "Land", data = { center = Vector3.new(0, 0, -25), radius = 7 } },
+		},
+		Pirouette = {
+			{ phase = "Spin", data = { duration = 1.2, radius = 6, ticks = 4 } },
+			{ phase = "Tick", data = { index = 1, hits = 1 } },
+			{ phase = "Deflect", data = { pos = Vector3.new(2, 3, 0) } },
+		},
+		Encore = {
+			{ phase = "Dash", data = { from = Vector3.new(0, 3, 0), to = Vector3.new(0, 3, -20), time = 0.2 } },
+			{ phase = "Dash", data = { from = Vector3.new(0, 3, -20), to = Vector3.new(0, 3, 0), time = 0.2 } },
+			{ phase = "Bow", data = { pos = Vector3.new(0, 3, 0), radius = 9 } },
+		},
+	})
+	local I = Loader.require(CLIENT .. "Kits.Integrity")
+	T.ok(I.IsDoubleJump(-12, 54, 54), "mid-air jump while falling")
+	T.ok(I.IsDoubleJump(8, 54, 54), "mid-air jump while rising")
+	T.ok(not I.IsDoubleJump(0, 54, 54), "a ground jump is not a double jump")
+	T.ok(not I.IsDoubleJump(-30, -10, 54), "falling is not a jump")
+end
+
+tests.strings_complete = function(T, Loader)
+	local text = Loader.require("ReplicatedStorage.Shared.Strings.KitHumansA")
+	local n = 0
+	for key, entry in text do
+		n += 1
+		T.ok(type(entry.en) == "string" and entry.en ~= "", key .. " en")
+		T.ok(type(entry.ru) == "string" and entry.ru ~= "", key .. " ru")
+	end
+	T.ok(n >= 7, "keys present")
+	local Strings = Loader.require("ReplicatedStorage.Shared.Strings")
+	T.ok(Strings.Has("fx.patience.ambush") and Strings.Has("fx.bravery.courage") and Strings.Has("fx.integrity.bravo"), "merged")
 end
 
 return tests

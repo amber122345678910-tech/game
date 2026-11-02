@@ -10,7 +10,8 @@
 --   CrimsonBlaster (Q)   one Fell-style BlasterBeam ("Red") over Fell's right shoulder aimed at the aim point (chest
 --                        height above ground): Delay charge, BeamTime, Width, Length, Damage, KR. An interrupted Fell
 --                        loses the shot (hazard removed).          Fx "Summon" {hazard, origin}, "Fizzle" {hazard, origin}
---   ChainGrab (E)        after Windup a Projectile hazard (visual "FellChain", Speed, Range, radius C.ChainRadius). The
+--   ChainGrab (E)        after Windup a Projectile hazard (visual "FellChain", Speed, Range, radius C.ChainRadius; from
+--                        the hand toward the aim at chest height, within C.ChainMaxSlope of level). The
 --                        first human it reaches takes Damage, is Stunned for PullTime + Stun and pulled (ForceMove Pull)
 --                        to C.GrabStop studs in front of Fell. Blocked / parried / absorbed-to-death hits, or a Fell who
 --                        was interrupted meanwhile, do not pull ("Snap"). I-framed humans let the chain fly on; downed
@@ -71,6 +72,7 @@ local C = {
 	FinisherWidth = 7,
 	BlasterSlot = { 2.4, 4.4, 1.8 }, -- CrimsonBlaster muzzle in caster space: right, up, back (studs)
 	ChainRadius = 1.1, -- ChainGrab hook radius (the visual hook glow is >= this)
+	ChainMaxSlope = 0.47, -- the throw stays within ~25 degrees of level
 	GrabStop = 3.4, -- the grabbed human ends this far in front of Fell (inside the M1 box)
 	PullSlack = 0.1,
 	RushTime = 0.24,
@@ -397,7 +399,18 @@ Abilities.ChainGrab = function(ctx: any)
 		ctx:Fx("Grab", { target = target, time = pullTime, to = dest })
 		return true
 	end
+	-- thrown from the hand toward the aim at chest height, kept roughly level (<= ~25 degrees up / down)
+	local start = ctx:RootPosition() + Vector3.new(0, 1, 0) + ctx.FlatDir * 1.5
+	local dir = chestAim(ctx) - start
+	local flatLen = Vector3.new(dir.X, 0, dir.Z).Magnitude
+	if flatLen < 1 then
+		dir = ctx.FlatDir
+	else
+		local maxRise = flatLen * C.ChainMaxSlope
+		dir = Vector3.new(dir.X, math.clamp(dir.Y, -maxRise, maxRise), dir.Z)
+	end
 	local id = ctx:Projectile({
+		Origin = LookAlong(start, dir),
 		Speed = N.Speed or 90,
 		Radius = C.ChainRadius,
 		MaxDist = ctx.Ability.Range or 40,

@@ -4,6 +4,9 @@
 -- determinism, red-mode reachability = a hit-free path exists), the strings file, the server rules
 -- (VerdictBoxService.Rules: validation, hit rate limit, verdict) and a service integration run on the combat harness.
 
+local roblox = require("@lune/roblox")
+local Vector3, Instance = roblox.Vector3, roblox.Instance
+
 local function load(Loader, name)
 	return Loader.require("ReplicatedStorage.Shared.VerdictBox." .. name)
 end
@@ -559,6 +562,368 @@ tests.strings_complete = function(T, Loader)
 		end
 	end
 	T.ok(Strings.L("vb.verdict.Innocent") == "INNOCENT", "merged into Strings")
+end
+
+---------------------------------------------------------------------------------------------------
+-- Server: pure rules
+
+local function service(Loader)
+	return Loader.requirePath("src/server/Services/VerdictBoxService")
+end
+
+tests.server_rules_pure = function(T, Loader)
+	local VB = service(Loader)
+	local R = VB.Rules
+	local Config = Loader.require("ReplicatedStorage.Shared.Config")
+	local c = Config.VerdictBox
+	local m = { team = "Monster", up = true, pos = Vector3.new(0, 3, 0) }
+	local v = { team = "Humans", up = true, boxed = false, pos = Vector3.new(0, 3, -12) }
+	T.ok(R.CheckPair(m, v, true), "valid pair")
+	T.eq(select(2, R.CheckPair(m, v, false)), "los", "needs line of sight")
+	T.eq(select(2, R.CheckPair({ team = "Humans", up = true, pos = m.pos }, v, true)), "role", "monster only")
+	T.eq(select(2, R.CheckPair(m, { team = "Monster", up = true, pos = v.pos }, true)), "target", "humans only")
+	T.eq(select(2, R.CheckPair(m, { team = "Humans", up = false, pos = v.pos }, true)), "down", "victim must be up (not Downed)")
+	T.eq(select(2, R.CheckPair({ team = "Monster", up = false, pos = m.pos }, v, true)), "caster", "monster must be up")
+	T.eq(select(2, R.CheckPair(m, { team = "Humans", up = true, boxed = true, pos = v.pos }, true)), "boxed", "not twice")
+	T.eq(select(2, R.CheckPair(m, { team = "Humans", up = true, pos = Vector3.new(0, 3, -(c.Range + 12)) }, true)), "range", "range + slack")
+	T.ok(R.CheckPair(m, { team = "Humans", up = true, pos = Vector3.new(0, 3, -(c.Range + 4)) }, true), "range slack tolerates lag")
+	local looking = { team = "Monster", up = true, pos = m.pos, look = Vector3.new(0, 0, 1) }
+	T.eq(select(2, R.CheckPair(looking, v, true)), "cone", "cone checked when a look direction is given")
+	-- hit cap
+	local intro = 1.0
+	T.eq(R.AcceptHits(0, 3, 0.4, intro), 0, "no hits before the first attack (+ latency slack)")
+	T.eq(R.AcceptHits(0, 1, intro + 0.01, intro), 1, "first hit right away")
+	T.eq(R.AcceptHits(1, 1, intro + 0.05, intro), 0, "second hit needs MinHitInterval")
+	T.eq(R.AcceptHits(0, 5, intro + 0.5, intro), 2, "capped by elapsed / interval")
+	T.eq(R.AcceptHits(0, 1e9, 30, intro), math.floor((c.Duration - intro) / c.MinHitInterval) + 1 > 8 and 8 or math.floor((c.Duration - intro) / c.MinHitInterval) + 1, "per-packet and per-box caps")
+	for _, bad in { 0 / 0, -1, "3", nil, 0.5 } do
+		T.eq(R.AcceptHits(0, bad, 5, intro), 0, "garbage report " .. tostring(bad))
+	end
+	-- verdict
+	T.ok(R.Verdict(0, "Duration", true), "no hits -> survived")
+	T.ok(R.Verdict(c.SurviveMaxHits, "Duration", true), "<= SurviveMaxHits -> survived")
+	T.ok(not R.Verdict(c.SurviveMaxHits + 1, "Duration", true), "too many hits")
+	T.ok(not R.Verdict(0, "Cancelled", true), "cancelled boxes give nothing")
+	T.ok(not R.Verdict(0, "Duration", false), "downed victims did not survive")
+	T.eq(R.VerdictName(0, "Duration", true), "Innocent", "verdict name")
+	T.eq(R.VerdictName(3, "Duration", false), "Guilty", "verdict name")
+	T.eq(R.VerdictName(0, "Cancelled", false), "Dismissed", "verdict name")
+	-- soul relay validation
+	T.ok(R.ValidSoul(10, -20), "valid soul")
+	T.ok(not R.ValidSoul(0 / 0, 0) and not R.ValidSoul(1e6, 0) and not R.ValidSoul("1", 2), "invalid soul")
+	-- bot hits
+	local Rng = Loader.require("ReplicatedStorage.Shared.Util.Rng")
+	for seed = 1, 50 do
+		local times = R.BotHits(Rng.new(seed), intro)
+		T.ok(#times >= 1 and #times <= 4, "bots take 1-4 hits")
+		for i, t in times do
+			T.ok(t >= intro + 0.3 and t <= c.Duration - 0.25, "bot hit inside the attacks")
+			if i > 1 then
+				T.ok(t - times[i - 1] >= c.MinHitInterval - 1e-9, "bot hits spaced by MinHitInterval")
+			end
+		end
+	end
+end
+
+---------------------------------------------------------------------------------------------------
+-- Server: integration on real StatusService / DamageService with a simulated clock and fake Net / world
+
+local function harness(Loader)
+	local H = { sent = {}, handlers = {}, models = {}, round = { Phase = "Round", TeamRevives = 2 } }
+	local clock = 500
+	local timers = {}
+	function H.now()
+		return clock
+	end
+	function H.advance(seconds)
+		local target = clock + seconds
+		while true do
+			table.sort(timers, function(a, b)
+				return a.at < b.at
+			end)
+			local first = timers[1]
+			if first == nil or first.at > target then
+				break
+			end
+			clock = math.max(clock, first.at)
+			table.remove(timers, 1)
+			first.fn()
+		end
+		clock = target
+	end
+	local G = getfenv(Loader.requirePath)
+	G.workspace = {
+		GetServerTimeNow = function()
+			return clock
+		end,
+		Raycast = function()
+			return nil
+		end,
+		FindFirstChild = function()
+			return nil
+		end,
+	}
+	G.RaycastParams = { new = function()
+		return {}
+	end }
+	local Validation = Loader.requirePath("src/server/Combat/Validation")
+	Validation.SetScheduler({
+		wait = function(s)
+			H.advance(s or 0)
+			return s or 0
+		end,
+		delay = function(s, fn)
+			table.insert(timers, { at = clock + s, fn = fn })
+		end,
+		defer = function(fn)
+			table.insert(timers, { at = clock, fn = fn })
+		end,
+	})
+	Validation.RoundAttr = function(name)
+		return H.round[name]
+	end
+	local Signal = Loader.require("ReplicatedStorage.Shared.Util.Signal")
+	H.playerOf = {}
+	local CS = { Spawned = Signal.new(), Died = Signal.new(), Downed = Signal.new(), Revived = Signal.new(), Despawning = Signal.new() }
+	function CS.GetAll()
+		return H.models
+	end
+	function CS.GetPlayer(m)
+		return H.playerOf[m]
+	end
+	function CS.SetDowned(m)
+		m:SetAttribute("Downed", true)
+	end
+	function CS.Kill(m)
+		m:SetAttribute("Dead", true)
+	end
+	H.CS = CS
+	Validation.SetService("CharacterService", CS)
+	Validation.SetService("StatsService", { Add = function() end })
+	Validation.SetService("RoundService", { TriggerFinalPhase = function() end })
+	local Net = Loader.require("ReplicatedStorage.Shared.Net")
+	H.Net = Net
+	Net.Server.FireAll = function(name, ...)
+		table.insert(H.sent, { name = name, args = table.pack(...) })
+	end
+	Net.Server.Fire = function(name, player, ...)
+		table.insert(H.sent, { name = name, player = player, args = table.pack(...) })
+	end
+	Net.Server.On = function(name, fn)
+		H.handlers[name] = fn
+		return { Disconnect = function() end }
+	end
+	H.players = {}
+	H.S = {}
+	for _, n in { "StatusService", "MovementService", "DamageService", "VerdictBoxService" } do
+		H.S[n] = Loader.requirePath("src/server/Services/" .. n)
+	end
+	for _, n in { "StatusService", "MovementService", "DamageService", "VerdictBoxService" } do
+		H.S[n].Init()
+	end
+	-- the Players mock lives in the module environments (game = the loader's mock)
+	getfenv(H.S.VerdictBoxService.Open).game:GetService("Players").GetPlayers = function()
+		return H.players
+	end
+	H.S.VerdictBoxService.Start() -- lifecycle hook: connects the remotes
+	H.S.VerdictBoxService.SetSeedSource(function()
+		return 4242
+	end)
+	local Kits = Loader.require("ReplicatedStorage.Shared.Kits")
+	local HazardDefs = Loader.require("ReplicatedStorage.Shared.Combat.HazardDefs")
+	function H.spawn(kitId, team, pos, player)
+		local kit = Kits.Get(kitId)
+		local m = Instance.new("Model")
+		m.Name = kitId .. "_" .. tostring(#H.models + 1)
+		local root = Instance.new("Part")
+		root.Name = "HumanoidRootPart"
+		root.CFrame = HazardDefs.LookAlong(pos + Vector3.new(0, 3, 0), Vector3.new(0, 0, -1))
+		root.Parent = m
+		m.PrimaryPart = root
+		local hum = Instance.new("Humanoid")
+		hum.MaxHealth = kit.Stats.MaxHP
+		hum.Health = kit.Stats.MaxHP
+		hum.Parent = m
+		m:SetAttribute("KitId", kitId)
+		m:SetAttribute("Team", team)
+		m:SetAttribute("Ult", 0)
+		m:SetAttribute("Downed", false)
+		m:SetAttribute("Dead", false)
+		m:SetAttribute("KR", 0)
+		if player == nil then
+			m:SetAttribute("IsBot", true)
+		end
+		m.Parent = Instance.new("Folder")
+		table.insert(H.models, m)
+		H.playerOf[m] = player
+		H.S.StatusService.Track(m)
+		return m
+	end
+	function H.last(name)
+		for i = #H.sent, 1, -1 do
+			if H.sent[i].name == name then
+				return H.sent[i].args, H.sent[i]
+			end
+		end
+		return nil
+	end
+	function H.count(name, player)
+		local n = 0
+		for _, e in H.sent do
+			if e.name == name and (player == nil or e.player == player) then
+				n += 1
+			end
+		end
+		return n
+	end
+	function H.hp(m)
+		return m:FindFirstChildOfClass("Humanoid").Health
+	end
+	function H.cleanup()
+		H.S.VerdictBoxService.CancelAll()
+		H.S.VerdictBoxService.SetSeedSource(nil)
+		Validation.SetScheduler(nil)
+		G.workspace = nil
+		G.RaycastParams = nil
+	end
+	return H
+end
+
+tests.server_box_lifecycle = function(T, Loader)
+	Loader.reset()
+	local H = harness(Loader)
+	local ok, err = pcall(function()
+		local VB, SS, DS = H.S.VerdictBoxService, H.S.StatusService, H.S.DamageService
+		local Config = Loader.require("ReplicatedStorage.Shared.Config")
+		local c = Config.VerdictBox
+		local p1 = { Name = "P1", DisplayName = "Frisk", UserId = 1, Parent = true }
+		local p2 = { Name = "P2", DisplayName = "Kris", UserId = 2, Parent = true }
+		H.players = { p1, p2 }
+		local sans = H.spawn("ClassicSans", "Monster", Vector3.new(0, 0, 0), nil)
+		local human = H.spawn("Determination", "Humans", Vector3.new(0, 0, -10), p1)
+		local bot = H.spawn("Bravery", "Humans", Vector3.new(4, 0, -12), nil)
+		local far = H.spawn("Justice", "Humans", Vector3.new(0, 0, -200), p2)
+
+		T.ok(not VB.Start(sans, far), "out of range")
+		T.ok(not VB.Start(human, sans), "humans cannot box")
+		T.ok(VB.Start(sans, human), "box opened")
+		T.ok(VB.IsBoxed(human) and not VB.IsBoxed(bot), "IsBoxed")
+		T.ok(not VB.Start(sans, bot), "one box per monster")
+		local args = H.last("BoxStart")
+		local pk = args[1]
+		T.ok(pk.boxId == 1 and pk.victim == human and pk.monster == sans, "BoxStart ids")
+		T.eq(pk.seed, 4242, "seed")
+		T.eq(pk.patternSet, "Classic", "kit pattern set")
+		T.eq(pk.duration, c.Duration, "duration")
+		T.eq(pk.damagePerHit, c.DamagePerHit, "damage per hit")
+		T.eq(pk.krPerHit, c.KRPerHit, "KR per hit")
+		T.ok(pk.box and pk.box:IsA("Model") and pk.box:GetAttribute("BoxId") == 1, "3D box model in the packet")
+		local screen = pk.box:FindFirstChild("Screen", true)
+		T.ok(screen and math.abs(screen.CFrame.Position.Y - (3 + c.Height)) < 1.5, "3D box floats Height above the victim")
+		T.ok(SS.Has(human, "Boxed") and SS.Has(human, "Invulnerable"), "Boxed + Invulnerable")
+		T.eq(human:GetAttribute("SoulMode"), "Boxed", "SoulMode Boxed")
+		-- only box damage applies
+		local hp0 = H.hp(human)
+		DS.Apply({ Attacker = sans, Target = human, Amount = 30, Kind = "Melee" })
+		T.eq(H.hp(human), hp0, "immune to normal damage while boxed")
+		-- hit reports
+		local tl = Loader.require("ReplicatedStorage.Shared.VerdictBox.Patterns").Build("Classic", 4242, c.Duration)
+		H.handlers.BoxReport(p1, 1, 2, false)
+		T.eq(H.hp(human), hp0, "no hits accepted during the intro")
+		H.handlers.BoxReport(p2, 1, 1, false)
+		T.eq(H.hp(human), hp0, "only the victim's client may report")
+		H.advance(tl.introEnd + 0.5)
+		local ult0 = sans:GetAttribute("Ult")
+		H.handlers.BoxReport(p1, 1, 5, false)
+		T.eq(H.hp(human), hp0 - 2 * c.DamagePerHit, "hits capped by MinHitInterval (2 of 5)")
+		T.ok(human:GetAttribute("KR") > 0, "box hits add KR")
+		T.ok(sans:GetAttribute("Ult") >= ult0 + 2 * c.MonsterUltPerHit, "monster ult per hit")
+		H.handlers.BoxReport(p1, 1, "x", "y")
+		H.handlers.BoxReport(p1, 99, 1, false)
+		-- soul relay
+		H.handlers.BoxSoul(p1, 1, 12.34, -5)
+		local relayed = H.count("BoxSoul", p2)
+		T.eq(relayed, 1, "relayed to the other player")
+		T.eq(H.count("BoxSoul", p1), 0, "not echoed to the victim")
+		local ra = H.last("BoxSoul")
+		T.ok(ra[1] == 1 and math.abs(ra[2] - 12.3) < 1e-6 and ra[4] == 2, "relay = (boxId, x, y, hits)")
+		H.handlers.BoxSoul(p1, 1, 1, 1)
+		T.eq(H.count("BoxSoul", p2), 1, "rate limited to 15 Hz")
+		H.advance(0.1)
+		H.handlers.BoxSoul(p1, 1, 0 / 0, 1)
+		H.handlers.BoxSoul(p2, 1, 1, 1)
+		T.eq(H.count("BoxSoul", p2), 1, "invalid / foreign soul packets dropped")
+		H.handlers.BoxSoul(p1, 1, 1, 1)
+		T.eq(H.count("BoxSoul", p2), 2, "next valid sample relayed")
+		-- end at the duration
+		local ended = nil
+		VB.Ended:Connect(function(id, victim, hits, survived)
+			ended = { id = id, victim = victim, hits = hits, survived = survived }
+		end)
+		H.advance(c.Duration)
+		local endArgs = H.last("BoxEnd")
+		T.ok(endArgs and endArgs[1] == 1 and endArgs[2].hits == 2 and endArgs[2].survived == false, "BoxEnd {hits, survived}")
+		T.eq(endArgs[2].reason, "Duration", "ended by the clock")
+		T.ok(ended and ended.victim == human and ended.hits == 2, "Ended signal")
+		T.ok(not SS.Has(human, "Boxed") and not SS.Has(human, "Invulnerable"), "statuses removed")
+		T.ok(human:GetAttribute("SoulMode") ~= "Boxed", "SoulMode restored")
+		T.ok(not VB.IsBoxed(human), "no longer boxed")
+		T.eq(pk.box:GetAttribute("Verdict"), "Guilty", "verdict shown on the 3D box")
+		T.ok(not SS.Has(human, "DamageUp"), "2 hits: no survive buff")
+
+		-- survive: <= SurviveMaxHits -> DamageUp + ult
+		human:SetAttribute("Ult", 0)
+		T.ok(VB.Start(sans, human), "second box")
+		H.advance(tl.introEnd + 0.2)
+		H.handlers.BoxReport(p1, 2, 1, true)
+		H.advance(c.Duration)
+		local e2 = H.last("BoxEnd")
+		T.ok(e2[1] == 2 and e2[2].survived == true and e2[2].hits == 1, "survived with one hit")
+		T.ok(SS.Has(human, "DamageUp"), "survive buff DamageUp")
+		T.ok(human:GetAttribute("Ult") >= c.SurviveUlt, "survive ult")
+		local _, mult = SS.Get(human, "DamageUp")
+		T.ok(mult and mult.mult == c.SurviveDamageMult, "DamageUp mult")
+
+		-- HP floor: box damage never drops below 1
+		local hum = human:FindFirstChildOfClass("Humanoid")
+		hum.Health = 3
+		T.ok(VB.Start(sans, human), "third box")
+		H.advance(tl.introEnd + 3)
+		H.handlers.BoxReport(p1, 3, 6, false)
+		T.ok(H.hp(human) >= 1, "box damage keeps 1 HP")
+		T.ok(not human:GetAttribute("Downed"), "never downed inside the box")
+		-- cancel (round end)
+		VB.CancelAll()
+		local e3 = H.last("BoxEnd")
+		T.ok(e3[1] == 3 and e3[2].reason == "Cancelled" and e3[2].survived == false, "cancelled")
+		T.ok(not SS.Has(human, "Boxed"), "cancel removes statuses")
+
+		-- bot victims auto-resolve with 1-4 hits
+		local botHp = H.hp(bot)
+		T.ok(VB.Start(sans, bot), "bot box")
+		T.ok(H.last("BoxStart")[1].bot == true, "packet flags bot victims")
+		H.advance(c.Duration + 0.2)
+		local e4 = H.last("BoxEnd")
+		T.ok(e4[1] == 4 and e4[2].hits >= 1 and e4[2].hits <= 4, "bot took 1-4 hits: " .. tostring(e4[2].hits))
+		T.near(botHp - H.hp(bot), e4[2].hits * c.DamagePerHit, 1e-6, "bot damage applied per hit")
+
+		-- victim leaves / dies mid-box
+		T.ok(VB.Start(sans, human), "fifth box")
+		H.advance(1)
+		human:SetAttribute("Dead", true)
+		H.advance(0.25)
+		local e5 = H.last("BoxEnd")
+		T.ok(e5[1] == 5 and e5[2].reason == "VictimGone", "ends when the victim is gone")
+		-- Ending phase refuses
+		human:SetAttribute("Dead", false)
+		H.round.Phase = "Ending"
+		T.ok(not VB.Start(sans, bot), "no box during the Ending phase")
+	end)
+	H.cleanup()
+	Loader.reset()
+	if not ok then
+		error(err, 0)
+	end
 end
 
 return tests

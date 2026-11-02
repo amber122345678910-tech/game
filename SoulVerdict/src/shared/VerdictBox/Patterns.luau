@@ -184,7 +184,7 @@ local function blaster(ctx: Ctx, seg: Seg, t: number, x: number, y: number, angl
 	local limit = limitOf(ctx, seg)
 	if t + appear + charge + fire > limit + 1e-6 then
 		charge = limit - t - appear - fire -- fit: shorter charge, never below 0.3 s
-		if charge < 0.3 then
+		if charge < 0.3 - 1e-6 then
 			return nil
 		end
 	end
@@ -472,7 +472,7 @@ GEN.BlasterCross = {
 	mode = "Red",
 	box = SQUARE,
 	nominal = 1.25,
-	min = 1.12,
+	min = 1.17,
 	fn = function(ctx, seg)
 		local rng = ctx.rng
 		local fast = seg.params.fast == true
@@ -736,6 +736,37 @@ GEN.StabBarrage = {
 	end,
 }
 
+-- Narrow full-height bone columns crash down from the ceiling one after another (step aside).
+GEN.Guillotine = {
+	mode = "Red",
+	box = SQUARE,
+	nominal = 0.7,
+	min = 0.6,
+	fn = function(ctx, seg)
+		local rng = ctx.rng
+		local n = if seg.k > 0.6 then 5 else 4
+		local width = 34
+		local spacing = math.max((seg.dur - 0.55) / (n - 1), 0.1)
+		local warn = math.max((0.36 - 0.06 * seg.k) * seg.warn, 0.3)
+		local lim = seg.w / 2 - width / 2
+		local lastX = 1e9
+		for i = 0, n - 1 do
+			local x = rng:Number(-lim, lim)
+			if math.abs(x - lastX) < width then
+				x = clamp(x + (if x > lastX then width else -width), -lim, lim)
+			end
+			lastX = x
+			stab(ctx, seg, seg.t0 + 0.02 + i * spacing, "Top", seg.h + 4, warn, {
+				a = x - width / 2,
+				b = x + width / 2,
+				rise = 0.07,
+				hold = 0.12,
+				fall = 0.1,
+			})
+		end
+	end,
+}
+
 GEN.Execution = {
 	mode = "Red",
 	box = SQUARE,
@@ -853,7 +884,7 @@ GEN.EclipseRing = {
 	mode = "Red",
 	box = SQUARE,
 	nominal = 0.8,
-	min = 0.6,
+	min = 0.55,
 	fn = function(ctx, seg)
 		ring(ctx, seg, seg.t0, true, 150 + 40 * seg.k)
 		if seg.k > 0.45 and seg.dur > 0.75 then
@@ -866,13 +897,13 @@ GEN.RiftBlasters = {
 	mode = "Red",
 	box = SQUARE,
 	nominal = 0.9,
-	min = 1.0,
+	min = 1.05,
 	fn = function(ctx, seg)
 		local rng = ctx.rng
 		local edges = rng:Shuffle({ "Left", "Right", "Top", "Bottom" })
 		local n = 3 + math.floor(seg.k * 1.5)
 		local room = limitOf(ctx, seg) - seg.t0 - 0.04
-		local spacing = 0.17
+		local spacing = 0.1
 		local charge = clamp(room - 0.24 - 0.27 - (n - 1) * spacing, 0.3, 0.38)
 		while n > 2 and 0.24 + charge + 0.27 + (n - 1) * spacing > room do
 			n -= 1
@@ -890,7 +921,7 @@ GEN.GravityFlip = {
 	mode = "Blue",
 	box = SQUARE,
 	nominal = 0.9,
-	min = 0.7,
+	min = 0.65,
 	gravity = "Down",
 	fn = function(ctx, seg)
 		local rng = ctx.rng
@@ -1037,7 +1068,7 @@ local SETS: { [string]: SetDef } = {
 			{ name = "BlasterCross", params = { fast = true } },
 			{ name = "SlamStab", params = { flank = true } },
 			{ name = "BoneTunnel" },
-			{ pick = 1, from = { "ChainSweep", "StabBarrage" } },
+			{ pick = 1, from = { "ChainSweep", "StabBarrage", "Guillotine" } },
 			{ name = "Execution" },
 		},
 	},

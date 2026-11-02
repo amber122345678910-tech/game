@@ -326,7 +326,7 @@ return {
 		T.ok(type(server.OnSpawn) == "function" and type(server.OnDespawn) == "function", "server lifecycle")
 		-- client geometry mirrors the server
 		local sc, cc = server.Constants, client.Constants
-		for _, key in { "ExecWidth", "ExecLock", "ChainRadius", "SpikeRadius", "RushTime", "LungeTime" } do
+		for _, key in { "ExecWidth", "ExecLock", "ChainRadius", "ChainMaxSlope", "SpikeRadius", "RushTime", "LungeTime" } do
 			T.eq(cc[key], sc[key], "client constant " .. key)
 		end
 		for i = 1, 3 do

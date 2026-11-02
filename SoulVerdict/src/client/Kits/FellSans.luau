@@ -64,6 +64,7 @@ local PARK = CFrame.new(0, 25000, 0)
 local C = {
 	BlasterSlot = { 2.4, 4.4, 1.8 },
 	ChainRadius = 1.1,
+	ChainMaxSlope = 0.47,
 	SpikeRadius = 2.6,
 	RushTime = 0.24,
 	LungeTime = 0.16,
@@ -933,9 +934,22 @@ Indicator.ChainGrab = function(fx: any): Map?
 		if cf == nil then
 			return
 		end
-		local start = cf.Position + Vector3.new(0, 1, 0) + flat(aim - cf.Position, cf.LookVector) * 1.5
-		local dir = aim - start
-		local look = if dir.Magnitude > 1e-3 then dir.Unit else cf.LookVector
+		local fwd = flat(aim - cf.Position, cf.LookVector)
+		local start = cf.Position + Vector3.new(0, 1, 0) + fwd * 1.5
+		local target = aim
+		local g = Lib.Ground(aim + Vector3.new(0, 0.5, 0), 3.5)
+		if g then
+			target = g + Vector3.new(0, 2.5, 0) -- same chest-height rule as the server
+		end
+		local dir = target - start
+		local flatLen = Vector3.new(dir.X, 0, dir.Z).Magnitude
+		local look = if flatLen < 1
+			then fwd
+			else Vector3.new(
+				dir.X,
+				math.clamp(dir.Y, -flatLen * C.ChainMaxSlope, flatLen * C.ChainMaxSlope),
+				dir.Z
+			).Unit
 		line.CFrame = Lib.LookAlong(start, look) * CFrame.new(0, 0, -range / 2) * CFrame.Angles(0, math.pi / 2, 0)
 		line.Transparency = 0.35 + 0.15 * math.sin(os.clock() * 8)
 		hook.CFrame = CFrame.new(start + look * range)

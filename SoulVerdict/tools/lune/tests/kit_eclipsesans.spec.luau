@@ -348,6 +348,12 @@ return {
 			local toChest = chest - pos
 			local along = toChest:Dot(look)
 			T.ok(along > 0 and (toChest - look * along).Magnitude < 0.05, "beam crosses the aim point")
+			-- the client indicator places the ghost rift with the same rule
+			local client = Loader.require(CLIENT .. "Kits.EclipseSans")
+			local cpos, cdir = client.RiftSide(Vector3.new(0, 0, -30), Vector3.new(0, 3, 0), N.Offset, function(_, _, d)
+				return d
+			end)
+			T.ok(near(cpos, pos, 1e-3) and near(cdir, look, 1e-3), "indicator mirrors the server placement")
 			local rift = H.fx("Rift", "RiftBlaster")[1]
 			T.ok(rift and rift.data.hazard == beam.id and near(rift.data.pos, pos, 1e-3), "Rift fx carries the rift")
 			local ok2, why = AS.CastAs(eclipse, "RiftBlaster", { aim = Vector3.new(0, 0, -30) })

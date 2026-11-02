@@ -71,6 +71,7 @@ local WHITE = Color3.new(1, 1, 1)
 local BLACK = Color3.new(0, 0, 0)
 local PARK = CFrame.new(0, 1e5, 0)
 
+local DISC_FACING = CFrame.Angles(0, math.pi / 2, 0) -- a Cylinder's X axis along a LookAlong frame's look
 local CHEST = 2.6 -- same constants as the server placement
 local RIFT_LIFT = 0.9
 
@@ -521,7 +522,7 @@ Effects.RiftBlaster = function(fx: any, packet: Map)
 		local delay = if type(data.delay) == "number" then data.delay else 1.1
 		local beamTime = if type(data.beamTime) == "number" then data.beamTime else 0.5
 		local width = if type(data.width) == "number" then data.width else 5
-		local radius = math.max(3, width * 0.85)
+		local radius = math.max(3, width * 1.1) -- the tear frames the skull (BlasterScale: skull ~1.25 x width)
 		local cf = LookAlong(pos, dir)
 		local burst = false
 		local lastSuck = 0
@@ -570,7 +571,7 @@ Indicator.RiftBlaster = function(fx: any): Map?
 	local width = N.Width or 5
 	local length = math.min(N.Length or 60, 48)
 	local lane = Lib.Lane(CFrame.new(), length, width, WHITE, { Fill = 0.86, Edge = 0.14, Height = 0.12 })
-	local ghost = Lib.Part("Ball", Vector3.new(2.2, 4.6, 0.25), PARK, VIOLET, Enum.Material.Neon, 0.55)
+	local ghost = Lib.Part("Cylinder", Vector3.new(0.2, 4.6, 4.6), PARK, VIOLET, Enum.Material.Neon, 0.55)
 	local target = Lib.GroundCircle(Vector3.zero, 1.4, WHITE, { Rim = 0.18, Fill = 0.8, Height = 0.14 })
 	local handle = {}
 	function handle.Update(_self: any, aim: Vector3, _charge: number)
@@ -581,7 +582,7 @@ Indicator.RiftBlaster = function(fx: any): Map?
 		local pos, dir = Kit.RiftSide(aim, r.Position, N.Offset or 13, clientClear)
 		local flatDir = flat(dir, Vector3.new(1, 0, 0))
 		lane:SetCFrame(LookAlong(Vector3.new(pos.X, aim.Y, pos.Z), flatDir))
-		ghost.CFrame = LookAlong(pos, dir)
+		ghost.CFrame = LookAlong(pos, dir) * DISC_FACING
 		ghost.Transparency = 0.45 + 0.15 * math.sin(os.clock() * 7)
 		target:SetCenter(aim)
 	end
@@ -1033,7 +1034,7 @@ Indicator.VoidStep = function(fx: any): Map?
 	local marker = Lib.GroundCircle(Vector3.zero, 1.8, VIOLET, { Rim = 0.22, Fill = 0.75, Height = 0.18 })
 	local range = Lib.GroundCircle(Vector3.zero, dist, LILAC, { Rim = 0.1, Fill = 1, Height = 0.08, Shadow = false })
 	range:SetTransparency(0.8, 1)
-	local ghost = Lib.Part("Ball", Vector3.new(2.4, 5, 0.25), PARK, VIOLET, Enum.Material.Neon, 0.6)
+	local ghost = Lib.Part("Cylinder", Vector3.new(0.2, 5, 5), PARK, VIOLET, Enum.Material.Neon, 0.6)
 	local handle = {}
 	function handle.Update(_self: any, aim: Vector3, _charge: number)
 		local r = fx.Root(fx.Character)
@@ -1044,7 +1045,7 @@ Indicator.VoidStep = function(fx: any): Map?
 		local g = Lib.Ground(dest + Vector3.new(0, 2, 0), 30) or dest
 		marker:SetCenter(g)
 		range:SetCenter(r.Position - Vector3.new(0, 2.8, 0))
-		ghost.CFrame = LookAlong(g + Vector3.new(0, 2.9, 0), flat(g - r.Position, r.CFrame.LookVector))
+		ghost.CFrame = LookAlong(g + Vector3.new(0, 2.9, 0), flat(g - r.Position, r.CFrame.LookVector)) * DISC_FACING
 		ghost.Transparency = 0.5 + 0.15 * math.sin(os.clock() * 6)
 	end
 	function handle.Destroy(_self: any)
@@ -1341,7 +1342,7 @@ Effects.TotalEclipse = function(fx: any, packet: Map)
 				subtitle(gui, Strings.L("eclipse.dark.self"), pal.Glow)
 				Lib.Debris(gui, 3.5)
 			end
-		elseif team ~= "Monster" and team ~= "" then
+		elseif team == "Humans" then
 			fx.State.Darkened = true
 			startDarkness(duration, vision)
 		end
@@ -1395,7 +1396,9 @@ HazardVisuals.RegisterVisual("EclipseStar", function(ctx: Map)
 		end
 	end
 	local drop: Map? = nil
-	local slant = Vector3.new(0.45, 0, 0.2)
+	local fallHeight = if type(p.fallHeight) == "number" then p.fallHeight else 42
+	local skyOffset = Vector3.zero -- impact point -> point under the sky rift (flat)
+	local dir = Vector3.new(0, -1, 0)
 	local impacted = false
 	local lastEmit = 0
 	local v: Map = {}
@@ -1411,8 +1414,10 @@ HazardVisuals.RegisterVisual("EclipseStar", function(ctx: Map)
 			drop = best
 			local c = p.center
 			if best and typeof(c) == "Vector3" then
-				-- every star falls away from the sky rift's centre
-				slant = flat(best.Position - c, Vector3.new(1, 0, 0.4)) * 0.45
+				-- every star pours out of the sky rift above the centre, straight to its marked impact point
+				skyOffset = Vector3.new(c.X - best.Position.X, 0, c.Z - best.Position.Z)
+				local path = -skyOffset - Vector3.new(0, fallHeight, 0)
+				dir = if path.Magnitude > 1e-3 then path.Unit else dir
 			end
 		end
 		local d: Map? = drop
@@ -1422,8 +1427,7 @@ HazardVisuals.RegisterVisual("EclipseStar", function(ctx: Map)
 		local state, height = HazardVisuals.RainFall(p, d, t)
 		local ground: Vector3 = d.Position
 		if state == "Fall" then
-			local pos = ground + Vector3.new(0, height + 0.6, 0) - slant * height
-			local dir = (Vector3.new(0, -1, 0) + slant).Unit
+			local pos = ground + skyOffset * clamp01(height / math.max(1, fallHeight)) + Vector3.new(0, height + 0.6, 0)
 			if model then
 				model:PivotTo(LookAlong(pos, dir))
 			end
@@ -1441,7 +1445,6 @@ HazardVisuals.RegisterVisual("EclipseStar", function(ctx: Map)
 			if model then
 				-- buried nose-first, the tail flickers out
 				local sink = math.max(0, (t - d.ImpactTime) * 2.5)
-				local dir = (Vector3.new(0, -1, 0) + slant).Unit
 				model:PivotTo(LookAlong(ground + Vector3.new(0, 0.3 - sink, 0), dir))
 				setAlpha(model, 1 - clamp01((t - d.ImpactTime) / 0.35))
 			end
