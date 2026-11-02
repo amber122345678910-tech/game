@@ -277,6 +277,7 @@ local SOUNDS: { [string]: SoundDef } = {
 }
 
 -- defaults that are fallbacks of other generic entries
+SOUNDS.Menu.Fallback = "Lobby" -- the title is never silent when the owner's menu id cannot load
 SOUNDS.UiOpen.Fallback = "UiConfirm"
 SOUNDS.UiClose.Fallback = "UiBack"
 SOUNDS.UiToggle.Fallback = "UiClick"
