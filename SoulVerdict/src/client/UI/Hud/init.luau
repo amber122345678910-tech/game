@@ -19,7 +19,8 @@
 --   Hud.FeedFromEvent(name, data, unitOf?) -> FeedEntry?   RoundEvent -> kill-feed entry (pure)
 -- Pieces (each: Create(theme, deps) -> { Root, Update(snapshot), Tick(now)?, Destroy } + extras):
 --   LobbyHud, TopStrip, BossBar, RoundHud, AbilityBar, TeamPanel, Objectives, KillFeed, Notifications,
---   Announcements, IntroSplash, SpectateHud, DeathScreen, MobileControls, Nameplates. Snapshot contract: Hud/Mock.
+--   Announcements, IntroSplash, SpectateHud, DeathScreen, MobileControls, Nameplates, EmoteWheel (B / D-pad down
+--   radial emote menu, whenever the local player has a body outside the intro). Snapshot contract: Hud/Mock.
 local Style = require(script.Style)
 local Mock = require(script.Mock)
 local Data = require(script.Data)
@@ -40,6 +41,7 @@ Hud.PIECES = {
 	{ Name = "Announcements", Z = 8 },
 	{ Name = "Notifications", Z = 9 },
 	{ Name = "DeathScreen", Z = 10 },
+	{ Name = "EmoteWheel", Z = 11 },
 	{ Name = "IntroSplash", Z = 12 },
 	{ Name = "Nameplates", Z = 0 },
 }
@@ -89,6 +91,8 @@ function Hud.Visible(name: string, s: { [string]: any }): boolean
 		return deathScreen
 	elseif name == "Nameplates" then
 		return true
+	elseif name == "EmoteWheel" then
+		return hasBody and phase ~= "Intro" and not deathScreen
 	end
 	return true -- Announcements, Notifications
 end

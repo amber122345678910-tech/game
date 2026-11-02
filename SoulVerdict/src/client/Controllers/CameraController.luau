@@ -16,8 +16,12 @@
 --     setting and GraphicsController.ReducedMotion);
 --   * modes: Follow, Intro (centripetal Catmull-Rom flight through RoundEvent "Intro" data.introPath at constant
 --     speed, look direction splined too; fallback: arena orbit), Spectate(model), KillCam(position, duration) (slow
---     orbit + slight zoom; also played for everyone on RoundEnd.lastHit), Menu (slow cinematic lobby orbit; Follow
---     without a character shows it too), Photo (free fly, UI + character controls hidden). Mode changes blend.
+--     orbit + slight zoom; also played for every round participant on RoundEnd.lastHit), Menu (title screen: the
+--     Lobby map's "MenuCamera" marker framing (LobbyController.MenuCamera) with a slow cinematic drift, else a slow
+--     orbit around SetMenuShot's focus / the local character; Follow without a character shows it too), Photo
+--     (free fly, UI + character controls hidden). Mode changes blend.
+--   * players who are not round participants (StateController.Role() "Lobby", e.g. mid-match joiners waiting in the
+--     lobby; fallback: character Team "Lobby") skip the round's Intro flyover and the RoundEnd kill-cam.
 --
 -- API (SPEC §20)
 --   CameraController.SetMode(mode, opts?)  mode: "Follow"|"Intro"|"Spectate"|"KillCam"|"Menu"|"Photo"; opts {Blend: number?}
@@ -40,7 +44,8 @@
 --   CameraController.SetCrosshair(icon: string?)   mouse icon while locked (default: built-in lock cursor; "" = none)
 --   CameraController.SetShoulder(side: number)     1 = right shoulder, -1 = left
 --   CameraController.Yaw()/Pitch()/SetYawPitch(yaw, pitch)
---   CameraController.Shaker -> VFX/CameraShake instance ; CameraController.Math -> pure helpers (Lune-tested)
+--   CameraController.Shaker -> VFX/CameraShake instance ; CameraController.Math -> pure helpers (Lune-tested):
+--     ... MenuDrift(base: CFrame, t) -> CFrame, IsParticipant(role?, team?, listed?) -> boolean
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -335,6 +340,32 @@ function CameraMath.Orbit(center: Vector3, yaw: number, radius: number, height: 
 	local offset = Vector3.new(-math.sin(yaw), 0, -math.cos(yaw)) * -radius
 	local position = center + offset + Vector3.new(0, height, 0)
 	return CameraMath.LookAt(position, center + Vector3.new(0, lookHeight, 0))
+end
+
+-- Title-screen drift around a fixed framing (the lobby's MenuCamera marker): a slow, never-repeating-looking sway
+-- of a stud or two plus a few degrees of yaw / pitch, so the shot breathes without leaving its composition.
+function CameraMath.MenuDrift(base: CFrame, t: number): CFrame
+	local sway = Vector3.new(math.sin(t * 0.07) * 1.6, math.sin(t * 0.23 + 0.4) * 0.35, math.sin(t * 0.05 + 0.8) * 1.1)
+	local yawOffset = math.sin(t * 0.11) * math.rad(3.5)
+	local pitchOffset = math.sin(t * 0.17 + 1.3) * math.rad(1.2)
+	local rotation = base - base.Position
+	return CFrame.new(base.Position + base:VectorToWorldSpace(sway))
+		* rotation
+		* CFrame.Angles(0, yawOffset, 0)
+		* CFrame.Angles(pitchOffset, 0, 0)
+end
+
+-- Is the local player part of the running round? `role` = Player attribute Role (StateController.Role()):
+-- Human / Monster / Spectator (a fallen participant) yes, Lobby no; without a role the character's Team decides.
+-- `listed` = the player appears in the round's Intro data (covers a Role attribute that has not replicated yet).
+function CameraMath.IsParticipant(role: string?, team: string?, listed: boolean?): boolean
+	if listed == true then
+		return true
+	end
+	if type(role) == "string" and role ~= "" then
+		return role ~= "Lobby"
+	end
+	return type(team) == "string" and team ~= "" and team ~= "Lobby"
 end
 
 ---------------------------------------------------------------------------------------------- state
@@ -1106,8 +1137,35 @@ local function followFrame(dt: number, model: Model, root: BasePart, spectating:
 	return CFrame.new(position) * rotation, pivot, fovSetting + speedFov
 end
 
+local menuMarkerCF: CFrame? = nil
+local menuMarkerCheckedAt = -math.huge
+
+-- The lobby's "MenuCamera" marker (LobbyController.MenuCamera), re-checked once a second (the lobby streams in).
+local function menuMarker(): CFrame?
+	local t = os.clock()
+	if t - menuMarkerCheckedAt >= 1 then
+		menuMarkerCheckedAt = t
+		menuMarkerCF = nil
+		local Lobby = controller("LobbyController")
+		if Lobby and type(Lobby.MenuCamera) == "function" then
+			local ok, cf = pcall(Lobby.MenuCamera)
+			if ok and typeof(cf) == "CFrame" then
+				menuMarkerCF = cf
+			end
+		end
+	end
+	return menuMarkerCF
+end
+
 local function menuFrame(): (CFrame, Vector3, number)
 	local focus = menuFocus
+	if focus == nil then
+		local marker = menuMarker()
+		if marker then
+			local cf = CameraMath.MenuDrift(marker, now())
+			return cf, cf.Position + cf.LookVector * 40, TUNING.MenuFov
+		end
+	end
 	if focus == nil then
 		local root = rootOf(localCharacter())
 		focus = if root then root.Position else (Registry.LobbyOrigin + Vector3.new(0, 5, 0))
@@ -1592,10 +1650,32 @@ local function hookState()
 			end
 		end)
 	end
+	-- round participant? (players waiting in the lobby during a round - e.g. mid-match joiners - are not)
+	local function participant(listed: boolean?): boolean
+		local okRole, role = pcall(State.Role)
+		local okChar, char = pcall(State.LocalCharacter)
+		local team = if okChar and typeof(char) == "Instance" then char:GetAttribute("Team") else nil
+		return CameraMath.IsParticipant(if okRole then role else nil, team, listed)
+	end
 	if type(State.OnRoundEvent) == "function" then
 		State.OnRoundEvent("Intro", function(data: any)
 			if type(data) ~= "table" then
 				return
+			end
+			-- listed in the intro lineup = taking part even if the Role attribute has not replicated yet
+			local me = Players.LocalPlayer
+			local listed = false
+			if me then
+				local units = if type(data.humans) == "table" then table.clone(data.humans) else {}
+				table.insert(units, data.monster)
+				for _, unit in units do
+					if type(unit) == "table" and unit.userId == me.UserId then
+						listed = true
+					end
+				end
+			end
+			if not participant(listed) then
+				return -- watching from the lobby: no arena flyover
 			end
 			local okLeft, left = pcall(State.TimeLeft)
 			local duration = if okLeft
@@ -1606,7 +1686,7 @@ local function hookState()
 			CameraController.PlayIntro(data.introPath, duration, { Center = data.center, Radius = data.radius })
 		end)
 		State.OnRoundEvent("RoundEnd", function(data: any)
-			if type(data) ~= "table" or type(data.lastHit) ~= "table" then
+			if type(data) ~= "table" or type(data.lastHit) ~= "table" or not participant(nil) then
 				return
 			end
 			local position: Vector3? = nil

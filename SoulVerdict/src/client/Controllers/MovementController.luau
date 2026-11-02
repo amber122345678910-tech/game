@@ -9,8 +9,10 @@
 --       Dash     front-loaded speed curve covering exactly the packet distance (Plane on ground, level in the air),
 --                echo packets answering our own predicted dash are skipped
 --       Teleport PivotTo locally (+ camera cut),  Root: horizontal velocity held at 0
---   * PredictDash(dir): instant local dash (Config.Human.DashDistance / DashTime) - does NOT fire Net "Dash";
---     CombatController fires it (the server stays authoritative for charges and i-frames).
+--   * PredictDash(dir, castId?): instant local dash (Config.Human.DashDistance / DashTime) - does NOT fire Net
+--     "Dash"; CombatController fires it (the server stays authoritative for charges and i-frames). Also plays the
+--     local Dash clip right away (AnimController.PlayAbility "Dash": a side-step Dodge when not forward) and marks
+--     castId predicted so the server's AbilityFx echo does not restart it.
 --   * Character facing: Humanoid.AutoRotate = false + AlignOrientation toward the camera yaw while
 --     CameraController.ShouldFaceCamera() (lock on) or Facing(true) / FaceFor(s) is requested; normal auto-rotate
 --     otherwise. Never while Dead / Downed / Stunned / Boxed.
@@ -25,7 +27,7 @@
 --   MovementController.ApplyForceMove(packet: ForceMovePacket)
 --   MovementController.IsDashing() -> boolean
 -- Extras
---   MovementController.PredictDash(dir: Vector3) -> boolean
+--   MovementController.PredictDash(dir: Vector3, castId: number?) -> boolean
 --   MovementController.FaceFor(seconds)                     face the camera briefly (casts while unlocked)
 --   MovementController.SetFacingYaw(yaw?)                   explicit facing yaw (nil = camera yaw)
 --   MovementController.Stop()                               cancel the active forced move
@@ -398,7 +400,7 @@ function MovementController.ApplyForceMove(packet: ForceMovePacket)
 	MovementController.ForceMoved:Fire(packet)
 end
 
-function MovementController.PredictDash(direction: Vector3): boolean
+function MovementController.PredictDash(direction: Vector3, castId: number?): boolean
 	local r = rig
 	if r == nil or r.Dead or r.Downed then
 		return false
@@ -433,6 +435,14 @@ function MovementController.PredictDash(direction: Vector3): boolean
 	}
 	lastPredictedDash = os.clock()
 	startMove(m)
+	-- own dash clip now (not ~ping later on the server echo); the echo of this castId is skipped
+	local Anim = controller("AnimController")
+	if Anim and type(Anim.PlayAbility) == "function" then
+		if type(castId) == "number" and castId ~= 0 and type(Anim.MarkPredicted) == "function" then
+			pcall(Anim.MarkPredicted, r.Model, castId)
+		end
+		pcall(Anim.PlayAbility, r.Model, r.Model:GetAttribute("KitId"), "Dash", nil, dir)
+	end
 	MovementController.Dashed:Fire(dir, true)
 	local Camera = controller("CameraController")
 	if Camera then

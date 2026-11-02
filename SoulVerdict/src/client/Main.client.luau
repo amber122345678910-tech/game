@@ -9,14 +9,27 @@ local StarterGui = game:GetService("StarterGui")
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Config = require(Shared:WaitForChild("Config")) :: any
 
--- Hide default Roblox HUD pieces we replace (retry: SetCoreGuiEnabled can fail very early).
+-- Hide default Roblox HUD pieces we replace, and disable the Esc-menu "Reset Character": it kills the custom
+-- character outright (the monster forfeits the round, a downed human skips the bleed-out, a frozen intro body
+-- dies). Lobby bodies never need it (the void watchdog puts fallen players back). SetCore / SetCoreGuiEnabled
+-- fail until the CoreScripts registered them: retry each call on its own.
 task.spawn(function()
-	for _ = 1, 20 do
-		local ok = pcall(function()
+	local pending = {
+		function()
 			StarterGui:SetCoreGuiEnabled(Enum.CoreGuiType.Health, false)
 			StarterGui:SetCoreGuiEnabled(Enum.CoreGuiType.Backpack, false)
-		end)
-		if ok then
+		end,
+		function()
+			StarterGui:SetCore("ResetButtonCallback", false)
+		end,
+	}
+	for _ = 1, 40 do
+		for i = #pending, 1, -1 do
+			if pcall(pending[i]) then
+				table.remove(pending, i)
+			end
+		end
+		if #pending == 0 then
 			break
 		end
 		task.wait(0.25)

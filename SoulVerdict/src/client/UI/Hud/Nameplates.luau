@@ -2,11 +2,14 @@
 -- Hud/Nameplates: BillboardGuis above every other character — name, LV + title, SOUL heart in the class
 -- colour (humans), a mini HP bar with KR for teammates (DOWN timer while downed), a skull (crown in the final
 -- phase) marker in the kit colour above the monster. Enemies get a shorter MaxDistance, are not AlwaysOnTop
--- (no wall-hacks) and are hidden while their Invisible attribute is set (Patience stealth).
+-- (no wall-hacks) and are hidden while invisible (Invisible attribute or an active Status_Invisible: Patience
+-- stealth, Eclipse VoidStep); allies of an invisible character see a faded "ghost" plate (name only) instead.
 --   Nameplates.Create(theme, deps) -> { Root, Update(snapshot), Destroy }
 --       live (deps.Live): billboards are parented to deps.BillboardParent (PlayerGui) in a "SV_Nameplates"
 --       folder; offline: a row of sample plates is drawn on Root for previews.
 --   Nameplates.BuildPlate(skin, unit, viewerTeam) -> { Root: Frame, Set(unit, viewerTeam, now) }
+--   Nameplates.BuildGhost(skin) -> { Root: Frame, Set(unit) }        the faded stealth plate allies see
+--   Nameplates.IsInvisible(unit, now) -> boolean ; Nameplates.Visibility(unit, viewerTeam, now) -> "Plate"|"Ghost"|"Hidden"
 -- Data: snapshot.Humans, Monster, Others (lobby bodies), Me (viewer team), Now.
 local Style = require(script.Parent.Style)
 
@@ -19,6 +22,66 @@ local function isTeammate(unit: any, viewerTeam: string): boolean
 		return unit.Team ~= "Monster"
 	end
 	return unit.Team == viewerTeam
+end
+
+local GHOST_TEXT_T = 0.5 -- the stealth plate's text transparency
+local STEALTH = Color3.fromRGB(120, 230, 230)
+
+-- Invisible: the Invisible attribute (unit.Invisible) or a Status_Invisible end time still ahead.
+function Nameplates.IsInvisible(unit: any, now: number): boolean
+	if unit.Invisible == true then
+		return true
+	end
+	local statuses = unit.Statuses
+	local endsAt = if type(statuses) == "table" then statuses.Invisible else nil
+	return type(endsAt) == "number" and endsAt > now
+end
+
+-- Which plate a viewer sees: the full "Plate", the faded "Ghost" (an invisible ally) or nothing (an invisible
+-- enemy - no free wall-hack on stealth).
+function Nameplates.Visibility(unit: any, viewerTeam: string, now: number): string
+	if not Nameplates.IsInvisible(unit, now) then
+		return "Plate"
+	end
+	return if isTeammate(unit, viewerTeam) then "Ghost" else "Hidden"
+end
+
+function Nameplates.BuildGhost(skin: any): any
+	local root = Style.Frame({ Name = "Ghost", Size = UDim2.fromOffset(PLATE.X, PLATE.Y), Visible = false })
+	local name = Style.Text(skin, {
+		Name = "Name",
+		Text = "",
+		Upper = false,
+		Role = if skin.Battle then "Label" else "Title",
+		TextSize = if skin.Battle then 12 else 15,
+		Color = STEALTH,
+		X = "Center",
+		Transparency = GHOST_TEXT_T,
+		Position = UDim2.fromOffset(0, 26),
+		Size = UDim2.new(1, 0, 0, 20),
+		Parent = root,
+	})
+	local stroke = name:FindFirstChildOfClass("UIStroke")
+	if stroke then
+		stroke.Transparency = 0.8
+	end
+	local tag = Style.Text(skin, {
+		Name = "Tag",
+		Text = Style.L("hud.plate.hidden"),
+		TextSize = if skin.Battle then 8 else 10,
+		Color = STEALTH,
+		X = "Center",
+		Transparency = GHOST_TEXT_T + 0.15,
+		Stroke = false,
+		Position = UDim2.fromOffset(0, 46),
+		Size = UDim2.new(1, 0, 0, 12),
+		Parent = root,
+	})
+	local function set(u: any)
+		Style.SetText(name, if skin.Battle then Style.Upper(skin, tostring(u.Name)) else tostring(u.Name))
+		local _ = tag
+	end
+	return { Root = root, Set = set }
 end
 
 function Nameplates.BuildPlate(skin: any, unit: any, viewerTeam: string): any
@@ -153,7 +216,7 @@ function Nameplates.Create(theme: any, deps: any): any
 		f.Parent = d.BillboardParent
 		folder = f
 	end
-	type Entry = { Gui: BillboardGui, Plate: any, Model: Model }
+	type Entry = { Gui: BillboardGui, Plate: any, Ghost: any?, Model: Model }
 	local entries: { [Model]: Entry } = {}
 	local active = true
 
@@ -210,10 +273,25 @@ function Nameplates.Create(theme: any, deps: any): any
 				end
 				if entry then
 					local mate = isTeammate(u, viewer)
+					local show = Nameplates.Visibility(u, viewer, s.Now or 0)
 					entry.Gui.AlwaysOnTop = mate
 					entry.Gui.MaxDistance = if mate then 260 else 90
-					entry.Gui.Enabled = active and not (u.Invisible and not mate)
-					entry.Plate.Set(u, viewer, s.Now or 0)
+					entry.Gui.Enabled = active and show ~= "Hidden"
+					entry.Plate.Root.Visible = show == "Plate"
+					if show == "Ghost" and entry.Ghost == nil then
+						local ghost = Nameplates.BuildGhost(skin)
+						ghost.Root.Parent = entry.Gui
+						entry.Ghost = ghost
+					end
+					if entry.Ghost then
+						entry.Ghost.Root.Visible = show == "Ghost"
+						if show == "Ghost" then
+							entry.Ghost.Set(u)
+						end
+					end
+					if show == "Plate" then
+						entry.Plate.Set(u, viewer, s.Now or 0)
+					end
 				end
 			end
 		end

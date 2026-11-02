@@ -18,14 +18,15 @@
 --   Invisible human -> VerdictBoxService.Start(monster, target) (if that service exists).
 -- Net "Block" (isBlocking): humans only; sets attributes Blocking and BlockStart (server time; 0 = this
 --   block cannot parry because the previous block ended < PARRY_RETRY s ago — anti parry-spam).
--- Net "Dash" (direction): humans only; needs DashCharges >= 1; grants IFrames Config.Human.DashIFrames and
---   MovementService.Dash(..., echo = true) (the owner client may already be dashing: echo packets confirm).
+-- Net "Dash" (direction, castId?): humans only; needs DashCharges >= 1; grants IFrames Config.Human.DashIFrames and
+--   MovementService.Dash(..., echo = true) (the owner client may already be dashing: echo packets confirm). The
+--   AbilityFx "Dash" echo carries the client's castId so the owner's AnimController skips its predicted clip.
 -- Kit lifecycle: on CharacterService.Spawned the kit's OnSpawn(model, ctxFactory) runs (ctxFactory(abilityId?)
 --   -> CastContext for passives); OnDespawn(model) runs once on death/despawn; active casts are cancelled.
 --
 -- API
 --   AbilityService.CastAs(model, abilityId, payload?) -> (boolean, string?)   bots (same validation, no player)
---   AbilityService.BlockAs(model, on) / AbilityService.DashAs(model, direction) -> boolean
+--   AbilityService.BlockAs(model, on) / AbilityService.DashAs(model, direction, echo?, castId?) -> boolean
 --   AbilityService.SetCooldown(model, abilityId, seconds)
 --   AbilityService.GetCooldowns(model) -> {[string]: number}     abilityId -> endsAt (server time)
 --   AbilityService.ResetCooldowns(model)
@@ -392,7 +393,7 @@ end
 ---------------------------------------------------------------------------------------------------
 -- Dashing
 
-function AbilityService.DashAs(model: Model, direction: Vector3, echo: boolean?): boolean
+function AbilityService.DashAs(model: Model, direction: Vector3, echo: boolean?, castId: number?): boolean
 	if Validation.Role(model) ~= "Human" or not StatusService.CanAct(model) then
 		return false
 	end
@@ -421,7 +422,7 @@ function AbilityService.DashAs(model: Model, direction: Vector3, echo: boolean?)
 		kit = model:GetAttribute("KitId") or "",
 		ability = "Dash",
 		phase = "Start",
-		castId = 0,
+		castId = castId or 0,
 		t0 = t,
 		dir = dir,
 	})
@@ -770,13 +771,14 @@ local function onBlock(player: Player, isBlocking: any)
 	end
 end
 
-local function onDash(player: Player, direction: any)
+local function onDash(player: Player, direction: any, castId: any)
 	if not Net.Check.Vector3(direction) then
 		return
 	end
+	local id = if Net.Check.Number(castId, 0, 2 ^ 31) then math.floor(castId) else 0
 	local model = Validation.ModelOf(player)
 	if model then
-		AbilityService.DashAs(model, direction, true)
+		AbilityService.DashAs(model, direction, true, id)
 	end
 end
 

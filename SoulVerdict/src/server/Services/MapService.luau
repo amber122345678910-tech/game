@@ -14,8 +14,12 @@
 --   Current() -> MapInfo?           Lobby() -> MapInfo?            CurrentId() -> string?
 --   Unload()                        RandomOptions(n) -> {string}  (distinct ids from Registry.Playable())
 --   Loaded: Signal(mapInfo), Unloaded: Signal(mapId)
+-- Studio: every build prints its cost once ("[MapService] Arena SnowdinCrossroads: 5454 parts, 30 lights, built in
+-- 0.21 s"); maps are built synchronously (Build functions are Lune-safe and never yield), so a slow map shows up
+-- here first (docs/STUDIO_REVIEW.md, performance notes).
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Registry = require(Shared:WaitForChild("Maps"):WaitForChild("Registry")) :: any
@@ -220,13 +224,47 @@ local function buildWithFallback(mapId: string): (any, string)
 	return emergencyMap(mapId), mapId
 end
 
-local function place(info: any, origin: Vector3, name: string): any
+-- One Output line per map build in Studio (cost of the synchronous build + placement).
+local function report(name: string, info: any, startedAt: number)
+	if not RunService:IsStudio() then
+		return
+	end
+	local model = info.Model
+	local parts = model:GetAttribute("PartCount")
+	local lights = model:GetAttribute("LightCount")
+	if type(parts) ~= "number" then
+		parts = 0
+		for _, d in model:GetDescendants() do
+			if d:IsA("BasePart") then
+				parts += 1
+			end
+		end
+	end
+	local seconds = os.clock() - startedAt
+	local line = ("[MapService] %s %s: %d parts, %s lights, built + placed in %.2f s"):format(
+		name,
+		tostring(info.Id),
+		parts,
+		if type(lights) == "number" then tostring(lights) else "?",
+		seconds
+	)
+	if seconds > 0.5 then
+		warn(line .. " (slow: consider fewer parts or streaming)")
+	else
+		print(line)
+	end
+end
+
+local function place(info: any, origin: Vector3, name: string, startedAt: number?): any
 	local model: Model = info.Model
 	model:PivotTo(CFrame.new(origin) * model:GetPivot())
 	model.Name = name
 	model:SetAttribute("MapId", info.Id)
 	local world = translate(info, origin)
 	model.Parent = workspace
+	if startedAt then
+		pcall(report, name, info, startedAt)
+	end
 	return world
 end
 
@@ -235,9 +273,10 @@ function MapService.LoadLobby(): any
 		return lobby
 	end
 	local id = Registry.LobbyId()
+	local startedAt = os.clock()
 	local info, usedId = buildWithFallback(id)
 	info.Id = usedId
-	lobby = place(info, Registry.LobbyOrigin, "Lobby")
+	lobby = place(info, Registry.LobbyOrigin, "Lobby", startedAt)
 	setState("LobbyPreset", lobby.Preset)
 	if current == nil then
 		setState("GraphicsPreset", lobby.Preset)
@@ -265,9 +304,10 @@ function MapService.Load(mapId: string): any
 	if current then
 		MapService.Unload()
 	end
+	local startedAt = os.clock()
 	local info, usedId = buildWithFallback(if type(mapId) == "string" then mapId else "TestArena")
 	info.Id = usedId
-	current = place(info, Registry.ArenaOrigin, "Arena")
+	current = place(info, Registry.ArenaOrigin, "Arena", startedAt)
 	setState("GraphicsPreset", current.Preset)
 	setState("FinalPreset", current.FinalPreset)
 	setState("MapId", current.Id)

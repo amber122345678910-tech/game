@@ -151,4 +151,22 @@ return {
 	},
 	["hud.death.by"] = { en = "Judged by {1}", ru = "Осуждён: {1}" },
 	["hud.death.spectate"] = { en = "Spectating in {1}...", ru = "Наблюдение через {1}..." },
+
+	-- nameplates: an invisible ally's faded plate
+	["hud.plate.hidden"] = { en = "hidden", ru = "невидим" },
+
+	-- emote wheel (Hud/EmoteWheel) + EmoteService refusal toast
+	["hud.emote.title"] = { en = "EMOTES", ru = "ЭМОЦИИ" },
+	["hud.emote.button"] = { en = "EMOTE", ru = "ЭМОЦИЯ" },
+	["hud.emote.Emote_Wave"] = { en = "Wave", ru = "Помахать" },
+	["hud.emote.Emote_Shrug"] = { en = "Shrug", ru = "Пожать плечами" },
+	["hud.emote.Emote_Sit"] = { en = "Sit", ru = "Сесть" },
+	["hud.emote.Emote_Laugh"] = { en = "Laugh", ru = "Смех" },
+	["hud.emote.Taunt"] = { en = "Taunt", ru = "Дразнить" },
+	["hud.emote.Victory"] = { en = "Cheer", ru = "Ликовать" },
+	["hud.emote.Wink"] = { en = "Wink", ru = "Подмигнуть" },
+	["hud.emote.hint.KeyboardMouse"] = { en = "Click or 1-{1}  ·  {2} / Esc to close", ru = "Клик или 1-{1}  ·  {2} / Esc — закрыть" },
+	["hud.emote.hint.Gamepad"] = { en = "Right stick + {1} to play  ·  B to close", ru = "Правый стик + {1}  ·  B — закрыть" },
+	["hud.emote.hint.Touch"] = { en = "Tap an emote", ru = "Нажми на эмоцию" },
+	["hud.emote.busy"] = { en = "You can't emote right now", ru = "Сейчас нельзя использовать эмоцию" },
 }

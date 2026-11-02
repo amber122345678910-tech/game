@@ -5,13 +5,19 @@
 -- state: cooldowns, hold charge, M1 combo, ammo/reload mirror (kits whose M1 has Numbers.Ammo, e.g. Justice).
 --
 -- Input (InputController.Action): action name == kit slot ("M1","Q","E","R","T","G","Shift"; ult = G for monsters,
--- R for humans, straight from kit data). Casting rules by AbilityDef:
+-- R for humans, straight from kit data). Casting rules by AbilityDef (CombatController.CastMode, pure):
 --   Hold = {MaxTime}          charge 0..1 while held (kit Indicator or a generic one), cast on release
---   Aim Ground/Target/Ally    aim indicator while held, cast on release (QuickCast setting = cast on press)
---   Aim Direction/Self        cast on press; M1 repeats while held (combo)
+--   QuickCast setting ON (default, Config.Defaults.QuickCast): everything else casts on press; M1 repeats while held
+--   QuickCast OFF ("hold to aim"): Direction / Ground / Target / Ally abilities (and Self ones whose kit defines an
+--     Indicator) show the kit Indicator - else a generic one: direction arrow lane, ground circle, target ring -
+--     while held and cast on release. M1 and Self abilities without an indicator still cast on press.
+--   Escape / right-click / a forced release (Roblox menu, focus loss: InputController.Cancelled) cancels a held aim
+--   or charge without casting.
+-- Soft targets never include Invisible enemies (attribute Invisible / active Status_Invisible).
 -- Payload (pure, BuildPayload): Direction -> camera aim point clamped to Range; Ground -> ground under the clamped
 -- point; Target/Ally -> soft target nearest to the aim ray (SelectTarget, within Range and an aim cone; Ally falls
--- back to self); Self -> own position. castId increments per cast.
+-- back to self); Self -> own position. castId increments per cast (dashes take one too: MovementController plays
+-- the Dash clip at once and AnimController skips the server echo of that castId).
 -- Prediction: local cooldown (rolled back when the server answers "Cooldown" with an earlier end, or when no answer
 -- arrives), cast clip via FxController.PlayCastClip (combo variant) + FxController.MarkPredicted + kit Predict.
 -- Suppressed while: InputController.CombatEnabled() is false, Dead, Downed, Stunned, Boxed (status or SoulMode),
@@ -30,7 +36,8 @@
 --        kinds: "Cooldown" | "NoTarget" | "NoUlt" | "Suppressed" | "NoAmmo" | "NoCharges" | "Rejected"
 -- Pure helpers (Lune-tested): BuildPayload(ability, ctx) -> CastPayload,
 --   SelectTarget(rayOrigin, rayDir, from, candidates {{Model, Pos}}, maxRange, maxAngleDeg) -> Model?,
---   ChargeOf(heldSeconds, maxTime) -> 0..1, AmmoAbility(kit) -> AbilityDef?, FlatDir(v, fallback) -> Vector3
+--   ChargeOf(heldSeconds, maxTime) -> 0..1, AmmoAbility(kit) -> AbilityDef?, FlatDir(v, fallback) -> Vector3,
+--   CastMode(ability, quickCast, hasKitIndicator) -> "Charge"|"Aim"|"Press", IsHidden(model, now) -> boolean
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Players = game:GetService("Players")
@@ -55,13 +62,14 @@ CombatController.ComboChanged = Signal.new()
 CombatController.AmmoChanged = Signal.new()
 CombatController.Casted = Signal.new()
 CombatController.Feedback = Signal.new()
-CombatController.QuickCast = false
+CombatController.QuickCast = true -- StateController setting "QuickCast" (Config.Defaults.QuickCast)
 
 type Map = { [string]: any }
 
 local VERDICT_ID = "VerdictBox"
 local PENDING_TIMEOUT = 1.6
 local TARGET_CONE = 22 -- degrees around the aim ray for soft targeting
+local PARK = CFrame.new(0, 25000, 0)
 
 ---------------------------------------------------------------------------------------------------
 -- Pure helpers
@@ -80,6 +88,32 @@ function CombatController.ChargeOf(held: number, maxTime: number): number
 		return 1
 	end
 	return math.clamp(held / maxTime, 0, 1)
+end
+
+local AIMED = { Direction = true, Ground = true, Target = true, Ally = true }
+
+-- How pressing an ability behaves: "Charge" (Hold: charge while held, cast on release), "Aim" (indicator while
+-- held, cast on release) or "Press" (cast at once).
+function CombatController.CastMode(ability: Map, quickCast: boolean, hasKitIndicator: boolean?): string
+	if type(ability.Hold) == "table" then
+		return "Charge"
+	end
+	if quickCast or ability.Slot == "M1" then
+		return "Press"
+	end
+	if AIMED[ability.Aim] or hasKitIndicator == true then
+		return "Aim"
+	end
+	return "Press"
+end
+
+-- Invisible characters (Patience stealth, Eclipse VoidStep): the attribute, or a Status_Invisible end time ahead.
+function CombatController.IsHidden(model: Instance, t: number): boolean
+	if model:GetAttribute("Invisible") == true then
+		return true
+	end
+	local endsAt = model:GetAttribute("Status_Invisible")
+	return type(endsAt) == "number" and endsAt > t
 end
 
 -- The M1 ability whose Numbers carry Ammo (ammo/reload mirror), if any.
@@ -403,13 +437,17 @@ local function groundAt(p: Vector3): Vector3?
 	return Lib.Ground(p + Vector3.new(0, 3, 0), 64)
 end
 
--- Living candidates for Target (enemies) / Ally (allies incl. self) abilities.
+-- Living candidates for Target (enemies) / Ally (allies incl. self) abilities. Invisible enemies are never offered.
 local function candidates(enemies: boolean): { { Model: Model, Pos: Vector3 } }
 	local me = localChar()
 	local out = {}
+	local t = now()
 	for _, m in Lib.Characters() do
 		if m:GetAttribute("Dead") ~= true and m.Parent ~= nil then
 			local ok = if enemies then Teams.AreEnemies(me, m) else Teams.AreAllies(me, m)
+			if ok and enemies and CombatController.IsHidden(m, t) then
+				ok = false
+			end
 			if ok and (enemies == false or m:GetAttribute("Downed") ~= true) then
 				local r = rootOf(m)
 				if r then
@@ -479,25 +517,50 @@ local function genericIndicator(ability: Map): Map?
 				ring:Destroy()
 			end,
 		}
-	elseif mode == "Direction" then
-		local len = math.min(if type(ability.Range) == "number" then ability.Range else 30, 60)
+	elseif mode == "Direction" or mode == "Self" then
+		-- direction arrow: a lane along the flat aim with a chevron head (Self: a short facing arrow)
+		local len = if mode == "Self"
+			then 6
+			else math.min(if type(ability.Range) == "number" then ability.Range else 30, 60)
 		local lane = Lib.Lane(CFrame.new(), len, 1.2, white, { Fill = 0.85, Edge = 0.12, Height = 0.12 })
+		local headL = Lib.Part("Block", Vector3.new(0.34, 0.14, 3), PARK, white, Enum.Material.Neon, 0.15)
+		local headR = Lib.Part("Block", Vector3.new(0.34, 0.14, 3), PARK, white, Enum.Material.Neon, 0.15)
 		return {
 			Update = function(_self: any, aim: Vector3, charge: number)
 				local root = rootOf(localChar())
 				if root then
 					local feet = root.Position - Vector3.new(0, 2.8, 0)
 					local dir = CombatController.FlatDir(aim - root.Position, root.CFrame.LookVector)
-					lane:SetCFrame(Lib.LookAlong(feet, dir))
-					lane:SetFill(charge)
+					local base = Lib.LookAlong(feet, dir)
+					lane:SetCFrame(base)
+					lane:SetFill(if mode == "Self" then 1 else charge)
+					local tip = base * CFrame.new(0, 0.12, -len - 0.6)
+					local pulse = 0.15 + 0.12 * math.sin(os.clock() * 8)
+					for side, part in { [-1] = headL, [1] = headR } do
+						-- each half of the chevron leans back from the tip at 40 degrees
+						part.CFrame = tip * CFrame.Angles(0, side * math.rad(40), 0) * CFrame.new(0, 0, 1.4)
+						part.Transparency = pulse
+					end
 				end
 			end,
 			Destroy = function(_self: any)
 				lane:Destroy()
+				Lib.Release(headL)
+				Lib.Release(headR)
 			end,
 		}
 	end
 	return nil
+end
+
+local function hasKitIndicator(ability: Map): boolean
+	local fx = controller("FxController")
+	local char = localChar()
+	if fx == nil or char == nil or type(fx.Kit) ~= "function" then
+		return false
+	end
+	local ok, kit = pcall(fx.Kit, char:GetAttribute("KitId"))
+	return ok and type(kit) == "table" and type(kit.Indicator) == "table" and type(kit.Indicator[ability.Id]) == "function"
 end
 
 local function makeIndicator(ability: Map): Map?
@@ -779,13 +842,15 @@ local function dash()
 		local _, d = aimRay()
 		dir = CombatController.FlatDir(d, root.CFrame.LookVector)
 	end
-	call("MovementController", "PredictDash", dir)
+	-- the dash gets a castId: MovementController plays our Dash clip now and AnimController skips the echo
+	local castId = nextCastId()
+	call("MovementController", "PredictDash", dir, castId)
 	local fx = controller("FxController")
 	if fx and type(fx.PlayDash) == "function" then
 		pcall(fx.PlayDash, char, dir, true)
 	end
-	Net.Client.Fire("Dash", dir)
-	CombatController.Casted:Fire("Dash", { dir = dir })
+	Net.Client.Fire("Dash", dir, castId)
+	CombatController.Casted:Fire("Dash", { dir = dir, castId = castId })
 end
 
 ---------------------------------------------------------------------------------------------------
@@ -807,7 +872,12 @@ local function beginAbility(ability: Map)
 	if aiming and aiming.Ability.Id ~= id then
 		cancelAim()
 	end
-	if type(ability.Hold) == "table" then
+	local castMode = CombatController.CastMode(
+		ability,
+		CombatController.QuickCast,
+		not CombatController.QuickCast and hasKitIndicator(ability)
+	)
+	if castMode ~= "Press" then
 		if not CombatController.IsReady(id) then
 			feedback("Cooldown", id)
 			return
@@ -819,17 +889,12 @@ local function beginAbility(ability: Map)
 				return
 			end
 		end
-		charging = { Ability = ability, Start = os.clock(), Indicator = makeIndicator(ability), Charge = 0 }
-		call("MovementController", "Facing", true, "CombatCharge")
-		return
-	end
-	local mode = ability.Aim
-	if (mode == "Ground" or mode == "Target" or mode == "Ally") and not CombatController.QuickCast then
-		if not CombatController.IsReady(id) then
-			feedback("Cooldown", id)
-			return
+		if castMode == "Charge" then
+			charging = { Ability = ability, Start = os.clock(), Indicator = makeIndicator(ability), Charge = 0 }
+			call("MovementController", "Facing", true, "CombatCharge")
+		else
+			aiming = { Ability = ability, Start = os.clock(), Indicator = makeIndicator(ability), Target = nil }
 		end
-		aiming = { Ability = ability, Start = os.clock(), Indicator = makeIndicator(ability), Target = nil }
 		return
 	end
 	cast(ability)
@@ -1099,6 +1164,16 @@ function CombatController.Start()
 				warn("[CombatController] input failed: " .. tostring(err))
 			end
 		end)
+		if input.Cancelled then
+			-- Escape / right-click / forced release: drop a held aim or charge without casting
+			input.Cancelled:Connect(function()
+				if aiming or charging then
+					cancelAim()
+					cancelCharge()
+					call("SoundController", "Play", "UiBack", nil, { Volume = 0.4 })
+				end
+			end)
+		end
 	else
 		warn("[CombatController] InputController missing: combat input disabled")
 	end
@@ -1123,12 +1198,13 @@ function CombatController.Start()
 	end
 	local state = controller("StateController")
 	if state and type(state.Setting) == "function" then
-		local ok, v = pcall(state.Setting, "QuickCast", false)
-		CombatController.QuickCast = ok and v == true
+		local ok, v = pcall(state.Setting, "QuickCast", true)
+		CombatController.QuickCast = not ok or v ~= false
 		if state.SettingChanged then
 			state.SettingChanged:Connect(function(key: string, value: any)
 				if key == "QuickCast" then
-					CombatController.QuickCast = value == true
+					CombatController.QuickCast = value ~= false
+					cancelAim() -- an aim begun under the old rule must not wait for a release
 				end
 			end)
 		end
