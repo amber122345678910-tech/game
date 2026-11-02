@@ -1,12 +1,13 @@
 --[[
-	THE STORY (7 chapters). Every line is written in Russian and English.
+	THE STORY (12 chapters). Every line is written in Russian and English.
 	  1  Good morning   - wake up, take the phone, go downstairs
 	  2  Breakfast      - Beth: "put the phone away!" -> choice -> the phone explodes
 	  3  Rick's garage  - Rick rebuilt Morty, but Rick is glitching
 	  4  Flight         - saucer out of the garage, warp, planet B137, landing
 	  5  Planet B137    - Rick tries to ditch Morty, something knocks him down, the curse
 	  6  The Titan      - old village, radar, Titan Speakerman 2.0 vs the entity, knock-back, drag
-	  7  The bunker     - planning how to reach Evil Morty. To be continued...
+	  7..12 live in StoryCurve: the bunker plan, the Curve Bell, Evil Morty, the hunt,
+	        the Alliance, the camera base, home (+ a scene after the credits)
 ]]
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -23,6 +24,7 @@ local Director = require(Game.Director)
 local Dialogue = require(Game.Dialogue)
 local Puppet = require(Game.Puppet)
 local Scenes = require(Game.Scenes)
+local StoryCurve = require(Game.StoryCurve)
 
 local Story = {}
 local rgb = Color3.fromRGB
@@ -314,7 +316,28 @@ do
 		Radar.sweep = sweep
 		Radar.blip = scope:FindFirstChild("Blip")
 	end
-	function Radar.show(on: boolean)
+	-- lines = { title, line1, line2, line3, line4 } (Lang keys); nil = the threat screen
+	function Radar.setLines(lines: { any }?)
+		if not Radar.gui then
+			build()
+		end
+		local l = lines or { "radar.title", "radar.threat", "radar.max", "radar.eta", "radar.days" }
+		local panel = Radar.panel
+		panel:FindFirstChild("Title").Text = Lang.t(l[1])
+		panel:FindFirstChild("Line1").Text = Lang.t(l[2])
+		panel:FindFirstChild("Line2").Text = Lang.t(l[3])
+		panel:FindFirstChild("Line3").Text = Lang.t(l[4])
+		panel:FindFirstChild("Line4").Text = Lang.t(l[5])
+	end
+	-- where the red dot is on the scope (0..1, 0..1)
+	function Radar.setBlip(x: number, y: number, visible: boolean?)
+		if not Radar.gui then
+			build()
+		end
+		Radar.blip.Position = UDim2.fromScale(x, y)
+		Radar.blip.Visible = visible ~= false
+	end
+	function Radar.show(on: boolean, lines: { any }?)
 		if not Radar.gui then
 			build()
 		end
@@ -323,11 +346,7 @@ do
 		local panel = Radar.panel
 		if on then
 			g.Enabled = true
-			panel:FindFirstChild("Title").Text = Lang.t("radar.title")
-			panel:FindFirstChild("Line1").Text = Lang.t("radar.threat")
-			panel:FindFirstChild("Line2").Text = Lang.t("radar.max")
-			panel:FindFirstChild("Line3").Text = Lang.t("radar.eta")
-			panel:FindFirstChild("Line4").Text = Lang.t("radar.days")
+			Radar.setLines(lines)
 			panel.Position = UDim2.new(1, -60, 0.42, 0)
 			UI.tween(panel, 0.5, { GroupTransparency = 0, Position = UDim2.new(1, -90, 0.42, 0) }, Enum.EasingStyle.Back)
 		else
@@ -1471,13 +1490,13 @@ CH[6] = function(c, fresh: boolean)
 	for i = 1, 5 do
 		if muzzle then
 			local origin = CFrame.lookAt(muzzle.Position, chest.Position)
-			Fx.sonicRing(origin, (chest.Position - muzzle.Position).Magnitude, 0.45, 9)
+			Fx.sonicRing(origin, (chest.Position - muzzle.Position).Magnitude, 0.45, 9, rgb(255, 90, 50))
 			play3D("SonicBoom", muzzle.Position, 1 + i * 0.05)
 		end
 		Director.shake(0.5, 0.3)
 		c.wait(0.45)
 		local hitPos = chest.Position + Vector3.new(math.random(-12, 12), math.random(-10, 10), -16)
-		Fx.explosion(hitPos, 3, { sound = "Explosion", smokeColor = rgb(14, 12, 16), waveColor = rgb(120, 220, 255) })
+		Fx.explosion(hitPos, 3, { sound = "Explosion", smokeColor = rgb(14, 12, 16), waveColor = rgb(255, 120, 80) })
 		entity:pose(ENTITY_POSES.hit, 10)
 		c.wait(0.2)
 	end
@@ -1492,7 +1511,7 @@ CH[6] = function(c, fresh: boolean)
 	task.spawn(animate, 0.4, function(a)
 		titan.root.CFrame = standRoot:Lerp(knock, a)
 	end, "out")
-	Fx.sparks(titan.root.Position + Vector3.new(0, 14, 0), 80, rgb(160, 230, 255))
+	Fx.sparks(titan.root.Position + Vector3.new(0, 14, 0), 80, rgb(255, 170, 120))
 	Fx.explosion(titan.root.Position + Vector3.new(0, 14, 6), 2, { sound = "MetalCrash", smokeColor = rgb(14, 12, 16) })
 	Director.shake(1.4, 0.8)
 	c.wait(1.0)
@@ -1509,13 +1528,13 @@ CH[6] = function(c, fresh: boolean)
 		for _, podName in { "PodL", "PodR" } do
 			local pod = titanPart(podName)
 			if pod then
-				Fx.sonicRing(CFrame.lookAt(pod.Position, chest.Position), (chest.Position - pod.Position).Magnitude, 0.5, 11)
+				Fx.sonicRing(CFrame.lookAt(pod.Position, chest.Position), (chest.Position - pod.Position).Magnitude, 0.5, 11, rgb(255, 90, 50))
 			end
 		end
 		play3D("SonicBoom", titan.root.Position + Vector3.new(0, 30, 0), 0.8)
 		Director.shake(0.6, 0.3)
 		c.wait(0.5)
-		Fx.explosion(chest.Position + Vector3.new(math.random(-14, 14), math.random(-8, 14), -14), 3.5, { sound = "Explosion", smokeColor = rgb(14, 12, 16), waveColor = rgb(120, 220, 255) })
+		Fx.explosion(chest.Position + Vector3.new(math.random(-14, 14), math.random(-8, 14), -14), 3.5, { sound = "Explosion", smokeColor = rgb(14, 12, 16), waveColor = rgb(255, 120, 80) })
 		bigBlackSmoke(chest.Position, 2)
 		local _ = i
 	end
@@ -1528,6 +1547,7 @@ CH[6] = function(c, fresh: boolean)
 	titan:pose(TITAN_POSES.charge, 6)
 	local core = titanPart("Core")
 	local coreLight = core and core:FindFirstChildOfClass("PointLight")
+	local coreSize = if core then core.Size else Vector3.one
 	play3D("ChargeLong", titan.root.Position, 0.9)
 	animate(2.4, function(a)
 		if coreLight then
@@ -1535,10 +1555,10 @@ CH[6] = function(c, fresh: boolean)
 			coreLight.Range = 40 + a * 20
 		end
 		if core then
-			core.Size = Vector3.new(4.4, 4.4, 2.6) * (1 + a * 0.5)
+			core.Size = coreSize * (1 + a * 0.5)
 		end
 		if math.random() < 0.3 and core then
-			Fx.sparks(core.Position, 6, rgb(170, 240, 255))
+			Fx.sparks(core.Position, 6, rgb(255, 170, 120))
 		end
 		Director.roll(math.sin(os.clock() * 30) * 0.004 * a)
 	end, "in")
@@ -1546,13 +1566,13 @@ CH[6] = function(c, fresh: boolean)
 	-- 6) FIRE
 	titan:pose(TITAN_POSES.fire, 12)
 	play3D("Laser", titan.root.Position + Vector3.new(0, 20, 0))
-	Fx.flash(rgb(170, 240, 255), 0.6, 0.05, 0.5)
-	local beam = Fx.beam(if core then core.Position else titan.root.Position, chest.Position, 9)
+	Fx.flash(rgb(255, 170, 140), 0.6, 0.05, 0.5)
+	local beam = Fx.beam(if core then core.Position else titan.root.Position, chest.Position, 9, rgb(255, 80, 40))
 	local firing = true
 	task.spawn(function()
 		while firing do
 			beam.Set(if core then core.Position else titan.root.Position, chest.Position)
-			Fx.sparks(chest.Position, 4, rgb(170, 240, 255))
+			Fx.sparks(chest.Position, 4, rgb(255, 170, 120))
 			RunService.RenderStepped:Wait()
 		end
 		beam.Destroy()
@@ -1569,7 +1589,7 @@ CH[6] = function(c, fresh: boolean)
 		coreLight.Range = 40
 	end
 	if core then
-		core.Size = Vector3.new(4.4, 4.4, 2.6)
+		core.Size = coreSize
 	end
 	entity:pose(ENTITY_POSES.hit, 8)
 	c.wait(1.0)
@@ -1660,126 +1680,6 @@ CH[6] = function(c, fresh: boolean)
 end
 
 ----------------------------------------------------------------------------
--- CHAPTER 7: The bunker
-----------------------------------------------------------------------------
-CH[7] = function(c, _fresh: boolean)
-	api.state("story")
-	api.gameplay(false)
-	Fx.black(1)
-	local rick = P.rick
-	local spots = R.bunkerSpots
-	holdCharacterAt(c, spots.MortySeat.CFrame)
-	Scenes.apply("Bunker", true)
-	Fx.muffle(false)
-	rick.follow = nil
-	rick:place(spots.RickSeat.CFrame)
-	rick:pose("sit", 10)
-	rick:snap()
-	rick.glitch = 0.25
-	local eye = spots.MortyEye.CFrame
-	rick:lookAt(eye.Position)
-	Director.start()
-	Director.cut(eye, 70)
-	Director.freeLook(true, { yaw = 1.4, pitchUp = 0.6, pitchDown = 0.9 })
-	-- the map shows the target in the right language
-	local map = R.bunkerRoom:FindFirstChild("BunkerTable") and R.bunkerRoom.BunkerTable:FindFirstChild("Map")
-	local label = map and map:FindFirstChild("TargetLabel", true) :: TextLabel?
-	if label then
-		label.Text = Lang.t("map.target")
-	end
-	Audio.music("MusicBunker", 4)
-	Fx.title("ch.7")
-	c.check()
-	Fx.fade(0, 1.6)
-	-- explosions up above
-	local lamp = R.bunkerRoom:FindFirstChild("HangingLamp")
-	local lampInit: { [BasePart]: CFrame } = {}
-	if lamp then
-		for _, d in lamp:GetDescendants() do
-			if d:IsA("BasePart") then
-				lampInit[d] = d.CFrame
-			end
-		end
-	end
-	local swing = 0
-	local pivot = if lamp then lamp:GetAttribute("Pivot") else nil
-	local dust = R.bunkerRoom:FindFirstChild("DustSource")
-	local emitter = dust and dust:FindFirstChildOfClass("ParticleEmitter")
-	local function boom(strength: number)
-		Audio.play("MuffledBoom", 0.8 + math.random() * 0.4)
-		Director.shake(0.5 * strength, 0.9)
-		swing += 0.18 * strength
-		if emitter then
-			emitter:Emit(math.floor(30 * strength))
-		end
-		Audio.play("DustFall", 1 + math.random() * 0.2)
-		Graphics.SetLight("BunkerLamp", false)
-		Graphics.SetLight("BunkerEmergency", true, { Brightness = 1.6 })
-		task.delay(0.08 + math.random() * 0.12, function()
-			Graphics.SetLight("BunkerLamp", true)
-		end)
-		task.delay(0.6, function()
-			Graphics.SetLight("BunkerEmergency", false)
-		end)
-	end
-	local bombing = true
-	task.spawn(function()
-		local t = 0
-		while bombing and c.alive() do
-			local dt = RunService.RenderStepped:Wait()
-			t += dt
-			swing *= math.exp(-dt * 0.5)
-			if pivot then
-				local a = math.sin(t * 2.2) * swing
-				hingeRotate(lampInit, pivot, CFrame.Angles(a, 0, a * 0.6))
-			end
-		end
-	end)
-	task.spawn(function()
-		while bombing and c.alive() do
-			task.wait(4 + math.random() * 3)
-			if bombing then
-				boom(1)
-			end
-		end
-	end)
-	c.wait(1)
-	c.say("Morty", { ru = "Рик... что это было? Тот робот... с колонкой вместо головы?", en = "Rick... what was that? That robot... with a speaker for a head?" })
-	c.say("Rick", { ru = "Титан Спикермен. Версия два-ноль. Если он здесь — дело дрянь.", en = "Titan Speakerman. Version two-point-oh. If he's here, things are bad." }, { glitch = 0.2 })
-	c.say("Rick", { ru = "А та штука в дыму... Морти, проклятие — это не просто неудача. За ним кто-то стоит.", en = "And that thing in the smoke... Morty, the curse isn't just bad luck. Someone's behind it." }, { glitch = 0.3 })
-	-- Rick points at the map
-	rick:pose({
-		["Right Hip"] = Puppet.R6.leg(1, 1.57),
-		["Left Hip"] = Puppet.R6.leg(-1, 1.57),
-		["Right Shoulder"] = Puppet.R6.arm(1, 1.3, 0.1),
-		RootJoint = Puppet.R6.root(0.25),
-	}, 8)
-	Director.freeLook(false)
-	if map then
-		local mapPos = (map :: BasePart).Position
-		Director.move(CFrame.lookAt(eye.Position, mapPos), 1.0)
-	end
-	c.say("Rick", { ru = "Злой Морти.", en = "Evil Morty." }, { glitch = 0.15 })
-	boom(1.6)
-	c.say("Morty", { ru = "Злой Морти?! Но как нам до него добраться?", en = "Evil Morty?! How do we even get to him?" })
-	rick:pose("sit", 8)
-	Director.move(eye, 1.0)
-	Director.freeLook(true)
-	c.say("Rick", { ru = "Вот это, Морти, и есть вопрос на миллион шмекелей.", en = "That, Morty, is the million-schmeckle question." }, { glitch = 0.2 })
-	Dialogue.hide()
-	boom(2.2)
-	c.wait(1.2)
-	Fx.letterbox(true, 1.5)
-	c.wait(1.6)
-	Fx.title("tbc")
-	c.wait(0.6)
-	bombing = false
-	Fx.fade(1, 1.2, true)
-	Audio.music(nil, 2)
-	api.toMenu()
-end
-
-----------------------------------------------------------------------------
 -- public
 ----------------------------------------------------------------------------
 function Story.init(a)
@@ -1836,11 +1736,50 @@ function Story.init(a)
 	familyAtBreakfast()
 	P.rick:pose("stand")
 
+	-- chapters 7-12 get the same tools
+	StoryCurve.init({
+		CH = CH,
+		R = R,
+		P = P,
+		init = init,
+		loops = loops,
+		api = function()
+			return api
+		end,
+		camera = camera,
+		loopSound = loopSound,
+		stopLoop = stopLoop,
+		play3D = play3D,
+		eyeFromHead = eyeFromHead,
+		bezier = bezier,
+		setParts = setParts,
+		emitters = emitters,
+		hingeRotate = hingeRotate,
+		animate = animate,
+		VM = VM,
+		Radar = Radar,
+		setDoor = setDoor,
+		setGarageDoor = setGarageDoor,
+		setPhoneOnNightstand = setPhoneOnNightstand,
+		saucerTo = saucerTo,
+		saucerThrust = saucerThrust,
+		ensureDesert = ensureDesert,
+		holdCharacterAt = holdCharacterAt,
+		giveControl = giveControl,
+		TITAN_POSES = TITAN_POSES,
+		ENTITY_POSES = ENTITY_POSES,
+		titanPart = titanPart,
+		titanJets = titanJets,
+		entityCloud = entityCloud,
+		bigBlackSmoke = bigBlackSmoke,
+	})
+
 	-- puppets talk when their line is on screen
 	Dialogue.setSpeakerCallback(function(who)
 		for name, p in { Rick = P.rick, Beth = P.beth, Jerry = P.jerry, Summer = P.summer } do
 			p.talking = (who == name)
 		end
+		StoryCurve.onSpeaker(who)
 	end)
 end
 
@@ -1851,7 +1790,7 @@ function Story.run(a, chapter: number)
 	local c = makeCtx(id)
 	task.spawn(function()
 		local ok, err = pcall(function()
-			for ch = chapter, 7 do
+			for ch = chapter, #CH do
 				c.check()
 				CH[ch](c, ch == chapter)
 			end
@@ -1932,6 +1871,7 @@ function Story.reset(_a)
 		Graphics.SetLight(lightName, false)
 	end
 	Scenes.setSpaceVisible(false)
+	StoryCurve.reset()
 	api.hideCharacter(true)
 end
 

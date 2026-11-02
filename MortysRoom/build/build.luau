@@ -11,9 +11,10 @@ local Characters = require("./Characters")
 local Garage = require("./Garage")
 local Planet = require("./Planet")
 local Titan = require("./Titan")
+local Worlds = require("./Worlds")
 local Character = require("./Character")
 
-local Instance, Enum, rgb = U.Instance, U.Enum, U.rgb
+local Instance, Enum, rgb, CFrame = U.Instance, U.Enum, U.rgb, U.CFrame
 
 local ROOT = process.cwd
 if string.sub(ROOT, -1) ~= "/" then
@@ -53,10 +54,14 @@ pcall(function()
 end)
 local house = Room.build(workspace)
 House.build(house)
-Characters.buildAll(workspace, house:FindFirstChild("Seats"))
+local cast = Characters.buildAll(workspace, house:FindFirstChild("Seats"))
 Garage.build(workspace)
 local planet = Planet.build(workspace)
-Titan.build(planet)
+Titan.build(planet, workspace)
+Worlds.build(workspace, planet, Planet.VILLAGE + U.v(-70, 0, 40))
+-- Evil Morty and Rick Prime wait far below until their scenes
+Characters.build(cast, Characters.Specs.EvilMorty, CFrame.new(-6000, -600, -6000))
+Characters.build(cast, Characters.Specs.RickPrime, CFrame.new(-6020, -600, -6000))
 
 -- Lighting (Future = real shadows from every lamp) -------------------------------
 lighting.Technology = Enum.Technology.Future
@@ -150,9 +155,14 @@ Character.build(starterPlayer, read("StarterCharacter/Animate.client.luau"))
 local gameFolder = Instance.new("Folder")
 gameFolder.Name = "Game"
 gameFolder.Parent = replicated
-for _, name in { "Config", "UI", "Widgets", "Settings", "Audio", "Graphics", "MenuController", "Lang", "Dialogue", "Director", "Fx", "Puppet", "Scenes", "Story" } do
+for _, name in { "Config", "UI", "Widgets", "Settings", "Audio", "Graphics", "MenuController", "Lang", "Dialogue", "Director", "Fx", "Puppet", "Scenes", "Story", "StoryCurve" } do
 	script("ModuleScript", name, read("ReplicatedStorage/" .. name .. ".luau"), gameFolder)
 end
+-- crowds the client clones: Cameramen, Speakermen, TV Men, Skibidi toilets
+local templates = Instance.new("Folder")
+templates.Name = "Templates"
+templates.Parent = gameFolder
+Characters.buildTemplates(templates)
 local stylesFolder = Instance.new("Folder")
 stylesFolder.Name = "MenuStyles"
 stylesFolder.Parent = gameFolder

@@ -31,6 +31,11 @@ local flat = {
 	{ VILLAGE, 95 },
 	{ VILLAGE + Vector3.new(120, 0, -120), 70 },
 	{ VILLAGE + Vector3.new(60, 0, -60), 50 },
+	-- the corridor north of the bunker hatch (chase + the Alliance army)
+	{ Vector3.new(6080, 0, 20), 50 },
+	{ Vector3.new(6080, 0, 90), 58 },
+	{ Vector3.new(6080, 0, 170), 60 },
+	{ Vector3.new(6080, 0, 250), 55 },
 }
 local function isFlat(p: Vector3, r: number): boolean
 	for _, z in flat do

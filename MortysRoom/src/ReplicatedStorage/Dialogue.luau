@@ -18,6 +18,14 @@ local SPEAKERS = {
 	Jerry = { color = rgb(136, 204, 104), pitch = 0.95 },
 	Summer = { color = rgb(255, 150, 92), pitch = 1.4 },
 	Unknown = { color = rgb(200, 120, 255), pitch = 0.6 },
+	Titan = { color = rgb(255, 70, 40), pitch = 0.45 },
+	EvilMorty = { color = rgb(168, 160, 255), pitch = 1.18 },
+	Cam = { color = rgb(196, 200, 210), pitch = 1.0 },
+	Lens = { color = rgb(150, 205, 255), pitch = 1.12 },
+	Commander = { color = rgb(255, 205, 110), pitch = 0.82 },
+	Agent = { color = rgb(180, 184, 196), pitch = 0.9 },
+	RickPrime = { color = rgb(140, 175, 200), pitch = 0.66 },
+	Cow = { color = rgb(240, 240, 236), pitch = 0.5 },
 }
 
 local gui: ScreenGui? = nil

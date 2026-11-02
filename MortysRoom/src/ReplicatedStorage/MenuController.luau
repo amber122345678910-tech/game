@@ -334,6 +334,11 @@ MenuController.ChapterNames = {
 	"5. Planet B137",
 	"6. The Titan",
 	"7. The bunker",
+	"8. The Curve Bell",
+	"9. The hunt",
+	"10. The Alliance",
+	"11. The camera base",
+	"12. Home",
 }
 
 function MenuController:_buildChapters()

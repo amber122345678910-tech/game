@@ -162,6 +162,35 @@ function Fx.title(key: string)
 	task.wait(0.9)
 end
 
+-- small location caption in the lower left (does not yield)
+local captionLabel: TextLabel? = nil
+function Fx.caption(key: any)
+	build()
+	if not captionLabel then
+		captionLabel = UI.label({
+			Name = "Caption",
+			Font = Enum.Font.GothamBold,
+			TextSize = 26,
+			TextColor3 = Color3.new(1, 1, 1),
+			TextTransparency = 1,
+			AnchorPoint = Vector2.new(0, 1),
+			Position = UDim2.new(0, 70, 1, -250),
+			Size = UDim2.fromOffset(1000, 40),
+			ZIndex = 11,
+			Parent = canvas,
+		}, { UI.stroke(1.5, Color3.new(0, 0, 0), 0.4) })
+	end
+	local l = captionLabel :: TextLabel
+	l.Text = Lang.t(key)
+	l.Position = UDim2.new(0, 50, 1, -250)
+	UI.tween(l, 0.8, { TextTransparency = 0, Position = UDim2.new(0, 70, 1, -250) }, Enum.EasingStyle.Quint)
+	task.delay(4, function()
+		if l.Text == Lang.t(key) then
+			UI.tween(l, 1.2, { TextTransparency = 1 })
+		end
+	end)
+end
+
 function Fx.heat(alpha: number, t: number?)
 	build()
 	heatFrame.Visible = alpha > 0
@@ -538,6 +567,179 @@ function Fx.beam(from: Vector3, to: Vector3, width: number, color: Color3?)
 	end
 	handle.Set(from, to)
 	return handle
+end
+
+-- a swirling portal disc facing cf.LookVector; returns a handle {part, Close(), Move(cf)}
+local PORTAL_COLORS = {
+	green = { rgb(70, 230, 90), rgb(190, 255, 160), rgb(40, 140, 50) },
+	red = { rgb(255, 50, 30), rgb(255, 170, 120), rgb(140, 20, 10) },
+	white = { rgb(220, 235, 255), rgb(255, 255, 255), rgb(150, 170, 200) },
+}
+function Fx.portal(cf: CFrame, kind: string?, diameter: number?, silent: boolean?)
+	local cols = PORTAL_COLORS[kind or "green"] or PORTAL_COLORS.green
+	local d = diameter or 9
+	local axis = CFrame.Angles(0, math.rad(90), 0) -- cylinder axis (X) along the look vector
+	local base = cf
+	local outer = fxPart({ Shape = Enum.PartType.Cylinder, Material = Enum.Material.Neon, Color = cols[1], Transparency = 0.05, Size = Vector3.new(0.3, 0.2, 0.2), CFrame = base * axis })
+	local inner = fxPart({ Shape = Enum.PartType.Cylinder, Material = Enum.Material.Neon, Color = cols[2], Transparency = 0.1, Size = Vector3.new(0.34, 0.2, 0.2), CFrame = base * axis })
+	local swirl = fxPart({ Shape = Enum.PartType.Cylinder, Material = Enum.Material.ForceField, Color = cols[3], Size = Vector3.new(0.4, 0.2, 0.2), CFrame = base * axis })
+	local rim = fxPart({ Shape = Enum.PartType.Cylinder, Material = Enum.Material.ForceField, Color = cols[1], Size = Vector3.new(0.5, 0.2, 0.2), CFrame = base * axis })
+	local light = Instance.new("PointLight")
+	light.Range = d * 3
+	light.Brightness = 3
+	light.Color = cols[1]
+	light.Parent = inner
+	local pe = Instance.new("ParticleEmitter")
+	pe.Texture = SPARK
+	pe.Color = ColorSequence.new(cols[2], cols[1])
+	pe.LightEmission = 1
+	pe.Size = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.5), NumberSequenceKeypoint.new(1, 0) })
+	pe.Lifetime = NumberRange.new(0.6, 1.2)
+	pe.Speed = NumberRange.new(2, 6)
+	pe.SpreadAngle = Vector2.new(180, 180)
+	pe.Rate = 40
+	pe.Parent = outer
+	local hum: Sound? = nil
+	if not silent then
+		local s = Audio.make("Portal", outer)
+		if s then
+			s:Play()
+		end
+		hum = Audio.make("PortalHum", outer)
+		if hum then
+			hum.Looped = true
+			hum.Volume = 0.35
+			hum:Play()
+		end
+	end
+	local size = 0
+	local target = d
+	local spin = 0
+	local alive = true
+	local conn
+	conn = RunService.RenderStepped:Connect(function(dt)
+		size += (target - size) * math.min(1, dt * 10)
+		spin += dt * 2.4
+		local wob = 1 + math.sin(os.clock() * 6) * 0.03
+		outer.Size = Vector3.new(0.3, size * wob, size * wob)
+		inner.Size = Vector3.new(0.34, size * 0.72, size * 0.72)
+		swirl.Size = Vector3.new(0.4, size * 0.9, size * 0.9)
+		rim.Size = Vector3.new(0.5, size * 1.08, size * 1.08)
+		outer.CFrame = base * axis
+		inner.CFrame = base * CFrame.new(0, 0, -0.02) * axis
+		swirl.CFrame = base * CFrame.new(0, 0, -0.04) * CFrame.Angles(0, 0, spin) * axis
+		rim.CFrame = base * CFrame.Angles(0, 0, -spin * 0.6) * axis
+		if not alive and size < 0.3 then
+			conn:Disconnect()
+			outer:Destroy()
+			inner:Destroy()
+			swirl:Destroy()
+			rim:Destroy()
+		end
+	end)
+	local handle = { part = outer }
+	function handle.Move(newCF: CFrame)
+		base = newCF
+	end
+	function handle.Close()
+		if not alive then
+			return
+		end
+		alive = false
+		target = 0
+		pe.Enabled = false
+		if hum then
+			Audio.fadeOut(hum, 0.3, true)
+		end
+		if not silent then
+			local holder = fxPart({ Transparency = 1, Size = Vector3.new(1, 1, 1), CFrame = base })
+			local s = Audio.make("Whoosh", holder)
+			if s then
+				s:Play()
+			end
+			task.delay(3, function()
+				holder:Destroy()
+			end)
+		end
+	end
+	return handle
+end
+
+-- full screen "YOU DIED"
+local deathGui: ScreenGui? = nil
+function Fx.death(on: boolean)
+	build()
+	if not deathGui then
+		local g = UI.new("ScreenGui", { Name = "Death", ResetOnSpawn = false, IgnoreGuiInset = true, DisplayOrder = 70, Enabled = false, Parent = gui.Parent })
+		local c = UI.canvas(g)
+		local group = UI.new("CanvasGroup", { Name = "Group", BackgroundColor3 = rgb(20, 0, 0), BackgroundTransparency = 0.2, Size = UDim2.fromScale(1, 1), GroupTransparency = 1, Parent = c })
+		UI.new("Frame", { BackgroundColor3 = rgb(0, 0, 0), BorderSizePixel = 0, Size = UDim2.fromScale(1, 1), Parent = group }, { UI.gradient(nil, { 1, 0.6, 0 }, 90) })
+		UI.label({
+			Name = "Big",
+			Font = Enum.Font.Bangers,
+			TextSize = 120,
+			TextColor3 = rgb(220, 30, 24),
+			TextXAlignment = Enum.TextXAlignment.Center,
+			AnchorPoint = Vector2.new(0.5, 0.5),
+			Position = UDim2.fromScale(0.5, 0.46),
+			Size = UDim2.fromOffset(1600, 150),
+			Parent = group,
+		})
+		UI.label({
+			Name = "Small",
+			Font = Enum.Font.GothamMedium,
+			TextSize = 24,
+			TextColor3 = rgb(240, 200, 190),
+			TextXAlignment = Enum.TextXAlignment.Center,
+			AnchorPoint = Vector2.new(0.5, 0.5),
+			Position = UDim2.fromScale(0.5, 0.58),
+			Size = UDim2.fromOffset(1400, 40),
+			Parent = group,
+		})
+		deathGui = g
+	end
+	local g = deathGui :: ScreenGui
+	local group = g:FindFirstChild("Group", true) :: CanvasGroup
+	if on then
+		(group:FindFirstChild("Big") :: TextLabel).Text = Lang.t("death.big");
+		(group:FindFirstChild("Small") :: TextLabel).Text = Lang.t("death.small")
+		g.Enabled = true
+		group.GroupTransparency = 1
+		UI.tween(group, 1.2, { GroupTransparency = 0 }, Enum.EasingStyle.Sine)
+	else
+		UI.tween(group, 0.8, { GroupTransparency = 1 }, Enum.EasingStyle.Sine)
+		task.delay(0.85, function()
+			if group.GroupTransparency > 0.99 then
+				g.Enabled = false
+			end
+		end)
+	end
+end
+
+-- end credits (yields until done)
+function Fx.credits(lines: { any })
+	build()
+	local g = UI.new("ScreenGui", { Name = "Credits", ResetOnSpawn = false, IgnoreGuiInset = true, DisplayOrder = 65, Parent = gui.Parent })
+	local c = UI.canvas(g)
+	local holder = UI.new("Frame", { BackgroundTransparency = 1, AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 1, 40), Size = UDim2.fromOffset(1200, #lines * 64), Parent = c })
+	for i, line in lines do
+		local big = type(line) == "table" and line.big
+		UI.label({
+			Text = Lang.t(if type(line) == "table" and line.text then line.text else line),
+			Font = if big then Enum.Font.GothamBlack else Enum.Font.GothamMedium,
+			TextSize = if big then 44 else 26,
+			TextColor3 = if big then rgb(250, 222, 70) else rgb(235, 235, 235),
+			TextXAlignment = Enum.TextXAlignment.Center,
+			Position = UDim2.fromOffset(0, (i - 1) * 64),
+			Size = UDim2.new(1, 0, 0, 60),
+			Parent = holder,
+		})
+	end
+	local total = #lines * 64 + 1100
+	local dur = total / 75
+	UI.tween(holder, dur, { Position = UDim2.new(0.5, 0, 1, -total) }, Enum.EasingStyle.Linear)
+	task.wait(dur)
+	g:Destroy()
 end
 
 -- a big dark part flash (used for the curse hand blur)
