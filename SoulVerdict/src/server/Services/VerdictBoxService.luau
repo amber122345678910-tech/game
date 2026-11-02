@@ -2,8 +2,8 @@
 -- VerdictBoxService (P35): the server side of the Verdict Box (SPEC §1.2, §4, §11, §17).
 -- AbilityService routes the monster's pseudo-cast "VerdictBox" (slot F; it already checked cooldown, range, cone and
 -- line of sight with the cast's aim) to Start(monster, victim). This service re-validates defensively (teams, both up,
--- victim not Downed/Boxed, one box per monster and per victim, range + slack, line of sight, not in the Ending phase),
--- then:
+-- victim not Downed/Boxed/Invisible, one box per monster and per victim, range + slack, line of sight, not in the
+-- Ending phase), then:
 --   * victim: Status Boxed + Invulnerable for the duration (+0.25 s): StatusService zeroes WalkSpeed/JumpPower,
 --     sets SoulMode = "Boxed" and blocks every damage kind except "Box";
 --   * spawns Props.VerdictBox3D anchored Config.VerdictBox.Height above the victim (screen facing the monster) in
@@ -119,6 +119,7 @@ export type PairInfo = {
 	team: string,
 	up: boolean,
 	boxed: boolean?,
+	invisible: boolean?, -- victim only: Invisible humans (Patience stealth) cannot be boxed
 	pos: Vector3?,
 	look: Vector3?, -- monster only: when given, the cone is checked too
 }
@@ -140,6 +141,9 @@ function Rules.CheckPair(m: PairInfo, v: PairInfo, los: boolean, c: any?): (bool
 	end
 	if v.boxed then
 		return false, "boxed"
+	end
+	if v.invisible then
+		return false, "invisible"
 	end
 	if m.pos == nil or v.pos == nil then
 		return false, "nopos"
@@ -488,6 +492,7 @@ function VerdictBoxService.Open(monster: Model, victim: Model): boolean
 		team = Validation.Team(victim),
 		up = Validation.IsUp(victim),
 		boxed = StatusService.Has(victim, "Boxed"),
+		invisible = victim:GetAttribute("Invisible") == true or StatusService.Has(victim, "Invisible"),
 		pos = vPos,
 	}, mPos ~= nil and vPos ~= nil and Validation.LineOfSight(mPos, vPos))
 	if not ok then

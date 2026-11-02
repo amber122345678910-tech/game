@@ -6,15 +6,16 @@
 --   (0.08 s latency tolerance), Ult >= 100 for ultimates (set to 0), Hold charge clamped to the time the
 --   ability has been ready (ClampCharge vs Hold.MaxTime), aim clamped to Range + Config.Combat.AimSlack
 --   (MaxAimRange for range-less abilities), Aim "Target"/"Ally" target checks (living enemy/ally within
---   range + slack, roughly in front; "Target" falls back to the nearest enemy in a cone, "Ally" to self),
+--   range + slack, roughly in front, enemies not Invisible; "Target" falls back to the nearest visible enemy in a
+--   cone, "Ally" to self),
 --   M1 combos (ComboIndex 1..Combo while casts follow within Numbers.ComboWindow)). Then: cooldown set
 --   (Net "Cooldown" to the caster + model attribute "Cooldown_<abilityId>" = endsAt for spectator/Studious
 --   UI), AbilityFx {phase = "Start"} to everyone, Casted signal, and the kit handler
 --   ServerKits[kitId].Abilities[abilityId](ctx) in its own thread (xpcall). A rejected cast answers the
 --   caster with "Cooldown"(abilityId, realEndsAt) so a predicted client cooldown can roll back.
 -- Missing handler: M1 abilities with Numbers.Damage1 fall back to Kits/Common.ComboStrike; others warn once.
--- Pseudo-ability "VerdictBox" (monsters, slot F): Config.VerdictBox cooldown/range/cone + line of sight ->
---   VerdictBoxService.Start(monster, target) (if that service exists).
+-- Pseudo-ability "VerdictBox" (monsters, slot F): Config.VerdictBox cooldown/range/cone + line of sight, never an
+--   Invisible human -> VerdictBoxService.Start(monster, target) (if that service exists).
 -- Net "Block" (isBlocking): humans only; sets attributes Blocking and BlockStart (server time; 0 = this
 --   block cannot parry because the previous block ended < PARRY_RETRY s ago — anti parry-spam).
 -- Net "Dash" (direction): humans only; needs DashCharges >= 1; grants IFrames Config.Human.DashIFrames and
@@ -298,6 +299,11 @@ local function inFront(origin: Vector3, dir: Vector3, pos: Vector3, minDot: numb
 	return to:Dot(Validation.FlatUnit(dir, to)) >= minDot
 end
 
+-- Invisible (Patience stealth, Eclipse VoidStep): the attribute, or a Status_Invisible the server still holds.
+local function isInvisible(model: Model): boolean
+	return model:GetAttribute("Invisible") == true or StatusService.Has(model, "Invisible")
+end
+
 local function validTarget(
 	caster: Model,
 	target: Model?,
@@ -310,7 +316,7 @@ local function validTarget(
 		return false
 	end
 	if wantEnemy then
-		if not Teams.AreEnemies(caster, target) then
+		if not Teams.AreEnemies(caster, target) or isInvisible(target) then
 			return false
 		end
 	elseif not Teams.AreAllies(caster, target) then
@@ -328,7 +334,7 @@ local function autoTarget(caster: Model, origin: Vector3, dir: Vector3, aim: Vec
 	local best: Model? = nil
 	local bestScore = math.huge
 	for _, m in Validation.Combatants() do
-		if m ~= caster and Validation.IsUp(m) and Teams.AreEnemies(caster, m) then
+		if m ~= caster and Validation.IsUp(m) and Teams.AreEnemies(caster, m) and not isInvisible(m) then
 			local pos = Validation.RootPosition(m)
 			if pos and (pos - origin).Magnitude <= maxDist and inFront(origin, dir, pos, 0.5) then
 				local score = (pos - aim).Magnitude
@@ -462,7 +468,7 @@ local function castVerdictBox(model: Model, player: Player?, payload: Payload): 
 		if m == nil or not Validation.IsUp(m) or Teams.TeamOf(m) ~= "Humans" then
 			return false
 		end
-		if StatusService.Has(m, "Boxed") or StatusService.Has(m, "Invulnerable") then
+		if StatusService.Has(m, "Boxed") or StatusService.Has(m, "Invulnerable") or isInvisible(m) then
 			return false
 		end
 		local pos = Validation.RootPosition(m)

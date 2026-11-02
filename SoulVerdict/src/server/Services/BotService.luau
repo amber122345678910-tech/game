@@ -5,7 +5,9 @@
 --     per-kit distance from the monster (ranged ~25 studs, melee ~M1 range), M1 in range, Q/E/R heuristics,
 --     occasional blocks, strafing; crawl away when downed.
 --   Monster bots: chase the nearest up human (finish downed ones nearby), mobility to close gaps, M1, kit
---     abilities in range, ultimate when charged, Verdict Box with line of sight.
+--     abilities in range, ultimate when charged, Verdict Box with line of sight. Invisible humans (attribute
+--     Invisible / an active Status_Invisible) are never targeted or aimed at: the bot searches where it last saw
+--     its target for a few seconds instead (BotService.IsInvisible(model) -> boolean).
 --   Movement: Humanoid:MoveTo + strafing + unstick (jump + sidestep); facing via an AlignOrientation.
 -- Every brain tick is pcall-wrapped: a broken kit or service can never crash the server.
 -- Training dummies: blueprint "Dummy", KitId "Dummy", Team "Dummy", 5000 HP, full heal 3 s after the last
@@ -81,6 +83,8 @@ type Bot = {
 	LastDashAt: number,
 	NextCooldownSync: number,
 	Personality: number, -- 0..1: higher = more objective-minded / careful
+	LastSeenPos: Vector3?, -- monster: where its target was last visible (searched after it turns invisible)
+	LastSeenAt: number,
 }
 
 type Dummy = {
@@ -568,6 +572,18 @@ local function isUp(model: Model): boolean
 	return CharacterService ~= nil and CharacterService.IsUp(model)
 end
 
+-- Invisible humans (Patience stealth, ...): attribute Invisible, or a Status_Invisible end time still ahead.
+local function isInvisible(model: Model): boolean
+	if model:GetAttribute("Invisible") == true then
+		return true
+	end
+	local endsAt = model:GetAttribute("Status_Invisible")
+	return type(endsAt) == "number" and endsAt > now()
+end
+BotService.IsInvisible = isInvisible
+
+local SEARCH_TIME = 3 -- monster bots search a vanished target's last seen spot this long
+
 local function strafeTarget(bot: Bot, center: Vector3, t: number): Vector3
 	if t >= bot.StrafeUntil then
 		bot.StrafeDir = if random:NextNumber() < 0.5 then -1 else 1
@@ -816,18 +832,31 @@ local function thinkMonster(bot: Bot, t: number)
 	local root = bot.Root
 	local pos = root.Position
 	local humans = aliveModels("Humans")
-	local target, dist = nearest(pos, humans, isUp)
+	local target, dist = nearest(pos, humans, function(m: Model): boolean
+		return isUp(m) and not isInvisible(m)
+	end)
 	local downed, downedDist = nearest(pos, humans, function(m: Model): boolean
-		return m:GetAttribute("Downed") == true
+		return m:GetAttribute("Downed") == true and not isInvisible(m)
 	end)
 	if downed and downedDist < 10 and (target == nil or dist > 8) then
 		target, dist = downed, downedDist
 	end
 	if target == nil then
-		stop(bot)
+		-- everyone left is invisible (or gone): search the last seen spot for a moment, never aim at the hidden
+		local seen = bot.LastSeenPos
+		if seen and t - bot.LastSeenAt < SEARCH_TIME and (seen - pos).Magnitude > 3 then
+			face(bot, seen)
+			moveTo(bot, seen)
+			updateUnstick(bot, true, t)
+		else
+			bot.LastSeenPos = nil
+			stop(bot)
+		end
 		return
 	end
 	local targetPos = (rootOf(target) :: BasePart).Position
+	bot.LastSeenPos = targetPos
+	bot.LastSeenAt = t
 	face(bot, targetPos)
 	if dist > bot.PreferredRange + 1.5 then
 		moveTo(bot, targetPos)
@@ -921,6 +950,8 @@ local function addBot(model: Model, kind: string, kit: any)
 		LastDashAt = 0,
 		NextCooldownSync = 0,
 		Personality = random:NextNumber(),
+		LastSeenPos = nil,
+		LastSeenAt = 0,
 	}
 	analyseKit(bot)
 	-- stagger first casts a little so all bots don't open with their whole kit at once
