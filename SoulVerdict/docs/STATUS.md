@@ -153,3 +153,13 @@ Next: adversarial review of all of it, tools/check.sh, tools/build.sh, commit + 
   back to Classic's candidates until the owner sends ids).
 - tools/check.sh 0 errors; build sent to the owner. Not tested in real Roblox: camera/animation timing of the scenes
   may need tuning after the owner's feedback.
+
+## 20:00 UTC — Last Breath Sans three phases (shipped)
+- Owner's ChatGPT asset ids (UGC + Creator Store models) NOT used: unverifiable here (roblox.com blocked), UGC = avatar
+  accessories, third-party models don't fit the rig contract and may carry scripts. Built the phases in our own rig.
+- Look per owner's reference: black jacket, white fur, white shoes. PhaseLook (Rigs/PhaseLook): Phase2_* / Phase3_*
+  parts (scar X, blood, torn slash, bone; skull crack, bloody teeth/hand). RoundState MonsterPhase 1/2/3;
+  RoundService.TriggerPhase3 (Last Breath in Phase 2 at <= 20 % HP: heal 15 %, dodges refilled, scene
+  "LastBreathSans3"); admin action Phase3; music slot Theme_LastBreathSans_P3 (Classic's candidates for now).
+- tools/check.sh 0 errors; build sent. Next: owner's feedback from real Roblox (scene camera/timing), music ids for
+  Last Breath phases 1-3.
