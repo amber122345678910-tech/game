@@ -128,3 +128,5 @@ Next: adversarial review of all of it, tools/check.sh, tools/build.sh, commit + 
 - 13:05 UTC: phase2, box+sound and loading continuation agents DONE (434 tests, committed). Shop agents still running
   (wf_e6443210-11b). Review of the finished parts running: review-batch-2 (wf_811a40e5-d2c, review -> verify -> fix).
   After both: review the shop part, then check/build/commit/push/send.
+- 13:20 UTC: shop agents DONE (436 tests, committed). Running: review-batch-2 (wf_811a40e5-d2c) and review-shop (wf_ef79027a-b92).
+  After both: tools/check.sh, tools/build.sh, commit + push, send rbxl + summary (previews already sent).
