@@ -185,7 +185,24 @@ local function buildAll(T, UIKit, Themes, theme, Kits)
 	return n
 end
 
-return {
+-- Client-side suite: setup() flips the shared loader into client mode (isServer = false, quiet warnings).
+-- Every test puts the flags back, even when it fails, so later suites still run as the server (test hygiene;
+-- run_tests.luau reports any shared state a test leaks).
+local function restoringFlags(tests)
+	for name, fn in tests do
+		tests[name] = function(T, Loader)
+			local isServer, quiet = Loader.isServer, Loader.quietWarnings
+			local ok, err = pcall(fn, T, Loader)
+			Loader.isServer, Loader.quietWarnings = isServer, quiet
+			if not ok then
+				error(err, 0)
+			end
+		end
+	end
+	return tests
+end
+
+return restoringFlags({
 	everyComponentInEveryTheme = function(T, Loader)
 		local Themes, UIKit, _, _, Strings, Kits = setup(Loader)
 		for _, lang in { "en", "ru" } do
@@ -271,4 +288,4 @@ return {
 		local phone = UIRoot.ComputeLayout(roblox.Vector2.new(844, 390))
 		T.ok(phone.Phone and phone.Compact, "844x390 is a compact phone layout")
 	end,
-}
+})

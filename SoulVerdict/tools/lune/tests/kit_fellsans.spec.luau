@@ -713,22 +713,30 @@ return {
 			local fell = fellSetup(H, { ult = 100 })
 			H.spawn("Determination", "Humans", Vector3.new(0, 0, -8), { look = Vector3.new(0, 0, 1) })
 			H.spawn("Perseverance", "Humans", Vector3.new(10, 0, -20))
+			-- module code calls the loader's per-module `warn` (not the script env's), so collect through
+			-- Loader.onWarn; restored below even if a cast throws (withHarness re-raises after cleanup)
 			local warned = {}
-			local G = H.G
-			local oldWarn = G.warn
-			G.warn = function(...)
-				table.insert(warned, table.concat({ ... }, " "))
+			local oldOnWarn = Loader.onWarn
+			Loader.onWarn = function(...)
+				local parts = {}
+				for i = 1, select("#", ...) do
+					table.insert(parts, tostring((select(i, ...))))
+				end
+				table.insert(warned, table.concat(parts, " "))
 			end
-			local kit = H.Kits.Get("FellSans")
-			for _, ability in kit.Abilities do
-				AS.SetCooldown(fell, ability.Id, 0)
-				H.S.StatusService.Remove(fell, "Stunned")
-				local ok, why =
-					AS.CastAs(fell, ability.Id, { aim = Vector3.new(0, 3, -12), dir = Vector3.new(0, 0, -1) })
-				T.ok(ok, ability.Id .. " cast (" .. tostring(why) .. ")")
-				run(H, 1.5)
-			end
-			G.warn = oldWarn
+			local okCasts, castErr = pcall(function()
+				local kit = H.Kits.Get("FellSans")
+				for _, ability in kit.Abilities do
+					AS.SetCooldown(fell, ability.Id, 0)
+					H.S.StatusService.Remove(fell, "Stunned")
+					local ok, why =
+						AS.CastAs(fell, ability.Id, { aim = Vector3.new(0, 3, -12), dir = Vector3.new(0, 0, -1) })
+					T.ok(ok, ability.Id .. " cast (" .. tostring(why) .. ")")
+					run(H, 1.5)
+				end
+			end)
+			Loader.onWarn = oldOnWarn
+			T.ok(okCasts, "casts ran: " .. tostring(castErr))
 			for _, w in warned do
 				T.ok(false, "warning: " .. w)
 			end

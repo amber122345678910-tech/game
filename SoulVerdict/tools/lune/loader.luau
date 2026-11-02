@@ -397,6 +397,7 @@ local gameMock = {
 }
 
 Loader.isServer = true
+Loader.quietWarnings = false
 
 local function makeEnv(modulePath)
 	local env = {
@@ -439,6 +440,9 @@ local function makeEnv(modulePath)
 		tick = os.clock,
 		time = os.clock,
 		warn = function(...)
+			if Loader.onWarn then
+				Loader.onWarn(...) -- tests that assert "no warnings" install a collector here
+			end
 			if not Loader.quietWarnings then
 				print("[warn]", ...)
 			end
@@ -494,6 +498,101 @@ end
 function Loader.reset()
 	cache = {}
 	loading = {}
+end
+
+-- Test hygiene (used by run_tests.luau around EVERY test): Loader.reset() only drops the module cache, while
+-- the mock services (game:GetService(...) proxies), the loader flags and the shared script environment
+-- (getfenv(Loader.requirePath), where specs park workspace / RaycastParams / typeof fakes) live for the
+-- whole run. A test that changes them and does not undo it poisons every later suite (e.g. a plain-table
+-- Players.LocalPlayer made ui_screens fail). captureState() snapshots all of it; restoreState(snapshot)
+-- puts it back and returns the names of whatever had leaked ({} = the test was clean).
+local function rawFields(t)
+	local out = {}
+	for k, v in next, t do
+		out[k] = v
+	end
+	return out
+end
+
+-- `inherited` (optional): the table behind now's __index; a raw field equal to the inherited value is not a
+-- change (specs restore with `G.warn = oldWarn`, where oldWarn was read through __index).
+local function diffFields(before, now, prefix, leaks, inherited)
+	for k, v in next, now do
+		if before[k] ~= v and not (before[k] == nil and inherited ~= nil and rawget(inherited, k) == v) then
+			table.insert(leaks, prefix .. tostring(k))
+		end
+	end
+	for k in next, before do
+		if rawget(now, k) == nil then
+			table.insert(leaks, prefix .. tostring(k))
+		end
+	end
+end
+
+function Loader.captureState()
+	local services = {}
+	for name, svc in serviceProxies do
+		services[name] = rawFields(svc)
+	end
+	local env = getfenv(Loader.requirePath)
+	return {
+		isServer = Loader.isServer,
+		quietWarnings = Loader.quietWarnings,
+		onWarn = Loader.onWarn,
+		services = services,
+		env = rawFields(env),
+	}
+end
+
+function Loader.restoreState(snapshot): { string }
+	local leaks = {}
+	if Loader.isServer ~= snapshot.isServer then
+		table.insert(leaks, "Loader.isServer")
+		Loader.isServer = snapshot.isServer
+	end
+	if Loader.quietWarnings ~= snapshot.quietWarnings then
+		table.insert(leaks, "Loader.quietWarnings")
+		Loader.quietWarnings = snapshot.quietWarnings
+	end
+	if Loader.onWarn ~= snapshot.onWarn then
+		table.insert(leaks, "Loader.onWarn")
+		Loader.onWarn = snapshot.onWarn
+	end
+	for name, svc in serviceProxies do
+		local before = snapshot.services[name]
+		if before == nil then
+			-- created lazily during the test: drop it, the next GetService builds a pristine mock
+			serviceProxies[name] = nil
+		else
+			local changed = {}
+			diffFields(before, svc, name .. ".", changed)
+			if #changed > 0 then
+				table.move(changed, 1, #changed, #leaks + 1, leaks)
+				table.clear(svc)
+				for k, v in next, before do
+					rawset(svc, k, v)
+				end
+			end
+		end
+	end
+	local env = getfenv(Loader.requirePath)
+	local meta = getmetatable(env)
+	local inherited = if type(meta) == "table" and type(meta.__index) == "table" then meta.__index else nil
+	local changed = {}
+	diffFields(snapshot.env, env, "env.", changed, inherited)
+	if #changed > 0 then
+		table.move(changed, 1, #changed, #leaks + 1, leaks)
+		for k in next, rawFields(env) do
+			if snapshot.env[k] == nil then
+				rawset(env, k, nil)
+			end
+		end
+		for k, v in next, snapshot.env do
+			rawset(env, k, v)
+		end
+	end
+	table.sort(leaks)
+	return leaks
 end
 
 Loader.roblox = roblox

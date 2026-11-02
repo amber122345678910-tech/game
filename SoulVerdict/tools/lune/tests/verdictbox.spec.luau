@@ -721,8 +721,11 @@ local function harness(Loader)
 	for _, n in { "StatusService", "MovementService", "DamageService", "VerdictBoxService" } do
 		H.S[n].Init()
 	end
-	-- the Players mock lives in the module environments (game = the loader's mock)
-	getfenv(H.S.VerdictBoxService.Open).game:GetService("Players").GetPlayers = function()
+	-- the Players mock lives in the module environments (game = the loader's mock); it is shared by every
+	-- spec, so H.cleanup puts the original GetPlayers back (test hygiene)
+	local playersMock = getfenv(H.S.VerdictBoxService.Open).game:GetService("Players")
+	local originalGetPlayers = rawget(playersMock, "GetPlayers")
+	playersMock.GetPlayers = function()
 		return H.players
 	end
 	H.S.VerdictBoxService.Start() -- lifecycle hook: connects the remotes
@@ -785,6 +788,7 @@ local function harness(Loader)
 		Validation.SetScheduler(nil)
 		G.workspace = nil
 		G.RaycastParams = nil
+		rawset(playersMock, "GetPlayers", originalGetPlayers)
 	end
 	return H
 end

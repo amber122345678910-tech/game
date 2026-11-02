@@ -7,10 +7,13 @@
 -- Rows exist only between BeginRound and the next BeginRound/Reset; Finish() freezes them.
 --
 -- API (SPEC §17)
---   BeginRound(models, practice?)          new rows for these character models (bots get negative userIds)
+--   BeginRound(models, practice?)          new rows for these character models (bots get userIds <= BOT_ID_BASE)
 --   Add(model, stat, amount)               stats: Damage, Healing, Kills, Downs, Parries, DodgesForced,
 --                                          Saves, Revives, BoxesSurvived, BoxHits, Survived, Win
---   Get(model) -> RoundStatRow?            Rows() -> {RoundStatRow}       Mvp() -> number? (userId; <0 = bot)
+--   Get(model) -> RoundStatRow?            Rows() -> {RoundStatRow}       Mvp() -> number? (userId; bot ids are
+--                                          <= StatsService.BOT_ID_BASE = -1000000. NOT "< 0": Studio test players
+--                                          (Test -> Local Server) have UserIds -1, -2, ... and must be rewarded)
+--   IsBotId(userId) -> boolean
 --   Track(model)                           adds a row for a model that joined after BeginRound
 --   Finish(winnerTeam?)                    marks Survived/Win events and freezes the rows
 --   Score(row) -> number                   IsActive() -> boolean          Reset()
@@ -74,6 +77,14 @@ local frozen = false
 local practice = false
 local botIds = 0
 
+-- Bot rows get userIds far below every real one: production UserIds are positive, Studio test players
+-- (Test -> Local Server) are -1, -2, ... — a bot row "-1" would collide with Player1 (rewards / MVP bonus).
+StatsService.BOT_ID_BASE = -1000000
+
+function StatsService.IsBotId(userId: any): boolean
+	return type(userId) == "number" and userId <= StatsService.BOT_ID_BASE
+end
+
 local function tryService(name: string): any
 	local module = (script.Parent :: Instance):FindFirstChild(name)
 	if module and module:IsA("ModuleScript") then
@@ -113,7 +124,7 @@ local function playerOf(model: Model): Player?
 		end
 	end
 	local userId = model:GetAttribute("OwnerUserId")
-	if type(userId) == "number" and userId > 0 then
+	if type(userId) == "number" and userId ~= 0 then -- bots carry 0; Studio test players are negative
 		return Players:GetPlayerByUserId(userId)
 	end
 	return nil
@@ -129,11 +140,11 @@ local function makeRow(model: Model): Row
 		playerByModel[model] = player
 	else
 		local owner = model:GetAttribute("OwnerUserId")
-		if type(owner) == "number" and owner > 0 then
+		if type(owner) == "number" and owner ~= 0 then
 			userId = owner
 		else
 			botIds += 1
-			userId = -botIds
+			userId = StatsService.BOT_ID_BASE - botIds
 		end
 		local display = model:GetAttribute("DisplayName")
 		name = if type(display) == "string" then display else model.Name
@@ -182,7 +193,7 @@ function StatsService.Track(model: Model)
 	local row = makeRow(model)
 	-- a player who re-enters (should not happen) keeps one row
 	for _, existing in rows do
-		if existing.userId == row.userId and row.userId > 0 then
+		if existing.userId == row.userId and row.userId ~= 0 and not StatsService.IsBotId(row.userId) then
 			rowByModel[model] = existing
 			return
 		end

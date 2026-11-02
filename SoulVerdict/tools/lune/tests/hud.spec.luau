@@ -49,7 +49,24 @@ local function findText(root, needle)
 	return false
 end
 
-return {
+-- Client-side suite: setup() flips the shared loader into client mode (isServer = false, quiet warnings).
+-- Every test puts the flags back, even when it fails, so later suites still run as the server (test hygiene;
+-- run_tests.luau reports any shared state a test leaks).
+local function restoringFlags(tests)
+	for name, fn in tests do
+		tests[name] = function(T, Loader)
+			local isServer, quiet = Loader.isServer, Loader.quietWarnings
+			local ok, err = pcall(fn, T, Loader)
+			Loader.isServer, Loader.quietWarnings = isServer, quiet
+			if not ok then
+				error(err, 0)
+			end
+		end
+	end
+	return tests
+end
+
+return restoringFlags({
 	everyPieceBuildsInEveryThemeAndStyle = function(T, Loader)
 		local Themes, desktop, phone = setup(Loader)
 		local Mock = Loader.requirePath(HUD .. "/Mock")
@@ -330,4 +347,4 @@ return {
 		T.ok(findText(h.Root, "DOWNED"), "downed overlay text")
 		h.Destroy()
 	end,
-}
+})

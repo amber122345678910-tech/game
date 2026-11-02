@@ -31,10 +31,20 @@ for _, f in files do
 		for _, name in names do
 			T.current = f .. " :: " .. name
 			Loader.reset()
+			local before = Loader.captureState()
 			local ok, err = pcall(suite[name], T, Loader)
 			total += 1
 			if not ok then
 				table.insert(T.failures, T.current .. ": ERROR " .. tostring(err))
+			end
+			-- shared mocks / loader flags / script env changed by the test are put back (no cascade into
+			-- later suites) and reported: every spec must undo what it changes (pcall + restore).
+			local leaks = Loader.restoreState(before)
+			if #leaks > 0 then
+				table.insert(
+					T.failures,
+					T.current .. ": leaked shared test state (restore it in the test): " .. table.concat(leaks, ", ")
+				)
 			end
 		end
 	end

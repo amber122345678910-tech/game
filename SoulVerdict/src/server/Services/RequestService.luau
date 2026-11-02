@@ -20,10 +20,12 @@
 --   Buy         {kind = "Kit"|"Skin", kitId, skinId?}   -> ShopService.Buy (G, LV, daily-shop discount)
 --   ClaimQuest  index | {index} | {id}                  -> QuestService.Claim
 --   RerollQuest index | {index}                         -> QuestService.Reroll (once per 12 h window)
---   SetSetting  {key, value}                            whitelist + type/range check (ProfileSchema.Settings)
+--   SetSetting  {key, value}                            whitelist + type/range check (ProfileSchema.Settings: every
+--                                                     Config.Defaults key, incl. the QuickCast / InvertY toggles)
 --   SetRolePref "Either"|"Monster"|"Human" | {pref}     (QueueService replaces this with its own handler)
 --   SetTitle    "titleId" | {titleId | title}           "" = no title
--- Other services register: Vote, StartPractice (RoundService), TryKit (CharacterService), StyleLab.
+-- Other services register: Vote, StartPractice (RoundService), TryKit (CharacterService), StyleLab,
+--   Emote (EmoteService: clip | {clip}, "" = stop; its own cooldown on top of the rate limit).
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -55,6 +57,7 @@ local ACTION_GAP: { [string]: number } = {
 	Vote = 0.25,
 	StartPractice = 1,
 	StyleLab = 0.2,
+	Emote = 0.25,
 }
 local MAX_ACTION_LEN = 32
 local MAX_STRING = 200

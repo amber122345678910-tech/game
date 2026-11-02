@@ -81,7 +81,24 @@ local function build(T, module, theme, deps, label)
 	return handle
 end
 
-return {
+-- Client-side suite: setup() flips the shared loader into client mode (isServer = false, quiet warnings).
+-- Every test puts the flags back, even when it fails, so later suites still run as the server (test hygiene;
+-- run_tests.luau reports any shared state a test leaks).
+local function restoringFlags(tests)
+	for name, fn in tests do
+		tests[name] = function(T, Loader)
+			local isServer, quiet = Loader.isServer, Loader.quietWarnings
+			local ok, err = pcall(fn, T, Loader)
+			Loader.isServer, Loader.quietWarnings = isServer, quiet
+			if not ok then
+				error(err, 0)
+			end
+		end
+	end
+	return tests
+end
+
+return restoringFlags({
 	everyScreenEveryThemeAndLayout = function(T, Loader)
 		local Themes, Strings, layouts = setup(Loader)
 		for _, lang in { "en", "ru" } do
@@ -325,4 +342,4 @@ return {
 			UIController.Close()
 		end, "Close before Start")
 	end,
-}
+})

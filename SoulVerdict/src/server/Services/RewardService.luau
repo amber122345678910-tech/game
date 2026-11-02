@@ -236,7 +236,9 @@ function RewardService.Process(result: any, resolvePlayer: ((number) -> Player?)
 	end
 	local finalPhase = finalPhaseReached()
 	for _, row in result.rows do
-		if type(row) == "table" and type(row.userId) == "number" and row.userId > 0 then
+		-- real players only: bot rows never resolve to a Player (StatsService ids <= -1000000); NOT "> 0" —
+		-- Studio test players (Test -> Local Server) have negative UserIds and must get their rewards too
+		if type(row) == "table" and type(row.userId) == "number" and row.userId ~= 0 and row.userId > -1000000 then
 			local player = if resolvePlayer then resolvePlayer(row.userId) else Players:GetPlayerByUserId(row.userId)
 			if player and DataService.Get(player) then
 				local ok, err = pcall(processPlayer, player, row, result, finalPhase)

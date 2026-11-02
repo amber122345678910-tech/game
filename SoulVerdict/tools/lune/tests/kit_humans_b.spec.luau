@@ -94,6 +94,7 @@ local function harness(Loader)
 
 	local G = getfenv(Loader.requirePath)
 	H.G = G
+	local oldWorkspace, oldRaycastParams = rawget(G, "workspace"), rawget(G, "RaycastParams")
 	G.workspace = SHARED_WORKSPACE
 	G.RaycastParams = {
 		new = function()
@@ -314,6 +315,9 @@ local function harness(Loader)
 		H.S.HazardService.Clear()
 		table.clear(timers)
 		current = nil
+		-- the script environment is shared by every spec: put the fakes back (test hygiene)
+		rawset(G, "workspace", oldWorkspace)
+		rawset(G, "RaycastParams", oldRaycastParams)
 	end
 	return H
 end

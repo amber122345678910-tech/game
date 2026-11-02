@@ -32,10 +32,15 @@
 -- PlayerModule / CoreGui bind them through ContextActionService, which marks them processed). End events are
 -- always delivered (no stuck keys); focus loss / the Roblox menu release everything.
 -- Contexts: PushContext/PopContext (counted). Contexts in SuppressingContexts ("Menu","Box","Dead","Photo",
--- "Cinematic") suppress CombatActions and release held ones.
+-- "Cinematic","EmoteWheel") suppress CombatActions and release held ones; while the emote wheel is the ONLY
+-- suppressing context its own key ("Emote") stays live so the same key closes it.
+-- Cancel: Escape / right mouse button (even when the CoreGui processed the key) fire Cancelled("Escape" |
+-- "MouseButton2"); ReleaseAll (Roblox menu, focus loss, gamepad disconnect) fires Cancelled("Release") BEFORE the
+-- forced End events, so held aims / charges can cancel instead of firing (CombatController, Hud/EmoteWheel).
 --
 -- API
 --   InputController.Action: Signal(action, state: "Begin"|"End", input: InputObject?)
+--   InputController.Cancelled: Signal(source: "Escape"|"MouseButton2"|"Release")
 --   InputController.On(action, fn(state, input?)) -> Connection         per-action convenience
 --   InputController.IsDown(action) -> boolean
 --   InputController.Device() -> "KeyboardMouse"|"Gamepad"|"Touch" ; DeviceChanged: Signal(device)
@@ -70,6 +75,7 @@ export type Layout = "Monster" | "Human"
 export type State = "Begin" | "End"
 
 InputController.Action = Signal.new()
+InputController.Cancelled = Signal.new()
 InputController.DeviceChanged = Signal.new()
 InputController.ContextChanged = Signal.new()
 
@@ -112,7 +118,11 @@ InputController.CombatActions = {
 -- bound only for KeyLabel hints, never emitted from keys (ProximityPrompts own these keys)
 InputController.HintOnly = { Interact = true }
 
-InputController.SuppressingContexts = { Menu = true, Box = true, Dead = true, Photo = true, Cinematic = true }
+InputController.SuppressingContexts =
+	{ Menu = true, Box = true, Dead = true, Photo = true, Cinematic = true, EmoteWheel = true }
+
+-- keys that fire Cancelled when pressed
+InputController.CancelKeys = { Escape = true, MouseButton2 = true }
 
 -- keys accepted even when gameProcessed (bound by default scripts through ContextActionService)
 InputController.Passthrough = { Space = true, Tab = true, ButtonA = true, ButtonB = true }
@@ -264,16 +274,22 @@ function InputController.SetBinding(device: string, layout: string?, action: str
 	rebuild()
 end
 
+-- The emote wheel suppresses combat but keeps its own toggle key alive when it is the only suppressing context.
+local function wheelKeepsKey(action: string, suppressing: number, contexts: { [string]: number }): boolean
+	return action == "Emote" and suppressing == 1 and (contexts.EmoteWheel or 0) > 0
+end
+
 function InputController.IsSuppressedBy(action: string, contexts: { [string]: number }): boolean
 	if not InputController.CombatActions[action] then
 		return false
 	end
+	local suppressing = 0
 	for name, count in contexts do
 		if count > 0 and InputController.SuppressingContexts[name] then
-			return true
+			suppressing += 1
 		end
 	end
-	return false
+	return suppressing > 0 and not wheelKeepsKey(action, suppressing, contexts)
 end
 
 ------------------------------------------------------------------------------------------------ state
@@ -355,7 +371,9 @@ local function fire(action: string, state: State, input: InputObject?)
 end
 
 local function suppressed(action: string): boolean
-	return suppressCount > 0 and InputController.CombatActions[action] == true
+	return suppressCount > 0
+		and InputController.CombatActions[action] == true
+		and not wheelKeepsKey(action, suppressCount, contexts)
 end
 
 local function beginAction(action: string, source: any, input: InputObject?): boolean
@@ -413,6 +431,8 @@ local function releaseCombat()
 end
 
 function InputController.ReleaseAll()
+	-- held aims / charges cancel first (their forced End must not fire them)
+	InputController.Cancelled:Fire("Release")
 	for _, action in InputController.Actions do
 		forceEnd(action)
 	end
@@ -498,6 +518,9 @@ local function onInputBegan(input: InputObject, gameProcessed: boolean)
 	local token, inputDevice = tokenOf(input)
 	if token == nil or inputDevice == nil then
 		return
+	end
+	if InputController.CancelKeys[token] then
+		InputController.Cancelled:Fire(token)
 	end
 	if InputController.IsTyping() or GuiService.MenuIsOpen then
 		return

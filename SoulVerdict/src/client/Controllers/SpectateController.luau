@@ -192,7 +192,7 @@ function SpectateController.TargetName(): string
 		return ""
 	end
 	local userId = model:GetAttribute("OwnerUserId")
-	if type(userId) == "number" and userId > 0 then
+	if type(userId) == "number" and userId ~= 0 then -- bots carry 0; Studio test players are negative
 		local player = Players:GetPlayerByUserId(userId)
 		if player then
 			return player.DisplayName
