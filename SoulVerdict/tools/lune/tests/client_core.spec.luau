@@ -480,9 +480,14 @@ return {
 		local def, name = Audio.Resolve("Land")
 		T.ok(def ~= nil and name == "Land", "built-in resolves to itself")
 		T.eq(Audio.Resolve("NoSuchSound"), nil, "unknown -> silent")
-		-- an empty entry with an empty fallback chain is silent; with a built-in at the end it resolves
-		local revive, reviveName = Audio.Resolve("Revive")
-		T.ok(revive ~= nil and reviveName == "GetUp", "Revive falls back to the built-in GetUp")
+		-- an entry without candidates resolves along its Fallback chain: Crit has none -> Hit (or a built-in at the end)
+		local crit, critName = Audio.Resolve("Crit")
+		if #Audio.Candidates("Crit") == 0 then
+			T.ok(crit == nil or critName ~= "Crit", "an entry without candidates never resolves to itself")
+			if crit ~= nil then
+				T.eq(critName, "Hit", "Crit falls back to Hit")
+			end
+		end
 		if #Audio.Candidates("Hit") == 0 and #Audio.Candidates("HitHeavy") == 0 then -- (Id and Ids both count)
 			T.eq(Audio.Resolve("HitHeavy"), nil, "fallback to an empty entry is silent")
 		end

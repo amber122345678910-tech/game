@@ -643,11 +643,16 @@ return {
 			"C/custom/pending",
 			"custom candidate lister"
 		)
-		-- real data: Revive (no ids) -> GetUp (built-in); the pure helper only knows the states it is given
-		local entry, id, status = Sound.ResolveChain("Revive", Audio.Get, function()
-			return nil
+		-- real data: an entry whose every candidate failed falls back along its chain (Revive -> GetUp, a built-in that
+		-- is never probed); the pure helper only knows the states it is given
+		local reviveIds = {}
+		for _, rid in Audio.Candidates("Revive") do
+			reviveIds[rid] = true
+		end
+		local entry, id, status = Sound.ResolveChain("Revive", Audio.Get, function(cid)
+			return if reviveIds[cid] then "bad" else nil
 		end)
-		T.eq(("%s/%s/%s"):format(entry, id, status), "GetUp/" .. Audio.Builtin.GetUp .. "/pending", "Revive -> GetUp")
+		T.eq(("%s/%s/%s"):format(entry, id, status), "GetUp/" .. Audio.Builtin.GetUp .. "/pending", "dead Revive -> GetUp")
 	end,
 
 	sound_arena_music_order = function(T, Loader)
