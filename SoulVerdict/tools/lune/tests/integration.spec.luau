@@ -76,7 +76,11 @@ local function keys(set: { [string]: any }): string
 	return table.concat(list, ",")
 end
 
-local function scan(files: { string }, patterns: { string }, filter: ((string, string) -> boolean)?): { [string]: string }
+local function scan(
+	files: { string },
+	patterns: { string },
+	filter: ((string, string) -> boolean)?
+): { [string]: string }
 	local found = {}
 	for _, path in files do
 		local src = code(read(path))
@@ -187,7 +191,9 @@ local function checkKitPhases(T, Loader, kitId: string)
 	local kit = Kits.Get(kitId)
 	for _, ability in kit.Abilities do
 		if ability.Slot ~= nil and ability.Passive ~= true then
-			local fallback = ability.Slot == "M1" and type(ability.Numbers) == "table" and ability.Numbers.Damage1 ~= nil
+			local fallback = ability.Slot == "M1"
+				and type(ability.Numbers) == "table"
+				and ability.Numbers.Damage1 ~= nil
 			T.ok(server[ability.Id] ~= nil or fallback, kitId .. ": no server handler for " .. ability.Id)
 		end
 	end
@@ -248,7 +254,22 @@ return {
 		for name, path in sent do
 			T.ok(registered[name] ~= nil, ("%s sends Request %q but no server service registers it"):format(path, name))
 		end
-		for _, name in { "EquipKit", "EquipSkin", "Buy", "ClaimQuest", "RerollQuest", "SetSetting", "SetRolePref", "SetTitle", "Vote", "StartPractice", "TryKit", "StyleLab" } do
+		for _, name in
+			{
+				"EquipKit",
+				"EquipSkin",
+				"Buy",
+				"ClaimQuest",
+				"RerollQuest",
+				"SetSetting",
+				"SetRolePref",
+				"SetTitle",
+				"Vote",
+				"StartPractice",
+				"TryKit",
+				"StyleLab",
+			}
+		do
 			T.ok(registered[name] ~= nil, "SPEC §17 request action not registered: " .. name)
 		end
 	end,
@@ -263,7 +284,10 @@ return {
 		local count = 0
 		for name in string.gmatch(client, 'action%s*=%s*"([%w_]+)"') do
 			count += 1
-			T.ok(actions[name] == true, "Style Lab button sends unknown action " .. name .. " (server: " .. keys(actions) .. ")")
+			T.ok(
+				actions[name] == true,
+				"Style Lab button sends unknown action " .. name .. " (server: " .. keys(actions) .. ")"
+			)
 		end
 		T.ok(count > 0, "no Style Lab actions found in the screen")
 	end,
@@ -288,7 +312,10 @@ return {
 		for name, path in read do
 			T.ok(
 				specs[name] ~= nil or LOCAL_ONLY[name] == true,
-				("%s reads setting %q that the server whitelist (ProfileSchema.Settings) does not know"):format(path, name)
+				("%s reads setting %q that the server whitelist (ProfileSchema.Settings) does not know"):format(
+					path,
+					name
+				)
 			)
 		end
 		T.ok(read.Sensitivity ~= nil, "CameraController must read the whitelisted Sensitivity key")
@@ -302,7 +329,27 @@ return {
 		for name in string.gmatch(defaults or "", "([%w_]+)%s*=") do
 			known[name] = true
 		end
-		for _, name in { "Phase", "PhaseEndsAt", "MapId", "VoteOptions", "MonsterUserId", "MonsterKit", "HumansAlive", "HumansTotal", "SavesLit", "SavesTotal", "FinalPhase", "Winner", "WinReason", "Practice", "TeamRevives", "CollapseRadius", "CollapseCenter" } do
+		for _, name in
+			{
+				"Phase",
+				"PhaseEndsAt",
+				"MapId",
+				"VoteOptions",
+				"MonsterUserId",
+				"MonsterKit",
+				"HumansAlive",
+				"HumansTotal",
+				"SavesLit",
+				"SavesTotal",
+				"FinalPhase",
+				"Winner",
+				"WinReason",
+				"Practice",
+				"TeamRevives",
+				"CollapseRadius",
+				"CollapseCenter",
+			}
+		do
 			T.ok(known[name] == true, "SPEC §4.1 RoundState attribute missing from STATE_DEFAULTS: " .. name)
 		end
 		local files = {
@@ -318,7 +365,8 @@ return {
 	end,
 
 	integration_phase_names_are_valid = function(T, _Loader)
-		local PHASES = { Waiting = true, Intermission = true, Intro = true, Round = true, Collapse = true, Ending = true }
+		local PHASES =
+			{ Waiting = true, Intermission = true, Intro = true, Round = true, Collapse = true, Ending = true }
 		-- round-phase comparisons only: State.Phase() / phase() calls, <snapshot>.Phase fields, PhaseChanged data
 		local used = scan(luauFiles("src/client"), {
 			'[Pp]hase%(%)%s*[=~]=%s*"([%w_]+)"',
@@ -404,14 +452,20 @@ return {
 			T.near(cf.RightVector:Cross(cf.UpVector):Dot(-cf.LookVector), 1, 1e-3, "right-handed basis")
 		end
 		local round = code(read("src/server/Services/RoundService.luau"))
-		T.ok(string.find(round, 'setState("CollapseRadius"', 1, true) ~= nil, "RoundService no longer drives CollapseRadius")
+		T.ok(
+			string.find(round, 'setState("CollapseRadius"', 1, true) ~= nil,
+			"RoundService no longer drives CollapseRadius"
+		)
 	end,
 
 	integration_intro_freeze_is_not_stun = function(T, _Loader)
 		local round = code(read("src/server/Services/RoundService.luau"))
 		local body = string.match(round, "local function freeze%(.-\nend")
 		T.ok(body ~= nil, "RoundService.freeze not found")
-		T.ok(string.find(body or "", '"Stunned"', 1, true) == nil, "intro freeze must not use Stunned (stun stars / dizzy pose)")
+		T.ok(
+			string.find(body or "", '"Stunned"', 1, true) == nil,
+			"intro freeze must not use Stunned (stun stars / dizzy pose)"
+		)
 		T.ok(string.find(body or "", '"Rooted"', 1, true) ~= nil, "intro freeze roots the characters")
 	end,
 
@@ -422,7 +476,13 @@ return {
 			"FxController.MarkPredicted must forward to AnimController.MarkPredicted (AnimController plays echo clips)"
 		)
 		local anim = code(read("src/client/Controllers/AnimController.luau"))
-		T.ok(string.find(anim, "function AnimController.MarkPredicted", 1, true) ~= nil, "AnimController.MarkPredicted missing")
-		T.ok(string.find(anim, "function AnimController.PlayAbility", 1, true) ~= nil, "AnimController.PlayAbility missing")
+		T.ok(
+			string.find(anim, "function AnimController.MarkPredicted", 1, true) ~= nil,
+			"AnimController.MarkPredicted missing"
+		)
+		T.ok(
+			string.find(anim, "function AnimController.PlayAbility", 1, true) ~= nil,
+			"AnimController.PlayAbility missing"
+		)
 	end,
 }

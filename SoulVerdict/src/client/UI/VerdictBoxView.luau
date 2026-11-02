@@ -330,30 +330,32 @@ local function makeStar(parent: Instance): StarObj
 	local root = frame({ Name = "StarBone", AnchorPoint = Vector2.new(0.5, 0.5), BackgroundTransparency = 1, ZIndex = 4 }, nil)
 	local bars, strokes = {}, {}
 	for i = 0, 2 do
-		local bar = frame({
+		local arm = frame({
 			Name = "Arm",
 			AnchorPoint = Vector2.new(0.5, 0.5),
 			Position = UDim2.fromScale(0.5, 0.5),
-			Size = UDim2.fromScale(0.26, 1),
+			Size = UDim2.fromScale(0.16, 0.8),
 			Rotation = i * 60,
 			BackgroundColor3 = WHITE,
 			ZIndex = 4,
 		}, root)
-		corner(bar, 0.5)
-		table.insert(bars, bar)
-		table.insert(strokes, stroke(bar, WHITE, 1, false))
+		corner(arm, 0.3)
+		table.insert(bars, arm)
+		table.insert(strokes, stroke(arm, WHITE, 1, false))
+		for _, y in { 0, 1 } do
+			local knob = frame({
+				Name = "Knob",
+				AnchorPoint = Vector2.new(0.5, 0.5),
+				Position = UDim2.fromScale(0.5, y),
+				Size = UDim2.fromScale(2.1, 0.17),
+				BackgroundColor3 = WHITE,
+				ZIndex = 4,
+			}, arm)
+			corner(knob, 0.5)
+			table.insert(bars, knob)
+			table.insert(strokes, stroke(knob, WHITE, 1, false))
+		end
 	end
-	local hub = frame({
-		Name = "Hub",
-		AnchorPoint = Vector2.new(0.5, 0.5),
-		Position = UDim2.fromScale(0.5, 0.5),
-		Size = UDim2.fromScale(0.42, 0.42),
-		BackgroundColor3 = WHITE,
-		ZIndex = 5,
-	}, root)
-	corner(hub, 0.5)
-	table.insert(bars, hub)
-	table.insert(strokes, stroke(hub, WHITE, 1, false))
 	root.Parent = parent
 	return { root = root, bars = bars, strokes = strokes, look = "" }
 end
@@ -697,11 +699,13 @@ function VerdictBoxView.new(parent: Instance?, timeline: any, opts: { [string]: 
 		self.header = label({
 			Name = "Header",
 			AnchorPoint = Vector2.new(0.5, 0),
-			Position = UDim2.new(0.5, 0, 0, 4),
-			Size = UDim2.new(0.96, 0, 0.085, 0),
+			Position = UDim2.new(0.5, 0, 0.02, 0),
+			Size = UDim2.new(0.9, 0, 0.055, 0),
 			TextScaled = true,
 			Text = Strings.L("vb.watch", string.upper(o.Name or "?")),
 			TextColor3 = theme.text,
+			TextStrokeColor3 = BLACK,
+			TextStrokeTransparency = 0,
 			ZIndex = 10,
 		}, root)
 	end
@@ -1020,7 +1024,7 @@ function VerdictBoxView._camera(self: View, w: number, h: number)
 		self.cx = size.X / 2
 		self.cy = size.Y / 2 + (OVERLAY_BOX_Y - STAGE_H / 2) * s
 	else
-		local header = size.Y * 0.1
+		local header = size.Y * 0.07
 		local s = math.min(size.X / (w + MIRROR_MARGIN * 2), (size.Y - header) / (h + MIRROR_MARGIN * 2))
 		self.scale = s
 		self.cx = size.X / 2
@@ -1040,8 +1044,8 @@ function VerdictBoxView._layoutHud(self: View, w: number, h: number, hudData: Hu
 	local function at(x: number, y: number): UDim2
 		return UDim2.fromOffset(left + x * s, top + y * s)
 	end
-	hud.title.Position = at(320, 64)
-	hud.title.Size = UDim2.fromOffset(560 * s, 22 * s)
+	hud.title.Position = at(320, 30)
+	hud.title.Size = UDim2.fromOffset(560 * s, 17 * s)
 	local rowY = OVERLAY_BOX_Y + 82.5 + 30
 	local d = hudData
 	local maxHp = if d then math.max(d.maxHp, 1) else 100
@@ -1118,7 +1122,7 @@ function VerdictBoxView.Render(self: View, t: number, soul: SoulView?, hudData: 
 	local intro = t < tl.introEnd
 	setVisible(self.textLabel, intro)
 	if intro then
-		self.textLabel.TextSize = math.max(8, math.floor(17 * s))
+		self.textLabel.TextSize = math.max(8, math.floor(19 * s))
 		local total = utf8.len(self.lineText) or #self.lineText
 		self.textLabel.MaxVisibleGraphemes = Sim.IntroChars(tl, t, total)
 	end
@@ -1214,8 +1218,8 @@ function VerdictBoxView.Render(self: View, t: number, soul: SoulView?, hudData: 
 	-- flashes
 	local flashLevel = Sim.EffectLevel(tl, "Flash", t)
 	local flashColor = WHITE
-	if sinceHit >= 0 and sinceHit < 0.3 then
-		local k = (1 - sinceHit / 0.3) * 0.4
+	if sinceHit >= 0 and sinceHit < 0.22 then
+		local k = (1 - sinceHit / 0.22) * 0.28
 		if k > flashLevel then
 			flashLevel, flashColor = k, Color3.fromRGB(255, 0, 0)
 		end
@@ -1235,9 +1239,6 @@ function VerdictBoxView.Render(self: View, t: number, soul: SoulView?, hudData: 
 	-- HUD / header
 	if self.hud then
 		self:_layoutHud(w, h, hudData, t)
-	end
-	if self.header then
-		self.header.Size = UDim2.new(0.96, 0, 0.085, 0)
 	end
 end
 

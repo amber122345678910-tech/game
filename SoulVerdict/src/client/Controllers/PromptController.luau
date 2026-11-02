@@ -57,7 +57,8 @@ local function localize(prompt: ProximityPrompt)
 	if type(objectKey) == "string" and Strings.Has(objectKey) then
 		local model = prompt:FindFirstAncestorOfClass("Model")
 		local name = if model then model:GetAttribute("DisplayName") else nil
-		prompt.ObjectText = Strings.L(objectKey, if type(name) == "string" then name elseif model then model.Name else "")
+		prompt.ObjectText =
+			Strings.L(objectKey, if type(name) == "string" then name elseif model then model.Name else "")
 	end
 end
 

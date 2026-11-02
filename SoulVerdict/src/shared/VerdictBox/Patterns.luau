@@ -327,7 +327,7 @@ local function riftBlaster(ctx: Ctx, seg: Seg, t: number, edge: string, offset: 
 	})
 	if b then
 		add(ctx, seg, "Rift", {
-			t0 = t - 0.12,
+			t0 = math.max(t - 0.12, seg.t0),
 			t1 = t + 0.24 + b.charge + 0.2,
 			x = px,
 			y = py,
@@ -1000,7 +1000,7 @@ GEN.RiftCross = {
 				})
 				if b then
 					add(ctx, seg, "Rift", {
-						t0 = t - 0.12,
+						t0 = math.max(t - 0.12, seg.t0),
 						t1 = t + 0.24 + b.charge + 0.2,
 						x = px,
 						y = py,

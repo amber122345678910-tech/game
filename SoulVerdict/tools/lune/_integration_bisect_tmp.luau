@@ -1,5 +1,5 @@
 --!nocheck
-local fs = require("@lune/fs")
+-- temporary (integration audit): which suite leaks state into ui_screens? deleted after use
 local process = require("@lune/process")
 local Loader = require("./loader")
 local T = require("./test")
@@ -14,6 +14,9 @@ for _, f in list do
 		local ok, err = pcall(suite[name], T, Loader)
 		if not ok then table.insert(T.failures, T.current .. " ERROR " .. tostring(err)) end
 	end
+	local Players = Loader.roblox and nil
+	local okP, lp = pcall(function() return require("@lune/roblox") end)
 end
-print(#T.failures .. " failures")
-for i = 1, math.min(3, #T.failures) do print(T.failures[i]) end
+local ui = 0
+for _, f in T.failures do if string.find(f, "^ui_screens") then ui += 1 end end
+print(process.args[1] .. " -> ui_screens failures: " .. ui)
