@@ -1,0 +1,391 @@
+<title>Soul Verdict Style Board</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Rubik:wght@400;500;700&family=JetBrains+Mono:wght@500&display=swap">
+<style>
+/* Layout: a single dark "battle box" world — black ground, white 4px pixel frames, yellow = chosen (Undertale's FIGHT-button highlight). */
+:root {
+  --bg: #000000;
+  --panel: #0c0c10;
+  --frame: #ffffff;
+  --fg: #f4f4f6;
+  --dim: #a3a3b2;
+  --pick: #ffff00;
+  --orange: #ff7f27;
+  --soul: #ff1a1a;
+  --kr: #ff00ff;
+  --ok: #3ddc84;
+  --font-display: "Press Start 2P", "Courier New", monospace;
+  --font-body: "Rubik", "Segoe UI", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, "Courier New", monospace;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body {
+  background: var(--bg);
+  color: var(--fg);
+  font: 16px/1.55 var(--font-body);
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 0 48px;
+}
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 10; background: var(--bg); }
+.wrap { max-width: 1240px; margin: 0 auto; }
+h1, h2, h3 { font-family: var(--font-display); font-weight: 400; text-wrap: balance; margin: 0; }
+p { margin: 0; }
+
+/* sticky status bar */
+.bar {
+  position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5;
+  display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; justify-content: space-between;
+  background: var(--bg); border-bottom: 4px solid var(--frame);
+  padding-block: 12px;
+}
+.bar .brand { font-family: var(--font-display); font-size: 13px; letter-spacing: 1px; display: flex; gap: 10px; align-items: center; }
+.heart { display: inline-block; width: 14px; height: 13px; flex: none; background: var(--soul);
+  clip-path: polygon(0 25%,12.5% 0,37.5% 0,50% 18%,62.5% 0,87.5% 0,100% 25%,100% 50%,50% 100%,0 50%); }
+.status { font-family: var(--font-mono); font-size: 13px; color: var(--dim); }
+.status.ok { color: var(--ok); }
+.status.warn { color: var(--orange); }
+
+/* hero */
+.hero { padding-block: 40px 28px; display: grid; gap: 18px; }
+.hero h1 { font-size: clamp(28px, 6vw, 56px); line-height: 1.15; letter-spacing: 2px; }
+.hero .sub { font-family: var(--font-display); font-size: clamp(10px, 1.6vw, 13px); color: var(--dim); letter-spacing: 1px; }
+.dialog { border: 4px solid var(--frame); padding: 18px 20px; max-width: 70ch; display: grid; gap: 8px; }
+.dialog p::before { content: "* "; }
+.counter { font-family: var(--font-mono); font-size: 13px; color: var(--dim); }
+.counter b { color: var(--pick); font-weight: 500; }
+
+/* sections */
+section { padding-block: 34px 8px; display: grid; gap: 16px; }
+.sec-head { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: baseline; justify-content: space-between; border-bottom: 2px solid #2a2a33; padding-bottom: 10px; }
+.sec-head h2 { font-size: clamp(13px, 2.2vw, 18px); letter-spacing: 1px; }
+.sec-head h2::before { content: "* "; color: var(--pick); }
+.hint { font-family: var(--font-mono); font-size: 12.5px; color: var(--dim); text-transform: uppercase; letter-spacing: 0.8px; }
+.lede { color: var(--dim); max-width: 70ch; }
+
+.grid { display: grid; gap: 18px; grid-template-columns: repeat(auto-fill, minmax(min(100%, 280px), 1fr)); }
+.grid.two { grid-template-columns: repeat(auto-fill, minmax(min(100%, 420px), 1fr)); }
+.grid.wide { grid-template-columns: 1fr; }
+
+.card {
+  background: var(--panel); border: 4px solid #3a3a46; display: grid; gap: 12px; padding: 12px;
+  min-width: 0; position: relative; transition: border-color .15s ease;
+}
+.card.picked { border-color: var(--pick); }
+.card.picked::after {
+  content: ""; position: absolute; top: 18px; right: 18px; width: 22px; height: 20px; background: var(--soul);
+  clip-path: polygon(0 25%,12.5% 0,37.5% 0,50% 18%,62.5% 0,87.5% 0,100% 25%,100% 50%,50% 100%,0 50%);
+  filter: drop-shadow(0 0 6px rgba(255,26,26,.8));
+}
+.shots { display: grid; gap: 8px; }
+.shots.pair { grid-template-columns: 1fr 1fr; }
+.shots img { display: block; width: 100%; height: auto; aspect-ratio: 16 / 9; object-fit: cover; background: #111; border: 2px solid #22222b; }
+.shots img.tall { aspect-ratio: auto; }
+.shots figure { margin: 0; display: grid; gap: 4px; min-width: 0; }
+.shots figcaption { font-family: var(--font-mono); font-size: 11.5px; color: var(--dim); text-transform: uppercase; letter-spacing: .6px; }
+.card h3 { font-size: 12px; line-height: 1.6; letter-spacing: .5px; }
+.card p { color: var(--dim); font-size: 15px; }
+.actions { display: flex; flex-wrap: wrap; gap: 10px; }
+button.pick {
+  font: 11px/1 var(--font-display); letter-spacing: 1px; color: var(--orange); background: transparent;
+  border: 3px solid var(--orange); padding: 12px 14px; cursor: pointer; display: inline-flex; gap: 8px; align-items: center;
+}
+button.pick:hover { color: var(--pick); border-color: var(--pick); }
+button.pick:focus-visible { outline: 3px dashed var(--pick); outline-offset: 3px; }
+button.pick[aria-pressed="true"] { color: #000; background: var(--pick); border-color: var(--pick); }
+button.pick .mark { width: 10px; height: 9px; background: currentColor;
+  clip-path: polygon(0 25%,12.5% 0,37.5% 0,50% 18%,62.5% 0,87.5% 0,100% 25%,100% 50%,50% 100%,0 50%); }
+button.pick.star .mark { clip-path: polygon(50% 0,61% 35%,98% 35%,68% 57%,79% 91%,50% 70%,21% 91%,32% 57%,2% 35%,39% 35%); width: 11px; height: 11px; }
+
+.gallery { display: grid; gap: 14px; }
+.gallery img { display: block; width: 100%; height: auto; border: 4px solid #22222b; background: #111; }
+.gallery figure { margin: 0; display: grid; gap: 6px; }
+.gallery figcaption { color: var(--dim); font-size: 14.5px; }
+.gallery.cols { grid-template-columns: repeat(auto-fill, minmax(min(100%, 360px), 1fr)); }
+
+textarea {
+  width: 100%; min-height: 140px; resize: vertical; background: var(--panel); color: var(--fg);
+  border: 4px solid var(--frame); padding: 14px; font: 16px/1.5 var(--font-body);
+}
+textarea:focus-visible { outline: 3px dashed var(--pick); outline-offset: 3px; }
+.foot { margin-top: 40px; color: var(--dim); font-size: 13.5px; border-top: 2px solid #2a2a33; padding-top: 16px; display: grid; gap: 6px; }
+@media (prefers-reduced-motion: reduce) { .card { transition: none; } }
+@media (max-width: 520px) { .shots.pair { grid-template-columns: 1fr; } }
+</style>
+
+<div class="wrap">
+  <header class="bar">
+    <div class="brand"><span class="heart" aria-hidden="true"></span>SOUL VERDICT</div>
+    <div id="status" class="status" role="status">Загружаю твой выбор…</div>
+  </header>
+
+  <div class="hero">
+    <h1>Доска стилей</h1>
+    <p class="sub">SOUL VERDICT · фанатская игра по UNDERTALE</p>
+    <div class="dialog">
+      <p>Здесь все варианты внешнего вида игры: стили персонажей, темы меню, интерфейс боя, графика и карты.</p>
+      <p>Жми «Выбрать» или «Нравится» на том, что по душе. Выбор сохраняется сам, Claude прочитает его и сделает стандартным в игре.</p>
+      <p>Всё остальное можно будет переключать прямо в игре через Style Lab.</p>
+    </div>
+    <p class="counter" id="counter">Выбрано: <b>0</b> из 6 разделов</p>
+  </div>
+
+  <section aria-labelledby="h-chars">
+    <div class="sec-head"><h2 id="h-chars">Персонажи</h2><span class="hint">Просто посмотреть</span></div>
+    <p class="lede">Три Санса-монстра и семь детей-душ. Всё собрано кодом из деталей Roblox, без загруженных моделей.</p>
+    <div class="gallery">
+      <figure><img src="img/sans_lineup.jpg" alt="Классический Санс, Фелл Санс и Эклипс Санс в ряд" loading="lazy" width="1400" height="778"><figcaption>Классический Санс · Фелл Санс · Эклипс Санс (наш собственный персонаж)</figcaption></figure>
+      <figure><img src="img/humans_lineup.jpg" alt="Семь людей-душ с оружием" loading="lazy" width="1600" height="600"><figcaption>Решимость · Терпение · Храбрость · Честность · Упорство · Доброта · Справедливость</figcaption></figure>
+    </div>
+    <div class="gallery cols">
+      <figure><img src="img/hd_skull.jpg" alt="Гладкий HD-череп Санса" loading="lazy"><figcaption>HD-череп Санса: включается в настройках игры или импортом файлов в Studio</figcaption></figure>
+      <figure><img src="img/hd_blaster.jpg" alt="HD Гастер-бластер с открытой челюстью" loading="lazy"><figcaption>HD Гастер-бластер с открывающейся челюстью</figcaption></figure>
+    </div>
+  </section>
+
+  <section aria-labelledby="h-rig">
+    <div class="sec-head"><h2 id="h-rig">Стиль персонажей</h2><span class="hint">Выбери один</span></div>
+    <div class="grid two" data-group="rigStyle" data-mode="single"></div>
+  </section>
+
+  <section aria-labelledby="h-menu">
+    <div class="sec-head"><h2 id="h-menu">Тема меню</h2><span class="hint">Выбери одну</span></div>
+    <p class="lede">Слева главный экран, справа выбор персонажа в той же теме.</p>
+    <div class="grid two" data-group="menuTheme" data-mode="single"></div>
+  </section>
+
+  <section aria-labelledby="h-hud">
+    <div class="sec-head"><h2 id="h-hud">Интерфейс боя</h2><span class="hint">Выбери один</span></div>
+    <p class="lede">Полоски HP, KR, защиты, уклонений и ульты. Слева так видит человек, справа монстр.</p>
+    <div class="grid two" data-group="hudStyle" data-mode="single"></div>
+  </section>
+
+  <section aria-labelledby="h-gfx">
+    <div class="sec-head"><h2 id="h-gfx">Графика</h2><span class="hint">Отметь все, что нравятся</span></div>
+    <p class="lede">У каждого пресета есть версия для финальной фазы боя, когда у монстра остаётся 30% HP. Она справа на каждой карточке.</p>
+    <div class="grid" data-group="presets" data-mode="multi"></div>
+  </section>
+
+  <section aria-labelledby="h-maps">
+    <div class="sec-head"><h2 id="h-maps">Карты</h2><span class="hint">Отметь понравившиеся и одну любимую</span></div>
+    <div class="grid two" data-group="maps" data-mode="multi"></div>
+  </section>
+
+  <section aria-labelledby="h-box">
+    <div class="sec-head"><h2 id="h-box">Коробка Вердикта</h2><span class="hint">Просто посмотреть</span></div>
+    <p class="lede">Главная фишка игры: монстр затягивает душу человека в настоящий 2D-бой прямо посреди 3D-матча. Остальные видят этот бой на парящей коробке.</p>
+    <div class="gallery cols">
+      <figure><img src="img/box_classic.jpg" alt="Коробка Вердикта Классического Санса: синяя душа на платформах, бластер" loading="lazy"><figcaption>Классический Санс: синяя душа, платформы, Гастер-бластер</figcaption></figure>
+      <figure><img src="img/box_fell.jpg" alt="Коробка Вердикта Фелл Санса: красные кости" loading="lazy"><figcaption>Фелл Санс: быстрые красные кости и удары из стен</figcaption></figure>
+      <figure><img src="img/box_eclipse.jpg" alt="Коробка Вердикта Эклипс Санса во тьме" loading="lazy"><figcaption>Эклипс Санс: тьма, видны только контуры костей</figcaption></figure>
+      <figure><img src="img/prop_blaster_firing.jpg" alt="Гастер-бластер стреляет лучом" loading="lazy"><figcaption>Гастер-бластер в момент выстрела (3D)</figcaption></figure>
+    </div>
+  </section>
+
+  <section aria-labelledby="h-notes">
+    <div class="sec-head"><h2 id="h-notes">Пожелания</h2><span class="hint">Сохраняется само</span></div>
+    <label for="notes" class="lede">Что поменять, добавить или убрать? Пиши как угодно, Claude прочитает.</label>
+    <textarea id="notes" placeholder="Например: сделать Фелла ещё злее, добавить карту с Папайрусом…"></textarea>
+  </section>
+
+  <div class="foot">
+    <p>Картинки отрендерены офлайн-рендером проекта. В Roblox свет, туман и свечение выглядят немного иначе.</p>
+    <p>Файл игры: SoulVerdict.rbxl в ветке ccr-94709699-94udct.</p>
+  </div>
+</div>
+
+<script>
+(function () {
+  "use strict";
+  var OPTIONS = {
+    rigStyle: [
+      { id: "Classic", title: "КЛАССИКА", desc: "Гладкий пластик, чистые цвета, без контуров.", shots: [["img/style_classic.jpg", ""]] },
+      { id: "Toon", title: "МУЛЬТЯШНЫЙ", desc: "Чёрный контур вокруг персонажей, как в рисовке Undertale. Читается издалека.", shots: [["img/style_toon.jpg", ""]] },
+      { id: "Soft", title: "МЯГКИЙ", desc: "Одежда из ткани, мягкие блики, уютнее и спокойнее.", shots: [["img/style_soft.jpg", ""]] },
+      { id: "Glow", title: "СИЯНИЕ", desc: "Неоновые акценты, светящиеся глаза и детали, цветной свет вокруг.", shots: [["img/style_glow.jpg", ""]] }
+    ],
+    menuTheme: [
+      { id: "Classic", title: "КЛАССИКА UNDERTALE", desc: "Чёрные окна, белые пиксельные рамки, сердечко-курсор, оранжевые кнопки.", shots: [["img/menu_classic.jpg", "Главный экран"], ["img/loadout_classic.jpg", "Выбор персонажа"]] },
+      { id: "Royal", title: "КОРОЛЕВСКИЙ", desc: "Тёмно-синий с золотом, витражные акценты, шрифт с засечками.", shots: [["img/menu_royal.jpg", "Главный экран"], ["img/loadout_royal.jpg", "Выбор персонажа"]] },
+      { id: "Void", title: "ПУСТОТА", desc: "Стеклянные панели, размытый мир за ними, неоновые бирюзовые обводки.", shots: [["img/menu_void.jpg", "Главный экран"], ["img/loadout_void.jpg", "Выбор персонажа"]] },
+      { id: "Fell", title: "ФЕЛЛ", desc: "Чёрно-багровые рубленые панели, тяжёлый шрифт, красное свечение.", shots: [["img/menu_fell.jpg", "Главный экран"], ["img/loadout_fell.jpg", "Выбор персонажа"]] }
+    ],
+    hudStyle: [
+      { id: "Battle", title: "БОЕВАЯ КОРОБКА", desc: "Как в Undertale: белые рамки, жёлтая полоса HP, пурпурный KR.", shots: [["img/hud_battle.jpg", "Человек"], ["img/hud_battle_monster.jpg", "Монстр"]] },
+      { id: "Modern", title: "СОВРЕМЕННЫЙ", desc: "Скруглённые полосы с градиентами и мягким свечением.", shots: [["img/hud_modern.jpg", "Человек"], ["img/hud_modern_monster.jpg", "Монстр"]] }
+    ],
+    presets: [
+      { id: "GoldenHall", title: "ЗОЛОТОЙ ЗАЛ", desc: "Золотой закат, лучи сквозь окна, пыль в воздухе.", shots: [["img/preset_GoldenHall.jpg", "Обычный"], ["img/preset_GoldenHallFinal.jpg", "Финал"]] },
+      { id: "SnowNight", title: "СНЕЖНАЯ НОЧЬ", desc: "Холодная луна, звёзды, снегопад и тёплые окна.", shots: [["img/preset_SnowNight.jpg", "Обычный"], ["img/preset_SnowNightFinal.jpg", "Финал"]] },
+      { id: "WaterfallGlow", title: "СВЕТ ВОДОПАДА", desc: "Тёмная пещера с бирюзовым сиянием.", shots: [["img/preset_WaterfallGlow.jpg", "Обычный"], ["img/preset_WaterfallGlowFinal.jpg", "Финал"]] },
+      { id: "VoidAbyss", title: "БЕЗДНА ПУСТОТЫ", desc: "Сине-чёрный сон с неоновыми трещинами.", shots: [["img/preset_VoidAbyss.jpg", "Обычный"], ["img/preset_VoidAbyssFinal.jpg", "Финал"]] },
+      { id: "CoreInferno", title: "ПЕКЛО ЯДРА", desc: "Оранжево-красный жар, дымка и искры.", shots: [["img/preset_CoreInferno.jpg", "Обычный"], ["img/preset_CoreInfernoFinal.jpg", "Финал"]] },
+      { id: "BloodFell", title: "КРОВАВЫЙ ФЕЛЛ", desc: "Багровые сумерки и падающий пепел.", shots: [["img/preset_BloodFell.jpg", "Обычный"], ["img/preset_BloodFellFinal.jpg", "Финал"]] },
+      { id: "Dreamscape", title: "СОН", desc: "Мягкий пастельный рассвет, спокойное настроение.", shots: [["img/preset_Dreamscape.jpg", "Обычный"], ["img/preset_DreamscapeFinal.jpg", "Финал"]] },
+      { id: "Monochrome", title: "СТАРАЯ ПЛЁНКА", desc: "Контрастный чёрно-белый с лёгкой сепией.", shots: [["img/preset_Monochrome.jpg", "Обычный"], ["img/preset_MonochromeFinal.jpg", "Финал"]] },
+      { id: "Lobby", title: "ЛОББИ", desc: "Тёплый уютный свет комнаты сохранения.", shots: [["img/preset_Lobby.jpg", "Обычный"], ["img/preset_EclipseDark.jpg", "Ульта Эклипса"]] },
+      { id: "Performance", title: "БЫСТРЫЙ", desc: "Простой и яркий свет для слабых телефонов.", shots: [["img/preset_Performance.jpg", "Обычный"], ["img/preset_PerformanceFinal.jpg", "Финал"]] }
+    ],
+    maps: [
+      { id: "HallOfVerdicts", title: "ЗАЛ ВЕРДИКТОВ", desc: "Золотой закат сквозь витражи, ряды колонн, красная дорожка к трону судьи.", shots: [["img/map_HallOfVerdicts.jpg", "Вид игрока"], ["img/mapiso_HallOfVerdicts.jpg", "Сверху"]] },
+      { id: "SnowdinCrossroads", title: "СНЕЖНЫЙ ПЕРЕКРЁСТОК", desc: "Ночная деревня в снегу: гирлянды, пекарня, большая ёлка, замёрзший пруд.", shots: [["img/map_SnowdinCrossroads.jpg", "Вид игрока"], ["img/mapiso_SnowdinCrossroads.jpg", "Сверху"]] },
+      { id: "WaterfallGrotto", title: "ГРОТ ВОДОПАДА", desc: "Светящиеся кристаллы, цветы эха, мостки над водой и водопад.", shots: [["img/map_WaterfallGrotto.jpg", "Вид игрока"], ["img/mapiso_WaterfallGrotto.jpg", "Сверху"]] },
+      { id: "VoidRift", title: "РАЗЛОМ ПУСТОТЫ", desc: "Парящие острова над бездной, неоновые трещины, гигантские черепа и рёбра.", shots: [["img/map_VoidRift.jpg", "Вид игрока"], ["img/mapiso_VoidRift.jpg", "Сверху"]] },
+      { id: "CoreReactor", title: "РЕАКТОР ЯДРА", desc: "Стальные мостки над лавой вокруг пылающего реактора.", shots: [["img/map_CoreReactor.jpg", "Вид игрока"], ["img/mapiso_CoreReactor.jpg", "Сверху"]] },
+      { id: "Lobby", title: "ЛОББИ", desc: "Площадь со звездой SAVE, статуями персонажей, манекенами и досками рекордов.", shots: [["img/map_Lobby.jpg", "Вид игрока"], ["img/mapiso_Lobby.jpg", "Сверху"]] }
+    ]
+  };
+
+  var state = { rigStyle: null, menuTheme: null, hudStyle: null, presets: [], maps: [], favoriteMap: null, notes: "" };
+  var statusEl = document.getElementById("status");
+  var notesEl = document.getElementById("notes");
+  var ref = null;          // db document reference when the store is available
+  var canSave = false;
+  var LOCAL_KEY = "sv-style-board-v1";
+
+  function setStatus(text, kind) {
+    statusEl.textContent = text;
+    statusEl.className = "status" + (kind ? " " + kind : "");
+  }
+
+  function el(tag, attrs, children) {
+    var e = document.createElement(tag);
+    if (attrs) { for (var k in attrs) { if (k === "text") e.textContent = attrs[k]; else e.setAttribute(k, attrs[k]); } }
+    (children || []).forEach(function (c) { if (c) e.appendChild(c); });
+    return e;
+  }
+
+  function pickButton(label, pressed, cls) {
+    var b = el("button", { type: "button", "class": "pick" + (cls ? " " + cls : ""), "aria-pressed": pressed ? "true" : "false" });
+    b.appendChild(el("span", { "class": "mark", "aria-hidden": "true" }));
+    b.appendChild(document.createTextNode(label));
+    return b;
+  }
+
+  function isPicked(group, id) {
+    var v = state[group];
+    return Array.isArray(v) ? v.indexOf(id) !== -1 : v === id;
+  }
+
+  function renderGroup(container) {
+    var group = container.getAttribute("data-group");
+    var mode = container.getAttribute("data-mode");
+    container.textContent = "";
+    OPTIONS[group].forEach(function (opt) {
+      var picked = isPicked(group, opt.id) || (group === "maps" && state.favoriteMap === opt.id);
+      var shots = el("div", { "class": "shots" + (opt.shots.length > 1 ? " pair" : "") });
+      opt.shots.forEach(function (s) {
+        var img = el("img", { src: s[0], alt: opt.title + (s[1] ? " — " + s[1] : ""), loading: "lazy" });
+        shots.appendChild(s[1] ? el("figure", null, [img, el("figcaption", { text: s[1] })]) : img);
+      });
+      var actions = el("div", { "class": "actions" });
+      if (mode === "single") {
+        var b = pickButton(isPicked(group, opt.id) ? "ВЫБРАНО" : "ВЫБРАТЬ", isPicked(group, opt.id));
+        b.addEventListener("click", function () { state[group] = isPicked(group, opt.id) ? null : opt.id; changed(); });
+        actions.appendChild(b);
+      } else {
+        var liked = isPicked(group, opt.id);
+        var lb = pickButton(liked ? "НРАВИТСЯ" : "НРАВИТСЯ?", liked);
+        lb.addEventListener("click", function () {
+          var arr = state[group].slice(); var i = arr.indexOf(opt.id);
+          if (i === -1) arr.push(opt.id); else arr.splice(i, 1);
+          state[group] = arr; changed();
+        });
+        actions.appendChild(lb);
+        if (group === "maps") {
+          var fav = state.favoriteMap === opt.id;
+          var fb = pickButton(fav ? "ЛЮБИМАЯ" : "ЛЮБИМАЯ?", fav, "star");
+          fb.addEventListener("click", function () {
+            state.favoriteMap = fav ? null : opt.id;
+            if (!fav && state.maps.indexOf(opt.id) === -1) state.maps = state.maps.concat([opt.id]);
+            changed();
+          });
+          actions.appendChild(fb);
+        }
+      }
+      var card = el("article", { "class": "card" + (picked ? " picked" : "") }, [
+        shots, el("h3", { text: opt.title }), el("p", { text: opt.desc }), actions
+      ]);
+      container.appendChild(card);
+    });
+  }
+
+  function renderAll() {
+    var groups = document.querySelectorAll("[data-group]");
+    for (var i = 0; i < groups.length; i++) renderGroup(groups[i]);
+    var done = 0;
+    ["rigStyle", "menuTheme", "hudStyle"].forEach(function (g) { if (state[g]) done++; });
+    if (state.presets.length) done++;
+    if (state.maps.length || state.favoriteMap) done++;
+    if (state.notes && state.notes.trim()) done++;
+    var c = document.getElementById("counter");
+    c.textContent = "";
+    c.appendChild(document.createTextNode("Выбрано: "));
+    c.appendChild(el("b", { text: String(done) }));
+    c.appendChild(document.createTextNode(" из 6 разделов"));
+  }
+
+  // ---- saving: one write at a time, coalesced ----
+  var saveTimer = null, saving = false, dirty = false;
+  function changed() { renderAll(); scheduleSave(400); }
+  function scheduleSave(ms) { dirty = true; clearTimeout(saveTimer); saveTimer = setTimeout(flush, ms); }
+  function snapshotState() {
+    return { rigStyle: state.rigStyle, menuTheme: state.menuTheme, hudStyle: state.hudStyle,
+      presets: state.presets.slice(), maps: state.maps.slice(), favoriteMap: state.favoriteMap,
+      notes: (state.notes || "").slice(0, 4000), updatedAt: new Date().toISOString() };
+  }
+  function saveLocal() { try { localStorage.setItem(LOCAL_KEY, JSON.stringify(snapshotState())); } catch (e) { /* storage blocked */ } }
+  function flush() {
+    if (!dirty) return;
+    if (!canSave || !ref) { dirty = false; saveLocal(); setStatus("Сохранено только на этом устройстве", "warn"); return; }
+    if (saving) { saveTimer = setTimeout(flush, 300); return; }
+    saving = true; dirty = false;
+    setStatus("Сохраняю…");
+    ref.set(snapshotState()).then(function () {
+      saving = false; setStatus("Сохранено ✓ — Claude увидит твой выбор", "ok");
+    }, function (err) {
+      saving = false;
+      saveLocal();
+      var code = err && err.code;
+      if (code === "invalid_argument" || code === "revoked" || code === "not_granted") { canSave = false; setStatus("Нет прав на сохранение — выбор останется на этом устройстве", "warn"); }
+      else { setStatus("Не удалось сохранить, попробую ещё раз…", "warn"); scheduleSave(2500); }
+    });
+  }
+
+  notesEl.addEventListener("input", function () { state.notes = notesEl.value; renderAll(); scheduleSave(900); });
+
+  function apply(data) {
+    if (!data) return;
+    ["rigStyle", "menuTheme", "hudStyle", "favoriteMap"].forEach(function (k) { if (typeof data[k] === "string" || data[k] === null) state[k] = data[k]; });
+    ["presets", "maps"].forEach(function (k) { if (Array.isArray(data[k])) state[k] = data[k].filter(function (x) { return typeof x === "string"; }); });
+    if (typeof data.notes === "string") { state.notes = data.notes; notesEl.value = data.notes; }
+    renderAll();
+  }
+
+  // initial render from local copy (if any), then from the store
+  try { var local = JSON.parse(localStorage.getItem(LOCAL_KEY) || "null"); if (local) apply(local); } catch (e) { /* ignore */ }
+  renderAll();
+
+  function noStore(msg) { setStatus(msg, "warn"); }
+  if (!window.claude || typeof window.claude.use !== "function") { noStore("Открой страницу в Claude, чтобы выбор сохранялся"); return; }
+  Promise.all([window.claude.use("db"), window.claude.use("user")]).then(function (res) {
+    var db = res[0], user = res[1];
+    if (!db || !user) { noStore("Войди в аккаунт Claude, чтобы выбор сохранялся"); return; }
+    return user.id().then(function (uid) {
+      if (!uid) { noStore("Войди в аккаунт Claude, чтобы выбор сохранялся"); return; }
+      ref = db.doc("picks/" + uid);
+      canSave = true;
+      var timer = setTimeout(function () { setStatus("Сервер пока не отвечает — выбор сохранится, когда он появится", "warn"); }, 10000);
+      return ref.get().then(function (snap) {
+        clearTimeout(timer);
+        if (snap.exists) { apply(snap.data()); setStatus("Твой прошлый выбор загружен", "ok"); }
+        else { setStatus("Готово — отмечай, что нравится", "ok"); }
+        if (dirty) flush();
+      }, function () { clearTimeout(timer); setStatus("Не удалось загрузить прошлый выбор — новые отметки всё равно сохранятся", "warn"); });
+    });
+  }).catch(function () { noStore("Сохранение недоступно — выбор останется на этом устройстве"); });
+})();
+</script>

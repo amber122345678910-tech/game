@@ -66,3 +66,7 @@ Journals: /root/.claude/projects/-home-user-game/f493f3e8-eb29-53b3-b677-a9d1a3d
 - 03:10 UTC: Verdict Box complete (Sim, Patterns (Classic/Fell/Eclipse, 8 segments each), service, controller, view, previews/verdictbox).
 - Integration audit fixed 7 seams (leaderboards JSON, Sensitivity key, double cast anims, revive prompt visibility/G key, intro "dizzy" freeze, Collapse ring visuals, StyleLab SetSkin). See docs/INTEGRATION.md.
 - Remaining from audit: Emote (B) has no handler; own dash anim waits for server echo; title camera ignores Lobby MenuCamera marker; mid-match joiners get arena lighting/music; InvertY/QuickCast have no Settings UI.
+- 03:30 UTC: Style board artifact published: https://claude.ai/artifact/CJgZH6jNp74GpkmuEJRHJy
+  (owner picks saved in db collection "picks", doc id = owner's user id; read with ArtifactData list "picks").
+  Source copy: docs/style_board.html (images from previews/). dump_model --style now applies RigStyles.
+- Final polish workflow wf_b83a4615-efa running (gameplay/UX polish + Studio-readiness review).
