@@ -629,13 +629,18 @@ fx.Part(character, name) -> BasePart?, fx.EyeGlow(character, side: "Left"|"Right
   coins, ketchup, "SHOP" board; the head is the owner's 40x37 sprite, both eyes closed while asleep) and the goods
   (daily rotation, all skins by kit, kit unlocks) on the right. `ShopKeeper.Plan` picks the largest whole
   screen-pixel cell that keeps the goods ≥ 640 (phone) / 1080 (desktop) design px; no column when there is no room
-  (portrait). Every cell is whole screen px and the scene corner is snapped to a whole pixel (`Snap`, from the
+  (portrait) or when a cell would be under `ShopKeeper.MinUnit` design px (phone 2.2 / desktop 3.8: his dialogue box
+  would be too narrow for his lines, e.g. 568x320 phones, portrait tablets). Every cell is whole screen px and the scene corner is snapped to a whole pixel (`Snap`, from the
   stage's AbsolutePosition). Sequence: asleep ~0.8 s (bob, "Z z z" rise and fade, dim "Zzz...") → wakes (sprite swap
   + 1-cell hop) → types `shop.keeper.greet` with `SansTextBlip` blips → idle blinks; Reduced Motion: no bob/hop,
   standing Z letters. A purchase the server confirms (Notify `prog.notify.bought`/`boughtKit`, or the item owned in
-  the next profile) → `shop.keeper.thanks` (once); not enough G → `shop.keeper.poor` (no pop-up, the button shakes;
-  also on the server's `prog.err.gold`). Shop handle extras: `Keeper`, `Press(kitId, skinId?)`, `Confirm()`;
-  deps `Keeper = false`, `KeeperAt` (offline pose). Preview: `tools/preview/gui/shop_keeper.luau`.
+  the next profile) → `shop.keeper.thanks` (once); not enough G → `shop.keeper.poor` (no pop-up, the button shakes,
+  no error buzz; also on the server's `prog.err.gold`). He starts awake (greeting already shown, unvoiced) when the
+  lobby booth's Sans is awake (`ShopkeeperController.State()`), i.e. when the Shop is opened at the booth. Every tile
+  of a skin in today's rotation (Daily row and All Skins) shows and charges today's price (the featured discount, as
+  the server's `Shop.PriceFor`); the header's LV / G row follows the profile. Shop handle extras: `Keeper`,
+  `Press(kitId, skinId?)`, `Confirm()`; deps `Keeper = false`, `KeeperAt` (offline pose), `KeeperAwake` (boolean,
+  overrides the booth check). Preview: `tools/preview/gui/shop_keeper.luau`.
 - **Style Lab** (owner / Studio / private-server owner): live switch of Graphics preset, Map (server),
   Menu theme, HUD style, Rig style, Skin, camera style, particle density, Photo mode.
   This exists so the owner can compare variants and pick defaults.
@@ -874,13 +879,16 @@ de-duplicated `{Id, ...Ids}` (best first; `SoundDef.Ids: {string}?`); an entry w
 reduced?)`, `At(stages, now)`, `CameraPose`, `CameraFx`, `Runner`), **SpectateController** (P45), **GraphicsController**
 (P12), **RigStyleController** (P50).
 **ShopkeeperController** (P62) — client-only life of the lobby ShopBooth NPC (Maps/Shopkeeper: a frozen ClassicSans rig
-in Decor/ShopBooth, anchored ghost parts, no Humanoid/joints; limb joints kept as attributes for pure FK). Asleep:
-breathing and a rising "Z" BillboardGui. Local player within 12 studs -> wakes (eyes open, skull lifts and turns to him), a
-Classic-style bubble (black box, white pixel border, PressStart2P) types `shop.keeper.greet` with "SansTextBlip" blips;
-beyond 18 studs for 2 s -> `shop.keeper.bye`, dozes off again. No server state; idle (nothing moves) when camera and
-player are > 80 studs away; upper body moved with `workspace:BulkMoveTo`. API: `State()`, `Attach(model)/Detach()/
-Step(dt)` (Start finds the lobby NPC and drives Step from Heartbeat), `Tuning`; pure (tests): `Machine.new/Step/Alpha`,
-`LookAngles`, `Typing`, `PoseRig/Pose`, `BuildBubble/BuildZzz`.
+in Decor/ShopBooth, anchored ghost parts, no Humanoid/joints/shadows; limb joints kept as attributes for pure FK).
+Asleep: breathing and a rising "Z" BillboardGui. Local player within 16 studs in front of him (covers the booth prompt's
+reach) -> wakes (eyes open, skull lifts and turns to him; a player behind him -> looks ahead), a Classic-style bubble
+(black box, white pixel border, PressStart2P) types `shop.keeper.greet` with "SansTextBlip" blips (only while the bubble
+is on screen); beyond 22 studs for 2 s -> `shop.keeper.bye` (skipped when the bubble is off screen), dozes off again;
+the bubble goes for good when the Shop screen opens. No server state; idle (nothing moves) when camera and player are
+> 80 studs away; not posed while off screen (`InView`) or behind the Shop screen; upper body moved with
+`workspace:BulkMoveTo`. API: `State()`, `Attach(model)/Detach()/Step(dt)` (Start finds the lobby NPC and drives Step
+from Heartbeat), `Search(lobby, fresh?)`, `Tuning`; pure (tests): `Machine.new/Step/Alpha`, `LookAngles`, `InView`,
+`Typing`, `PoseRig/Pose`, `BuildBubble/BuildZzz`.
 **UIController** (P90) — mounts UIRoot, title screen, menus, results; calls `Hud.Mount(screenGui, deps)` once
 (`src/client/UI/Hud/init.luau` owns per-phase HUD visibility). PLAY / PRACTICE use `UI/Overlays/Loading`: the session's
 first PLAY (or no character yet) = full screen (≥4 s, menu track out, lobby track 2 s before the light); later PLAYs =

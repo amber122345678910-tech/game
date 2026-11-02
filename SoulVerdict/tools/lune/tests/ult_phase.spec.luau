@@ -199,9 +199,10 @@ local function harness(Loader)
 			local SS = H.S.StatusService
 			if cause == "Ult" then
 				-- no reset button: Exhausted / dodges / ult bar stay; the short transformation window only when the
-				-- monster is not Exhausted
+				-- monster is not Exhausted, lifted when it becomes Exhausted inside it (StatusService.Applied below)
 				if not SS.Has(m, "Exhausted") then
 					SS.Apply(m, "Invulnerable", H.Config.Round.FinalPhaseInvulnerable)
+					H.ultGuardUntil = clock + H.Config.Round.FinalPhaseInvulnerable
 				end
 			else
 				SS.Apply(m, "Invulnerable", H.Config.Round.FinalPhaseInvulnerable)
@@ -215,6 +216,14 @@ local function harness(Loader)
 			return true
 		end,
 	})
+	-- RoundService's onStatusApplied: Exhausted on the monster inside the ult window ends that window at once
+	H.ultGuardUntil = 0
+	H.S.StatusService.Applied:Connect(function(model, name)
+		if name == "Exhausted" and model == H.monster and H.ultGuardUntil > clock then
+			H.ultGuardUntil = 0
+			H.S.StatusService.Remove(model, "Invulnerable")
+		end
+	end)
 
 	local world = Instance.new("Folder")
 	world.Name = "World"

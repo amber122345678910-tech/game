@@ -11,7 +11,10 @@
 --     portrait). He sleeps, wakes up when the shop opens and greets you (shop.keeper.greet, Sans's text blips).
 --     A purchase the server confirms (Notify "prog.notify.bought"/"boughtKit", or the item owned in the next profile)
 --     -> shop.keeper.thanks; not enough G -> shop.keeper.poor (with the keeper there is no "not enough" pop-up: the
---     button shakes + the error sound, like an Undertale shop; the server's "prog.err.gold" says it too).
+--     button shakes and his line carries the refusal, no error buzz, like an Undertale shop; the server's
+--     "prog.err.gold" says it too). The header's LV / G row is rebuilt when the profile's G / LV / EXP change.
+--   * Prices: today's offer price (the featured discount) on every tile that sells that skin, Daily row or All Skins
+--     (the server charges it from either list).
 -- ShopToday shapes accepted: { Day?, Items = {Item} } | {Item};  Item = "kitId:skinId" |
 --   { KitId|Kit|kitId, SkinId|Skin|skinId, Price?|price?, Discount?|discount? (percent), Featured?|featured? }
 --
@@ -19,7 +22,8 @@
 --       Press(kitId, skinId?) -> boolean (what that item's price button does), Confirm() -> boolean (the purchase
 --       modal's Buy button) }
 --   deps: State, UI, Layout (+ offline: Profile, Kit = rail selection, Tab = "Daily"|"All" on phones, Now,
---         Keeper = false (no shopkeeper column), KeeperAt = seconds (pose that moment of his wake-up), ReducedMotion)
+--         Keeper = false (no shopkeeper column), KeeperAt = seconds (pose that moment of his wake-up), ReducedMotion,
+--         KeeperAwake = boolean (he starts awake; default: whether the lobby booth's Sans is awake, live))
 -- Requests: Buy {kind="Skin", kitId, skinId} | {kind="Kit", kitId}; EquipSkin {kitId, skinId}.
 
 local Themes = require(script.Parent.Parent.Themes)
@@ -115,6 +119,30 @@ local function fitLabel(button: any)
 	end
 end
 
+-- the lobby booth's 3D Sans (Controllers/ShopkeeperController) is awake: he wakes farther out (WAKE_RADIUS) than the
+-- booth's Shop prompt reaches, so opening the Shop there finds him awake (and he just greeted you): the screen's Sans
+-- then starts awake instead of napping and greeting a second time. Live only; any failure = asleep as usual.
+local function boothSansAwake(): boolean
+	if not Motion.IsLive() then
+		return false
+	end
+	local ok, awake = pcall(function(): boolean
+		local client = script.Parent.Parent.Parent
+		local controllers = client and client:FindFirstChild("Controllers")
+		local module = controllers and controllers:FindFirstChild("ShopkeeperController")
+		if module == nil or not module:IsA("ModuleScript") then
+			return false
+		end
+		local loaded, controller = pcall(require, module)
+		if not loaded or type(controller) ~= "table" or type(controller.State) ~= "function" then
+			return false
+		end
+		local state = controller.State()
+		return state == "Waking" or state == "Awake" or state == "Bye"
+	end)
+	return ok and awake == true
+end
+
 local function dailyOffers(deps: any, profile: any, kits: any): { Offer }
 	local config = Common.Config()
 	local count = (config and config.Shop and config.Shop.DailySkins) or 4
@@ -200,6 +228,7 @@ function Shop.Create(theme: Theme, deps: any): any
 				Phone = phone,
 				Deps = d,
 				At = if type(d.KeeperAt) == "number" then d.KeeperAt else nil,
+				Awake = if type(d.KeeperAwake) == "boolean" then d.KeeperAwake else boothSansAwake(),
 				ReducedMotion = if type(d.ReducedMotion) == "boolean" then d.ReducedMotion else nil,
 			})
 			if keeper then
@@ -282,10 +311,10 @@ function Shop.Create(theme: Theme, deps: any): any
 		local name = if skin then pick(skin.Name) else pick(kit.Name)
 		if gold < price then
 			if keeper then
-				-- Undertale-style: the shopkeeper says it (no pop-up; the G balance sits in the header)
+				-- Undertale-style: the shopkeeper says it (no pop-up; the G balance sits in the header). No error
+				-- buzz: the button already played its select sound and Sans's blips carry the refusal.
 				closeModal()
 				keeperSay("shop.keeper.poor")
-				Motion.Sound(theme.Sounds.Error)
 				shake(pressed)
 				return
 			end
@@ -575,7 +604,18 @@ function Shop.Create(theme: Theme, deps: any): any
 	end
 
 	-- sections -----------------------------------------------------------------------------------------
-	local todayPrice: { [string]: number } = {} -- "kitId:skinId" -> today's price (daily rotation)
+	-- today's rotation: the server sells an offer at today's price whichever list it is bought from (ShopService ->
+	-- Shop.CheckBuy -> Shop.PriceFor), so the Daily row, the All Skins tiles and Press() all price from this map.
+	-- Loaded by refresh() (phones build only one tab; the kit rail / EQUIP rebuild only the All Skins grid).
+	local todayOffers: { Offer } = {}
+	local todayOffer: { [string]: Offer } = {} -- "kitId:skinId" -> today's offer
+	local function loadOffers()
+		todayOffers = if kits then dailyOffers(d, profile, kits) else {}
+		table.clear(todayOffer)
+		for _, o in todayOffers do
+			todayOffer[o.kit.Id .. ":" .. o.skin.Id] = o
+		end
+	end
 	local dailyHolder = frame({ Name = "DailyHolder", Size = UDim2.new(1, 0, 0, 0), Parent = goods })
 	local allHolder = frame({ Name = "AllHolder", Size = UDim2.new(1, 0, 0, 0), Parent = goods })
 	local refresh: () -> ()
@@ -611,11 +651,7 @@ function Shop.Create(theme: Theme, deps: any): any
 		bag.Add(Motion.Loop(cd, function()
 			cd.Text = L("scr.shop.resets", Common.Clock(86400 - (Common.Now(d) % 86400)))
 		end))
-		local offers = if kits then dailyOffers(d, profile, kits) else {}
-		table.clear(todayPrice)
-		for _, o in offers do
-			todayPrice[o.kit.Id .. ":" .. o.skin.Id] = o.price
-		end
+		local offers = todayOffers
 		if #offers == 0 then
 			Common.Empty(theme, L("scr.shop.empty"), { Parent = panel.Content })
 			return
@@ -833,7 +869,12 @@ function Shop.Create(theme: Theme, deps: any): any
 		end
 		for _, skin in kit.Skins do
 			order += 1
+			-- today's offer of this skin (the featured one is cheaper today, here too: badge + struck-through price)
+			local o = todayOffer[kit.Id .. ":" .. skin.Id]
 			grid.Add(skinTile(kit, skin, Vector2.new(tileW, contentH - 6), {
+				Price = if o then o.price else nil,
+				Base = if o then o.base else nil,
+				Discount = if o then o.discount else nil,
 				LayoutOrder = order,
 				Refresh = function()
 					buildAll(parent, w, h)
@@ -845,6 +886,7 @@ function Shop.Create(theme: Theme, deps: any): any
 	local tabs: any = nil
 	refresh = function()
 		defaultSel = nil
+		loadOffers()
 		if phone then
 			local tabsH = 34
 			-- (Classic panel titles sit ON the top border, half above it: keep them clear of the tab underline)
@@ -885,10 +927,34 @@ function Shop.Create(theme: Theme, deps: any): any
 	end
 	refresh()
 
+	-- the header's LV / G row: Common.Screen builds it once from the opening profile, but a purchase spends G while
+	-- the shop is open (and Sans's "come back with more G" points at that number), so rebuild it when it changes
+	local function walletOf(p: any): string
+		return if p then string.format("%s|%s|%s", tostring(p.Gold), tostring(p.Level), tostring(p.Exp)) else ""
+	end
+	local shownWallet = walletOf(profile)
+	local function syncWallet()
+		local now = walletOf(profile)
+		if now == shownWallet then
+			return
+		end
+		local right = screen.Header:FindFirstChild("Right")
+		local old = right and right:FindFirstChild("Currency")
+		if right == nil or old == nil or not old:IsA("GuiObject") then
+			return
+		end
+		shownWallet = now
+		local height = (old :: GuiObject).Size.Y.Offset
+		local order = (old :: GuiObject).LayoutOrder
+		old:Destroy()
+		Common.Currency(theme, profile, { Height = height, Compact = phone, LayoutOrder = order, Parent = right })
+	end
+
 	local state = d.State
 	if state and state.ProfileChanged then
 		bag.Connect(state.ProfileChanged, function(p: any)
 			profile = p or Common.Profile(d)
+			syncWallet()
 			table.clear(pendingSkin)
 			local item = pendingBuy
 			if item and bought(profile, item) then
@@ -936,7 +1002,9 @@ function Shop.Create(theme: Theme, deps: any): any
 				then
 					return false
 				end
-				buy(kit, skin, todayPrice[kitId .. ":" .. skinId] or skin.Price or 0)
+				-- (the price the item's tile shows, Daily row or All Skins)
+				local o = todayOffer[kitId .. ":" .. skinId]
+				buy(kit, skin, if o then o.price else (skin.Price or 0))
 				return true
 			end
 			local level = profile and profile.Level or 1

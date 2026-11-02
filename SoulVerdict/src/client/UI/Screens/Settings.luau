@@ -235,6 +235,10 @@ function Settings.Create(theme: Theme, deps: any): any
 	for _, id in Themes.HudIds do
 		table.insert(hudOptions, { Id = id, Text = pick(Themes.GetHud(id).Name) })
 	end
+	local difficultyOptions = {}
+	for _, level in { "Easy", "Normal", "Hard" } do
+		table.insert(difficultyOptions, { Id = level, Text = L("set.difficulty." .. level) })
+	end
 	local qualityOptions = {}
 	for _, q in QUALITY do
 		table.insert(qualityOptions, { Id = q, Text = L("set.quality." .. q) })
@@ -324,6 +328,7 @@ function Settings.Create(theme: Theme, deps: any): any
 		slider(content, "SfxVolume", 0, 1, 0.05, pct, 2)
 	end
 	local function camera(content: Frame)
+		cycle(content, "Difficulty", difficultyOptions, 0)
 		slider(content, "CameraShake", 0, 2, 0.1, pct, 1)
 		slider(content, "FieldOfView", 50, 100, 1, function(v: number): string
 			return L("set.degrees", math.floor(v + 0.5))

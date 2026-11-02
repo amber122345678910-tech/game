@@ -19,12 +19,14 @@
 --
 -- API
 --   ShopKeeper.Plan(bodyW, bodyH, scale, phone, gap) -> Plan?   column for a Shop body (design px): the largest whole
---       screen-pixel cell that fits while the goods keep MinGoods px; nil = no room (portrait / tiny window).
+--       screen-pixel cell that fits while the goods keep MinGoods px; nil = no room (portrait / tiny window, or
+--       cells under MinUnit design px: his dialogue box would be too narrow for his lines).
 --       Plan = Fit + { Width (column, design px), Height }
 --   ShopKeeper.Create(theme, opts) -> Keeper?   nil when opts.Size cannot hold the scene
 --       opts: { Size: Vector2 (design px), Scale: number (UIRoot layout scale), Phone: boolean?, Deps: any?
 --               (Deps.Sound.Play plays the blips; else Motion.Sound), At: number? (pose this moment, offline),
---               ReducedMotion: boolean?, Name: string? }
+--               Awake: boolean? (he is awake already, e.g. the lobby booth's Sans just greeted you: no nap, the
+--               greeting stands in the box unvoiced), ReducedMotion: boolean?, Name: string? }
 --   Keeper: { Root: Frame, Stage: Frame, Scene: Frame, Box: Frame, Text: TextLabel, Sign: TextLabel?, Fit: Fit,
 --             Timeline: Timeline, Step(dt) (advance the clock: pose + blips + Snap), Pose(t) (pose only, no sound),
 --             Settle() (end state), Say(key, ...), Snap(stageAbs: Vector2?) (scene corner onto a whole screen
@@ -101,6 +103,10 @@ ShopKeeper.Timing = {
 
 ShopKeeper.BlipSound = "SansTextBlip"
 ShopKeeper.MaxPixel = 12
+-- design px per cell at least: the dialogue box is as wide as the scene (72 cells), and below this his longest lines
+-- (ru) no longer fit it at TextSize (measured with the real fonts: phone text >= 124 px wide in its 136 px tall box,
+-- desktop >= 224 px in 112 px); a smaller column is no column (the Shop keeps the old layout + pop-up)
+ShopKeeper.MinUnit = { Phone = 2.2, Desktop = 3.8 }
 ShopKeeper.MinGoods = { Phone = 640, Desktop = 1080 } -- design px the goods (daily + all skins) keep beside the column
 ShopKeeper.MinBox = { Phone = 84, Desktop = 120 }
 ShopKeeper.MaxBox = { Phone = 150, Desktop = 136 }
@@ -164,6 +170,9 @@ function ShopKeeper.Fit(innerW: number, innerH: number, scale: number, phone: bo
 	local widthCap = math.min(innerW, maxW or innerW)
 	for p = ShopKeeper.MaxPixel, 1, -1 do
 		local u = p / scale
+		if u < ShopKeeper.MinUnit[dev] - 1e-9 then
+			break -- (smaller cells only get narrower)
+		end
 		local sw, sh = W * u, H * u
 		if sw <= widthCap + 1e-6 and sh <= innerH + 1e-6 then
 			local fit: Fit? = nil
@@ -753,8 +762,15 @@ function ShopKeeper.Create(theme: Theme, opts: { [string]: any }): any
 		applySnow(t)
 	end
 
+	-- graphemes of the current line already voiced (reset when a new line starts: its Times table changes)
+	local voiced = 0
+	local voicedTimes: { number }? = nil
+
 	function keeper.Settle()
 		clock = math.max(clock, timeline.EndAt() + 0.5)
+		-- the line stands in full: said already (Step does not voice it afterwards)
+		voicedTimes = timeline.Times
+		voiced = #timeline.Times
 		apply(timeline.PoseAt(clock, reduced, true))
 		applySnow(clock)
 	end
@@ -768,10 +784,6 @@ function ShopKeeper.Create(theme: Theme, opts: { [string]: any }): any
 			Motion.Sound(ShopKeeper.BlipSound)
 		end
 	end
-
-	-- graphemes of the current line already voiced (reset when a new line starts: its Times table changes)
-	local voiced = 0
-	local voicedTimes: { number }? = nil
 
 	function keeper.Step(dt: number)
 		local d = if type(dt) == "number" and dt == dt then math.clamp(dt, 0, 0.25) else 0
@@ -843,7 +855,11 @@ function ShopKeeper.Create(theme: Theme, opts: { [string]: any }): any
 		clock = math.max(opts.At, 0)
 		keeper.Pose(clock)
 	elseif Motion.IsLive() then
-		keeper.Pose(0)
+		if opts.Awake == true then
+			keeper.Settle() -- awake already: the greeting stands in the box, not typed / voiced a second time
+		else
+			keeper.Pose(0)
+		end
 		stopLoop = Motion.Loop(root, function(dt: number)
 			keeper.Step(dt)
 		end)

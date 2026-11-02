@@ -3,6 +3,8 @@
 -- the lobby builds with the NPC (named, frozen ghost parts, inside the booth, behind the counter, asleep on it),
 -- the pure forward kinematics reproduce the built pose and give a sensible awake pose, the controller's pure state
 -- machine (asleep -> awake -> bye -> asleep, by distance and timers), look-at clamps, typing, and the strings.
+local task = require("@lune/task")
+
 local SHOPKEEPER = "ReplicatedStorage.Shared.Maps.Shopkeeper"
 local LOBBY = "ReplicatedStorage.Shared.Maps.Lobby"
 local STRINGS = "ReplicatedStorage.Shared.Strings"
@@ -44,6 +46,105 @@ local function limb(model, name)
 	return part
 end
 
+-- A camera CFrame at `from` looking at `at` (Lune's CFrame.lookAt is mirrored: build it from basis vectors).
+local function looking(roblox, from, at)
+	local look = (at - from).Unit
+	local right = look:Cross(roblox.Vector3.new(0, 1, 0)).Unit
+	return roblox.CFrame.fromMatrix(from, right, right:Cross(look), -look)
+end
+
+-- The controller's frame step on a fresh NPC (built at the origin, facing -Z) with stand-ins for the engine: a fake
+-- workspace (a phone-sized camera with a real field of view + BulkMoveTo counting moves), a fake local character,
+-- SoundController (counting "SansTextBlip") and UIController (the Shop screen open or not). body(C, h) runs the
+-- test; everything is put back afterwards.
+local function withRuntime(T, Loader, body)
+	local C = Loader.require(CONTROLLER)
+	local Shopkeeper = Loader.require(SHOPKEEPER)
+	local Strings = Loader.require(STRINGS)
+	local roblox = Loader.roblox
+	local Vector3 = roblox.Vector3
+	local G = getfenv(C.Step)
+	local Players = G.game:GetService("Players")
+	local oldWorkspace, oldPlayer, oldLang = rawget(G, "workspace"), rawget(Players, "LocalPlayer"), Strings.Language()
+	local h = { moves = 0, blips = 0, shop = false }
+	h.camera = { CFrame = roblox.CFrame.new(0, 8, -20), FieldOfView = 72, ViewportSize = roblox.Vector2.new(844, 390) }
+	G.workspace = {
+		CurrentCamera = h.camera,
+		BulkMoveTo = function(_, parts, cframes)
+			h.moves += 1
+			for i, part in parts do
+				part.CFrame = cframes[i]
+			end
+		end,
+	}
+	local function fakePart()
+		return {
+			Position = Vector3.zero,
+			IsA = function(_, class)
+				return class == "BasePart"
+			end,
+		}
+	end
+	local bodyPart, headPart = fakePart(), fakePart()
+	function h.standAt(x, z)
+		bodyPart.Position = Vector3.new(x, 3, z)
+		headPart.Position = Vector3.new(x, 4.6, z)
+	end
+	function h.look(from, at)
+		h.camera.CFrame = looking(roblox, from, at)
+	end
+	function h.run(seconds, dt, each)
+		dt = dt or 1 / 60
+		for _ = 1, math.floor(seconds / dt + 0.5) do
+			if each then
+				each()
+			end
+			C.Step(dt)
+		end
+	end
+	local character = {
+		FindFirstChild = function(_, name)
+			return if name == "HumanoidRootPart" then bodyPart elseif name == "Head" then headPart else nil
+		end,
+	}
+	rawset(Players, "LocalPlayer", { Name = "Kid", Character = character })
+	Strings.SetLanguage("en")
+	C._Harness({
+		Sound = {
+			Play = function(name)
+				if name == "SansTextBlip" then
+					h.blips += 1
+				end
+			end,
+		},
+		UI = {
+			IsOpen = function(name)
+				return name == "Shop" and h.shop
+			end,
+		},
+	})
+	local ok, err = pcall(function()
+		local folder = roblox.Instance.new("Folder")
+		h.model = Shopkeeper.Build(roblox.CFrame.new(0, 3.39, 0))
+		h.model.Parent = folder
+		local root = h.model.PrimaryPart
+		T.ok(C.Attach(h.model), "attaches to the frozen NPC")
+		h.gui = root:FindFirstChild("ShopkeeperBubbleAnchor"):FindFirstChild("ShopkeeperBubble")
+		h.line = h.gui:FindFirstChild("Line", true)
+		h.skull = h.model.Head:FindFirstChild("Cranium")
+		h.rest = h.skull.CFrame
+		body(C, h, Strings)
+	end)
+	C.Detach()
+	C._Harness({})
+	G.workspace = oldWorkspace
+	rawset(Players, "LocalPlayer", oldPlayer)
+	Strings.SetLanguage(oldLang)
+	if not ok then
+		error(err, 0)
+	end
+end
+
 local function run(M, m, seconds, distance, dt)
 	dt = dt or 0.05
 	local events = {}
@@ -73,12 +174,15 @@ return {
 			"lives in Decor/ShopBooth"
 		)
 		T.eq(info.Model:GetAttribute("ShopkeeperError"), nil, "no build error recorded on the lobby")
-		local parts, bad = 0, {}
+		local parts, bad, shadows = 0, {}, 0
 		for _, inst in model:GetDescendants() do
 			if inst:IsA("BasePart") then
 				parts += 1
 				if not inst.Anchored or inst.CanCollide or inst.CanQuery or inst.CanTouch then
 					table.insert(bad, inst.Name)
+				end
+				if inst.CastShadow then
+					shadows += 1
 				end
 			end
 			T.ok(not inst:IsA("Humanoid"), "no Humanoid: not a character, invisible to targeting")
@@ -87,6 +191,9 @@ return {
 		end
 		T.ok(parts > 100, "a full rig (" .. parts .. " parts)")
 		T.eq(#bad, 0, "anchored ghost parts (no collide / query / touch): " .. table.concat(bad, ", "))
+		-- the client moves ~130 of them several times a second: moving shadow casters would keep invalidating the
+		-- lighting around the booth on phones
+		T.eq(shadows, 0, "no part casts a shadow")
 		T.eq(model:GetAttribute("PartCount"), parts, "PartCount attribute matches")
 		T.ok(
 			model.PrimaryPart ~= nil and model.PrimaryPart.Name == "HumanoidRootPart",
@@ -221,14 +328,37 @@ return {
 	shop_booth_controller_api = function(T, Loader)
 		local C = Loader.require(CONTROLLER)
 		T.eq(C.Priority, 62, "Priority")
-		for _, name in { "Init", "Start", "State", "LookAngles", "Typing", "PoseRig", "Pose" } do
+		for _, name in { "Init", "Start", "State", "LookAngles", "Typing", "PoseRig", "Pose", "InView", "Search" } do
 			T.eq(type(C[name]), "function", name)
 		end
 		T.eq(C.State(), nil, "no shopkeeper offline")
-		T.eq(C.Tuning.WAKE_RADIUS, 12, "wakes within ~12 studs")
-		T.eq(C.Tuning.LEAVE_RADIUS, 18, "bye beyond ~18 studs...")
-		T.eq(C.Tuning.LEAVE_TIME, 2, "...for 2 s")
-		T.ok(C.Tuning.LEAVE_RADIUS > C.Tuning.WAKE_RADIUS, "hysteresis")
+		T.eq(C.Tuning.LEAVE_TIME, 2, "bye after 2 s away")
+		T.ok(C.Tuning.LEAVE_RADIUS >= C.Tuning.WAKE_RADIUS + 4, "hysteresis")
+		-- he is awake before the booth's Shop prompt shows: the prompt appears MaxActivationDistance from its marker
+		-- (in front of the counter), which can be farther from him than a 12-stud wake radius
+		local model, info = npc(Loader)
+		local marker = find(info.Model, "ShopBooth", "BasePart")
+		local prompt = marker and marker:FindFirstChildOfClass("ProximityPrompt")
+		T.ok(model ~= nil and prompt ~= nil, "shopkeeper and booth prompt")
+		if model == nil or prompt == nil then
+			return
+		end
+		local root = model.PrimaryPart.CFrame
+		local m = root:Inverse() * marker.CFrame.Position
+		local reach = 0
+		for deg = -90, 90, 5 do -- player roots at the marker's height, in front of him, at the prompt's edge
+			local a = math.rad(deg)
+			local p = m + Loader.roblox.Vector3.new(math.sin(a), 0, -math.cos(a)) * prompt.MaxActivationDistance
+			reach = math.max(reach, p.Magnitude)
+		end
+		T.ok(
+			C.Tuning.WAKE_RADIUS >= reach,
+			("wakes before the Shop prompt shows (wake %.1f, prompt reach %.1f studs)"):format(
+				C.Tuning.WAKE_RADIUS,
+				reach
+			)
+		)
+		T.ok(C.Tuning.WAKE_RADIUS <= reach + 3, "...but only just (he is not woken from across the plaza)")
 	end,
 
 	shop_booth_controller_pose = function(T, Loader)
@@ -393,8 +523,18 @@ return {
 		T.near(pitch, 0, 1e-6, "straight ahead: no pitch")
 		yaw = C.LookAngles(CFrame.new(), Vector3.new(-10, 0, -10))
 		T.near(yaw, math.rad(45), 1e-4, "+yaw = his left (-X)")
-		yaw = C.LookAngles(CFrame.new(), Vector3.new(10, 0, 10))
-		T.near(yaw, -C.Tuning.MAX_YAW, 1e-6, "behind him: yaw clamped")
+		yaw = C.LookAngles(CFrame.new(), Vector3.new(10, 0, -2))
+		T.near(yaw, -C.Tuning.MAX_YAW, 1e-6, "far round to his right: yaw clamped")
+		-- behind him he looks ahead: no skull whipping from one shoulder limit to the other as a player crosses
+		-- behind his back (atan2 jumps from +180 to -180 deg there)
+		local p
+		yaw, p = C.LookAngles(CFrame.new(), Vector3.new(10, 0, 10))
+		T.ok(yaw == 0 and p == 0, "behind him: looks ahead")
+		local left = C.LookAngles(CFrame.new(), Vector3.new(-0.3, 0, 10))
+		local right = C.LookAngles(CFrame.new(), Vector3.new(0.3, 0, 10))
+		T.ok(left == 0 and right == 0, "crossing right behind him: no jump")
+		local _, straightUp = C.LookAngles(CFrame.new(), Vector3.new(0, 10, 0))
+		T.near(straightUp, C.Tuning.MAX_PITCH_UP, 1e-6, "straight above: looks up (not 'behind')")
 		local _, up = C.LookAngles(CFrame.new(), Vector3.new(0, 50, -1))
 		T.near(up, C.Tuning.MAX_PITCH_UP, 1e-6, "pitch up clamped")
 		local _, down = C.LookAngles(CFrame.new(), Vector3.new(0, -50, -1))
@@ -582,6 +722,200 @@ return {
 		if not ok then
 			error(err, 0)
 		end
+	end,
+
+	shop_booth_in_view = function(T, Loader)
+		local C = Loader.require(CONTROLLER)
+		local roblox = Loader.roblox
+		local CFrame, Vector3 = roblox.CFrame, roblox.Vector3
+		local cam = CFrame.new()
+		local wide = 16 / 9
+		T.ok(C.InView(cam, 70, wide, Vector3.new(0, 0, -10), 0), "straight ahead")
+		T.ok(not C.InView(cam, 70, wide, Vector3.new(0, 0, 10), 1), "behind the camera")
+		T.ok(C.InView(cam, 70, wide, Vector3.new(0, 0, 0.5), 1), "a sphere around the camera")
+		-- 16:9 at 70 deg vertical sees ~51 deg to each side
+		local side = Vector3.new(math.tan(math.rad(60)) * 10, 0, -10)
+		T.ok(not C.InView(cam, 70, wide, side, 0), "60 deg to the side: out of view")
+		T.ok(C.InView(cam, 70, wide, side, 5), "...but a big enough sphere pokes in")
+		local phoneSide = Vector3.new(-math.tan(math.rad(55)) * 10, 0, -10)
+		T.ok(not C.InView(cam, 70, wide, phoneSide, 0), "55 deg to the side: out of a 16:9 view")
+		T.ok(C.InView(cam, 70, 844 / 390, phoneSide, 0), "...inside a wide phone's")
+		T.ok(not C.InView(cam, 70, wide, Vector3.new(0, math.tan(math.rad(40)) * 10, -10), 0), "40 deg up: above it")
+		local turned = looking(roblox, Vector3.new(5, 2, 5), Vector3.new(5, 2, 30))
+		T.ok(C.InView(turned, 70, wide, Vector3.new(5, 2, 20), 0), "in the camera's own frame")
+		T.ok(not C.InView(turned, 70, wide, Vector3.new(5, 2, -10), 0), "...behind it")
+	end,
+
+	shop_booth_runtime_offscreen = function(T, Loader)
+		-- he is only posed while the camera can see him: not from the title screen's camera (37 studs away, 78 deg
+		-- past him), not behind the walking player's camera, not behind the opaque Shop screen
+		withRuntime(T, Loader, function(C, h)
+			local V = Loader.roblox.Vector3.new
+			local npcPos = h.model.PrimaryPart.CFrame.Position
+			h.standAt(0, -60)
+			local from = V(0, 12, -37)
+			h.look(from, from + V(math.sin(math.rad(78)), -0.1, math.cos(math.rad(78))))
+			h.run(2)
+			T.eq(C.State(), "Asleep", "asleep")
+			T.eq(h.moves, 0, "title-screen camera looking past him: no part moves")
+			h.look(from, npcPos)
+			h.run(1 / 60)
+			T.eq(h.moves, 1, "the camera turns to him: his current pose is applied at once")
+			h.run(1)
+			T.ok(h.moves >= 11 and h.moves <= 17, "...then he breathes at ~15 Hz (" .. h.moves .. " moves)")
+			h.look(V(0, 8, -20), V(0, 8, -40))
+			local before = h.moves
+			h.run(1)
+			T.eq(h.moves, before, "behind the camera: no moves")
+			-- the Shop screen is open (full screen) while he wakes up: nothing moves, nothing is said
+			h.look(V(0, 8, -20), npcPos)
+			h.shop = true
+			h.standAt(0, -8)
+			before = h.moves
+			h.run(2)
+			T.eq(C.State(), "Awake", "awake behind the Shop screen")
+			T.eq(h.moves, before, "...but not posed while the Shop screen hides him")
+			T.eq(h.blips, 0, "...and no greeting blips behind it")
+			T.ok(not h.gui.Enabled, "...nor a bubble")
+			h.shop = false
+			h.run(1 / 60)
+			T.eq(h.moves, before + 1, "the Shop closes: posed at once")
+			T.ok(h.skull.CFrame.Position.Y > h.rest.Position.Y + 0.15, "...awake, the skull lifted")
+			-- awake, the player standing still: ~30 Hz once the skull has settled on him
+			h.run(1)
+			before = h.moves
+			h.run(1)
+			local hz = h.moves - before
+			T.ok(hz >= 25 and hz <= 32, "settled on the player: ~30 Hz (" .. hz .. ")")
+		end)
+	end,
+
+	shop_booth_runtime_bubble = function(T, Loader)
+		-- his 2D text blips (and the bye line) only come with a bubble the player can see; a Shop screen opened
+		-- over the greeting takes it away for good
+		withRuntime(T, Loader, function(C, h, Strings)
+			local V = Loader.roblox.Vector3.new
+			local npcPos = h.model.PrimaryPart.CFrame.Position
+			local greet = "* " .. Strings.L("shop.keeper.greet")
+			local bye = "* " .. Strings.L("shop.keeper.bye")
+			local z = -22
+			h.standAt(0, z)
+			h.look(V(0, 8, z - 11), npcPos)
+			h.run(0.2)
+			h.run(1.2, nil, function() -- walks up to the counter, the camera behind him on the booth
+				z = math.min(-6, z + 17 / 60)
+				h.standAt(0, z)
+				h.look(V(0, 8, z - 11), npcPos)
+			end)
+			h.run(3)
+			T.eq(h.line.Text, greet, "greeted")
+			T.ok(h.blips >= 8, "with blips: the bubble is on screen (" .. h.blips .. ")")
+			-- the Shop opens while the greeting is still up, then closes again
+			h.shop = true
+			h.run(1)
+			h.shop = false
+			h.run(0.5)
+			T.ok(not h.gui.Enabled, "the greeting does not come back after the Shop closes")
+			-- turns round and walks back to the plaza: the booth is behind the camera
+			local blips, sawBye = h.blips, false
+			h.run(5, nil, function()
+				z -= 17 / 60
+				h.standAt(0, z)
+				local camZ = math.min(z + 11, -3)
+				h.look(V(0, 8, camZ), V(0, 6, camZ - 20))
+				sawBye = sawBye or C.State() == "Bye"
+			end)
+			T.ok(sawBye, "he still goes through bye")
+			T.eq(h.blips, blips, "no blips from a bubble behind the camera")
+			T.ok(h.line.Text ~= bye, "no bye line typed where nobody can see it")
+			T.ok(not h.gui.Enabled, "no bubble left up")
+			h.run(4)
+			T.eq(C.State(), "Asleep", "dozed off quietly")
+			-- coming back, then backing away with the camera on him: the bye line is said, with blips
+			z = -8
+			h.standAt(0, z)
+			h.look(V(0, 8, z - 11), npcPos)
+			h.run(4)
+			blips = h.blips
+			h.run(5, nil, function()
+				z -= 8 / 60
+				h.standAt(0, z)
+				h.look(V(0, 8, z - 11), npcPos)
+			end)
+			T.eq(h.line.Text, bye, "backing away in view: says bye")
+			T.ok(h.blips > blips, "...with blips (" .. (h.blips - blips) .. ")")
+			h.run(6)
+			T.eq(C.State(), "Asleep", "asleep again")
+			-- backs up to the counter looking at the plaza: the greeting types silently until he turns round
+			z = -8
+			h.standAt(0, z)
+			h.look(V(0, 8, z + 4), V(0, 6, z - 20))
+			blips = h.blips
+			h.run(0.8)
+			T.eq(h.line.Text, greet, "greets a player who backed up to the counter")
+			T.eq(h.blips, blips, "no blips while the bubble is behind the camera")
+			h.look(V(0, 8, z - 11), npcPos)
+			h.run(2)
+			T.ok(h.blips > blips, "the rest of the line blips once it is on screen")
+		end)
+	end,
+
+	shop_booth_runtime_customers_only = function(T, Loader)
+		-- a player behind the booth (behind its back shelf) or beside / behind him does not wake him up
+		withRuntime(T, Loader, function(C, h)
+			local V = Loader.roblox.Vector3.new
+			h.look(V(0, 10, 20), h.model.PrimaryPart.CFrame.Position)
+			h.standAt(0, 8)
+			h.run(2)
+			T.eq(C.State(), "Asleep", "a player behind the booth does not wake him")
+			h.standAt(-6, 2)
+			h.run(1)
+			T.eq(C.State(), "Asleep", "...nor one beside and behind him")
+			h.standAt(0, -8)
+			h.run(0.1)
+			T.eq(C.State(), "Waking", "a customer in front of him does")
+		end)
+	end,
+
+	shop_booth_search_gives_up = function(T, Loader)
+		-- no usable shopkeeper in the lobby (TestArena fallback, a rig it cannot read): the lobby is searched once,
+		-- not rescanned for the whole session; a lobby whose shopkeeper failed to build is not searched at all
+		local C = Loader.require(CONTROLLER)
+		C.Tuning.SEARCH_TRIES, C.Tuning.SEARCH_INTERVAL = 3, 0
+		local function fakeLobby(err)
+			local lobby = { Parent = {}, Scans = 0 }
+			function lobby.GetAttribute(_, name)
+				return if name == "ShopkeeperError" then err else nil
+			end
+			function lobby.GetDescendants(self)
+				self.Scans += 1
+				return {}
+			end
+			return lobby
+		end
+		local empty = fakeLobby(nil)
+		C.Search(empty)
+		task.wait(0.1)
+		T.eq(empty.Scans, 3, "searched SEARCH_TRIES times")
+		C.Search(empty)
+		task.wait(0.1)
+		T.eq(empty.Scans, 3, "searched in vain: not searched again")
+		C.Search(empty, true)
+		task.wait(0.1)
+		T.eq(empty.Scans, 6, "...unless fresh (a new LobbyController.Ready)")
+		local broken = fakeLobby("Build failed")
+		C.Search(broken)
+		task.wait(0.1)
+		T.eq(broken.Scans, 0, "ShopkeeperError on the lobby: nothing to search for")
+		-- a lobby with a shopkeeper: found and attached
+		local roblox = Loader.roblox
+		local lobby = roblox.Instance.new("Model")
+		lobby.Parent = roblox.Instance.new("Folder")
+		Loader.require(SHOPKEEPER).Build(roblox.CFrame.new(0, 3.39, 0)).Parent = lobby
+		C.Search(lobby)
+		task.wait(0.05)
+		T.eq(C.State(), "Asleep", "attached to the lobby's shopkeeper")
+		C.Detach()
 	end,
 
 	shop_booth_strings = function(T, Loader)

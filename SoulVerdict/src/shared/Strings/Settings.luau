@@ -6,7 +6,7 @@ return {
 	["set.section.graphics"] = { en = "Graphics", ru = "Графика" },
 	["set.section.interface"] = { en = "Interface", ru = "Интерфейс" },
 	["set.section.audio"] = { en = "Audio", ru = "Звук" },
-	["set.section.camera"] = { en = "Camera & controls", ru = "Камера и управление" },
+	["set.section.camera"] = { en = "Game & controls", ru = "Игра и управление" },
 	["set.section.characters"] = { en = "Characters", ru = "Персонажи" },
 
 	["set.GraphicsPreset"] = { en = "Lighting preset", ru = "Пресет освещения" },

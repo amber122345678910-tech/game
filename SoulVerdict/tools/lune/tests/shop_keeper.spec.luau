@@ -133,6 +133,62 @@ local function mockState(profile)
 	return state, requests
 end
 
+local function deepCopy(t)
+	if type(t) ~= "table" then
+		return t
+	end
+	local out = {}
+	for k, v in t do
+		out[k] = deepCopy(v)
+	end
+	return out
+end
+
+-- runs fn(callbackOf) while every UIKit.Button keeps its OnActivated (offline Motion.On wires nothing):
+-- callbackOf(buttonRoot) -> the function a tap on that button runs
+local function withButtons(Loader, fn)
+	local UIKit = Loader.requirePath("src/client/UI/UIKit")
+	local real = UIKit.Button
+	local callbacks = {}
+	UIKit.Button = function(theme, props)
+		local h = real(theme, props)
+		table.insert(callbacks, props.OnActivated or false)
+		h.Root:SetAttribute("TestCallback", #callbacks)
+		return h
+	end
+	local ok, err = pcall(fn, function(button)
+		local id = button and button:GetAttribute("TestCallback")
+		return if id then callbacks[id] or nil else nil
+	end)
+	UIKit.Button = real
+	if not ok then
+		error(err, 0)
+	end
+end
+
+-- the text of a button (its label)
+local function buttonText(button)
+	if button == nil then
+		return ""
+	end
+	for _, d in button:GetDescendants() do
+		if d:IsA("TextLabel") and d.Text ~= "" then
+			return d.Text
+		end
+	end
+	return ""
+end
+
+-- the text of the header's G chip
+local function headerGold(root)
+	local header = root:FindFirstChild("Header")
+	local right = header and header:FindFirstChild("Right")
+	local row = right and right:FindFirstChild("Currency")
+	local gold = row and row:FindFirstChild("Gold")
+	local text = gold and gold:FindFirstChild("Text")
+	return if text then text.Text else ""
+end
+
 -- a skin of a kit the profile owns that the profile does not own yet (and is for sale)
 local function skinForSale(Common, Kits, profile)
 	for _, kit in Kits.All() do
@@ -646,18 +702,29 @@ return restoringFlags({
 			return h.Root:FindFirstChild("Modal") ~= nil
 		end
 
-		-- not enough G: Sans says so, no request, no pop-up
+		-- not enough G: Sans says so, no request, no pop-up, no error buzz (the tap already played the select sound;
+		-- his blips carry the refusal)
 		local poor = Common.SampleProfile()
 		poor.Gold = 5
 		local state, requests = mockState(poor)
 		local h = Shop.Create(theme, { Layout = phone, State = state, Profile = poor })
 		local kit, skin = skinForSale(Common, Kits, poor)
 		if T.ok(kit ~= nil, "a skin for sale") then
-			T.ok(h.Press(kit.Id, skin.Id), "pressed")
+			local Motion = Loader.requirePath("src/client/UI/Motion")
+			local realSound = Motion.Sound
+			local sounds = {}
+			Motion.Sound = function(key)
+				table.insert(sounds, key)
+				return realSound(key)
+			end
+			local ok, err = pcall(h.Press, kit.Id, skin.Id)
+			Motion.Sound = realSound
+			T.ok(ok and err == true, "pressed: " .. tostring(err))
 			T.eq(h.Keeper.Line(), L("shop.keeper.poor"), "poor line")
 			T.eq(#requests, 0, "no request")
 			T.ok(not modalOpen(h), "no pop-up with the keeper")
 			T.ok(not h.Confirm(), "nothing to confirm")
+			T.ok(table.find(sounds, theme.Sounds.Error) == nil, "no error buzz on top of the select sound")
 		end
 		-- the server says not enough G (stale balance): poor too
 		h.Keeper.Say("shop.keeper.greet")
@@ -727,6 +794,311 @@ return restoringFlags({
 		T.ok(modalOpen(h4), "not-enough pop-up without the keeper")
 		T.eq(#requests4, 0, "no request")
 		h4.Destroy()
+	end,
+
+	-- the server sells today's featured skin at its discounted price whichever list it is bought from
+	-- (ShopService -> Shop.CheckBuy -> Shop.PriceFor): the All Skins tile must show and charge that price too
+	featuredSkinCostsTodaysPriceInEveryList = function(T, Loader)
+		local Strings, Themes, UIRoot, roblox = setup(Loader)
+		local Shop = Loader.requirePath(SHOP)
+		local Common = Loader.requirePath("src/client/UI/Screens/Common")
+		local Kits = Loader.require("ReplicatedStorage.Shared.Kits")
+		local Rules = Loader.require("ReplicatedStorage.Shared.Progression.Shop")
+		local theme = Themes.Get("Classic")
+		local phone = deviceLayout(UIRoot, roblox, 860, 400, 36)
+		local desktop = deviceLayout(UIRoot, roblox, 1920, 1080)
+		-- today's shop exactly as the server sends it (ProfileSchema.View: ShopToday = deepCopy(Shop.Daily(day)))
+		local day = Rules.Day(1700000000) -- mockState's clock
+		local daily = Rules.Daily(day)
+		local featured = nil
+		for _, o in daily.Offers do
+			if o.Featured then
+				featured = o
+			end
+		end
+		if not T.ok(featured ~= nil and featured.Price < featured.BasePrice, "a discounted featured offer today") then
+			return
+		end
+		local kit, skin = Kits.Get(featured.KitId), Kits.Skin(featured.KitId, featured.SkinId)
+		local function profileWith(gold)
+			local p = Common.SampleProfile()
+			p.Gold = gold
+			p.Unlocked = table.clone(p.Unlocked or {})
+			p.Unlocked[kit.Id] = true
+			p.Unlocked[kit.Id .. ":" .. skin.Id] = nil
+			p.ShopToday = deepCopy(daily)
+			return p
+		end
+		local function tileIn(root, holderName, skinId)
+			local holder = root:FindFirstChild(holderName, true)
+			return holder and holder:FindFirstChild("Skin_" .. kit.Id .. "_" .. (skinId or skin.Id), true)
+		end
+		local function digits(text)
+			return (string.gsub(text, "%D", ""))
+		end
+		local today = tostring(featured.Price)
+		local item = { Kind = "Skin", KitId = kit.Id, SkinId = skin.Id }
+
+		withButtons(Loader, function(callbackOf)
+			-- phone, All tab, G = today's price (< the full price): the tile sells it at today's price
+			local p = profileWith(featured.Price)
+			local ok, _, serverPrice = Rules.CheckBuy(p, item, day)
+			T.ok(ok and serverPrice == featured.Price, "the server sells it at today's price")
+			local state, requests = mockState(p)
+			local h = Shop.Create(theme, { Layout = phone, State = state, Profile = p, Tab = "All", Kit = kit.Id })
+			local tile = tileIn(h.Root, "AllHolder")
+			if T.ok(tile ~= nil, "All Skins tile of today's featured skin") then
+				local action = tile:FindFirstChild("Action")
+				T.eq(digits(buttonText(action)), today, "All Skins price = today's price")
+				T.ok(tile:FindFirstChild("WasPrice", true) ~= nil, "struck-through full price")
+				local tap = callbackOf(action)
+				if T.ok(type(tap) == "function", "the price button's tap") then
+					tap()
+					T.ok(h.Root:FindFirstChild("Modal") ~= nil, "confirm pop-up (not 'come back with more G')")
+					T.eq(h.Keeper.Line(), Strings.L("shop.keeper.greet"), "Sans does not refuse")
+					local expected = Strings.L(
+						"scr.shop.confirmText",
+						Common.Num(featured.Price),
+						Common.Pick(skin.Name),
+						Common.Pick(kit.Name)
+					)
+					local shown = false
+					local modal = h.Root:FindFirstChild("Modal")
+					for _, d in if modal then modal:GetDescendants() else {} do
+						-- (Classic dialogue labels start with "* ")
+						if d:IsA("TextLabel") and string.find(d.Text, expected, 1, true) then
+							shown = true
+						end
+					end
+					T.ok(shown, "the pop-up names today's price: " .. expected)
+					T.ok(h.Confirm(), "confirmed")
+					T.eq(#requests, 1, "one Buy request")
+					T.eq(requests[1] and requests[1][2].skinId, skin.Id, "for that skin")
+				end
+			end
+			h.Destroy()
+			-- Press() prices it the same way on the All tab
+			local state2, requests2 = mockState(p)
+			local h2 = Shop.Create(theme, { Layout = phone, State = state2, Profile = p, Tab = "All", Kit = kit.Id })
+			T.ok(h2.Press(kit.Id, skin.Id), "pressed")
+			T.ok(h2.Root:FindFirstChild("Modal") ~= nil, "Press: confirm pop-up")
+			T.eq(h2.Keeper.Line(), Strings.L("shop.keeper.greet"), "Press: Sans does not refuse")
+			T.eq(#requests2, 0, "nothing sent before the confirmation")
+			h2.Destroy()
+
+			-- desktop: the Daily row and the All Skins list show the same price; a skin that is not in today's shop
+			-- keeps its full price (no badge)
+			local h3 = Shop.Create(theme, { Layout = desktop, State = mockState(p), Profile = p, Kit = kit.Id })
+			local dailyTile, allTile = tileIn(h3.Root, "DailyHolder"), tileIn(h3.Root, "AllHolder")
+			T.ok(dailyTile ~= nil and allTile ~= nil, "both tiles on desktop")
+			if dailyTile and allTile then
+				T.eq(
+					digits(buttonText(allTile:FindFirstChild("Action"))),
+					digits(buttonText(dailyTile:FindFirstChild("Action"))),
+					"same price in both lists"
+				)
+			end
+			local inToday = {}
+			for _, o in daily.Offers do
+				inToday[o.Key] = true
+			end
+			for _, other in kit.Skins do
+				local key = kit.Id .. ":" .. other.Id
+				if
+					(other.Price or 0) > 0
+					and other.Mastery == nil
+					and not inToday[key]
+					and not Common.SkinOwned(p, kit, other)
+				then
+					local t = tileIn(h3.Root, "AllHolder", other.Id)
+					if T.ok(t ~= nil, "tile of " .. key) then
+						T.eq(
+							digits(buttonText(t:FindFirstChild("Action"))),
+							tostring(other.Price),
+							key .. ": full price"
+						)
+						T.ok(t:FindFirstChild("WasPrice", true) == nil, key .. ": no struck-through price")
+					end
+				end
+			end
+			h3.Destroy()
+		end)
+	end,
+
+	-- no column whose dialogue box is too narrow for his lines (1 screen px per cell on a 568x320 phone left a 97 px
+	-- wide text area for a 24 px line: the ru lines ran out of the box); those screens keep the old layout + pop-up
+	noColumnTooNarrowForHisLines = function(T, Loader)
+		local _, Themes, UIRoot, roblox = setup(Loader)
+		local Shop = Loader.requirePath(SHOP)
+		local SK = Loader.requirePath(KEEPER)
+		local Common = Loader.requirePath("src/client/UI/Screens/Common")
+		local theme = Themes.Get("Classic")
+		for _, case in
+			{
+				{ "phone 568x320 (iPhone SE 1st gen)", deviceLayout(UIRoot, roblox, 568, 320) },
+				{ "tablet 768x1024 portrait", deviceLayout(UIRoot, roblox, 768, 1024) },
+				{ "window 800x600", deviceLayout(UIRoot, roblox, 800, 600) },
+			}
+		do
+			local h = Shop.Create(theme, { Layout = case[2] })
+			T.ok(h.Keeper == nil, case[1] .. ": no keeper column")
+			T.eq(h.Root.Body.Goods.Position.X.Offset, 0, case[1] .. ": the goods take the whole body")
+			h.Destroy()
+		end
+		-- every column a window gets leaves the line room: text area >= what his longest (ru) lines need at
+		-- TextSize (measured with the real fonts: 124 px in the phone box, 224 px in the desktop box)
+		local need = { Phone = 124, Desktop = 224 }
+		local columns, bad = 0, {}
+		for w = 480, 2600, 64 do
+			for hgt = 300, 1500, 48 do
+				local layout = deviceLayout(UIRoot, roblox, w, hgt)
+				local m = Common.Metrics(layout)
+				local phone = layout.Phone == true
+				local dev = if phone then "Phone" else "Desktop"
+				local bodyTop = (if phone then 8 else 18) + m.HeaderH + m.Gap
+				local bodyH = layout.Canvas.Y - bodyTop - m.FooterH - (if phone then 10 else 12)
+				local plan = SK.Plan(layout.Canvas.X - m.Margin * 2, bodyH, layout.Scale, phone, m.Gap)
+				if plan then
+					columns += 1
+					local textW = plan.Width - SK.Pad[dev] * 2 - (if phone then 20 else 32)
+					if plan.Unit < SK.MinUnit[dev] - 1e-9 or textW < need[dev] then
+						table.insert(bad, ("%dx%d %s px=%d text=%d"):format(w, hgt, dev, plan.Pixel, textW))
+					end
+				end
+			end
+		end
+		T.ok(columns > 100, "windows with a column: " .. columns)
+		T.eq(#bad, 0, "columns too narrow for the line: " .. table.concat(bad, ", "))
+	end,
+
+	-- opening the Shop at the lobby booth finds the 3D Sans awake (he just greeted you): the screen's Sans starts
+	-- awake with the greeting standing in the box, no nap and no second greeting with blips
+	startsAwakeWhenTheBoothSansGreetedYou = function(T, Loader)
+		local Strings, Themes, UIRoot, roblox = setup(Loader)
+		local SK = Loader.requirePath(KEEPER)
+		local Shop = Loader.requirePath(SHOP)
+		local Motion = Loader.requirePath("src/client/UI/Motion")
+		local theme = Themes.Get("Classic")
+		local layout = deviceLayout(UIRoot, roblox, 860, 400, 36)
+		local function make(awake, played)
+			return SK.Create(theme, {
+				Size = roblox.Vector2.new(320, 400),
+				Scale = layout.Scale,
+				Phone = true,
+				ReducedMotion = false,
+				Awake = awake,
+				Deps = {
+					Sound = {
+						Play = function(name)
+							table.insert(played, name)
+						end,
+					},
+				},
+			})
+		end
+		-- live (the engine's clock drives Step; offline Motion settles everything at once)
+		local isLive, loop = Motion.IsLive, Motion.Loop
+		Motion.IsLive = function()
+			return true
+		end
+		Motion.Loop = function()
+			return function() end
+		end
+		local ok, err = pcall(function()
+			local greet = Strings.L("shop.keeper.greet")
+			local played = {}
+			local k = make(true, played)
+			T.eq(k.State(), "Idle", "awake at once")
+			T.eq(k.Line(), greet, "the greeting")
+			T.eq(k.Text.MaxVisibleGraphemes, -1, "shown in full")
+			for _ = 1, 90 do
+				k.Step(1 / 60)
+			end
+			T.eq(#played, 0, "not voiced a second time")
+			T.eq(k.State(), "Idle", "still idle")
+			-- a new line is still typed and voiced
+			k.Say("shop.keeper.thanks")
+			for _ = 1, 90 do
+				k.Step(1 / 60)
+			end
+			T.ok(#played > 0, "thanks voiced")
+			k.Destroy()
+			-- not awake: the usual nap, then the greeting with blips
+			local played2 = {}
+			local k2 = make(nil, played2)
+			T.eq(k2.State(), "Asleep", "asleep when the shop opens")
+			for _ = 1, 240 do
+				k2.Step(1 / 60)
+			end
+			T.ok(#played2 > 0, "greeting voiced")
+			k2.Destroy()
+		end)
+		Motion.IsLive, Motion.Loop = isLive, loop
+		if not ok then
+			error(err, 0)
+		end
+		-- the Shop hands deps.KeeperAwake to him (default offline: asleep as usual)
+		local create = SK.Create
+		local seen = {}
+		SK.Create = function(th, opts)
+			table.insert(seen, opts.Awake)
+			return create(th, opts)
+		end
+		local ok2, err2 = pcall(function()
+			for _, value in { true, false } do
+				local h = Shop.Create(theme, { Layout = layout, KeeperAwake = value })
+				T.eq(seen[#seen], value, "Awake = deps.KeeperAwake " .. tostring(value))
+				h.Destroy()
+			end
+			local h = Shop.Create(theme, { Layout = layout })
+			T.eq(seen[#seen], false, "offline default: not awake")
+			h.Destroy()
+		end)
+		SK.Create = create
+		if not ok2 then
+			error(err2, 0)
+		end
+	end,
+
+	-- the header's G chip is the balance Sans's "come back with more G" points at: it follows the profile
+	headerGoldFollowsTheProfile = function(T, Loader)
+		local _, Themes, UIRoot, roblox = setup(Loader)
+		local Shop = Loader.requirePath(SHOP)
+		local Common = Loader.requirePath("src/client/UI/Screens/Common")
+		for _, case in
+			{
+				{ "phone", deviceLayout(UIRoot, roblox, 860, 400, 36) },
+				{ "desktop", deviceLayout(UIRoot, roblox, 1920, 1080) },
+			}
+		do
+			for _, theme in Themes.List() do
+				local label = theme.Id .. " " .. case[1]
+				local p = Common.SampleProfile()
+				p.Gold = 1840
+				-- (the game passes no deps.Profile: the screen reads State.Profile())
+				local state = mockState(p)
+				local h = Shop.Create(theme, { Layout = case[2], State = state })
+				T.eq(string.gsub(headerGold(h.Root), "%D", ""), "1840", label .. ": header before")
+				local spent = table.clone(p)
+				spent.Gold = 490
+				state.ProfileChanged:Fire(spent)
+				T.eq(string.gsub(headerGold(h.Root), "%D", ""), "490", label .. ": header after the purchase")
+				local right = h.Root.Header.Right
+				local rows = 0
+				for _, child in right:GetChildren() do
+					if child.Name == "Currency" then
+						rows += 1
+						T.eq(child.LayoutOrder, 1, label .. ": before the close button")
+					end
+				end
+				T.eq(rows, 1, label .. ": one LV / G row")
+				-- a profile update that leaves G / LV / EXP alone keeps the row (no rebuild)
+				right.Currency:SetAttribute("Kept", true)
+				state.ProfileChanged:Fire(table.clone(spent))
+				T.eq(right.Currency:GetAttribute("Kept"), true, label .. ": same row")
+				h.Destroy()
+			end
+		end
 	end,
 
 	stringsExistInBothLanguages = function(T, Loader)

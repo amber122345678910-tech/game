@@ -38,6 +38,7 @@ local SOURCES = {
 	"MobileUI",
 	"Loading",
 	"ShopKeeper",
+	"Difficulty",
 }
 
 local merged: { [string]: Localized } = {}

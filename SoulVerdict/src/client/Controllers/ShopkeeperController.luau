@@ -3,21 +3,28 @@
 -- (Shared/Maps/Shopkeeper builds him into the lobby, frozen and anchored). Every client animates its own copy
 -- locally; nothing is replicated and the server keeps no state.
 --   * Asleep: slow breathing, "Z z z" letters rising and fading above his skull (BillboardGui, pixel font).
---   * The LOCAL player comes within Tuning.WAKE_RADIUS (12 studs): he wakes up (eyes open, the skull lifts off
+--   * The LOCAL player comes within Tuning.WAKE_RADIUS (16 studs: a little beyond the reach of the booth's Shop
+--     prompt) IN FRONT of him (not behind the booth's back shelf): he wakes up (eyes open, the skull lifts off
 --     his arms and turns towards the player, eased with a small overshoot) and a speech bubble (BillboardGui,
 --     black box with a white pixel border and the pixel menu font, like the Classic theme) types
---     shop.keeper.greet with Sans's text blips (SoundController "SansTextBlip").
---   * Awake: his head follows the player (yaw/pitch clamped) and he blinks now and then.
---   * The player stays beyond Tuning.LEAVE_RADIUS (18 studs) for Tuning.LEAVE_TIME (2 s): he says
---     shop.keeper.bye, then dozes off again (the skull sinks back onto his arms, eyes shut, Zzz again). Coming
---     back while he says bye keeps him awake (no second greeting); coming back while he dozes off wakes him up
---     with the greeting again.
+--     shop.keeper.greet with Sans's text blips (SoundController "SansTextBlip"; only while the bubble is on
+--     screen: a 2D blip with nothing to see would come out of nowhere).
+--   * Awake: his head follows the player (yaw/pitch clamped; a player behind him -> he looks ahead) and he
+--     blinks now and then.
+--   * The player stays beyond Tuning.LEAVE_RADIUS (22 studs) for Tuning.LEAVE_TIME (2 s): he says
+--     shop.keeper.bye (only if the bubble is on screen; otherwise he dozes off without a word), then dozes off
+--     again (the skull sinks back onto his arms, eyes shut, Zzz again). Coming back while he says bye keeps him
+--     awake (no second greeting); coming back while he dozes off wakes him up with the greeting again.
 --   * Cheap: one Heartbeat callback that returns at once while both the camera and the player are farther than
---     Tuning.ACTIVE_RADIUS (the guis are disabled, no part moves). Breathing updates at ~15 Hz, waking / talking /
---     looking every frame. Poses come from Maps/Shopkeeper.Solve (pure forward kinematics, no Motor6Ds) and only
---     the upper body (~120 anchored parts) is moved, with one workspace:BulkMoveTo call.
+--     Tuning.ACTIVE_RADIUS (the guis are disabled, no part moves). Nothing moves either while he is off screen
+--     (InView: outside the camera's view, e.g. behind the title-screen camera or the walking player) or behind
+--     the opaque Shop screen; his current pose is applied the moment he shows again. Breathing updates at
+--     ~15 Hz, ~30 Hz awake once the skull has settled on the player, waking / dozing / turning every frame.
+--     Poses come from Maps/Shopkeeper.Solve (pure forward kinematics, no Motor6Ds) and only the upper body
+--     (~130 anchored parts, no shadows) is moved, with one workspace:BulkMoveTo call.
 --   * Reduced Motion (GraphicsController): shallower breathing, no overshoot, calmer Zzz.
---   * The speech bubble hides while the Shop screen is open (the screen has its own pixel shopkeeper).
+--   * The speech bubble goes away while the Shop screen is open (the screen has its own pixel shopkeeper) and
+--     does not come back when it closes.
 --
 -- API
 --   ShopkeeperController.Priority = 62
@@ -36,7 +43,14 @@
 --     Machine.Alpha(m, reduced?) -> number        0 = sleep pose .. 1 = awake pose (Waking overshoots a little
 --                                                 above 1 unless reduced); continuous across interruptions
 --   ShopkeeperController.LookAngles(neck: CFrame, target: Vector3) -> (yaw, pitch)   radians in the neck frame
---       (+yaw = his left, +pitch = up), clamped to Tuning.MAX_YAW / MAX_PITCH_UP / MAX_PITCH_DOWN
+--       (+yaw = his left, +pitch = up), clamped to Tuning.MAX_YAW / MAX_PITCH_UP / MAX_PITCH_DOWN; (0, 0) for a
+--       target behind him (farther round than Tuning.LOOK_BEHIND)
+--   ShopkeeperController.InView(cameraCF, fov, aspect, centre: Vector3, radius) -> boolean   a sphere at least
+--       partly inside a camera's view (fov = Camera.FieldOfView, vertical degrees; aspect = width / height)
+--   ShopkeeperController.Search(lobby, fresh?)   look for the shopkeeper in a lobby map and attach (Start does it;
+--       retried for late replication). A lobby searched to the end in vain, or carrying ShopkeeperError (the
+--       server could not build him), is skipped from then on unless `fresh` (a new LobbyController.Ready)
+--   ShopkeeperController._Harness(deps)           tests: stand-ins for Init's controllers { Sound, UI, Graphics }
 --   ShopkeeperController.Typing(text, elapsed, interval?, pause?) -> number   graphemes shown after `elapsed`
 --       seconds of typing (punctuation pauses longer)
 --   ShopkeeperController.PoseRig(model) -> PoseRig?   reads the frozen NPC (joint attributes, root) for Pose
@@ -59,9 +73,12 @@ local ShopkeeperController = {}
 ShopkeeperController.Priority = 62
 
 local Tuning = {
-	WAKE_RADIUS = 12, -- the local player this close wakes him
-	LEAVE_RADIUS = 18, -- ... and this far away, for LEAVE_TIME seconds, makes him say bye
+	-- the local player this close wakes him: the booth's Shop prompt shows 11 studs from its marker, which is ~4 studs
+	-- in front of him (~15 studs at most), so he is up before the player can open the Shop from it
+	WAKE_RADIUS = 16,
+	LEAVE_RADIUS = 22, -- ... and this far away, for LEAVE_TIME seconds, makes him say bye
 	LEAVE_TIME = 2,
+	FRONT_MARGIN = 0.5, -- studs in front of him a player must be to count at all (not behind the booth's shelf)
 	WAKE_TIME = 0.85, -- skull lift (s)
 	BYE_TIME = 2.6, -- bye line on screen before he dozes off
 	DOZE_TIME = 1.9, -- skull sinking back onto his arms
@@ -69,10 +86,20 @@ local Tuning = {
 	MAX_YAW = math.rad(65),
 	MAX_PITCH_UP = math.rad(28),
 	MAX_PITCH_DOWN = math.rad(22),
+	-- a target farther round than this is behind him: he looks ahead (clamping would swing the skull from one
+	-- shoulder limit to the other as the player crosses behind his back)
+	LOOK_BEHIND = math.rad(90),
 	LOOK_RATE = 7, -- 1/s, smoothing of the head following the player
+	LOOK_SETTLED = math.rad(1), -- the skull this close to its target counts as settled (AWAKE_HZ)
 	SLEEP_BREATH = { Period = 4.6, Amp = math.rad(1.7) },
 	AWAKE_BREATH = { Period = 3.4, Amp = math.rad(0.7) },
 	SLEEP_HZ = 15, -- pose updates per second while only breathing
+	AWAKE_HZ = 30, -- ... while awake with the skull settled on the player (only breathing moves)
+	VIEW_MARGIN = 1, -- studs added around the upper body / Zzz for the on-screen test (awake lift, look-at)
+	ZZZ_REACH = 3.2, -- studs the Zzz letters reach from their anchor
+	BUBBLE_VIEW_RADIUS = 1.5, -- studs around the bubble's anchor for "the bubble is on screen"
+	SEARCH_TRIES = 20, -- looking for him in a new lobby: tries, one every SEARCH_INTERVAL seconds
+	SEARCH_INTERVAL = 1,
 	GREET_HOLD = 6, -- the greeting stays up this long after it is typed
 	TYPE_INTERVAL = 0.045,
 	TYPE_PAUSE = 0.22, -- after . , ? ! and the like
@@ -183,10 +210,39 @@ function ShopkeeperController.LookAngles(neck: CFrame, target: Vector3): (number
 	if flat < 1e-4 and math.abs(rel.Y) < 1e-4 then
 		return 0, 0
 	end
-	local yaw = math.atan2(-rel.X, -rel.Z)
+	local yaw = if flat < 1e-4 then 0 else math.atan2(-rel.X, -rel.Z)
+	if math.abs(yaw) > Tuning.LOOK_BEHIND then
+		-- behind him: look ahead. Clamping would park the skull at one shoulder limit and swing it to the other
+		-- (130 deg in a blink) as the target crosses behind his back, where atan2 jumps from +180 to -180.
+		return 0, 0
+	end
 	local pitch = math.atan2(rel.Y, flat)
 	return math.clamp(yaw, -Tuning.MAX_YAW, Tuning.MAX_YAW),
 		math.clamp(pitch, -Tuning.MAX_PITCH_DOWN, Tuning.MAX_PITCH_UP)
+end
+
+-- True while a sphere (centre, radius: studs) is at least partly inside a camera's view: not behind it and not
+-- beyond any of its four side planes. fov = Camera.FieldOfView (the vertical field of view, degrees), aspect =
+-- viewport width / height.
+function ShopkeeperController.InView(
+	cameraCF: CFrame,
+	fov: number,
+	aspect: number,
+	centre: Vector3,
+	radius: number
+): boolean
+	local rel = cameraCF:PointToObjectSpace(centre)
+	local depth = -rel.Z
+	if depth < -radius then
+		return false -- behind the camera
+	end
+	local tanV = math.tan(math.rad(math.clamp(fov, 1, 179)) / 2)
+	local tanH = tanV * math.max(aspect, 0.05)
+	-- how far the centre lies outside each pair of side planes (|x| = depth * tan at the edge), along their normals
+	if (math.abs(rel.X) - depth * tanH) / math.sqrt(1 + tanH * tanH) > radius then
+		return false
+	end
+	return (math.abs(rel.Y) - depth * tanV) / math.sqrt(1 + tanV * tanV) <= radius
 end
 
 local TYPE_BEAT = 0.12 -- a beat between the bubble popping up and the first letter
@@ -356,6 +412,10 @@ type Rig = {
 	Model: Model,
 	Root: BasePart,
 	Pose: PoseRig,
+	RootInv: CFrame, -- world -> his root space (customers at -Z)
+	ViewCentre: Vector3, -- the sphere the camera must see for posing to matter (upper body in any pose + Zzz)
+	ViewRadius: number,
+	BubblePos: Vector3, -- the speech bubble's anchor (world)
 	Limbs: { Limb },
 	LimbCFrames: { [string]: CFrame }, -- scratch: solved limbs, reused every frame
 	MoveParts: { BasePart },
@@ -376,7 +436,8 @@ type Rig = {
 	BlinkUntil: number,
 	Clock: number,
 	Breath: number, -- breathing phase (radians)
-	SleepAccum: number,
+	PoseAccum: number, -- seconds since the last pose update (SLEEP_HZ / AWAKE_HZ)
+	PoseDirty: boolean, -- a pose update was skipped while he could not be seen: apply one as soon as he can
 	Idle: boolean,
 	Connections: { RBXScriptConnection },
 }
@@ -394,6 +455,7 @@ local UI: any = nil
 local rig: Rig? = nil
 local random = Random.new()
 local searching = false
+local fruitless: Instance? = nil -- the last lobby searched to the end without a usable shopkeeper
 
 local function controller(name: string): any
 	local module = script.Parent:FindFirstChild(name)
@@ -447,6 +509,27 @@ local function localTarget(): (Vector3?, Vector3?)
 	local head = character:FindFirstChild("Head")
 	local headPos = if head and head:IsA("BasePart") then head.Position else root.Position + Vector3.new(0, 1.6, 0)
 	return root.Position, headPos
+end
+
+-- The camera's vertical field of view (degrees) and aspect; nil while it has no usable viewport yet.
+local function viewOf(camera: Camera?): (number?, number?)
+	if camera == nil then
+		return nil, nil
+	end
+	local cam = camera :: any
+	local fov, size = cam.FieldOfView, cam.ViewportSize
+	if type(fov) ~= "number" or typeof(size) ~= "Vector2" or size.X < 2 or size.Y < 2 then
+		return nil, nil
+	end
+	return fov, size.X / size.Y
+end
+
+-- InView for this frame's camera; without a usable camera / viewport everything counts as seen.
+local function cameraSees(cameraCF: CFrame?, fov: number?, aspect: number?, centre: Vector3, radius: number): boolean
+	if cameraCF == nil or fov == nil or aspect == nil then
+		return true
+	end
+	return ShopkeeperController.InView(cameraCF, fov, aspect, centre, radius)
 end
 
 -- Guis -------------------------------------------------------------------------------------------------------
@@ -639,36 +722,48 @@ local function say(r: Rig, key: string, hold: number)
 	bubble.Pop = 0
 end
 
-local function stepBubble(r: Rig, dt: number, reduced: boolean)
+-- Takes the line down for good: the rest of it is shown silently while the bubble fades out, and it does not come
+-- back later (no hold left).
+local function hideBubble(bubble: Bubble)
+	if bubble.Shown < #bubble.Chars then
+		bubble.Shown = #bubble.Chars
+		bubble.Label.MaxVisibleGraphemes = -1
+	end
+	bubble.Visible = false
+	bubble.Hold = 0
+end
+
+-- shop: the Shop screen is open; audible: the bubble is on screen (its blips play only then)
+local function stepBubble(r: Rig, dt: number, reduced: boolean, shop: boolean, audible: boolean)
 	local bubble = r.Bubble
+	if shop and bubble.Visible then
+		-- the Shop screen's own pixel shopkeeper talks now: drop the line, whether it is still typing or already
+		-- up, so that it does not fade back in when the Shop closes
+		hideBubble(bubble)
+	end
 	-- typing
 	if bubble.Visible and bubble.Shown < #bubble.Chars then
-		if shopOpen() then
-			-- the Shop screen's own pixel shopkeeper talks now: finish silently and get out of the way
-			bubble.Shown = #bubble.Chars
-			bubble.Label.MaxVisibleGraphemes = -1
-			bubble.Visible = false
-		else
-			bubble.Clock += dt
-			local target = if bubble.Clock < TYPE_BEAT then 0 else typedCount(bubble.Chars, bubble.Clock - TYPE_BEAT)
-			local blipped = false
-			while bubble.Shown < target do
-				bubble.Shown += 1
-				local char = bubble.Chars[bubble.Shown]
-				-- one blip every BLIP_EVERY letters (not for the "* " prefix, spaces or punctuation), one per frame
-				if
-					not blipped
-					and char ~= " "
-					and not PUNCTUATION[char]
-					and bubble.Shown > 2
-					and bubble.Shown % Tuning.BLIP_EVERY == 1
-				then
-					blipped = true
+		bubble.Clock += dt
+		local target = if bubble.Clock < TYPE_BEAT then 0 else typedCount(bubble.Chars, bubble.Clock - TYPE_BEAT)
+		local blipped = false
+		while bubble.Shown < target do
+			bubble.Shown += 1
+			local char = bubble.Chars[bubble.Shown]
+			-- one blip every BLIP_EVERY letters (not for the "* " prefix, spaces or punctuation), one per frame
+			if
+				not blipped
+				and char ~= " "
+				and not PUNCTUATION[char]
+				and bubble.Shown > 2
+				and bubble.Shown % Tuning.BLIP_EVERY == 1
+			then
+				blipped = true
+				if audible then
 					playBlip()
 				end
 			end
-			bubble.Label.MaxVisibleGraphemes = if bubble.Shown >= #bubble.Chars then -1 else bubble.Shown
 		end
+		bubble.Label.MaxVisibleGraphemes = if bubble.Shown >= #bubble.Chars then -1 else bubble.Shown
 	elseif bubble.Visible and bubble.Hold < math.huge then
 		bubble.Hold -= dt
 		if bubble.Hold <= 0 then
@@ -676,7 +771,7 @@ local function stepBubble(r: Rig, dt: number, reduced: boolean)
 		end
 	end
 	-- fade / pop
-	local target = if bubble.Visible and not shopOpen() then 1 else 0
+	local target = if bubble.Visible and not shop then 1 else 0
 	local alpha = bubble.Alpha
 	if alpha ~= target then
 		local rate = if target > alpha then 8 else 4
@@ -708,7 +803,8 @@ local function layoutZzz(letters: { TextLabel }, strokes: { UIStroke }, clock: n
 	end
 end
 
-local function stepZzz(r: Rig, dt: number, reduced: boolean)
+-- seen: the camera can see him (otherwise the letters wait where they are)
+local function stepZzz(r: Rig, dt: number, reduced: boolean, seen: boolean)
 	local asleep = r.Machine.State == "Asleep"
 		or (r.Machine.State == "Dozing" and r.Machine.Time > Tuning.DOZE_TIME * 0.6)
 	local target = if asleep then 1 else 0
@@ -720,7 +816,7 @@ local function stepZzz(r: Rig, dt: number, reduced: boolean)
 	end
 	local visible = r.ZzzAlpha > 0.01
 	r.Zzz.Enabled = visible
-	if not visible then
+	if not visible or not seen then
 		return
 	end
 	layoutZzz(r.Letters, r.LetterStrokes, r.Clock, r.ZzzAlpha, reduced)
@@ -867,10 +963,29 @@ local function setup(model: Model): boolean
 	local bubble = buildBubble(bubbleAnchor)
 	setBubbleAlpha(bubble, 0)
 
+	-- what the camera has to see for posing to matter: every moving part (+ a margin for the awake lift and the
+	-- look-at) and the rising Zzz; the root never moves, so this is fixed
+	local rootCF = pose.RootCF
+	local lo, hi = rootCF.Position, rootCF.Position
+	local function extend(p: Vector3, pad: number)
+		lo = Vector3.new(math.min(lo.X, p.X - pad), math.min(lo.Y, p.Y - pad), math.min(lo.Z, p.Z - pad))
+		hi = Vector3.new(math.max(hi.X, p.X + pad), math.max(hi.Y, p.Y + pad), math.max(hi.Z, p.Z + pad))
+	end
+	for _, entry in limbs do
+		for _, part in entry.Parts do
+			extend(part.CFrame.Position, part.Size.Magnitude * 0.5)
+		end
+	end
+	extend(rootCF * zzzAnchor.Position, Tuning.ZZZ_REACH)
+
 	local r: Rig = {
 		Model = model,
 		Root = root,
 		Pose = pose,
+		RootInv = rootCF:Inverse(),
+		ViewCentre = (lo + hi) * 0.5,
+		ViewRadius = (hi - lo).Magnitude * 0.5 + Tuning.VIEW_MARGIN,
+		BubblePos = rootCF * bubbleAnchor.Position,
 		Limbs = limbs,
 		LimbCFrames = {},
 		MoveParts = {},
@@ -891,7 +1006,8 @@ local function setup(model: Model): boolean
 		BlinkUntil = 0,
 		Clock = random:NextNumber(0, 10),
 		Breath = random:NextNumber(0, 2 * math.pi),
-		SleepAccum = 0,
+		PoseAccum = 0,
+		PoseDirty = false,
 		Idle = true,
 		Connections = {},
 	}
@@ -918,7 +1034,7 @@ local function findShopkeeper(container: Instance): Model?
 	return nil
 end
 
-local function consider(lobby: Instance?)
+local function consider(lobby: Instance?, fresh: boolean?)
 	if lobby == nil or searching then
 		return
 	end
@@ -926,18 +1042,32 @@ local function consider(lobby: Instance?)
 	if current and current.Model.Parent and current.Model:IsDescendantOf(lobby) then
 		return
 	end
+	if lobby:GetAttribute("ShopkeeperError") ~= nil then
+		return -- the server could not build him into this lobby: nothing to find
+	end
+	if lobby == fruitless then
+		if not fresh then
+			return -- searched to the end already (a TestArena fallback, a rig PoseRig rejects): no rescans
+		end
+		fruitless = nil
+	end
 	searching = true
 	task.spawn(function()
 		-- the map replicates as a whole, but give late descendants (joint attributes, head parts) a moment
-		for _ = 1, 20 do
+		local found = false
+		for _ = 1, Tuning.SEARCH_TRIES do
 			if lobby.Parent == nil then
 				break
 			end
 			local model = findShopkeeper(lobby)
 			if model and ShopkeeperController.Attach(model) then
+				found = true
 				break
 			end
-			task.wait(1)
+			task.wait(Tuning.SEARCH_INTERVAL)
+		end
+		if not found and lobby.Parent ~= nil then
+			fruitless = lobby
 		end
 		searching = false
 	end)
@@ -956,10 +1086,12 @@ local function step(dt: number)
 	end
 	local rootPos = r.Pose.RootCF.Position
 	local body, headPos = localTarget()
-	local distance: number? = if body then (body - rootPos).Magnitude else nil
+	local bodyDistance: number? = if body then (body - rootPos).Magnitude else nil
 	local camera = workspace.CurrentCamera
-	local cameraDistance = if camera then (camera.CFrame.Position - rootPos).Magnitude else math.huge
-	if (distance == nil or distance > Tuning.ACTIVE_RADIUS) and cameraDistance > Tuning.ACTIVE_RADIUS then
+	local cameraCF: CFrame? = if camera then camera.CFrame else nil
+	local cameraPos: Vector3? = if cameraCF then cameraCF.Position else nil
+	local cameraDistance = if cameraPos then (cameraPos - rootPos).Magnitude else math.huge
+	if (bodyDistance == nil or bodyDistance > Tuning.ACTIVE_RADIUS) and cameraDistance > Tuning.ACTIVE_RADIUS then
 		-- far away (in a round, on the other side of the island): snap back to sleep once, then do nothing
 		if not r.Idle then
 			r.Idle = true
@@ -972,19 +1104,39 @@ local function step(dt: number)
 			r.Yaw, r.Pitch = 0, 0
 			applyPose(r, 0, 0, 0)
 			setEyes(r, false)
+			r.PoseDirty = false
 		end
 		return
 	end
 	r.Idle = false
 	r.Clock += dt
 	local reduced = reducedMotion()
+	local shop = shopOpen()
+	-- only a customer counts: a player in front of him (one behind the booth's back shelf does not wake him up)
+	local distance: number? = nil
+	if body and bodyDistance and (r.RootInv * body).Z < -Tuning.FRONT_MARGIN then
+		distance = bodyDistance
+	end
+	-- what the camera can see: him (pose, Zzz; nothing of the world shows behind the opaque Shop screen) and the
+	-- speech bubble (on screen and within its MaxDistance: its 2D blips and the bye line need it)
+	local fov, aspect = viewOf(camera)
+	local bodySeen = not shop and cameraSees(cameraCF, fov, aspect, r.ViewCentre, r.ViewRadius)
+	local bubbleSeen = not shop
+		and (cameraPos == nil or (cameraPos - r.BubblePos).Magnitude <= Tuning.BUBBLE_MAX_DISTANCE)
+		and cameraSees(cameraCF, fov, aspect, r.BubblePos, Tuning.BUBBLE_VIEW_RADIUS)
 	local m = r.Machine
 	for _, event in Machine.Step(m, dt, distance) do
 		if event == "Wake" then
 			say(r, "shop.keeper.greet", Tuning.GREET_HOLD)
 			r.BlinkAt = r.Clock + random:NextNumber(1.6, 3)
 		elseif event == "Bye" then
-			say(r, "shop.keeper.bye", math.huge)
+			if bubbleSeen then
+				say(r, "shop.keeper.bye", math.huge)
+			else
+				-- the player walked off with the booth out of sight: no line typed (and blipped) where nobody can see
+				-- it, and no old line left up either; he dozes off without a word
+				hideBubble(r.Bubble)
+			end
 		elseif event == "Doze" or event == "Return" then
 			-- the bye line (if still up) fades shortly after it is fully typed
 			r.Bubble.Hold = math.min(r.Bubble.Hold, if event == "Doze" then 0.4 else 0.8)
@@ -1003,8 +1155,8 @@ local function step(dt: number)
 	r.Pitch += (pitchTarget - r.Pitch) * k
 
 	stepEyes(r)
-	stepZzz(r, dt, reduced)
-	stepBubble(r, dt, reduced)
+	stepZzz(r, dt, reduced, bodySeen)
+	stepBubble(r, dt, reduced, shop, bubbleSeen)
 
 	-- breathing: slow and deep asleep, light awake; the phase is integrated so changing pace never jumps
 	local up = clamp01(alpha)
@@ -1014,14 +1166,23 @@ local function step(dt: number)
 	r.Breath = (r.Breath + dt * 2 * math.pi / period) % (2 * math.pi)
 	local breath = math.sin(r.Breath) * amp
 
-	-- pose: every frame while anything moves; ~15 Hz while he only breathes in his sleep
-	if m.State == "Asleep" then
-		r.SleepAccum += dt
-		if r.SleepAccum < 1 / Tuning.SLEEP_HZ then
-			return
-		end
+	-- pose: never while he cannot be seen (off screen, behind the Shop screen: the current pose is applied the moment
+	-- he shows again); every frame while he wakes, dozes off or turns; ~30 Hz awake with the skull settled on the
+	-- player; ~15 Hz while he only breathes in his sleep
+	if not bodySeen then
+		r.PoseDirty = true
+		return
 	end
-	r.SleepAccum = 0
+	local settled = (m.State == "Awake" or m.State == "Bye")
+		and math.abs(yawTarget - r.Yaw) < Tuning.LOOK_SETTLED
+		and math.abs(pitchTarget - r.Pitch) < Tuning.LOOK_SETTLED
+	local hz = if m.State == "Asleep" then Tuning.SLEEP_HZ elseif settled then Tuning.AWAKE_HZ else 0
+	r.PoseAccum += dt
+	if hz > 0 and not r.PoseDirty and r.PoseAccum < 1 / hz then
+		return
+	end
+	r.PoseAccum = 0
+	r.PoseDirty = false
 	local overshoot = if alpha > 1 then (alpha - 1) * math.rad(40) else 0
 	applyPose(r, alpha, breath, overshoot)
 end
@@ -1067,6 +1228,18 @@ function ShopkeeperController.State(): string?
 	return if r then r.Machine.State else nil
 end
 
+-- Looks for the shopkeeper in a lobby map (in the background, retried for late replication) and attaches to it.
+function ShopkeeperController.Search(lobby: Instance?, fresh: boolean?)
+	consider(lobby, fresh)
+end
+
+-- Tests: stand-ins for the controllers Init() looks up.
+function ShopkeeperController._Harness(deps: { [string]: any })
+	Sound = deps.Sound
+	UI = deps.UI
+	Graphics = deps.Graphics
+end
+
 function ShopkeeperController.Init()
 	Lobby = controller("LobbyController")
 	Graphics = controller("GraphicsController")
@@ -1077,7 +1250,7 @@ end
 function ShopkeeperController.Start()
 	if Lobby and Lobby.Ready then
 		Lobby.Ready:Connect(function(model: Model)
-			consider(model)
+			consider(model, true)
 		end)
 	end
 	if Lobby and type(Lobby.Lobby) == "function" then

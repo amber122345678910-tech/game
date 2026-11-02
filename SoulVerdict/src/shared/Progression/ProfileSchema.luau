@@ -159,6 +159,7 @@ function ProfileSchema.Settings(): { [string]: SettingSpec }
 		CameraLock = { Type = "boolean", Default = if D.CameraLock == nil then true else D.CameraLock },
 		ColorblindPatterns = { Type = "boolean", Default = false },
 		ReducedFlashes = { Type = "boolean", Default = false },
+		Difficulty = { Type = "enum", Default = D.Difficulty or "Easy", Values = { "Easy", "Normal", "Hard" } },
 	}
 	-- any later Config.Defaults addition becomes settable automatically (validated by its default's type)
 	for key, default in D do

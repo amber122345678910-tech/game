@@ -120,6 +120,7 @@ end
 -- jumps back to 0 when its asset loads (the engine quirk the resume fix-up covers).
 -- world.sounds = every fake Sound; world.decks() = the two music decks; world.deckOf(id) = the deck playing `id`;
 -- world.setContext(name, active) (InputController), world.setRole(role), world.roundEvents[name](data).
+-- world.inFlight = PreloadAsync calls that have not returned yet (downloads still running), world.maxInFlight = peak.
 local function loadSoundWithMocks(Loader)
 	local roblox = Loader.roblox
 	local Enum = roblox.Enum
@@ -136,6 +137,8 @@ local function loadSoundWithMocks(Loader)
 		round = { Phase = "Waiting" },
 		role = "Human",
 		resetPositionOnLoad = false,
+		inFlight = 0,
+		maxInFlight = 0,
 	}
 	local timers, deferred, hanging, loading = {}, {}, {}, {}
 	local seq = 0
@@ -280,12 +283,15 @@ local function loadSoundWithMocks(Loader)
 	function contentProvider:PreloadAsync(items, callback)
 		local id = items[1].SoundId
 		table.insert(world.preloads, id)
+		world.inFlight += 1
+		world.maxInFlight = math.max(world.maxInFlight, world.inFlight)
 		local answer = world.fetch[id]
 		if answer == "Hang" then
 			hanging[id] = coroutine.running()
 			coroutine.yield()
 			answer = world.fetch[id]
 		end
+		world.inFlight -= 1
 		if answer == "Error" then
 			error("mock: PreloadAsync is not available")
 		end
@@ -980,14 +986,15 @@ return {
 			T.eq(S.Status("Shot"), "ok", "a checker error never silences an id")
 			T.eq(world.count(world.warnings, "could not check audio id " .. id(904)), 1, "checker error warned")
 
-			-- a round with Fell Sans: 101 fails, 102 is still being checked -> the lobby track keeps playing
+			-- a round with Fell Sans: 101 fails, 102 is still being checked -> the lobby track keeps playing through the
+			-- Intro (its tracks arrive with it: rarely warmed up); from Round on it is not kept (sound_intro_stand_in)
 			world.setRound("MapId", "SnowdinCrossroads")
 			world.setRound("MonsterKit", "FellSans")
 			world.setRound("Phase", "Intro")
 			T.eq(S.Status("Theme_FellSans"), "pending", "theme: 101 bad, 102 being checked")
 			T.eq(S.NowPlaying().Key, "Theme_FellSans", "the theme is requested")
 			world.advance(2)
-			T.eq(world.audible(), nil, "the lobby track is not kept in the arena while the theme is checked (silence)")
+			T.eq(world.audible(), id(301), "the lobby track goes on through the Intro while the theme is checked")
 			T.eq(
 				world.count(world.warnings, "[Sound] audio id failed to load: " .. id(101) .. " (Theme_FellSans)"),
 				1,
@@ -1291,8 +1298,9 @@ return {
 			world.advance(3)
 			T.eq(world.probes(rid(601)), 1, "the theme is being checked")
 			T.eq(world.probes(rid(611)), 0, "the Phase 2 theme waits for the track the player is waiting for")
+			T.eq(world.audible(), rid(301), "the lobby goes on through the Intro meanwhile")
 			world.release(rid(601), "Success")
-			world.advance(0.5)
+			world.advance(2)
 			T.eq(world.audible(), rid(601), "the theme")
 			for _, n in { 611, 1003, 1004, 1005 } do
 				T.eq(world.probes(rid(n)), 1, "warming up " .. n)
@@ -1504,6 +1512,203 @@ return {
 			T.eq(S.Status("Theme_ClassicSans"), "ok", "the preferred theme is re-checked during the fight")
 			world.advance(2)
 			T.eq(world.audible(), rid(601), "and takes over")
+		end)
+	end,
+
+	-- the Intro: MonsterKit / MapId arrive with it, so its tracks are rarely warmed up - the lobby track goes on while
+	-- they are checked (not silence at round start); from Round on only arena tracks stand in (no lobby in the fight)
+	sound_intro_stand_in = function(T, Loader)
+		local Audio = Loader.require(AUDIO)
+		local Sound = load(Loader, SOUND)
+		local function all()
+			return true
+		end
+		local intro = { Phase = "Intro", MapId = "HallOfVerdicts", MonsterKit = "ClassicSans" }
+		local function choices(round, playing)
+			return list(Sound.MusicChoices(round, { Participant = true, Usable = all, Playing = playing }))
+		end
+		T.eq(choices(intro, "Lobby"), "Theme_ClassicSans,Map_HallOfVerdicts,Lobby", "Intro: the playing lobby stands in last")
+		T.eq(Sound.MusicFor(intro, { Participant = true, Usable = all, Playing = "Lobby" }), "Theme_ClassicSans", "MusicFor unchanged")
+		for _, playing in { "VerdictBox", "Victory", "Defeat", "Menu" } do
+			T.eq(choices(intro, playing), "Theme_ClassicSans,Map_HallOfVerdicts", "never stands in: " .. playing)
+		end
+		local round = table.clone(intro)
+		round.Phase = "Round"
+		T.eq(choices(round, "Lobby"), "Theme_ClassicSans,Map_HallOfVerdicts", "Round: arena tracks only")
+		withPatch(Audio, {
+			Menu = { Ids = { "1001" } },
+			Shop = { Ids = { "1002" } },
+			Lobby = { Ids = { "301" } },
+			Theme_ClassicSans = { Ids = { "601" } },
+			Theme_ClassicSans_Final = { Ids = { "611" } },
+			Map_HallOfVerdicts = { Ids = { "201" } },
+			VerdictBox = { Ids = { "701" } },
+		}, function()
+			for _, tail in { "theme ready in the Intro", "still checking at Round" } do
+				local world = loadSoundWithMocks(Loader)
+				local S = world.controller
+				for _, n in { 1001, 1002, 301, 611, 701 } do
+					world.fetch[rid(n)] = "Success"
+				end
+				world.fetch[rid(601)] = "Hang"
+				world.fetch[rid(201)] = "Hang"
+				S.Init()
+				S.Start()
+				world.advance(5)
+				T.eq(world.audible(), rid(301), "the lobby")
+				world.setRound("MapId", "HallOfVerdicts")
+				world.setRound("MonsterKit", "ClassicSans")
+				world.setRound("Phase", "Intro")
+				world.advance(3)
+				T.eq(S.NowPlaying().Key, "Theme_ClassicSans", "the theme is requested")
+				T.eq(world.audible(), rid(301), "the lobby goes on while the theme downloads (" .. tail .. ")")
+				if tail == "theme ready in the Intro" then
+					world.release(rid(601), "Success")
+					world.advance(2)
+					T.eq(world.audible(), rid(601), "then the theme")
+				else
+					world.setRound("Phase", "Round")
+					world.advance(2)
+					T.eq(world.audible(), nil, "Round: the lobby is not kept in the fight")
+					world.release(rid(601), "Success")
+					world.advance(2)
+					T.eq(world.audible(), rid(601), "the theme once ready")
+				end
+			end
+		end)
+	end,
+
+	-- a dead request the selection cannot skip (an override, the box track): a ready stand-in goes on instead of
+	-- silence; the Shop falls back to the lobby track like the Menu; "Silence" (empty) still fades out
+	sound_dead_request_keeps_a_stand_in = function(T, Loader)
+		local Audio = Loader.require(AUDIO)
+		T.eq(Audio.Get("Shop").Fallback, "Lobby", "the shop track falls back to the lobby track")
+		T.eq(#Audio.Validate(), 0, "Audio.Validate: no problems")
+		local base = {
+			Menu = { Ids = { "1001" } },
+			Shop = { Ids = { "1002" } },
+			Lobby = { Ids = { "301" } },
+			Theme_ClassicSans = { Ids = { "601" } },
+			Theme_ClassicSans_Final = { Ids = { "611" } },
+			Map_HallOfVerdicts = { Ids = { "201" } },
+			VerdictBox = { Ids = { "701", "702" } },
+			CollapsePhase = { Ids = { "1003" } },
+			Victory = { Ids = { "1004" } },
+			Defeat = { Ids = { "1005" } },
+		}
+		local function run(patch, answers, fn)
+			local patches = table.clone(base)
+			for k, v in patch do
+				patches[k] = v
+			end
+			withPatch(Audio, patches, function()
+				local world = loadSoundWithMocks(Loader)
+				for _, n in { 1001, 1002, 301, 601, 611, 201, 701, 702, 1003, 1004, 1005 } do
+					world.fetch[rid(n)] = answers[n] or "Success"
+				end
+				world.controller.Init()
+				world.controller.Start()
+				world.advance(1)
+				fn(world, world.controller)
+			end)
+		end
+		-- the owner's shop id cannot load: its Fallback keeps the lobby track going (no restart, no silence)
+		run({}, { [1002] = "Failure" }, function(world, S)
+			T.eq(world.audible(), rid(301), "the lobby")
+			local lobbyDeck = world.deckOf(rid(301))
+			S.SetMusicOverride("Shop")
+			world.advance(3)
+			T.eq(S.Status("Shop"), "ok", "the shop resolves to the lobby track")
+			T.eq(world.audible(), rid(301), "the lobby track goes on in the shop")
+			T.eq(world.deckOf(rid(301)), lobbyDeck, "not restarted")
+			S.SetMusicOverride(nil)
+			world.advance(2)
+			T.eq(world.audible(), rid(301), "the lobby after the shop")
+		end)
+		-- without a Fallback: the playing stand-in (the lobby under an override) goes on all the same
+		run({ Shop = { Ids = { "1002" }, Fallback = NIL } }, { [1002] = "Failure" }, function(world, S)
+			S.SetMusicOverride("Shop")
+			world.advance(3)
+			T.eq(S.Status("Shop"), "dead", "the shop track is dead")
+			T.eq(world.audible(), rid(301), "the lobby stands in for a dead override")
+			T.eq(S.NowPlaying().Key, "Shop", "the shop is still the one requested (its re-check may bring it back)")
+			-- intentional silence (an empty entry) still fades out
+			S.SetMusicOverride("Silence", 0.5)
+			world.advance(1)
+			T.eq(world.audible(), nil, "Silence fades everything out")
+			S.SetMusicOverride(nil, 0.5)
+			world.advance(1)
+		end)
+		-- every box candidate dead: the fight it sits on goes on (not a silent box); a stinger still has no stand-in
+		run({}, { [701] = "Failure", [702] = "Failure", [1004] = "Failure" }, function(world, S)
+			world.setRound("MapId", "HallOfVerdicts")
+			world.setRound("MonsterKit", "ClassicSans")
+			world.setRound("Phase", "Round")
+			world.advance(3)
+			T.eq(world.audible(), rid(601), "the boss theme")
+			S.Prewarm("VerdictBox")
+			world.advance(1)
+			world.setContext("Box", true)
+			world.advance(2)
+			T.eq(S.Status("VerdictBox"), "dead", "the box track is dead")
+			T.eq(world.audible(), rid(601), "the boss theme goes on in the box")
+			world.setContext("Box", false)
+			world.advance(2)
+			world.setRound("Phase", "Ending")
+			world.roundEvents.RoundEnd({ winner = "Humans" })
+			world.advance(2)
+			T.eq(world.audible(), nil, "a dead stinger: silence, not the stale fight track")
+		end)
+	end,
+
+	-- a music check that timed out keeps downloading (PreloadAsync cannot be cancelled): the warm-up and the re-checks
+	-- wait for that download instead of starting more next to it (no pile-up of parallel downloads on a slow phone),
+	-- and resume as soon as it ends - or after MUSIC_DOWNLOAD_MAX s when the engine never answers
+	sound_music_downloads_one_at_a_time = function(T, Loader)
+		local Audio = Loader.require(AUDIO)
+		local patches = {
+			Menu = { Ids = { "1001" } },
+			Shop = { Ids = { "1002" } },
+			Lobby = { Ids = { "301", "302" } },
+			VerdictBox = { Ids = { "701", "702" } },
+		}
+		local function world0()
+			local world = loadSoundWithMocks(Loader)
+			for _, n in { 1001, 1002, 301, 302, 701, 702 } do
+				world.fetch[rid(n)] = "Hang" -- queued requests: no answer, GetAssetFetchStatus None (the 20 s cap)
+			end
+			world.controller.Init()
+			world.controller.Start()
+			world.controller.Prewarm("VerdictBox")
+			return world, world.controller
+		end
+		withPatch(Audio, patches, function()
+			local world, S = world0()
+			world.advance(S.MUSIC_PROBE_TIMEOUT + 1)
+			T.eq(S.IdState(rid(301)), "bad", "the first lobby candidate timed out")
+			T.eq(world.probes(rid(302)), 1, "the track the player waits for moves on to its next candidate")
+			T.eq(world.probes(rid(1001)), 0, "no warm-up next to the download that is still running")
+			world.advance(150)
+			T.ok(world.maxInFlight <= 2, ("at most 2 downloads at once (peak %d)"):format(world.maxInFlight))
+			T.eq(world.probes(rid(1001)) + world.probes(rid(701)) + world.probes(rid(1002)), 0, "the warm-up waits")
+			-- the first candidate's download finally ends: a late Success counts, the lobby plays
+			world.release(rid(301), "Success")
+			world.advance(2)
+			T.eq(S.IdState(rid(301)), "good", "late Success")
+			T.eq(world.audible(), rid(301), "the lobby track")
+			T.eq(world.probes(rid(1001)), 0, "the second candidate is still downloading: the warm-up still waits")
+			world.release(rid(302), "Failure")
+			world.advance(0.5)
+			T.eq(world.probes(rid(1001)), 1, "both downloads over: the warm-up goes on at once")
+			T.ok(world.maxInFlight <= 2, ("still at most 2 at once (peak %d)"):format(world.maxInFlight))
+		end)
+		-- the engine never answers: after MUSIC_DOWNLOAD_MAX s those downloads no longer hold the warm-up back
+		withPatch(Audio, patches, function()
+			local world, S = world0()
+			world.advance(S.MUSIC_DOWNLOAD_MAX - 10)
+			T.eq(world.probes(rid(1001)), 0, "the warm-up waits for the hanging downloads")
+			world.advance(S.MUSIC_PROBE_TIMEOUT + 15)
+			T.eq(world.probes(rid(1001)), 1, "...but not for ever")
 		end)
 	end,
 

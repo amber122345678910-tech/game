@@ -101,6 +101,7 @@ local HazardService: any = nil
 local MovementService: any = nil
 local StatusService: any = nil
 local DamageService: any = nil
+local DifficultyService: any = nil
 
 local bots: { [Model]: Bot } = {}
 local dummies: { [Model]: Dummy } = {}
@@ -374,7 +375,10 @@ local function cast(bot: Bot, ability: any, target: Model?, targetPos: Vector3):
 	local t = now()
 	if ok and success == true then
 		local cooldown = if type(ability.Cooldown) == "number" then ability.Cooldown else 1
-		bot.Cooldowns[ability.Id] = t + cooldown + (ability.Windup or 0)
+		-- difficulty: practice bots against an Easy player wait longer between their abilities
+		local okPace, pace = call(DifficultyService, "BotPace")
+		local mult = if okPace and type(pace) == "number" and pace > 0 then pace else 1
+		bot.Cooldowns[ability.Id] = t + (cooldown + (ability.Windup or 0)) * mult
 		return true
 	end
 	-- rejected (cooldown/state): back off a little instead of spamming the service
@@ -1155,6 +1159,7 @@ function BotService.Init()
 	MovementService = tryService("MovementService")
 	StatusService = tryService("StatusService")
 	DamageService = tryService("DamageService")
+	DifficultyService = tryService("DifficultyService")
 end
 
 function BotService.Start()

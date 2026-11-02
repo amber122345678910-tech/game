@@ -12,7 +12,10 @@
 -- running), the owner's first PLAY timings (Menu out, lobby track 2 s before the light at 4 s, waits for a spawning
 -- character), later PLAYs = a ~0.6 s plain dip with a Menu -> lobby crossfade, PRACTICE revealed 0.3 s after the
 -- round's Intro starts (>= 2.5 s of the 4 s Intro visible), a refusal ends the black at once (re-toast only after a
--- late reveal), no loading screen while a round runs; the music lead never delays the reveal; the plain dip view.
+-- late reveal), no loading screen while a round runs; the music lead never delays the reveal; the plain dip view;
+-- closing the Title gives the camera back (a lobby viewer during someone's Intro too; a cut under a loading
+-- screen), a menu track whose ids failed is skipped (also when it fails while the Shop is open), a participant's
+-- Victory / Defeat stinger is never cut by a menu track.
 local LOADING = "src/client/UI/Overlays/Loading"
 local SANS = "src/shared/PixelArt/SansHead"
 local DT = 1 / 60
@@ -220,6 +223,47 @@ local function controllerRig(Loader, opts)
 		table.insert(rig.sound.overrides, { key = key, fade = fade, at = rig.now })
 		rig.sound.override = key
 	end
+	-- opts.Status: SoundController.Status(key) = rig.sound.status[key] ("ok" when unset); without it UIController
+	-- uses the static check (the key has ids in Shared/Audio)
+	if opts.Status then
+		rig.sound.status = {}
+		rig.sound.Status = function(key)
+			return rig.sound.status[key] or "ok"
+		end
+	end
+	-- opts.Camera: a fake CameraController that logs SetMode(mode, {Blend}) with the loading screen's blackness then
+	rig.camera = nil
+	if opts.Camera then
+		local cam = { mode = "Follow", calls = {} }
+		cam.SetMode = function(mode, modeOpts)
+			local handle = rig.Loading.Active()
+			table.insert(cam.calls, {
+				mode = mode,
+				blend = if type(modeOpts) == "table" then modeOpts.Blend else nil,
+				black = if handle then handle.Sequence.Backdrop else nil,
+				at = rig.now,
+			})
+			cam.mode = mode
+		end
+		cam.Mode = function()
+			return cam.mode
+		end
+		rig.camera = cam
+	end
+	-- UIController's scheduled calls (_Harness Delay): run by rig.run / rig.finish on the test clock
+	rig.delays = {}
+	local function runDue()
+		local i = 1
+		while i <= #rig.delays do
+			local d = rig.delays[i]
+			if d.at <= rig.now + 1e-9 then
+				table.remove(rig.delays, i)
+				d.fn()
+			else
+				i += 1
+			end
+		end
+	end
 	local state = { phase = "Waiting", role = "Lobby", requests = {}, Notify = syncSignal() }
 	state.Phase = function()
 		return state.phase
@@ -267,9 +311,13 @@ local function controllerRig(Loader, opts)
 		UIRoot = root,
 		Sound = rig.sound,
 		State = state,
+		Camera = rig.camera,
 		ShowOpts = showOpts,
 		Clock = function()
 			return rig.now
+		end,
+		Delay = function(seconds, fn)
+			table.insert(rig.delays, { at = rig.now + seconds, fn = fn })
 		end,
 	})
 
@@ -289,6 +337,7 @@ local function controllerRig(Loader, opts)
 		local target = rig.now + seconds - 1e-9
 		while rig.now < target do
 			rig.now += DT
+			runDue()
 			if onStep then
 				onStep(rig.now)
 			end
@@ -303,6 +352,7 @@ local function controllerRig(Loader, opts)
 		local limit = rig.now + (maxSeconds or 30)
 		while handle and not handle.Done and rig.now < limit do
 			rig.now += DT
+			runDue()
 			if onStep then
 				onStep(rig.now)
 			end
@@ -311,6 +361,14 @@ local function controllerRig(Loader, opts)
 			end
 		end
 		return handle, rig.now
+	end
+	-- the camera log as "mode@blend" (blend "-" = CameraController's default)
+	function rig.modes()
+		local out = {}
+		for _, c in (rig.camera and rig.camera.calls or {}) do
+			table.insert(out, ("%s@%s"):format(c.mode, if c.blend then tostring(c.blend) else "-"))
+		end
+		return table.concat(out, " ")
 	end
 	-- the override log as "key@fade" (key "auto" = nil = automatic selection; fade "-" = SoundController's default)
 	function rig.music(from)
@@ -1620,6 +1678,215 @@ return restoringFlags({
 			if not okPhase then
 				error(errPhase, 0)
 			end
+		end
+	end,
+
+	-- review fix: closing the Title gives the camera back to the player. A lobby viewer (late joiner, someone else's
+	-- practice) who leaves it during another player's Intro has no flyover of their own: Follow too (it stayed on the
+	-- title shot). Under a loading screen the switch is a cut while the screen is black (a 0.6 s blend was still flying
+	-- from the title shot when the quick dip lifted); a participant's flyover keeps the camera.
+	controller_title_camera_back_to_follow = function(T, Loader)
+		local function scenario(label, run)
+			local rig = controllerRig(Loader, { Camera = true })
+			local ok, err = pcall(run, rig, label)
+			rig.done()
+			if not ok then
+				error(err, 0)
+			end
+		end
+		scenario("lobby viewer, first PLAY in the Intro", function(rig, label)
+			rig.spawn()
+			rig.state.phase = "Intro" -- Role "Lobby"
+			rig.UI.Open("Title")
+			T.eq(rig.modes(), "Menu@-", label .. ": the title shot")
+			rig.UI.Play()
+			local handle = rig.Loading.Active()
+			T.ok(handle ~= nil and not handle.View.Plain, label .. ": the full loading screen")
+			rig.finish()
+			T.eq(rig.modes(), "Menu@- Follow@0", label .. ": back to Follow, a cut")
+			local follow = rig.camera.calls[2]
+			T.eq(follow and follow.black, 1, label .. ": while the screen is black")
+			T.eq(rig.camera.mode, "Follow", label .. ": the camera follows the player")
+		end)
+		scenario("lobby viewer, Menu key in the Intro", function(rig, label)
+			rig.spawn()
+			rig.state.phase = "Intro"
+			rig.UI.Open("Title")
+			rig.UI.Close()
+			T.eq(rig.modes(), "Menu@- Follow@-", label .. ": back to Follow (a blend: nothing hides the switch)")
+		end)
+		scenario("lobby viewer, later PLAY in the Intro", function(rig, label)
+			rig.spawn()
+			rig.UI.Open("Title")
+			rig.UI.Close() -- entered
+			rig.state.phase = "Intro"
+			rig.UI.Open("Title")
+			rig.UI.Play()
+			local handle = rig.Loading.Active()
+			T.ok(handle ~= nil and handle.View.Plain, label .. ": the quick dip")
+			rig.finish()
+			T.eq(rig.modes(), "Menu@- Follow@- Menu@- Follow@0", label .. ": back to Follow, a cut under the dip")
+			T.eq(rig.camera.mode, "Follow", label .. ": the camera follows the player")
+		end)
+		scenario("later PLAY in the lobby", function(rig, label)
+			rig.spawn()
+			rig.UI.Open("Title")
+			rig.UI.Close()
+			rig.UI.Open("Title")
+			local before = #rig.camera.calls
+			local pressedAt = rig.now
+			rig.UI.Play()
+			local handle = rig.Loading.Active()
+			local liftAt
+			rig.finish(5, function(now)
+				if liftAt == nil and handle.Sequence.Stage == "FadeOut" then
+					liftAt = now
+				end
+			end)
+			local follow = rig.camera.calls[before + 1]
+			T.eq(follow and follow.mode, "Follow", label .. ": Follow")
+			T.eq(follow and follow.blend, 0, label .. ": a cut, not a blend")
+			T.eq(follow and follow.black, 1, label .. ": while the dip is fully black")
+			T.ok(
+				follow ~= nil and liftAt ~= nil and follow.at < liftAt and follow.at - pressedAt <= 0.25,
+				label .. ": before the black lifts"
+			)
+			T.eq(#rig.camera.calls, before + 1, label .. ": one switch")
+		end)
+		scenario("participant in the Intro", function(rig, label)
+			rig.spawn()
+			rig.UI.Open("Title") -- in the lobby: the title shot
+			rig.state.phase = "Intro"
+			rig.state.role = "Human"
+			rig.UI.Close()
+			T.eq(rig.modes(), "Menu@-", label .. ": the Intro flyover keeps the camera")
+		end)
+		scenario("flyover already running", function(rig, label)
+			rig.spawn()
+			rig.state.phase = "Intro" -- listed in the lineup, Role not replicated yet: the flyover runs
+			rig.UI.Open("Title")
+			rig.camera.mode = "Intro"
+			rig.UI.Close()
+			T.eq(rig.modes(), "Menu@-", label .. ": a running flyover is never interrupted")
+		end)
+	end,
+
+	-- review fix: a menu track whose ids all failed never leaves the menu silent - the Shop's only id (not shared with
+	-- the experience, moderated...): the Menu track under the Shop, else the automatic music; also when the id fails
+	-- while the Shop is open (a first visit: its check was still running), within ~1 s
+	controller_menu_music_skips_a_dead_track = function(T, Loader)
+		local function scenario(label, run)
+			local rig = controllerRig(Loader, { Status = true })
+			local ok, err = pcall(run, rig, label)
+			rig.done()
+			if not ok then
+				error(err, 0)
+			end
+		end
+		scenario("dead before the visit", function(rig, label)
+			rig.spawn()
+			rig.sound.status.Shop = "dead"
+			rig.UI.Open("Title")
+			rig.UI.Open("Shop")
+			T.eq(rig.UI.Top(), "Shop", label .. ": the Shop is open")
+			T.eq(rig.sound.override, "Menu", label .. ": the Title's Menu track goes on")
+			rig.UI.Close()
+			rig.UI.Open("Shop") -- the lobby booth: no Title under it
+			T.eq(rig.UI.Top(), "Shop", label .. ": the booth's Shop is open")
+			T.eq(rig.sound.override, nil, label .. ": the automatic music (the lobby track)")
+			T.eq(rig.music(), "Menu@- auto@-", label .. ": the dead Shop track is never asked for")
+			T.eq(#rig.delays, 0, label .. ": nothing to look at again")
+		end)
+		scenario("fails during the visit", function(rig, label)
+			rig.spawn()
+			rig.sound.status.Shop = "pending"
+			rig.UI.Open("Title")
+			rig.UI.Open("Shop")
+			T.eq(rig.sound.override, "Shop", label .. ": asked for while it is checked (its stand-in plays)")
+			rig.run(3)
+			T.eq(rig.music(), "Menu@- Shop@-", label .. ": no change while it is checked")
+			rig.sound.status.Shop = "dead"
+			local failedAt = rig.now
+			rig.run(1.5)
+			T.eq(rig.sound.override, "Menu", label .. ": the Menu track again (" .. rig.music() .. ")")
+			local last = rig.sound.overrides[#rig.sound.overrides]
+			T.ok(last.at - failedAt <= 1.05, ("%s: within ~1 s (%.2f)"):format(label, last.at - failedAt))
+			T.eq(#rig.delays, 0, label .. ": no more looks once it is decided")
+			rig.UI.Back()
+			T.eq(rig.sound.override, "Menu", label .. ": back on the Title")
+		end)
+		scenario("fails during a booth visit", function(rig, label)
+			rig.spawn()
+			rig.sound.status.Shop = "pending"
+			rig.UI.Open("Shop")
+			T.eq(rig.sound.override, "Shop", label .. ": asked for")
+			rig.sound.status.Shop = "dead"
+			rig.run(1.5)
+			T.eq(rig.sound.override, nil, label .. ": the automatic music (the lobby track)")
+		end)
+		scenario("loads during the visit", function(rig, label)
+			rig.spawn()
+			rig.sound.status.Shop = "pending"
+			rig.UI.Open("Title")
+			rig.UI.Open("Shop")
+			rig.run(2)
+			rig.sound.status.Shop = "ok"
+			rig.run(3)
+			T.eq(rig.music(), "Menu@- Shop@-", label .. ": the Shop track stays")
+			T.eq(#rig.delays, 0, label .. ": no more looks")
+		end)
+	end,
+
+	-- review fix: a participant's Victory / Defeat stinger (Ending) is never cut by a menu track - SoundController would
+	-- start it again from the top when the menu closes; the Title's track comes with the next phase. A lobby viewer
+	-- (no stinger) still hears the Menu track.
+	controller_ending_keeps_the_stinger = function(T, Loader)
+		local rig = controllerRig(Loader)
+		local ok, err = pcall(function()
+			rig.spawn()
+			rig.UI.Open("Title")
+			rig.UI.Close() -- joined, then played a round
+			for _, r in { "Human", "Monster", "Spectator" } do
+				local label = r .. " in the Ending"
+				rig.state.phase = "Ending"
+				rig.state.role = r
+				local before = #rig.sound.overrides
+				rig.UI.Open("Title")
+				T.eq(rig.UI.IsOpen("Title"), true, label .. ": the Title opens")
+				rig.UI.Open("Shop")
+				rig.UI.Close()
+				rig.UI.Open("Title")
+				rig.UI.Play() -- a quick dip
+				rig.finish()
+				T.eq(rig.UI.IsOpen(), false, label .. ": back to the game")
+				T.eq(rig.music(before + 1), "", label .. ": the stinger is never touched")
+			end
+			-- the full loading screen (no character yet) keeps the stinger under the black too
+			rig.state.character = nil
+			local before = #rig.sound.overrides
+			rig.UI.Open("Title")
+			rig.UI.Play()
+			rig.finish(20, function(now)
+				if now >= 1 and rig.state.character == nil then
+					rig.spawn()
+				end
+			end)
+			T.eq(rig.music(before + 1), "", "no Silence over the stinger")
+			-- the Title is still open when the phase moves on: its track comes then (onPhase -> sync)
+			rig.UI.Open("Title")
+			rig.state.phase = "Intermission"
+			rig.state.role = "Lobby"
+			rig.UI._SyncMenuMusic()
+			T.eq(rig.sound.override, "Menu", "Intermission: the Menu track")
+			rig.UI.Close()
+			-- a lobby viewer during someone's Ending has no stinger: the Menu track as usual
+			rig.state.phase = "Ending"
+			rig.UI.Open("Title")
+			T.eq(rig.sound.override, "Menu", "lobby viewer: the Menu track")
+		end)
+		rig.done()
+		if not ok then
+			error(err, 0)
 		end
 	end,
 })

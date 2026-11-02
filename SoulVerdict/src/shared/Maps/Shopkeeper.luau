@@ -3,8 +3,8 @@
 -- Maps/Lobby (buildShop) builds him INTO the lobby map, perched on a tall stool behind the counter: a ClassicSans
 -- rig (Rigs/RigBuilder) posed asleep (SleepPose: slumped over the counter, forearms crossed on the counter top,
 -- skull tipped sideways onto them, eyes shut), then frozen like the lobby statues: every part Anchored,
--- CanCollide / CanQuery / CanTouch false, no Humanoid, no joints, no lights. Players walk through him, raycasts /
--- bots / targeting never see him and he is not a round character (no Humanoid, not in workspace.Bots).
+-- CanCollide / CanQuery / CanTouch / CastShadow false, no Humanoid, no joints, no lights. Players walk through him,
+-- raycasts / bots / targeting never see him and he is not a round character (no Humanoid, not in workspace.Bots).
 -- Controllers/ShopkeeperController animates him locally on each client (breathing, waking up, looking at the
 -- local player, Zzz, speech bubble) with the pure forward kinematics below: every physics limb keeps its joint as
 -- attributes, so any pose can be solved without Motor6Ds, and each limb's visual parts follow their limb.
@@ -242,7 +242,9 @@ function Shopkeeper.Build(seat: CFrame, opts: { [string]: any }?): Model
 	rig:SetAttribute("ZzzOffset", headTop(Shopkeeper.SleepPose) + Vector3.new(0, 0.3 * s, 0))
 	rig:SetAttribute("BubbleOffset", headTop(Shopkeeper.AwakePose) + Vector3.new(0, 0.75 * s, 0))
 
-	-- freeze: anchored, ghost-like (no collisions / queries / touches), no Humanoid, joints or lights
+	-- freeze: anchored, ghost-like (no collisions / queries / touches), no Humanoid, joints or lights; no shadows
+	-- either: ShopkeeperController moves the upper body every few frames, and moving shadow casters keep
+	-- invalidating the lighting around the booth on phones (he sits in the awning's shade anyway)
 	local doomed: { Instance } = {}
 	local parts = 0
 	for _, inst in rig:GetDescendants() do
@@ -251,6 +253,7 @@ function Shopkeeper.Build(seat: CFrame, opts: { [string]: any }?): Model
 			inst.CanCollide = false
 			inst.CanQuery = false
 			inst.CanTouch = false
+			inst.CastShadow = false
 			if DROP[inst.Name] then
 				table.insert(doomed, inst)
 			else

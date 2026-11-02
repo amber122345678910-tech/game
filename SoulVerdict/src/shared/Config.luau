@@ -204,6 +204,7 @@ Config.Defaults = {
 	ParticleDensity = 1,
 	DamageNumbers = true,
 	CameraLock = true,
+	Difficulty = "Easy", -- Easy | Normal | Hard (Config.Difficulty); newcomers start on Easy
 	QuickCast = true, -- aimed abilities fire on press; false = hold to aim (indicator), release to cast
 	InvertY = false, -- camera pitch inverted
 }
@@ -225,6 +226,17 @@ Config.Camera = {
 	PitchMin = -70,
 	PitchMax = 65,
 	FollowStiffness = 28,
+}
+
+-- Difficulty (owner: newcomers were lost against the Sans). Each player picks it in Settings (profile setting
+-- "Difficulty"); it changes only what THAT player suffers, so mixed lobbies stay fair to everyone else.
+-- Server: DifficultyService (a DamageService "Before" hook) + practice bot pacing; client: HintController tips.
+Config.Difficulty = {
+	Levels = { "Easy", "Normal", "Hard" },
+	DamageTaken = { Easy = 0.6, Normal = 1.0, Hard = 1.3 }, -- monster damage to that human (Verdict Box hits too)
+	KR = { Easy = 0.5, Normal = 1.0, Hard = 1.25 }, -- karma gained from monster hits
+	BotPace = { Easy = 1.7, Normal = 1.0, Hard = 0.8 }, -- practice bots wait this x their ability cooldowns
+	Hints = { Easy = true, Normal = false, Hard = false }, -- on-screen tips (blue/orange attacks, the box)
 }
 
 -- Emotes (EmoteService validates against these; Hud/EmoteWheel shows them). Clip names from Shared/Anim/Clips.

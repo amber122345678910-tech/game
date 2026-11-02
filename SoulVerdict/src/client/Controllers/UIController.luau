@@ -2,8 +2,10 @@
 -- UIController (client, SPEC §16 / §20, Priority 90): owns the whole menu layer.
 --   * UIRoot.Init(PlayerGui) with the shared UI deps table (SPEC §20 + RigStyle, Spectate), UI sounds through
 --     SoundController; mounts the HUD once (UI/Hud.Mount(UIRoot.Layer("Hud"), deps) when that module exists);
---   * shows the Title on join (camera "Menu" while in the lobby), keeps a named menu stack in sync with UIRoot,
---     pushes InputController context "Menu" while any menu is open (and "Photo" in photo mode);
+--   * shows the Title on join (camera "Menu" while in the lobby; "Follow" again when it closes - in any phase for a
+--     lobby viewer, outside the Intro for a participant, whose flyover owns the camera; a cut under a loading screen),
+--     keeps a named menu stack in sync with UIRoot, pushes InputController context "Menu" while any menu is open (and
+--     "Photo" in photo mode);
 --   * hotkeys: Menu toggles (lobby: Title, in a round: Settings), Back pops, Prev/Next switch tabs (screen OnAction);
 --   * round flow: RoundEvent "RoundEnd" -> Results after the kill-cam, "Rewards" -> Results.SetRewards (kept in the
 --     entry deps so theme/language rebuilds keep them); Intro for a local participant closes every menu;
@@ -23,7 +25,8 @@
 --     Intro is seen), ends at once on a refusal, and skips the screen while a round runs. If the module is missing
 --     or fails, both fall back to the instant switch; no path leaves the "Silence" music override behind.
 --   * menu music: the Title plays "Menu", the Shop on top plays "Shop" (SoundController.SetMusicOverride; this is
---     its only caller, see wantedMusic).
+--     its only caller, see wantedMusic); a track whose ids all failed (SoundController.Status "dead") is skipped, also
+--     when it fails while its menu is open; a participant's Victory / Defeat stinger is never cut by a menu track.
 --
 -- API
 --   UIController.Open(name, opts?) -> ScreenHandle?   names: Title, Play (= Loadout), Loadout, Shop, Quests, Profile,
@@ -82,6 +85,9 @@ local Spectate: any = nil
 
 -- loading screen module (UI/Overlays/Loading), required on first use; false = unavailable (instant switch)
 local LoadingOverlay: any = nil
+-- the loading screen that is up (whoever started it), nil when none; defined with the loading screen below (sync cuts
+-- the camera under it)
+local runningLoading: () -> any?
 -- server answers to StartPractice that mean "no practice round is coming" (the loading screen ends early)
 local PRACTICE_REFUSED: { [string]: boolean } = {
 	["round.practice.busy"] = true,
@@ -215,6 +221,13 @@ local function inLobby(): boolean
 	return r == "Lobby" or r == "" or p == "Waiting" or p == "Intermission" or p == "Ending"
 end
 
+-- the local player takes part in the round: a fighter or a fallen one ("Spectator"), as CameraController (Intro
+-- flyover) and SoundController (Victory / Defeat stinger) count it; a lobby viewer (Role "Lobby") has neither
+local function participant(): boolean
+	local r = role()
+	return r ~= "Lobby" and r ~= ""
+end
+
 local function topEntry(): Entry?
 	return stack[#stack]
 end
@@ -276,10 +289,12 @@ local function sync()
 		menuCamera = wantMenuCamera
 		if wantMenuCamera then
 			call(Camera, "SetMode", "Menu")
-		elseif phase() ~= "Intro" then
+		elseif phase() ~= "Intro" or not participant() then
+			-- (a participant's Intro flyover owns the camera; a lobby viewer has none: back to Follow in every phase)
 			local okMode, mode = call(Camera, "Mode")
 			if not okMode or mode == "Menu" then
-				call(Camera, "SetMode", "Follow")
+				-- under a loading screen: a cut (a blend would still fly from the title shot when a quick dip lifts)
+				call(Camera, "SetMode", "Follow", if runningLoading() ~= nil then { Blend = 0 } else nil)
 			end
 		end
 	end
@@ -620,6 +635,7 @@ local MENU_FADE_OUT = 1.2 -- s
 local NEXT_FADE_IN = 1.5 -- s
 local QUICK_MUSIC_FADE = 1.0 -- s: the Menu -> lobby crossfade of a later PLAY
 local RETOAST_AFTER = 2.5 -- s from a practice refusal to the reveal after which its toast is shown again
+local MUSIC_RECHECK = 1.0 -- s between looks at a menu track whose id SoundController is still checking (it may fail)
 local MENU_MUSIC = "Menu"
 local SHOP_MUSIC = "Shop"
 local SILENCE = "Silence"
@@ -630,6 +646,10 @@ local loadingKind: string? = nil -- "Play" | "Practice" | "Quick" while a loadin
 local loadingToken: any = nil -- that screen: callbacks of any other one never touch the music
 local showDefaults: { [string]: any }? = nil -- Lune harness: merged into every Loading.Show (Driver, Parent)
 local clock: () -> number = os.clock
+local schedule: (number, () -> ()) -> () = function(seconds: number, fn: () -> ())
+	task.delay(seconds, fn)
+end
+local recheckQueued = false -- a look at the menu track's id is scheduled (syncMenuMusic)
 
 local function loadingOverlay(): any
 	if LoadingOverlay == nil then
@@ -654,7 +674,26 @@ local function setMusic(key: string?, fade: number?)
 	end
 end
 
+-- SoundController's live answer for a music key along its Fallback chain: "ok" | "pending" (being checked) | "dead"
+-- (every id failed) | "empty"; nil without SoundController
+local function musicStatus(key: string): string?
+	if Sound and type(Sound.Status) == "function" then
+		local ok, status = pcall(Sound.Status, key)
+		if ok and type(status) == "string" then
+			return status
+		end
+	end
+	return nil
+end
+
+-- can `key` be the menu track? Live: "ok" or "pending" (its stand-in plays while it is checked), never "dead" (e.g. the
+-- Shop's only id is not shared with the experience: an override on it would leave the menu silent, so the next choice
+-- plays). Without SoundController: the key has ids in Shared/Audio.
 local function musicUsable(key: string): boolean
+	local status = musicStatus(key)
+	if status ~= nil then
+		return status == "ok" or status == "pending"
+	end
 	local ok, def = pcall(function()
 		local Audio = require(Shared:WaitForChild("Audio")) :: any
 		return Audio.Resolve(key)
@@ -663,10 +702,16 @@ local function musicUsable(key: string): boolean
 end
 
 -- The music override (UIController is SoundController.SetMusicOverride's only caller):
+--   a participant's Ending -> automatic: the Victory / Defeat stinger is never cut (SoundController would start it
+--     again from the top once the menu / the black is gone); the menu track comes with the next phase (onPhase);
 --   loading screen "Out" -> "Silence": the menu (or lobby) track fades out into the black;
 --   loading screen "In"  -> automatic selection (after its music cue, or a later PLAY): the lobby / round track;
---   otherwise the Shop on top -> "Shop" (sleepy Sans's shop), an open Title -> "Menu", nothing -> automatic.
+--   otherwise the Shop on top -> "Shop" (sleepy Sans's shop), an open Title -> "Menu", nothing -> automatic; a track
+--     whose ids all failed is skipped (a dead Shop id: the Menu track under the Shop, else the automatic music).
 local function wantedMusic(): string?
+	if phase() == "Ending" and participant() then
+		return nil
+	end
 	if loadingMusic == "Out" then
 		return SILENCE
 	elseif loadingMusic == "In" then
@@ -682,12 +727,21 @@ local function wantedMusic(): string?
 end
 
 -- Applies wantedMusic() when it changed (fade nil = SoundController's default). Runs on every menu change (sync)
--- and at every loading-screen music step (live, cue, end, no screen), so the override always matches the state.
+-- and at every loading-screen music step (live, cue, end, no screen), so the override always matches the state. While
+-- the chosen track's id is still being checked it runs again every MUSIC_RECHECK s: an id that fails while its menu is
+-- open (the Shop's, on a first visit) hands over to the next choice instead of leaving the menu silent.
 local function syncMenuMusic(fade: number?)
 	local want = wantedMusic()
 	if want ~= appliedMusic then
 		appliedMusic = want
 		setMusic(want, fade)
+	end
+	if want ~= nil and not recheckQueued and musicStatus(want) == "pending" then
+		recheckQueued = true
+		schedule(MUSIC_RECHECK, function()
+			recheckQueued = false
+			syncMenuMusic()
+		end)
 	end
 end
 UIController._SyncMenuMusic = syncMenuMusic
@@ -697,8 +751,8 @@ local function setLoadingMusic(state: string?, fade: number?)
 	syncMenuMusic(fade)
 end
 
--- the loading screen that is up (whoever started it), nil when none
-local function runningLoading(): any?
+-- the loading screen that is up (whoever started it), nil when none (declared above sync)
+runningLoading = function(): any?
 	local overlay = if started then loadingOverlay() else nil
 	if overlay and type(overlay.Active) == "function" then
 		local ok, handle = pcall(overlay.Active)
@@ -935,17 +989,24 @@ function UIController.Practice(side: string?)
 end
 
 -- Lune tests only (tools/lune/tests/loading_screen.spec.luau): stands in for Init / Start with fakes so PLAY /
--- PRACTICE and the menu music run offline. env: { UIRoot, Sound, State, ShowOpts: {[string]: any}? (merged into
--- every Loading.Show: Driver, Parent), Clock: (() -> number)? }. Never called by the game.
+-- PRACTICE and the menu music run offline. env: { UIRoot, Sound, State, Camera?, ShowOpts: {[string]: any}? (merged
+-- into every Loading.Show: Driver, Parent), Clock: (() -> number)?, Delay: ((seconds, fn) -> ())? (task.delay) }.
+-- Never called by the game.
 function UIController._Harness(env: { [string]: any })
 	UIFolder = (script.Parent :: Instance).Parent:WaitForChild("UI")
 	ScreensFolder = UIFolder:FindFirstChild("Screens")
 	UIRoot = env.UIRoot
 	Sound = env.Sound
 	State = env.State
+	if env.Camera ~= nil then
+		Camera = env.Camera
+	end
 	showDefaults = env.ShowOpts
 	if type(env.Clock) == "function" then
 		clock = env.Clock
+	end
+	if type(env.Delay) == "function" then
+		schedule = env.Delay
 	end
 	started = true
 end

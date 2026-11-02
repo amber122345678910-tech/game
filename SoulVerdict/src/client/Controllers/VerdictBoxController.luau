@@ -244,6 +244,7 @@ type Box = {
 	chest: Instance?,
 	flashed: boolean,
 	touchControls: { { any } }, -- {GuiObject, visible}: hidden until the flash
+	contextPushed: boolean, -- this box pushed the InputController "Box" context (popped once, by this box)
 }
 
 local boxes: { [number]: Box } = {}
@@ -589,15 +590,22 @@ local function unbindEntry()
 	end
 end
 
--- ends the transition: camera put back (if it still holds our frame), post effects off, the layer removed
+-- ends the transition: camera put back (if it still holds our frame), post effects off, the layer removed. The
+-- render step and the post effects are shared: only the box that owns them (victimBox) releases them, so tearing
+-- down an older box (an admin re-box before it had closed) never freezes the newer box's transition.
 local function stopEntry(box: Box?)
-	unbindEntry()
+	local owner = box == nil or box == victimBox
+	if owner then
+		unbindEntry()
+	end
 	if box and box.entry then
 		local runner = box.entry
 		box.entry = nil
 		pcall(runner.Stop, runner)
 	end
-	clearPostFx()
+	if owner then
+		clearPostFx()
+	end
 end
 
 -- every frame of the transition, right after CameraController wrote the camera (Entry Runner: camera pull, effects,
@@ -665,10 +673,18 @@ local function destroyBox(box: Box)
 	if box.gui then
 		box.gui:Destroy()
 	end
-	if box.isVictim and victimBox == box then
+	-- the shared victim state belongs to the newest box; the "Box" context is counted, so every box pops its own push
+	-- (an older box closing under a newer one must not leave the count up: combat, touch look and music stuck)
+	local current = box.isVictim and victimBox == box
+	if current then
 		victimBox = nil
 		disconnectInput()
+	end
+	if box.contextPushed then
+		box.contextPushed = false
 		call("InputController", "PopContext", "Box")
+	end
+	if current then
 		VerdictBoxController.Changed:Fire(false)
 	end
 	if next(boxes) == nil and renderConn then
@@ -976,6 +992,7 @@ local function newBox(packet: { [string]: any }, isVictim: boolean): Box
 		chest = nil,
 		flashed = false,
 		touchControls = {},
+		contextPushed = false,
 	}
 end
 
@@ -1011,6 +1028,12 @@ local function openOverlay(box: Box)
 			control.Visible = false -- shown with the box at the flash, not over the world during the pull-in
 		end
 	end
+	local previous = victimBox
+	if previous ~= nil and previous ~= box then
+		-- re-boxed before the previous box closed (admin cooldown bypass): its transition, if still playing, ends now
+		-- and the render step passes to this box; the previous box only fades out underneath
+		stopEntry(previous)
+	end
 	victimBox = box
 	local okEntry, errEntry = pcall(startEntry, box, gui)
 	if not okEntry then
@@ -1022,6 +1045,7 @@ local function openOverlay(box: Box)
 	gui.Parent = playerGui
 	-- the pull-in, the box music (SoundController follows the "Box" context) and the implosion start together
 	call("InputController", "PushContext", "Box")
+	box.contextPushed = true
 	sound("Implode", nil, { Force2D = true, Volume = TUNING.ImplodeVolume })
 	VerdictBoxController.Changed:Fire(true)
 	entryStep() -- first frame of the transition right away

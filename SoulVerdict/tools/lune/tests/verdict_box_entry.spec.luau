@@ -326,6 +326,248 @@ local function loadSound(Loader)
 end
 
 ---------------------------------------------------------------------------------------------------
+-- The REAL VerdictBoxController (+ real UI/VerdictBoxView, UI/VerdictBoxEntry, Sim, Patterns, Strings, Config) in its
+-- own environment: fake RunService (render steps recorded, PreRender), UserInputService (a phone), Players
+-- (LocalPlayer = the victim's owner), Net (handlers captured), a counted InputController like the real one, a server
+-- clock driven by world.frame(dt). Lune has no layout and no instance events, so the source is loaded with two shims:
+-- `x.AbsoluteSize` reads a 844 x 390 phone screen and GuiObject `x.Input*:Connect(` gets a dummy signal. Nothing
+-- shared (mock services, the loader environment) is touched.
+
+local function loadBoxController(Loader)
+	local world = { clock = 100, warnings = {}, bound = {}, contexts = {}, contextLog = {}, handlers = {} }
+	local preRender = makeSignal()
+	local runService = {
+		PreRender = preRender,
+		BindToRenderStep = function(_, name, priority, fn)
+			world.bound[name] = { priority = priority, fn = fn }
+		end,
+		UnbindFromRenderStep = function(_, name)
+			world.bound[name] = nil
+		end,
+	}
+	local uis = {
+		InputChanged = makeSignal(),
+		InputEnded = makeSignal(),
+		InputBegan = makeSignal(),
+		TouchEnabled = true,
+		KeyboardEnabled = false,
+		IsKeyDown = function()
+			return false
+		end,
+		GetFocusedTextBox = function()
+			return nil
+		end,
+		GetGamepadConnected = function()
+			return false
+		end,
+		IsGamepadButtonDown = function()
+			return false
+		end,
+	}
+	local playerGui = roblox.Instance.new("PlayerGui")
+	local victim = roblox.Instance.new("Model")
+	victim.Name = "Kris"
+	victim:SetAttribute("OwnerUserId", 4242)
+	local lp = { UserId = 4242, Name = "Kris", DisplayName = "Kris", Character = victim }
+	function lp:FindFirstChildOfClass(c)
+		return if c == "PlayerGui" then playerGui else nil
+	end
+	function lp:GetAttribute(n)
+		return if n == "Level" then 5 else nil
+	end
+	local players = {
+		LocalPlayer = lp,
+		GetPlayerByUserId = function()
+			return nil
+		end,
+	}
+	-- counted contexts, as InputController: ContextChanged on the first push and the last pop only
+	local input = {}
+	function input.PushContext(name)
+		local n = (world.contexts[name] or 0) + 1
+		world.contexts[name] = n
+		if n == 1 then
+			table.insert(world.contextLog, name .. "=true")
+		end
+	end
+	function input.PopContext(name)
+		local n = world.contexts[name]
+		if n == nil then
+			return
+		end
+		n -= 1
+		world.contexts[name] = if n > 0 then n else nil
+		if n <= 0 then
+			table.insert(world.contextLog, name .. "=false")
+		end
+	end
+	function input.Device()
+		return "Touch"
+	end
+	local net = {
+		Client = {
+			On = function(name, fn)
+				world.handlers[name] = fn
+				return { Disconnect = function() end }
+			end,
+			Fire = function() end,
+		},
+	}
+	local function pathProxy(path)
+		return {
+			__loaderPath = path,
+			WaitForChild = function(_, n)
+				return pathProxy(path .. "." .. n)
+			end,
+			FindFirstChild = function(_, n)
+				return pathProxy(path .. "." .. n)
+			end,
+		}
+	end
+	local function moduleRef(fields)
+		fields.IsA = function(_, c)
+			return c == "ModuleScript"
+		end
+		return fields
+	end
+	local ui = {
+		FindFirstChild = function(_, n)
+			if n == "VerdictBoxView" or n == "VerdictBoxEntry" then
+				return moduleRef({ __file = "src/client/UI/" .. n })
+			end
+			return nil
+		end,
+	}
+	local controllers = {
+		Parent = {
+			FindFirstChild = function(_, n)
+				return if n == "UI" then ui else nil
+			end,
+		},
+		FindFirstChild = function(_, n)
+			return if n == "InputController" then moduleRef({ __fake = input }) else nil
+		end,
+	}
+	local services = {
+		RunService = runService,
+		UserInputService = uis,
+		Players = players,
+		ReplicatedStorage = pathProxy("ReplicatedStorage"),
+	}
+	local camera = roblox.Instance.new("Camera")
+	local env = setmetatable({
+		game = {
+			GetService = function(_, n)
+				return services[n] or error("mock: no service " .. n)
+			end,
+		},
+		workspace = {
+			CurrentCamera = camera,
+			GetServerTimeNow = function()
+				return world.clock
+			end,
+			FindFirstChild = function()
+				return nil
+			end,
+		},
+		script = { Name = "VerdictBoxController", Parent = controllers },
+		require = function(target)
+			if type(target) == "table" and target.__fake then
+				return target.__fake
+			elseif type(target) == "table" and target.__file then
+				return Loader.requirePath(target.__file)
+			elseif type(target) == "table" and target.__loaderPath == "ReplicatedStorage.Shared.Net" then
+				return net
+			elseif type(target) == "table" and target.__loaderPath then
+				return Loader.require(target.__loaderPath)
+			end
+			error("mock: unexpected require")
+		end,
+		warn = function(...)
+			local parts = {}
+			for i = 1, select("#", ...) do
+				parts[i] = tostring((select(i, ...)))
+			end
+			table.insert(world.warnings, table.concat(parts, " "))
+		end,
+		print = function() end,
+		Instance = roblox.Instance,
+		Enum = roblox.Enum,
+		Vector2 = roblox.Vector2,
+		Vector3 = roblox.Vector3,
+		CFrame = roblox.CFrame,
+		UDim = roblox.UDim,
+		UDim2 = roblox.UDim2,
+		Color3 = roblox.Color3,
+		Font = roblox.Font,
+		__absSize = function()
+			return Vector2.new(844, 390)
+		end,
+		__guiEvent = function()
+			return makeSignal()
+		end,
+	}, { __index = _G })
+	local source = fs.readFile("src/client/Controllers/VerdictBoxController.luau")
+	local sizes, events
+	source, sizes = string.gsub(source, "([%w_]+)%.AbsoluteSize", "__absSize(%1)")
+	source, events = string.gsub(source, "([%w_]+)%.(Input%a+):Connect%(", function(obj, event)
+		if obj == "UserInputService" then
+			return nil -- the fake service has real (fake) signals
+		end
+		return ("__guiEvent(%s, %q):Connect("):format(obj, event)
+	end)
+	assert(sizes > 0 and events > 0, "the controller source changed: update the Lune shims")
+	local before = Loader.quietWarnings
+	Loader.quietWarnings = true -- module-level warnings of the shared modules (no SoundService offline etc.)
+	local ok, controller = pcall(function()
+		return luau.load(source, { debugName = "VerdictBoxController(mock)", environment = env, injectGlobals = true })()
+	end)
+	Loader.quietWarnings = before
+	if not ok then
+		error(controller, 0)
+	end
+	controller.Init()
+	controller.Start()
+	world.controller = controller
+	world.camera = camera
+	world.victim = victim
+	world.playerGui = playerGui
+	function world.frame(dt)
+		world.clock += dt
+		preRender:Fire(dt) -- the boxes (onRender)
+		local steps = {}
+		for name, b in world.bound do
+			table.insert(steps, { name = name, priority = b.priority, fn = b.fn })
+		end
+		table.sort(steps, function(a, b)
+			return a.priority < b.priority
+		end)
+		for _, s in steps do
+			s.fn(dt)
+		end
+	end
+	function world.runUntil(t, dt)
+		while world.clock < t - 1e-9 do
+			world.frame(dt or 1 / 30)
+		end
+	end
+	-- the entry layers still in a VerdictBox ScreenGui (the transition's black / iris / heart / flash)
+	function world.entryLayers()
+		local n = 0
+		for _, d in playerGui:GetDescendants() do
+			if d.Name == "VerdictBoxEntry" then
+				n += 1
+			end
+		end
+		return n
+	end
+	function world.postFx()
+		return #camera:GetChildren()
+	end
+	return world
+end
+
+---------------------------------------------------------------------------------------------------
 
 local tests = {}
 
@@ -669,6 +911,74 @@ tests.entry_layer_renders = function(T, Loader)
 	local preview = Entry.Create(nil, { Time = 0.5 })
 	T.ok(preview and preview.Root and type(preview.Destroy) == "function", "Create(theme, deps) preview contract")
 	preview.Destroy()
+end
+
+-- An admin re-box (NoCooldowns / ResetCooldowns) of the same player while the previous box is still in its verdict
+-- hold + fade: the older box closing in the middle of the new box's pull-in must neither unbind the new transition
+-- (its black / iris layer would freeze over the whole fight) nor leave the counted "Box" context pushed (combat, touch
+-- camera look and the box music stuck for the rest of the session).
+tests.entry_rebox_before_the_old_box_closed = function(T, Loader)
+	local world = loadBoxController(Loader)
+	local C = world.controller
+	local U = C.Tuning
+	local c = Loader.require("ReplicatedStorage.Shared.Config").VerdictBox
+	local latency = 0.05
+	local function packet(id, seed, t0)
+		return {
+			boxId = id,
+			victim = world.victim,
+			seed = seed,
+			patternSet = "Classic",
+			duration = c.Duration,
+			t0 = t0,
+			damagePerHit = c.DamagePerHit,
+			krPerHit = c.KRPerHit,
+		}
+	end
+	-- box A: a normal box
+	local tA0 = world.clock - latency + c.IntroTime
+	world.handlers.BoxStart(packet(1, 11, tA0))
+	T.eq(world.contexts.Box, 1, "A pushed the Box context")
+	T.ok(world.bound[U.EntryStep] ~= nil, "A's transition is bound to its render step")
+	T.eq(world.entryLayers(), 1, "A's entry layer")
+	world.runUntil(tA0 + 0.5)
+	T.eq(world.entryLayers(), 0, "A's transition finished and removed its layer")
+	T.eq(world.bound[U.EntryStep], nil, "render step released after A's transition")
+	T.eq(world.postFx(), 0, "no post effects left after A's transition")
+	world.runUntil(tA0 + c.Duration + 0.1 + latency)
+	world.handlers.BoxEnd(1, { hits = 0, survived = true, reason = "Duration" })
+	local endA = world.clock
+	-- box B for the same player 0.75 s later: A is still in its verdict hold (+ fade)
+	world.runUntil(endA + 0.75)
+	local startB = world.clock
+	local tB0 = startB - latency + c.IntroTime
+	world.handlers.BoxStart(packet(2, 22, tB0))
+	T.eq(#C.ActiveBoxes(), 2, "A still fades out under B's pull-in")
+	T.eq(world.contexts.Box, 2, "both boxes hold a push")
+	T.ok(C.IsInBox(), "in B")
+	-- A closes in the middle of B's transition (B is in its full black)
+	world.runUntil(endA + U.VerdictHold + U.FadeOut + 0.05)
+	T.eq(#C.ActiveBoxes(), 1, "A has closed")
+	T.ok(world.clock < tB0, "A closed before B's flash (the case under test)")
+	T.ok(world.bound[U.EntryStep] ~= nil, "B's transition keeps its render step when A closes")
+	T.eq(world.entryLayers(), 1, "B's layer is still playing")
+	T.eq(world.contexts.Box, 1, "A popped its own push")
+	T.eq(table.concat(world.contextLog, ","), "Box=true", "no Box off / on flicker (music, combat) between the boxes")
+	-- B's fight: its transition ran to the end and released everything
+	world.runUntil(tB0 + 1.0)
+	T.eq(world.entryLayers(), 0, "no black / iris / heart frozen over B's fight")
+	T.eq(world.bound[U.EntryStep], nil, "B's render step released at the end of its transition")
+	T.eq(world.postFx(), 0, "no blur / colour correction left on the camera")
+	-- B ends: everything back to the world
+	world.runUntil(tB0 + c.Duration + 0.1 + latency)
+	world.handlers.BoxEnd(2, { hits = 2, survived = false, reason = "Duration" })
+	world.runUntil(world.clock + U.VerdictHold + U.FadeOut + 0.2)
+	T.eq(#C.ActiveBoxes(), 0, "no box left")
+	T.eq(world.contexts.Box, nil, "the Box context is fully popped (combat, touch look and lobby music come back)")
+	T.eq(table.concat(world.contextLog, ","), "Box=true,Box=false", "one Box on / off for the two boxes")
+	T.eq(C.IsInBox(), false, "not in a box")
+	T.eq(#world.playerGui:GetChildren(), 0, "both box overlays destroyed")
+	T.eq(#world.warnings, 0, "no warnings: " .. table.concat(world.warnings, " | "))
 end
 
 tests.entry_music_switches_on_the_first_frame = function(T, Loader)

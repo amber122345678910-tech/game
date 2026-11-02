@@ -120,6 +120,7 @@ local state = {
 	HumansAtStart = 0,
 	FinalPhase = false,
 	MonsterBroken = false, -- the monster's HP reached Config.Round.FinalPhaseHpFraction during the fight
+	UltGuardUntil = 0, -- end of an ult-started Phase 2's Invulnerable window (0 = none; lifted when Exhausted starts)
 	SecondWind = false,
 	TimeUp = false,
 	Result = nil :: Result?,
@@ -548,6 +549,7 @@ local function resetMatchState()
 	state.HumansAtStart = 0
 	state.FinalPhase = false
 	state.MonsterBroken = false
+	state.UltGuardUntil = 0
 	state.SecondWind = false
 	state.TimeUp = false
 	state.Result = nil
@@ -1375,7 +1377,8 @@ end
 --          the round's monster. NOT a reset button: Exhausted, dodges and the ult bar stay as they are (that cast
 --          spends the bar and still runs as the opening move); the transformation is Invulnerable for
 --          Config.Round.FinalPhaseInvulnerable s (blocks hits only, never moving or casting) only while the monster is
---          not Exhausted, so it can never eat the humans' Exhausted / SAVE Surge window.
+--          not Exhausted - skipped when it already is, and lifted the moment it becomes Exhausted inside the window
+--          (SAVE Surge, dodge drain: onStatusApplied) - so it can never eat the humans' Exhausted / SAVE Surge window.
 --   "Hp"   HP crossed Config.Round.FinalPhaseHpFraction before any ultimate (DamageService / checkMonsterHp): the
 --          comeback refresh - Invulnerable window, Exhausted cleared, dodges refilled, ult set to 100.
 --   nil    forced (admin / Style Lab), reported as "Forced": the same refresh as "Hp".
@@ -1414,6 +1417,7 @@ function RoundService.TriggerFinalPhase(cause: string?, caster: Model?): boolean
 	if invulnerable > 0 then
 		call(StatusService, "Apply", monster, "Invulnerable", invulnerable)
 	end
+	state.UltGuardUntil = if byUlt and invulnerable > 0 then now() + invulnerable else 0
 	monster:SetAttribute("FinalForm", true)
 	setState("FinalPhase", true)
 	fireRoundEvent("FinalPhase", {
@@ -1424,6 +1428,26 @@ function RoundService.TriggerFinalPhase(cause: string?, caster: Model?): boolean
 	})
 	RoundService.FinalPhaseStarted:Fire(monster, reason)
 	return true
+end
+
+-- StatusService.Applied: the monster becoming Exhausted inside an ult-started Phase 2's Invulnerable window (the SAVE
+-- Surge completing, a Bravery slam draining the last dodges ...) ends that window at once, so every hit of the
+-- exhaustion lands (Applied fires synchronously, before the hit that follows a drain). Only the window's own
+-- Invulnerable goes: one that lasts longer comes from something else (admin god mode) and stays.
+local function onStatusApplied(model: Model, name: string)
+	if name ~= "Exhausted" or model ~= state.Monster or state.UltGuardUntil <= 0 then
+		return
+	end
+	local guardUntil = state.UltGuardUntil
+	state.UltGuardUntil = 0
+	if now() >= guardUntil then
+		return
+	end
+	local _, endsAt = call(StatusService, "Get", model, "Invulnerable")
+	if type(endsAt) == "number" and endsAt > guardUntil + 0.05 then
+		return
+	end
+	call(StatusService, "Remove", model, "Invulnerable")
 end
 
 function RoundService.StartPractice(player: Player, side: string?, allies: number?): (boolean, string?)
@@ -1544,6 +1568,7 @@ function RoundService.Start()
 	connect(CharacterService, "Downed", onDowned)
 	connect(CharacterService, "Revived", onRevived)
 	connect(DamageService, "Damaged", onDamaged)
+	connect(StatusService, "Applied", onStatusApplied)
 	Players.PlayerRemoving:Connect(onPlayerRemoving)
 	Players.PlayerAdded:Connect(onPlayerAdded)
 	task.spawn(mainLoop)

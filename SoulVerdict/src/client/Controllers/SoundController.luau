@@ -23,9 +23,13 @@
 --     at once), then the usual crossfade. While it is still being checked, the track that plays goes on only if it is
 --     an acceptable stand-in for the new request (MusicChoices: e.g. the normal boss theme while the Phase 2 theme
 --     loads, the arena track while the box track loads); else the first stand-in that is ready plays; else the music
---     fades out (never a stale track: the box loop after the box, a stinger after the round, the menu track...).
+--     fades out (never a stale track: the box loop after the box, a stinger after the round, the menu track...). The
+--     same when the request is dead (an override or the box track whose candidates all failed: the lobby under a dead
+--     shop track, the fight under a dead box track); only an empty entry ("Silence") fades out on purpose.
 --   Warm-up: music that will be needed soon is checked (= downloaded) in the background, one id at a time and never
---     while a track the player is waiting for downloads: at Start the title / lobby / box / shop tracks, and for a
+--     while a track the player is waiting for downloads (a check that timed out keeps downloading - PreloadAsync cannot
+--     be cancelled - and holds the warm-up / re-checks back until it ends, at most MUSIC_DOWNLOAD_MAX s after it
+--     started: no pile-up of parallel downloads on a slow phone): at Start the title / lobby / box / shop tracks, and for a
 --     round the fight track, the box track, the Phase 2 track, CollapsePhase, Victory and Defeat (PrefetchOrder), so
 --     those switches are instant.
 --   A looped track that comes back within RESUME_WINDOW s (the boss theme after a Verdict Box, the lobby after the
@@ -88,7 +92,8 @@
 --                                                    Shared/Audio) }
 --   SoundController.MusicChoices(round, ctx) -> {string}   MusicFor's answer first, then the stand-ins accepted
 --                                                    while it is still being checked (the context it sits on:
---                                                    override -> box -> phase track(s))
+--                                                    override -> box -> phase track(s); in the Intro also the
+--                                                    looped track that plays, e.g. the lobby)
 --   SoundController.PrefetchOrder(round, ctx) -> {string}  music a round will soon need, most urgent first
 --                                                    (ctx = { Participant, Usable }; nothing outside a round)
 
@@ -118,6 +123,9 @@ SoundController.MUSIC_PROBE_TIMEOUT = 20 -- s for a music id (a 3-5 MB download 
 SoundController.MUSIC_PROBE_EXTEND = 10 -- ...plus this, again and again, while the engine still reports it Loading...
 SoundController.MUSIC_PROBE_MAX = 60 -- ...up to this in total
 SoundController.LOAD_TIMEOUT = 15 -- s a music deck may take to load a checked id before that id counts as bad
+-- a music check that timed out keeps downloading (PreloadAsync cannot be cancelled): the background warm-up / re-checks
+-- wait for that download to end, but not longer than this many s after it started (a request the engine never answers)
+SoundController.MUSIC_DOWNLOAD_MAX = 180
 SoundController.PROBE_BATCH = 3 -- concurrent background probes (SFX / UI)
 SoundController.PROBE_BATCH_DELAY = 4 -- s after Start before the background batch begins
 SoundController.RETRY_AFTER = 60 -- s before a failed / timed-out id may be checked again (in the background)...
@@ -209,6 +217,7 @@ local probeQueue: { string } = {}
 local probeQueued: { [string]: boolean } = {}
 local backgroundProbes = 0
 local musicProbes: { [string]: boolean } = {} -- music ids being checked right now (big downloads)
+local musicDownloads: { [any]: number } = {} -- music PreloadAsync calls still running (token -> os.clock() at start)
 local musicQueue: { string } = {} -- music entries to warm up, most urgent first
 local musicQueued: { [string]: boolean } = {}
 local refreshQueued = false
@@ -437,6 +446,22 @@ local function isFinalStatus(status: Enum.AssetFetchStatus?): boolean
 	return status ~= nil and status ~= Enum.AssetFetchStatus.None and status ~= Enum.AssetFetchStatus.Loading
 end
 
+-- a music id is being checked, or a music download is still running after its check gave up (timed out); a download
+-- older than MUSIC_DOWNLOAD_MAX s no longer counts. The background (warm-up, re-checks) starts no music download then:
+-- one physical download at a time, so a slow phone connection never piles up parallel downloads.
+local function musicBusy(): boolean
+	if next(musicProbes) ~= nil then
+		return true
+	end
+	local now = os.clock()
+	for _, since in musicDownloads do
+		if now - since < SoundController.MUSIC_DOWNLOAD_MAX then
+			return true
+		end
+	end
+	return false
+end
+
 type ProbeOpts = {
 	batch: boolean?, -- one of the SFX / UI background batch slots
 	warm: string?, -- a music warm-up of this entry (its next candidate is queued after a bad answer)
@@ -475,6 +500,7 @@ local function startProbe(id: string, entry: string?, opts: ProbeOpts?)
 	end
 	local started = os.clock()
 	local done = false
+	local download = {} -- this probe's PreloadAsync in musicDownloads (music only)
 	local function finish(good: boolean, reason: string?)
 		if done then
 			-- an answer after the timeout: a slow load that did succeed counts after all
@@ -516,6 +542,17 @@ local function startProbe(id: string, entry: string?, opts: ProbeOpts?)
 			return
 		end
 		finish(false, TIMEOUT_REASON)
+		if musicDownloads[download] ~= nil then
+			-- the download goes on and holds the background back; if the engine never answers, not for ever
+			local remaining = SoundController.MUSIC_DOWNLOAD_MAX - (os.clock() - started)
+			task.delay(math.max(remaining, 0) + 0.05, function()
+				if musicDownloads[download] ~= nil then
+					pumpMusic()
+					pumpProbes()
+					scheduleMusicRefresh()
+				end
+			end)
+		end
 	end
 	task.delay(if music then SoundController.MUSIC_PROBE_TIMEOUT else SoundController.PROBE_TIMEOUT, onTimeout)
 	task.spawn(function()
@@ -526,10 +563,17 @@ local function startProbe(id: string, entry: string?, opts: ProbeOpts?)
 			sound.Name = "SV_AudioProbe"
 			sound.SoundId = id
 			probe = sound
+			if music then
+				musicDownloads[download] = os.clock()
+			end
 			ContentProvider:PreloadAsync({ sound }, function(_contentId: string, status: Enum.AssetFetchStatus)
 				result = status
 			end)
 		end)
+		-- the download has ended (or never started); a check that already gave up (timeout) left the background waiting
+		-- for it: wake it up below
+		musicDownloads[download] = nil
+		local late = done
 		if not ok then
 			-- the check itself failed (not the asset): never keep audio silent because of that (a music deck that
 			-- then does not load is still caught by the deck load check)
@@ -569,6 +613,11 @@ local function startProbe(id: string, entry: string?, opts: ProbeOpts?)
 				sound:Destroy()
 			end)
 		end
+		if late and music then
+			pumpMusic()
+			pumpProbes()
+			scheduleMusicRefresh() -- a re-check that waited for this download
+		end
 	end)
 end
 
@@ -591,7 +640,7 @@ local function retryDue(name: string)
 			end
 			local at = idRetryAt[id]
 			if at ~= nil and now >= at and not idRetrying[id] then
-				if def.Group == "Music" and next(musicProbes) ~= nil then
+				if def.Group == "Music" and musicBusy() then
 					return -- one music download at a time: next time
 				end
 				startProbe(id, current, { retry = true })
@@ -604,7 +653,7 @@ end
 
 pumpProbes = function()
 	-- a music download in flight gets the bandwidth: the short-sound batch then checks one id at a time
-	local limit = if next(musicProbes) ~= nil then 1 else SoundController.PROBE_BATCH
+	local limit = if musicBusy() then 1 else SoundController.PROBE_BATCH
 	while backgroundProbes < limit and #probeQueue > 0 do
 		local id = table.remove(probeQueue, 1) :: string
 		if idState[id] == nil then
@@ -656,7 +705,7 @@ pumpMusic = function()
 	if not started or not warmupOpen then
 		return
 	end
-	while next(musicProbes) == nil and #musicQueue > 0 do
+	while not musicBusy() and #musicQueue > 0 do
 		local key = table.remove(musicQueue, 1) :: string
 		musicQueued[key] = nil
 		local entry, id, status = resolveLive(key)
@@ -1289,9 +1338,10 @@ local function playOn(key: string, entry: string, id: string, fade: number)
 	runFader()
 end
 
--- Puts the requested track on the decks: a good id -> (cross)fade to it; still being checked -> the playing track
--- goes on only if it is an acceptable stand-in (requestedChoices), else the first ready stand-in plays, else the music
--- fades out; dead / empty -> fade out (the selection has already moved on if it could).
+-- Puts the requested track on the decks: a good id -> (cross)fade to it; still being checked, or dead (every candidate
+-- failed: an override / the box track the selection cannot skip) -> the playing track goes on only if it is an
+-- acceptable stand-in (requestedChoices), else the first ready stand-in plays, else the music fades out; empty (no
+-- candidates: intentional silence such as "Silence") -> fade out.
 local function syncDeck(fade: number)
 	ensureDecks()
 	local current = decks[activeDeck]
@@ -1315,8 +1365,10 @@ local function syncDeck(fade: number)
 			entry, id = current.Entry :: string, current.Id :: string
 		end
 		playOn(key, entry, id, fade)
-	elseif status == "pending" and id ~= nil then
-		startProbe(id, entry) -- its answer re-runs the selection (onIdChanged)
+	elseif (status == "pending" and id ~= nil) or status == "dead" then
+		if status == "pending" and id ~= nil then
+			startProbe(id, entry) -- its answer re-runs the selection (onIdChanged)
+		end
 		if current.Key ~= nil and deckAlive(current) and table.find(requestedChoices, current.Key) ~= nil then
 			return -- an acceptable stand-in keeps playing meanwhile
 		end
@@ -1331,7 +1383,7 @@ local function syncDeck(fade: number)
 		end
 		fadeOutDeck(current, fade) -- nothing ready: silence rather than a stale track
 	else
-		fadeOutDeck(current, fade)
+		fadeOutDeck(current, fade) -- empty: intentional silence
 	end
 end
 
@@ -1488,6 +1540,16 @@ local function staticUsable(key: string): boolean
 	return Audio.Resolve(key) ~= nil
 end
 
+-- the track that plays may go on through the Intro while the arena tracks are checked: a looped one, never the box
+-- loop, the title track or a one-shot stinger
+local function introStandIn(key: any): boolean
+	if type(key) ~= "string" or key == "VerdictBox" or key == "Menu" then
+		return false
+	end
+	local def = Audio.Get(key)
+	return def ~= nil and def.Group == "Music" and def.Looped ~= false
+end
+
 -- The automatic selection's choices, most preferred first: an override, then the box track, then the phase's track(s)
 -- (a lobby viewer: the lobby; the arena: every usable key of ArenaMusicOrder; Ending: the stinger, else the track
 -- that was on - never the box track). `firstOnly` stops at the first key (MusicFor: no Usable calls past it).
@@ -1526,6 +1588,11 @@ local function musicChoices(round: { [string]: any }, ctx: { [string]: any }, fi
 		end
 		if not any then
 			add(order[#order]) -- nothing playable: the map's track (silent), as without themes
+		end
+		if phase == "Intro" and introStandIn(ctx.Playing) then
+			-- MonsterKit / MapId arrive with the Intro, so its tracks are rarely warmed up: the lobby track goes on
+			-- while they are checked instead of silence (from Round on, only arena tracks stand in)
+			add(ctx.Playing)
 		end
 	elseif phase == "Ending" then
 		if ctx.Stinger then
