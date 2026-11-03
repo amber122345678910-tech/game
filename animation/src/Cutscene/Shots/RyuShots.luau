@@ -498,12 +498,15 @@ local function finale(ctx: Timeline.Ctx)
 	local root = rootAt(Field.RYU, -90)
 	local bones = ctx:rig("Ryu", root, Cast.alive(Cast.ryu.spread, ctx.t, 0.2))
 	-- low angle from the waist up, the shouting face clearly visible
-	local cam = Util.lookAt(root:PointToWorldSpace(V(-1.0, 1.9, -5.2 - ctx.u * 1.5)), root:PointToWorldSpace(V(0, 4.7, 0)))
+	-- from below, then a fast pull back until he stands small in the fog
+	local back = Util.smoothstep(0, 1, ctx.u) ^ 0.8
+	local eye = root:PointToWorldSpace(V(-1.0 - back * 1.5, 1.9 + back * 0.6, -5.2 - back * 10))
+	local cam = Util.lookAt(eye, root:PointToWorldSpace(V(0, 4.7 - back * 1.2, 0)))
 	ctx:camera(cam, 50)
-	ctx:focus(5.6, 1)
+	ctx:focus((root.Position + Vector3.new(0, 4, 0) - eye).Magnitude, 1)
 	Cast.expr(ctx, "ryu", "shout")
 	-- the Granite Blast fully charged on top of his head
-	charge(ctx, chargePoint(bones), 0.75 + 0.25 * ctx.u, bones.Head.Rotation, 1.9)
+	charge(ctx, chargePoint(bones), 0.75 + 0.25 * ctx.u, bones.Head.Rotation, 1.9 + ctx.u * 1.6)
 	ctx:light("RyuFace", 1.0, nil, 8)
 	Cast.ryuAura(ctx, bones, 1, 7)
 	local w = math.clamp((ctx.lt - 1.2) / 0.6, 0, 1)

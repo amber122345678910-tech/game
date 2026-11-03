@@ -20,7 +20,7 @@ Yuta.dims = {
 	waist = 0.5,
 	neck = 1.38,
 	shoulderY = 1.22,
-	shoulderX = 0.92,
+	shoulderX = 1.0, -- broad shoulders (V-shaped torso)
 	upperArm = 1.02,
 	lowerArm = 0.92,
 	upperLeg = 1.15,
@@ -34,15 +34,19 @@ function Yuta.build(scene: Builder.Scene, rigName: string): Rig.RigDef
 	local k = Builder.kit(scene, rigName, rigName)
 
 	-- Hips: trousers, and the jacket's hem just over the hips
-	k.add("LowerTorso", "Block", V(1.42, 0.7, 0.84), C(0, 0.12, 0), "yPants", "cloth")
-	k.add("LowerTorso", "Block", V(1.6, 0.42, 0.96), C(0, 0.3, 0), "yUniform", "cloth", "Hem")
+	k.add("LowerTorso", "Block", V(1.34, 0.7, 0.82), C(0, 0.12, 0), "yPants", "cloth")
+	k.add("LowerTorso", "Block", V(1.46, 0.42, 0.92), C(0, 0.3, 0), "yUniform", "cloth", "Hem")
 	k.add("LowerTorso", "Ellipsoid", V(0.5, 0.36, 0.1), C(-0.32, 0.3, -0.49) * R(0, 0, 12), "yBlood", "cloth", "BloodHem")
 
 	-- Jacket, high collar, katana on the back
-	k.add("UpperTorso", "Block", V(1.66, 1.44, 0.95), C(0, 0.72, 0), "yUniform", "cloth", "Torso")
+	-- V-shaped torso: broad at the shoulders, narrow at the waist
+	k.add("UpperTorso", "Block", V(1.3, 1.44, 0.93), C(0, 0.72, 0), "yUniform", "cloth", "Torso")
+	for _, sx in { -1, 1 } do
+		k.add("UpperTorso", "Block", V(0.5, 1.46, 0.9), C(sx * 0.72, 0.77, 0.01) * R(0, 0, -sx * 12), "yUniform", "cloth", "TorsoSide")
+	end
 	k.add("UpperTorso", "Block", V(0.06, 1.3, 0.02), C(-0.12, 0.7, -0.48), "yUniformShade", "cloth", "Placket")
 	for _, sx in { -1, 1 } do
-		k.add("UpperTorso", "Block", V(0.62, 0.4, 0.98), C(sx * 0.72, 1.3, 0) * R(0, 0, sx * -10), "yUniform", "cloth", "Shoulder")
+		k.add("UpperTorso", "Block", V(0.66, 0.4, 0.96), C(sx * 0.84, 1.32, 0) * R(0, 0, sx * -10), "yUniform", "cloth", "Shoulder")
 	end
 	-- blood soaked into the left shoulder, running down the chest, and on the belly
 	k.add("UpperTorso", "Ellipsoid", V(0.75, 0.8, 1.02), C(-0.55, 1.2, -0.05) * R(0, 0, -20), "yBlood", "cloth", "Blood")

@@ -20,7 +20,7 @@ Ryu.dims = {
 	waist = 0.55,
 	neck = 1.6,
 	shoulderY = 1.42,
-	shoulderX = 1.18,
+	shoulderX = 1.3, -- broad shoulders (V-shaped torso)
 	upperArm = 1.15,
 	lowerArm = 1.05,
 	upperLeg = 1.3,
@@ -42,11 +42,15 @@ function Ryu.build(scene: Builder.Scene, rigName: string, bare: boolean?): Rig.R
 
 	-- Pelvis, belt, coat tails ------------------------------------------------
 	-- narrow trousers and a burgundy belt; the jacket stops at the waist
-	k.add("LowerTorso", "Block", V(1.5, 0.8, 0.94), C(0, 0.1, 0), "rPants", "cloth", "Pelvis")
-	k.add("LowerTorso", "Block", V(1.54, 0.16, 0.98), C(0, 0.44, 0), "rBelt", "cloth", "Belt")
+	k.add("LowerTorso", "Block", V(1.44, 0.8, 0.92), C(0, 0.1, 0), "rPants", "cloth", "Pelvis")
+	k.add("LowerTorso", "Block", V(1.48, 0.16, 0.96), C(0, 0.44, 0), "rBelt", "cloth", "Belt")
 
 	-- Chest and coat ------------------------------------------------------------
-	k.add("UpperTorso", "Block", V(2.05, 1.62, 1.15), C(0, 0.8, 0), "rCoat", "cloth", "Torso")
+	-- V-shaped torso: broad at the shoulders, narrow at the waist
+	k.add("UpperTorso", "Block", V(1.62, 1.62, 1.12), C(0, 0.8, 0), "rCoat", "cloth", "Torso")
+	for _, sx in { -1, 1 } do
+		k.add("UpperTorso", "Block", V(0.62, 1.66, 1.1), C(sx * 0.9, 0.86, 0.01) * R(0, 0, -sx * 13), "rCoat", "cloth", "TorsoSide")
+	end
 	k.add("UpperTorso", "Block", V(0.9, 1.4, 0.1), C(0, 0.88, -0.56), "rSkin", "skin", "Chest")
 	for _, sx in { -1, 1 } do
 		k.add("UpperTorso", "Ellipsoid", V(0.6, 0.42, 0.24), C(sx * 0.21, 1.2, -0.58) * R(0, 0, sx * 8), "rSkin", "skin", "Pec")
@@ -180,7 +184,10 @@ function Ryu.buildBare(k: Builder.Kit)
 		k.add("LowerTorso", "Ellipsoid", V(0.5, 0.9, 0.5), C(sx * 1.05, 0.5, 0.3) * R(0, 0, sx * 30), "rFur", "fur", "FurTuft")
 	end
 	-- bare muscular torso: chest and abs at the front, a broad back
-	k.add("UpperTorso", "Block", V(1.92, 1.58, 1.06), C(0, 0.8, 0), "rSkin", "skin", "Torso")
+	k.add("UpperTorso", "Block", V(1.5, 1.58, 1.04), C(0, 0.8, 0), "rSkin", "skin", "Torso")
+	for _, sx in { -1, 1 } do
+		k.add("UpperTorso", "Block", V(0.6, 1.62, 1.0), C(sx * 0.84, 0.86, 0.01) * R(0, 0, -sx * 13), "rSkin", "skin", "TorsoSide")
+	end
 	for _, sx in { -1, 1 } do
 		k.add("UpperTorso", "Ellipsoid", V(0.95, 0.62, 0.34), C(sx * 0.46, 1.16, -0.48) * R(0, 0, sx * 8), "rSkin", "skin", "Pec")
 		k.add("UpperTorso", "Ellipsoid", V(0.8, 0.05, 0.05), C(sx * 0.45, 0.9, -0.64) * R(0, 0, sx * -6), "rSkinDeep", "skin", "PecLine")

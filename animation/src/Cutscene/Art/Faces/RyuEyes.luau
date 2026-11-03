@@ -126,6 +126,10 @@ function RyuEyes.paint(c: Paint.Canvas, pal: { [string]: Color3 }, lw: number, s
 		line
 	)
 	c:stroke({ { 166, 452 }, { 277, 428 }, { 421, 420 }, { 452, 430 } }, { L(0.8), L(2), L(2), L(0.8) }, deep)
+	-- a bead of sweat running down the temple
+	c:ellipse(150, 418, 11, 17, -8, Color3.fromRGB(214, 236, 255))
+	c:stroke({ { 141, 405 }, { 140, 418 }, { 145, 431 }, { 154, 434 } }, { L(1.2), L(1.8), L(1.6), L(0.8) }, line)
+	c:circle(147, 412, 3.2, Color3.new(1, 1, 1))
 	-- far eye wide open as well
 	c:stroke({ { 622, 446 }, { 655, 446 }, { 688, 444 } }, { 34, 50, 38 }, pal.sclera)
 	c:ellipse(655, 444, 9, 9, 0, pal.rIrisDark)

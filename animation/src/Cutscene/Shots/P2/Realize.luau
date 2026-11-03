@@ -188,6 +188,14 @@ local function ryuGlow(ctx: Timeline.Ctx)
 	ctx:camera(Clash.shake(Util.lookAt(eye, head.Position + V(0, -0.15, 0)), ctx.t, 0.04 + ctx.u * 0.1, 10), 46)
 	ctx:focus(3.2, 1)
 	local k = Util.smoothstep(0, 1, ctx.u)
+	local hh = h(ctx)
+	for i, p in hh.rikaBlood do
+		if i <= 3 then
+			local len = 0.18 + 0.22 * k
+			ctx:place(p, bones.Head * C(-0.18 + i * 0.05, 1.12 - i * 0.12 - len * 0.4, -0.6))
+			ctx:prop(p, { s = V(0.05, len, 0.03) })
+		end
+	end
 	ctx:light("RyuFace", 1.2 + 3 * k, ORANGE, 10)
 	ctx:alpha("orangeFlare", Util.smoothstep(0.55, 1, ctx.u))
 	ctx:bloom(1.4)
