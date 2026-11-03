@@ -209,6 +209,8 @@ local function punchStage(ctx: Timeline.Ctx): ({ [string]: CFrame }, { [string]:
 end
 
 local function impact(ctx: Timeline.Ctx)
+	ctx:wind(1.5)
+	ctx:gust(2.2 * (1 - ctx.u))
 	local hh = h(ctx)
 	local _, _, chest = punchStage(ctx)
 	Cast.expr(ctx, "ryu", "shock")
@@ -225,6 +227,8 @@ end
 
 -- profile: the fist in Ryu's chest, space shattering round it like glass
 local function punch(ctx: Timeline.Ctx)
+	ctx:wind(1.6)
+	ctx:gust(1.2 * math.exp(-ctx.lt * 2.5))
 	local hh = h(ctx)
 	local rb, _, chest = punchStage(ctx)
 	Cast.expr(ctx, "ryu", "shock")
@@ -257,6 +261,8 @@ end
 
 -- Ryu's fist (foreground) sends Yuta flying back across the cracked deck
 local function strike(ctx: Timeline.Ctx)
+	ctx:wind(1.6)
+	ctx:gust(1.8 * math.exp(-ctx.lt * 3))
 	local hh = h(ctx)
 	local lt = ctx.lt
 	local root = Common.ryuRoot(0)
@@ -285,6 +291,7 @@ end
 
 -- Rika flies straight at the camera, right fist drawn back, red eye blazing
 local function rikaFlies(ctx: Timeline.Ctx)
+	ctx:wind(2.6)
 	local u = ctx.u
 	local base = Common.RYU + V(8 - u * 6, 0, -10 + u * 4)
 	local root = C(base) * CFrame.Angles(0, math.rad(55), 0)
@@ -303,6 +310,8 @@ end
 -- from behind, low: Ryu skids back on the deck, Yuta far off on one knee,
 -- Rika's shadow falling over Ryu from above
 local function ryuSkid(ctx: Timeline.Ctx)
+	ctx:wind(1.8)
+	ctx:gust(0.8 * math.exp(-ctx.lt * 1.5))
 	local hh = h(ctx)
 	local lt = ctx.lt
 	local slide = 6 * (1 - math.exp(-lt * 1.6))
@@ -327,6 +336,8 @@ end
 
 -- low angle: the fist comes down on Ryu's head
 local function fistDown(ctx: Timeline.Ctx)
+	ctx:wind(1.4)
+	ctx:gust(2.0 * Util.smoothstep(0.55, 0.75, ctx.u))
 	local k = 1 - Util.smoothstep(0, 0.7, ctx.u)
 	local rb, kb = rikaFistOn(ctx, "Ryu", C(Common.RYU + V(0, 0, 6)), Cast.alive(ryuPinned, ctx.t), k * 2.5)
 	Cast.expr(ctx, "ryu", "grit")
@@ -350,6 +361,7 @@ end
 
 -- his face: the fist on his forehead, blood, teeth bared in pain
 local function fistOnHead(ctx: Timeline.Ctx)
+	ctx:gust(1.4 * math.exp(-ctx.lt * 3))
 	local hh = h(ctx)
 	local rb = rikaFistOn(ctx, "Ryu", C(Common.RYU + V(0, 0, 6)), Cast.alive(ryuPinned, ctx.t))
 	Cast.expr(ctx, "ryu", "grit")
@@ -391,6 +403,8 @@ local function catchStage(ctx: Timeline.Ctx): ({ [string]: CFrame }, { [string]:
 end
 
 local function catch(ctx: Timeline.Ctx)
+	ctx:wind(1.2)
+	ctx:gust(0.5 * math.exp(-ctx.lt * 2))
 	local hh = h(ctx)
 	local rb, yb, _, belly = catchStage(ctx)
 	Cast.expr(ctx, "yuta", "glare")

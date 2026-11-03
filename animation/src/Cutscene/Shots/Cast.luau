@@ -42,6 +42,15 @@ function Cast.build(scene: Builder.Scene)
 	Builder.emitter(scene, "YutaGlints", "embers", yutaChest, pal.ePink, 0.9, 1.0)
 	local rikaMouth = anchor("Rika", "Head", Vector3.new(1.5, 1, 1.5), CFrame.new(0, 0.7, -1.6), "MouthAnchor")
 	Builder.light(scene, "RikaMouth", "Point", rikaMouth, pal.ePink, 30)
+	-- Ryu's hair (shots recolour it when it smoulders from overuse)
+	local hairNames = { HairTop = true, Pompadour = true, PompTip = true, HairBack = true, HairSide = true, Sideburn = true, Strand = true, HairShine = true }
+	local ryuHair: { Builder.PartSpec } = {}
+	for _, p in scene.parts do
+		if p.rig == "Ryu" and hairNames[p.name] then
+			table.insert(ryuHair, p)
+		end
+	end
+	scene.data.ryuHair = ryuHair
 	scene.data.cast = {
 		ryuAura = FX.bolts(scene, "RyuBolts", pal.eCyan, 36),
 		yutaAura = FX.bolts(scene, "YutaBolts", pal.ePink, 16),

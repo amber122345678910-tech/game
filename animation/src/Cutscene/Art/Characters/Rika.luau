@@ -115,7 +115,7 @@ function Rika.build(scene: Builder.Scene, rigName: string): Rig.RigDef
 		for si, part in { { 0.42, 1.0, 0 }, { 0.34, 0.78, 18 }, { 0.3, 0.52, 22 } } do
 			local segLen, ww = len * part[1], w * part[2]
 			cf = cf * R(part[3], 0, 0)
-			E("Head", V(ww, segLen * 1.25, ww * 0.9), cf * C(0, segLen * 0.5, 0), "kHair", if si == 1 then "Hair" else "HairTip")
+			Builder.flex(k.add("Head", "Ellipsoid", V(ww, segLen * 1.25, ww * 0.9), cf * C(0, segLen * 0.5, 0), "kHair", "body", if si == 1 then "Hair" else "HairTip"), si * 2.5, V(0, -segLen * 0.5, 0))
 			if si == 1 and i % 2 == 1 then
 				E("Head", V(0.1, segLen * 1.1, ww * 0.92 + 0.03), cf * C(0, segLen * 0.5, 0), "kStripe", "HairLine")
 			end
@@ -168,8 +168,8 @@ function Rika.build(scene: Builder.Scene, rigName: string): Rig.RigDef
 			local w = w0 + (w1 - w0) * f
 			E(bone, V(w, len * 0.75, w * 0.85), C(math.sin(j * 1.9 + ti) * 0.06, -len * f, 0), "kDark", "Tail")
 		end
-		E(bone, V(0.16, len * 0.8, 0.2), C(w0 * 0.45, -len * 0.55, 0.15) * R(0, 0, 14 + ti * 4), "kStripe", "Wisp")
-		E(bone, V(0.12, len * 0.6, 0.16), C(-w0 * 0.4, -len * 0.6, -0.1) * R(0, 0, -12), "kStripe", "Wisp")
+		Builder.flex(k.add(bone, "Ellipsoid", V(0.16, len * 0.8, 0.2), C(w0 * 0.45, -len * 0.55, 0.15) * R(0, 0, 14 + ti * 4), "kStripe", "body", "Wisp"), 10, V(0, len * 0.4, 0))
+		Builder.flex(k.add(bone, "Ellipsoid", V(0.12, len * 0.6, 0.16), C(-w0 * 0.4, -len * 0.6, -0.1) * R(0, 0, -12), "kStripe", "body", "Wisp"), 10, V(0, len * 0.3, 0))
 	end
 	return def
 end

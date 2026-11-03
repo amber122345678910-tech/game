@@ -35,7 +35,7 @@ function Yuta.build(scene: Builder.Scene, rigName: string): Rig.RigDef
 
 	-- Hips: trousers, and the jacket's hem just over the hips
 	k.add("LowerTorso", "Block", V(1.34, 0.7, 0.82), C(0, 0.12, 0), "yPants", "cloth")
-	k.add("LowerTorso", "Block", V(1.46, 0.42, 0.92), C(0, 0.3, 0), "yUniform", "cloth", "Hem")
+	Builder.flex(k.add("LowerTorso", "Block", V(1.46, 0.42, 0.92), C(0, 0.3, 0), "yUniform", "cloth", "Hem"), 2.5, V(0, 0.21, 0))
 	k.add("LowerTorso", "Ellipsoid", V(0.5, 0.36, 0.1), C(-0.32, 0.3, -0.49) * R(0, 0, 12), "yBlood", "cloth", "BloodHem")
 
 	-- Jacket, high collar, katana on the back
@@ -84,7 +84,7 @@ function Yuta.build(scene: Builder.Scene, rigName: string): Rig.RigDef
 	end
 	local function lock(x: number, y: number, z: number, pitch: number, roll: number, yaw: number, len: number, w: number, col: string, name: string)
 		-- hangs along -Y from (x, y, z); pitch > 0 swings the tip forward
-		k.add("Head", "Ellipsoid", V(w, len, w * 0.8), C(x, y, z) * R(pitch, yaw, roll) * C(0, -len * 0.45, 0), col, "hair", name)
+		Builder.flex(k.add("Head", "Ellipsoid", V(w, len, w * 0.8), C(x, y, z) * R(pitch, yaw, roll) * C(0, -len * 0.45, 0), col, "hair", name), if name == "Spike" then 6 else 8, V(0, len * 0.45, 0))
 	end
 	-- bangs over the forehead: pointed locks (wedge triangles turned to face
 	-- forward, tip down) ending above the painted brows, one longer lock
@@ -100,7 +100,7 @@ function Yuta.build(scene: Builder.Scene, rigName: string): Rig.RigDef
 	}
 	for i, b in bangs do
 		local turn = if i % 2 == 0 then 90 else -90
-		k.add("Head", "Wedge", V(0.06, b[4], b[5]), C(b[1], b[2], b[3]) * R(8, 0, b[6]) * C(0, -b[4] / 2, 0) * R(0, 0, 180) * R(0, turn, 0), if i == 3 then "yHairHi" else "yHair", "hair", "Bang")
+		Builder.flex(k.add("Head", "Wedge", V(0.06, b[4], b[5]), C(b[1], b[2], b[3]) * R(8, 0, b[6]) * C(0, -b[4] / 2, 0) * R(0, 0, 180) * R(0, turn, 0), if i == 3 then "yHairHi" else "yHair", "hair", "Bang"), 7, V(0, -b[4] / 2, 0))
 	end
 	-- locks over the temples and ears
 	for _, sx in { -1, 1 } do

@@ -42,6 +42,8 @@ export type H = {
 	rikaBlood: { Builder.PartSpec },
 	fbSky: { Builder.PartSpec },
 	rings: { Builder.PartSpec },
+	flames: FX.Burst,
+	smoke: FX.Burst,
 	rikaEye: Builder.PartSpec,
 	shell: FX.Burst,
 	uroArm: { upper: Builder.PartSpec, lower: Builder.PartSpec, band: Builder.PartSpec, hand: Builder.PartSpec },
@@ -73,6 +75,8 @@ function Common.build(scene: Builder.Scene)
 		rikaBlood = {},
 		fbSky = {},
 		rings = {},
+		flames = FX.burst(scene, "P2Flames", Color3.fromRGB(255, 120, 40), 24, "Wedge", 69),
+		smoke = FX.burst(scene, "P2Smoke", Color3.fromRGB(70, 66, 70), 16, "Ball", 70),
 		rikaEye = FX.core(scene, "P2RikaEye", Color3.fromRGB(255, 40, 52)),
 		shell = FX.burst(scene, "P2Shell", Color3.fromRGB(22, 22, 28), 34, "Wedge", 68),
 		uroArm = {
@@ -90,7 +94,12 @@ function Common.build(scene: Builder.Scene)
 		h.bands[i] = FX.curvedBeam(scene, "P2Band" .. i, if i % 2 == 0 then white else pal.eCyan, 12)
 	end
 	-- rock, snow, dust and blood are matter, not light
-	for _, bu in { h.debris, h.dust, h.spray, h.blood, h.shell } do
+	for i, p in h.flames.parts do
+		if i % 3 == 0 then
+			p.color = Color3.fromRGB(255, 205, 90)
+		end
+	end
+	for _, bu in { h.debris, h.dust, h.spray, h.blood, h.shell, h.smoke } do
 		for _, p in bu.parts do
 			p.material = if bu == h.debris or bu == h.shell then "Slate" elseif bu == h.blood then "SmoothPlastic" else "Concrete"
 		end

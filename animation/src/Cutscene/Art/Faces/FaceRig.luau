@@ -20,6 +20,7 @@ FaceRig.expr = {
 		shock = { "ryu:eyes:wide", "ryu:brows:raised", "ryu:mouth:closed" },
 		gasp = { "ryu:eyes:wide", "ryu:brows:raised", "ryu:mouth:talk" },
 		grit = { "ryu:eyes:wide", "ryu:brows:angry", "ryu:mouth:grin" },
+		strain = { "ryu:eyes:narrow", "ryu:brows:angry", "ryu:mouth:talk" },
 	},
 	yuta = {
 		neutral = { "yuta:eyes:normal", "yuta:brows:calm", "yuta:mouth:closed" },

@@ -75,7 +75,7 @@ function Uro.build(scene: Builder.Scene, rigName: string): Rig.RigDef
 	local cf = C(0, 0.9, 0.42)
 	for i, seg in { { 1.0, 1.0, 0.36 }, { 1.4, 0.9, 0.3 }, { 1.4, 0.7, 0.22 } } do
 		local len, w, d = seg[1], seg[2], seg[3]
-		k.addColor("Head", "Ellipsoid", V(w, len * 1.15, d), cf * C(0, -len / 2, 0), if i == 2 then PINK_DARK else PINK, "hair", "LongHair")
+		Builder.flex(k.addColor("Head", "Ellipsoid", V(w, len * 1.15, d), cf * C(0, -len / 2, 0), if i == 2 then PINK_DARK else PINK, "hair", "LongHair"), 3 + i * 3, V(0, len / 2, 0))
 		cf = cf * C(0, -len, 0) * R(-10, 0, 0)
 	end
 

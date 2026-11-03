@@ -67,11 +67,11 @@ function Ryu.build(scene: Builder.Scene, rigName: string, bare: boolean?): Rig.R
 	k.add("UpperTorso", "Ellipsoid", V(0.62, 0.55, 0.6), C(0, 1.62, 0), "rSkin", "skin", "Neck")
 
 	-- Fur collar: fluffy ring over the shoulders + a crown of white spikes ------
-	k.add("UpperTorso", "Ellipsoid", V(2.8, 1.35, 1.15), C(0, 1.78, 0.42) * R(-12, 0, 0), "rFur", "fur", "FurBack")
+	Builder.flex(k.add("UpperTorso", "Ellipsoid", V(2.8, 1.35, 1.15), C(0, 1.78, 0.42) * R(-12, 0, 0), "rFur", "fur", "FurBack"), 2)
 	for _, sx in { -1, 1 } do
-		k.add("UpperTorso", "Ellipsoid", V(1.45, 1.0, 1.6), C(sx * 1.02, 1.55, 0.05) * R(0, 0, sx * -12), "rFur", "fur", "FurShoulder")
+		Builder.flex(k.add("UpperTorso", "Ellipsoid", V(1.45, 1.0, 1.6), C(sx * 1.02, 1.55, 0.05) * R(0, 0, sx * -12), "rFur", "fur", "FurShoulder"), 2)
 		k.add("UpperTorso", "Ellipsoid", V(0.5, 1.5, 0.5), C(sx * 0.78, 1.2, -0.5) * R(0, 0, sx * 18), "rFur", "fur", "FurFront")
-		k.add("UpperTorso", "Ellipsoid", V(1.0, 0.7, 1.1), C(sx * 1.38, 1.3, 0.25) * R(0, 0, sx * -30), "rFurShade", "fur", "FurUnder")
+		Builder.flex(k.add("UpperTorso", "Ellipsoid", V(1.0, 0.7, 1.1), C(sx * 1.38, 1.3, 0.25) * R(0, 0, sx * -30), "rFurShade", "fur", "FurUnder"), 2)
 	end
 	-- dense spiky fur all around the collar: thin tapered strands pointing
 	-- outward and up in three rings (outer longest); the front stays open
@@ -94,7 +94,7 @@ function Ryu.build(scene: Builder.Scene, rigName: string, bare: boolean?): Rig.R
 			local rotZ = -math.deg(math.atan2(out.X, out.Y))
 			local rotX = math.deg(math.atan2(out.Z, out.Y))
 			local col = if (i + ri) % 6 == 3 then "rFurShade" else "rFur"
-			k.add("UpperTorso", "Ellipsoid", V(rg.w, len, rg.w * 0.85), C(x, y, z) * R(rotX, wob * 12, rotZ) * C(0, len * 0.42, 0), col, "fur", "FurSpike")
+			Builder.flex(k.add("UpperTorso", "Ellipsoid", V(rg.w, len, rg.w * 0.85), C(x, y, z) * R(rotX, wob * 12, rotZ) * C(0, len * 0.42, 0), col, "fur", "FurSpike"), 7 + ri * 1.5, V(0, -len * 0.42, 0))
 		end
 	end
 	-- fur round the jacket's hem at the waist (back and sides, open at the front)
@@ -105,14 +105,14 @@ function Ryu.build(scene: Builder.Scene, rigName: string, bare: boolean?): Rig.R
 		local out = Vector3.new(x, -0.9, z).Unit
 		local rotZ = -math.deg(math.atan2(out.X, out.Y))
 		local rotX = math.deg(math.atan2(out.Z, out.Y))
-		k.add("UpperTorso", "Ellipsoid", V(0.2, len, 0.17), C(x, 0.06, z) * R(rotX, 0, rotZ) * C(0, len * 0.4, 0), if i % 5 == 2 then "rFurShade" else "rFur", "fur", "FurHem")
+		Builder.flex(k.add("UpperTorso", "Ellipsoid", V(0.2, len, 0.17), C(x, 0.06, z) * R(rotX, 0, rotZ) * C(0, len * 0.4, 0), if i % 5 == 2 then "rFurShade" else "rFur", "fur", "FurHem"), 9, V(0, -len * 0.4, 0))
 	end
 	-- fur lining down the front edges of the coat: thin strands fanning out
 	for _, sx in { -1, 1 } do
 		for j = 0, 7 do
 			local y = 1.42 - j * 0.2
 			local len = 0.38 + (j % 3) * 0.1
-			k.add("UpperTorso", "Ellipsoid", V(0.1, len, 0.1), C(sx * (0.64 - j * 0.02), y, -0.64) * R(-14, 0, sx * (62 + (j % 2) * 18)) * C(0, len * 0.4, 0), if j % 3 == 1 then "rFurShade" else "rFur", "fur", "FurTrim")
+			Builder.flex(k.add("UpperTorso", "Ellipsoid", V(0.1, len, 0.1), C(sx * (0.64 - j * 0.02), y, -0.64) * R(-14, 0, sx * (62 + (j % 2) * 18)) * C(0, len * 0.4, 0), if j % 3 == 1 then "rFurShade" else "rFur", "fur", "FurTrim"), 7, V(0, -len * 0.4, 0))
 		end
 	end
 
@@ -168,7 +168,7 @@ function Ryu.buildHead(scene: Builder.Scene, k: Builder.Kit, rigName: string)
 	end
 	-- loose strands falling over the forehead
 	for _, st in { { -0.22, 12 }, { 0.05, -6 }, { 0.28, -16 } } do
-		k.add("Head", "Wedge", V(0.06, 0.5, 0.12), C(st[1], 1.06, -0.58) * R(0, 0, 180 + st[2]) * R(0, 90, 0), "rHair", "hair", "Strand")
+		Builder.flex(k.add("Head", "Wedge", V(0.06, 0.5, 0.12), C(st[1], 1.06, -0.58) * R(0, 0, 180 + st[2]) * R(0, 90, 0), "rHair", "hair", "Strand"), 9, V(0, -0.25, 0))
 	end
 end
 

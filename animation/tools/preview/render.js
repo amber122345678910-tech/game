@@ -498,6 +498,19 @@ function renderFrame(i) {
   cam.matrixWorldNeedsUpdate = true;
   cam.updateMatrixWorld(true);
   const props = fr.props || {};
+  // a property set by a frame holds only for that frame (same as Realizer.apply)
+  if (st.propIds) {
+    for (const id of st.propIds) {
+      if (!(String(id) in props)) {
+        const e = st.entries[id];
+        if (e) {
+          applyProps(e, { s: e.p.size, t: e.p.transparency, c: e.p.color });
+          if (!(id in st.partIndex)) applyPart(e, cfMatrix(e.p.cf));
+        }
+      }
+    }
+  }
+  st.propIds = Object.keys(props).map(Number);
   data.dynamicIds.forEach((id, k) => {
     const e = st.entries[id];
     const pr = props[String(id)];

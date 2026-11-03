@@ -23,6 +23,7 @@ export type Live = {
 	moveParts: { BasePart },
 	moveCFs: { CFrame },
 	applied: { [number]: Applied },
+	propIds: { [number]: boolean }, -- parts whose properties the last frame changed
 	groups: { [string]: { GuiObject } },
 	groupState: { [string]: boolean },
 	overlay: { [string]: { { f: GuiObject, base: number } } },
@@ -308,6 +309,7 @@ function Realizer.build(styleId: string, parent: Instance, part: number?): Live
 		moveParts = {},
 		moveCFs = {},
 		applied = {},
+		propIds = {},
 		groups = {},
 		groupState = {},
 		overlay = {},
@@ -403,6 +405,23 @@ function Realizer.apply(live: Live, frame: Timeline.FrameState, camera: Camera, 
 		live.moveCFs[i] = Scene.partCFrame(spec, frame)
 	end
 	Workspace:BulkMoveTo(live.moveParts, live.moveCFs, Enum.BulkMoveMode.FireCFrameChanged)
+
+	-- a property set by a frame holds only for that frame: parts the last frame
+	-- changed but this one does not go back to how they were built
+	for id in live.propIds do
+		if frame.props[id] == nil then
+			local spec = live.scene.parts[id]
+			local part = live.parts[id]
+			part.Size = spec.size
+			part.Transparency = spec.transparency
+			part.Color = spec.color
+			live.applied[id] = nil
+		end
+	end
+	table.clear(live.propIds)
+	for id in frame.props do
+		live.propIds[id] = true
+	end
 
 	-- animated part properties (only written when they change)
 	for id, p in frame.props do

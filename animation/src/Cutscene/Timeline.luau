@@ -30,6 +30,8 @@ export type FrameState = {
 	grade: Grade?,
 	bloom: number,
 	fog: number, -- atmosphere density multiplier
+	wind: number, -- wind on hair, fur and cloth (1 = normal breeze)
+	gust: number, -- extra sway on top of the wind (a jolt, an impact)
 }
 
 export type Ctx = {
@@ -53,6 +55,8 @@ export type Ctx = {
 	grade: (self: Ctx, g: Grade) -> (),
 	bloom: (self: Ctx, k: number) -> (),
 	fog: (self: Ctx, k: number) -> (),
+	wind: (self: Ctx, k: number) -> (),
+	gust: (self: Ctx, k: number) -> (),
 	channel: (self: Ctx, name: string, cf: CFrame) -> (),
 }
 
@@ -126,6 +130,14 @@ function Ctx.bloom(self: Ctx, k: number)
 	self.frame.bloom = k
 end
 
+function Ctx.wind(self: Ctx, k: number)
+	self.frame.wind = k
+end
+
+function Ctx.gust(self: Ctx, k: number)
+	self.frame.gust = k
+end
+
 function Ctx.fog(self: Ctx, k: number)
 	self.frame.fog = k
 end
@@ -157,6 +169,8 @@ function Timeline.newFrame(t: number): FrameState
 		grade = nil,
 		bloom = 1,
 		fog = 1,
+		wind = 1,
+		gust = 0,
 	}
 end
 

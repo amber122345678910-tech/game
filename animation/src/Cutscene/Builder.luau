@@ -29,6 +29,8 @@ export type PartSpec = {
 	bone: string?,
 	channel: string?, -- or by a named transform channel
 	fx: boolean, -- or placed directly by the timeline (parked when not placed)
+	flex: number?, -- sways in the wind / with the body (degrees), rig parts only
+	pivot: Vector3?, -- where a flexing part is attached (part-local offset)
 	cf: CFrame, -- local to bone / channel, or world CFrame for static parts
 	gui: GuiSpec?,
 }
@@ -135,6 +137,14 @@ function Builder.part(scene: Scene, model: string, size: Vector3, cf: CFrame, co
 end
 
 -- Effect part: parked out of sight unless the timeline places it.
+-- Let a rig part (hair strand, fur tuft, hem) sway: `amp` degrees at full
+-- wind, rotating about `pivot` (the point where it is attached, part-local)
+function Builder.flex(p: PartSpec, amp: number, pivot: Vector3?): PartSpec
+	p.flex = amp
+	p.pivot = pivot
+	return p
+end
+
 function Builder.fx(scene: Scene, model: string, shape: string, size: Vector3, color: Color3, material: string?, transparency: number?, name: string?): PartSpec
 	Builder.model(scene, model, false)
 	return Builder.part(scene, model, size, CFrame.new(), color, {

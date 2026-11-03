@@ -152,6 +152,28 @@ function Scene.evaluate(scene: Builder.Scene, t: number): Timeline.FrameState
 	return ctx.frame
 end
 
+-- Sway of a flexing part (hair, fur, cloth): a slow wind wave shared by
+-- everything plus a quicker flutter of its own, about its attachment point
+local TAU = math.pi * 2
+local function flexRot(part: Builder.PartSpec, frame: Timeline.FrameState): CFrame
+	local amp = (part.flex or 0) * (frame.wind + frame.gust)
+	if amp < 0.01 then
+		return CFrame.new()
+	end
+	local t = frame.t
+	local ph = part.id * 1.37
+	local ax = 0.65 * math.sin(TAU * 0.9 * t + ph * 0.3) + 0.35 * math.sin(TAU * 3.1 * t + ph)
+	local az = 0.5 * math.cos(TAU * 0.7 * t + ph * 0.2) + 0.3 * math.sin(TAU * 2.6 * t + ph * 1.7)
+	-- a gust shakes things quickly
+	local g = frame.gust * 0.6 * math.sin(TAU * 7 * t + ph)
+	local rot = CFrame.Angles(math.rad((ax + g) * amp), 0, math.rad((az - g) * amp))
+	local piv = part.pivot
+	if piv then
+		return CFrame.new(piv) * rot * CFrame.new(-piv)
+	end
+	return rot
+end
+
 -- World CFrame of a part for a frame (parked when not used by the shot)
 function Scene.partCFrame(part: Builder.PartSpec, frame: Timeline.FrameState): CFrame
 	if part.rig and part.bone then
@@ -159,6 +181,9 @@ function Scene.partCFrame(part: Builder.PartSpec, frame: Timeline.FrameState): C
 		if bones then
 			local b = bones[part.bone]
 			if b then
+				if part.flex then
+					return b * part.cf * flexRot(part, frame)
+				end
 				return b * part.cf
 			end
 		end

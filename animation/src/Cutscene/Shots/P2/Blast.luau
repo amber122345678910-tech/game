@@ -111,6 +111,8 @@ local function swirl(ctx: Timeline.Ctx)
 end
 
 local function launch(ctx: Timeline.Ctx)
+	ctx:wind(2.2)
+	ctx:gust(1.2 * math.exp(-ctx.lt * 3))
 	local hh = h(ctx)
 	local root = Common.ryuRoot(0)
 	local bones = ctx:rig("Ryu", root, Cast.add(Cast.ryu.spread, "Head", R(14, 0, 0)))
@@ -133,6 +135,8 @@ local function launch(ctx: Timeline.Ctx)
 end
 
 local function side(ctx: Timeline.Ctx)
+	ctx:wind(2.5)
+	ctx:gust(1)
 	local hh = h(ctx)
 	local root = Common.ryuRoot(0)
 	local bones = ctx:rig("Ryu", root, Cast.add(Cast.ryu.spread, "Head", R(14, 0, 0)))
@@ -155,17 +159,25 @@ end
 -- wide, Yuta at the left in profile holding the blast back with his left
 -- hand; purple-pink waves of Rika's energy around him, rock flying
 local function engulf(ctx: Timeline.Ctx)
+	ctx:wind(2.6)
+	ctx:gust(0.6 + 0.6 * math.max(0, math.sin(ctx.t * 4.3)))
 	local hh = h(ctx)
-	local yroot = Common.yutaRoot()
-	local yb = ctx:rig("Yuta", yroot, Cast.alive(holdBeam, ctx.t))
+	-- the stream shoves him back, feet scraping, the whole body straining
+	local push = ctx.lt * 0.7 + Util.noise1(ctx.t * 5, 21) * 0.08
+	local yroot = Common.yutaRoot() * C(0, 0, push)
+	local tr = Util.noise1(ctx.t * 12, 22)
+	local strain = Cast.add(Cast.add(holdBeam, "UpperTorso", R(tr * 2.5, tr * 3, 0)), "LeftUpperArm", R(tr * 3, 0, tr * 2))
+	strain = Cast.add(strain, "Head", R(-tr * 3, Util.noise1(ctx.t * 3, 23) * 6, 0))
+	local yb = ctx:rig("Yuta", yroot, Cast.alive(strain, ctx.t))
 	Cast.expr(ctx, "yuta", "glare")
 	local rbones = ctx:rig("Ryu", Common.ryuRoot(0), Cast.ryu.spread)
 	local palm = (yb.LeftHand * C(0, -0.35, 0)).Position
-	local ip = palm + V(0, 0, 0.8)
-	FX.placeBeam(ctx, hh.blast, blastStart(rbones), ip, 3.6, 0.85, 2)
+	FX.placeBurst(ctx, hh.dust, yroot:PointToWorldSpace(V(0, 0.2, -0.6)), ctx.lt % 0.4, 8, 0.4, 0.4, V(0, 0.6, -1), 0.8, 20)
+	local ip = palm + V(0, 0, 1.6)
+	FX.placeBeam(ctx, hh.blast, blastStart(rbones), ip, 2.4, 0.85, 2)
 	local fl = 1 + math.sin(ctx.t * 41) * 0.08
-	FX.placeCore(ctx, hh.blastCore, ip, 1.5 * fl, 1)
-	FX.placeCore(ctx, hh.blastHalo, ip, 3.0 * fl, 0.22)
+	FX.placeCore(ctx, hh.blastCore, ip, 0.7 * fl, 1)
+	FX.placeCore(ctx, hh.blastHalo, ip, 1.5 * fl, 0.2)
 	FX.placeCore(ctx, hh.pinkGlow, Common.YUTA + V(0, 3.2, 1.6), 2.4, 0.3)
 	FX.placeBurst(ctx, hh.shards, ip, ctx.lt % 0.55, 30, 0.6, 0.55, V(0.2, 0.4, -1), 0.8, 4)
 	FX.placeBurst(ctx, hh.debris, ip + V(0, -2.8, 0), (ctx.lt + 0.25) % 0.7, 22, 0.9, 0.7, V(0.3, 0.7, -1), 0.9, 25)
@@ -183,6 +195,8 @@ end
 -- from behind Yuta: a dome of light with pink-violet edges, his silhouette
 -- throwing the left arm up and out
 local function dome(ctx: Timeline.Ctx)
+	ctx:wind(2.6)
+	ctx:gust(0.8 + 0.5 * math.max(0, math.sin(ctx.t * 3.7)))
 	local hh = h(ctx)
 	local yroot = Common.yutaRoot()
 	ctx:rig("Yuta", yroot, Cast.alive(Cast.mix(holdBeam, leftUp, Util.smoothstep(0, 0.6, ctx.u)), ctx.t))
@@ -205,6 +219,8 @@ end
 
 -- profile: his left hand reaches into the blast and grips the air
 local function reach(ctx: Timeline.Ctx)
+	ctx:wind(1.8)
+	ctx:gust(0.3)
 	local hh = h(ctx)
 	local yroot = Common.yutaRoot()
 	local k = Util.smoothstep(10.25, 11.0, ctx.t)
@@ -225,6 +241,7 @@ end
 
 -- the left hand with the ring: fingers clawing the air like a pane of glass
 local function hand(ctx: Timeline.Ctx)
+	ctx:wind(1.6)
 	local hh = h(ctx)
 	local yroot = Common.yutaRoot()
 	local yb = ctx:rig("Yuta", yroot, Cast.add(reachPose(1), "LeftHand", R(-10 - ctx.u * 25, 0, 0)))
@@ -249,6 +266,8 @@ end
 -- Yuta's face from a little above: a cold look and a half-smile; he pulls
 -- the sky to the side with his left hand; Ryu's thoughts over it
 local function face(ctx: Timeline.Ctx)
+	ctx:wind(1.6)
+	ctx:gust(0.25)
 	local hh = h(ctx)
 	local yroot = Common.yutaRoot()
 	local pull = Util.smoothstep(0.2, 0.9, ctx.u)
@@ -319,6 +338,8 @@ end
 -- wide from low at the side: Yuta (lower right) bends the blast in an arc
 -- up and over, from lower left to upper right; violet flashes, black shards
 local function fold(ctx: Timeline.Ctx)
+	ctx:wind(2.4)
+	ctx:gust(0.6 + 0.4 * math.max(0, math.sin(ctx.t * 2.9)))
 	local hh = h(ctx)
 	local yroot = Common.yutaRoot()
 	ctx:rig("Yuta", yroot, Cast.alive(Cast.add(reachPose(1), "LeftUpperArm", R(40, 0, -20)), ctx.t))
