@@ -348,8 +348,16 @@ local function ecu(ctx: Timeline.Ctx)
 	else
 		Cast.expr(ctx, "ryu", "grin")
 	end
-	FX.placeBurst(ctx, h.shards, head:PointToWorldSpace(V(1.2, 0.5, -0.5)), ctx.lt % 0.7, 18, 0.35, 0.6, head.RightVector * -1, 0.8, 0)
-	Cast.ryuAura(ctx, bones, 1, 6)
+	-- small shards flying off beside the head, away from the lens
+	FX.placeBurst(ctx, h.shards, head:PointToWorldSpace(V(1.3, 0.6, 0.2)), ctx.lt % 0.7, 14, 0.14, 0.6, head.RightVector, 0.8, 0)
+	-- the aura without its body bolts: 2 studs from the lens a bolt in front
+	-- of the face covers the eyes; crackle beside the head instead
+	Cast.ryuAura(ctx, bones, 1, 0)
+	local idx = 1
+	for i, side in { 1, -1 } do
+		local a = head:PointToWorldSpace(V(side * 1.0, 0.8, 0.3))
+		idx = FX.placeBolt(ctx, h.bolts, idx, a, a + head:VectorToWorldSpace(V(side * 2.6, 1.4, 0.6)), 8, 0.16, 0.04, 90 + i, 12)
+	end
 	ctx:light("RyuFace", 2.2, nil, 9)
 	ctx:bloom(1.4)
 	grade(ctx, 0, 0.22, -0.05)
