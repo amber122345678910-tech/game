@@ -18,7 +18,7 @@ local Scene = Loader.load("src/Cutscene/Scene")
 local Realizer = Loader.load("src/Cutscene/Realizer")
 
 local ok = true
-for _, run in { { id = "cinema", part = 1 }, { id = "cinema", part = 2 } } do
+for _, run in { { id = "cinema", part = 1 }, { id = "cinema", part = 2 }, { id = "cinema", part = 3 } } do
 	local id, part = run.id, run.part
 	local success, err = pcall(function()
 		local live = Realizer.build(id, Workspace, part)

@@ -29,7 +29,7 @@ local expected = {
 	"Art/Sets/SkyPaint", "Art/Sets/WideSet", "Art/Sets/CloseupSet",
 	"Shots/Cast", "Shots/Field", "Shots/Overlay", "Shots/Opening", "Shots/Clash", "Shots/RyuShots", "Shots/YutaShots",
 	"Art/Characters/Uro", "Shots/Part2", "Shots/P2/Common", "Shots/P2/Overlay2", "Shots/P2/Blast", "Shots/P2/Realize",
-	"Shots/P2/Flashback", "Shots/P2/Grapple",
+	"Shots/P2/Flashback", "Shots/P2/Grapple", "Shots/Part3",
 }
 for _, rel in expected do
 	local node = cutscene

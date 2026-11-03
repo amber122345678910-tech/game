@@ -14,6 +14,7 @@ local Clash = require(Shots.Clash)
 local RyuShots = require(Shots.RyuShots)
 local YutaShots = require(Shots.YutaShots)
 local Part2 = require(Shots.Part2)
+local Part3 = require(Shots.Part3)
 
 local Scene = {}
 
@@ -59,6 +60,20 @@ Scene.SUBTITLES2 = {
 	{ t0 = 57.6, t1 = 58.7, text = "Five minutes." },
 } :: { Subtitle }
 Scene.DURATION2 = 59.167
+
+-- Part 3: opens on the end of part 2 (t3 = t2 - 56.2)
+Scene.SUBTITLES3 = {
+	{ t0 = 1.4, t1 = 2.5, text = "Five minutes." },
+	{ t0 = 2.933, t1 = 6.033, text = "Okkotsu's connection to \"Rika\" was severed." },
+	{ t0 = 12.467, t1 = 14.667, text = "Yuta!" },
+	{ t0 = 17.833, t1 = 19.5, text = "I had no idea" },
+	{ t0 = 23.267, t1 = 26.4, text = "there was more after wringing everything out!" },
+	{ t0 = 29.267, t1 = 33.033, text = "This is what dessert is like!" },
+	{ t0 = 55.067, t1 = 56.533, text = "Now we're done." },
+} :: { Subtitle }
+Scene.DURATION3 = 56.867
+Scene.RECAP3_FROM = 56.2
+Scene.RECAP3_LEN = 2.633
 Scene.RECAP_FROM = 53.3 -- part 1 time shown at part 2's t = 0
 Scene.RECAP_LEN = 5.267
 
@@ -97,6 +112,23 @@ function Scene.build(styleId: string, part: number?): Builder.Scene
 		end
 		scene.data.duration = Scene.DURATION
 		scene.data.subtitles = Scene.SUBTITLES
+	elseif partId == 3 then
+		for _, m in { Clash, RyuShots, YutaShots } do
+			m.build(scene)
+		end
+		Part2.build(scene)
+		Part3.build(scene)
+		local a, b = Scene.RECAP3_FROM, Scene.RECAP3_FROM + Scene.RECAP3_LEN
+		for _, s in Part2.shots do
+			if s.t1 > a and s.t0 < b then
+				table.insert(shots, shifted(s, a, 0, Scene.RECAP3_LEN))
+			end
+		end
+		for _, s in Part3.shots do
+			table.insert(shots, s)
+		end
+		scene.data.duration = Scene.DURATION3
+		scene.data.subtitles = Scene.SUBTITLES3
 	else
 		for _, m in { Clash, RyuShots, YutaShots } do
 			m.build(scene)

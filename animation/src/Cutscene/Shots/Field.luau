@@ -332,7 +332,7 @@ end
 -- Damage to the field that stays once it has happened (runs after every shot)
 function Field.aftermath(ctx: Timeline.Ctx)
 	-- in part 2 the trench has long been carved
-	local p = if ctx.scene.data.part == 2 then 1 else Field.trenchProgress(ctx.t)
+	local p = if ctx.scene.data.part ~= 1 then 1 else Field.trenchProgress(ctx.t)
 	if p <= 0 then
 		return
 	end

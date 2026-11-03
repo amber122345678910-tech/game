@@ -1,0 +1,52 @@
+{
+  "name": "YutaVsRyu3",
+  "tree": {
+    "$className": "DataModel",
+    "ReplicatedStorage": {
+      "Cutscene": {
+        "$path": "src/Cutscene"
+      },
+      "CutscenePart": {
+        "$className": "IntValue",
+        "$properties": {
+          "Value": 3
+        }
+      }
+    },
+    "StarterPlayer": {
+      "StarterPlayerScripts": {
+        "CutscenePlayer": {
+          "$path": "src/Player/CutscenePlayer.client.luau"
+        }
+      }
+    },
+    "Players": {
+      "$properties": {
+        "CharacterAutoLoads": false
+      }
+    },
+    "Workspace": {
+      "$properties": {
+        "StreamingEnabled": false,
+        "SignalBehavior": "Deferred"
+      },
+      "ReadMe": {
+        "$path": "src/ReadMe3.model.json"
+      }
+    },
+    "Lighting": {
+      "$properties": {
+        "LightingStyle": "Soft",
+        "PrioritizeLightingQuality": true,
+        "ClockTime": 13.5,
+        "Brightness": 1,
+        "GlobalShadows": false
+      }
+    },
+    "MaterialService": {
+      "$properties": {
+        "Use2022Materials": true
+      }
+    }
+  }
+}
