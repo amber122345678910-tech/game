@@ -6,6 +6,7 @@ local process = require("@lune/process")
 local roblox = require("@lune/roblox")
 
 local path = process.args[1] or "YutaVsRyu_Part1.rbxl"
+local wantPart = tonumber(process.args[2] or "1")
 local game = roblox.deserializePlace(fs.readFile(path))
 
 local failures = 0
@@ -27,6 +28,8 @@ local expected = {
 	"Art/Faces/YutaEyes", "Art/Faces/RyuEyes", "Art/Faces/FaceRig",
 	"Art/Sets/SkyPaint", "Art/Sets/WideSet", "Art/Sets/CloseupSet",
 	"Shots/Cast", "Shots/Field", "Shots/Overlay", "Shots/Opening", "Shots/Clash", "Shots/RyuShots", "Shots/YutaShots",
+	"Art/Characters/Uro", "Shots/Part2", "Shots/P2/Common", "Shots/P2/Overlay2", "Shots/P2/Blast", "Shots/P2/Realize",
+	"Shots/P2/Flashback", "Shots/P2/Grapple",
 }
 for _, rel in expected do
 	local node = cutscene
@@ -35,6 +38,8 @@ for _, rel in expected do
 	end
 	check(node ~= nil and node.ClassName == "ModuleScript" and #node.Source > 100, "module " .. rel)
 end
+local partValue = rs:FindFirstChild("CutscenePart")
+check(partValue ~= nil and partValue.ClassName == "IntValue" and partValue.Value == wantPart, "ReplicatedStorage.CutscenePart = " .. tostring(wantPart))
 local sps = game:GetService("StarterPlayer"):FindFirstChild("StarterPlayerScripts")
 local player = sps and sps:FindFirstChild("CutscenePlayer")
 check(player ~= nil and player.ClassName == "LocalScript", "StarterPlayerScripts.CutscenePlayer is a LocalScript")

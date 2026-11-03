@@ -5,6 +5,12 @@
     "ReplicatedStorage": {
       "Cutscene": {
         "$path": "src/Cutscene"
+      },
+      "CutscenePart": {
+        "$className": "IntValue",
+        "$properties": {
+          "Value": 1
+        }
       }
     },
     "StarterPlayer": {

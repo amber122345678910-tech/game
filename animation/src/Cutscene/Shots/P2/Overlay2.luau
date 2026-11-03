@@ -52,25 +52,25 @@ local function digit(c: Paint.Canvas, ch: string, x: number, y: number, w: numbe
 		return string.find(segs, sg, 1, true) ~= nil
 	end
 	if on("a") then
-		c:rect(x + w / 2, y + t / 2, w - t * 1.1, t, 0, col, 0, t / 2)
+		c:rect(x + w / 2, y + t / 2, w - t * 0.35, t, 0, col, 0, t / 2)
 	end
 	if on("g") then
-		c:rect(x + w / 2, y + half, w - t * 1.1, t, 0, col, 0, t / 2)
+		c:rect(x + w / 2, y + half, w - t * 0.35, t, 0, col, 0, t / 2)
 	end
 	if on("d") then
-		c:rect(x + w / 2, y + h - t / 2, w - t * 1.1, t, 0, col, 0, t / 2)
+		c:rect(x + w / 2, y + h - t / 2, w - t * 0.35, t, 0, col, 0, t / 2)
 	end
 	if on("f") then
-		c:rect(x + t / 2, y + half / 2, t, half - t * 1.1, 0, col, 0, t / 2)
+		c:rect(x + t / 2, y + half / 2, t, half - t * 0.35, 0, col, 0, t / 2)
 	end
 	if on("b") then
-		c:rect(x + w - t / 2, y + half / 2, t, half - t * 1.1, 0, col, 0, t / 2)
+		c:rect(x + w - t / 2, y + half / 2, t, half - t * 0.35, 0, col, 0, t / 2)
 	end
 	if on("e") then
-		c:rect(x + t / 2, y + half * 1.5, t, half - t * 1.1, 0, col, 0, t / 2)
+		c:rect(x + t / 2, y + half * 1.5, t, half - t * 0.35, 0, col, 0, t / 2)
 	end
 	if on("c") then
-		c:rect(x + w - t / 2, y + half * 1.5, t, half - t * 1.1, 0, col, 0, t / 2)
+		c:rect(x + w - t / 2, y + half * 1.5, t, half - t * 0.35, 0, col, 0, t / 2)
 	end
 end
 

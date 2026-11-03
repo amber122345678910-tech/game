@@ -113,11 +113,11 @@ local rikaBite: Rig.Pose = {
 	LowerTorso = R(-14, 0, 0),
 	UpperTorso = R(-44, 0, 0),
 	Head = R(40, 0, 0),
-	LeftUpperArm = R(70, 0, -30),
-	LeftLowerArm = R(70, 0, 0),
+	LeftUpperArm = R(30, 0, -64),
+	LeftLowerArm = R(50, 0, 0),
 	LeftHand = R(20, 0, 0),
-	RightUpperArm = R(70, 0, 30),
-	RightLowerArm = R(70, 0, 0),
+	RightUpperArm = R(30, 0, 64),
+	RightLowerArm = R(50, 0, 0),
 	RightHand = R(20, 0, 0),
 	LeftUpperLeg = R(30, 0, 10),
 	LeftLowerLeg = R(-40, 0, -30),
@@ -267,7 +267,8 @@ end
 local function rikaOnRyu(ctx: Timeline.Ctx, ryuRoot: CFrame, pose: Rig.Pose): ({ [string]: CFrame }, { [string]: CFrame })
 	local rb = ctx:rig("Ryu", ryuRoot, pose)
 	local target = (rb.Head * C(0, 1.9, 0.5)).Position
-	local r0 = C(ryuRoot.Position + V(0, 0, 4)) * CFrame.Angles(0, math.rad(180), 0)
+	-- Rika stands behind him, facing the same way, and bends over his head
+	local r0 = C(ryuRoot.Position + V(0, 0, 4))
 	local kb = ctx:rig("Rika", r0, rikaBite)
 	local delta = target - kb.Head.Position
 	kb = ctx:rig("Rika", C(delta) * r0, rikaBite)
@@ -300,7 +301,7 @@ local function bitten(ctx: Timeline.Ctx)
 	Cast.expr(ctx, "ryu", "grit")
 	bloodOn(ctx, rb.Head, 1)
 	local head = rb.Head * C(0, 0.7, 0)
-	local eye = head:PointToWorldSpace(V(1.0, -0.7, -2.7))
+	local eye = head:PointToWorldSpace(V(0.7, -0.6, -2.2))
 	ctx:camera(Clash.shake(Util.lookAt(eye, head.Position + V(0, 0.3, 0)), ctx.t, 0.18, 14), 52)
 	ctx:focus((head.Position - eye).Magnitude, 1)
 	ctx:light("RyuFace", 0.8, Color3.fromRGB(200, 210, 255), 8)
@@ -326,7 +327,7 @@ local function palmStage(ctx: Timeline.Ctx): ({ [string]: CFrame }, { [string]: 
 	local rr = Common.ryuRoot(0)
 	local rb = ctx:rig("RyuBare", rr, Cast.alive(ryuBitten, ctx.t))
 	local chest = (rb.UpperTorso * C(0.15, 1.05, -0.72)).Position
-	local y0 = C(Common.RYU + V(0, 0, -3)) * CFrame.Angles(0, math.rad(180), 0)
+	local y0 = C(Common.RYU + V(0.7, 0, -3)) * CFrame.Angles(0, math.rad(180), 0)
 	local yb = ctx:rig("Yuta", y0, yutaPalm)
 	local palm = (yb.RightHand * C(0, -0.3, 0)).Position
 	yb = ctx:rig("Yuta", C(chest - palm) * y0, yutaPalm)
@@ -338,11 +339,11 @@ local function chest(ctx: Timeline.Ctx)
 	local rb, yb, pt = palmStage(ctx)
 	Cast.expr(ctx, "yuta", "glare")
 	Cast.expr(ctx, "ryu", "grit")
-	local eye = rb.UpperTorso:PointToWorldSpace(V(-1.6, 1.4, 2.6))
+	local eye = rb.UpperTorso:PointToWorldSpace(V(2.0, 1.7, 2.8))
 	ctx:camera(Clash.shake(Util.lookAt(eye, yb.Head.Position:Lerp(pt, 0.4)), ctx.t, 0.06, 8), 55)
 	ctx:focus((yb.Head.Position - eye).Magnitude, 1)
-	FX.placeCore(ctx, hh.palmGlow, pt, 0.35 + math.sin(ctx.t * 30) * 0.05, 0.9)
-	ctx:light("YutaAura", 2.4, CYAN, 10)
+	FX.placeCore(ctx, hh.palmGlow, pt, 0.22 + math.sin(ctx.t * 30) * 0.03, 0.8)
+	ctx:light("YutaAura", 1.2, CYAN, 8)
 	Common.grade(ctx, -0.02, 0.22, 0.05, Color3.fromRGB(220, 230, 255))
 	Common.sky(ctx, "wisps", 22)
 end
@@ -354,10 +355,11 @@ local function palmClose(ctx: Timeline.Ctx, stage: number, push: number)
 	local eye = pt + V(2.3 - push * 0.35, 0.45, -0.7)
 	ctx:camera(Clash.shake(Util.lookAt(eye, pt), ctx.t, 0.04, 6), 50)
 	ctx:focus((pt - eye).Magnitude, 1)
-	FX.placeCore(ctx, hh.palmGlow, pt + V(0, 0, -0.1), 0.3 + math.sin(ctx.t * 30) * 0.04, 0.9)
+	FX.placeCore(ctx, hh.palmGlow, pt + V(0, 0, -0.1), 0.16 + math.sin(ctx.t * 30) * 0.02, 0.75)
 	ctx:show("crack" .. stage)
-	ctx:light("YutaAura", 2.4, CYAN, 8)
-	Common.grade(ctx, -0.04, 0.24, 0, Color3.fromRGB(225, 232, 255))
+	ctx:light("YutaAura", 0.9, CYAN, 6)
+	ctx:bloom(1.1)
+	Common.grade(ctx, -0.1, 0.26, 0, Color3.fromRGB(225, 232, 255))
 end
 
 local function palm(ctx: Timeline.Ctx)

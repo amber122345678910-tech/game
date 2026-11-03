@@ -40,10 +40,10 @@ Scene.SUBTITLES = {
 -- Part 2 ("end fight scene pt. 2"): the first 5.27 s repeat the end of
 -- part 1 (from 53.3 s on), then the new shots follow.
 Scene.SUBTITLES2 = {
-	{ t0 = 0, t1 = 0.633, text = "even you couldn't have recovered that much." },
-	{ t0 = 0.633, t1 = 2.267, text = "I'll settle this." },
-	{ t0 = 2.5, t1 = 5.233, text = "Granite Blast!" },
-	{ t0 = 9.633, t1 = 12.733, text = "Okkotsu's technique" },
+	{ t0 = 0, t1 = 0.333, text = "even you couldn't have recovered that much." },
+	{ t0 = 0.633, t1 = 2.1, text = "I'll settle this." },
+	{ t0 = 2.5, t1 = 4.9, text = "Granite Blast!" },
+	{ t0 = 9.5, t1 = 12.733, text = "Okkotsu's technique" },
 	{ t0 = 12.767, t1 = 15.6, text = "had already recovered." },
 	{ t0 = 17.6, t1 = 20.233, text = "Uro's technique?!" },
 	{ t0 = 20.333, t1 = 23.0, text = "I thought he was more than just a cursed speech user!" },
@@ -55,8 +55,8 @@ Scene.SUBTITLES2 = {
 	{ t0 = 34.933, t1 = 36.1, text = "While I wasn't looking?!" },
 	{ t0 = 36.2, t1 = 39.4, text = "Don't tell me there are no conditions?!" },
 	{ t0 = 42.9, t1 = 44.667, text = "That was when he did it!" },
-	{ t0 = 45.1, t1 = 46.633, text = "Thin Ice Breaker!" },
-	{ t0 = 57.5, t1 = 58.7, text = "Five minutes." },
+	{ t0 = 45.0, t1 = 46.2, text = "Thin Ice Breaker!" },
+	{ t0 = 57.6, t1 = 58.7, text = "Five minutes." },
 } :: { Subtitle }
 Scene.DURATION2 = 59.167
 Scene.RECAP_FROM = 53.3 -- part 1 time shown at part 2's t = 0
