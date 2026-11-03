@@ -1,10 +1,12 @@
 --!strict
--- Part 2: Ryu watches his blast bend away and works out Yuta's technique.
---  20.300 Ryu from behind, the blast bending up into the sky
---  23.000 Ryu's head in profile, cyan light, wind
---  27.667 Yuta from behind and below, hand raised to the sky
---  38.700 cyan slashes of folded space     39.433 the blast flies off (comet)
---  40.700 Ryu's face, red-orange light from above
+-- Part 2: Ryu keeps firing while his blast bends away, and works out Yuta's
+-- technique; then Yuta lets the blast go and dashes at him.
+--  20.300 Ryu from below and behind, the beam from his head bent up and right
+--  23.000 Ryu's head in profile, blue energy flaring round his face and neck
+--  27.667 Yuta from behind and below, his right hand raised, energy swirling
+--  38.700 from above: the bent blast over the cracked deck, Yuta darts through
+--  39.433 Yuta dashes at the camera through blue fog
+--  40.700 Ryu's face frozen, red light growing over his head
 --  42.300 his eye alone in the dark, orange streaks
 local Timeline = require(script.Parent.Parent.Parent.Timeline)
 local FX = require(script.Parent.Parent.Parent.FX)
@@ -22,47 +24,51 @@ local C = CFrame.new
 local R = Rig.R
 
 local CYAN = Color3.fromRGB(120, 230, 255)
-local ORANGE = Color3.fromRGB(255, 120, 60)
+local ORANGE = Color3.fromRGB(255, 110, 60)
+local PINK = Color3.fromRGB(255, 120, 220)
 
 local function h(ctx: Timeline.Ctx): Common.H
 	return ctx.scene.data.p2
 end
 
--- the bent blast spreading up into the sky above Yuta (seen from afar)
-local function skyBands(ctx: Timeline.Ctx, lt: number, k: number)
+-- Ryu's blast leaving his head and the bands it bends into above Yuta
+local function bentBlast(ctx: Timeline.Ctx, ryuBones: { [string]: CFrame }, k: number)
 	local hh = h(ctx)
-	local bend = Common.YUTA + V(0, 4.2, 5.2)
+	local bend = Blast.bandPoint(3, 0)
+	FX.placeBeam(ctx, hh.blast, Blast.blastStart(ryuBones), bend, 3.2, 0.9 * k, 2)
 	for i, b in hh.bands do
-		local off = V((i - 3) * 2.4, (i - 3) * 0.8, 0)
-		local p0 = bend + off
-		local p1 = bend + V(0, 6, 12) + off * 2
-		local p2 = bend + V((i - 3) * 9, 70, 30)
-		local function pt(f: number): Vector3
-			local w = 1 - f
-			return p0 * (w * w) + p1 * (2 * w * f) + p2 * (f * f)
-		end
-		local head = math.clamp(0.6 + lt * 0.12, 0, 1)
-		FX.placeCurvedBeam(ctx, b, pt, math.clamp(head - 0.7, 0, 1), head, if i % 2 == 0 then 1.3 else 2.6, 0.8 * k)
+		FX.placeCurvedBeam(ctx, b, function(f: number): Vector3
+			return Blast.bandPoint(i, f)
+		end, 0.25, 1, if i % 2 == 0 then 1.3 else 2.6, 0.8 * k)
 	end
-	FX.placeCore(ctx, hh.blastCore, bend, 1.8, k)
-	FX.placeCore(ctx, hh.blastHalo, bend, 3.8, 0.25 * k)
+	FX.placeCore(ctx, hh.blastCore, bend, 1.6, k)
+	FX.placeCore(ctx, hh.blastHalo, bend, 3.4, 0.25 * k)
+end
+
+-- rings of shock travelling along the beam near Ryu's head
+local function beamRings(ctx: Timeline.Ctx, from: Vector3, to: Vector3)
+	local hh = h(ctx)
+	local d = (to - from).Unit
+	for i, ring in hh.rings do
+		local ph = (ctx.t * 1.6 + i / 3) % 1
+		FX.placeRing(ctx, ring, from + d * (2 + ph * 14), d, 1.4 + ph * 2.2, 0.06, 0.55 * (1 - ph))
+	end
 end
 
 local function ryuBack(ctx: Timeline.Ctx)
-	local hh = h(ctx)
 	local root = Common.ryuRoot(0)
-	local bones = ctx:rig("Ryu", root, Cast.alive(Cast.add(Cast.ryu.spread, "Head", R(-10, -26, 0)), ctx.t))
-	Cast.expr(ctx, "ryu", "shock")
+	local bones = ctx:rig("Ryu", root, Cast.alive(Cast.add(Cast.ryu.spread, "Head", R(-16, -10, 0)), ctx.t))
+	Cast.expr(ctx, "ryu", "grit")
 	ctx:rig("Yuta", Common.yutaRoot(), Cast.alive(Blast.reachPose(1), ctx.t))
-	skyBands(ctx, ctx.lt + 3, 1)
-	FX.placeRays(ctx, hh.rays, Common.YUTA + V(0, 9, 6), C(), 16, 0.25, 0.55, 10, V(0, 0.6, 0))
-	local eye = root:PointToWorldSpace(V(-2.4, 5.1, 4.2 - ctx.u * 0.4))
-	local look = root:PointToWorldSpace(V(5, 9.5, -22))
-	ctx:camera(Clash.shake(Util.lookAt(eye, look), ctx.t, 0.06, 8), 52)
+	bentBlast(ctx, bones, 1)
+	beamRings(ctx, Blast.blastStart(bones), Blast.bandPoint(3, 0))
+	local eye = root:PointToWorldSpace(V(-2.6, 2.4, 5.2 - ctx.u * 0.8))
+	local look = root:PointToWorldSpace(V(3, 9.5, -16))
+	ctx:camera(Clash.shake(Util.lookAt(eye, look), ctx.t, 0.06, 8), 54)
 	ctx:focus((bones.Head.Position - eye).Magnitude, 1)
-	Cast.ryuAura(ctx, bones, 0.7, 4)
+	Cast.ryuAura(ctx, bones, 0.8, 4)
 	ctx:bloom(1.3)
-	Common.grade(ctx, -0.04, 0.24, 0.1, Color3.fromRGB(205, 230, 255))
+	Common.grade(ctx, -0.06, 0.24, 0.1, Color3.fromRGB(205, 225, 255))
 	Common.sky(ctx, "wisps", 40)
 end
 
@@ -73,18 +79,22 @@ local function ryuProfile(ctx: Timeline.Ctx)
 	Cast.expr(ctx, "ryu", "glare")
 	local head = bones.Head * C(0, 0.75, 0)
 	local eye = head:PointToWorldSpace(V(2.3 - ctx.u * 0.25, 0.1, -1.7))
-	ctx:camera(Clash.shake(Util.lookAt(eye, head.Position + V(0, -0.15, 0)), ctx.t, 0.05, 6), 42)
+	ctx:camera(Clash.shake(Util.lookAt(eye, head.Position + V(0, -0.15, 0)), ctx.t, 0.07, 9), 42)
 	ctx:focus((head.Position - eye).Magnitude, 1)
-	-- cyan glare of the bending blast and sparks blowing past
+	-- the beam from his head, right and up; blue energy flaring at his face and neck
+	local a = Blast.blastStart(bones)
+	FX.placeBeam(ctx, hh.blast, a, Blast.bandPoint(3, 0), 2.6, 0.8, 2)
 	local fl = 0.8 + 0.2 * math.sin(ctx.t * 11) * math.sin(ctx.t * 5.3)
-	ctx:light("RyuFace", 2.2 * fl, CYAN, 9)
-	Common.streamers(ctx, hh.streamers, head.Position + root.LookVector * 1.2, V(0, 0.4, 1), 1.8, 1.4, 60, 0.45)
+	ctx:light("RyuFace", 2.0 * fl, CYAN, 9)
 	local idx = 1
-	local a = head:PointToWorldSpace(V(-1.4, 1.2, -1.8))
-	idx = FX.placeBolt(ctx, hh.bolts, idx, a, a + V(0, -0.8, 3.5), 7, 0.12, 0.03, 31, 10)
-	Cast.ryuAura(ctx, bones, 0.6, 3)
-	ctx:bloom(1.6)
-	Common.grade(ctx, 0, 0.2, 0.05, Color3.fromRGB(205, 228, 255))
+	for i = 1, 6 do
+		local p = head:PointToWorldSpace(V(math.sin(i * 2.1) * 0.5, -0.6 - (i % 3) * 0.35, 0.2 + math.cos(i * 1.7) * 0.4))
+		idx = FX.placeBolt(ctx, hh.bolts, idx, p, p + V(math.sin(i + ctx.t * 4) * 0.8, 1.2 + (i % 2) * 0.6, math.cos(i * 3.1) * 0.8), 6, 0.16, 0.035, 40 + i, 14)
+	end
+	ctx:emit("RyuGlints", 60)
+	Cast.ryuAura(ctx, bones, 0.8, 3)
+	ctx:bloom(1.5)
+	Common.grade(ctx, -0.04, 0.22, 0.05, Color3.fromRGB(200, 222, 255))
 	Common.sky(ctx, "wisps", 30)
 end
 
@@ -100,12 +110,14 @@ local raiseArm: Rig.Pose = {
 	RightUpperLeg = R(-8, 0, 6),
 }
 
+-- Yuta from behind in the glare, right hand raised; pink and blue energy
+-- and black shards swirling round him
 local function yutaRaise(ctx: Timeline.Ctx)
 	local hh = h(ctx)
 	local yroot = Common.yutaRoot()
 	local yb = ctx:rig("Yuta", yroot, Cast.alive(Cast.mix(Blast.reachPose(1), raiseArm, Util.smoothstep(0, 0.5, ctx.lt)), ctx.t))
 	Cast.expr(ctx, "yuta", "glare")
-	local eye = yroot:PointToWorldSpace(V(1.4, 1.3, 3.8))
+	local eye = yroot:PointToWorldSpace(V(1.4, 1.3, 3.8 + ctx.u * 0.8))
 	local look = yroot:PointToWorldSpace(V(-1.5, 7, -8))
 	ctx:camera(Clash.shake(Util.lookAt(eye, look), ctx.t, 0.07, 8), 60)
 	ctx:focus(4, 1)
@@ -115,65 +127,71 @@ local function yutaRaise(ctx: Timeline.Ctx)
 	FX.placeRays(ctx, hh.rays, src, Util.lookAt(src, eye), 34, 0.45, 0.8, 12, (eye - src).Unit)
 	local hand = (yb.RightHand * C(0, -0.4, 0)).Position
 	FX.placeCore(ctx, hh.palmGlow, hand, 0.3, 0.7)
-	ctx:light("YutaAura", 1.8, CYAN, 14)
+	-- energy and shards circling him
+	local c = Common.YUTA + V(0, 3, 0)
+	for i, p in hh.shell.parts do
+		local a = ctx.t * (1.2 + (i % 3) * 0.3) + i * 0.7
+		local rr = 3 + (i % 5) * 0.8
+		local pos = c + V(math.cos(a) * rr, math.sin(i * 1.3 + ctx.t) * 2.5, math.sin(a) * rr)
+		ctx:place(p, CFrame.new(pos) * CFrame.Angles(a, i, a * 0.5))
+		local sz = 0.25 + (i % 4) * 0.1
+		ctx:prop(p, { s = V(sz, sz * 1.4, sz * 0.3) })
+	end
+	Common.streamers(ctx, hh.streamers, c, V(1, 0.6, 0.2), 4, 3, 50, 0.6)
+	ctx:light("YutaAura", 1.8, PINK, 14)
 	ctx:bloom(1.4)
 	Common.grade(ctx, -0.02, 0.25, 0.2, Color3.fromRGB(230, 225, 255))
 end
 
--- folded space: cyan slashes sweeping across a dark blue sky
-local function slashes(ctx: Timeline.Ctx)
+-- from above: the bent blast arching over the cracked deck, Yuta darting
+-- through it towards Ryu
+local function overBeam(ctx: Timeline.Ctx)
 	local hh = h(ctx)
-	Clash.void(ctx, Color3.fromRGB(12, 22, 64))
-	local o = Clash.O
-	ctx:camera(C(o + V(0, 0, 34)) * CFrame.Angles(0, 0, math.rad(-20)), 62)
-	ctx:focus(30, 0)
-	for i, b in hh.bands do
-		local y0 = (i - 3) * 7
-		local function pt(f: number): Vector3
-			local a = math.rad(-30 + f * 90)
-			return o + V(-40 + f * 80, y0 + math.sin(a) * 10, (i - 3) * 2)
-		end
-		local head = math.clamp(ctx.u * 1.6 - (i - 1) * 0.1, 0, 1)
-		FX.placeCurvedBeam(ctx, b, pt, math.clamp(head - 0.5, 0, 1), head, if i % 2 == 0 then 1.4 else 3, 1)
-	end
-	FX.placeBurst(ctx, hh.shards, o, ctx.lt, 30, 0.8, 0.8, V(1, 0.3, 0.5), 1, 0)
-	ctx:bloom(2.2)
-	Common.grade(ctx, 0, 0.25, 0.2, Color3.fromRGB(200, 225, 255))
+	local u = ctx.u
+	local p = Common.YUTA:Lerp(Common.RYU, 0.2 + u * 0.35)
+	ctx:rig("Yuta", C(p) * CFrame.Angles(0, math.rad(180), 0), Cast.run(ctx.t * 3.4, 34))
+	local rbones = ctx:rig("Ryu", Common.ryuRoot(0), Cast.ryu.spread)
+	bentBlast(ctx, rbones, 1)
+	local mid = Common.YUTA:Lerp(Common.RYU, 0.4)
+	local cam = Util.lookAt(mid + V(-10, 34, -6), mid + V(2, 0, 2), V(0, 0, 1))
+	ctx:camera(Clash.shake(cam * CFrame.Angles(0, 0, math.rad(-25)), ctx.t, 0.3, 14), 58)
+	ctx:focus(34, 0)
+	Common.streamers(ctx, hh.streamers, p + V(0, 2.5, 0), V(0, 0, 1), 1.4, 6, 140, 0.8)
+	ctx:bloom(1.5)
+	Common.grade(ctx, -0.04, 0.28, 0.2, Color3.fromRGB(200, 225, 255))
 end
 
--- the deflected blast flies off into the night like a comet
-local function cometAway(ctx: Timeline.Ctx)
+-- Yuta dashes at the camera through blue fog, a violet streak behind him
+local function dash(ctx: Timeline.Ctx)
 	local hh = h(ctx)
-	local eye = Common.YUTA + V(-6, 2, -10)
-	local dir = V(0.3, 0.55, 1).Unit
-	local start = Common.YUTA + V(0, 30, 40)
-	local headPos = start + dir * (ctx.lt * 160)
-	ctx:camera(Util.lookAt(eye, start + dir * 120), 40)
-	ctx:focus(100, 0)
-	local k = 1 - Util.smoothstep(0.7, 1, ctx.u)
-	FX.placeBeam(ctx, hh.comet, headPos - dir * 30, headPos, 4, k)
-	FX.placeCore(ctx, hh.blastCore, headPos, 5, k)
-	-- the sparkle where it vanishes
-	local s = Util.smoothstep(0.55, 0.8, ctx.u) * (1 - Util.smoothstep(0.85, 1, ctx.u))
-	FX.placeRays(ctx, hh.rays, start + dir * 190, Util.lookAt(start + dir * 190, eye), 12, 0.3, s, 8, nil)
-	ctx:bloom(2.2)
-	Common.grade(ctx, -0.25, 0.3, 0.25, Color3.fromRGB(150, 175, 255))
-	ctx:fog(0.5)
+	local u = ctx.u
+	local p = Common.YUTA:Lerp(Common.RYU, 0.45 + u * 0.4)
+	local yb = ctx:rig("Yuta", C(p) * CFrame.Angles(0, math.rad(180), 0), Cast.run(ctx.t * 3.4, 38))
+	Cast.expr(ctx, "yuta", "glare")
+	local eye = Common.RYU + V(1.6, 2.6, -3)
+	ctx:camera(Clash.shake(Util.lookAt(eye, yb.Head.Position + V(0, -1, 0)), ctx.t, 0.25, 12), 55)
+	ctx:focus((yb.Head.Position - eye).Magnitude, 0.8)
+	Common.streamers(ctx, hh.streamers, p + V(0, 2.6, -4), V(0, 0, 1), 1.2, 8, 160, 0.7)
+	FX.placeCore(ctx, hh.pinkGlow, p + V(0, 2.6, -1.5), 0.8, 0.35)
+	ctx:fog(2.2)
+	ctx:bloom(1.3)
+	Common.grade(ctx, -0.12, 0.25, 0.15, Color3.fromRGB(170, 190, 255))
+	Common.sky(ctx, "heavy", 14)
 end
 
 local function ryuGlow(ctx: Timeline.Ctx)
 	local root = Common.ryuRoot(0)
 	local bones = ctx:rig("Ryu", root, Cast.alive(Cast.add(Cast.ryu.spread, "Head", R(6, 0, 0)), ctx.t))
-	Cast.expr(ctx, "ryu", "shock")
+	Cast.expr(ctx, "ryu", "gasp")
 	local head = bones.Head * C(0, 0.7, 0)
 	local eye = head:PointToWorldSpace(V(0.1, -0.35, -3.3 + ctx.u * 0.4))
-	ctx:camera(Clash.shake(Util.lookAt(eye, head.Position + V(0, -0.15, 0)), ctx.t, 0.05 + ctx.u * 0.15, 10), 46)
+	ctx:camera(Clash.shake(Util.lookAt(eye, head.Position + V(0, -0.15, 0)), ctx.t, 0.04 + ctx.u * 0.1, 10), 46)
 	ctx:focus(3.2, 1)
 	local k = Util.smoothstep(0, 1, ctx.u)
 	ctx:light("RyuFace", 1.2 + 3 * k, ORANGE, 10)
 	ctx:alpha("orangeFlare", Util.smoothstep(0.55, 1, ctx.u))
-	ctx:bloom(1.6)
-	Common.grade(ctx, 0.02, 0.25, 0.1, Color3.fromRGB(255, 225, 205))
+	ctx:bloom(1.4)
+	Common.grade(ctx, 0, 0.25, 0.1, Color3.fromRGB(255, 225, 205))
 	Common.sky(ctx, "wisps", 26)
 end
 
@@ -187,9 +205,9 @@ Realize.shots = {
 	{ id = "P2 16 ryu back", t0 = 20.3, t1 = 23.0, run = ryuBack },
 	{ id = "P2 17 ryu profile", t0 = 23.0, t1 = 27.667, run = ryuProfile },
 	{ id = "P2 18 yuta raise", t0 = 27.667, t1 = 31.3, run = yutaRaise },
-	{ id = "P2 27 slashes", t0 = 38.7, t1 = 39.433, run = slashes },
-	{ id = "P2 28 comet", t0 = 39.433, t1 = 40.7, run = cometAway },
-	{ id = "P2 29 ryu glow", t0 = 40.7, t1 = 42.3, run = ryuGlow },
+	{ id = "P2 27 over the beam", t0 = 38.7, t1 = 39.433, run = overBeam },
+	{ id = "P2 28 dash", t0 = 39.433, t1 = 40.7, run = dash },
+	{ id = "P2 29 ryu frozen", t0 = 40.7, t1 = 42.3, run = ryuGlow },
 	{ id = "P2 30 eye black", t0 = 42.3, t1 = 42.9, run = eyeBlack },
 } :: { Timeline.Shot }
 

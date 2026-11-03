@@ -1,7 +1,8 @@
 --!strict
--- The battlefield: a frozen snowfield with cracked ice, a rubble crater, the
+-- The battlefield: the wide concrete deck of an elevated road in a ruined
+-- city (no snow), cracked, with a rubble crater, the
 -- trench Rika's beam carves, ruined city blocks in the distance, mist plates
--- that follow the camera and falling snow.
+-- that follow the camera and drifting dust.
 local Builder = require(script.Parent.Parent.Builder)
 local Timeline = require(script.Parent.Parent.Timeline)
 local Paint = require(script.Parent.Parent.Paint)
@@ -94,15 +95,15 @@ local function mistPlate(scene: Builder.Scene, name: string, w: number, h: numbe
 	return p
 end
 
--- The battlefield is a snowed-in city district (reference: the top view
--- shows streets with yellow markings under the snow). Roads cross the field,
+-- The battlefield is a wide elevated road in the city (reference: the top
+-- view shows lanes with yellow markings). Lanes cross the deck,
 -- ruined blocks stand around it at a distance (silhouettes in the fog),
 -- with bent lamp posts, abandoned cars and broken concrete.
 local function city(scene: Builder.Scene)
 	local pal = scene.style.color
 	local r = Util.rng(7171)
-	local asphalt = Util.mix(pal.concreteDark, pal.snow, 0.35)
-	local curb = Util.mix(pal.concrete, pal.snow, 0.45)
+	local asphalt = Util.mix(pal.concreteDark, pal.ground, 0.45)
+	local curb = Util.mix(pal.concrete, pal.ground, 0.5)
 	local yellow = Color3.fromRGB(196, 164, 84)
 	local white = Color3.fromRGB(214, 220, 230)
 	local function road(a: Vector3, b: Vector3, w: number)
@@ -116,19 +117,13 @@ local function city(scene: Builder.Scene)
 			Builder.part(scene, "Field", V(len, 0.45, 1.2), frame * C(0, 0.22, sz * (w / 2 + 0.6)), curb, { material = "Concrete", castShadow = false, name = "Curb" })
 			Builder.part(scene, "Field", V(len, 0.03, 0.25), frame * C(0, 0.11, sz * (w / 2 - 0.9)), white, { material = "SmoothPlastic", castShadow = false, name = "EdgeLine" })
 		end
-		-- dashed yellow centre line, partly buried under snow
+		-- dashed yellow centre line, worn away in places
 		local n = math.floor(len / 6)
 		for i = 0, n - 1 do
 			if Util.rand(r) > 0.18 then
 				local x = -len / 2 + (i + 0.5) * (len / n)
 				Builder.part(scene, "Field", V(3.2, 0.03, 0.4), frame * C(x, 0.11, 0), yellow, { material = "SmoothPlastic", castShadow = false, name = "LaneMark" })
 			end
-		end
-		-- drifts of snow across the asphalt
-		for _ = 1, math.floor(len / 14) do
-			local x = Util.randRange(r, -len / 2, len / 2)
-			local z = Util.randRange(r, -w / 2, w / 2)
-			Builder.part(scene, "Field", V(Util.randRange(r, 5, 12), 0.14, Util.randRange(r, 3, 7)), frame * C(x, 0.08, z) * CFrame.Angles(0, Util.randRange(r, 0, 6.28), 0), pal.snow, { material = "Snow", castShadow = false, name = "Drift" })
 		end
 	end
 	road(V(-200, 0, -96), V(180, 0, -96), 16)
@@ -178,9 +173,8 @@ local function city(scene: Builder.Scene)
 		for floor = 1, math.floor((top - 4) / 5) do
 			blockPart(V(b.w * 0.86, 1.8, 0.2), base * C(0, 2 + floor * 5, -b.d / 2 - 0.05), pal.crack, nil, "Windows", false)
 		end
-		-- snow on the roof and a heap of rubble at the foot
-		Builder.part(scene, "Field", V(b.w + 0.4, 0.6, b.d + 0.4), base * C(0, top + 0.3, 0), pal.snow, { channel = "cityBlocks", material = "Snow", castShadow = false, name = "RoofSnow" })
-		blockPart(V(b.w * 0.7, 5, 9), base * C(Util.randRange(r, -b.w * 0.2, b.w * 0.2), 0.8, -b.d / 2 - 3) * CFrame.Angles(math.rad(16), math.rad(180), 0), Util.mix(pal.rubble, pal.snow, 0.3), "Wedge", "RubbleHeap")
+		-- a heap of rubble at the foot
+		blockPart(V(b.w * 0.7, 5, 9), base * C(Util.randRange(r, -b.w * 0.2, b.w * 0.2), 0.8, -b.d / 2 - 3) * CFrame.Angles(math.rad(16), math.rad(180), 0), Util.mix(pal.rubble, pal.concrete, 0.3), "Wedge", "RubbleHeap")
 	end
 
 	-- bent lamp posts along the roads
@@ -193,7 +187,7 @@ local function city(scene: Builder.Scene)
 		Builder.part(scene, "Field", V(1.2, 0.35, 0.8), base * C(2.6, 11.7, 0), pal.ice, { channel = "cityBlocks", material = "Glass", name = "Lamp" })
 	end
 
-	-- abandoned cars under snow
+	-- abandoned cars
 	local cars = { { -76, -104, 20 }, { 30, -150, -70 }, { -48, -168, 95 }, { -118, -92, 84 }, { 96, -92, -12 } }
 	for _, cdef in cars do
 		local base = C(cdef[1], 0, cdef[2]) * CFrame.Angles(0, math.rad(cdef[3]), 0)
@@ -201,23 +195,15 @@ local function city(scene: Builder.Scene)
 		Builder.part(scene, "Field", V(4.4, 1.5, 9.5), base * C(0, 1.25, 0), body, { material = "Metal", name = "Car" })
 		Builder.part(scene, "Field", V(4.0, 1.4, 5.0), base * C(0, 2.6, 0.6), body, { material = "Metal", name = "CarCabin" })
 		Builder.part(scene, "Field", V(3.9, 0.9, 4.8), base * C(0, 2.7, 0.6), pal.crack, { material = "Glass", name = "CarGlass" })
-		Builder.part(scene, "Field", V(4.2, 0.5, 5.2), base * C(0, 3.5, 0.6), pal.snow, { material = "Snow", castShadow = false, name = "CarSnow" })
 	end
 
-	-- broken concrete and snow mounds scattered over the streets
+	-- broken concrete scattered over the deck
 	for _ = 1, 34 do
 		local a = Util.randRange(r, 0, math.pi * 2)
 		local d = Util.randRange(r, 40, 120)
 		local p = V(-5 + math.cos(a) * d, 0, -125 + math.sin(a) * d)
 		local sz = Util.randRange(r, 1.2, 4)
-		Builder.part(scene, "Field", V(sz * 1.5, sz * 0.7, sz), C(p + V(0, sz * 0.25, 0)) * CFrame.Angles(Util.randRange(r, -0.4, 0.4), Util.randRange(r, 0, 6.28), Util.randRange(r, -0.4, 0.4)), Util.mix(pal.concrete, pal.snow, Util.randRange(r, 0, 0.4)), { shape = if math.floor(sz * 10) % 3 == 0 then "Wedge" else "Block", material = "Concrete", name = "Debris" })
-	end
-	for _ = 1, 18 do
-		local a = Util.randRange(r, 0, math.pi * 2)
-		local d = Util.randRange(r, 45, 140)
-		local p = V(-5 + math.cos(a) * d, 0, -125 + math.sin(a) * d)
-		local w = Util.randRange(r, 8, 20)
-		Builder.part(scene, "Field", V(w, Util.randRange(r, 1.5, 4), w * Util.randRange(r, 0.6, 1.2)), C(p), pal.snow, { shape = "Ellipsoid", material = "Snow", castShadow = false, name = "SnowMound" })
+		Builder.part(scene, "Field", V(sz * 1.5, sz * 0.7, sz), C(p + V(0, sz * 0.25, 0)) * CFrame.Angles(Util.randRange(r, -0.4, 0.4), Util.randRange(r, 0, 6.28), Util.randRange(r, -0.4, 0.4)), Util.mix(pal.concrete, pal.concreteDark, Util.randRange(r, 0, 0.6)), { shape = if math.floor(sz * 10) % 3 == 0 then "Wedge" else "Block", material = "Concrete", name = "Debris" })
 	end
 end
 
@@ -228,12 +214,12 @@ function Field.build(scene: Builder.Scene)
 	Builder.model(scene, "Mist", false)
 	local r = Util.rng(4242)
 
-	-- snow ground and ice sheets
-	Builder.part(scene, "Field", V(3000, 4, 3000), C(0, -2, -600), pal.snow, { material = st.material.ground, castShadow = false, name = "Ground" })
+	-- concrete deck and patches of newer concrete
+	Builder.part(scene, "Field", V(3000, 4, 3000), C(0, -2, -600), pal.ground, { material = st.material.ground, castShadow = false, name = "Ground" })
 	for i = 1, 14 do
 		local p = V(Util.randRange(r, -90, 80), 0.02, Util.randRange(r, -220, -100))
 		local s = V(Util.randRange(r, 20, 60), 0.06, Util.randRange(r, 14, 40))
-		Builder.part(scene, "Field", s, C(p) * CFrame.Angles(0, Util.randRange(r, 0, 6.28), 0), Util.mix(pal.ice, pal.snow, Util.randRange(r, 0, 0.5)), { material = "Glacier", castShadow = false, name = "IceSheet" })
+		Builder.part(scene, "Field", s, C(p) * CFrame.Angles(0, Util.randRange(r, 0, 6.28), 0), Util.mix(pal.ground, pal.concrete, Util.randRange(r, 0.1, 0.45)), { material = "Concrete", castShadow = false, name = "Slab" })
 	end
 	cracks(scene, r, V(-15, 0, -125), 26, 5, pal.crack)
 	cracks(scene, r, V(20, 0, -140), 16, 6, pal.crack)
@@ -241,7 +227,7 @@ function Field.build(scene: Builder.Scene)
 	local cr = Field.CRATER
 	Builder.part(scene, "Field", V(1, 26, 26), C(cr + V(0, 0.03, 0)) * CFrame.Angles(0, 0, math.rad(90)), pal.rubble, { shape = "Cylinder", material = "Slate", castShadow = false, name = "CraterFloor" })
 	rubble(scene, r, cr, 13, 70, 2.2, { pal.rubble, pal.rubbleLight, pal.iceDark }, "Slate")
-	rubble(scene, r, cr, 15, 30, 1.6, { pal.ice, pal.snow }, "Glacier")
+	rubble(scene, r, cr, 15, 30, 1.6, { pal.concrete, pal.rubbleLight }, "Concrete")
 	-- trench carved by Rika's beam (seen from above), curving towards Ryu;
 	-- hidden until the beam ploughs it (Field.aftermath)
 	local rows = {}
@@ -268,6 +254,12 @@ function Field.build(scene: Builder.Scene)
 	scene.data.trench = { from = Field.TRENCH_FROM, to = Field.TRENCH_TO, ctrl = Field.TRENCH_CTRL, rows = rows, floors = floors } :: Trench
 
 	city(scene)
+
+	-- low concrete parapets along the edges of the deck, fading into the fog
+	for _, e in { { V(-104, 0, -130), V(2, 2.4, 300) }, { V(92, 0, -130), V(2, 2.4, 300) }, { V(-6, 0, -282), V(196, 2.4, 2) }, { V(-6, 0, 22), V(196, 2.4, 2) } } do
+		Builder.part(scene, "Field", e[2], C(e[1] + V(0, 1.2, 0)), pal.concrete, { channel = "cityBlocks", material = "Concrete", name = "Parapet" })
+		Builder.part(scene, "Field", e[2] + V(0.4, -2.2, 0.4), C(e[1] + V(0, 2.5, 0)), pal.concreteDark, { channel = "cityBlocks", material = "Concrete", name = "ParapetCap" })
+	end
 
 	-- broken building west of Ryu (behind him in the finale), outside the wide shot
 	local b0 = Field.RYU + V(-46, 0, 0)
@@ -366,12 +358,13 @@ function Field.aftermath(ctx: Timeline.Ctx)
 	end
 end
 
--- falling snow around the camera
+-- Fine dust drifting around the camera (the reference has no snowfall; the
+-- particles stay sparse and slow)
 function Field.snow(ctx: Timeline.Ctx, rate: number?)
 	local h: Handles = ctx.scene.data.field
 	local cam = ctx.frame.camera
 	ctx:place(h.snow, C(cam.Position + cam.LookVector * 24 + V(0, 16, 0)))
-	ctx:emit("Snow", rate or 120)
+	ctx:emit("Snow", (rate or 120) * 0.12)
 end
 
 return Field

@@ -27,6 +27,7 @@ FaceRig.expr = {
 		talk = { "yuta:eyes:normal", "yuta:brows:tense", "yuta:mouth:talk" },
 		shout = { "yuta:eyes:wide", "yuta:brows:tense", "yuta:mouth:open" },
 		glare = { "yuta:eyes:normal", "yuta:brows:tense", "yuta:mouth:closed" },
+		smirk = { "yuta:eyes:normal", "yuta:brows:calm", "yuta:mouth:smirk" },
 	},
 }
 
@@ -158,6 +159,10 @@ function FaceRig.yuta(c: Paint.Canvas, pal: { [string]: Color3 })
 	c:stroke({ { 42, 81 }, { 50, 86 }, { 58, 81 } }, { 2.5, 6, 2.5 }, Color3.fromRGB(70, 30, 38))
 	c:stroke({ { 43, 80.6 }, { 50, 81.3 }, { 57, 80.6 } }, { 1, 1.6, 1 }, Color3.fromRGB(240, 238, 232))
 	c:stroke({ { 42, 81 }, { 50, 80.8 }, { 58, 81 } }, { 0.6, 0.9, 0.6 }, line)
+	-- a cool half-smile: the left corner (screen right) lifts
+	c:setGroup("yuta:mouth:smirk")
+	c:stroke({ { 43, 82.4 }, { 50, 82.6 }, { 56, 81.2 }, { 59, 79.6 } }, { 0.6, 1.1, 1.0, 0.4 }, line)
+	c:stroke({ { 57.5, 80.4 }, { 59.4, 81.6 } }, { 0.5, 0.3 }, deep)
 	c:setGroup(nil)
 end
 

@@ -1,6 +1,8 @@
 --!strict
--- Yuta: slim, dark spiky hair with bangs, white high-collar uniform, katana
--- in a dark sheath across the back. R15 skeleton.
+-- Yuta: slim, dark spiky hair with a split fringe, a loose white jacket that
+-- ends at the hips (sleeves rolled up to the elbows, blood on the left
+-- shoulder and the belly), dark navy trousers, white sneakers, a silver ring
+-- on the left ring finger. No coat, no sword. R15 skeleton.
 local Builder = require(script.Parent.Parent.Parent.Builder)
 local Rig = require(script.Parent.Parent.Parent.Rig)
 local Paint = require(script.Parent.Parent.Parent.Paint)
@@ -31,14 +33,10 @@ function Yuta.build(scene: Builder.Scene, rigName: string): Rig.RigDef
 	Builder.model(scene, rigName, scene.style.outline ~= nil)
 	local k = Builder.kit(scene, rigName, rigName)
 
-	-- Hips and jacket hem
-	k.add("LowerTorso", "Block", V(1.5, 0.7, 0.88), C(0, 0.12, 0), "yPants", "cloth")
-	k.add("LowerTorso", "Block", V(1.56, 0.14, 0.92), C(0, 0.42, 0), "ySheath", "cloth", "Belt")
-	k.add("LowerTorso", "Block", V(1.66, 1.25, 0.2), C(0, -0.3, 0.44) * R(-5, 0, 0), "yUniform", "cloth", "HemBack")
-	for _, sx in { -1, 1 } do
-		k.add("LowerTorso", "Block", V(0.2, 1.2, 0.95), C(sx * 0.8, -0.28, 0) * R(0, 0, sx * 4), "yUniform", "cloth", "HemSide")
-		k.add("LowerTorso", "Block", V(0.74, 1.18, 0.18), C(sx * 0.4, -0.26, -0.46) * R(3, sx * 4, 0), "yUniform", "cloth", "HemFront")
-	end
+	-- Hips: trousers, and the jacket's hem just over the hips
+	k.add("LowerTorso", "Block", V(1.42, 0.7, 0.84), C(0, 0.12, 0), "yPants", "cloth")
+	k.add("LowerTorso", "Block", V(1.6, 0.42, 0.96), C(0, 0.3, 0), "yUniform", "cloth", "Hem")
+	k.add("LowerTorso", "Ellipsoid", V(0.5, 0.36, 0.1), C(-0.32, 0.3, -0.49) * R(0, 0, 12), "yBlood", "cloth", "BloodHem")
 
 	-- Jacket, high collar, katana on the back
 	k.add("UpperTorso", "Block", V(1.66, 1.44, 0.95), C(0, 0.72, 0), "yUniform", "cloth", "Torso")
@@ -46,15 +44,11 @@ function Yuta.build(scene: Builder.Scene, rigName: string): Rig.RigDef
 	for _, sx in { -1, 1 } do
 		k.add("UpperTorso", "Block", V(0.62, 0.4, 0.98), C(sx * 0.72, 1.3, 0) * R(0, 0, sx * -10), "yUniform", "cloth", "Shoulder")
 	end
-	-- katana across the back: sheath from the right hip up to the left shoulder
-	local back = C(0, 0.72, 0.6) * R(0, 0, 38)
-	k.add("UpperTorso", "Block", V(0.17, 3.2, 0.17), back, "ySheath", "metal", "Sheath")
-	k.add("UpperTorso", "Block", V(0.4, 0.07, 0.4), back * C(0, 1.62, 0), "rTag", "metal", "Guard")
-	k.add("UpperTorso", "Block", V(0.13, 0.9, 0.13), back * C(0, 2.1, 0), "yHair", "metal", "Hilt")
-
-	-- blood soaked into the right shoulder and chest
-	k.add("UpperTorso", "Ellipsoid", V(0.75, 0.8, 1.02), C(0.55, 1.2, -0.05) * R(0, 0, 20), "yBlood", "cloth", "Blood")
-	k.add("UpperTorso", "Ellipsoid", V(0.35, 0.6, 0.12), C(0.3, 0.9, -0.48) * R(0, 0, -15), "yBloodDark", "cloth", "BloodDrip")
+	-- blood soaked into the left shoulder, running down the chest, and on the belly
+	k.add("UpperTorso", "Ellipsoid", V(0.75, 0.8, 1.02), C(-0.55, 1.2, -0.05) * R(0, 0, -20), "yBlood", "cloth", "Blood")
+	k.add("UpperTorso", "Ellipsoid", V(0.35, 0.6, 0.12), C(-0.3, 0.9, -0.48) * R(0, 0, 15), "yBloodDark", "cloth", "BloodDrip")
+	k.add("UpperTorso", "Ellipsoid", V(0.7, 0.5, 0.12), C(-0.15, 0.2, -0.48) * R(0, 0, -10), "yBlood", "cloth", "BloodBelly")
+	k.add("UpperTorso", "Ellipsoid", V(0.3, 0.24, 0.1), C(0.25, 0.32, -0.49), "yBloodDark", "cloth", "BloodBelly")
 	-- tall rounded collar of the jujutsu uniform, opened a little at the front
 	for i = 0, 7 do
 		local a = math.rad(-150 + i * (300 / 7))
@@ -134,10 +128,16 @@ function Yuta.build(scene: Builder.Scene, rigName: string): Rig.RigDef
 	-- Arms
 	for _, side in { "Left", "Right" } do
 		k.add(side .. "UpperArm", "Block", V(0.56, 1.1, 0.6), C(0, -0.48, 0), "yUniform", "cloth")
-		k.add(side .. "LowerArm", "Block", V(0.52, 1.0, 0.56), C(0, -0.45, 0), "yUniform", "cloth")
+		-- sleeves rolled up to the elbows: a thick roll of cloth, bare forearms
+		k.add(side .. "LowerArm", "Ellipsoid", V(0.62, 0.32, 0.66), C(0, -0.04, 0), "yUniform", "cloth", "SleeveRoll")
+		k.add(side .. "LowerArm", "Block", V(0.4, 0.96, 0.42), C(0, -0.48, 0), "skin", "skin", "Forearm")
 		k.add(side .. "Hand", "Block", V(0.4, 0.36, 0.22), C(0, -0.2, 0), "skin", "skin", "Palm")
 		for fi = 0, 3 do
 			k.add(side .. "Hand", "Block", V(0.085, 0.3, 0.1), C((fi - 1.5) * 0.095, -0.5, -0.01) * R(-10, 0, 0), "skin", "skin", "Finger")
+		end
+		if side == "Left" then
+			-- silver ring on the ring finger
+			k.add(side .. "Hand", "Block", V(0.11, 0.06, 0.13), C(-0.5 * 0.095, -0.46, -0.01) * R(-10, 0, 0), "rTag", "metal", "Ring")
 		end
 	end
 	-- Legs

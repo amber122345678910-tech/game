@@ -1,13 +1,14 @@
 --!strict
--- Part 2, 45.800-59.167: Yuta closes in; they grapple, Ryu shoves him off,
--- Rika lunges and clamps her jaws on Ryu's head, Yuta presses his palm to
--- Ryu's chest; the countdown hits zero. "Five minutes."
---  45.800 impact (blur)       46.133 grappling           47.767 negative flash
---  48.267 Ryu shoves Yuta     48.900 radial burst        49.167 Rika lunges
---  50.067 Ryu skids back      51.533 Rika grabs him      51.867 his face, bitten
---  52.533 Rika's head         53.400 Yuta's palm, from behind Ryu
---  54.500 the palm, cracks    55.833 countdown           56.000 0:00:00
---  57.100 the palm again      58.833 wide: Rika holds Ryu up
+-- Part 2, 45.800-59.167: Yuta's "Thin Ice Breaker" punch into Ryu's chest;
+-- Ryu knocks him back; Rika flies in and drives her fist down onto Ryu's
+-- head; Yuta catches Ryu with both palms on his stomach while the countdown
+-- runs out and Rika's shell cracks and crumbles. "Five minutes."
+--  45.800 impact (blur)       46.133 the punch into the chest  47.767 negative
+--  48.267 Ryu hits Yuta back  48.900 radial burst              49.167 Rika flies in
+--  50.067 Ryu skids back      51.533 her fist comes down       51.867 fist on his head
+--  52.533 Rika's head, red eye 53.400 Yuta catches Ryu         54.500 the hands, cracks
+--  55.833 countdown           56.000 0:00:00                   57.100 the hands, shards fall
+--  58.833 wide: Rika's fist on Ryu, Yuta holding him
 local Timeline = require(script.Parent.Parent.Parent.Timeline)
 local FX = require(script.Parent.Parent.Parent.FX)
 local Util = require(script.Parent.Parent.Parent.Util)
@@ -29,39 +30,43 @@ local function h(ctx: Timeline.Ctx): Common.H
 	return ctx.scene.data.p2
 end
 
-local ryuGrapple: Rig.Pose = {
+-- Ryu doubled over the fist in his chest, eyes white
+local ryuHit: Rig.Pose = {
 	LowerTorso = R(-6, 0, 0),
-	UpperTorso = R(16, 10, 0),
-	Head = R(-12, -8, 0),
-	RightUpperArm = R(60, 0, 10),
-	RightLowerArm = R(20, 0, 0),
-	LeftUpperArm = R(-20, 0, -40),
-	LeftLowerArm = R(40, 0, 0),
-	LeftUpperLeg = R(20, 0, -8),
-	LeftLowerLeg = R(-24, 0, 0),
-	RightUpperLeg = R(-16, 0, 8),
+	UpperTorso = R(26, 0, 0),
+	Head = R(12, 0, 0),
+	RightUpperArm = R(30, 0, 50),
+	RightLowerArm = R(30, 0, 0),
+	LeftUpperArm = R(30, 0, -50),
+	LeftLowerArm = R(30, 0, 0),
+	LeftUpperLeg = R(16, 0, -6),
+	LeftLowerLeg = R(-20, 0, 0),
+	RightUpperLeg = R(-12, 0, 6),
 }
 
-local yutaGrip: Rig.Pose = {
-	LowerTorso = R(-10, 0, 0),
-	UpperTorso = R(20, 0, 0),
-	Head = R(-8, 12, 0),
-	RightUpperArm = R(75, 0, 18),
-	RightLowerArm = R(40, 0, 0),
-	LeftUpperArm = R(75, 0, -18),
-	LeftLowerArm = R(40, 0, 0),
-	LeftUpperLeg = R(30, 0, -6),
+-- Yuta's right fist driven forward, the whole body behind it
+local yutaPunch: Rig.Pose = {
+	LowerTorso = R(-10, 20, 0),
+	UpperTorso = R(16, 26, 0),
+	Head = R(-6, -26, 0),
+	RightUpperArm = R(92, 0, 2),
+	RightLowerArm = R(0, 0, 0),
+	RightHand = R(-80, 0, 0),
+	LeftUpperArm = R(-30, 0, -30),
+	LeftLowerArm = R(60, 0, 0),
+	LeftUpperLeg = R(40, 0, -8),
 	LeftLowerLeg = R(-40, 0, 0),
-	RightUpperLeg = R(-20, 0, 6),
+	RightUpperLeg = R(-30, 0, 8),
+	RightLowerLeg = R(-10, 0, 0),
 }
 
-local ryuShove: Rig.Pose = {
+local ryuStrike: Rig.Pose = {
 	LowerTorso = R(-4, -10, 0),
 	UpperTorso = R(10, -14, 0),
 	Head = R(-6, 10, 0),
 	RightUpperArm = R(92, 0, -4),
 	RightLowerArm = R(0, 0, 0),
-	RightHand = R(-60, 0, 0),
+	RightHand = R(-80, 0, 0),
 	LeftUpperArm = R(-30, 0, -30),
 	LeftLowerArm = R(30, 0, 0),
 	LeftUpperLeg = R(24, 0, -8),
@@ -69,7 +74,7 @@ local ryuShove: Rig.Pose = {
 	RightUpperLeg = R(-20, 0, 8),
 }
 
-local yutaHit: Rig.Pose = {
+local yutaFlung: Rig.Pose = {
 	LowerTorso = R(20, 0, 0),
 	UpperTorso = R(-30, 0, 0),
 	Head = R(-30, 0, 0),
@@ -98,8 +103,24 @@ local ryuSlide: Rig.Pose = {
 	RightLowerLeg = R(-14, 0, -8),
 }
 
-local ryuBitten: Rig.Pose = {
-	LowerTorso = R(0, 0, 0),
+-- Yuta down on one knee, right arm raised
+local yutaKneel: Rig.Pose = {
+	HumanoidRootPart = C(0, -0.95, 0),
+	LowerTorso = R(-6, 0, 0),
+	UpperTorso = R(16, 0, 0),
+	Head = R(-14, 0, 0),
+	RightUpperArm = R(150, 0, 20),
+	RightLowerArm = R(20, 0, 0),
+	LeftUpperArm = R(20, 0, -20),
+	LeftLowerArm = R(50, 0, 0),
+	LeftUpperLeg = R(90, 0, -6),
+	LeftLowerLeg = R(-90, 0, 0),
+	RightUpperLeg = R(-20, 0, 6),
+	RightLowerLeg = R(-100, 0, 0),
+}
+
+-- Ryu under Rika's fist: head pushed down, arms thrown out
+local ryuPinned: Rig.Pose = {
 	UpperTorso = R(10, 0, 0),
 	Head = R(18, 0, 0),
 	RightUpperArm = R(40, 0, 72),
@@ -108,87 +129,124 @@ local ryuBitten: Rig.Pose = {
 	LeftLowerArm = R(70, 0, 0),
 }
 
-local rikaBite: Rig.Pose = {
-	HumanoidRootPart = C(0, 1.2, 0),
-	LowerTorso = R(-14, 0, 0),
-	UpperTorso = R(-44, 0, 0),
-	Head = R(40, 0, 0),
-	LeftUpperArm = R(30, 0, -64),
-	LeftLowerArm = R(50, 0, 0),
-	LeftHand = R(20, 0, 0),
-	RightUpperArm = R(30, 0, 64),
-	RightLowerArm = R(50, 0, 0),
-	RightHand = R(20, 0, 0),
-	LeftUpperLeg = R(30, 0, 10),
-	LeftLowerLeg = R(-40, 0, -30),
-	LeftFoot = R(-40, 0, -40),
+-- Ryu sagging backwards into Yuta's hands (coat slipped down)
+local ryuSag: Rig.Pose = {
+	LowerTorso = R(6, 0, 0),
+	UpperTorso = R(-14, 0, 0),
+	Head = R(-22, 0, 0),
+	RightUpperArm = R(-10, 0, 34),
+	RightLowerArm = R(20, 0, 0),
+	LeftUpperArm = R(-10, 0, -34),
+	LeftLowerArm = R(20, 0, 0),
+	LeftUpperLeg = R(-6, 0, -6),
+	RightUpperLeg = R(-6, 0, 6),
 }
 
-local rikaLungePose: Rig.Pose = {
+-- Yuta holding him up, both palms flat on his stomach
+local yutaCatch: Rig.Pose = {
+	LowerTorso = R(-8, 0, 0),
+	UpperTorso = R(14, 0, 0),
+	Head = R(-12, 0, 0),
+	RightUpperArm = R(78, 0, 14),
+	RightLowerArm = R(26, 0, 0),
+	RightHand = R(-70, 0, 0),
+	LeftUpperArm = R(78, 0, -14),
+	LeftLowerArm = R(26, 0, 0),
+	LeftHand = R(-70, 0, 0),
+	LeftUpperLeg = R(26, 0, -6),
+	LeftLowerLeg = R(-30, 0, 0),
+	RightUpperLeg = R(-18, 0, 6),
+}
+
+-- Rika flying in, right fist drawn back, jaws open
+local rikaSwing: Rig.Pose = {
 	HumanoidRootPart = C(0, 1.4, 0),
 	LowerTorso = R(-20, 0, 0),
-	UpperTorso = R(-30, 0, 0),
-	Head = R(8, 0, 0),
-	LeftUpperArm = R(70, 0, -70),
+	UpperTorso = R(-30, 10, 0),
+	Head = R(8, -10, 0),
+	RightUpperArm = R(150, 0, 40),
+	RightLowerArm = R(80, 0, 0),
+	RightHand = R(30, 0, 0),
+	LeftUpperArm = R(70, 0, -50),
 	LeftLowerArm = R(30, 0, 0),
-	RightUpperArm = R(70, 0, 70),
-	RightLowerArm = R(30, 0, 0),
 	LeftUpperLeg = R(40, 0, 10),
 	LeftLowerLeg = R(-30, 0, -30),
 	LeftFoot = R(-30, 0, -40),
 }
 
-local yutaPalm: Rig.Pose = {
-	LowerTorso = R(-6, 0, 0),
-	UpperTorso = R(10, 0, 0),
-	Head = R(-14, 0, 0),
-	RightUpperArm = R(100, 0, 6),
-	RightLowerArm = R(14, 0, 0),
-	RightHand = R(-70, 0, 0),
-	LeftUpperArm = R(10, 0, -20),
-	LeftLowerArm = R(30, 0, 0),
-	LeftUpperLeg = R(24, 0, -6),
-	LeftLowerLeg = R(-30, 0, 0),
-	RightUpperLeg = R(-18, 0, 6),
+-- Rika bent over, her right fist pressing down
+local rikaPound: Rig.Pose = {
+	HumanoidRootPart = C(0, 1.6, 0),
+	LowerTorso = R(-14, 0, 0),
+	UpperTorso = R(-36, 0, 0),
+	Head = R(20, 0, 0),
+	RightUpperArm = R(60, 0, 12),
+	RightLowerArm = R(40, 0, 0),
+	RightHand = R(70, 0, 0),
+	LeftUpperArm = R(30, 0, -60),
+	LeftLowerArm = R(50, 0, 0),
+	LeftUpperLeg = R(30, 0, 10),
+	LeftLowerLeg = R(-40, 0, -30),
+	LeftFoot = R(-40, 0, -40),
 }
 
--- the grapple: Ryu at his mark facing -Z, Yuta pressed against him
-local function grappleStage(ctx: Timeline.Ctx, k: number): ({ [string]: CFrame }, { [string]: CFrame })
-	local rb = ctx:rig("Ryu", Common.ryuRoot(0), Cast.alive(Cast.mix(Cast.ryu.spread, ryuGrapple, k), ctx.t))
-	local yr = C(Common.RYU + V(0.3, 0, -2.5)) * CFrame.Angles(0, math.rad(180), 0)
-	local yb = ctx:rig("Yuta", yr, Cast.alive(yutaGrip, ctx.t))
-	return rb, yb
+-- Rika behind Ryu with her fist on top of his head
+local function rikaFistOn(ctx: Timeline.Ctx, ryuRig: string, ryuRoot: CFrame, pose: Rig.Pose, lift: number?): ({ [string]: CFrame }, { [string]: CFrame })
+	local rb = ctx:rig(ryuRig, ryuRoot, pose)
+	local top = (rb.Head * C(0, 2.2 + (lift or 0), 0)).Position
+	local kb = Common.rigAt(ctx, "Rika", C(ryuRoot.Position + V(1.5, 0, 4.5)), rikaPound, "RightHand", C(0, -0.9, 0), top)
+	Common.rikaEye(ctx, kb)
+	return rb, kb
+end
+
+-- the punch: Yuta at Ryu's chest, his fist buried in it
+local function punchStage(ctx: Timeline.Ctx): ({ [string]: CFrame }, { [string]: CFrame }, Vector3)
+	local rb = ctx:rig("Ryu", Common.ryuRoot(0), Cast.alive(ryuHit, ctx.t))
+	local chest = (rb.UpperTorso * C(0, 0.9, -0.62)).Position
+	local y0 = C(Common.RYU + V(0.4, 0, -3)) * CFrame.Angles(0, math.rad(180), 0)
+	local yb = Common.rigAt(ctx, "Yuta", y0, yutaPunch, "RightHand", C(0, -0.35, 0), chest)
+	return rb, yb, chest
 end
 
 local function impact(ctx: Timeline.Ctx)
-	local rb = grappleStage(ctx, 1)
-	Cast.expr(ctx, "ryu", "grit")
-	Cast.expr(ctx, "yuta", "glare")
-	local c = rb.UpperTorso * C(0, 1.4, 0)
-	local cam = Util.lookAt(c.Position + V(4.5, 0.6, -1.5), c.Position + V(0, 0.2, -1.2))
+	local hh = h(ctx)
+	local _, _, chest = punchStage(ctx)
+	Cast.expr(ctx, "ryu", "shock")
+	-- Yuta shouts the technique's name
+	Cast.expr(ctx, "yuta", if Util.noise1(ctx.t * 7, 9) > -0.3 then "shout" else "glare")
+	FX.placeBurst(ctx, hh.shards, chest, ctx.lt, 24, 0.6, 0.6, nil, nil, 0)
+	local cam = Util.lookAt(chest + V(4.8, 0.6, -1.4), chest + V(0, 0.2, -0.6))
 	ctx:camera(Clash.shake(cam, ctx.t, 1.2, 24), 60)
-	ctx:focus(4.6, 1)
+	ctx:focus(5, 1)
 	ctx:flash(WHITE, 0.75 * (1 - ctx.u))
 	Common.grade(ctx, 0.05, 0.2, 0.05)
 	Common.sky(ctx, "wisps", 22)
 end
 
-local function grapple(ctx: Timeline.Ctx)
-	local rb = grappleStage(ctx, 1)
-	Cast.expr(ctx, "ryu", "grit")
-	Cast.expr(ctx, "yuta", "glare")
-	local c = rb.UpperTorso * C(0, 1.6, 0)
-	local cam = Util.lookAt(c.Position + V(5.4 - ctx.u * 0.6, 0.4, -1.2), c.Position + V(0, 0.4, -1.3))
-	ctx:camera(Clash.shake(cam, ctx.t, 0.18, 10), 52)
+-- profile: the fist in Ryu's chest, space shattering round it like glass
+local function punch(ctx: Timeline.Ctx)
+	local hh = h(ctx)
+	local rb, _, chest = punchStage(ctx)
+	Cast.expr(ctx, "ryu", "shock")
+	if ctx.t < 46.3 then
+		Cast.expr(ctx, "yuta", if Util.noise1(ctx.t * 7, 9) > -0.3 then "shout" else "glare")
+	else
+		Cast.expr(ctx, "yuta", "shout")
+	end
+	FX.placeBurst(ctx, hh.shards, chest, ctx.lt % 0.8, 20, 0.7, 0.8, nil, nil, 0)
+	FX.placeBurst(ctx, hh.streamers, chest, ctx.lt % 0.5, 26, 0.5, 0.5, nil, nil, 0)
+	FX.placeBurst(ctx, hh.blood, chest + V(0, 0.3, 0), ctx.lt, 8, 0.16, 0.7, V(0, 0.5, 1), 0.8, 12)
+	local c = rb.UpperTorso * C(0, 1.4, 0)
+	local cam = Util.lookAt(c.Position + V(5.4 - ctx.u * 0.6, 0.3, -1.4), c.Position + V(0, 0.2, -1.3))
+	ctx:camera(Clash.shake(cam, ctx.t, 0.2, 12), 52)
 	ctx:focus(5.2, 1)
-	Cast.ryuAura(ctx, rb, 0.5, 3)
 	ctx:alpha("wind", 0.6)
-	Common.grade(ctx, 0.02, 0.2, 0.05)
+	Common.grade(ctx, 0.02, 0.22, 0.05)
 	Common.sky(ctx, "low", 24)
 end
 
 local function invert(ctx: Timeline.Ctx)
-	local rb = grappleStage(ctx, 1)
+	local rb = punchStage(ctx)
 	Cast.expr(ctx, "ryu", "grit")
 	local head = rb.Head * C(0, 0.7, 0)
 	ctx:camera(Clash.shake(Util.lookAt(head:PointToWorldSpace(V(-1.2, -0.4, -3.4)), head.Position), ctx.t, 0.5, 20), 50)
@@ -197,18 +255,19 @@ local function invert(ctx: Timeline.Ctx)
 	Common.grade(ctx, 0.15, 0.6, -1, WHITE)
 end
 
-local function shove(ctx: Timeline.Ctx)
+-- Ryu's fist (foreground) sends Yuta flying back across the cracked deck
+local function strike(ctx: Timeline.Ctx)
 	local hh = h(ctx)
 	local lt = ctx.lt
 	local root = Common.ryuRoot(0)
-	local rb = ctx:rig("Ryu", root, Cast.alive(ryuShove, ctx.t))
+	local rb = ctx:rig("Ryu", root, Cast.alive(ryuStrike, ctx.t))
 	Cast.expr(ctx, "ryu", "grit")
 	local fly = lt * 13
 	local yr = C(Common.RYU + V(0.6, 0.8 + math.sin(math.min(1, lt * 1.6) * math.pi) * 1.2, -2.8 - fly)) * CFrame.Angles(0, math.rad(180), 0) * CFrame.Angles(math.rad(lt * 70), 0, 0)
-	local yb = ctx:rig("Yuta", yr, yutaHit)
+	local yb = ctx:rig("Yuta", yr, yutaFlung)
 	Cast.expr(ctx, "yuta", "shout")
 	FX.placeBurst(ctx, hh.blood, (yb.UpperTorso * C(0, 1, -0.5)).Position, lt, 9, 0.18, 0.6, V(0, 0.3, -1), 0.8, 14)
-	FX.placeBurst(ctx, hh.spray, Common.RYU + V(0.6, 0.3, -3 - fly), lt % 0.4, 10, 0.5, 0.4, V(0, 1, 0), 1, 22)
+	FX.placeBurst(ctx, hh.dust, Common.RYU + V(0.6, 0.3, -3 - fly), lt % 0.4, 10, 0.5, 0.4, V(0, 1, 0), 1, 22)
 	local hand = (rb.RightHand * C(0, -0.5, 0)).Position
 	local eye = root:PointToWorldSpace(V(2.2, 3.6, 2.6))
 	ctx:camera(Clash.shake(Util.lookAt(eye, hand:Lerp((yb.Head).Position, 0.6)), ctx.t, 0.35, 16), 60)
@@ -224,65 +283,58 @@ local function burst(ctx: Timeline.Ctx)
 	ctx:flash(WHITE, 0.5 + 0.3 * math.sin(ctx.u * math.pi))
 end
 
-local function rikaLunge(ctx: Timeline.Ctx)
+-- Rika flies straight at the camera, right fist drawn back, red eye blazing
+local function rikaFlies(ctx: Timeline.Ctx)
 	local u = ctx.u
-	local base = Common.RYU + V(9 - u * 7, 0, -9 + u * 3)
-	local root = C(base) * CFrame.Angles(0, math.rad(60), 0)
-	local rb = ctx:rig("Rika", root, Cast.alive(rikaLungePose, ctx.t))
+	local base = Common.RYU + V(8 - u * 6, 0, -10 + u * 4)
+	local root = C(base) * CFrame.Angles(0, math.rad(55), 0)
+	local rb = ctx:rig("Rika", root, Cast.alive(rikaSwing, ctx.t))
+	Common.rikaEye(ctx, rb)
 	local head = rb.Head.Position
-	local eye = Common.RYU + V(-3, 1.4, -13)
+	local eye = Common.RYU + V(-3, 1.4, -13 + u * 2)
 	ctx:camera(Clash.shake(Util.lookAt(eye, head + V(0, -1.5, 0)), ctx.t, 0.35, 14), 62)
 	ctx:focus((head - eye).Magnitude, 1)
-	ctx:light("RikaMouth", 1.5, nil, 18)
+	ctx:light("RikaMouth", 1.2, nil, 18)
 	ctx:alpha("speed", 0.45)
 	Common.grade(ctx, 0.02, 0.22, 0.05, Color3.fromRGB(220, 230, 255))
 	Common.sky(ctx, "wisps", 40)
 end
 
+-- from behind, low: Ryu skids back on the deck, Yuta far off on one knee,
+-- Rika's shadow falling over Ryu from above
 local function ryuSkid(ctx: Timeline.Ctx)
 	local hh = h(ctx)
 	local lt = ctx.lt
 	local slide = 6 * (1 - math.exp(-lt * 1.6))
-	local root = C(Common.RYU + V(0, 0, slide)) * CFrame.Angles(0, 0, 0)
+	local root = C(Common.RYU + V(0, 0, slide))
 	ctx:rig("Ryu", root, Cast.alive(ryuSlide, ctx.t))
 	Cast.expr(ctx, "ryu", "grit")
-	ctx:rig("Yuta", Common.yutaRoot() * C(0, 0, 6), Cast.yuta.brace)
+	ctx:rig("Yuta", Common.yutaRoot() * C(0, 0, 8), yutaKneel)
 	for i, foot in { V(-1.2, 0.3, 0.6), V(1.2, 0.3, 0.6) } do
 		FX.placeBurst(ctx, if i == 1 then hh.spray else hh.dust, root:PointToWorldSpace(foot), (lt + i * 0.17) % 0.45, 12, 0.5, 0.45, V(0, 0.8, 1), 0.8, 26)
 	end
 	local eye = Common.RYU + V(1.4, 1.3, 13)
 	ctx:camera(Clash.shake(Util.lookAt(eye, Common.RYU + V(0, 3.2, -8)), ctx.t, 0.12, 9), 50)
 	ctx:focus(13 - slide, 0.8)
-	-- Rika drops in from above at the very end
-	if ctx.u > 0.8 then
-		local k = (ctx.u - 0.8) / 0.2
-		ctx:rig("Rika", C(Common.RYU + V(0, 12 - k * 6, slide - 2)) * CFrame.Angles(0, math.rad(180), 0), rikaBite)
+	if ctx.u > 0.7 then
+		local k = (ctx.u - 0.7) / 0.3
+		local kb = ctx:rig("Rika", C(Common.RYU + V(1.5, 14 - k * 6, slide + 2)), rikaSwing)
+		Common.rikaEye(ctx, kb)
 	end
-	Cast.ryuAura(ctx, (ctx.frame.rigs :: any).Ryu, 0.4, 2)
-	Common.grade(ctx, 0, 0.2, 0.05)
+	Common.grade(ctx, -0.04, 0.2, 0.05)
 	Common.sky(ctx, "low", 30)
 end
 
--- Rika's jaws closing over Ryu's head: place her so her head sits on his
-local function rikaOnRyu(ctx: Timeline.Ctx, ryuRoot: CFrame, pose: Rig.Pose): ({ [string]: CFrame }, { [string]: CFrame })
-	local rb = ctx:rig("Ryu", ryuRoot, pose)
-	local target = (rb.Head * C(0, 1.9, 0.5)).Position
-	-- Rika stands behind him, facing the same way, and bends over his head
-	local r0 = C(ryuRoot.Position + V(0, 0, 4))
-	local kb = ctx:rig("Rika", r0, rikaBite)
-	local delta = target - kb.Head.Position
-	kb = ctx:rig("Rika", C(delta) * r0, rikaBite)
-	return rb, kb
-end
-
-local function grab(ctx: Timeline.Ctx)
-	local rb, kb = rikaOnRyu(ctx, C(Common.RYU + V(0, 0, 6)), Cast.alive(ryuBitten, ctx.t))
+-- low angle: the fist comes down on Ryu's head
+local function fistDown(ctx: Timeline.Ctx)
+	local k = 1 - Util.smoothstep(0, 0.7, ctx.u)
+	local rb, kb = rikaFistOn(ctx, "Ryu", C(Common.RYU + V(0, 0, 6)), Cast.alive(ryuPinned, ctx.t), k * 2.5)
 	Cast.expr(ctx, "ryu", "grit")
-	local eye = rb.UpperTorso:PointToWorldSpace(V(1.5, -0.6, -5.5))
-	ctx:camera(Clash.shake(Util.lookAt(eye, kb.Head.Position:Lerp(rb.Head.Position, 0.5)), ctx.t, 0.5, 18), 62)
-	ctx:focus(6, 0.8)
-	ctx:light("RikaMouth", 1.6, nil, 16)
-	Common.grade(ctx, 0, 0.25, 0.05)
+	local eye = rb.UpperTorso:PointToWorldSpace(V(1.8, -0.8, -6))
+	ctx:camera(Clash.shake(Util.lookAt(eye, kb.RightHand.Position:Lerp(rb.Head.Position, 0.5)), ctx.t, 0.5, 18), 62)
+	ctx:focus(6.5, 0.8)
+	ctx:light("RikaMouth", 0.8, nil, 14)
+	Common.grade(ctx, -0.04, 0.25, 0.05)
 	Common.sky(ctx, "wisps", 30)
 end
 
@@ -296,78 +348,95 @@ local function bloodOn(ctx: Timeline.Ctx, head: CFrame, k: number)
 	end
 end
 
-local function bitten(ctx: Timeline.Ctx)
-	local rb = rikaOnRyu(ctx, C(Common.RYU + V(0, 0, 6)), Cast.alive(ryuBitten, ctx.t))
+-- his face: the fist on his forehead, blood, teeth bared in pain
+local function fistOnHead(ctx: Timeline.Ctx)
+	local hh = h(ctx)
+	local rb = rikaFistOn(ctx, "Ryu", C(Common.RYU + V(0, 0, 6)), Cast.alive(ryuPinned, ctx.t))
 	Cast.expr(ctx, "ryu", "grit")
 	bloodOn(ctx, rb.Head, 1)
 	local head = rb.Head * C(0, 0.7, 0)
-	local eye = head:PointToWorldSpace(V(0.7, -0.6, -2.2))
-	ctx:camera(Clash.shake(Util.lookAt(eye, head.Position + V(0, 0.3, 0)), ctx.t, 0.18, 14), 52)
+	FX.placeBurst(ctx, hh.blood, head.Position + V(0, 0.8, -0.4), ctx.lt % 0.33, 8, 0.12, 0.33, V(0, 0.6, -1), 1, 10)
+	local eye = head:PointToWorldSpace(V(0.6, -0.5, -2.4))
+	ctx:camera(Clash.shake(Util.lookAt(eye, head.Position + V(0, 0.35, 0)), ctx.t, 0.22, 16), 52)
 	ctx:focus((head.Position - eye).Magnitude, 1)
 	ctx:light("RyuFace", 0.8, Color3.fromRGB(200, 210, 255), 8)
 	Common.grade(ctx, -0.04, 0.25, 0)
 end
 
+-- Rika's head looming over Ryu, her red eye, her fist on him
 local function rikaHead(ctx: Timeline.Ctx)
-	local rb, kb = rikaOnRyu(ctx, C(Common.RYU + V(0, 0, 6)), Cast.alive(ryuBitten, ctx.t))
+	local rb, kb = rikaFistOn(ctx, "Ryu", C(Common.RYU + V(0, 0, 6)), Cast.alive(ryuPinned, ctx.t))
 	Cast.expr(ctx, "ryu", "grit")
 	bloodOn(ctx, rb.Head, 1)
 	local head = kb.Head
-	local eye = head:PointToWorldSpace(V(5.2, 0.6, -3.6 + ctx.u * 0.4))
-	ctx:camera(Clash.shake(Util.lookAt(eye, head.Position + V(0, -0.8, 0)), ctx.t, 0.12, 10), 52)
+	local eye = head:PointToWorldSpace(V(1.2, -1.2, -5.6 + ctx.u * 0.5))
+	ctx:camera(Clash.shake(Util.lookAt(eye, head.Position + V(0, -0.4, 0)), ctx.t, 0.1, 10), 54)
 	ctx:focus((head.Position - eye).Magnitude, 1)
-	ctx:light("RikaMouth", 0.5, nil, 10)
-	Common.grade(ctx, -0.02, 0.25, 0, Color3.fromRGB(220, 225, 255))
+	ctx:light("RikaMouth", 0.6, nil, 10)
+	Common.grade(ctx, -0.04, 0.25, 0, Color3.fromRGB(220, 225, 255))
 	Common.sky(ctx, "wisps", 24)
 end
 
--- Yuta's palm pressed flat on Ryu's bare chest (two-step: put the palm on
--- the chest point)
-local function palmStage(ctx: Timeline.Ctx): ({ [string]: CFrame }, { [string]: CFrame }, Vector3)
+-- Yuta holding the sagging Ryu (coat slipped off), both palms on his stomach,
+-- Rika's fist still on his head
+local function catchStage(ctx: Timeline.Ctx): ({ [string]: CFrame }, { [string]: CFrame }, { [string]: CFrame }, Vector3)
 	local rr = Common.ryuRoot(0)
-	local rb = ctx:rig("RyuBare", rr, Cast.alive(ryuBitten, ctx.t))
-	local chest = (rb.UpperTorso * C(0.15, 1.05, -0.72)).Position
-	local y0 = C(Common.RYU + V(0.7, 0, -3)) * CFrame.Angles(0, math.rad(180), 0)
-	local yb = ctx:rig("Yuta", y0, yutaPalm)
-	local palm = (yb.RightHand * C(0, -0.3, 0)).Position
-	yb = ctx:rig("Yuta", C(chest - palm) * y0, yutaPalm)
-	return rb, yb, chest
+	local rb, kb = rikaFistOn(ctx, "RyuBare", rr, Cast.alive(ryuSag, ctx.t))
+	local belly = (rb.UpperTorso * C(0, 0.45, -0.62)).Position
+	local y0 = C(Common.RYU + V(0.2, 0, -2.6)) * CFrame.Angles(0, math.rad(180), 0)
+	local b0 = ctx:rig("Yuta", y0, yutaCatch)
+	local mid = ((b0.LeftHand * C(0, -0.35, 0)).Position + (b0.RightHand * C(0, -0.35, 0)).Position) / 2
+	local yb = ctx:rig("Yuta", C(belly - mid) * y0, yutaCatch)
+	return rb, yb, kb, belly
 end
 
-local function chest(ctx: Timeline.Ctx)
+local function catch(ctx: Timeline.Ctx)
 	local hh = h(ctx)
-	local rb, yb, pt = palmStage(ctx)
+	local rb, yb, _, belly = catchStage(ctx)
 	Cast.expr(ctx, "yuta", "glare")
 	Cast.expr(ctx, "ryu", "grit")
-	local eye = rb.UpperTorso:PointToWorldSpace(V(2.0, 1.7, 2.8))
-	ctx:camera(Clash.shake(Util.lookAt(eye, yb.Head.Position:Lerp(pt, 0.4)), ctx.t, 0.06, 8), 55)
+	local eye = rb.UpperTorso:PointToWorldSpace(V(3.6, 1.3, 1.0))
+	ctx:camera(Clash.shake(Util.lookAt(eye, yb.Head.Position:Lerp(belly, 0.5)), ctx.t, 0.06, 8), 55)
 	ctx:focus((yb.Head.Position - eye).Magnitude, 1)
-	FX.placeCore(ctx, hh.palmGlow, pt, 0.22 + math.sin(ctx.t * 30) * 0.03, 0.8)
-	ctx:light("YutaAura", 1.2, CYAN, 8)
-	Common.grade(ctx, -0.02, 0.22, 0.05, Color3.fromRGB(220, 230, 255))
+	FX.placeBolt(ctx, hh.bolts, 1, belly + V(-0.4, 0, -0.2), belly + V(0.4, 0.2, -0.2), 5, 0.1, 0.02, 3, 16)
+	ctx:light("YutaAura", 1.0, CYAN, 8)
+	Common.grade(ctx, -0.04, 0.22, 0.05, Color3.fromRGB(220, 230, 255))
 	Common.sky(ctx, "wisps", 22)
 end
 
-local function palmClose(ctx: Timeline.Ctx, stage: number, push: number)
+-- the hands on his stomach; behind them Rika's eye cracks like glass and
+-- her black shell crumbles away
+local function hands(ctx: Timeline.Ctx, stage: number, push: number, fall: number)
 	local hh = h(ctx)
-	local _, _, pt = palmStage(ctx)
+	local _, _, kb, belly = catchStage(ctx)
 	Cast.expr(ctx, "ryu", "grit")
-	local eye = pt + V(2.3 - push * 0.35, 0.45, -0.7)
-	ctx:camera(Clash.shake(Util.lookAt(eye, pt), ctx.t, 0.04, 6), 50)
-	ctx:focus((pt - eye).Magnitude, 1)
-	FX.placeCore(ctx, hh.palmGlow, pt + V(0, 0, -0.1), 0.16 + math.sin(ctx.t * 30) * 0.02, 0.75)
-	ctx:show("crack" .. stage)
-	ctx:light("YutaAura", 0.9, CYAN, 6)
+	local eye = belly + V(2.8 - push * 0.4, 0.5, -0.9)
+	ctx:camera(Clash.shake(Util.lookAt(eye, belly + V(0, 0.3, -0.5)), ctx.t, 0.04, 6), 52)
+	ctx:focus((belly - eye).Magnitude, 1)
+	ctx:alpha("crack" .. stage, 0.7)
+	-- black shards of Rika's shell drifting down behind them
+	if fall > 0 then
+		local top = kb.Head.Position
+		for i, p in hh.shell.parts do
+			local rr = Util.rng(900 + i)
+			local ph = (ctx.t * (0.35 + Util.rand(rr) * 0.3) + Util.rand(rr)) % 1
+			local pos = top + V(Util.randRange(rr, -5, 5), 2 - ph * 9, Util.randRange(rr, -2, 3))
+			ctx:place(p, CFrame.new(pos) * CFrame.Angles(ph * 6 + i, i, ph * 4))
+			local sz = (0.3 + (i % 4) * 0.12) * fall
+			ctx:prop(p, { s = V(sz, sz * 1.5, sz * 0.25) })
+		end
+	end
+	ctx:light("YutaAura", 0.8, CYAN, 6)
 	ctx:bloom(1.1)
 	Common.grade(ctx, -0.1, 0.26, 0, Color3.fromRGB(225, 232, 255))
 end
 
-local function palm(ctx: Timeline.Ctx)
-	palmClose(ctx, 1 + math.min(2, math.floor(ctx.u * 3)), ctx.u)
+local function handsA(ctx: Timeline.Ctx)
+	hands(ctx, 1 + math.min(2, math.floor(ctx.u * 3)), ctx.u, 0.4 * ctx.u)
 end
 
-local function palm2(ctx: Timeline.Ctx)
-	palmClose(ctx, 3, 1 + ctx.u * 0.5)
+local function handsB(ctx: Timeline.Ctx)
+	hands(ctx, 3, 1 + ctx.u * 0.5, 1)
 end
 
 local function timer(ctx: Timeline.Ctx)
@@ -382,33 +451,33 @@ local function timerZero(ctx: Timeline.Ctx)
 	ctx:show("timer00")
 end
 
+-- wide: Rika's fist on Ryu's head, Yuta holding Ryu up by the waist
 local function wide(ctx: Timeline.Ctx)
-	local rb, kb = rikaOnRyu(ctx, C(Common.RYU + V(0, 2.5, 0)), ryuBitten)
-	local _ = rb
-	ctx:rig("Yuta", C(Common.RYU + V(6, 0, -5)) * CFrame.Angles(0, math.rad(150), 0), Cast.yuta.stand)
-	local eye = Common.RYU + V(4, 1.2, -26)
-	ctx:camera(Util.lookAt(eye, kb.Head.Position:Lerp(Common.RYU, 0.6)), 50)
-	ctx:focus(26, 0.8)
-	Common.grade(ctx, 0, 0.2, 0.05)
+	local _, _, kb, _ = catchStage(ctx)
+	Cast.expr(ctx, "ryu", "grit")
+	local eye = Common.RYU + V(4, 1.4, -17)
+	ctx:camera(Util.lookAt(eye, kb.Head.Position:Lerp(Common.RYU + V(0, 3, 0), 0.6)), 52)
+	ctx:focus(17, 0.8)
+	Common.grade(ctx, -0.02, 0.2, 0.05)
 	Common.sky(ctx, "low", 30)
 end
 
 Grapple.shots = {
 	{ id = "P2 34 impact", t0 = 45.8, t1 = 46.133, run = impact },
-	{ id = "P2 35 grapple", t0 = 46.133, t1 = 47.767, run = grapple },
+	{ id = "P2 35 punch", t0 = 46.133, t1 = 47.767, run = punch },
 	{ id = "P2 36 negative", t0 = 47.767, t1 = 48.267, run = invert },
-	{ id = "P2 37 shove", t0 = 48.267, t1 = 48.9, run = shove },
+	{ id = "P2 37 strike", t0 = 48.267, t1 = 48.9, run = strike },
 	{ id = "P2 38 burst", t0 = 48.9, t1 = 49.167, run = burst },
-	{ id = "P2 39 rika lunges", t0 = 49.167, t1 = 50.067, run = rikaLunge },
+	{ id = "P2 39 rika flies", t0 = 49.167, t1 = 50.067, run = rikaFlies },
 	{ id = "P2 40 ryu skids", t0 = 50.067, t1 = 51.533, run = ryuSkid },
-	{ id = "P2 41 grab", t0 = 51.533, t1 = 51.867, run = grab },
-	{ id = "P2 42 bitten", t0 = 51.867, t1 = 52.533, run = bitten },
+	{ id = "P2 41 fist down", t0 = 51.533, t1 = 51.867, run = fistDown },
+	{ id = "P2 42 fist on head", t0 = 51.867, t1 = 52.533, run = fistOnHead },
 	{ id = "P2 43 rika head", t0 = 52.533, t1 = 53.4, run = rikaHead },
-	{ id = "P2 44 chest", t0 = 53.4, t1 = 54.5, run = chest },
-	{ id = "P2 45 palm", t0 = 54.5, t1 = 55.833, run = palm },
+	{ id = "P2 44 catch", t0 = 53.4, t1 = 54.5, run = catch },
+	{ id = "P2 45 hands", t0 = 54.5, t1 = 55.833, run = handsA },
 	{ id = "P2 46 timer", t0 = 55.833, t1 = 56.0, run = timer },
 	{ id = "P2 47 zero", t0 = 56.0, t1 = 57.1, run = timerZero },
-	{ id = "P2 48 palm", t0 = 57.1, t1 = 58.833, run = palm2 },
+	{ id = "P2 48 hands", t0 = 57.1, t1 = 58.833, run = handsB },
 	{ id = "P2 49 wide", t0 = 58.833, t1 = 59.167, run = wide },
 } :: { Timeline.Shot }
 

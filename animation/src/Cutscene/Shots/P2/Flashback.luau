@@ -68,11 +68,26 @@ local reachUp: Rig.Pose = {
 }
 
 local function fbWide(ctx: Timeline.Ctx)
-	ctx:rig("Yuta", yutaRoot(), Cast.alive(blockPose, ctx.t))
-	Cast.expr(ctx, "yuta", "glare")
+	-- Yuta flies at Uro and kicks her in the stomach; she doubles over
 	local u = ctx.u
-	local p = O + V(10 - u * 8, 2.5 + math.sin(u * math.pi) * 5, 0)
-	ctx:rig("Uro", C(p) * CFrame.Angles(0, math.rad(90), 0) * CFrame.Angles(math.rad(-15), 0, 0), Uro.poses.kick)
+	local hit = Util.smoothstep(0.45, 0.6, u)
+	local yp = O + V(-7 + u * 8, 2.6 + math.sin(math.min(1, u * 1.4) * math.pi) * 2.5, 0)
+	ctx:rig("Yuta", C(yp) * CFrame.Angles(0, math.rad(-90), 0) * CFrame.Angles(math.rad(-20), 0, 0), Uro.poses.kick)
+	Cast.expr(ctx, "yuta", "glare")
+	local doubled: Rig.Pose = {
+		LowerTorso = R(-10, 0, 0),
+		UpperTorso = R(40, 0, 0),
+		Head = R(20, 0, 0),
+		LeftUpperArm = R(60, 0, -10),
+		LeftLowerArm = R(40, 0, 0),
+		RightUpperArm = R(60, 0, 10),
+		RightLowerArm = R(40, 0, 0),
+		LeftUpperLeg = R(30, 0, 0),
+		LeftLowerLeg = R(-40, 0, 0),
+		RightUpperLeg = R(10, 0, 0),
+	}
+	local up = O + V(4 + hit * 2.5, hit * 1.5, 0)
+	ctx:rig("Uro", C(up) * CFrame.Angles(0, math.rad(90), 0), Cast.mix(Uro.poses.leap, doubled, hit))
 	ctx:camera(Util.lookAt(O + V(1, 16, 40), O + V(1, 3, 0)), 40)
 	ctx:focus(40, 0)
 	ctx:alpha("fbLines", 0.95)
@@ -80,11 +95,14 @@ local function fbWide(ctx: Timeline.Ctx)
 end
 
 local function fbYuta(ctx: Timeline.Ctx)
+	-- a claw tears Uro's left arm off: blood flies past Yuta (black and white)
+	local hh = h(ctx)
 	local yb = ctx:rig("Yuta", yutaRoot(), blockPose)
 	Cast.expr(ctx, "yuta", "glare")
 	local chest = yb.UpperTorso * C(0, 0.9, 0)
 	ctx:camera(Util.lookAt(chest:PointToWorldSpace(V(1.4, 0.4, -2.6)), chest.Position), 50)
 	ctx:focus(3, 1)
+	FX.placeBurst(ctx, hh.blood, chest:PointToWorldSpace(V(1.2, 0.6, -0.8)), ctx.lt + 0.05, 10, 0.2, 0.5, V(-0.6, 0.4, -1), 0.8, 10)
 	ctx:alpha("fbLines", 0.4)
 	mono(ctx, 0.1)
 end
@@ -123,13 +141,15 @@ local function fbDust(ctx: Timeline.Ctx)
 end
 
 local function fbHand(ctx: Timeline.Ctx)
+	-- Uro falls; in the foreground Rika's huge white hand closes into a fist
 	local u = ctx.u
-	local yb = ctx:rig("Yuta", yutaRoot(), reachUp)
-	local hand = (yb.RightHand * C(0, -0.4, 0)).Position
-	local p = O + V(-1 - u * 2, 12 + u * 2, -1)
-	ctx:rig("Uro", C(p) * CFrame.Angles(0, math.rad(90), 0) * CFrame.Angles(math.rad(-160 + u * 30), 0, 0), Uro.poses.leap)
-	local eye = hand + V(1.2, -1.6, 3.4)
-	ctx:camera(Util.lookAt(eye, p:Lerp(hand, 0.35)), 55)
+	local rr = C(O + V(-4, -2, 6)) * CFrame.Angles(0, math.rad(-150), 0)
+	local rb = ctx:rig("Rika", rr, Cast.add(Cast.add(Cast.rika.roar, "RightUpperArm", R(80, 0, 10)), "RightHand", R(-40 + u * 90, 0, 0)))
+	local hand = (rb.RightHand * C(0, -1.4, 0)).Position
+	local p = O + V(1 - u * 2, 13 - u * 4, -2)
+	ctx:rig("Uro", C(p) * CFrame.Angles(0, math.rad(90), 0) * CFrame.Angles(math.rad(-160 + u * 50), 0, 0), Uro.poses.caught)
+	local eye = hand + V(1.2, -2.2, 3.2)
+	ctx:camera(Util.lookAt(eye, p:Lerp(hand, 0.3)), 62)
 	ctx:focus((hand - eye).Magnitude, 0.6)
 	ctx:alpha("fbLines", 0.75)
 	purple(ctx, -0.05)
@@ -156,16 +176,20 @@ local function ryuEye(ctx: Timeline.Ctx)
 end
 
 local function fbArm(ctx: Timeline.Ctx)
-	local yb = ctx:rig("Yuta", yutaRoot(), Cast.mix(blockPose, {
-		RightUpperArm = R(90, 0, 10),
-		RightLowerArm = R(6, 0, 0),
-		RightHand = R(-10, 0, 0),
-	}, 0.5 + ctx.u * 0.5))
-	local hand = (yb.RightHand * C(0, -0.3, 0)).Position
-	local elbow = yb.RightLowerArm.Position
-	ctx:camera(Util.lookAt(elbow + V(0.5, 2.4, 3.2), hand:Lerp(elbow, 0.4)), 50)
-	ctx:focus(3.8, 1)
-	ctx:alpha("fbLines", 0.7)
+	-- Uro's severed arm tumbling through the air, blood trailing (blue line art)
+	local hh = h(ctx)
+	local arm = hh.uroArm
+	local u = ctx.u
+	local base = C(O + V(-2 + u * 2.5, 6 + u * 1.2, 0)) * CFrame.Angles(0, 0, math.rad(70 + u * 70)) * CFrame.Angles(math.rad(12), math.rad(20), 0)
+	ctx:place(arm.upper, base * C(0, -0.5, 0))
+	ctx:place(arm.lower, base * C(0, -1.45, 0) * CFrame.Angles(math.rad(-15), 0, 0))
+	ctx:place(arm.band, base * C(0, -1.88, -0.05))
+	ctx:place(arm.hand, base * C(0, -2.18, -0.08) * CFrame.Angles(math.rad(-10), 0, 0))
+	FX.placeBurst(ctx, hh.blood, base.Position, ctx.lt % 0.6, 6, 0.16, 0.6, V(-1, 0.2, 0), 0.6, 4)
+	local mid = (base * C(0, -1.2, 0)).Position
+	ctx:camera(Util.lookAt(mid + V(0.5, 0.8, 3.1), mid), 50)
+	ctx:focus(3.2, 1)
+	ctx:alpha("fbLines", 0.45)
 	Common.grade(ctx, -0.05, 0.25, -0.5, Color3.fromRGB(170, 195, 255))
 	ctx:fog(0.25)
 end

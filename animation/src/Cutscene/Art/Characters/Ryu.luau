@@ -1,6 +1,8 @@
 --!strict
--- Ryu: big man, black pompadour, long dark coat with a huge white fur collar,
--- open chest with dog tags. R15 skeleton, parts built from primitives.
+-- Ryu: big man, black pompadour, a short dark jacket worn open on his bare
+-- chest (huge white fur collar, fur on the cuffs and round the hem at the
+-- waist), dog tags, narrow black trousers with a burgundy belt. No coat.
+-- R15 skeleton, parts built from primitives.
 local Builder = require(script.Parent.Parent.Parent.Builder)
 local Rig = require(script.Parent.Parent.Parent.Rig)
 local Paint = require(script.Parent.Parent.Parent.Paint)
@@ -39,15 +41,9 @@ function Ryu.build(scene: Builder.Scene, rigName: string, bare: boolean?): Rig.R
 	end
 
 	-- Pelvis, belt, coat tails ------------------------------------------------
-	-- one-piece trousers at a narrow waist; the long coat hangs open at the
-	-- sides and the back, so the front shows the trousers, not two coat panels
-	k.add("LowerTorso", "Block", V(1.6, 0.8, 0.98), C(0, 0.1, 0), "rPants", "cloth", "Pelvis")
-	k.add("LowerTorso", "Block", V(1.64, 0.15, 1.02), C(0, 0.44, 0), "rShoe", "cloth", "Belt")
-	k.add("LowerTorso", "Block", V(2.0, 1.75, 0.2), C(0, -0.5, 0.5) * R(-6, 0, 0), "rCoat", "cloth", "CoatBack")
-	for _, sx in { -1, 1 } do
-		k.add("LowerTorso", "Block", V(0.2, 1.7, 1.0), C(sx * 0.98, -0.46, 0.02) * R(0, 0, sx * 6), "rCoat", "cloth", "CoatSide")
-		k.add("LowerTorso", "Block", V(0.4, 1.6, 0.16), C(sx * 0.98, -0.42, -0.5) * R(4, sx * 38, sx * 4), "rCoat", "cloth", "CoatFront")
-	end
+	-- narrow trousers and a burgundy belt; the jacket stops at the waist
+	k.add("LowerTorso", "Block", V(1.5, 0.8, 0.94), C(0, 0.1, 0), "rPants", "cloth", "Pelvis")
+	k.add("LowerTorso", "Block", V(1.54, 0.16, 0.98), C(0, 0.44, 0), "rBelt", "cloth", "Belt")
 
 	-- Chest and coat ------------------------------------------------------------
 	k.add("UpperTorso", "Block", V(2.05, 1.62, 1.15), C(0, 0.8, 0), "rCoat", "cloth", "Torso")
@@ -97,6 +93,16 @@ function Ryu.build(scene: Builder.Scene, rigName: string, bare: boolean?): Rig.R
 			k.add("UpperTorso", "Ellipsoid", V(rg.w, len, rg.w * 0.85), C(x, y, z) * R(rotX, wob * 12, rotZ) * C(0, len * 0.42, 0), col, "fur", "FurSpike")
 		end
 	end
+	-- fur round the jacket's hem at the waist (back and sides, open at the front)
+	for i = 0, 17 do
+		local ang = math.rad(-140 + i * (280 / 17))
+		local x, z = math.sin(ang) * 1.04, math.cos(ang) * 0.6
+		local len = 0.34 + math.abs(math.sin(i * 1.9)) * 0.22
+		local out = Vector3.new(x, -0.9, z).Unit
+		local rotZ = -math.deg(math.atan2(out.X, out.Y))
+		local rotX = math.deg(math.atan2(out.Z, out.Y))
+		k.add("UpperTorso", "Ellipsoid", V(0.2, len, 0.17), C(x, 0.06, z) * R(rotX, 0, rotZ) * C(0, len * 0.4, 0), if i % 5 == 2 then "rFurShade" else "rFur", "fur", "FurHem")
+	end
 	-- fur lining down the front edges of the coat: thin strands fanning out
 	for _, sx in { -1, 1 } do
 		for j = 0, 7 do
@@ -125,9 +131,9 @@ function Ryu.build(scene: Builder.Scene, rigName: string, bare: boolean?): Rig.R
 
 	-- Legs --------------------------------------------------------------------
 	for _, side in { "Left", "Right" } do
-		k.add(side .. "UpperLeg", "Block", V(0.8, 1.36, 0.84), C(0, -0.62, 0), "rPants", "cloth")
-		k.add(side .. "LowerLeg", "Block", V(0.72, 1.3, 0.76), C(0, -0.6, 0), "rPants", "cloth")
-		k.add(side .. "Foot", "Block", V(0.74, 0.32, 1.12), C(0, -0.04, -0.18), "rShoe", "cloth")
+		k.add(side .. "UpperLeg", "Block", V(0.72, 1.36, 0.76), C(0, -0.62, 0), "rPants", "cloth")
+		k.add(side .. "LowerLeg", "Block", V(0.62, 1.3, 0.66), C(0, -0.6, 0), "rPants", "cloth")
+		k.add(side .. "Foot", "Block", V(0.66, 0.32, 1.08), C(0, -0.04, -0.18), "rShoe", "cloth")
 	end
 	return def
 end

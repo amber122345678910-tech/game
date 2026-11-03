@@ -41,6 +41,10 @@ export type H = {
 	bolts: FX.Bolt,
 	rikaBlood: { Builder.PartSpec },
 	fbSky: { Builder.PartSpec },
+	rings: { Builder.PartSpec },
+	rikaEye: Builder.PartSpec,
+	shell: FX.Burst,
+	uroArm: { upper: Builder.PartSpec, lower: Builder.PartSpec, band: Builder.PartSpec, hand: Builder.PartSpec },
 }
 
 function Common.build(scene: Builder.Scene)
@@ -68,15 +72,27 @@ function Common.build(scene: Builder.Scene)
 		bolts = FX.bolts(scene, "P2Bolts", cyanHot, 40),
 		rikaBlood = {},
 		fbSky = {},
+		rings = {},
+		rikaEye = FX.core(scene, "P2RikaEye", Color3.fromRGB(255, 40, 52)),
+		shell = FX.burst(scene, "P2Shell", Color3.fromRGB(22, 22, 28), 34, "Wedge", 68),
+		uroArm = {
+			upper = Builder.fx(scene, "P2UroArm", "Block", V(0.36, 1.0, 0.38), pal.skin, "SmoothPlastic", 0, "UroArm"),
+			lower = Builder.fx(scene, "P2UroArm", "Block", V(0.32, 0.9, 0.34), pal.skin, "SmoothPlastic", 0, "UroArm"),
+			band = Builder.fx(scene, "P2UroArm", "Block", V(0.36, 0.12, 0.38), Color3.fromRGB(20, 20, 24), "SmoothPlastic", 0, "UroBand"),
+			hand = Builder.fx(scene, "P2UroArm", "Block", V(0.3, 0.44, 0.16), pal.skin, "SmoothPlastic", 0, "UroHand"),
+		},
 	}
+	for i = 1, 3 do
+		h.rings[i] = FX.ring(scene, "P2Ring" .. i, Util.mix(pal.eCyan, white, 0.6))
+	end
 	-- the folded sky: broad bands of cyan and white
 	for i = 1, 5 do
 		h.bands[i] = FX.curvedBeam(scene, "P2Band" .. i, if i % 2 == 0 then white else pal.eCyan, 12)
 	end
 	-- rock, snow, dust and blood are matter, not light
-	for _, bu in { h.debris, h.dust, h.spray, h.blood } do
+	for _, bu in { h.debris, h.dust, h.spray, h.blood, h.shell } do
 		for _, p in bu.parts do
-			p.material = if bu == h.debris then "Slate" elseif bu == h.blood then "SmoothPlastic" else "Snow"
+			p.material = if bu == h.debris or bu == h.shell then "Slate" elseif bu == h.blood then "SmoothPlastic" else "Concrete"
 		end
 	end
 	-- blood around Rika's mouth (flashback: she has just eaten Uro's arm)
@@ -150,6 +166,20 @@ function Common.panelCamera(ctx: Timeline.Ctx, cx: number, cy: number, hpx: numb
 	local fov = math.deg(2 * math.atan(math.tan(math.rad(Layout.CLOSE_FOV) / 2) * hpx / Layout.FRAME_H))
 	ctx:camera(CFrame.new(pos) * cam.Rotation, fov)
 	ctx:focus(Layout.FACE_DEPTH, 0)
+end
+
+-- Rika's eye glowing red (part 2 close-ups)
+function Common.rikaEye(ctx: Timeline.Ctx, bones: { [string]: CFrame }, k: number?)
+	local h: H = ctx.scene.data.p2
+	FX.placeCore(ctx, h.rikaEye, (bones.Head * C(0.48, 1.55, -1.68)).Position, 0.2, k or 1)
+end
+
+-- Put a rig so that one of its bones (at an offset) lands on a world point:
+-- solve once, then shift the root by the difference
+function Common.rigAt(ctx: Timeline.Ctx, rig: string, root: CFrame, pose: any, bone: string, offset: CFrame, target: Vector3): { [string]: CFrame }
+	local b = ctx:rig(rig, root, pose)
+	local d = target - (b[bone] * offset).Position
+	return ctx:rig(rig, CFrame.new(d) * root, pose)
 end
 
 -- Long thin energy streamers flowing past along `dir` around `center`
