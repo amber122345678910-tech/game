@@ -32,12 +32,14 @@ function Ryu.build(scene: Builder.Scene, rigName: string): Rig.RigDef
 	local k = Builder.kit(scene, rigName, rigName)
 
 	-- Pelvis, belt, coat tails ------------------------------------------------
-	k.add("LowerTorso", "Block", V(1.9, 0.75, 1.05), C(0, 0.12, 0), "rPants", "cloth", "Pelvis")
-	k.add("LowerTorso", "Block", V(1.96, 0.18, 1.1), C(0, 0.46, 0), "rShoe", "cloth", "Belt")
-	k.add("LowerTorso", "Block", V(2.15, 1.75, 0.22), C(0, -0.5, 0.52) * R(-6, 0, 0), "rCoat", "cloth", "CoatBack")
+	-- one-piece trousers at a narrow waist; the long coat hangs open at the
+	-- sides and the back, so the front shows the trousers, not two coat panels
+	k.add("LowerTorso", "Block", V(1.6, 0.8, 0.98), C(0, 0.1, 0), "rPants", "cloth", "Pelvis")
+	k.add("LowerTorso", "Block", V(1.64, 0.15, 1.02), C(0, 0.44, 0), "rShoe", "cloth", "Belt")
+	k.add("LowerTorso", "Block", V(2.0, 1.75, 0.2), C(0, -0.5, 0.5) * R(-6, 0, 0), "rCoat", "cloth", "CoatBack")
 	for _, sx in { -1, 1 } do
-		k.add("LowerTorso", "Block", V(0.22, 1.7, 1.12), C(sx * 1.02, -0.46, 0.0) * R(0, 0, sx * 5), "rCoat", "cloth", "CoatSide")
-		k.add("LowerTorso", "Block", V(0.82, 1.62, 0.2), C(sx * 0.6, -0.42, -0.55) * R(4, sx * 14, sx * 3), "rCoat", "cloth", "CoatFront")
+		k.add("LowerTorso", "Block", V(0.2, 1.7, 1.0), C(sx * 0.98, -0.46, 0.02) * R(0, 0, sx * 6), "rCoat", "cloth", "CoatSide")
+		k.add("LowerTorso", "Block", V(0.4, 1.6, 0.16), C(sx * 0.98, -0.42, -0.5) * R(4, sx * 38, sx * 4), "rCoat", "cloth", "CoatFront")
 	end
 
 	-- Chest and coat ------------------------------------------------------------

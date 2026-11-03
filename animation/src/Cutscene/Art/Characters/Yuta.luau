@@ -74,21 +74,61 @@ function Yuta.build(scene: Builder.Scene, rigName: string): Rig.RigDef
 		gui = { face = "Front", canvas = Vector2.new(400, 432), lightInfluence = scene.style.face.lightInfluence, elems = face.elems },
 	})
 	k.add("Head", "Block", V(0.86, 0.26, 0.9), C(0, 0.1, -0.02), "skin", "skin", "Jaw")
-	k.add("Head", "Ellipsoid", V(1.18, 0.66, 1.22), C(0, 1.18, 0.04), "yHair", "hair", "HairTop")
-	k.add("Head", "Block", V(1.08, 0.92, 0.28), C(0, 0.86, 0.5), "yHair", "hair", "HairBack")
+	-- Hair: dark, messy and spiky like the reference. A rounded mass over the
+	-- skull, then many thin tapered locks: bangs falling over the forehead
+	-- (one between the eyes), locks over the temples and ears, a shaggy nape
+	-- and a few spiky ends sticking out at the crown and back.
+	k.add("Head", "Ellipsoid", V(1.2, 0.74, 1.26), C(0, 1.16, 0.05), "yHair", "hair", "HairTop")
+	k.add("Head", "Ellipsoid", V(1.16, 1.0, 0.62), C(0, 0.86, 0.36), "yHair", "hair", "HairBack")
 	for _, sx in { -1, 1 } do
-		k.add("Head", "Block", V(0.16, 0.86, 0.74), C(sx * 0.55, 0.8, 0.06), "yHair", "hair", "HairSide")
-		k.add("Head", "Block", V(0.08, 0.28, 0.18), C(sx * 0.53, 0.62, 0.06), "skin", "skin", "Ear")
+		k.add("Head", "Ellipsoid", V(0.24, 0.8, 0.8), C(sx * 0.54, 0.86, 0.08), "yHair", "hair", "HairSide")
+		k.add("Head", "Block", V(0.08, 0.26, 0.18), C(sx * 0.53, 0.58, 0.08), "skin", "skin", "Ear")
 	end
-	-- bangs: thin wedges hanging over the forehead (above the painted brows)
-	local bangs = { { -0.36, 14, 0.5 }, { -0.16, -6, 0.58 }, { 0.06, 8, 0.52 }, { 0.26, -12, 0.56 }, { 0.42, 18, 0.42 } }
-	for _, b in bangs do
-		k.add("Head", "Wedge", V(0.1, b[3], 0.22), C(b[1], 1.0, -0.53) * R(0, 0, 180 + b[2]) * R(0, 90, 0), "yHair", "hair", "Bang")
+	local function lock(x: number, y: number, z: number, pitch: number, roll: number, yaw: number, len: number, w: number, col: string, name: string)
+		-- hangs along -Y from (x, y, z); pitch > 0 swings the tip forward
+		k.add("Head", "Ellipsoid", V(w, len, w * 0.8), C(x, y, z) * R(pitch, yaw, roll) * C(0, -len * 0.45, 0), col, "hair", name)
 	end
-	-- spikes on top / back
-	local spikes = { { -0.4, 1.35, 0.25, -40, 0, 30 }, { 0.35, 1.38, 0.3, -45, 0, -28 }, { 0, 1.4, 0.45, -60, 0, 0 }, { -0.2, 1.3, 0.55, -80, 0, 15 } }
-	for _, sp in spikes do
-		k.add("Head", "Wedge", V(0.34, 0.6, 0.3), C(sp[1], sp[2], sp[3]) * R(sp[4], sp[5], sp[6]) * C(0, 0.3, 0), "yHair", "hair", "Spike")
+	-- bangs over the forehead: pointed locks (wedge triangles turned to face
+	-- forward, tip down) ending above the painted brows, one longer lock
+	-- between the eyes; alternate sides of the right angle make them jagged
+	local bangs = {
+		-- x, top y, z, length, width, roll
+		{ -0.4, 1.16, -0.47, 0.34, 0.26, -14 },
+		{ -0.22, 1.18, -0.51, 0.4, 0.24, -6 },
+		{ -0.04, 1.18, -0.53, 0.52, 0.2, 2 },
+		{ 0.13, 1.18, -0.52, 0.38, 0.24, 8 },
+		{ 0.3, 1.17, -0.49, 0.36, 0.24, 14 },
+		{ 0.45, 1.13, -0.42, 0.3, 0.2, 24 },
+	}
+	for i, b in bangs do
+		local turn = if i % 2 == 0 then 90 else -90
+		k.add("Head", "Wedge", V(0.06, b[4], b[5]), C(b[1], b[2], b[3]) * R(8, 0, b[6]) * C(0, -b[4] / 2, 0) * R(0, 0, 180) * R(0, turn, 0), if i == 3 then "yHairHi" else "yHair", "hair", "Bang")
+	end
+	-- locks over the temples and ears
+	for _, sx in { -1, 1 } do
+		lock(sx * 0.52, 1.02, -0.22, 8, sx * -10, 0, 0.62, 0.17, "yHair", "SideLock")
+		lock(sx * 0.56, 0.98, 0.06, 2, sx * -14, 0, 0.66, 0.18, "yHair", "SideLock")
+		lock(sx * 0.5, 0.96, 0.32, -10, sx * -18, 0, 0.58, 0.18, "yHair", "SideLock")
+	end
+	-- shaggy nape
+	for i = 0, 5 do
+		local x = -0.4 + i * 0.16
+		lock(x, 0.86, 0.5, -22 - (i % 2) * 8, x * -30, 0, 0.5 + (i % 3) * 0.08, 0.18, "yHair", "NapeLock")
+	end
+	-- spiky ends at the crown and the back of the head
+	local spikes = {
+		{ -0.34, 1.42, 0.12, -150, 30, 0.5 },
+		{ -0.12, 1.5, 0.2, -160, 12, 0.56 },
+		{ 0.12, 1.5, 0.18, -158, -10, 0.54 },
+		{ 0.34, 1.42, 0.1, -148, -28, 0.48 },
+		{ -0.24, 1.36, 0.42, -130, 22, 0.5 },
+		{ 0.22, 1.38, 0.44, -128, -20, 0.5 },
+		{ 0, 1.3, 0.56, -112, 0, 0.48 },
+		{ -0.46, 1.22, 0.36, -120, 48, 0.42 },
+		{ 0.46, 1.22, 0.34, -122, -46, 0.42 },
+	}
+	for i, sp in spikes do
+		lock(sp[1], sp[2], sp[3], sp[4], sp[5], 0, sp[6] * 1.15, 0.15, if i % 4 == 1 then "yHairHi" else "yHair", "Spike")
 	end
 
 	-- Arms
@@ -104,7 +144,8 @@ function Yuta.build(scene: Builder.Scene, rigName: string): Rig.RigDef
 	for _, side in { "Left", "Right" } do
 		k.add(side .. "UpperLeg", "Block", V(0.62, 1.2, 0.66), C(0, -0.56, 0), "yPants", "cloth")
 		k.add(side .. "LowerLeg", "Block", V(0.56, 1.16, 0.6), C(0, -0.55, 0), "yPants", "cloth")
-		k.add(side .. "Foot", "Block", V(0.58, 0.28, 0.98), C(0, -0.04, -0.16), "ySheath", "cloth")
+		k.add(side .. "Foot", "Block", V(0.58, 0.28, 0.98), C(0, -0.04, -0.16), "yShoe", "cloth", "Shoe")
+		k.add(side .. "Foot", "Block", V(0.6, 0.08, 1.0), C(0, -0.16, -0.16), "yShoeSole", "cloth", "Sole")
 	end
 	return def
 end

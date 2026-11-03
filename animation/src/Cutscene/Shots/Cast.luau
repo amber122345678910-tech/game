@@ -4,6 +4,7 @@
 local Builder = require(script.Parent.Parent.Builder)
 local Timeline = require(script.Parent.Parent.Timeline)
 local Rig = require(script.Parent.Parent.Rig)
+local Util = require(script.Parent.Parent.Util)
 local FX = require(script.Parent.Parent.FX)
 local FaceRig = require(script.Parent.Parent.Art.Faces.FaceRig)
 local Ryu = require(script.Parent.Parent.Art.Characters.Ryu)
@@ -55,10 +56,39 @@ function Cast.expr(ctx: Timeline.Ctx, who: string, name: string)
 	end
 end
 
--- mouth flaps for speech (talk/closed alternating ~8 times a second)
+-- Who actually speaks on screen, and when (seconds, read off the reference
+-- frame by frame). Mouths only move inside these intervals; lines spoken off
+-- screen (voice-over over someone else's close-up) move no mouth at all.
+Cast.SPEECH = {
+	ryu = {
+		{ 16.1, 18.6 }, -- "That was seriously sweet, Okkotsu!" (then just grins)
+		{ 30.1, 30.95 }, -- "That's right!"
+		{ 31.4, 33.45 }, -- "Let's keep going!" (laughing)
+		{ 40.1, 40.6 }, -- "But..."
+		{ 52.0, 53.6 }, -- "...even you couldn't have recovered that much." (close-up part)
+		{ 54.3, 55.35 }, -- "I'll settle this."
+	},
+	yuta = {}, -- Yuta says nothing in part 1
+} :: { [string]: { { number } } }
+
+function Cast.speaking(who: string, t: number): boolean
+	for _, iv in Cast.SPEECH[who] or {} do
+		if t >= iv[1] and t < iv[2] then
+			return true
+		end
+	end
+	return false
+end
+
+-- Mouth flaps while the character speaks (an irregular syllable rhythm of
+-- about 7 a second); outside the speech intervals the face holds `base`.
 function Cast.talk(ctx: Timeline.Ctx, who: string, base: string, open: string)
-	local phase = math.floor(ctx.t * 8.5) % 3
-	Cast.expr(ctx, who, if phase == 0 then base else open)
+	if not Cast.speaking(who, ctx.t) then
+		Cast.expr(ctx, who, base)
+		return
+	end
+	local n = Util.noise1(ctx.t * 7.5, if who == "ryu" then 3 else 5)
+	Cast.expr(ctx, who, if n > -0.2 then open else base)
 end
 
 -- pose helpers ----------------------------------------------------------------
@@ -102,6 +132,25 @@ function Cast.run(phase: number, lean: number?): Rig.Pose
 		RightUpperLeg = R(-s * 55, 0, 0),
 		RightLowerLeg = R(-math.max(0, c) * 80 - 15, 0, 0),
 		RightFoot = R(10, 0, 0),
+	}
+end
+
+-- walking cycle (phase in cycles), calmer than the run
+function Cast.walk(phase: number): Rig.Pose
+	local s = math.sin(phase * math.pi * 2)
+	local c = math.cos(phase * math.pi * 2)
+	return {
+		HumanoidRootPart = CFrame.new(0, -0.05 + math.abs(c) * 0.1, 0),
+		LowerTorso = R(-2, s * 6, 0),
+		UpperTorso = R(2, -s * 8, 0),
+		LeftUpperArm = R(-s * 18, 0, -6),
+		LeftLowerArm = R(14, 0, 0),
+		RightUpperArm = R(s * 18, 0, 6),
+		RightLowerArm = R(14, 0, 0),
+		LeftUpperLeg = R(s * 26, 0, 0),
+		LeftLowerLeg = R(-math.max(0, -c) * 38 - 4, 0, 0),
+		RightUpperLeg = R(-s * 26, 0, 0),
+		RightLowerLeg = R(-math.max(0, c) * 38 - 4, 0, 0),
 	}
 end
 

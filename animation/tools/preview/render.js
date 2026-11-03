@@ -281,7 +281,8 @@ function init(data, W, H) {
   scene.background = atm ? srgb(atm.Color) : srgb([0.6, 0.65, 0.8]);
   if (atm) {
     const fc = srgb(atm.Color).lerp(srgb(atm.Decay), 0.25);
-    scene.fog = new THREE.FogExp2(fc, atm.Density * 0.0068 * (0.6 + 0.25 * atm.Haze));
+    // tuned so a Roblox Atmosphere of density ~0.5 reads as a thick fog at 100-200 studs
+    scene.fog = new THREE.FogExp2(fc, atm.Density * 0.0092 * (0.6 + 0.25 * atm.Haze));
     st.fogBase = scene.fog.density;
   }
 

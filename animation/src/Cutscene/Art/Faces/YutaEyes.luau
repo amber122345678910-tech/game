@@ -77,6 +77,17 @@ function YutaEyes.paint(c: Paint.Canvas, pal: { [string]: Color3 }, lw: number, 
 	-- double-lid crease
 	c:stroke({ { 616, 104 }, { 642, 78 }, { 695, 74 }, { 745, 89 }, { 775, 122 } }, { L(0.6), L(2), L(2.2), L(2), L(0.6) }, deep)
 
+	-- 2b. glare (shown from 5.2 s, when the energies flare): the upper lid
+	-- drops over the top of the iris and the eye narrows
+	c:setGroup("split:yutaGlare")
+	c:stroke({ { 641, 119 }, { 699, 131 }, { 749, 142 }, { 791, 158 }, { 824, 178 }, { 849, 204 }, { 863, 230 } }, { 24, 32, 32, 27, 21, 11, 3 }, skin)
+	c:stroke(
+		{ { 641, 126 }, { 699, 141 }, { 749, 152 }, { 791, 166 }, { 824, 184 }, { 849, 207 }, { 863, 230 } },
+		{ L(22), L(23), L(19), L(15), L(12), L(10), L(2) },
+		line
+	)
+	c:setGroup(nil)
+
 	-- 3. far eye (screen left, foreshortened) --------------------------------------
 	c:stroke({ { 420, 82 }, { 423, 104 }, { 428, 136 } }, { 76, 80, 46 }, pal.sclera)
 	c:stroke({ { 392, 58 }, { 446, 66 } }, { 22, 16 }, pal.scleraShade)
@@ -91,6 +102,10 @@ function YutaEyes.paint(c: Paint.Canvas, pal: { [string]: Color3 }, lw: number, 
 	for i, s in { { 392, 146, 410, 152 }, { 400, 158, 428, 163 }, { 418, 168, 448, 170 }, { 396, 136, 420, 146 } } do
 		c:stroke({ { s[1], s[2] }, { s[3], s[4] } }, { L(i == 4 and 1.2 or 2), L(1) }, line)
 	end
+	c:setGroup("split:yutaGlare")
+	c:stroke({ { 380, 52 }, { 412, 50 }, { 446, 58 } }, { 14, 14, 10 }, skin)
+	c:stroke({ { 378, 56 }, { 410, 54 }, { 446, 62 }, { 458, 74 } }, { L(13), L(12), L(8), L(3) }, line)
+	c:setGroup(nil)
 	-- far brow
 	c:stroke({ { 372, 34 }, { 410, 28 }, { 448, 38 } }, { L(12), L(10), L(5) }, hair)
 

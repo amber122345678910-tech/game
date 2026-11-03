@@ -73,6 +73,45 @@ end
 ------------------------------------------------------------------------------
 -- Lightning: a pool of thin neon segments forming jagged bolts
 ------------------------------------------------------------------------------
+------------------------------------------------------------------------------
+-- Curved beam: a chain of short glowing segments (core, glow, soft halo)
+-- laid along any curve, overlapping so the bends stay round
+------------------------------------------------------------------------------
+export type CurvedBeam = { cores: { Part }, glows: { Part }, halos: { Part }, n: number }
+
+function FX.curvedBeam(scene: Builder.Scene, name: string, color: Color3, n: number): CurvedBeam
+	local cores, glows, halos = {}, {}, {}
+	local hot = Util.mix(color, Color3.new(1, 1, 1), 0.75)
+	for i = 1, n do
+		cores[i] = Builder.fx(scene, "FX_" .. name, "Cylinder", Vector3.one, hot, "Neon", 0, name .. "Core")
+		glows[i] = Builder.fx(scene, "FX_" .. name, "Cylinder", Vector3.one, color, "Neon", 0.35, name .. "Glow")
+		halos[i] = Builder.fx(scene, "FX_" .. name, "Cylinder", Vector3.one, color, "Neon", 0.8, name .. "Halo")
+	end
+	return { cores = cores, glows = glows, halos = halos, n = n }
+end
+
+-- point(f) gives the curve; the beam covers f0..f1 and swells near its head
+function FX.placeCurvedBeam(ctx: Timeline.Ctx, cb: CurvedBeam, point: (number) -> Vector3, f0: number, f1: number, width: number, k: number)
+	if k <= 0.001 or f1 <= f0 + 1e-3 then
+		return
+	end
+	for i = 1, cb.n do
+		local fa = f0 + (f1 - f0) * (i - 1) / cb.n
+		local fb = f0 + (f1 - f0) * i / cb.n
+		local a, b = point(fa), point(fb)
+		local len = (b - a).Magnitude
+		local swell = 1 + 0.35 * (i / cb.n) ^ 3
+		local w = width * swell * (1 + math.sin(ctx.t * 55 + i * 1.7) * 0.07)
+		local cf = along(a, b, ctx.t * 9 + i)
+		ctx:place(cb.cores[i], cf)
+		ctx:prop(cb.cores[i], { s = Vector3.new(len + w * 0.38, w * 0.38, w * 0.38), t = 1 - k })
+		ctx:place(cb.glows[i], cf)
+		ctx:prop(cb.glows[i], { s = Vector3.new(len + w * 0.75, w * 0.75, w * 0.75), t = 1 - k * 0.65 })
+		ctx:place(cb.halos[i], cf)
+		ctx:prop(cb.halos[i], { s = Vector3.new(len + w * 1.5, w * 1.5, w * 1.5), t = 1 - k * 0.22 })
+	end
+end
+
 export type Bolt = { segs: { Part }, color: Color3 }
 
 function FX.bolts(scene: Builder.Scene, name: string, color: Color3, n: number): Bolt

@@ -100,6 +100,16 @@ function RyuEyes.paint(c: Paint.Canvas, pal: { [string]: Color3 }, lw: number, s
 	c:stroke({ { 212, 548 }, { 260, 568 }, { 330, 572 }, { 400, 558 }, { 440, 540 } }, { L(0.6), L(1.8), L(2), L(1.8), L(0.6) }, deep)
 	c:stroke({ { 190, 528 }, { 206, 548 } }, { L(1.4), L(0.6) }, line)
 
+	-- 3b. glare (shown from 5.2 s): heavier lid over the iris, eye narrower
+	c:setGroup("split:ryuGlare")
+	c:stroke({ { 200, 486 }, { 280, 470 }, { 340, 463 }, { 410, 452 }, { 452, 456 } }, { 20, 26, 28, 26, 16 }, shade)
+	c:stroke(
+		{ { 160, 496 }, { 205, 492 }, { 243, 487 }, { 321, 477 }, { 380, 469 }, { 420, 464 }, { 452, 466 } },
+		{ L(1), L(7), L(12), L(15), L(16), L(14), L(6) },
+		line
+	)
+	c:setGroup(nil)
+
 	-- 4. far eye (screen right, under the brow band) --------------------------------
 	c:stroke({ { 626, 446 }, { 655, 450 }, { 684, 446 } }, { 30, 44, 34 }, pal.sclera)
 	c:stroke({ { 622, 432 }, { 660, 428 }, { 690, 430 } }, { 12, 14, 10 }, pal.scleraShade)
@@ -119,6 +129,10 @@ function RyuEyes.paint(c: Paint.Canvas, pal: { [string]: Color3 }, lw: number, s
 	c:stroke({ { 118, 370 }, { 230, 352 }, { 364, 374 }, { 478, 410 }, { 540, 424 }, { 560, 436 } }, { L(2), L(22), L(36), L(38), L(30), L(10) }, hair)
 	c:stroke({ { 520, 430 }, { 548, 440 }, { 566, 452 } }, { L(14), L(10), L(3) }, hair)
 	c:stroke({ { 250, 345 }, { 364, 356 }, { 450, 386 } }, { L(1), L(3), L(1) }, hair)
+	-- glare: the brow knits lower over the eye
+	c:setGroup("split:ryuGlare")
+	c:stroke({ { 140, 384 }, { 236, 370 }, { 364, 392 }, { 478, 426 }, { 540, 438 } }, { L(2), L(20), L(30), L(30), L(14) }, hair)
+	c:setGroup(nil)
 
 	-- 6. hair strands crossing the forehead -------------------------------------------
 	c:stroke({ { 303, 307 }, { 284, 334 }, { 252, 380 }, { 203, 440 } }, { 12, 12, 9, 1 }, hair)

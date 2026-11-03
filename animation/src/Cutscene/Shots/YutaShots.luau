@@ -163,15 +163,20 @@ end
 -- 31: charging straight at the camera through mist and purple sparks
 local function charge(ctx: Timeline.Ctx)
 	local h: H = ctx.scene.data.yuta
+	-- slow motion: the stride and the ground covered slow down together
+	-- (1 run cycle a second = ~5 studs a second, no sliding feet), the camera
+	-- holds still so he comes out of the mist towards it; sparks drift slowly
 	local start = Field.RYU + V(0, 0, -30)
-	local pos = start + V(0, 0, ctx.u * 8)
-	local yb = ctx:rig("Yuta", C(pos) * CFrame.Angles(0, math.rad(180), 0), Cast.run(ctx.t * 2.8, 26))
+	local lt = ctx.t - 43.867
+	local pos = start + V(0, 0, lt * 4.8)
+	local yb = ctx:rig("Yuta", C(pos) * CFrame.Angles(0, math.rad(180), 0), Cast.run(0.15 + lt * 1.0, 28))
 	Cast.expr(ctx, "yuta", "focus")
 	local head = yb.Head * C(0, 0.6, 0)
-	local cam = Util.lookAt(pos + V(0.8, 3.2, 9.5), head.Position + V(0, -1.4, 0))
-	ctx:camera(Clash.shake(cam, ctx.t, 0.12, 10), 55)
-	ctx:focus(9, 1)
-	FX.placeBurst(ctx, h.sparks, head.Position + V(4, 0, 2), ctx.lt % 0.5, 40, 0.5, 0.5, V(-1, 0.1, 0.4), 0.5, 0)
+	local camPos = start + V(0.7, 4.0, 13.5)
+	local cam = Util.lookAt(camPos, start + V(0, 3.3, lt * 4.8))
+	ctx:camera(Clash.shake(cam, ctx.t, 0.04, 3), 50)
+	ctx:focus((head.Position - camPos).Magnitude, 1)
+	FX.placeBurst(ctx, h.sparks, head.Position + V(4, 0, 2), lt % 1.3, 12, 0.22, 1.3, V(-1, 0.1, 0.4), 0.5, 0)
 	ctx:alpha("streaks", 0.85)
 	grade(ctx, -0.02, 0.15, -0.05, Color3.fromRGB(230, 225, 255))
 	Field.mist(ctx, "heavy", 12)
@@ -185,11 +190,8 @@ local function closeUp(ctx: Timeline.Ctx)
 	local cam = Util.lookAt(head:PointToWorldSpace(V(0.2, 0.9, -2.6)), head.Position + V(0, -0.35, 0))
 	ctx:camera(Clash.shake(cam, ctx.t, 0.05, 6), 50)
 	ctx:focus(2.8, 1)
-	if (ctx.t > 45.6 and ctx.t < 48.3) or (ctx.t > 49.17) then
-		Cast.talk(ctx, "yuta", "focus", "talk")
-	else
-		Cast.expr(ctx, "yuta", "focus")
-	end
+	-- Ryu's lines here are voice-over: Yuta keeps his mouth shut
+	Cast.expr(ctx, "yuta", "focus")
 	ctx:alpha("streaks", math.clamp(1 - (ctx.t - 45.4) / 0.8, 0, 0.9))
 	grade(ctx, 0, 0.16, -0.08, Color3.fromRGB(228, 236, 255))
 	Field.mist(ctx, "wisps", 14)

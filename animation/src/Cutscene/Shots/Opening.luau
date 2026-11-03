@@ -43,6 +43,10 @@ end
 local function wide(ctx: Timeline.Ctx)
 	ctx:camera(Layout.WIDE_CAM, Layout.WIDE_FOV)
 	ctx:focus(118, 1)
+	-- only fog behind them in the establishing shot (reference): the ruined
+	-- blocks around the field are lowered out of sight for these frames
+	ctx:channel("cityBlocks", CFrame.new(0, -600, 0))
+	ctx:fog(1.15)
 	local t = ctx.t
 	ctx:rig("Ryu", CFrame.new(Field.RYU) * CFrame.Angles(0, math.rad(-90), 0), Cast.alive(Cast.ryu.point, t))
 	local rp = Cast.add(Cast.rika.crouch, "UpperTorso", Rig.R(math.sin(t * math.pi * 1.1) * 1.4, 0, 0))
@@ -64,6 +68,11 @@ local function eyes(ctx: Timeline.Ctx)
 	ctx:channel("plateRyu", slideCF(Track.sample(ryuSlide, ctx.t)))
 	ctx:show("divider")
 	ctx:emit("SnowClose", 20)
+	-- 5.2 s on: both narrow their eyes into a glare (reference)
+	if ctx.t >= 5.2 then
+		ctx:show("split:yutaGlare")
+		ctx:show("split:ryuGlare")
+	end
 	-- 5.10 s on: their energies flare up, the panels wash out to white
 	local g = math.clamp((ctx.t - 5.1) / 0.55, 0, 1)
 	if g > 0 then

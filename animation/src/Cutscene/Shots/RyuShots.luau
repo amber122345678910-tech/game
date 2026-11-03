@@ -30,6 +30,13 @@ type H = {
 	shards: FX.Burst,
 	bolts: FX.Bolt,
 	headGlow: Builder.PartSpec,
+	chargeHalo: Builder.PartSpec,
+	motes: FX.Burst,
+	chargeRays: FX.Rays,
+	crown: FX.Bolt,
+	arc: FX.CurvedBeam,
+	spiral: FX.Burst,
+	debris: FX.Burst,
 }
 
 function RyuShots.build(scene: Builder.Scene)
@@ -41,8 +48,54 @@ function RyuShots.build(scene: Builder.Scene)
 		shards = FX.burst(scene, "RyuShards", pal.eCyan, 26, "Wedge", 21),
 		bolts = FX.bolts(scene, "RyuYellowBolts", pal.eYellow, 24),
 		headGlow = FX.core(scene, "RyuHeadGlow", pal.eCyan),
+		chargeHalo = FX.core(scene, "RyuChargeHalo", Util.mix(pal.eCyan, Color3.new(1, 1, 1), 0.35)),
+		motes = FX.burst(scene, "RyuChargeMotes", pal.eCyan, 28, "Block", 41),
+		chargeRays = FX.rays(scene, "RyuChargeRays", { pal.eCyan, Color3.new(1, 1, 1) }, 10, 43),
+		crown = FX.bolts(scene, "RyuCrownBolts", Util.mix(pal.eCyan, Color3.new(1, 1, 1), 0.55), 56),
+		arc = FX.curvedBeam(scene, "RikaArc", pal.ePink, 18),
+		spiral = FX.burst(scene, "RikaArcSpiral", Util.mix(pal.ePink, Color3.new(1, 1, 1), 0.4), 40, "Block", 51),
+		debris = FX.burst(scene, "TrenchDebris", pal.rubble, 24, "Block", 53),
 	}
+	-- the debris is rock, not light
+	for _, p in h.debris.parts do
+		p.material = "Slate"
+	end
+	Builder.light(scene, "RyuCharge", "Point", h.chargeHalo, pal.eCyan, 18)
+	Builder.light(scene, "PinkHead", "Point", h.pinkCore, pal.ePink, 40)
 	scene.data.ryu = h
+end
+
+-- Where the Granite Blast gathers: on top of his head, at the front of the
+-- pompadour (not on the face)
+local function chargePoint(bones: { [string]: CFrame }): Vector3
+	return (bones.Head * C(0, 1.74, -0.72)).Position
+end
+
+-- The Granite Blast gathering on his head: motes of energy stream in from
+-- all around, the glow swells and flickers, short rays crackle off it and
+-- light the face. k = 0..1 charge level.
+local function charge(ctx: Timeline.Ctx, center: Vector3, k: number, basis: CFrame, scale: number?)
+	if k <= 0.01 then
+		return
+	end
+	local sc = scale or 1
+	local h: H = ctx.scene.data.ryu
+	local t = ctx.t
+	local flick = 0.86 + 0.14 * math.sin(t * 37) * math.sin(t * 23 + 1)
+	FX.placeCore(ctx, h.headGlow, center, (0.12 + 0.17 * k) * flick * sc, 1)
+	FX.placeCore(ctx, h.chargeHalo, center, (0.2 + 0.26 * k) * flick * sc, 0.16 * k)
+	for i, p in h.motes.parts do
+		local r = Util.rng(500 + i * 13)
+		local dir = V(Util.randRange(r, -1, 1), Util.randRange(r, -0.5, 1), Util.randRange(r, -1, 1)).Unit
+		local ph = (t * (1.0 + Util.rand(r) * 0.9) + Util.rand(r)) % 1
+		local dist = ((0.6 + 2.4 * k) * (1 - ph) ^ 1.6 + 0.12) * sc
+		local pos = center + dir * dist
+		local len = (0.12 + 0.4 * (1 - ph)) * sc
+		ctx:place(p, FX.along(pos + dir * len, pos))
+		ctx:prop(p, { s = V(len, 0.035 * sc, 0.035 * sc), t = 1 - 0.85 * k * math.min(1, ph * 4) })
+	end
+	FX.placeRays(ctx, h.chargeRays, center, basis, (0.45 + 0.7 * k) * sc, 0.025 * sc, 0.6 * k, 14)
+	ctx:light("RyuCharge", (0.8 + 1.4 * k) * flick, nil, 6 + 4 * k)
 end
 
 -- Ryu standing at `pos` facing `yaw` degrees (0 = -Z, -90 = +X)
@@ -52,8 +105,10 @@ end
 
 local function sky(ctx: Timeline.Ctx, mistName: string?, depth: number?)
 	Field.snow(ctx, 120)
-	if mistName then
-		Field.mist(ctx, mistName, depth or 30, 0.4)
+	-- fog banks behind the characters in every shot on the field
+	Field.mist(ctx, mistName or "low", depth or 34, 0.4)
+	if mistName ~= "wisps" then
+		Field.mist(ctx, "wisps", 70, -0.3, -0.08)
 	end
 end
 
@@ -102,11 +157,8 @@ local function talk(ctx: Timeline.Ctx)
 	local cam = Util.lookAt(head:PointToWorldSpace(V(-2.1 + ctx.u * 0.3, -0.05, -4.0 + ctx.u * 0.5)), head.Position + V(0, -0.3, 0))
 	ctx:camera(Clash.shake(cam, ctx.t, 0.12, 8), 40)
 	ctx:focus(3.4, 1)
-	if ctx.t < 16.05 then
-		Cast.expr(ctx, "ryu", "grin")
-	else
-		Cast.talk(ctx, "ryu", "grin", "laugh")
-	end
+	-- closed smirk until he speaks, a toothy grin once he has finished
+	Cast.talk(ctx, "ryu", if ctx.t < 16.1 then "smirk" else "grin", "laugh")
 	Cast.ryuAura(ctx, bones, 1, 7)
 	ctx:light("RyuFace", 1.6, nil, 9)
 	ctx:bloom(1.6)
@@ -137,22 +189,46 @@ end
 
 -- 18: front, low angle, grinning, lightning on the arm, wind
 local function grin(ctx: Timeline.Ctx)
+	-- 25.07-26.30 grinning into the camera while cyan energy whips past;
+	-- 26.30-26.60 he spins away; then walks off, looking back over his right
+	-- shoulder with the same grin (reference 25-27.5 s)
 	local h: H = ctx.scene.data.ryu
-	local root = rootAt(Field.RYU, -60)
-	local pose = Cast.alive(Cast.add(Cast.ryu.spread, "RightUpperArm", R(-40, 0, -30)), ctx.t)
+	local t = ctx.t
+	local turn = Util.smoothstep(26.3, 26.62, t)
+	local walkT = math.max(0, t - 26.42)
+	local yaw0 = -60
+	local yaw = yaw0 + turn * 150
+	local fwd = CFrame.Angles(0, math.rad(yaw), 0).LookVector
+	local pos = Field.RYU + fwd * (walkT * 3.2)
+	local root = C(pos) * CFrame.Angles(0, math.rad(yaw), 0)
+	local pose = Cast.alive(Cast.add(Cast.ryu.spread, "RightUpperArm", R(-40, 0, -30)), t)
+	if walkT > 0 then
+		local w = Cast.walk(walkT * 1.25)
+		w.UpperTorso = (w.UpperTorso or CFrame.new()) * R(0, -38 * turn, 0)
+		w.Head = R(-4, -84 * turn, 4)
+		pose = Cast.mix(pose, w, Util.smoothstep(26.42, 26.62, t))
+	end
 	local bones = ctx:rig("Ryu", root, pose)
 	local head = bones.Head * C(0, 0.7, 0)
-	local cam = Util.lookAt(root:PointToWorldSpace(V(-1.0, 2.6, -5.2 + ctx.u * 0.6)), head.Position + V(0, -0.6, 0))
-	ctx:camera(cam * CFrame.Angles(0, 0, math.rad(-6)), 48)
-	ctx:focus(5, 1)
+	-- front-left and slightly low while he grins; as he turns away the camera
+	-- swings up behind his right shoulder, at head height, to catch the look back
+	local base = rootAt(Field.RYU, yaw0)
+	local eyeA = base:PointToWorldSpace(V(-1.2, 2.7, -5.0 + (t - 25.067) * 0.2))
+	local eyeC = root:PointToWorldSpace(V(2.6, 7.0, 3.0))
+	local eye = eyeA:Lerp(eyeC, turn)
+	local cam = Util.lookAt(eye, head.Position + V(0, -0.7 + turn * 0.5, 0))
+	ctx:camera(Clash.shake(cam * CFrame.Angles(0, 0, math.rad(-6)), t, 0.06 + turn * (1 - turn) * 0.8, 10), 46)
+	ctx:focus((head.Position - eye).Magnitude, 1)
 	Cast.expr(ctx, "ryu", "grin")
-	local idx = 1
-	local hand = (bones.RightHand * C(0, -0.4, 0)).Position
-	local shoulder = (bones.RightUpperArm).Position
-	for i = 1, 4 do
-		idx = FX.placeBolt(ctx, h.bolts, idx, shoulder, hand + V(math.sin(i) * 0.5, math.cos(i) * 0.4, 0), 6, 0.18, 0.06, i + 30, 16)
+	if turn < 0.5 then
+		local idx = 1
+		local hand = (bones.RightHand * C(0, -0.4, 0)).Position
+		local shoulder = (bones.RightUpperArm).Position
+		for i = 1, 4 do
+			idx = FX.placeBolt(ctx, h.bolts, idx, shoulder, hand + V(math.sin(i) * 0.5, math.cos(i) * 0.4, 0), 6, 0.18, 0.06, i + 30, 16)
+		end
 	end
-	Cast.ryuAura(ctx, bones, 0.8, 4)
+	Cast.ryuAura(ctx, bones, 0.8 * (1 - turn * 0.6), 4)
 	ctx:alpha("wind", 0.8)
 	grade(ctx, 0.02, 0.16, -0.1)
 	sky(ctx)
@@ -187,7 +263,7 @@ local function thatsRight(ctx: Timeline.Ctx)
 	local cam = Util.lookAt(head:PointToWorldSpace(V(-1.5, -1.1, -4.8 + ctx.u * 0.3)), head.Position + V(0, -0.9, 0))
 	ctx:camera(cam, 46)
 	ctx:focus(4.8, 1)
-	Cast.talk(ctx, "ryu", "laugh", "grin")
+	Cast.talk(ctx, "ryu", "grin", "laugh")
 	Cast.ryuAura(ctx, bones, 0.4, 3)
 	ctx:alpha("wind", 0.4)
 	grade(ctx, 0.03, 0.15, -0.08)
@@ -196,40 +272,75 @@ end
 
 -- 21: "Let's keep going!" laughing up into a cyan glare, yellow bolt across
 local function keepGoing(ctx: Timeline.Ctx)
+	-- laughing with his head thrown back while the Granite Blast gathers on
+	-- top of his head (reference 31.4-33.9 s): front, chest height
 	local h: H = ctx.scene.data.ryu
 	local root = rootAt(Field.RYU, -70)
-	local bones = ctx:rig("Ryu", root, Cast.alive(Cast.ryu.laughBack, ctx.t, 1))
+	local pose = Cast.add(Cast.alive(Cast.ryu.laughBack, ctx.t, 1), "Head", R(-12, 10, 6))
+	local bones = ctx:rig("Ryu", root, pose)
 	local head = bones.Head * C(0, 0.7, 0)
-	local cam = Util.lookAt(head:PointToWorldSpace(V(-0.6, -1.0, -3.6 + ctx.u * 0.4)), head.Position + V(0, -0.5, 0))
-	ctx:camera(Clash.shake(cam, ctx.t, 0.1, 10), 44)
-	ctx:focus(3.6, 1)
+	local eye = root:PointToWorldSpace(V(-1.1, 4.3, -5.4 + ctx.u * 0.5))
+	local cam = Util.lookAt(eye, head.Position + V(0, -0.3, 0))
+	ctx:camera(Clash.shake(cam * CFrame.Angles(0, 0, math.rad(6)), ctx.t, 0.1, 10), 46)
+	ctx:focus((head.Position - eye).Magnitude, 1)
 	Cast.talk(ctx, "ryu", "laugh", "shout")
-	Cast.ryuAura(ctx, bones, 1, 6)
-	ctx:light("RyuFace", 2.4, nil, 10)
-	FX.placeCore(ctx, h.headGlow, head:PointToWorldSpace(V(2.2, 2.2, -0.4)), 0.9, 0.7)
+	Cast.ryuAura(ctx, bones, 1, 5)
+	charge(ctx, chargePoint(bones), 0.35 + 0.65 * Util.smoothstep(31.4, 33.4, ctx.t), bones.Head.Rotation)
+	ctx:light("RyuFace", 1.0, nil, 8)
 	local a = head:PointToWorldSpace(V(-5, -2.2, -1))
 	FX.placeBolt(ctx, h.bolts, 1, a, a + head:VectorToWorldSpace(V(10, 0.8, 0)), 10, 0.06, 0.05, 77, 12)
-	ctx:bloom(1.5)
+	ctx:bloom(1.15)
 	grade(ctx, 0.02, 0.2, -0.1)
 	sky(ctx, "wisps", 24)
 end
 
 -- 26: top view, the pink beam ploughs the trench towards a tiny Ryu
 local function topDown(ctx: Timeline.Ctx)
+	-- top view: Rika's beam bends in a wide pink arc towards a tiny Ryu,
+	-- ploughing the trench; energy spirals around it, rock and ice spray up
+	-- at its head (reference 35.6-36.9 s)
 	local h: H = ctx.scene.data.ryu
-	local tr = ctx.scene.data.trench
+	local t = ctx.t
 	local root = rootAt(Field.RYU, -60)
 	local bones = ctx:rig("Ryu", root, Cast.ryu.blast)
-	local mid = (tr.from + tr.to) / 2
-	local cam = Util.lookAt(mid + V(-6, 95 - ctx.u * 8, 18), mid, V(1, 0, 0))
-	ctx:camera(cam * CFrame.Angles(0, 0, math.rad(8)), 50)
+	-- straight down, the beam coming up the frame at Ryu near the top edge
+	local mid = Field.trenchPoint(0.62)
+	local upDir = (Field.TRENCH_TO - Field.TRENCH_FROM).Unit
+	local cam = Util.lookAt(mid + V(0, 100 - ctx.u * 10, 0) - upDir * 6, mid + upDir * 4, upDir)
+	ctx:camera(cam * CFrame.Angles(0, 0, math.rad(10)), 52)
 	ctx:focus(95, 0)
-	local head = tr.from:Lerp(tr.to, Field.trenchProgress(ctx.t))
-	FX.placeBeam(ctx, h.pinkBeam, tr.from + V(0, 3, 0), head + V(0, 1.5, 0), 4.5, 1)
+	local p = Field.trenchProgress(t)
+	local function beamPoint(f: number): Vector3
+		-- leaves Rika high up and skims the ground towards its head
+		return Field.trenchPoint(f) + V(0, 1.4 + 5 * (1 - f) ^ 2, 0)
+	end
+	FX.placeCurvedBeam(ctx, h.arc, beamPoint, 0, p, 4.2, 1)
+	local head = beamPoint(p)
+	local flick = 1 + math.sin(t * 43) * 0.12
+	FX.placeCore(ctx, h.pinkCore, head, 2.6 * flick, 0.95)
+	-- spiralling energy along the beam
+	local tan = Field.trenchTangent(p)
+	for i, part in h.spiral.parts do
+		local ph = (t * 0.8 + i / #h.spiral.parts) % 1
+		local f = p * (1 - ph * 0.85)
+		local c = beamPoint(f)
+		local tg = Field.trenchTangent(f)
+		local side = tg:Cross(V(0, 1, 0)).Unit
+		local up = side:Cross(tg).Unit
+		local a = t * 11 + i * 0.9
+		local rr = 2.4 + math.sin(i * 1.7) * 0.7
+		local pos = c + (side * math.cos(a) + up * math.sin(a)) * rr
+		ctx:place(part, FX.along(pos, pos + tg * 2.6))
+		ctx:prop(part, { s = V(2.6, 0.32, 0.32), t = 0.1 + ph * 0.6 })
+	end
+	-- rock and ice thrown up at the head, in pulses
+	local ground = Field.trenchPoint(p)
+	FX.placeBurst(ctx, h.debris, ground, (t * 1.6) % 0.62, 26, 1.6, 0.62, V(0, 1, 0) - tan * 0.6, 0.9, 30)
+	ctx:light("PinkHead", 6, nil, 40)
 	Cast.ryuAura(ctx, bones, 1, 4)
 	ctx:fog(0.6)
-	ctx:bloom(2)
-	grade(ctx, 0, 0.15, 0)
+	ctx:bloom(1.8)
+	grade(ctx, 0, 0.18, 0)
 end
 
 -- 27: over the shoulder: lightning claw, Yuta sprinting in the distance
@@ -317,12 +428,16 @@ local function pushIn(ctx: Timeline.Ctx)
 	else
 		Cast.expr(ctx, "ryu", "grin")
 	end
-	Cast.ryuAura(ctx, bones, 1, 8)
+	Cast.ryuAura(ctx, bones, 1, 6)
+	-- a crown of long lightning bolts radiating from the charge on his head
+	local top = chargePoint(bones)
+	charge(ctx, top, 0.6 + 0.4 * e, bones.Head.Rotation)
 	local idx = 1
-	local c = (bones.UpperTorso * C(0, 1.2, 0)).Position
-	for i = 1, 3 do
-		local a = math.rad(i * 120 + ctx.t * 40)
-		idx = FX.placeBolt(ctx, h.bolts, idx, c, c + V(math.cos(a) * 9, 3 + math.sin(i) * 3, math.sin(a) * 9), 7, 0.2, 0.08, i + 90, 14)
+	for i = 1, 7 do
+		local a = math.rad(i * (360 / 7) + math.sin(ctx.t * 1.3 + i) * 12)
+		local up = 0.6 + math.sin(i * 2.3) * 0.5
+		local dir = V(math.cos(a), up, math.sin(a)).Unit
+		idx = FX.placeBolt(ctx, h.crown, idx, top, top + dir * (7 + (i % 3) * 2.5), 8, 0.16, 0.05, i + 90, 16)
 	end
 	if u > 0.45 then
 		FX.placeBurst(ctx, h.shards, head.Position, (ctx.lt - 1.6) % 0.9, 20, 0.5, 0.8, nil, nil, 2)
@@ -380,17 +495,16 @@ end
 
 -- 38: "Granite Blast!" — arms spread, blue light flaring at his forehead
 local function finale(ctx: Timeline.Ctx)
-	local h: H = ctx.scene.data.ryu
 	local root = rootAt(Field.RYU, -90)
 	local bones = ctx:rig("Ryu", root, Cast.alive(Cast.ryu.spread, ctx.t, 0.2))
-	local head = bones.Head * C(0, 0.7, 0)
 	-- low angle from the waist up, the shouting face clearly visible
 	local cam = Util.lookAt(root:PointToWorldSpace(V(-1.0, 1.9, -5.2 - ctx.u * 1.5)), root:PointToWorldSpace(V(0, 4.7, 0)))
 	ctx:camera(cam, 50)
 	ctx:focus(5.6, 1)
 	Cast.expr(ctx, "ryu", "shout")
-	FX.placeCore(ctx, h.headGlow, head:PointToWorldSpace(V(0.15, 0.3, -0.62)), 0.2 + math.sin(ctx.t * 20) * 0.03, 1)
-	ctx:light("RyuFace", 1.8, nil, 10)
+	-- the Granite Blast fully charged on top of his head
+	charge(ctx, chargePoint(bones), 0.75 + 0.25 * ctx.u, bones.Head.Rotation, 1.9)
+	ctx:light("RyuFace", 1.0, nil, 8)
 	Cast.ryuAura(ctx, bones, 1, 7)
 	local w = math.clamp((ctx.lt - 1.2) / 0.6, 0, 1)
 	if w > 0 then

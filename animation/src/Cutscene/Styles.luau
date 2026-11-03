@@ -72,7 +72,9 @@ Styles.cinema = {
 		yIrisLight = hex("#86BDCF"),
 		yUniform = hex("#D9DDE5"),
 		yUniformShade = hex("#8F98AD"),
-		yPants = hex("#CDD2DC"),
+		yPants = hex("#17181D"), -- black uniform trousers
+		yShoe = hex("#D8DCE4"), -- white sneakers
+		yShoeSole = hex("#9AA1B0"),
 		ySheath = hex("#18181D"),
 		rHair = hex("#17171C"),
 		rIris = hex("#45466C"),
@@ -143,12 +145,12 @@ Styles.cinema = {
 		ShadowSoftness = 0.6,
 	},
 	atmosphere = {
-		Density = 0.4,
-		Offset = 0.2,
+		Density = 0.52, -- a thick freezing fog over the battlefield
+		Offset = 0.12,
 		Color = hex("#B9C5DC"),
 		Decay = hex("#66779E"),
 		Glare = 0.05,
-		Haze = 2.2,
+		Haze = 2.6,
 	},
 	clouds = { Cover = 0.86, Density = 0.72, Color = hex("#A3AFC7") },
 	defaultSky = true,
