@@ -64,21 +64,33 @@ function Rika.build(scene: Builder.Scene, rigName: string): Rig.RigDef
 	E("UpperTorso", V(0.85, 2.2, 0.9), C(0, 4.15, -0.35) * R(-30, 0, 0), "kBody", "Neck")
 	E("UpperTorso", V(0.9, 0.16, 0.95), C(0, 4.0, -0.3) * R(-30, 0, 0), "kDark", "NeckLine")
 
-	-- Head: long skull, huge grin, shadowed eyes ------------------------------
-	E("Head", V(1.85, 2.2, 3.4), C(0, 1.3, -0.35) * R(-10, 0, 0), "kBody", "Skull")
-	E("Head", V(1.65, 1.25, 2.3), C(0, 0.35, -1.05) * R(-6, 0, 0), "kBody", "Jaw")
-	-- dark red mouth slit from ear to ear, with rows of teeth
-	E("Head", V(1.95, 0.55, 1.5), C(0, 0.68, -1.15), "kMouth", "Mouth")
-	local nT = 12
+	-- Head: a long mask-like skull whose lower half is one huge open mouth
+	-- full of long fangs (as in the drawing); the eyes are thin dark slits
+	E("Head", V(1.75, 2.0, 2.6), C(0, 1.55, -0.1) * R(-10, 0, 0), "kBody", "Skull")
+	E("Head", V(1.7, 2.3, 1.6), C(0, 0.75, -0.95) * R(-6, 0, 0), "kBody", "Face")
+	E("Head", V(1.5, 0.9, 1.3), C(0, -0.25, -0.75) * R(8, 0, 0), "kBody", "Jaw")
+	E("Head", V(1.42, 1.3, 0.55), C(0, 0.42, -1.6) * R(-6, 0, 0), "kMouth", "Mouth")
+	-- fangs: triangles turned to face forward, upper row pointing down,
+	-- lower row pointing up, longest in the middle
+	local nT = 9
 	for i = 0, nT - 1 do
-		local a = math.rad(-60 + i * (120 / (nT - 1)))
-		local x, z = math.sin(a) * 0.92, -math.cos(a) * 0.72 - 0.98
-		k.add("Head", "Wedge", V(0.12, 0.28, 0.16), C(x, 0.84, z) * R(180, -math.deg(a), 0), "kTeeth", "body", "Tooth")
-		k.add("Head", "Wedge", V(0.12, 0.24, 0.16), C(x * 0.96, 0.53, z * 0.98 + 0.02) * R(0, -math.deg(a), 0), "kTeeth", "body", "Tooth")
+		local f = (i - (nT - 1) / 2) / ((nT - 1) / 2) -- -1..1 across the mouth
+		local a = math.rad(f * 48)
+		local mid = 1 - math.abs(f) * 0.45
+		local x, z = math.sin(a) * 0.66, -1.84 + (1 - math.cos(a)) * 0.5
+		local turn = if i % 2 == 0 then 90 else -90
+		local up = 0.6 * mid
+		k.add("Head", "Wedge", V(0.08, up, 0.2), C(x, 1.02 - up / 2 + 0.02, z) * R(0, -math.deg(a), 0) * R(0, 0, 180) * R(0, turn, 0), "kTeeth", "body", "Fang")
+		local low = 0.5 * mid
+		k.add("Head", "Wedge", V(0.08, low, 0.18), C(x * 0.94, -0.16 + low / 2, z + 0.04) * R(0, -math.deg(a), 0) * R(0, turn, 0), "kTeeth", "body", "Fang")
 	end
-	-- eye shadows under the hair hood
+	-- narrow slanted eye slits under the hair
 	for _, sx in { -1, 1 } do
-		E("Head", V(0.55, 0.3, 0.3), C(sx * 0.48, 1.55, -1.55) * R(0, 0, sx * -15), "kEye", "Socket")
+		E("Head", V(0.5, 0.13, 0.25), C(sx * 0.45, 1.62, -1.58) * R(0, 0, sx * -22), "kEye", "Socket")
+	end
+	-- dark creases running down the mask
+	for _, sx in { -1, 1 } do
+		E("Head", V(0.06, 0.95, 0.12), C(sx * 0.62, 1.15, -1.63) * R(-8, 0, sx * 10), "kStripe", "Crease")
 	end
 	-- hair: thick white dreadlock-like strands growing from the forehead and
 	-- crown, lying along the skull, then sweeping back and drooping (hood)
@@ -195,6 +207,23 @@ Rika.poses = {
 		LeftUpperLeg = R(20, 0, -14),
 		LeftLowerLeg = R(-24, 0, 30),
 		LeftFoot = R(-26, 0, 36),
+	} :: Rig.Pose,
+	-- floating idle, as in the reference drawing: hunched, one arm reaching
+	-- forward, the other bent, the tail curling underneath
+	float = {
+		HumanoidRootPart = CFrame.new(0, 0.6, 0),
+		LowerTorso = R(-10, 0, 0),
+		UpperTorso = R(-24, -10, 0),
+		Head = R(4, 12, 0),
+		RightUpperArm = R(42, 0, 16),
+		RightLowerArm = R(28, 0, 0),
+		RightHand = R(14, 0, 0),
+		LeftUpperArm = R(18, 0, -28),
+		LeftLowerArm = R(72, 0, 0),
+		LeftHand = R(24, 0, 0),
+		LeftUpperLeg = R(18, 0, 10),
+		LeftLowerLeg = R(-40, 0, -32),
+		LeftFoot = R(-50, 0, -52),
 	} :: Rig.Pose,
 	-- head thrust forward, jaw aimed at the target (fires the beam)
 	roar = {

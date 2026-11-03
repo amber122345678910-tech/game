@@ -64,30 +64,36 @@ function Ryu.build(scene: Builder.Scene, rigName: string): Rig.RigDef
 		k.add("UpperTorso", "Ellipsoid", V(0.5, 1.5, 0.5), C(sx * 0.78, 1.2, -0.5) * R(0, 0, sx * 18), "rFur", "fur", "FurFront")
 		k.add("UpperTorso", "Ellipsoid", V(1.0, 0.7, 1.1), C(sx * 1.38, 1.3, 0.25) * R(0, 0, sx * -30), "rFurShade", "fur", "FurUnder")
 	end
-	-- dense spiky fur all around the collar: short tapered tufts pointing
-	-- outward and up, in two rings (outer longer, inner shorter)
-	for ring = 0, 1 do
-		local nS = if ring == 0 then 34 else 24
-		for i = 0, nS - 1 do
-			local f = i / (nS - 1)
-			local ang = math.rad(-118 + f * 236) -- sides and back; the front stays open so the face shows
-			local rx, rz = 1.3 - ring * 0.35, 0.8 - ring * 0.2
-			local x, z = math.sin(ang) * rx, math.cos(ang) * rz
-			local y = 1.78 + math.cos(ang) * 0.22 + ring * 0.18 + math.sin(i * 2.7) * 0.08
-			local front = math.clamp((math.abs(math.deg(ang)) - 60) / 60, 0, 1) -- 0 at the back, 1 at the front edge
-			local len = (0.55 + math.abs(math.sin(i * 1.37 + ring)) * 0.45) * (1 - ring * 0.25) * (1 - front * 0.45)
-			local out = Vector3.new(x * (0.8 + front * 1.2), 1.1 + ring * 0.5 - front * 0.6, z * 0.8).Unit
+	-- dense spiky fur all around the collar: thin tapered strands pointing
+	-- outward and up in three rings (outer longest); the front stays open
+	-- so the face shows
+	local rings = {
+		{ n = 46, rx = 1.32, rz = 0.82, y = 1.74, len0 = 0.8, len1 = 1.45, w = 0.15, lift = 0.9 },
+		{ n = 36, rx = 1.1, rz = 0.68, y = 1.86, len0 = 0.6, len1 = 1.05, w = 0.16, lift = 1.3 },
+		{ n = 26, rx = 0.86, rz = 0.55, y = 1.98, len0 = 0.42, len1 = 0.7, w = 0.17, lift = 1.8 },
+	}
+	for ri, rg in rings do
+		for i = 0, rg.n - 1 do
+			local f = (i + 0.5 * (ri - 1)) / rg.n
+			local ang = math.rad(-125 + f * 250)
+			local x, z = math.sin(ang) * rg.rx, math.cos(ang) * rg.rz
+			local y = rg.y + math.cos(ang) * 0.2 + math.sin(i * 2.7 + ri) * 0.07
+			local front = math.clamp((math.abs(math.deg(ang)) - 70) / 55, 0, 1) -- 0 at the back, 1 at the front edge
+			local wob = math.sin(i * 1.37 + ri * 2.1)
+			local len = (rg.len0 + math.abs(wob) * (rg.len1 - rg.len0)) * (1 - front * 0.4)
+			local out = Vector3.new(x * (1 + front * 1.0), rg.lift - front * 0.5 + wob * 0.15, z * 1.1).Unit
 			local rotZ = -math.deg(math.atan2(out.X, out.Y))
 			local rotX = math.deg(math.atan2(out.Z, out.Y))
-			k.add("UpperTorso", "Ellipsoid", V(0.24, len, 0.24), C(x, y, z) * R(rotX, 0, rotZ) * C(0, len * 0.4, 0), if (i + ring) % 5 == 2 then "rFurShade" else "rFur", "fur", "FurSpike")
+			local col = if (i + ri) % 6 == 3 then "rFurShade" else "rFur"
+			k.add("UpperTorso", "Ellipsoid", V(rg.w, len, rg.w * 0.85), C(x, y, z) * R(rotX, wob * 12, rotZ) * C(0, len * 0.42, 0), col, "fur", "FurSpike")
 		end
 	end
-	-- fur trim down the front edges of the coat
+	-- fur lining down the front edges of the coat: thin strands fanning out
 	for _, sx in { -1, 1 } do
-		for j = 0, 4 do
-			local y = 1.3 - j * 0.3
-			local len = 0.32 + (j % 2) * 0.1
-			k.add("UpperTorso", "Ellipsoid", V(0.16, len, 0.16), C(sx * (0.62 - j * 0.03), y, -0.64) * R(-10, 0, sx * (70 + j * 5)) * C(0, len * 0.35, 0), "rFur", "fur", "FurTrim")
+		for j = 0, 7 do
+			local y = 1.42 - j * 0.2
+			local len = 0.38 + (j % 3) * 0.1
+			k.add("UpperTorso", "Ellipsoid", V(0.1, len, 0.1), C(sx * (0.64 - j * 0.02), y, -0.64) * R(-14, 0, sx * (62 + (j % 2) * 18)) * C(0, len * 0.4, 0), if j % 3 == 1 then "rFurShade" else "rFur", "fur", "FurTrim")
 		end
 	end
 
