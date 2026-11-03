@@ -16,7 +16,8 @@ local YutaShots = require(Shots.YutaShots)
 
 local Scene = {}
 
-Scene.PARK = CFrame.new(0, -5000, 0)
+-- far away and high up (never below Workspace.FallenPartsDestroyHeight)
+Scene.PARK = CFrame.new(0, 9000, 40000)
 Scene.DURATION = 58.533
 
 -- English subtitles as in the reference edit (start, end, text)
@@ -75,6 +76,7 @@ function Scene.evaluate(scene: Builder.Scene, t: number): Timeline.FrameState
 	local shot = Timeline.find(shots, t)
 	local ctx = Timeline.context(scene, t, shot)
 	shot.run(ctx)
+	Field.aftermath(ctx)
 	ctx.frame.sub = Scene.subtitle(t)
 	return ctx.frame
 end

@@ -61,22 +61,35 @@ local function grade(ctx: Timeline.Ctx, b: number, c: number, s: number, tint: C
 	ctx:grade({ brightness = b, contrast = c, saturation = s, tint = tint or Color3.fromRGB(232, 238, 255) })
 end
 
--- 7: low angle from behind, arm thrown up, cyan shards and pink lines
+-- 7: low angle from the front, arm thrown up, cyan shards and pink lines
+-- left arm thrown up (mirror of Cast.ryu.raise), seen from the front
+local raiseLeft: Rig.Pose = {
+	UpperTorso = R(-10, -10, 0),
+	Head = R(-14, 8, 0),
+	LeftUpperArm = R(165, 0, -18),
+	LeftLowerArm = R(14, 0, 0),
+	RightUpperArm = R(12, 0, 38),
+	RightLowerArm = R(34, 0, 0),
+}
+
 local function raise(ctx: Timeline.Ctx)
 	local h: H = ctx.scene.data.ryu
 	local root = rootAt(Field.RYU, -90)
-	local bones = ctx:rig("Ryu", root, Cast.alive(Cast.mix(Cast.ryu.point, Cast.ryu.raise, ctx.u * 3), ctx.t))
-	local cam = Util.lookAt(root:PointToWorldSpace(V(-3.4, 0.6, 4.8)), root:PointToWorldSpace(V(0.8, 6.2, -1.5)))
+	local bones = ctx:rig("Ryu", root, Cast.alive(Cast.mix(Cast.ryu.point, raiseLeft, ctx.u * 3), ctx.t))
+	-- very low in front of him, looking up past his face at the raised hand
+	local cam = Util.lookAt(root:PointToWorldSpace(V(-1.4, 0.9, -5.4)), root:PointToWorldSpace(V(-0.9, 6.0, 0)))
 	ctx:camera(Clash.shake(cam, ctx.t, 0.35), 62)
-	ctx:focus(6, 1)
+	ctx:focus(5.6, 1)
 	Cast.expr(ctx, "ryu", "grin")
 	Cast.ryuAura(ctx, bones, 1, 6)
-	local hand = (bones.RightHand * C(0, -0.6, 0)).Position
-	FX.placeBurst(ctx, h.shards, hand, ctx.lt % 0.8, 26, 0.7, 0.7, V(0.4, 1, 0.2), 1.2, 6)
+	local hand = (bones.LeftHand * C(0, -0.6, 0)).Position
+	FX.placeBurst(ctx, h.shards, hand, ctx.lt % 0.8, 26, 0.7, 0.7, V(-0.4, 1, -0.2), 1.2, 6)
+	FX.placeCore(ctx, h.headGlow, hand, 0.7 + math.sin(ctx.t * 24) * 0.1, 0.9)
 	ctx:light("RyuHand", 5, nil, 18)
 	ctx:alpha("streaks", 0.55)
 	ctx:bloom(1.8)
-	grade(ctx, -0.04, 0.2, -0.1)
+	-- deep night blue like the reference
+	grade(ctx, -0.12, 0.25, 0.3, Color3.fromRGB(160, 190, 255))
 	sky(ctx)
 end
 
@@ -170,9 +183,10 @@ local function thatsRight(ctx: Timeline.Ctx)
 	local root = rootAt(Field.RYU, -70)
 	local bones = ctx:rig("Ryu", root, Cast.alive(Cast.mix(Cast.ryu.spread, Cast.ryu.laughBack, 0.4), ctx.t, 1))
 	local head = bones.Head * C(0, 0.7, 0)
-	local cam = Util.lookAt(root:PointToWorldSpace(V(0.6, 2.2, -6.6)), head.Position + V(0, -1.0, 0))
-	ctx:camera(cam, 52)
-	ctx:focus(6.5, 1)
+	-- head-and-shoulders close-up from slightly below, like the reference
+	local cam = Util.lookAt(head:PointToWorldSpace(V(-1.5, -1.1, -4.8 + ctx.u * 0.3)), head.Position + V(0, -0.9, 0))
+	ctx:camera(cam, 46)
+	ctx:focus(4.8, 1)
 	Cast.talk(ctx, "ryu", "laugh", "grin")
 	Cast.ryuAura(ctx, bones, 0.4, 3)
 	ctx:alpha("wind", 0.4)
@@ -210,7 +224,7 @@ local function topDown(ctx: Timeline.Ctx)
 	local cam = Util.lookAt(mid + V(-6, 95 - ctx.u * 8, 18), mid, V(1, 0, 0))
 	ctx:camera(cam * CFrame.Angles(0, 0, math.rad(8)), 50)
 	ctx:focus(95, 0)
-	local head = tr.from:Lerp(tr.to, math.clamp(0.35 + ctx.u * 0.75, 0, 1))
+	local head = tr.from:Lerp(tr.to, Field.trenchProgress(ctx.t))
 	FX.placeBeam(ctx, h.pinkBeam, tr.from + V(0, 3, 0), head + V(0, 1.5, 0), 4.5, 1)
 	Cast.ryuAura(ctx, bones, 1, 4)
 	ctx:fog(0.6)
@@ -362,19 +376,20 @@ local function finale(ctx: Timeline.Ctx)
 	local root = rootAt(Field.RYU, -90)
 	local bones = ctx:rig("Ryu", root, Cast.alive(Cast.ryu.spread, ctx.t, 0.2))
 	local head = bones.Head * C(0, 0.7, 0)
-	local cam = Util.lookAt(root:PointToWorldSpace(V(-0.8, 1.2, -7.5 - ctx.u * 3)), root:PointToWorldSpace(V(0, 3.8, 0)))
-	ctx:camera(cam, 55)
-	ctx:focus(8, 1)
+	-- low angle from the waist up, the shouting face clearly visible
+	local cam = Util.lookAt(root:PointToWorldSpace(V(-1.0, 1.9, -5.2 - ctx.u * 1.5)), root:PointToWorldSpace(V(0, 4.7, 0)))
+	ctx:camera(cam, 50)
+	ctx:focus(5.6, 1)
 	Cast.expr(ctx, "ryu", "shout")
-	FX.placeCore(ctx, h.headGlow, head:PointToWorldSpace(V(0.15, 0.25, -0.62)), 0.35 + math.sin(ctx.t * 20) * 0.05, 1)
-	ctx:light("RyuFace", 3, nil, 12)
+	FX.placeCore(ctx, h.headGlow, head:PointToWorldSpace(V(0.15, 0.3, -0.62)), 0.2 + math.sin(ctx.t * 20) * 0.03, 1)
+	ctx:light("RyuFace", 1.8, nil, 10)
 	Cast.ryuAura(ctx, bones, 1, 7)
 	local w = math.clamp((ctx.lt - 1.2) / 0.6, 0, 1)
 	if w > 0 then
 		ctx:flash(Color3.fromRGB(225, 238, 255), w * 0.85)
 	end
 	ctx:fog(1.3 + w)
-	ctx:bloom(1.8)
+	ctx:bloom(1.5)
 	grade(ctx, 0.02, 0.15, -0.1)
 	sky(ctx, "low", 18)
 end

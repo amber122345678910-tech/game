@@ -48,11 +48,29 @@ function WideSet.build(scene: Builder.Scene)
 			fogBlobs(c, 107, 5, 650, 330, 950, 390, pal.fogLight, 0.5, 120, 220)
 		end),
 		mid = framePlate(scene, "FogMid", 70, function(c)
+			-- the fog bank the figures stand in (their feet vanish, as in the reference)
+			c:grad(-220, 372, 1320, 720, {
+				transparency = NumberSequence.new({
+					NumberSequenceKeypoint.new(0, 1),
+					NumberSequenceKeypoint.new(0.12, 0.62),
+					NumberSequenceKeypoint.new(0.4, 0.42),
+					NumberSequenceKeypoint.new(1, 0.3),
+				}),
+				rotation = 90,
+			}, pal.fogLight)
 			fogBlobs(c, 113, 12, -150, 398, 1250, 414, pal.fogLight, fogA * 0.6, 260, 480)
 			fogBlobs(c, 111, 14, -150, 436, 1250, 462, pal.fogLight, fogA * 0.85, 180, 340)
 			fogBlobs(c, 112, 5, 700, 420, 900, 452, pal.fogLight, 0.4, 100, 180)
 		end),
 		near = framePlate(scene, "FogNear", 40, function(c)
+			c:grad(-220, 440, 1320, 720, {
+				transparency = NumberSequence.new({
+					NumberSequenceKeypoint.new(0, 1),
+					NumberSequenceKeypoint.new(0.3, 0.6),
+					NumberSequenceKeypoint.new(1, 0.4),
+				}),
+				rotation = 90,
+			}, pal.fogLight)
 			fogBlobs(c, 121, 14, -200, 480, 1300, 700, pal.fogLight, fogA * 0.7, 320, 620)
 			fogBlobs(c, 122, 8, -200, 540, 1300, 700, pal.fogDark, 0.25, 320, 600)
 		end),

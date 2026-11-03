@@ -333,6 +333,7 @@ function init(data, W, H) {
       if (outlineModels.has(p.model)) st.outlineMeshes.push(mesh);
     }
     if (p.gui) {
+      if (!Array.isArray(p.gui.elems)) p.gui.elems = []; // empty Luau table -> {}
       entry.cv = guiCanvas(p.gui);
       entry.tex = new THREE.CanvasTexture(entry.cv);
       entry.tex.colorSpace = THREE.SRGBColorSpace;

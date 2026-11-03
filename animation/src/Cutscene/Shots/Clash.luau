@@ -13,6 +13,7 @@ local Builder = require(script.Parent.Parent.Builder)
 local Timeline = require(script.Parent.Parent.Timeline)
 local FX = require(script.Parent.Parent.FX)
 local Util = require(script.Parent.Parent.Util)
+local Paint = require(script.Parent.Parent.Paint)
 local Overlay = require(script.Parent.Overlay)
 
 local Clash = {}
@@ -37,9 +38,70 @@ type H = {
 	bolts: FX.Bolt,
 	sparks: Builder.PartSpec,
 	city: { Builder.PartSpec },
+	cityBack: Builder.PartSpec,
+	cityGround: Builder.PartSpec,
 	swarmC: FX.Burst,
 	swarmP: FX.Burst,
 }
+
+-- Painted backdrop for the night-city shot: night sky glowing over the
+-- horizon, two layers of skyline with lit windows (canvas px = 1/10 stud)
+local CITY_W, CITY_H = 1600, 900
+local function cityBackdrop(scene: Builder.Scene): Builder.PartSpec
+	local hex = Util.hex
+	local c = Paint.canvas(1, 0, 0)
+	c:grad(0, 0, CITY_W, CITY_H, {
+		color = ColorSequence.new({
+			ColorSequenceKeypoint.new(0, hex("#0B1440")),
+			ColorSequenceKeypoint.new(0.24, hex("#1E3276")),
+			ColorSequenceKeypoint.new(0.36, hex("#3A5CA4")),
+			ColorSequenceKeypoint.new(0.5, hex("#22386E")),
+			ColorSequenceKeypoint.new(1, hex("#141F3E")),
+		}),
+		rotation = 90,
+	})
+	-- thin clouds lit from below
+	local r = Util.rng(919)
+	for _ = 1, 9 do
+		local w = Util.randRange(r, 260, 560)
+		c:blob(Util.randRange(r, 0, CITY_W), Util.randRange(r, 110, 290), w, w * 0.14, hex("#3A5A9E"), 0.25)
+	end
+	local warm, cool = hex("#F4D9A2"), hex("#A8DCFF")
+	local function skyline(y0: number, y1: number, wMin: number, wMax: number, col: Color3, winA: number, winP: number)
+		local x = Util.randRange(r, -30, 0)
+		while x < CITY_W do
+			local w = Util.randRange(r, wMin, wMax)
+			local top = Util.randRange(r, y0, y1)
+			c:box(x, top, x + w, CITY_H, col)
+			if Util.rand(r) < 0.3 then -- antenna / roof box
+				c:box(x + w * 0.4, top - Util.randRange(r, 10, 30), x + w * 0.46, top, col)
+			end
+			-- window grid, some lit
+			local cols = math.max(1, math.floor((w - 8) / 11))
+			local rows = math.min(14, math.floor((CITY_H - top - 10) / 15))
+			for row = 0, rows - 1 do
+				for col2 = 0, cols - 1 do
+					if Util.rand(r) < winP then
+						local wx = x + 6 + col2 * 11 + 2.5
+						local wy = top + 10 + row * 15 + 3.5
+						c:rect(wx, wy, 5, 7, 0, if Util.rand(r) < 0.7 then warm else cool, 1 - winA * Util.randRange(r, 0.5, 1))
+					end
+				end
+			end
+			x += w + Util.randRange(r, 2, 14)
+		end
+	end
+	-- the camera looks 7 degrees down: the horizon sits at 36% of the height
+	skyline(250, 330, 30, 90, hex("#1A2A50"), 0.5, 0.16)
+	skyline(300, 390, 50, 120, hex("#101A34"), 0.7, 0.14)
+	return Builder.part(scene, "ClashCity", V(CITY_W / 10, CITY_H / 10, 0.05), C(), Color3.new(1, 1, 1), {
+		transparency = 1,
+		castShadow = false,
+		fx = true,
+		name = "CityBackdrop",
+		gui = { face = "Front", canvas = Vector2.new(CITY_W, CITY_H), lightInfluence = 0, elems = c.elems },
+	})
+end
 
 function Clash.build(scene: Builder.Scene)
 	local pal = scene.style.color
@@ -78,17 +140,40 @@ function Clash.build(scene: Builder.Scene)
 		bolts = FX.bolts(scene, "ClashBolts", pal.eYellow, 40),
 		sparks = Builder.fx(scene, "ClashVoid", "Block", V(2, 2, 2), Color3.new(1, 1, 1), "SmoothPlastic", 1, "SparkBox"),
 		city = {},
+		cityBack = cityBackdrop(scene),
+		cityGround = Builder.fx(scene, "ClashCity", "Block", V(400, 1, 300), Util.hex("#0A0F1C"), "Concrete", 0, "Streets"),
 		swarmC = FX.burst(scene, "SwarmC", pal.eCyan, 60, "Wedge", 7),
 		swarmP = FX.burst(scene, "SwarmP", pal.ePink, 60, "Wedge", 8),
 	}
 	Builder.emitter(scene, "ClashSparks", "sparks", h.sparks, pal.eRed, 1.6, 1.4)
 	Builder.emitter(scene, "ClashShards", "shards", h.sparks, pal.eYellow, 1.3, 1.2)
-	-- night city silhouettes for shot 5
+	-- the two energy clouds light the city (shot 5)
+	Builder.light(scene, "CityCyan", "Point", h.glow, pal.eCyan, 90)
+	Builder.light(scene, "CityPink", "Point", h.glow2, pal.ePink, 90)
+	-- night city blocks for shot 5, lit windows on the side facing the camera
 	local r = Util.rng(808)
-	for i = 1, 22 do
-		local w, hh, d = Util.randRange(r, 10, 24), Util.randRange(r, 14, 46), Util.randRange(r, 10, 20)
-		local p = Builder.fx(scene, "ClashCity", "Block", V(w, hh, d), Util.mix(pal.city, pal.cityLight, Util.rand(r)), "Concrete", 0, "Building")
-		h.city[i] = p
+	local rw = Util.rng(809)
+	local warm, cool = Util.hex("#F4D9A2"), Util.hex("#A8DCFF")
+	for i = 1, 33 do
+		local near = i > 22 -- third row, right under the camera: low blocks
+		local w, hh, d = Util.randRange(r, 10, 24), if near then Util.randRange(r, 8, 16) else Util.randRange(r, 10, 34), Util.randRange(r, 10, 20)
+		local c = Paint.canvas(10, 0, 0) -- drawn in studs, 10 canvas px per stud
+		local cols, rows = math.floor((w - 1.4) / 2.6), math.floor((hh - 2) / 3.2)
+		for row = 0, rows - 1 do
+			for col = 0, cols - 1 do
+				if Util.rand(rw) < 0.28 then
+					local x = (w - cols * 2.6) / 2 + col * 2.6 + 1.3
+					c:rect(x, 2 + row * 3.2, 1.2, 1.6, 0, if Util.rand(rw) < 0.7 then warm else cool, Util.randRange(rw, 0.05, 0.45))
+				end
+			end
+		end
+		h.city[i] = Builder.part(scene, "ClashCity", V(w, hh, d), C(), Util.mix(pal.city, pal.cityLight, Util.rand(r)), {
+			material = "Concrete",
+			castShadow = false,
+			fx = true,
+			name = "Building",
+			gui = { face = "Front", canvas = Vector2.new(w * 10, hh * 10), lightInfluence = 0, elems = c.elems },
+		})
 	end
 	scene.data.clash = h
 end
@@ -172,16 +257,26 @@ end
 -- 5: wide night view, a cyan and a magenta cloud of energy colliding over a ruined city
 local function city(ctx: Timeline.Ctx)
 	local h: H = ctx.scene.data.clash
-	void(ctx, Color3.fromRGB(10, 14, 32))
+	ctx:fog(0.15) -- no void walls here: the painted sky fills the frame
 	local base = O + V(0, -60, -30)
-	local cam = Util.lookAt(base + V(0, 22, 100), base + V(0, 32, 0))
+	-- high over the rooftops, looking 7 degrees down
+	local cam = Util.lookAt(base + V(0, 46, 110), base + V(0, 30, -20))
 	ctx:camera(cam * CFrame.new(ctx.u * 2, 0, 0), 50)
 	ctx:focus(150, 0)
+	-- painted sky and skyline behind the 3D blocks, filling the frame
+	local depth = 180
+	local need = 2 * depth * math.tan(math.rad(50) / 2) * 1.06
+	local k = need / h.cityBack.size.Y
+	ctx:place(h.cityBack, cam * C(0, 0, -depth) * CFrame.Angles(0, math.pi, 0))
+	ctx:prop(h.cityBack, { s = V(h.cityBack.size.X * k, h.cityBack.size.Y * k, 0.05) })
+	ctx:place(h.cityGround, C(base + V(0, -0.5, -20)))
+	-- three rows of blocks (windows on their Front face, turned to the camera)
 	local r = Util.rng(808)
 	for i, b in h.city do
-		local x = -78 + i * 7.2 + Util.randRange(r, -3, 3)
-		local z = Util.randRange(r, -30, 10)
-		ctx:place(b, C(base + V(x, b.size.Y / 2, z)))
+		local row = (i - 1) // 11
+		local x = -95 + ((i - 1) % 11) * 19 + Util.randRange(r, -4, 4)
+		local z = -30 + row * 35 + Util.randRange(r, -6, 6)
+		ctx:place(b, C(base + V(x, b.size.Y / 2, z)) * CFrame.Angles(0, math.pi, 0))
 	end
 	-- two swarms flowing into each other
 	local function swarm(bu: FX.Burst, from: Vector3, seed: number)
@@ -198,6 +293,10 @@ local function city(ctx: Timeline.Ctx)
 	swarm(h.swarmC, base + V(55, 44, 0), 1)
 	swarm(h.swarmP, base + V(-55, 38, 0), 2)
 	FX.placeCore(ctx, h.core, base + V(0, 40, 0), 5, 0.9)
+	FX.placeCore(ctx, h.glow, base + V(26, 42, 4), 2.5, 0.5)
+	FX.placeCore(ctx, h.glow2, base + V(-26, 40, 4), 2.5, 0.5)
+	ctx:light("CityCyan", 6, nil, 90)
+	ctx:light("CityPink", 6, nil, 90)
 	ctx:bloom(2)
 	grade(ctx, 0.15, 0.2, -0.03)
 end

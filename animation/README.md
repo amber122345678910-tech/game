@@ -25,7 +25,7 @@
 Звука нет: музыку и голоса накладываешь при монтаже. Английские субтитры совпадают по времени с оригиналом
 (выключаются клавишей `S`).
 
-Превью без Studio лежит в [`preview/`](preview/). Это приблизительный рендер вне Roblox:
+Превью без Studio: [`preview/part1_preview.mp4`](preview/part1_preview.mp4). Это приблизительный рендер вне Roblox:
 свет, облака и материалы в Studio будут выглядеть немного иначе. Точный вид — в `.rbxl`.
 
 ## Раскадровка
@@ -74,8 +74,17 @@ animation/
 ../tools/setup.sh                  # Rojo, Lune, luau-lsp в ../.tools/
 tools/build.sh                     # анализ типов -> проверка объектов -> .rbxl -> проверка места
 (cd tools/preview && npm install)  # three.js для превью
-../.tools/lune run tools/export.luau build/part1.json 30
-node tools/preview/render.cjs build/part1.json build/frames 1280 720
+# превью всей части: кадры построчно (JSONL), рендер потоком, затем MP4
+../.tools/lune run tools/export.luau build/part1.jsonl 30
+node tools/preview/render.cjs build/part1.jsonl build/frames 1280 720
+ffmpeg -framerate 30 -i build/frames/f_%04d.png -c:v libx264 -pix_fmt yuv420p -crf 18 build/part1_preview.mp4
+# сравнение с оригиналом бок о бок
+tools/preview/compare.sh <оригинал.mp4> build/part1_preview.mp4 build/compare.mp4
+# отдельные моменты сцены: времена через запятую
+../.tools/lune run tools/shotlab.luau build/lab.json 0.4,9.0
+# ...или с наездом камеры на точку x,y,z и своим FOV
+../.tools/lune run tools/shotlab.luau build/lab.json 0.4 25,4,-119 9
+node tools/preview/render.cjs build/lab.json build/lab 960 540
 ```
 
 Проверки:

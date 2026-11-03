@@ -46,7 +46,7 @@ local function wide(ctx: Timeline.Ctx)
 	local t = ctx.t
 	ctx:rig("Ryu", CFrame.new(Field.RYU) * CFrame.Angles(0, math.rad(-90), 0), Cast.alive(Cast.ryu.point, t))
 	local rp = Cast.add(Cast.rika.crouch, "UpperTorso", Rig.R(math.sin(t * math.pi * 1.1) * 1.4, 0, 0))
-	ctx:rig("Rika", CFrame.new(Field.RIKA) * CFrame.Angles(0, math.rad(84), 0), rp)
+	ctx:rig("Rika", CFrame.new(Field.RIKA) * CFrame.Angles(0, math.rad(128), 0), rp)
 	ctx:rig("Yuta", CFrame.new(Field.YUTA) * CFrame.Angles(0, math.rad(96), 0), Cast.alive(Cast.yuta.stand, t))
 	-- the glint at Ryu's raised finger
 	ctx:light("RyuHand", 2.5, nil, 12)

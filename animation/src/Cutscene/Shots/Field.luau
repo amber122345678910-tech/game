@@ -23,6 +23,20 @@ export type Handles = {
 	snow: Builder.PartSpec,
 }
 
+-- the furrow Rika's beam ploughs towards Ryu (built hidden, revealed in shot 26)
+export type TrenchPiece = { part: Builder.PartSpec, cf: CFrame }
+export type Trench = {
+	from: Vector3,
+	to: Vector3,
+	rows: { { f: number, pieces: { TrenchPiece } } },
+	floor: Builder.PartSpec,
+}
+
+-- shot 26 (35.600-36.867): the beam head runs along the trench from 35% to the
+-- end; the furrow grows behind it and stays for the rest of the fight
+Field.TRENCH_T0 = 35.6
+Field.TRENCH_T1 = 36.867
+
 local function rubble(scene: Builder.Scene, r: Util.Rng, center: Vector3, radius: number, n: number, size: number, cols: { Color3 }, mat: string)
 	for i = 1, n do
 		local a = Util.randRange(r, 0, math.pi * 2)
@@ -74,7 +88,7 @@ function Field.build(scene: Builder.Scene)
 	-- snow ground and ice sheets
 	Builder.part(scene, "Field", V(3000, 4, 3000), C(0, -2, -600), pal.snow, { material = st.material.ground, castShadow = false, name = "Ground" })
 	for i = 1, 14 do
-		local p = V(Util.randRange(r, -90, 80), 0.02, Util.randRange(r, -220, -60))
+		local p = V(Util.randRange(r, -90, 80), 0.02, Util.randRange(r, -220, -100))
 		local s = V(Util.randRange(r, 20, 60), 0.06, Util.randRange(r, 14, 40))
 		Builder.part(scene, "Field", s, C(p) * CFrame.Angles(0, Util.randRange(r, 0, 6.28), 0), Util.mix(pal.ice, pal.snow, Util.randRange(r, 0, 0.5)), { material = "Glacier", castShadow = false, name = "IceSheet" })
 	end
@@ -85,22 +99,27 @@ function Field.build(scene: Builder.Scene)
 	Builder.part(scene, "Field", V(1, 26, 26), C(cr + V(0, 0.03, 0)) * CFrame.Angles(0, 0, math.rad(90)), pal.rubble, { shape = "Cylinder", material = "Slate", castShadow = false, name = "CraterFloor" })
 	rubble(scene, r, cr, 13, 70, 2.2, { pal.rubble, pal.rubbleLight, pal.iceDark }, "Slate")
 	rubble(scene, r, cr, 15, 30, 1.6, { pal.ice, pal.snow }, "Glacier")
-	-- trench carved by Rika's beam (seen from above), running at Ryu
+	-- trench carved by Rika's beam (seen from above), running at Ryu; hidden
+	-- until the beam ploughs it (Field.aftermath)
 	local t0, t1 = V(70, 0, -60), Field.RYU + V(6, 0, -4)
 	local dir = (t1 - t0)
+	local rows = {}
 	for i = 0, 26 do
 		local f = i / 26
 		local p = t0 + dir * f
 		local side = dir:Cross(V(0, 1, 0)).Unit
+		local pieces: { TrenchPiece } = {}
 		for sgn = -1, 1, 2 do
 			local q = p + side * sgn * Util.randRange(r, 2.2, 3.2)
 			local s = Util.randRange(r, 1.0, 2.2)
-			Builder.part(scene, "Field", V(s * 1.4, s * 0.7, s), C(q + V(0, s * 0.25, 0)) * CFrame.Angles(Util.randRange(r, -0.5, 0.5), Util.randRange(r, 0, 6.28), Util.randRange(r, -0.5, 0.5)), if i % 2 == 0 then pal.rubble else pal.iceDark, { material = "Slate", name = "TrenchRubble" })
+			local cf = C(q + V(0, s * 0.25, 0)) * CFrame.Angles(Util.randRange(r, -0.5, 0.5), Util.randRange(r, 0, 6.28), Util.randRange(r, -0.5, 0.5))
+			local part = Builder.part(scene, "Field", V(s * 1.4, s * 0.7, s), cf, if i % 2 == 0 then pal.rubble else pal.iceDark, { material = "Slate", fx = true, name = "TrenchRubble" })
+			table.insert(pieces, { part = part, cf = cf })
 		end
+		table.insert(rows, { f = f, pieces = pieces })
 	end
-	local mid = (t0 + t1) / 2
-	Builder.part(scene, "Field", V(dir.Magnitude, 0.1, 4.2), C(mid + V(0, 0.05, 0)) * CFrame.Angles(0, -math.atan2(dir.Z, dir.X), 0), pal.crack, { material = "Slate", castShadow = false, name = "TrenchFloor" })
-	scene.data.trench = { from = t0, to = t1 }
+	local floor = Builder.part(scene, "Field", V(dir.Magnitude, 0.1, 4.2), C(), pal.crack, { material = "Slate", castShadow = false, fx = true, name = "TrenchFloor" })
+	scene.data.trench = { from = t0, to = t1, rows = rows, floor = floor } :: Trench
 
 	-- broken building west of Ryu (behind him in the finale), outside the wide shot
 	local b0 = Field.RYU + V(-46, 0, 0)
@@ -160,6 +179,34 @@ function Field.mist(ctx: Timeline.Ctx, name: string, depth: number, drift: numbe
 	local x = (drift or 0) * ctx.t
 	ctx:place(p, cam * C(x, (yShift or 0) * need, -depth) * CFrame.Angles(0, math.pi, 0))
 	ctx:prop(p, { s = V(p.size.X * scale, p.size.Y * scale, 0.05) })
+end
+
+-- How far along the trench Rika's beam has ploughed at time t (0..1)
+function Field.trenchProgress(t: number): number
+	if t < Field.TRENCH_T0 then
+		return 0
+	end
+	return math.clamp(0.35 + (t - Field.TRENCH_T0) / (Field.TRENCH_T1 - Field.TRENCH_T0) * 0.75, 0, 1)
+end
+
+-- Damage to the field that stays once it has happened (runs after every shot)
+function Field.aftermath(ctx: Timeline.Ctx)
+	local p = Field.trenchProgress(ctx.t)
+	if p <= 0 then
+		return
+	end
+	local tr: Trench = ctx.scene.data.trench
+	for _, row in tr.rows do
+		if row.f <= p then
+			for _, piece in row.pieces do
+				ctx:place(piece.part, piece.cf)
+			end
+		end
+	end
+	local dir = tr.to - tr.from
+	local len = dir.Magnitude * p
+	ctx:place(tr.floor, C(tr.from + dir.Unit * (len / 2) + V(0, 0.05, 0)) * CFrame.Angles(0, -math.atan2(dir.Z, dir.X), 0))
+	ctx:prop(tr.floor, { s = V(len, 0.1, 4.2) })
 end
 
 -- falling snow around the camera

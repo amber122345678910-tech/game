@@ -110,7 +110,7 @@ local function makeSurfaceGui(live: Live, gui: Builder.GuiSpec, adornee: BasePar
 	return sg
 end
 
-local PARK = CFrame.new(0, -5000, 0)
+local PARK = CFrame.new(0, 9000, 40000) -- same as Scene.PARK
 
 local function makePart(live: Live, spec: Builder.PartSpec): BasePart
 	local p = Instance.new("Part")

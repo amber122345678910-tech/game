@@ -37,9 +37,9 @@ local function partCFrame(part, frame)
 		if bones and bones[part.bone] then
 			return bones[part.bone] * part.cf
 		end
-		return CFrame.new(0, -5000, 0)
+		return CFrame.new(0, 9000, 40000)
 	elseif part.fx then
-		return frame.parts[part.id] or CFrame.new(0, -5000, 0)
+		return frame.parts[part.id] or CFrame.new(0, 9000, 40000)
 	end
 	return part.cf
 end

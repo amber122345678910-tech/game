@@ -163,21 +163,22 @@ function Rika.build(scene: Builder.Scene, rigName: string): Rig.RigDef
 end
 
 Rika.poses = {
-	-- hunched forward like the reference drawing, long arms hanging down
+	-- low and hunched over (shot 1): shoulders up, head hanging forward,
+	-- both clawed hands resting on the ice in front, tail lying behind
 	crouch = {
-		HumanoidRootPart = CFrame.new(0, -0.4, 0),
-		LowerTorso = R(-10, 0, 0),
-		UpperTorso = R(-28, 4, 0),
-		Head = R(-8, -8, 4),
-		LeftUpperArm = R(26, 0, -14),
-		LeftLowerArm = R(-12, 0, 0),
-		LeftHand = R(-18, 0, 0),
-		RightUpperArm = R(34, 0, 20),
-		RightLowerArm = R(30, 0, 0),
-		RightHand = R(-10, 0, 0),
-		LeftUpperLeg = R(24, 0, 16),
-		LeftLowerLeg = R(-26, 0, -34),
-		LeftFoot = R(-30, 0, -40),
+		HumanoidRootPart = CFrame.new(0, -1.3, 0),
+		LowerTorso = R(-18, 0, 0),
+		UpperTorso = R(-36, 0, 0),
+		Head = R(-2, 0, 0),
+		RightUpperArm = R(55, 0, 14),
+		RightLowerArm = R(40, 0, 0),
+		RightHand = R(45, 0, 0),
+		LeftUpperArm = R(36, 0, -24),
+		LeftLowerArm = R(64, 0, 0),
+		LeftHand = R(40, 0, 0),
+		LeftUpperLeg = R(-5, 0, 10),
+		LeftLowerLeg = R(-70, 0, -10),
+		LeftFoot = R(-15, 0, -45),
 	} :: Rig.Pose,
 	-- looming over Yuta, wrapping both arms forward around him
 	embrace = {
