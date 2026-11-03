@@ -196,7 +196,7 @@ local function ryuGlow(ctx: Timeline.Ctx)
 			ctx:prop(p, { s = V(0.05, len, 0.03) })
 		end
 	end
-	ctx:light("RyuFace", 1.2 + 3 * k, ORANGE, 10)
+	ctx:light("RyuFace", 0.8 + 1.4 * k, ORANGE, 8)
 	ctx:alpha("orangeFlare", Util.smoothstep(0.55, 1, ctx.u))
 	ctx:bloom(1.4)
 	Common.grade(ctx, 0, 0.25, 0.1, Color3.fromRGB(255, 225, 205))

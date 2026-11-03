@@ -231,18 +231,18 @@ local function hand(ctx: Timeline.Ctx)
 	Cast.expr(ctx, "yuta", "smirk")
 	local palm = (yb.LeftHand * C(0, -0.3, 0)).Position
 	local fwd = yroot.LookVector
-	local eye = palm - fwd * 1.2 - yroot.RightVector * 1.9 + V(0, 0.7, 0)
+	local eye = palm - fwd * 1.6 - yroot.RightVector * 2.4 + V(0, 0.8, 0)
 	ctx:camera(Clash.shake(Util.lookAt(eye, palm + fwd * 0.9), ctx.t, 0.05, 8), 50)
 	ctx:focus((palm - eye).Magnitude, 1)
 	local g = Util.smoothstep(0.2, 1, ctx.u)
 	for i, ring in hh.rings do
 		local gi = math.clamp(g * 1.4 - (i - 1) * 0.25, 0, 1)
-		FX.placeRing(ctx, ring, palm + fwd * (0.4 + i * 0.25), fwd, 0.4 + gi * (3 + i * 2), 0.03, 0.35 * gi)
+		FX.placeRing(ctx, ring, palm + fwd * (0.4 + i * 0.25), fwd, 0.4 + gi * (3 + i * 2), 0.025, 0.22 * gi)
 	end
-	FX.placeCore(ctx, hh.palmGlow, palm + fwd * 0.35, 0.2 + g * 0.2, 0.7)
-	Common.streamers(ctx, hh.streamers, palm + fwd * 2, V(0, 0, -1), 2.6, 3.5, 110, 0.85)
-	ctx:light("YutaAura", 2.0, CYAN, 12)
-	ctx:bloom(1.5)
+	FX.placeCore(ctx, hh.palmGlow, palm + fwd * 0.35, 0.12 + g * 0.1, 0.5)
+	Common.streamers(ctx, hh.streamers, palm + fwd * 3, V(0, 0, -1), 2.6, 3.5, 110, 0.6)
+	ctx:light("YutaAura", 1.2, CYAN, 10)
+	ctx:bloom(1.2)
 	Common.grade(ctx, 0, 0.22, 0.15, Color3.fromRGB(205, 210, 255))
 end
 

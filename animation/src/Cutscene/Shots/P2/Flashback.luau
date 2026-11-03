@@ -209,9 +209,8 @@ local function fbRika(ctx: Timeline.Ctx)
 	local cam = head:PointToWorldSpace(V(1.6, 0.6, -4.2 + ctx.u * 0.4))
 	ctx:camera(Clash.shake(Util.lookAt(cam, head.Position + V(0, 0.3, 0)), ctx.t, 0.06, 8), 50)
 	ctx:focus((head.Position - cam).Magnitude, 1)
-	ctx:light("RikaMouth", 1.2, nil, 12)
 	ctx:alpha("fbLines", 0.5)
-	Common.grade(ctx, -0.05, 0.25, -0.45, Color3.fromRGB(185, 190, 255))
+	Common.grade(ctx, -0.02, 0.25, -0.7, Color3.fromRGB(215, 218, 240))
 	ctx:fog(0.25)
 end
 
