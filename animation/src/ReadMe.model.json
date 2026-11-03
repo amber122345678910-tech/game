@@ -1,0 +1,40 @@
+{
+  "className": "Part",
+  "properties": {
+    "Anchored": true,
+    "CanCollide": false,
+    "Size": [34, 1, 14],
+    "Color": [0.07, 0.08, 0.12],
+    "Material": "SmoothPlastic",
+    "TopSurface": "Smooth",
+    "BottomSurface": "Smooth"
+  },
+  "children": [
+    {
+      "name": "Sign",
+      "className": "SurfaceGui",
+      "properties": {
+        "Face": "Top",
+        "SizingMode": "PixelsPerStud",
+        "PixelsPerStud": 40,
+        "LightInfluence": 0
+      },
+      "children": [
+        {
+          "name": "Text",
+          "className": "TextLabel",
+          "properties": {
+            "Size": { "UDim2": [[0.94, 0], [0.9, 0]] },
+            "Position": { "UDim2": [[0.03, 0], [0.05, 0]] },
+            "BackgroundTransparency": 1,
+            "TextColor3": [1, 1, 1],
+            "TextScaled": true,
+            "TextWrapped": true,
+            "Font": "GothamBold",
+            "Text": "Юта vs Рю — часть 1 (проба стилей)\nНажми ▶ Play (F5) — анимация запустится сама.\n1 / 2 / 3 — стиль (Аниме / Кино / Классика) · A — все три подряд\nR — заново · Пробел — пауза · ← → — по кадру · H — скрыть подсказку"
+          }
+        }
+      ]
+    }
+  ]
+}

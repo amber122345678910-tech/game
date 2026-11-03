@@ -1,0 +1,8 @@
+{
+  "name": "cutscene-preview",
+  "private": true,
+  "description": "Offline preview renderer for the Roblox cutscene (approximation of the Roblox look)",
+  "dependencies": {
+    "three": "0.170.0"
+  }
+}

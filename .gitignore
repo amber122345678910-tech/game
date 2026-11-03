@@ -3,3 +3,6 @@ sourcemap.json
 *.rbxl.lock
 *.rbxlx.lock
 /build/
+animation/build/
+animation/sourcemap.json
+animation/tools/preview/node_modules/
