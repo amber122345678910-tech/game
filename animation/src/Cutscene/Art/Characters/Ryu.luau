@@ -3,6 +3,8 @@
 -- open chest with dog tags. R15 skeleton, parts built from primitives.
 local Builder = require(script.Parent.Parent.Parent.Builder)
 local Rig = require(script.Parent.Parent.Parent.Rig)
+local Paint = require(script.Parent.Parent.Parent.Paint)
+local FaceRig = require(script.Parent.Parent.Faces.FaceRig)
 
 local R = Rig.R
 local V = Vector3.new
@@ -30,7 +32,7 @@ function Ryu.build(scene: Builder.Scene, rigName: string): Rig.RigDef
 	local k = Builder.kit(scene, rigName, rigName)
 
 	-- Pelvis, belt, coat tails ------------------------------------------------
-	k.add("LowerTorso", "Block", V(1.9, 0.75, 1.05), C(0, 0.12, 0), "rPants", "cloth")
+	k.add("LowerTorso", "Block", V(1.9, 0.75, 1.05), C(0, 0.12, 0), "rPants", "cloth", "Pelvis")
 	k.add("LowerTorso", "Block", V(1.96, 0.18, 1.1), C(0, 0.46, 0), "rShoe", "cloth", "Belt")
 	k.add("LowerTorso", "Block", V(2.15, 1.75, 0.22), C(0, -0.5, 0.52) * R(-6, 0, 0), "rCoat", "cloth", "CoatBack")
 	for _, sx in { -1, 1 } do
@@ -40,79 +42,95 @@ function Ryu.build(scene: Builder.Scene, rigName: string): Rig.RigDef
 
 	-- Chest and coat ------------------------------------------------------------
 	k.add("UpperTorso", "Block", V(2.05, 1.62, 1.15), C(0, 0.8, 0), "rCoat", "cloth", "Torso")
-	k.add("UpperTorso", "Block", V(0.8, 1.35, 0.1), C(0, 0.9, -0.57), "skin", "skin", "Chest")
-	k.add("UpperTorso", "Block", V(0.05, 0.55, 0.02), C(0, 0.55, -0.625), "skinShade", "skin", "Abs")
+	k.add("UpperTorso", "Block", V(0.9, 1.4, 0.1), C(0, 0.88, -0.56), "rSkin", "skin", "Chest")
 	for _, sx in { -1, 1 } do
-		k.add("UpperTorso", "Block", V(0.66, 1.62, 0.12), C(sx * 0.7, 0.8, -0.6) * R(0, sx * 12, 0), "rCoat", "cloth", "Lapel")
-		-- dog tags
-		k.add("UpperTorso", "Block", V(0.13, 0.21, 0.03), C(sx * 0.07, 0.72, -0.64) * R(0, 0, sx * 8), "rTag", "metal", "Tag")
+		k.add("UpperTorso", "Ellipsoid", V(0.6, 0.42, 0.24), C(sx * 0.21, 1.2, -0.58) * R(0, 0, sx * 8), "rSkin", "skin", "Pec")
+		k.add("UpperTorso", "Ellipsoid", V(0.5, 0.05, 0.05), C(sx * 0.21, 1.0, -0.655) * R(0, 0, sx * -6), "rSkinDeep", "skin", "PecLine")
+		k.add("UpperTorso", "Block", V(0.66, 1.62, 0.12), C(sx * 0.72, 0.8, -0.6) * R(0, sx * 12, 0), "rCoat", "cloth", "Lapel")
+		-- dog tags on a chain
+		k.add("UpperTorso", "Block", V(0.13, 0.22, 0.03), C(sx * 0.075, 0.68, -0.66) * R(0, 0, sx * 8), "rTag", "metal", "Tag")
+		k.add("UpperTorso", "Block", V(0.03, 0.5, 0.02), C(sx * 0.13, 1.0, -0.66) * R(0, 0, sx * 16), "rTag", "metal", "Chain")
 	end
-	k.add("UpperTorso", "Block", V(0.03, 0.42, 0.02), C(-0.12, 0.98, -0.635) * R(0, 0, -16), "rTag", "metal", "Chain")
-	k.add("UpperTorso", "Block", V(0.03, 0.42, 0.02), C(0.12, 0.98, -0.635) * R(0, 0, 16), "rTag", "metal", "Chain")
-	k.add("UpperTorso", "Block", V(0.5, 0.4, 0.5), C(0, 1.66, 0), "skin", "skin", "Neck")
+	for i = 0, 2 do
+		k.add("UpperTorso", "Block", V(0.38, 0.03, 0.02), C(0, 0.78 - i * 0.2, -0.615), "rSkinDeep", "skin", "Abs")
+	end
+	k.add("UpperTorso", "Block", V(0.03, 0.62, 0.02), C(0, 0.6, -0.615), "rSkinDeep", "skin", "AbsMid")
+	k.add("UpperTorso", "Ellipsoid", V(0.62, 0.55, 0.6), C(0, 1.62, 0), "rSkin", "skin", "Neck")
 
-	-- Fur collar: big fluffy ring over the shoulders plus spiky tufts ---------
-	k.add("UpperTorso", "Ellipsoid", V(2.7, 1.25, 1.05), C(0, 1.78, 0.42) * R(-12, 0, 0), "rFur", "fur", "FurBack")
+	-- Fur collar: fluffy ring over the shoulders + a crown of white spikes ------
+	k.add("UpperTorso", "Ellipsoid", V(2.8, 1.35, 1.15), C(0, 1.78, 0.42) * R(-12, 0, 0), "rFur", "fur", "FurBack")
 	for _, sx in { -1, 1 } do
-		k.add("UpperTorso", "Ellipsoid", V(1.35, 0.95, 1.55), C(sx * 1.02, 1.55, 0.05) * R(0, 0, sx * -12), "rFur", "fur", "FurShoulder")
-		k.add("UpperTorso", "Ellipsoid", V(0.6, 1.5, 0.55), C(sx * 0.52, 1.2, -0.55) * R(0, 0, sx * 28), "rFur", "fur", "FurFront")
-		k.add("UpperTorso", "Ellipsoid", V(1.0, 0.7, 1.1), C(sx * 1.35, 1.3, 0.25) * R(0, 0, sx * -30), "rFurShade", "fur", "FurUnder")
+		k.add("UpperTorso", "Ellipsoid", V(1.45, 1.0, 1.6), C(sx * 1.02, 1.55, 0.05) * R(0, 0, sx * -12), "rFur", "fur", "FurShoulder")
+		k.add("UpperTorso", "Ellipsoid", V(0.5, 1.5, 0.5), C(sx * 0.78, 1.2, -0.5) * R(0, 0, sx * 18), "rFur", "fur", "FurFront")
+		k.add("UpperTorso", "Ellipsoid", V(1.0, 0.7, 1.1), C(sx * 1.38, 1.3, 0.25) * R(0, 0, sx * -30), "rFurShade", "fur", "FurUnder")
 	end
-	-- spiky tufts radiating from the collar
-	local tufts = {
-		-- {x, y, z, rotX, rotY, rotZ, length}
-		{ -1.55, 1.75, 0.0, 0, 0, 62, 0.9 },
-		{ 1.55, 1.75, 0.0, 0, 0, -62, 0.9 },
-		{ -1.25, 2.05, 0.35, -20, 0, 35, 0.85 },
-		{ 1.25, 2.05, 0.35, -20, 0, -35, 0.85 },
-		{ -0.7, 2.25, 0.55, -30, 0, 18, 0.8 },
-		{ 0.7, 2.25, 0.55, -30, 0, -18, 0.8 },
-		{ 0.0, 2.3, 0.7, -35, 0, 0, 0.75 },
-		{ -1.7, 1.35, 0.3, 0, 0, 85, 0.7 },
-		{ 1.7, 1.35, 0.3, 0, 0, -85, 0.7 },
-		{ -0.9, 1.15, -0.75, 70, 0, 25, 0.6 },
-		{ 0.9, 1.15, -0.75, 70, 0, -25, 0.6 },
-	}
-	for i, t in tufts do
-		local len = t[7]
-		k.add(
-			"UpperTorso",
-			"Wedge",
-			V(0.42, len, 0.42),
-			C(t[1], t[2], t[3]) * R(t[4], t[5], t[6]) * C(0, len / 2, 0),
-			if i % 3 == 0 then "rFurShade" else "rFur",
-			"fur",
-			"FurTuft"
-		)
+	-- dense spiky fur all around the collar: short tapered tufts pointing
+	-- outward and up, in two rings (outer longer, inner shorter)
+	for ring = 0, 1 do
+		local nS = if ring == 0 then 34 else 24
+		for i = 0, nS - 1 do
+			local f = i / (nS - 1)
+			local ang = math.rad(-118 + f * 236) -- sides and back; the front stays open so the face shows
+			local rx, rz = 1.3 - ring * 0.35, 0.8 - ring * 0.2
+			local x, z = math.sin(ang) * rx, math.cos(ang) * rz
+			local y = 1.78 + math.cos(ang) * 0.22 + ring * 0.18 + math.sin(i * 2.7) * 0.08
+			local front = math.clamp((math.abs(math.deg(ang)) - 60) / 60, 0, 1) -- 0 at the back, 1 at the front edge
+			local len = (0.55 + math.abs(math.sin(i * 1.37 + ring)) * 0.45) * (1 - ring * 0.25) * (1 - front * 0.45)
+			local out = Vector3.new(x * (0.8 + front * 1.2), 1.1 + ring * 0.5 - front * 0.6, z * 0.8).Unit
+			local rotZ = -math.deg(math.atan2(out.X, out.Y))
+			local rotX = math.deg(math.atan2(out.Z, out.Y))
+			k.add("UpperTorso", "Ellipsoid", V(0.24, len, 0.24), C(x, y, z) * R(rotX, 0, rotZ) * C(0, len * 0.4, 0), if (i + ring) % 5 == 2 then "rFurShade" else "rFur", "fur", "FurSpike")
+		end
+	end
+	-- fur trim down the front edges of the coat
+	for _, sx in { -1, 1 } do
+		for j = 0, 4 do
+			local y = 1.3 - j * 0.3
+			local len = 0.32 + (j % 2) * 0.1
+			k.add("UpperTorso", "Ellipsoid", V(0.16, len, 0.16), C(sx * (0.62 - j * 0.03), y, -0.64) * R(-10, 0, sx * (70 + j * 5)) * C(0, len * 0.35, 0), "rFur", "fur", "FurTrim")
+		end
 	end
 
-	-- Head and pompadour --------------------------------------------------------
-	k.add("Head", "Block", V(1.1, 1.18, 1.1), C(0, 0.72, 0), "skin", "skin", "Head")
-	k.add("Head", "Block", V(0.98, 0.3, 1.0), C(0, 0.2, -0.03), "skin", "skin", "Jaw")
-	k.add("Head", "Ellipsoid", V(1.24, 0.72, 1.32), C(0, 1.36, 0.06), "rHair", "hair", "HairTop")
-	k.add("Head", "Ellipsoid", V(1.16, 0.72, 0.95), C(0, 1.42, -0.48) * R(22, 0, 0), "rHair", "hair", "Pompadour")
-	k.add("Head", "Wedge", V(0.95, 0.42, 0.7), C(0, 1.6, -0.92) * R(-18, 180, 0), "rHair", "hair", "PompTip")
-	k.add("Head", "Block", V(1.14, 0.88, 0.22), C(0, 0.95, 0.58), "rHair", "hair", "HairBack")
+	-- Head (face painted on the front) and pompadour --------------------------
+	local face = Paint.canvas(4.4, 0, 0)
+	FaceRig.ryu(face, scene.style.color)
+	Builder.part(scene, rigName, V(1.1, 1.18, 1.1), C(0, 0.72, 0), scene.style.color.rSkin, {
+		shape = "Block",
+		material = scene.style.material.skin,
+		rig = rigName,
+		bone = "Head",
+		name = "Head",
+		gui = { face = "Front", canvas = Vector2.new(440, 472), lightInfluence = scene.style.face.lightInfluence, elems = face.elems },
+	})
+	k.add("Head", "Block", V(0.98, 0.3, 1.0), C(0, 0.18, -0.02), "rSkin", "skin", "Jaw")
+	k.add("Head", "Ellipsoid", V(1.3, 0.78, 1.42), C(0, 1.38, 0.08), "rHair", "hair", "HairTop")
+	k.add("Head", "Ellipsoid", V(1.22, 0.88, 1.05), C(0, 1.5, -0.5) * R(25, 0, 0), "rHair", "hair", "Pompadour")
+	k.add("Head", "Wedge", V(1.05, 0.5, 0.82), C(0, 1.72, -0.98) * R(-14, 180, 0), "rHair", "hair", "PompTip")
+	k.add("Head", "Block", V(1.16, 0.95, 0.24), C(0, 0.98, 0.6), "rHair", "hair", "HairBack")
 	for _, sx in { -1, 1 } do
-		k.add("Head", "Block", V(0.16, 0.72, 0.95), C(sx * 0.6, 0.98, 0.08), "rHair", "hair", "HairSide")
-		k.add("Head", "Block", V(0.1, 0.34, 0.16), C(sx * 0.57, 0.55, -0.12), "rHair", "hair", "Sideburn")
-		-- tiny face marks (read as eyes/brows from afar)
-		k.add("Head", "Block", V(0.36, 0.08, 0.03), C(sx * 0.25, 0.86, -0.56) * R(0, 0, sx * -12), "rHair", "hair", "Brow")
-		k.add("Head", "Block", V(0.2, 0.06, 0.03), C(sx * 0.25, 0.73, -0.56), "line", "hair", "Eye")
+		k.add("Head", "Block", V(0.16, 0.78, 1.0), C(sx * 0.6, 0.98, 0.08), "rHair", "hair", "HairSide")
+		k.add("Head", "Block", V(0.1, 0.36, 0.16), C(sx * 0.57, 0.52, -0.12), "rHair", "hair", "Sideburn")
+		k.add("Head", "Block", V(0.08, 0.3, 0.2), C(sx * 0.58, 0.7, 0.08), "rSkin", "skin", "Ear")
+		k.add("Head", "Ellipsoid", V(0.1, 0.08, 1.0), C(sx * 0.26, 1.86, -0.52) * R(25, 0, 0), "rCoatHi", "hair", "HairShine")
+	end
+	-- loose strands falling over the forehead
+	for _, st in { { -0.22, 12 }, { 0.05, -6 }, { 0.28, -16 } } do
+		k.add("Head", "Wedge", V(0.06, 0.5, 0.12), C(st[1], 1.06, -0.58) * R(0, 0, 180 + st[2]) * R(0, 90, 0), "rHair", "hair", "Strand")
 	end
 
 	-- Arms --------------------------------------------------------------------
 	for _, side in { "Left", "Right" } do
 		local sx = if side == "Left" then -1 else 1
-		k.add(side .. "UpperArm", "Block", V(0.74, 1.28, 0.8), C(0, -0.55, 0), "rCoat", "cloth")
-		k.add(side .. "LowerArm", "Block", V(0.68, 1.12, 0.72), C(0, -0.5, 0), "rCoat", "cloth")
-		k.add(side .. "LowerArm", "Ellipsoid", V(0.86, 0.26, 0.9), C(0, -1.0, 0), "rFur", "fur", "Cuff")
-		k.add(side .. "Hand", "Block", V(0.48, 0.48, 0.42), C(0, -0.26, 0), "skin", "skin")
-		if side == "Right" then
-			-- pointing index finger + thumb
-			k.add(side .. "Hand", "Block", V(0.12, 0.42, 0.12), C(-0.1 * sx, -0.66, -0.12), "skin", "skin", "Finger")
-			k.add(side .. "Hand", "Block", V(0.12, 0.26, 0.12), C(0.2 * sx, -0.3, -0.2) * R(-30, 0, 0), "skin", "skin", "Thumb")
+		k.add(side .. "UpperArm", "Block", V(0.76, 1.3, 0.82), C(0, -0.55, 0), "rCoat", "cloth")
+		k.add(side .. "LowerArm", "Block", V(0.7, 1.14, 0.74), C(0, -0.5, 0), "rCoat", "cloth")
+		k.add(side .. "LowerArm", "Ellipsoid", V(0.9, 0.3, 0.94), C(0, -1.0, 0), "rFur", "fur", "Cuff")
+		local hand = side .. "Hand"
+		k.add(hand, "Block", V(0.48, 0.42, 0.24), C(0, -0.22, 0), "rSkin", "skin", "Palm")
+		for fi = 0, 3 do
+			local fx = (fi - 1.5) * 0.115
+			k.add(hand, "Block", V(0.1, 0.36, 0.12), C(fx, -0.58, -0.02) * R(-12, 0, (fi - 1.5) * -4), "rSkin", "skin", "Finger")
 		end
+		k.add(hand, "Block", V(0.11, 0.3, 0.12), C(sx * -0.26, -0.3, -0.1) * R(-25, 0, sx * -30), "rSkin", "skin", "Thumb")
 	end
 
 	-- Legs --------------------------------------------------------------------

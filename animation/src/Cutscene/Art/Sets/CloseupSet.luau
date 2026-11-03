@@ -53,18 +53,8 @@ function CloseupSet.build(scene: Builder.Scene)
 	-- snow drifting between the camera and the faces (cinematic style)
 	if st.snow then
 		local cam = Layout.CLOSE_CAM
-		table.insert(scene.emitters, {
-			name = "SnowClose",
-			kind = "snow",
-			cf = cam * CFrame.new(0, 3.2, -6),
-			size = Vector3.new(9, 0.2, 7),
-			rate = 22,
-			color = Color3.fromRGB(235, 240, 250),
-			sizeRange = { 0.025, 0.06 },
-			speed = { 0.5, 0.9 },
-			lifetime = { 7, 9 },
-			transparency = 0.2,
-		})
+		local box = Builder.part(scene, "CloseupSet", Vector3.new(9, 0.2, 7), cam * CFrame.new(0, 3.2, -6), Color3.new(1, 1, 1), { transparency = 1, castShadow = false, name = "SnowCloseBox" })
+		Builder.emitter(scene, "SnowClose", "snow", box, Color3.fromRGB(235, 240, 250), 0.18, 0.18)
 	end
 
 	-- overlay: hand-inked divider (frame design px 1113 x 626)

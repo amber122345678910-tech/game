@@ -1,7 +1,7 @@
 --!strict
--- Scene description as plain data. Sets and characters add parts here; the
--- Realizer creates Roblox instances from it and the exporter writes it to
--- JSON for the offline preview.
+-- Scene description as plain data. Stages, characters and effects add parts,
+-- lights and particle emitters here; the Realizer creates Roblox instances
+-- from it and the exporter writes it to JSON for the offline preview.
 local Paint = require(script.Parent.Paint)
 local Rig = require(script.Parent.Rig)
 local Styles = require(script.Parent.Styles)
@@ -11,6 +11,7 @@ export type GuiSpec = {
 	canvas: Vector2, -- SurfaceGui.CanvasSize
 	lightInfluence: number,
 	elems: { Paint.Elem },
+	alwaysOnTop: boolean?,
 }
 
 export type PartSpec = {
@@ -24,9 +25,10 @@ export type PartSpec = {
 	transparency: number,
 	castShadow: boolean,
 	studs: boolean,
-	rig: string?, -- animated by a rig bone
+	rig: string?, -- animated by a rig bone (parked while the rig is not in the shot)
 	bone: string?,
 	channel: string?, -- or by a named transform channel
+	fx: boolean, -- or placed directly by the timeline (parked when not placed)
 	cf: CFrame, -- local to bone / channel, or world CFrame for static parts
 	gui: GuiSpec?,
 }
@@ -35,17 +37,28 @@ export type ModelSpec = { name: string, outline: boolean }
 
 export type RigInst = { name: string, def: Rig.RigDef, model: string }
 
+-- Light attached to a part (PointLight / SpotLight). Brightness etc. are
+-- animated by the timeline; a light is off unless the frame turns it on.
+export type LightSpec = {
+	name: string,
+	kind: string, -- "Point" | "Spot"
+	part: number,
+	color: Color3,
+	range: number,
+	angle: number?,
+	face: string?,
+	shadows: boolean,
+}
+
+-- Particle emitter attached to a part (its size is the emission volume).
+-- "kind" selects a preset (see FX.EMITTERS); off unless the frame sets a rate.
 export type EmitterSpec = {
 	name: string,
-	kind: string, -- "snow"
-	cf: CFrame, -- world CFrame of the emitter box
-	size: Vector3, -- emission volume
-	rate: number,
+	kind: string,
+	part: number,
 	color: Color3,
-	sizeRange: { number },
-	speed: { number },
-	lifetime: { number },
-	transparency: number,
+	scale: number, -- particle size multiplier
+	speed: number, -- speed multiplier
 }
 
 export type Scene = {
@@ -53,9 +66,10 @@ export type Scene = {
 	parts: { PartSpec },
 	models: { ModelSpec },
 	rigs: { [string]: RigInst },
+	lights: { LightSpec },
 	emitters: { EmitterSpec },
-	overlay: { Paint.Elem }, -- split-screen divider etc (design px 1113x626)
-	data: { [string]: any }, -- free-form data for the timeline (poses, tracks)
+	overlay: { Paint.Elem }, -- 2D overlay (design px 1113 x 626), grouped
+	data: { [string]: any }, -- free-form data for the timeline (part ids, poses)
 }
 
 local Builder = {}
@@ -66,6 +80,7 @@ function Builder.new(style: Styles.Style): Scene
 		parts = {},
 		models = {},
 		rigs = {},
+		lights = {},
 		emitters = {},
 		overlay = {},
 		data = {},
@@ -90,6 +105,7 @@ export type PartOpts = {
 	rig: string?,
 	bone: string?,
 	channel: string?,
+	fx: boolean?,
 	gui: GuiSpec?,
 	name: string?,
 }
@@ -110,11 +126,53 @@ function Builder.part(scene: Scene, model: string, size: Vector3, cf: CFrame, co
 		rig = opts.rig,
 		bone = opts.bone,
 		channel = opts.channel,
+		fx = opts.fx == true,
 		cf = cf,
 		gui = opts.gui,
 	}
 	table.insert(scene.parts, p)
 	return p
+end
+
+-- Effect part: parked out of sight unless the timeline places it.
+function Builder.fx(scene: Scene, model: string, shape: string, size: Vector3, color: Color3, material: string?, transparency: number?, name: string?): PartSpec
+	Builder.model(scene, model, false)
+	return Builder.part(scene, model, size, CFrame.new(), color, {
+		shape = shape,
+		material = material or "Neon",
+		transparency = transparency or 0,
+		castShadow = false,
+		fx = true,
+		name = name or "FX",
+	})
+end
+
+function Builder.light(scene: Scene, name: string, kind: string, part: PartSpec, color: Color3, range: number, shadows: boolean?, angle: number?, face: string?): LightSpec
+	local l: LightSpec = {
+		name = name,
+		kind = kind,
+		part = part.id,
+		color = color,
+		range = range,
+		angle = angle,
+		face = face,
+		shadows = shadows == true,
+	}
+	table.insert(scene.lights, l)
+	return l
+end
+
+function Builder.emitter(scene: Scene, name: string, kind: string, part: PartSpec, color: Color3, scale: number?, speed: number?): EmitterSpec
+	local e: EmitterSpec = {
+		name = name,
+		kind = kind,
+		part = part.id,
+		color = color,
+		scale = scale or 1,
+		speed = speed or 1,
+	}
+	table.insert(scene.emitters, e)
+	return e
 end
 
 function Builder.rig(scene: Scene, name: string, def: Rig.RigDef, model: string)

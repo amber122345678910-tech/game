@@ -6,6 +6,6 @@ cd "$(dirname "$0")/.."
 T=../.tools
 tools/analyze.sh
 $T/lune run tools/check_realizer.luau
-$T/rojo build default.project.json -o YutaVsRyu_StyleTest.rbxl
-$T/lune run tools/verify_place.luau YutaVsRyu_StyleTest.rbxl | tail -1
-echo "Built YutaVsRyu_StyleTest.rbxl"
+$T/rojo build default.project.json -o YutaVsRyu_Part1.rbxl
+$T/lune run tools/verify_place.luau YutaVsRyu_Part1.rbxl | tail -1
+echo "Built YutaVsRyu_Part1.rbxl"

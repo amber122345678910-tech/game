@@ -1,26 +1,39 @@
 --!strict
 -- Roblox side: turns the scene description into Instances and applies
--- evaluated frames (camera, bone transforms, channels, overlay, effects).
+-- evaluated frames (camera, bones, effect parts, lights, particles, GUI
+-- groups, overlay, colour grade).
 local Lighting = game:GetService("Lighting")
 local Workspace = game:GetService("Workspace")
 
 local Builder = require(script.Parent.Builder)
 local Scene = require(script.Parent.Scene)
-local Shots = require(script.Parent.Shots)
+local Timeline = require(script.Parent.Timeline)
 local Paint = require(script.Parent.Paint)
+local Particles = require(script.Parent.Particles)
 
 local Realizer = {}
+
+type Applied = { t: number?, s: Vector3?, c: Color3? }
 
 export type Live = {
 	scene: Builder.Scene,
 	root: Folder,
-	parts: { BasePart },
-	dynamic: { { spec: Builder.PartSpec, part: BasePart } },
-	effects: Folder,
-	dof: DepthOfFieldEffect?,
-	overlayFrames: { [string]: { GuiObject } },
+	parts: { [number]: BasePart },
+	moveSpecs: { Builder.PartSpec },
 	moveParts: { BasePart },
 	moveCFs: { CFrame },
+	applied: { [number]: Applied },
+	groups: { [string]: { GuiObject } },
+	groupState: { [string]: boolean },
+	overlay: { [string]: { { f: GuiObject, base: number } } },
+	overlayAlpha: { [string]: number },
+	lights: { [string]: Light },
+	emitters: { [string]: ParticleEmitter },
+	dof: DepthOfFieldEffect?,
+	cc: ColorCorrectionEffect?,
+	bloom: BloomEffect?,
+	atmo: Atmosphere?,
+	fog: number,
 }
 
 local SHAPES: { [string]: Enum.PartType } = {
@@ -67,27 +80,39 @@ function Realizer.makeFrame(e: Paint.Elem, z: number, scaleMode: Vector2?): Fram
 	return f
 end
 
-local function makeSurfaceGui(gui: Builder.GuiSpec, adornee: BasePart): SurfaceGui
+local function makeSurfaceGui(live: Live, gui: Builder.GuiSpec, adornee: BasePart): SurfaceGui
 	local sg = Instance.new("SurfaceGui")
 	sg.Face = (Enum.NormalId :: any)[gui.face]
 	sg.SizingMode = Enum.SurfaceGuiSizingMode.FixedSize
 	sg.CanvasSize = gui.canvas
 	sg.LightInfluence = gui.lightInfluence
 	sg.Brightness = 1
-	sg.AlwaysOnTop = false
+	sg.AlwaysOnTop = gui.alwaysOnTop == true
 	sg.ClipsDescendants = true
 	sg.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 	sg.MaxDistance = 0
 	sg.ResetOnSpawn = false
 	for i, e in gui.elems do
-		Realizer.makeFrame(e, i, nil).Parent = sg
+		local f = Realizer.makeFrame(e, i, nil)
+		if e.group then
+			f.Visible = false
+			local list = live.groups[e.group]
+			if not list then
+				list = {}
+				live.groups[e.group] = list
+			end
+			table.insert(list, f)
+		end
+		f.Parent = sg
 	end
 	sg.Adornee = adornee
 	sg.Parent = adornee
 	return sg
 end
 
-local function makePart(spec: Builder.PartSpec): BasePart
+local PARK = CFrame.new(0, -5000, 0)
+
+local function makePart(live: Live, spec: Builder.PartSpec): BasePart
 	local p = Instance.new("Part")
 	p.Name = spec.name
 	p.Anchored = true
@@ -114,15 +139,15 @@ local function makePart(spec: Builder.PartSpec): BasePart
 		m.Scale = Vector3.one
 		m.Parent = p
 	end
-	p.CFrame = spec.cf
+	p.CFrame = if spec.fx or spec.rig then PARK else spec.cf
 	if spec.gui then
-		makeSurfaceGui(spec.gui, p)
+		makeSurfaceGui(live, spec.gui, p)
 	end
 	return p
 end
 
-local function applyLighting(scene: Builder.Scene, effects: Folder): DepthOfFieldEffect?
-	local st = scene.style
+local function applyLighting(live: Live)
+	local st = live.scene.style
 	local L = st.lighting
 	pcall(function()
 		(Lighting :: any).LightingStyle = (Enum :: any).LightingStyle[L.LightingStyle]
@@ -138,7 +163,6 @@ local function applyLighting(scene: Builder.Scene, effects: Folder): DepthOfFiel
 	Lighting.GlobalShadows = L.GlobalShadows
 	Lighting.ShadowSoftness = L.ShadowSoftness
 
-	-- remove effects of the previous style (only ours, tagged by attribute)
 	for _, ch in Lighting:GetChildren() do
 		if ch:GetAttribute("CutsceneFX") then
 			ch:Destroy()
@@ -165,6 +189,7 @@ local function applyLighting(scene: Builder.Scene, effects: Folder): DepthOfFiel
 		a.Glare = st.atmosphere.Glare
 		a.Haze = st.atmosphere.Haze
 		tag(a, Lighting)
+		live.atmo = a
 	end
 	if st.defaultSky then
 		local s = Instance.new("Sky")
@@ -185,6 +210,7 @@ local function applyLighting(scene: Builder.Scene, effects: Folder): DepthOfFiel
 		b.Size = post.bloom.Size
 		b.Threshold = post.bloom.Threshold
 		tag(b, Lighting)
+		live.bloom = b
 	end
 	if post.cc then
 		local c = Instance.new("ColorCorrectionEffect")
@@ -193,6 +219,7 @@ local function applyLighting(scene: Builder.Scene, effects: Folder): DepthOfFiel
 		c.Saturation = post.cc.Saturation
 		c.TintColor = post.cc.TintColor
 		tag(c, Lighting)
+		live.cc = c
 	end
 	if post.sunrays then
 		local s = Instance.new("SunRaysEffect")
@@ -200,7 +227,6 @@ local function applyLighting(scene: Builder.Scene, effects: Folder): DepthOfFiel
 		s.Spread = post.sunrays.Spread
 		tag(s, Lighting)
 	end
-	local dof: DepthOfFieldEffect? = nil
 	if post.dof then
 		local d = Instance.new("DepthOfFieldEffect")
 		d.FarIntensity = post.dof.FarIntensity
@@ -208,56 +234,92 @@ local function applyLighting(scene: Builder.Scene, effects: Folder): DepthOfFiel
 		d.InFocusRadius = post.dof.InFocusRadius
 		d.FocusDistance = 100
 		tag(d, Lighting)
-		dof = d
+		live.dof = d
 	end
-	return dof
 end
 
-local function makeSnow(spec: Builder.EmitterSpec, parent: Instance)
-	local box = Instance.new("Part")
-	box.Name = spec.name
-	box.Anchored = true
-	box.CanCollide = false
-	box.CanQuery = false
-	box.CanTouch = false
-	box.Transparency = 1
-	box.Size = spec.size
-	box.CFrame = spec.cf
+local function makeLight(spec: Builder.LightSpec, parent: BasePart): Light
+	local l: Light
+	if spec.kind == "Spot" then
+		local s = Instance.new("SpotLight")
+		s.Angle = spec.angle or 60
+		s.Face = (Enum.NormalId :: any)[spec.face or "Front"]
+		s.Range = spec.range
+		l = s
+	else
+		local p = Instance.new("PointLight")
+		p.Range = spec.range
+		l = p
+	end
+	l.Name = spec.name
+	l.Color = spec.color
+	l.Brightness = 0
+	l.Shadows = spec.shadows
+	l.Enabled = false
+	l.Parent = parent
+	return l
+end
+
+local function makeEmitter(spec: Builder.EmitterSpec, parent: BasePart): ParticleEmitter
+	local p = Particles.get(spec.kind)
 	local pe = Instance.new("ParticleEmitter")
+	pe.Name = spec.name
 	pe.Shape = Enum.ParticleEmitterShape.Box
 	pe.ShapeStyle = Enum.ParticleEmitterShapeStyle.Volume
-	pe.Rate = spec.rate
+	pe.Rate = 0
+	pe.Enabled = false
 	pe.Color = ColorSequence.new(spec.color)
-	pe.Size = NumberSequence.new(spec.sizeRange[1], spec.sizeRange[2])
-	pe.Speed = NumberRange.new(spec.speed[1], spec.speed[2])
-	pe.Lifetime = NumberRange.new(spec.lifetime[1], spec.lifetime[2])
+	pe.Size = NumberSequence.new(p.size[1] * spec.scale, p.size[2] * spec.scale)
+	pe.Speed = NumberRange.new(p.speed[1] * spec.speed, p.speed[2] * spec.speed)
+	pe.Lifetime = NumberRange.new(p.lifetime[1], p.lifetime[2])
 	pe.Transparency = NumberSequence.new({
 		NumberSequenceKeypoint.new(0, 1),
-		NumberSequenceKeypoint.new(0.15, spec.transparency),
-		NumberSequenceKeypoint.new(0.85, spec.transparency),
+		NumberSequenceKeypoint.new(0.12, p.transparency),
+		NumberSequenceKeypoint.new(0.8, p.transparency),
 		NumberSequenceKeypoint.new(1, 1),
 	})
-	pe.EmissionDirection = Enum.NormalId.Bottom
-	pe.SpreadAngle = Vector2.new(18, 18)
-	pe.Acceleration = Vector3.new(1.2, -0.6, 0)
-	pe.RotSpeed = NumberRange.new(-40, 40)
-	pe.LightInfluence = 0.6
-	pe.LightEmission = 0.15
-	pe.Texture = "rbxasset://textures/particles/sparkles_main.dds"
-	pe.Parent = box
-	box.Parent = parent
-	-- fill the volume right away so the first frame already has snow
-	-- (pcall: Emit is an engine method the offline checker does not have)
-	local count = math.floor(spec.rate * spec.lifetime[2] * 0.6)
-	pcall(function()
-		pe:Emit(count)
-	end)
+	pe.EmissionDirection = (Enum.NormalId :: any)[p.direction]
+	pe.SpreadAngle = Vector2.new(p.spread, p.spread)
+	pe.Acceleration = p.accel
+	pe.Drag = p.drag
+	pe.RotSpeed = NumberRange.new(-p.rotSpeed, p.rotSpeed)
+	pe.Rotation = NumberRange.new(0, 360)
+	pe.LightInfluence = p.lightInfluence
+	pe.LightEmission = p.lightEmission
+	pe.ZOffset = p.zOffset
+	if p.squash > 0 then
+		pe.Orientation = Enum.ParticleOrientation.VelocityParallel
+		pe.Squash = NumberSequence.new(p.squash)
+	end
+	pe.Texture = Particles.SPARKLE
+	pe.Parent = parent
+	return pe
 end
 
 function Realizer.build(styleId: string, parent: Instance): Live
 	local scene = Scene.build(styleId)
 	local root = Instance.new("Folder")
-	root.Name = "Cutscene_" .. styleId
+	root.Name = "Cutscene"
+	local live: Live = {
+		scene = scene,
+		root = root,
+		parts = {},
+		moveSpecs = {},
+		moveParts = {},
+		moveCFs = {},
+		applied = {},
+		groups = {},
+		groupState = {},
+		overlay = {},
+		overlayAlpha = {},
+		lights = {},
+		emitters = {},
+		dof = nil,
+		cc = nil,
+		bloom = nil,
+		atmo = nil,
+		fog = 1,
+	}
 	local models: { [string]: Model } = {}
 	for _, m in scene.models do
 		local model = Instance.new("Model")
@@ -275,49 +337,35 @@ function Realizer.build(styleId: string, parent: Instance): Live
 			h.Parent = model
 		end
 	end
-	local parts: { BasePart } = {}
-	local dynamic: { { spec: Builder.PartSpec, part: BasePart } } = {}
 	for _, spec in scene.parts do
-		local p = makePart(spec)
+		local p = makePart(live, spec)
 		p.Parent = models[spec.model] or root
-		parts[spec.id] = p
-		if spec.rig or spec.channel then
-			table.insert(dynamic, { spec = spec, part = p })
+		live.parts[spec.id] = p
+		if spec.rig or spec.channel or spec.fx then
+			table.insert(live.moveSpecs, spec)
+			table.insert(live.moveParts, p)
 		end
 	end
-	local effects = Instance.new("Folder")
-	effects.Name = "Effects"
-	effects.Parent = root
-	for _, em in scene.emitters do
-		makeSnow(em, effects)
+	for _, l in scene.lights do
+		live.lights[l.name] = makeLight(l, live.parts[l.part])
 	end
-	local dof = applyLighting(scene, effects)
+	for _, e in scene.emitters do
+		live.emitters[e.name] = makeEmitter(e, live.parts[e.part])
+	end
+	applyLighting(live)
 	root.Parent = parent
-	local moveParts: { BasePart } = {}
-	for i, d in dynamic do
-		moveParts[i] = d.part
-	end
-	return {
-		scene = scene,
-		root = root,
-		parts = parts,
-		dynamic = dynamic,
-		effects = effects,
-		dof = dof,
-		overlayFrames = {},
-		moveParts = moveParts,
-		moveCFs = {},
-	}
+	return live
 end
 
--- Overlay elements (split-screen divider) inside a 16:9 container frame
+-- 2D overlay elements inside the 16:9 picture frame
 function Realizer.buildOverlay(live: Live, container: GuiObject)
 	for _, ch in container:GetChildren() do
 		if ch:GetAttribute("CutsceneOverlay") then
 			ch:Destroy()
 		end
 	end
-	live.overlayFrames = {}
+	live.overlay = {}
+	live.overlayAlpha = {}
 	local design = Vector2.new(1113, 626)
 	for i, e in live.scene.overlay do
 		local f = Realizer.makeFrame(e, 10 + i, design)
@@ -325,12 +373,23 @@ function Realizer.buildOverlay(live: Live, container: GuiObject)
 		f.Visible = false
 		f.Parent = container
 		local g = e.group or "misc"
-		live.overlayFrames[g] = live.overlayFrames[g] or {}
-		table.insert(live.overlayFrames[g], f)
+		local list = live.overlay[g]
+		if not list then
+			list = {}
+			live.overlay[g] = list
+		end
+		table.insert(list, { f = f, base = e.alpha })
 	end
 end
 
-function Realizer.apply(live: Live, frame: Shots.FrameState, camera: Camera, fovScale: number)
+local function sameColor(a: Color3?, b: Color3?): boolean
+	if a == nil or b == nil then
+		return a == b
+	end
+	return a == b
+end
+
+function Realizer.apply(live: Live, frame: Timeline.FrameState, camera: Camera, fovScale: number)
 	camera.CFrame = frame.camera
 	-- keep the 16:9 picture's vertical FOV when the window is taller than 16:9
 	local fov = frame.fov
@@ -338,22 +397,115 @@ function Realizer.apply(live: Live, frame: Shots.FrameState, camera: Camera, fov
 		fov = math.deg(2 * math.atan(math.tan(math.rad(fov) / 2) * fovScale))
 	end
 	camera.FieldOfView = fov
-	for i, d in live.dynamic do
-		live.moveCFs[i] = Scene.partCFrame(d.spec, frame)
+
+	-- transforms
+	for i, spec in live.moveSpecs do
+		live.moveCFs[i] = Scene.partCFrame(spec, frame)
 	end
 	Workspace:BulkMoveTo(live.moveParts, live.moveCFs, Enum.BulkMoveMode.FireCFrameChanged)
+
+	-- animated part properties (only written when they change)
+	for id, p in frame.props do
+		local part = live.parts[id]
+		local last: Applied = live.applied[id] or ({} :: Applied)
+		live.applied[id] = last
+		if p.t ~= nil and p.t ~= last.t then
+			part.Transparency = p.t
+			last.t = p.t
+		end
+		if p.s ~= nil and p.s ~= last.s then
+			part.Size = p.s
+			last.s = p.s
+		end
+		if p.c ~= nil and not sameColor(p.c, last.c) then
+			part.Color = p.c
+			last.c = p.c
+		end
+	end
+
+	-- GUI groups (face expressions etc.)
+	for g, list in live.groups do
+		local on = frame.vis[g] == true
+		if live.groupState[g] ~= on then
+			live.groupState[g] = on
+			for _, f in list do
+				f.Visible = on
+			end
+		end
+	end
+	-- overlay groups with alpha
+	for g, list in live.overlay do
+		local a = frame.alpha[g] or (if frame.vis[g] then 1 else 0)
+		if live.overlayAlpha[g] ~= a then
+			live.overlayAlpha[g] = a
+			for _, it in list do
+				it.f.Visible = a > 0.001
+				it.f.BackgroundTransparency = 1 - (1 - it.base) * a
+			end
+		end
+	end
+
+	-- lights and particles
+	for name, l in live.lights do
+		local s = frame.lights[name]
+		if s and s.b > 0 then
+			l.Enabled = true
+			l.Brightness = s.b
+			if s.c then
+				l.Color = s.c
+			end
+			if s.r then
+				(l :: any).Range = s.r
+			end
+		elseif l.Enabled then
+			l.Enabled = false
+		end
+	end
+	for name, pe in live.emitters do
+		local r = frame.emit[name] or 0
+		if r > 0 then
+			pe.Rate = r
+			pe.Enabled = true
+		elseif pe.Enabled then
+			pe.Enabled = false
+		end
+	end
+
+	-- post
+	local st = live.scene.style
 	local dof = live.dof
-	local dofStyle = live.scene.style.post.dof
+	local dofStyle = st.post.dof
 	if dof and dofStyle then
 		dof.FocusDistance = frame.focus
 		dof.FarIntensity = dofStyle.FarIntensity * frame.dof
 		dof.NearIntensity = dofStyle.NearIntensity * frame.dof
 	end
-	for g, frames in live.overlayFrames do
-		local vis = frame.overlay[g] == true
-		for _, f in frames do
-			f.Visible = vis
+	local cc = live.cc
+	local ccStyle = st.post.cc
+	if cc and ccStyle then
+		local g = frame.grade
+		if g then
+			cc.Brightness = g.brightness
+			cc.Contrast = g.contrast
+			cc.Saturation = g.saturation
+			cc.TintColor = g.tint
+		else
+			cc.Brightness = ccStyle.Brightness
+			cc.Contrast = ccStyle.Contrast
+			cc.Saturation = ccStyle.Saturation
+			cc.TintColor = ccStyle.TintColor
 		end
+	end
+	local bloom = live.bloom
+	local bloomStyle = st.post.bloom
+	if bloom and bloomStyle then
+		bloom.Intensity = bloomStyle.Intensity * frame.bloom
+	end
+	local atmo = live.atmo
+	local atmoStyle = st.atmosphere
+	if atmo and atmoStyle and live.fog ~= frame.fog then
+		live.fog = frame.fog
+		atmo.Density = math.clamp(atmoStyle.Density * frame.fog, 0, 1)
 	end
 end
 

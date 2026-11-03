@@ -1,10 +1,9 @@
 --!strict
--- Plays the cutscene when you press Play in Roblox Studio.
---   1 / 2 / 3  - style: Anime / Cinema / Classic (restarts from 0)
---   A          - showcase: all three styles one after another (for recording)
---   R          - restart          Space - pause / resume
+-- Plays "Yuta vs Ryu — part 1" (Cinema look) when you press Play in Studio.
+--   R          - restart              Space - pause / resume
 --   Left/Right - step one frame (1/30 s) while paused
---   L          - loop on/off       H     - hide/show the info panel
+--   J / K      - previous / next shot  L     - loop on/off
+--   S          - subtitles on/off      H     - hide/show the info panel
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
@@ -15,13 +14,11 @@ local Workspace = game:GetService("Workspace")
 local Cutscene = ReplicatedStorage:WaitForChild("Cutscene")
 local Realizer = require(Cutscene:WaitForChild("Realizer"))
 local Scene = require(Cutscene:WaitForChild("Scene"))
-local Styles = require(Cutscene:WaitForChild("Styles"))
 
 local player = Players.LocalPlayer
 local camera = Workspace.CurrentCamera
 
-local HOLD = 0.8 -- seconds the last frame is held before looping
-local CARD = 1.1 -- title card length in showcase mode
+local HOLD = 1.0 -- seconds the last frame is held before looping
 
 -- clean screen for recording ---------------------------------------------------
 task.spawn(function()
@@ -93,27 +90,51 @@ for i, rot in { 0, 90, 180, 270 } do
 	vignette[i] = f
 end
 
+-- full-screen flash (white-outs, impact flashes)
+local flash = Instance.new("Frame")
+flash.Name = "Flash"
+flash.Size = UDim2.fromScale(1, 1)
+flash.BorderSizePixel = 0
+flash.BackgroundTransparency = 1
+flash.ZIndex = 80
+flash.Parent = safe
+
+-- subtitles (English, as in the reference edit)
+local sub = Instance.new("TextLabel")
+sub.Name = "Subtitle"
+sub.AnchorPoint = Vector2.new(0.5, 1)
+sub.Position = UDim2.fromScale(0.5, 0.955)
+sub.Size = UDim2.fromScale(0.8, 0.09)
+sub.BackgroundTransparency = 1
+sub.TextColor3 = Color3.new(1, 1, 1)
+sub.TextStrokeColor3 = Color3.new(0, 0, 0)
+sub.TextStrokeTransparency = 0.1
+sub.Font = Enum.Font.GothamBold
+sub.TextScaled = true
+sub.TextWrapped = true
+sub.TextYAlignment = Enum.TextYAlignment.Bottom
+sub.ZIndex = 85
+sub.Text = ""
+sub.Parent = safe
+local subSize = Instance.new("UITextSizeConstraint")
+subSize.MaxTextSize = 48
+subSize.Parent = sub
+
 local card = Instance.new("TextLabel")
-card.Name = "TitleCard"
+card.Name = "Loading"
 card.Size = UDim2.fromScale(1, 1)
 card.BackgroundColor3 = Color3.new(0, 0, 0)
-card.BackgroundTransparency = 0
 card.TextColor3 = Color3.new(1, 1, 1)
 card.Font = Enum.Font.GothamBold
-card.TextScaled = true
+card.TextSize = 28
+card.Text = "Сборка сцены…"
 card.ZIndex = 90
-card.Visible = false
 card.Parent = safe
-local cardPad = Instance.new("UIPadding")
-cardPad.PaddingTop = UDim.new(0.4, 0)
-cardPad.PaddingBottom = UDim.new(0.4, 0)
-cardPad.Parent = card
 
 local hud = Instance.new("TextLabel")
 hud.Name = "Info"
-hud.AnchorPoint = Vector2.new(0, 0)
 hud.Position = UDim2.fromOffset(14, 14)
-hud.Size = UDim2.fromOffset(470, 118)
+hud.Size = UDim2.fromOffset(500, 100)
 hud.BackgroundColor3 = Color3.new(0, 0, 0)
 hud.BackgroundTransparency = 0.35
 hud.TextColor3 = Color3.new(1, 1, 1)
@@ -131,19 +152,12 @@ hudPad.Parent = hud
 Instance.new("UICorner").Parent = hud
 
 -- state ----------------------------------------------------------------------------
-local live: Realizer.Live? = nil
-local styleIndex = 1
 local t = 0
 local playing = true
 local looping = true
+local subsOn = true
 local holdTimer = 0
-local showcase = false
-local cardTimer = 0
 local fovScale = 1
-
-local function styleId(): string
-	return Styles.order[styleIndex]
-end
 
 local function layout()
 	local vp = camera.ViewportSize
@@ -163,72 +177,52 @@ local function layout()
 	fovScale = h / sh
 end
 
-local function updateHud()
-	local st = Styles.get(styleId())
+local readMe = Workspace:FindFirstChild("ReadMe")
+if readMe then
+	readMe:Destroy() -- the instruction sign is only for the editor view
+end
+camera.CameraType = Enum.CameraType.Scriptable
+layout()
+camera:GetPropertyChangedSignal("ViewportSize"):Connect(layout)
+RunService.RenderStepped:Wait()
+
+local live = Realizer.build("cinema", Workspace)
+Realizer.buildOverlay(live, safe)
+local shots = Scene.shots(live.scene)
+local vig = live.scene.style.vignette
+for _, v in vignette do
+	v.Visible = vig > 0
+	v.BackgroundTransparency = 1 - vig
+end
+card.Visible = false
+
+local function shotIndex(time: number): number
+	local idx = 1
+	for i, s in shots do
+		if time >= s.t0 then
+			idx = i
+		end
+	end
+	return idx
+end
+
+local function updateHud(shotId: string)
 	hud.Text = string.format(
-		"<b>Юта vs Рю — часть 1 · проба стиля</b>\n<b>%s</b> — %s\nt = %.2f с  %s%s\n<font transparency='0.35'>1/2/3 стиль · A все подряд · R заново · Пробел пауза · ←/→ кадр · L повтор · H скрыть</font>",
-		st.title,
-		st.subtitle,
+		"<b>Юта vs Рю — часть 1</b> · стиль «Кино»\nt = %.2f / %.2f с · план %s %s%s\n<font transparency='0.35'>R заново · Пробел пауза · ←/→ кадр · J/K план · S субтитры · L повтор · H скрыть</font>",
 		t,
+		Scene.DURATION,
+		shotId,
 		if playing then "" else "[пауза] ",
-		if showcase then "[показ всех стилей]" elseif looping then "[повтор]" else ""
+		if looping then "[повтор]" else ""
 	)
 end
 
-local loading = false
-
-local function load(index: number)
-	if loading then
-		return
-	end
-	loading = true
-	styleIndex = index
-	if live then
-		Realizer.destroy(live)
-		live = nil
-	end
-	card.Text = "Сборка сцены…"
-	card.Visible = true
-	RunService.RenderStepped:Wait()
-	local newLive = Realizer.build(styleId(), Workspace)
-	Realizer.buildOverlay(newLive, safe)
-	live = newLive
-	local st = Styles.get(styleId())
-	for _, v in vignette do
-		v.Visible = st.vignette > 0
-		v.BackgroundTransparency = 1 - st.vignette
-	end
-	card.Visible = false
-	t = 0
-	holdTimer = 0
-	if showcase then
-		card.Text = st.title .. "  —  " .. st.subtitle
-		card.Visible = true
-		cardTimer = CARD
-	end
-	loading = false
-end
-
--- input --------------------------------------------------------------------------
 UserInputService.InputBegan:Connect(function(input, processed)
 	if processed then
 		return
 	end
 	local k = input.KeyCode
-	if k == Enum.KeyCode.One or k == Enum.KeyCode.KeypadOne then
-		showcase = false
-		load(1)
-	elseif k == Enum.KeyCode.Two or k == Enum.KeyCode.KeypadTwo then
-		showcase = false
-		load(2)
-	elseif k == Enum.KeyCode.Three or k == Enum.KeyCode.KeypadThree then
-		showcase = false
-		load(3)
-	elseif k == Enum.KeyCode.A then
-		showcase = true
-		playing = true
-		load(1)
-	elseif k == Enum.KeyCode.R then
+	if k == Enum.KeyCode.R then
 		t = 0
 		holdTimer = 0
 		playing = true
@@ -240,53 +234,46 @@ UserInputService.InputBegan:Connect(function(input, processed)
 	elseif k == Enum.KeyCode.Left then
 		playing = false
 		t = math.max(0, t - 1 / 30)
+	elseif k == Enum.KeyCode.K then
+		local i = math.min(#shots, shotIndex(t) + 1)
+		t = shots[i].t0 + 0.001
+	elseif k == Enum.KeyCode.J then
+		local i = shotIndex(t)
+		if t - shots[i].t0 < 0.3 then
+			i = math.max(1, i - 1)
+		end
+		t = shots[i].t0 + 0.001
 	elseif k == Enum.KeyCode.L then
 		looping = not looping
+	elseif k == Enum.KeyCode.S then
+		subsOn = not subsOn
 	elseif k == Enum.KeyCode.H then
 		hud.Visible = not hud.Visible
 	end
 end)
 
--- main loop -----------------------------------------------------------------------
-local readMe = Workspace:FindFirstChild("ReadMe")
-if readMe then
-	readMe:Destroy() -- the instruction sign is only for the editor view
-end
-camera.CameraType = Enum.CameraType.Scriptable
-layout()
-camera:GetPropertyChangedSignal("ViewportSize"):Connect(layout)
-load(1)
-
 RunService:BindToRenderStep("Cutscene", Enum.RenderPriority.Camera.Value + 1, function(dt: number)
-	local cur = live
-	if not cur then
-		return
-	end
 	camera.CameraType = Enum.CameraType.Scriptable
-	if cardTimer > 0 then
-		cardTimer -= dt
-		card.Visible = cardTimer > 0
-	elseif playing then
+	if playing then
 		if t < Scene.DURATION then
 			t = math.min(Scene.DURATION, t + dt)
 		else
 			holdTimer += dt
-			if holdTimer >= HOLD then
-				if showcase then
-					if styleIndex < #Styles.order then
-						-- rebuilding yields, which is not allowed inside a render step
-						task.spawn(load, styleIndex + 1)
-						return
-					end
-					showcase = false
-					playing = false
-				elseif looping then
-					t = 0
-					holdTimer = 0
-				end
+			if holdTimer >= HOLD and looping then
+				t = 0
+				holdTimer = 0
 			end
 		end
 	end
-	Realizer.apply(cur, Scene.evaluate(cur.scene, t), camera, fovScale)
-	updateHud()
+	local frame = Scene.evaluate(live.scene, math.min(t, Scene.DURATION - 0.001))
+	Realizer.apply(live, frame, camera, fovScale)
+	local f = frame.flash
+	if f and f.alpha > 0 then
+		flash.BackgroundColor3 = f.color
+		flash.BackgroundTransparency = 1 - f.alpha
+	else
+		flash.BackgroundTransparency = 1
+	end
+	sub.Text = if subsOn and frame.sub then frame.sub else ""
+	updateHud(frame.shot)
 end)

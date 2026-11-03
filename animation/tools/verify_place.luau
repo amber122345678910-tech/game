@@ -5,7 +5,7 @@ local fs = require("@lune/fs")
 local process = require("@lune/process")
 local roblox = require("@lune/roblox")
 
-local path = process.args[1] or "YutaVsRyu_StyleTest.rbxl"
+local path = process.args[1] or "YutaVsRyu_Part1.rbxl"
 local game = roblox.deserializePlace(fs.readFile(path))
 
 local failures = 0
@@ -22,10 +22,11 @@ local rs = game:GetService("ReplicatedStorage")
 local cutscene = rs:FindFirstChild("Cutscene")
 check(cutscene ~= nil, "ReplicatedStorage.Cutscene exists")
 local expected = {
-	"Util", "Paint", "Rig", "Track", "Layout", "Builder", "Styles", "Shots", "Scene", "Realizer",
+	"Util", "Paint", "Rig", "Track", "Layout", "Builder", "Styles", "Timeline", "Particles", "FX", "Scene", "Realizer",
 	"Art/Characters/Ryu", "Art/Characters/Yuta", "Art/Characters/Rika",
-	"Art/Faces/YutaEyes", "Art/Faces/RyuEyes",
+	"Art/Faces/YutaEyes", "Art/Faces/RyuEyes", "Art/Faces/FaceRig",
 	"Art/Sets/SkyPaint", "Art/Sets/WideSet", "Art/Sets/CloseupSet",
+	"Shots/Cast", "Shots/Field", "Shots/Overlay", "Shots/Opening", "Shots/Clash", "Shots/RyuShots", "Shots/YutaShots",
 }
 for _, rel in expected do
 	local node = cutscene

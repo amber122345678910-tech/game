@@ -18,9 +18,14 @@ local Scene = Loader.load("src/Cutscene/Scene")
 local Realizer = Loader.load("src/Cutscene/Realizer")
 
 local ok = true
-for _, id in { "anime", "cinema", "classic" } do
+for _, id in { "cinema" } do
 	local success, err = pcall(function()
 		local live = Realizer.build(id, Workspace)
+		-- the overlay layers become Frames in a ScreenGui container
+		local sg = roblox.Instance.new("ScreenGui")
+		local safe = roblox.Instance.new("Frame")
+		safe.Parent = sg
+		Realizer.buildOverlay(live, safe)
 		local count, guis, frames = 0, 0, 0
 		for _, d in live.root:GetDescendants() do
 			if d:IsA("BasePart") then
@@ -35,7 +40,15 @@ for _, id in { "anime", "cinema", "classic" } do
 		for _, ch in Lighting:GetChildren() do
 			table.insert(fx, ch.ClassName)
 		end
-		print(string.format("%-8s parts=%d surfaceGuis=%d frames=%d lighting=[%s]", id, count, guis, frames, table.concat(fx, ",")))
+		local lights, emitters, overlay = 0, 0, #safe:GetChildren()
+		for _, d in live.root:GetDescendants() do
+			if d:IsA("Light") then
+				lights += 1
+			elseif d:IsA("ParticleEmitter") then
+				emitters += 1
+			end
+		end
+		print(string.format("%-8s parts=%d surfaceGuis=%d frames=%d lights=%d emitters=%d overlay=%d lighting=[%s]", id, count, guis, frames, lights, emitters, overlay, table.concat(fx, ",")))
 		Realizer.destroy(live)
 	end)
 	if not success then
