@@ -46,7 +46,7 @@ local function wide(ctx: Timeline.Ctx)
 	-- only fog behind them in the establishing shot (reference): the ruined
 	-- blocks around the field are lowered out of sight for these frames
 	ctx:channel("cityBlocks", CFrame.new(0, -600, 0))
-	ctx:fog(1.15)
+	ctx:fog(0.7)
 	local t = ctx.t
 	ctx:rig("Ryu", CFrame.new(Field.RYU) * CFrame.Angles(0, math.rad(-90), 0), Cast.alive(Cast.ryu.point, t))
 	local rp = Cast.add(Cast.rika.crouch, "UpperTorso", Rig.R(math.sin(t * math.pi * 1.1) * 1.4, 0, 0))

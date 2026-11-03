@@ -55,6 +55,7 @@ export type Canvas = {
 
 export type StrokeOpts = {
 	maxStep: number?, -- longest pill (canvas units, before scale)
+	minStep: number?, -- shortest pill: coarse strokes for big 2D overlays
 	minWidth: number?,
 	closed: boolean?,
 }
@@ -249,19 +250,20 @@ function Canvas.stroke(self: Canvas, pts: { { number } }, widths: { number } | n
 	for i = 2, n do
 		acc += math.sqrt((xs[i] - xs[i - 1]) ^ 2 + (ys[i] - ys[i - 1]) ^ 2)
 		local w = math.max(math.min(ws[i], ws[lastI]), minW)
-		local step = Util.clamp(0.9 * w, 1.2, maxStep)
+		local step = Util.clamp(0.9 * w, o.minStep or 1.2, maxStep)
 		local split = acc >= step
+		local minAcc = math.max(0.8, (o.minStep or 0) * 0.5)
 		if not split and i - lastI >= 2 then
 			-- direction change since the last node
 			local dx1, dy1 = xs[lastI + 1] - xs[lastI], ys[lastI + 1] - ys[lastI]
 			local dx2, dy2 = xs[i] - xs[i - 1], ys[i] - ys[i - 1]
 			local a1, a2 = math.atan2(dy1, dx1), math.atan2(dy2, dx2)
 			local d = math.abs((a2 - a1 + math.pi) % (2 * math.pi) - math.pi)
-			if d > math.rad(7) and acc > 0.8 then
+			if d > math.rad(7) and acc > minAcc then
 				split = true
 			end
 			local wr = math.abs(ws[i] - ws[lastI]) / math.max(ws[lastI], minW)
-			if wr > 0.18 and acc > 0.8 then
+			if wr > 0.18 and acc > minAcc then
 				split = true
 			end
 		end

@@ -17,12 +17,16 @@ FaceRig.expr = {
 		talk = { "ryu:eyes:normal", "ryu:brows:angry", "ryu:mouth:talk" },
 		shout = { "ryu:eyes:wide", "ryu:brows:angry", "ryu:mouth:laugh" },
 		glare = { "ryu:eyes:narrow", "ryu:brows:angry", "ryu:mouth:closed" },
+		shock = { "ryu:eyes:wide", "ryu:brows:raised", "ryu:mouth:closed" },
+		gasp = { "ryu:eyes:wide", "ryu:brows:raised", "ryu:mouth:talk" },
+		grit = { "ryu:eyes:wide", "ryu:brows:angry", "ryu:mouth:grin" },
 	},
 	yuta = {
 		neutral = { "yuta:eyes:normal", "yuta:brows:calm", "yuta:mouth:closed" },
 		focus = { "yuta:eyes:normal", "yuta:brows:tense", "yuta:mouth:closed" },
 		talk = { "yuta:eyes:normal", "yuta:brows:tense", "yuta:mouth:talk" },
 		shout = { "yuta:eyes:wide", "yuta:brows:tense", "yuta:mouth:open" },
+		glare = { "yuta:eyes:normal", "yuta:brows:tense", "yuta:mouth:closed" },
 	},
 }
 

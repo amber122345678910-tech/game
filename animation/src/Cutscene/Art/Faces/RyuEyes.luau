@@ -110,6 +110,29 @@ function RyuEyes.paint(c: Paint.Canvas, pal: { [string]: Color3 }, lw: number, s
 	)
 	c:setGroup(nil)
 
+	-- 3c. shock (part 2): the eye flies open, a small iris in a ring of white
+	c:setGroup("split:ryuShock")
+	c:stroke({ { 170, 470 }, { 260, 452 }, { 340, 444 }, { 420, 440 }, { 460, 452 } }, { 30, 40, 44, 40, 24 }, skin)
+	c:stroke({ { 205, 500 }, { 258, 494 }, { 320, 488 }, { 382, 482 }, { 425, 478 }, { 446, 474 } }, { 22, 74, 92, 90, 64, 18 }, pal.sclera)
+	c:stroke({ { 232, 462 }, { 320, 452 }, { 400, 448 }, { 440, 456 } }, { 10, 12, 12, 8 }, pal.scleraShade)
+	c:ellipse(338, 490, 21, 21, 0, pal.rIrisDark)
+	c:ellipse(339, 491, 16, 16, 0, pal.rIris)
+	c:ellipse(340, 497, 10, 6, 0, pal.rIrisLight)
+	c:circle(339, 489, 6.5, pal.rIrisDark)
+	c:circle(346, 483, 3, pal.sclera)
+	c:stroke(
+		{ { 160, 494 }, { 205, 474 }, { 243, 460 }, { 321, 446 }, { 380, 440 }, { 420, 441 }, { 452, 454 } },
+		{ L(1), L(6), L(11), L(13), L(14), L(13), L(6) },
+		line
+	)
+	c:stroke({ { 166, 452 }, { 277, 428 }, { 421, 420 }, { 452, 430 } }, { L(0.8), L(2), L(2), L(0.8) }, deep)
+	-- far eye wide open as well
+	c:stroke({ { 622, 446 }, { 655, 446 }, { 688, 444 } }, { 34, 50, 38 }, pal.sclera)
+	c:ellipse(655, 444, 9, 9, 0, pal.rIrisDark)
+	c:ellipse(655, 444, 6, 6, 0, pal.rIris)
+	c:circle(655, 443, 2.6, pal.rIrisDark)
+	c:setGroup(nil)
+
 	-- 4. far eye (screen right, under the brow band) --------------------------------
 	c:stroke({ { 626, 446 }, { 655, 450 }, { 684, 446 } }, { 30, 44, 34 }, pal.sclera)
 	c:stroke({ { 622, 432 }, { 660, 428 }, { 690, 430 } }, { 12, 14, 10 }, pal.scleraShade)

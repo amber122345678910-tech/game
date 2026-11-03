@@ -25,11 +25,18 @@ Ryu.dims = {
 	lowerLeg = 1.25,
 }
 
-function Ryu.build(scene: Builder.Scene, rigName: string): Rig.RigDef
+-- bare = true: the coat has slipped down to his waist (part 2, Rika's grab):
+-- bare muscular back and arms, the coat and its fur bunched around the hips
+function Ryu.build(scene: Builder.Scene, rigName: string, bare: boolean?): Rig.RigDef
 	local def = Rig.humanoid(Ryu.dims)
 	Builder.rig(scene, rigName, def, rigName)
 	Builder.model(scene, rigName, scene.style.outline ~= nil)
 	local k = Builder.kit(scene, rigName, rigName)
+	if bare then
+		Ryu.buildBare(k)
+		Ryu.buildHead(scene, k, rigName)
+		return def
+	end
 
 	-- Pelvis, belt, coat tails ------------------------------------------------
 	-- one-piece trousers at a narrow waist; the long coat hangs open at the
@@ -99,32 +106,7 @@ function Ryu.build(scene: Builder.Scene, rigName: string): Rig.RigDef
 		end
 	end
 
-	-- Head (face painted on the front) and pompadour --------------------------
-	local face = Paint.canvas(4.4, 0, 0)
-	FaceRig.ryu(face, scene.style.color)
-	Builder.part(scene, rigName, V(1.1, 1.18, 1.1), C(0, 0.72, 0), scene.style.color.rSkin, {
-		shape = "Block",
-		material = scene.style.material.skin,
-		rig = rigName,
-		bone = "Head",
-		name = "Head",
-		gui = { face = "Front", canvas = Vector2.new(440, 472), lightInfluence = scene.style.face.lightInfluence, elems = face.elems },
-	})
-	k.add("Head", "Block", V(0.98, 0.3, 1.0), C(0, 0.18, -0.02), "rSkin", "skin", "Jaw")
-	k.add("Head", "Ellipsoid", V(1.3, 0.78, 1.42), C(0, 1.38, 0.08), "rHair", "hair", "HairTop")
-	k.add("Head", "Ellipsoid", V(1.22, 0.88, 1.05), C(0, 1.5, -0.5) * R(25, 0, 0), "rHair", "hair", "Pompadour")
-	k.add("Head", "Wedge", V(1.05, 0.5, 0.82), C(0, 1.72, -0.98) * R(-14, 180, 0), "rHair", "hair", "PompTip")
-	k.add("Head", "Block", V(1.16, 0.95, 0.24), C(0, 0.98, 0.6), "rHair", "hair", "HairBack")
-	for _, sx in { -1, 1 } do
-		k.add("Head", "Block", V(0.16, 0.78, 1.0), C(sx * 0.6, 0.98, 0.08), "rHair", "hair", "HairSide")
-		k.add("Head", "Block", V(0.1, 0.36, 0.16), C(sx * 0.57, 0.52, -0.12), "rHair", "hair", "Sideburn")
-		k.add("Head", "Block", V(0.08, 0.3, 0.2), C(sx * 0.58, 0.7, 0.08), "rSkin", "skin", "Ear")
-		k.add("Head", "Ellipsoid", V(0.1, 0.08, 1.0), C(sx * 0.26, 1.86, -0.52) * R(25, 0, 0), "rCoatHi", "hair", "HairShine")
-	end
-	-- loose strands falling over the forehead
-	for _, st in { { -0.22, 12 }, { 0.05, -6 }, { 0.28, -16 } } do
-		k.add("Head", "Wedge", V(0.06, 0.5, 0.12), C(st[1], 1.06, -0.58) * R(0, 0, 180 + st[2]) * R(0, 90, 0), "rHair", "hair", "Strand")
-	end
+	Ryu.buildHead(scene, k, rigName)
 
 	-- Arms --------------------------------------------------------------------
 	for _, side in { "Left", "Right" } do
@@ -151,6 +133,86 @@ function Ryu.build(scene: Builder.Scene, rigName: string): Rig.RigDef
 end
 
 -- Poses ---------------------------------------------------------------------
+function Ryu.buildHead(scene: Builder.Scene, k: Builder.Kit, rigName: string)
+	-- Head (face painted on the front) and pompadour --------------------------
+	local face = Paint.canvas(4.4, 0, 0)
+	FaceRig.ryu(face, scene.style.color)
+	Builder.part(scene, rigName, V(1.1, 1.18, 1.1), C(0, 0.72, 0), scene.style.color.rSkin, {
+		shape = "Block",
+		material = scene.style.material.skin,
+		rig = rigName,
+		bone = "Head",
+		name = "Head",
+		gui = { face = "Front", canvas = Vector2.new(440, 472), lightInfluence = scene.style.face.lightInfluence, elems = face.elems },
+	})
+	k.add("Head", "Block", V(0.98, 0.3, 1.0), C(0, 0.18, -0.02), "rSkin", "skin", "Jaw")
+	k.add("Head", "Ellipsoid", V(1.3, 0.78, 1.42), C(0, 1.38, 0.08), "rHair", "hair", "HairTop")
+	k.add("Head", "Ellipsoid", V(1.22, 0.88, 1.05), C(0, 1.5, -0.5) * R(25, 0, 0), "rHair", "hair", "Pompadour")
+	k.add("Head", "Wedge", V(1.05, 0.5, 0.82), C(0, 1.72, -0.98) * R(-14, 180, 0), "rHair", "hair", "PompTip")
+	k.add("Head", "Block", V(1.16, 0.95, 0.24), C(0, 0.98, 0.6), "rHair", "hair", "HairBack")
+	for _, sx in { -1, 1 } do
+		k.add("Head", "Block", V(0.16, 0.78, 1.0), C(sx * 0.6, 0.98, 0.08), "rHair", "hair", "HairSide")
+		k.add("Head", "Block", V(0.1, 0.36, 0.16), C(sx * 0.57, 0.52, -0.12), "rHair", "hair", "Sideburn")
+		k.add("Head", "Block", V(0.08, 0.3, 0.2), C(sx * 0.58, 0.7, 0.08), "rSkin", "skin", "Ear")
+		k.add("Head", "Ellipsoid", V(0.1, 0.08, 1.0), C(sx * 0.26, 1.86, -0.52) * R(25, 0, 0), "rCoatHi", "hair", "HairShine")
+	end
+	-- loose strands falling over the forehead
+	for _, st in { { -0.22, 12 }, { 0.05, -6 }, { 0.28, -16 } } do
+		k.add("Head", "Wedge", V(0.06, 0.5, 0.12), C(st[1], 1.06, -0.58) * R(0, 0, 180 + st[2]) * R(0, 90, 0), "rHair", "hair", "Strand")
+	end
+end
+
+function Ryu.buildBare(k: Builder.Kit)
+	-- trousers, belt and the coat bunched around the hips
+	k.add("LowerTorso", "Block", V(1.6, 0.8, 0.98), C(0, 0.1, 0), "rPants", "cloth", "Pelvis")
+	k.add("LowerTorso", "Block", V(1.64, 0.15, 1.02), C(0, 0.44, 0), "rShoe", "cloth", "Belt")
+	k.add("LowerTorso", "Ellipsoid", V(2.3, 0.7, 1.5), C(0, 0.32, 0.08), "rCoat", "cloth", "CoatBunch")
+	k.add("LowerTorso", "Ellipsoid", V(2.1, 0.5, 1.4), C(0, 0.62, 0.1), "rFur", "fur", "FurBunch")
+	k.add("LowerTorso", "Block", V(1.9, 1.5, 0.2), C(0, -0.45, 0.55) * R(-8, 0, 0), "rCoat", "cloth", "CoatBack")
+	for _, sx in { -1, 1 } do
+		k.add("LowerTorso", "Block", V(0.2, 1.5, 0.9), C(sx * 1.0, -0.4, 0.05) * R(0, 0, sx * 8), "rCoat", "cloth", "CoatSide")
+		k.add("LowerTorso", "Ellipsoid", V(0.5, 0.9, 0.5), C(sx * 1.05, 0.5, 0.3) * R(0, 0, sx * 30), "rFur", "fur", "FurTuft")
+	end
+	-- bare muscular torso: chest and abs at the front, a broad back
+	k.add("UpperTorso", "Block", V(1.92, 1.58, 1.06), C(0, 0.8, 0), "rSkin", "skin", "Torso")
+	for _, sx in { -1, 1 } do
+		k.add("UpperTorso", "Ellipsoid", V(0.95, 0.62, 0.34), C(sx * 0.46, 1.16, -0.48) * R(0, 0, sx * 8), "rSkin", "skin", "Pec")
+		k.add("UpperTorso", "Ellipsoid", V(0.8, 0.05, 0.05), C(sx * 0.45, 0.9, -0.64) * R(0, 0, sx * -6), "rSkinDeep", "skin", "PecLine")
+		-- back: shoulder blades, lats and the trapezius
+		k.add("UpperTorso", "Ellipsoid", V(0.8, 0.9, 0.36), C(sx * 0.48, 1.08, 0.46) * R(0, 0, sx * -10), "rSkin", "skin", "Blade")
+		k.add("UpperTorso", "Ellipsoid", V(0.6, 1.2, 0.3), C(sx * 0.7, 0.55, 0.42) * R(0, 0, sx * 12), "rSkin", "skin", "Lat")
+		k.add("UpperTorso", "Ellipsoid", V(0.7, 0.05, 0.05), C(sx * 0.5, 0.62, 0.58) * R(0, 0, sx * 30), "rSkinDeep", "skin", "BackLine")
+		k.add("UpperTorso", "Ellipsoid", V(0.7, 0.42, 0.5), C(sx * 0.42, 1.55, 0.1) * R(0, 0, sx * -20), "rSkin", "skin", "Trap")
+		k.add("UpperTorso", "Block", V(0.13, 0.22, 0.03), C(sx * 0.075, 0.66, -0.56) * R(0, 0, sx * 8), "rTag", "metal", "Tag")
+		k.add("UpperTorso", "Block", V(0.03, 0.5, 0.02), C(sx * 0.13, 0.98, -0.6) * R(0, 0, sx * 16), "rTag", "metal", "Chain")
+	end
+	k.add("UpperTorso", "Block", V(0.05, 1.3, 0.04), C(0, 0.85, 0.54), "rSkinDeep", "skin", "Spine")
+	for i = 0, 2 do
+		k.add("UpperTorso", "Block", V(0.42, 0.03, 0.02), C(0, 0.72 - i * 0.2, -0.535), "rSkinDeep", "skin", "Abs")
+	end
+	k.add("UpperTorso", "Block", V(0.03, 0.62, 0.02), C(0, 0.56, -0.535), "rSkinDeep", "skin", "AbsMid")
+	k.add("UpperTorso", "Ellipsoid", V(0.62, 0.55, 0.6), C(0, 1.62, 0), "rSkin", "skin", "Neck")
+	-- bare arms
+	for _, side in { "Left", "Right" } do
+		local sx = if side == "Left" then -1 else 1
+		k.add(side .. "UpperArm", "Ellipsoid", V(0.82, 1.4, 0.86), C(0, -0.52, 0), "rSkin", "skin", "Biceps")
+		k.add(side .. "UpperArm", "Ellipsoid", V(0.95, 0.7, 0.95), C(0, -0.05, 0), "rSkin", "skin", "Shoulder")
+		k.add(side .. "LowerArm", "Ellipsoid", V(0.7, 1.2, 0.72), C(0, -0.48, 0), "rSkin", "skin", "Forearm")
+		local hand = side .. "Hand"
+		k.add(hand, "Block", V(0.48, 0.42, 0.24), C(0, -0.22, 0), "rSkin", "skin", "Palm")
+		for fi = 0, 3 do
+			local fx = (fi - 1.5) * 0.115
+			k.add(hand, "Block", V(0.1, 0.36, 0.12), C(fx, -0.58, -0.02) * R(-12, 0, (fi - 1.5) * -4), "rSkin", "skin", "Finger")
+		end
+		k.add(hand, "Block", V(0.11, 0.3, 0.12), C(sx * -0.26, -0.3, -0.1) * R(-25, 0, sx * -30), "rSkin", "skin", "Thumb")
+	end
+	for _, side in { "Left", "Right" } do
+		k.add(side .. "UpperLeg", "Block", V(0.8, 1.36, 0.84), C(0, -0.62, 0), "rPants", "cloth")
+		k.add(side .. "LowerLeg", "Block", V(0.72, 1.3, 0.76), C(0, -0.6, 0), "rPants", "cloth")
+		k.add(side .. "Foot", "Block", V(0.74, 0.32, 1.12), C(0, -0.04, -0.18), "rShoe", "cloth")
+	end
+end
+
 Ryu.poses = {
 	-- standing in profile, right arm straight out, finger pointing at the enemy
 	point = {

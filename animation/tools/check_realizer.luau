@@ -18,9 +18,10 @@ local Scene = Loader.load("src/Cutscene/Scene")
 local Realizer = Loader.load("src/Cutscene/Realizer")
 
 local ok = true
-for _, id in { "cinema" } do
+for _, run in { { id = "cinema", part = 1 }, { id = "cinema", part = 2 } } do
+	local id, part = run.id, run.part
 	local success, err = pcall(function()
-		local live = Realizer.build(id, Workspace)
+		local live = Realizer.build(id, Workspace, part)
 		-- the overlay layers become Frames in a ScreenGui container
 		local sg = roblox.Instance.new("ScreenGui")
 		local safe = roblox.Instance.new("Frame")
@@ -48,7 +49,7 @@ for _, id in { "cinema" } do
 				emitters += 1
 			end
 		end
-		print(string.format("%-8s parts=%d surfaceGuis=%d frames=%d lights=%d emitters=%d overlay=%d lighting=[%s]", id, count, guis, frames, lights, emitters, overlay, table.concat(fx, ",")))
+		print(string.format("%-8s part %d: parts=%d surfaceGuis=%d frames=%d lights=%d emitters=%d overlay=%d lighting=[%s]", id, part, count, guis, frames, lights, emitters, overlay, table.concat(fx, ",")))
 		Realizer.destroy(live)
 	end)
 	if not success then

@@ -186,7 +186,11 @@ layout()
 camera:GetPropertyChangedSignal("ViewportSize"):Connect(layout)
 RunService.RenderStepped:Wait()
 
-local live = Realizer.build("cinema", Workspace)
+-- which part this place plays (ReplicatedStorage.CutscenePart, default 1)
+local partValue = game:GetService("ReplicatedStorage"):FindFirstChild("CutscenePart")
+local part = if partValue and partValue:IsA("IntValue") then partValue.Value else 1
+local live = Realizer.build("cinema", Workspace, part)
+local DURATION = Scene.duration(live.scene)
 Realizer.buildOverlay(live, safe)
 local shots = Scene.shots(live.scene)
 local vig = live.scene.style.vignette
@@ -208,9 +212,9 @@ end
 
 local function updateHud(shotId: string)
 	hud.Text = string.format(
-		"<b>Юта vs Рю — часть 1</b> · стиль «Кино»\nt = %.2f / %.2f с · план %s %s%s\n<font transparency='0.35'>R заново · Пробел пауза · ←/→ кадр · J/K план · S субтитры · L повтор · H скрыть</font>",
+		"<b>Юта vs Рю — часть " .. part .. "</b> · стиль «Кино»\nt = %.2f / %.2f с · план %s %s%s\n<font transparency='0.35'>R заново · Пробел пауза · ←/→ кадр · J/K план · S субтитры · L повтор · H скрыть</font>",
 		t,
-		Scene.DURATION,
+		DURATION,
 		shotId,
 		if playing then "" else "[пауза] ",
 		if looping then "[повтор]" else ""
@@ -230,7 +234,7 @@ UserInputService.InputBegan:Connect(function(input, processed)
 		playing = not playing
 	elseif k == Enum.KeyCode.Right then
 		playing = false
-		t = math.min(Scene.DURATION, t + 1 / 30)
+		t = math.min(DURATION, t + 1 / 30)
 	elseif k == Enum.KeyCode.Left then
 		playing = false
 		t = math.max(0, t - 1 / 30)
@@ -255,8 +259,8 @@ end)
 RunService:BindToRenderStep("Cutscene", Enum.RenderPriority.Camera.Value + 1, function(dt: number)
 	camera.CameraType = Enum.CameraType.Scriptable
 	if playing then
-		if t < Scene.DURATION then
-			t = math.min(Scene.DURATION, t + dt)
+		if t < DURATION then
+			t = math.min(DURATION, t + dt)
 		else
 			holdTimer += dt
 			if holdTimer >= HOLD and looping then
@@ -265,7 +269,7 @@ RunService:BindToRenderStep("Cutscene", Enum.RenderPriority.Camera.Value + 1, fu
 			end
 		end
 	end
-	local frame = Scene.evaluate(live.scene, math.min(t, Scene.DURATION - 0.001))
+	local frame = Scene.evaluate(live.scene, math.min(t, DURATION - 0.001))
 	Realizer.apply(live, frame, camera, fovScale)
 	local f = frame.flash
 	if f and f.alpha > 0 then

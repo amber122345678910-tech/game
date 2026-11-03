@@ -34,7 +34,8 @@ end
 local fov = tonumber(process.args[4] or "12")
 local dist = tonumber(process.args[5] or "0")
 
-local scene = Scene.build("cinema")
+local PART = tonumber(process.env.PART or "1") or 1 -- PART=2 for part 2
+local scene = Scene.build("cinema", PART)
 local json = E.sceneJson(scene, Particles)
 json.fps = 30
 json.frames = {}

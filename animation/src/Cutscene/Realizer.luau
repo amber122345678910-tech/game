@@ -296,8 +296,8 @@ local function makeEmitter(spec: Builder.EmitterSpec, parent: BasePart): Particl
 	return pe
 end
 
-function Realizer.build(styleId: string, parent: Instance): Live
-	local scene = Scene.build(styleId)
+function Realizer.build(styleId: string, parent: Instance, part: number?): Live
+	local scene = Scene.build(styleId, part)
 	local root = Instance.new("Folder")
 	root.Name = "Cutscene"
 	local live: Live = {

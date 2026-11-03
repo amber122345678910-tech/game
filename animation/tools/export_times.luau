@@ -7,7 +7,8 @@ local Loader = require("./loader")
 local E = require("./exportlib")
 local Scene = Loader.load("src/Cutscene/Scene")
 local Particles = Loader.load("src/Cutscene/Particles")
-local scene = Scene.build("cinema")
+local PART = tonumber(process.env.PART or "1") or 1 -- PART=2 for part 2
+local scene = Scene.build("cinema", PART)
 local json = E.sceneJson(scene, Particles)
 json.fps = 30
 json.frames = {}

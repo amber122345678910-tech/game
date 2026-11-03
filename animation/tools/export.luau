@@ -1,7 +1,7 @@
 --!nocheck
 -- Exports the scene and its frames as JSON for the offline preview.
 -- Runs the exact same Luau scene/timeline code as Roblox does.
--- Usage: lune run tools/export.luau <out.json> [fps] [t0] [t1] [step]
+-- Usage: [PART=2] lune run tools/export.luau <out.json> [fps] [t0] [t1] [step]
 --   step > 1 exports every n-th frame (quick contact sheets)
 local fs = require("@lune/fs")
 local serde = require("@lune/serde")
@@ -17,10 +17,14 @@ local Particles = Loader.load(root .. "/Particles")
 local outPath = process.args[1] or "build/part1.json"
 local fps = tonumber(process.args[2] or "30")
 local t0 = tonumber(process.args[3] or "0")
-local t1 = tonumber(process.args[4] or tostring(Scene.DURATION))
+local t1 = tonumber(process.args[4] or "0")
 local step = tonumber(process.args[5] or "1")
 
-local scene = Scene.build("cinema")
+local PART = tonumber(process.env.PART or "1") or 1 -- PART=2 for part 2
+local scene = Scene.build("cinema", PART)
+if t1 <= 0 then
+	t1 = Scene.duration(scene)
+end
 local json = E.sceneJson(scene, Particles)
 json.fps = fps / step
 local n = math.floor((t1 - t0) * fps + 0.5)

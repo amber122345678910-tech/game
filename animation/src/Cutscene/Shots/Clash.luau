@@ -196,6 +196,8 @@ local function void(ctx: Timeline.Ctx, col: Color3)
 	end
 	ctx:fog(0.15)
 end
+Clash.void = void
+Clash.O = O
 
 local function grade(ctx: Timeline.Ctx, contrast: number, sat: number, bright: number?)
 	ctx:grade({ brightness = bright or 0, contrast = contrast, saturation = sat, tint = Color3.new(1, 1, 1) })
