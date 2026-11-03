@@ -136,7 +136,8 @@ local function rikaFires(ctx: Timeline.Ctx)
 	local root = C(Field.RIKA + V(4, 0, 0)) * CFrame.Angles(0, math.rad(84), 0)
 	local bones = ctx:rig("Rika", root, Cast.rika.roar)
 	local mouth = (bones.Head * C(0, 0.7, -1.9)).Position
-	local cam = Util.lookAt(mouth + V(-8, -1, 13), mouth + V(-10, -1, 0))
+	-- her skull in the upper right, the beam sweeping out to the left
+	local cam = Util.lookAt(mouth + V(-6.5, -3.2, 12), mouth + V(-6.5, -1.6, 0))
 	ctx:camera(Clash.shake(cam, ctx.t, 0.5, 22), 62)
 	ctx:focus(14, 0)
 	FX.placeBeam(ctx, h.pink, mouth, mouth + root.LookVector * 90 + V(0, -3, 0), 4.5 + ctx.u * 2, 1, 2)
