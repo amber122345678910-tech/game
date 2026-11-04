@@ -53,9 +53,9 @@ function Yuta.build(scene: Builder.Scene, rigName: string): Rig.RigDef
 	k.add("UpperTorso", "Ellipsoid", V(0.48, 0.72, 0.05), C(-0.64, 1.12, -0.49) * R(0, 0, -12), "yBlood", "cloth", "Blood")
 	k.add("UpperTorso", "Ellipsoid", V(0.66, 0.05, 0.86), C(-0.84, 1.53, -0.02), "yBlood", "cloth", "Blood")
 	k.add("UpperTorso", "Ellipsoid", V(0.05, 0.6, 0.7), C(-1.18, 1.25, -0.05), "yBlood", "cloth", "Blood")
-	k.add("UpperTorso", "Ellipsoid", V(0.35, 0.6, 0.12), C(-0.3, 0.9, -0.48) * R(0, 0, 15), "yBloodDark", "cloth", "BloodDrip")
-	k.add("UpperTorso", "Ellipsoid", V(0.7, 0.5, 0.12), C(-0.15, 0.2, -0.48) * R(0, 0, -10), "yBlood", "cloth", "BloodBelly")
-	k.add("UpperTorso", "Ellipsoid", V(0.3, 0.24, 0.1), C(0.25, 0.32, -0.49), "yBloodDark", "cloth", "BloodBelly")
+	-- a thin run of blood down from the shoulder (no round spots)
+	k.add("UpperTorso", "Ellipsoid", V(0.14, 0.62, 0.04), C(-0.42, 0.82, -0.485) * R(0, 0, 12), "yBloodDark", "cloth", "BloodDrip")
+	k.add("UpperTorso", "Ellipsoid", V(0.09, 0.4, 0.04), C(-0.3, 0.7, -0.485) * R(0, 0, 4), "yBlood", "cloth", "BloodDrip")
 	-- tall rounded collar of the jujutsu uniform, opened a little at the front
 	for i = 0, 7 do
 		local a = math.rad(-150 + i * (300 / 7))

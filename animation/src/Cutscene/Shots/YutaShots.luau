@@ -191,25 +191,54 @@ local function feet(ctx: Timeline.Ctx)
 end
 
 -- 31: charging straight at the camera through mist and purple sparks
+-- Yuta's slow-motion charge out of the fog: a long low stride, the body
+-- pitched forward ~40 degrees, the head up looking from under his brows,
+-- one arm bent low in front, the other swung back (phase in cycles)
+local function slowCharge(phase: number): Rig.Pose
+	local s = math.sin(phase * math.pi * 2)
+	local c = math.cos(phase * math.pi * 2)
+	local lean = 40
+	return {
+		HumanoidRootPart = CFrame.new(0, -0.35 + math.abs(c) * 0.18, 0),
+		LowerTorso = R(-lean, s * 6, 0),
+		UpperTorso = R(-6, -s * 10, 0),
+		Head = R(lean * 0.8, s * 4, 0),
+		LeftUpperArm = R(30 - s * 26, 0, -12),
+		LeftLowerArm = R(80, 0, 0),
+		LeftHand = R(10, 0, 0),
+		RightUpperArm = R(-30 + s * 26, 0, 12),
+		RightLowerArm = R(56, 0, 0),
+		LeftUpperLeg = R(lean + s * 46, 0, -2),
+		LeftLowerLeg = R(-math.max(0, -c) * 95 - 18, 0, 0),
+		LeftFoot = R(16, 0, 0),
+		RightUpperLeg = R(lean - s * 46, 0, 2),
+		RightLowerLeg = R(-math.max(0, c) * 95 - 18, 0, 0),
+		RightFoot = R(16, 0, 0),
+	}
+end
+
 local function charge(ctx: Timeline.Ctx)
 	local h: H = ctx.scene.data.yuta
-	-- slow motion: the stride and the ground covered slow down together
-	-- (1 run cycle a second = ~5 studs a second, no sliding feet), the camera
-	-- holds still so he comes out of the mist towards it; sparks drift slowly
+	-- slow motion: about one step in the shot; he advances as far as the
+	-- stride carries him (no sliding feet) while the camera pushes in low
+	-- at chest height, so he comes out of the fog towards us
 	local start = Field.RYU + V(0, 0, -30)
 	local lt = ctx.t - 43.867
-	local pos = start + V(0, 0, lt * 4.8)
-	local yb = ctx:rig("Yuta", C(pos) * CFrame.Angles(0, math.rad(180), 0), Cast.run(0.15 + lt * 1.0, 28))
+	local phase = 0.2 + lt * 0.55
+	local pos = start + V(0, 0, lt * 3.6)
+	local yb = ctx:rig("Yuta", C(pos) * CFrame.Angles(0, math.rad(180), 0), Cast.alive(slowCharge(phase), ctx.t))
 	Cast.expr(ctx, "yuta", "focus")
 	local head = yb.Head * C(0, 0.6, 0)
-	local camPos = start + V(0.7, 4.0, 13.5)
-	local cam = Util.lookAt(camPos, start + V(0, 3.3, lt * 4.8))
-	ctx:camera(Clash.shake(cam, ctx.t, 0.04, 3), 50)
+	local push = Util.smoothstep(43.867, 44.8, ctx.t)
+	local camPos = start + V(0.5, 3.0, 15 - push * 4.2)
+	local cam = Util.lookAt(camPos, pos + V(0, 3.2, 0))
+	ctx:camera(Clash.shake(cam, ctx.t, 0.04, 3), 48)
 	ctx:focus((head.Position - camPos).Magnitude, 1)
-	FX.placeBurst(ctx, h.sparks, head.Position + V(4, 0, 2), lt % 1.3, 12, 0.22, 1.3, V(-1, 0.1, 0.4), 0.5, 0)
+	FX.placeBurst(ctx, h.sparks, head.Position + V(4, 0, 2), lt % 1.3, 12, 0.12, 1.3, V(-1, 0.1, 0.4), 0.5, 0)
 	ctx:alpha("streaks", 0.85)
-	grade(ctx, -0.02, 0.15, -0.05, Color3.fromRGB(230, 225, 255))
-	Field.mist(ctx, "heavy", 12)
+	ctx:wind(1.6)
+	grade(ctx, -0.1, 0.2, 0.15, Color3.fromRGB(165, 182, 255))
+	Field.mist(ctx, "heavy", 12 - push * 4)
 end
 
 -- 32: close-up, determined, blood soaked shoulder
