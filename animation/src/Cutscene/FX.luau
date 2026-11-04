@@ -31,18 +31,55 @@ end
 FX.along = along
 
 ------------------------------------------------------------------------------
--- Beam: white-hot core, coloured glow, soft outer halo (+ optional light)
+-- Beam: a white-hot core, a coloured glow, a soft halo and a wide haze, all
+-- with round caps (capsule ends); bright bands spiral along it, sparks fly
+-- off it and thin lightning crackles round it (+ optional light)
 ------------------------------------------------------------------------------
-export type Beam = { core: Part, glow: Part, halo: Part, tip: Part, light: string? }
+export type Beam = {
+	core: Part,
+	glow: Part,
+	halo: Part,
+	haze: Part,
+	tip: Part,
+	caps: { Part },
+	streaks: { Part },
+	sparks: { Part },
+	bolt: Bolt,
+	light: string?,
+}
+
+local STREAKS, SPARKS = 8, 10
 
 function FX.beam(scene: Builder.Scene, name: string, color: Color3, withLight: boolean?): Beam
-	local core = Builder.fx(scene, "FX_" .. name, "Cylinder", Vector3.one, Util.mix(color, Color3.new(1, 1, 1), 0.75), "Neon", 0, name .. "Core")
-	local glow = Builder.fx(scene, "FX_" .. name, "Cylinder", Vector3.one, color, "Neon", 0.35, name .. "Glow")
-	local halo = Builder.fx(scene, "FX_" .. name, "Cylinder", Vector3.one, color, "Neon", 0.78, name .. "Halo")
-	local tip = Builder.fx(scene, "FX_" .. name, "Ball", Vector3.one, Util.mix(color, Color3.new(1, 1, 1), 0.6), "Neon", 0.1, name .. "Tip")
-	local b: Beam = { core = core, glow = glow, halo = halo, tip = tip, light = nil }
+	local model = "FX_" .. name
+	local hot = Util.mix(color, Color3.new(1, 1, 1), 0.75)
+	local function p(shape: string, col: Color3, tr: number, n: string): Part
+		return Builder.fx(scene, model, shape, Vector3.one, col, "Neon", tr, name .. n)
+	end
+	local b: Beam = {
+		core = p("Cylinder", hot, 0, "Core"),
+		glow = p("Cylinder", color, 0.3, "Glow"),
+		halo = p("Cylinder", color, 0.72, "Halo"),
+		haze = p("Cylinder", color, 0.9, "Haze"),
+		tip = p("Ball", Util.mix(color, Color3.new(1, 1, 1), 0.6), 0.1, "Tip"),
+		caps = {},
+		streaks = {},
+		sparks = {},
+		bolt = FX.bolts(scene, name .. "Crackle", Util.mix(color, Color3.new(1, 1, 1), 0.4), 12),
+		light = nil,
+	}
+	for i = 1, 6 do
+		local layer = (i - 1) % 3
+		b.caps[i] = p("Ball", if layer == 0 then hot else color, ({ 0, 0.3, 0.72 })[layer + 1], "Cap")
+	end
+	for i = 1, STREAKS do
+		b.streaks[i] = p("Ellipsoid", Util.mix(color, Color3.new(1, 1, 1), if i % 2 == 0 then 0.85 else 0.45), 0.15, "Streak")
+	end
+	for i = 1, SPARKS do
+		b.sparks[i] = p("Ball", Util.mix(color, Color3.new(1, 1, 1), 0.55), 0, "Spark")
+	end
 	if withLight then
-		Builder.light(scene, name .. "Light", "Point", tip, color, 40)
+		Builder.light(scene, name .. "Light", "Point", b.tip, color, 40)
 		b.light = name .. "Light"
 	end
 	return b
@@ -53,18 +90,76 @@ function FX.placeBeam(ctx: Timeline.Ctx, b: Beam, a: Vector3, c: Vector3, width:
 	if k <= 0.001 then
 		return
 	end
-	local len = (c - a).Magnitude
-	local w = width * (1 + math.sin(ctx.t * 60) * 0.06 * (wobble or 1))
-	local cf = along(a, c, ctx.t * 9)
-	ctx:place(b.core, cf)
-	ctx:prop(b.core, { s = Vector3.new(len, w * 0.38, w * 0.38), t = 1 - k })
-	ctx:place(b.glow, cf)
-	ctx:prop(b.glow, { s = Vector3.new(len, w * 0.75, w * 0.75), t = 1 - k * 0.65 })
-	ctx:place(b.halo, cf)
-	ctx:prop(b.halo, { s = Vector3.new(len * 1.02, w * 1.5, w * 1.5), t = 1 - k * 0.22 })
+	local t = ctx.t
+	local d = c - a
+	local len = d.Magnitude
+	if len < 1e-3 then
+		return
+	end
+	local dir = d / len
+	-- the width breathes and flickers
+	local w = width * (1 + (math.sin(t * 60) * 0.05 + math.sin(t * 23 + 1.3) * 0.04) * (wobble or 1))
+	local cf = along(a, c, t * 9)
+	local layers = { { b.core, 0.36, 1 - k }, { b.glow, 0.72, 1 - k * 0.7 }, { b.halo, 1.35, 1 - k * 0.3 }, { b.haze, 2.4, 1 - k * 0.12 } }
+	for li, L in layers do
+		local part, f, tr = L[1] :: Part, L[2] :: number, L[3] :: number
+		ctx:place(part, cf)
+		ctx:prop(part, { s = Vector3.new(len, w * f, w * f), t = tr })
+		-- round caps on the three inner layers, at both ends
+		if li <= 3 then
+			for e = 0, 1 do
+				-- the start (at a hand or a mouth) is a little narrower
+				local cap = b.caps[li + e * 3]
+				ctx:place(cap, CFrame.new(if e == 0 then a else c))
+				ctx:prop(cap, { s = Vector3.one * w * f * (if e == 0 then 0.7 else 1), t = tr })
+			end
+		end
+	end
+	-- the bright head
 	ctx:place(b.tip, CFrame.new(c))
-	local tw = w * (1.6 + math.sin(ctx.t * 47) * 0.2)
+	local tw = w * (1.7 + math.sin(t * 47) * 0.2)
 	ctx:prop(b.tip, { s = Vector3.new(tw, tw, tw), t = 1 - k * 0.9 })
+	-- bands spiralling along the beam towards the head
+	local side1 = dir:Cross(Vector3.new(0, 1, 0))
+	if side1.Magnitude < 1e-3 then
+		side1 = dir:Cross(Vector3.new(1, 0, 0))
+	end
+	side1 = side1.Unit
+	local side2 = dir:Cross(side1).Unit
+	local speed = math.max(30, len * 1.6)
+	for i, sp in b.streaks do
+		local f = (t * speed / len + i / #b.streaks) % 1
+		local ang = t * 7 + i * 2.39 + f * 9
+		local r = w * (0.34 + 0.08 * math.sin(i * 1.7))
+		local center = a + d * f + (side1 * math.cos(ang) + side2 * math.sin(ang)) * r
+		local sl = math.min(len * 0.22, w * 3.5)
+		ctx:place(sp, along(center - dir * sl / 2, center + dir * sl / 2))
+		local fade = math.sin(f * math.pi)
+		ctx:prop(sp, { s = Vector3.new(sl, w * 0.09, w * 0.09), t = 1 - k * 0.9 * fade })
+	end
+	-- sparks thrown off sideways
+	local rr = Util.rng(len * 13 + 7)
+	for i, sp in b.sparks do
+		local f0 = Util.randRange(rr, 0.05, 1)
+		local a0 = Util.randRange(rr, 0, math.pi * 2)
+		local ph = (t * Util.randRange(rr, 1.2, 2.4) + i * 0.37) % 1
+		local out = side1 * math.cos(a0) + side2 * math.sin(a0)
+		local pos = a + d * f0 + out * (w * 0.4 + ph * w * 2.6) + dir * ph * w * 1.5
+		local s = w * 0.13 * (1 - ph)
+		ctx:place(sp, along(pos - dir * s * 1.5, pos + dir * s * 1.5))
+		ctx:prop(sp, { s = Vector3.new(s * 3, s, s), t = ph * 0.6 + (1 - k) })
+	end
+	-- two thin bolts crackling along the surface
+	local step = math.floor(t * 18)
+	local br = Util.rng(step * 31 + math.floor(len))
+	local idx = 1
+	for j = 1, 2 do
+		local f1 = Util.randRange(br, 0, 0.7)
+		local f2 = math.min(1, f1 + Util.randRange(br, 0.12, 0.3))
+		local a1 = Util.randRange(br, 0, math.pi * 2)
+		local o1 = (side1 * math.cos(a1) + side2 * math.sin(a1)) * w * 0.55
+		idx = FX.placeBolt(ctx, b.bolt, idx, a + d * f1 + o1, a + d * f2 + o1 * 1.2, 6, 0.12, w * 0.045, j + step, 18)
+	end
 	if b.light then
 		ctx:light(b.light, 6 * k, nil, 30 + width * 4)
 	end
@@ -77,17 +172,21 @@ end
 -- Curved beam: a chain of short glowing segments (core, glow, soft halo)
 -- laid along any curve, overlapping so the bends stay round
 ------------------------------------------------------------------------------
-export type CurvedBeam = { cores: { Part }, glows: { Part }, halos: { Part }, n: number }
+export type CurvedBeam = { cores: { Part }, glows: { Part }, halos: { Part }, hazes: { Part }, joints: { Part }, head: Part, n: number }
 
 function FX.curvedBeam(scene: Builder.Scene, name: string, color: Color3, n: number): CurvedBeam
-	local cores, glows, halos = {}, {}, {}
+	local cores, glows, halos, hazes, joints = {}, {}, {}, {}, {}
 	local hot = Util.mix(color, Color3.new(1, 1, 1), 0.75)
 	for i = 1, n do
 		cores[i] = Builder.fx(scene, "FX_" .. name, "Cylinder", Vector3.one, hot, "Neon", 0, name .. "Core")
 		glows[i] = Builder.fx(scene, "FX_" .. name, "Cylinder", Vector3.one, color, "Neon", 0.35, name .. "Glow")
 		halos[i] = Builder.fx(scene, "FX_" .. name, "Cylinder", Vector3.one, color, "Neon", 0.8, name .. "Halo")
+		hazes[i] = Builder.fx(scene, "FX_" .. name, "Cylinder", Vector3.one, color, "Neon", 0.92, name .. "Haze")
+		-- round joints between segments (glow layer) so the bends stay round
+		joints[i] = Builder.fx(scene, "FX_" .. name, "Ball", Vector3.one, color, "Neon", 0.35, name .. "Joint")
 	end
-	return { cores = cores, glows = glows, halos = halos, n = n }
+	local head = Builder.fx(scene, "FX_" .. name, "Ball", Vector3.one, hot, "Neon", 0.1, name .. "Head")
+	return { cores = cores, glows = glows, halos = halos, hazes = hazes, joints = joints, head = head, n = n }
 end
 
 -- point(f) gives the curve; the beam covers f0..f1 and swells near its head
@@ -109,6 +208,15 @@ function FX.placeCurvedBeam(ctx: Timeline.Ctx, cb: CurvedBeam, point: (number) -
 		ctx:prop(cb.glows[i], { s = Vector3.new(len + w * 0.75, w * 0.75, w * 0.75), t = 1 - k * 0.65 })
 		ctx:place(cb.halos[i], cf)
 		ctx:prop(cb.halos[i], { s = Vector3.new(len + w * 1.5, w * 1.5, w * 1.5), t = 1 - k * 0.22 })
+		ctx:place(cb.hazes[i], cf)
+		ctx:prop(cb.hazes[i], { s = Vector3.new(len + w * 2.4, w * 2.4, w * 2.4), t = 1 - k * 0.1 })
+		ctx:place(cb.joints[i], CFrame.new(a))
+		ctx:prop(cb.joints[i], { s = Vector3.one * w * 0.75, t = 1 - k * 0.65 })
+		if i == cb.n then
+			local hw = w * (1.5 + math.sin(ctx.t * 41) * 0.15)
+			ctx:place(cb.head, CFrame.new(b))
+			ctx:prop(cb.head, { s = Vector3.one * hw, t = 1 - k * 0.9 })
+		end
 	end
 end
 
@@ -261,6 +369,7 @@ function FX.placeRays(ctx: Timeline.Ctx, rays: Rays, center: Vector3, basis: CFr
 	local step = math.floor(ctx.t * (rate or 12))
 	for i, p in rays.parts do
 		local r = Util.rng(rays.seed * 1000 + i * 97 + step * 7)
+		Util.rand(r) -- the first value barely changes between nearby seeds
 		local ang = Util.randRange(r, 0, math.pi * 2)
 		local el = Util.randRange(r, -0.5, 0.5)
 		local dir = basis:VectorToWorldSpace(Vector3.new(math.cos(ang), math.sin(ang), el)).Unit
