@@ -79,9 +79,9 @@ function Ryu.build(scene: Builder.Scene, rigName: string, bare: boolean?, loose:
 	-- outward and up in three rings (outer longest); the front stays open
 	-- so the face shows
 	local rings = {
-		{ n = 46, rx = 1.32, rz = 0.82, y = 1.74, len0 = 0.8, len1 = 1.45, w = 0.15, lift = 0.9 },
-		{ n = 36, rx = 1.1, rz = 0.68, y = 1.86, len0 = 0.6, len1 = 1.05, w = 0.16, lift = 1.3 },
-		{ n = 26, rx = 0.86, rz = 0.55, y = 1.98, len0 = 0.42, len1 = 0.7, w = 0.17, lift = 1.8 },
+		{ n = 46, rx = 1.26, rz = 0.8, y = 1.74, len0 = 0.56, len1 = 0.98, w = 0.15, lift = 0.9 },
+		{ n = 36, rx = 1.06, rz = 0.66, y = 1.86, len0 = 0.44, len1 = 0.74, w = 0.16, lift = 1.3 },
+		{ n = 26, rx = 0.84, rz = 0.54, y = 1.98, len0 = 0.32, len1 = 0.52, w = 0.17, lift = 1.8 },
 	}
 	for ri, rg in rings do
 		for i = 0, rg.n - 1 do

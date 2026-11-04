@@ -21,6 +21,11 @@ FaceRig.expr = {
 		gasp = { "ryu:eyes:wide", "ryu:brows:raised", "ryu:mouth:talk" },
 		grit = { "ryu:eyes:wide", "ryu:brows:angry", "ryu:mouth:grin" },
 		strain = { "ryu:eyes:narrow", "ryu:brows:angry", "ryu:mouth:talk" },
+		berserk = { "ryu:eyes:blank", "ryu:brows:angry", "ryu:mouth:grin" },
+		growl = { "ryu:eyes:blank", "ryu:brows:angry", "ryu:mouth:talk" },
+		hit = { "ryu:eyes:narrow", "ryu:brows:raised", "ryu:mouth:talk" },
+		roar = { "ryu:eyes:blank", "ryu:brows:angry", "ryu:mouth:laugh" },
+		heh = { "ryu:eyes:wide", "ryu:brows:angry", "ryu:mouth:laugh" },
 	},
 	yuta = {
 		neutral = { "yuta:eyes:normal", "yuta:brows:calm", "yuta:mouth:closed" },
@@ -29,6 +34,13 @@ FaceRig.expr = {
 		shout = { "yuta:eyes:wide", "yuta:brows:tense", "yuta:mouth:open" },
 		glare = { "yuta:eyes:normal", "yuta:brows:tense", "yuta:mouth:closed" },
 		smirk = { "yuta:eyes:normal", "yuta:brows:calm", "yuta:mouth:smirk" },
+		startle = { "yuta:eyes:wide", "yuta:brows:tense", "yuta:mouth:closed" },
+		gasp = { "yuta:eyes:wide", "yuta:brows:tense", "yuta:mouth:talk" },
+		-- part 3: doubled over, the eyes lost in the shadow of the fringe,
+		-- teeth clenched; then the eyes fly open
+		shadow = { "yuta:eyes:shadow", "yuta:mouth:grit" },
+		grit = { "yuta:eyes:wide", "yuta:brows:tense", "yuta:mouth:grit" },
+		cold = { "yuta:eyes:normal", "yuta:brows:tense", "yuta:mouth:closed" },
 	},
 }
 
@@ -64,6 +76,14 @@ function FaceRig.ryu(c: Paint.Canvas, pal: { [string]: Color3 })
 		local g = "ryu:eyes:" .. v.name
 		eye(30, -1, v.h, g)
 		eye(70, 1, v.h, g)
+	end
+	-- berserk: wide white eyes with no irises (part 3)
+	c:setGroup("ryu:eyes:blank")
+	for _, e in { { cx = 30, dir = -1 }, { cx = 70, dir = 1 } } do
+		local inner, outer = e.cx + e.dir * -10, e.cx + e.dir * 11
+		c:stroke({ { inner, 50 }, { e.cx, 51 }, { outer, 48 } }, { 6, 10, 4 }, white)
+		c:stroke({ { inner + e.dir * -1, 46.5 }, { e.cx, 44.5 }, { outer + e.dir * 1.5, 43.2 } }, { 1.6, 2.6, 1.2 }, line)
+		c:stroke({ { inner, 50.5 }, { e.cx, 55 }, { outer, 49 } }, { 0.4, 0.9, 0.4 }, line)
 	end
 
 	-- brows
@@ -110,6 +130,21 @@ function FaceRig.ryu(c: Paint.Canvas, pal: { [string]: Color3 })
 	c:stroke({ { 40, 82.4 }, { 50, 83.6 }, { 60, 82.4 } }, { 1.2, 2.4, 1.2 }, teeth)
 	c:stroke({ { 39, 83 }, { 50, 82.6 }, { 61, 83 } }, { 0.9, 1.2, 0.9 }, line)
 	c:stroke({ { 39, 83 }, { 50, 91.5 }, { 61, 83 } }, { 0.9, 1.4, 0.9 }, line)
+
+	-- part 3: his face running with blood: a patch on the forehead, a smear
+	-- across the eyes, streams down over the nose to the mouth, drips
+	c:setGroup("ryu:blood")
+	local blood, bloodDark = Color3.fromRGB(150, 18, 26), Color3.fromRGB(96, 8, 16)
+	c:stroke({ { 36, 20 }, { 46, 26 }, { 52, 34 } }, { 5, 8, 5 }, blood)
+	c:stroke({ { 20, 47 }, { 34, 45 }, { 48, 48 }, { 58, 46 } }, { 2, 4.5, 4, 1.5 }, blood)
+	c:stroke({ { 50, 30 }, { 48, 44 }, { 47, 58 }, { 45, 70 }, { 42, 80 } }, { 3, 3.6, 3, 2.4, 1.6 }, blood)
+	c:stroke({ { 53, 36 }, { 55, 52 }, { 57, 66 }, { 58, 78 } }, { 2, 2.4, 2, 1.2 }, blood)
+	c:stroke({ { 40, 46 }, { 38, 58 }, { 37, 66 } }, { 1.6, 1.4, 0.6 }, blood)
+	c:stroke({ { 47, 34 }, { 47.5, 48 }, { 46, 62 } }, { 0.6, 0.9, 0.5 }, bloodDark)
+	c:stroke({ { 36, 84 }, { 34, 92 }, { 35, 99 } }, { 1.6, 1.2, 0.5 }, blood)
+	c:stroke({ { 64, 84 }, { 65, 91 } }, { 1.4, 0.6 }, blood)
+	c:circle(60, 74, 1.1, blood)
+	c:circle(26, 58, 0.9, blood)
 	c:setGroup(nil)
 end
 
@@ -164,6 +199,33 @@ function FaceRig.yuta(c: Paint.Canvas, pal: { [string]: Color3 })
 	c:setGroup("yuta:mouth:smirk")
 	c:stroke({ { 43, 82.4 }, { 50, 82.6 }, { 56, 81.2 }, { 59, 79.6 } }, { 0.6, 1.1, 1.0, 0.4 }, line)
 	c:stroke({ { 57.5, 80.4 }, { 59.4, 81.6 } }, { 0.5, 0.3 }, deep)
+
+	-- part 3 -----------------------------------------------------------------
+	-- the eyes lost in the black shadow of the fringe (head bowed)
+	c:setGroup("yuta:eyes:shadow")
+	local shade = Color3.fromRGB(26, 24, 34)
+	c:stroke({ { 10, 44 }, { 30, 47 }, { 50, 50 }, { 70, 47 }, { 90, 44 } }, { 10, 15, 13, 15, 10 }, shade)
+	c:stroke({ { 14, 56 }, { 30, 58 }, { 46, 57 } }, { 1, 2.4, 1 }, shade)
+	c:stroke({ { 54, 57 }, { 70, 58 }, { 86, 56 } }, { 1, 2.4, 1 }, shade)
+	-- clenched teeth, bared
+	c:setGroup("yuta:mouth:grit")
+	local teeth = Color3.fromRGB(240, 238, 232)
+	c:stroke({ { 38, 80 }, { 44, 82.4 }, { 50, 83 }, { 56, 82.4 }, { 62, 80 } }, { 1.5, 4, 4.6, 4, 1.5 }, teeth)
+	c:stroke({ { 38, 80 }, { 44, 80.4 }, { 50, 80.6 }, { 56, 80.4 }, { 62, 80 } }, { 0.7, 1, 1, 1, 0.7 }, line)
+	c:stroke({ { 38, 80 }, { 44, 84.6 }, { 50, 85.4 }, { 56, 84.6 }, { 62, 80 } }, { 0.7, 1, 1.1, 1, 0.7 }, line)
+	c:stroke({ { 40, 82 }, { 50, 82.9 }, { 60, 82 } }, { 0.3, 0.5, 0.3 }, deep)
+	for i = -2, 2 do
+		local x = 50 + i * 4.2
+		c:stroke({ { x, 81 }, { x, 84.6 } }, { 0.4, 0.4 }, deep)
+	end
+	-- blood running from the corners of the mouth down the chin
+	c:setGroup("yuta:blood")
+	local blood = Color3.fromRGB(156, 20, 28)
+	c:stroke({ { 40, 82 }, { 39, 89 }, { 40, 96 }, { 39, 100 } }, { 2, 2.2, 1.4, 0.5 }, blood)
+	c:stroke({ { 46, 84 }, { 46, 90 }, { 47, 95 } }, { 1.4, 1.2, 0.4 }, blood)
+	c:stroke({ { 58, 82 }, { 59, 90 }, { 58, 97 } }, { 1.8, 1.6, 0.5 }, blood)
+	c:circle(52, 92, 0.9, blood)
+	c:circle(35, 88, 0.7, blood)
 	c:setGroup(nil)
 end
 

@@ -261,6 +261,56 @@ function Overlay2.build(scene: Builder.Scene)
 	timer(scene, "timer09", "09", black, Color3.fromRGB(226, 228, 232), Color3.fromRGB(22, 23, 28))
 	timer(scene, "timer00", "00", Color3.fromRGB(232, 16, 20), Color3.fromRGB(14, 4, 6), Color3.fromRGB(205, 12, 16))
 
+	-- part 3 (53.8): the frame split by a slanted strip through the middle
+	-- (Ryu's eye shows in it); above it the white fur hem of his jacket with
+	-- Yuta's hand in the black cloth, below it the cloth and Yuta's forearm
+	c = Paint.canvas(1, 0, 0)
+	local navy, cloth = Color3.fromRGB(44, 58, 104), Color3.fromRGB(22, 22, 30)
+	local fur, furShade = Color3.fromRGB(236, 236, 240), Color3.fromRGB(176, 172, 190)
+	local skin, skinShade = Color3.fromRGB(240, 196, 160), Color3.fromRGB(196, 140, 120)
+	-- top band: edge from (0, 157) to (W, 207)
+	c:rect(570, -117, 1400, 600, 2.57, navy)
+	c:rect(910, -98, 700, 600, 2.57, cloth)
+	for i = 0, 15 do
+		local x = 250 + i * 24
+		local len = 110 + (i % 4) * 30
+		c:pill(x, 70 + (i % 3) * 14, len, 26, -150 + (i % 5) * 8, if i % 4 == 1 then furShade else fur)
+	end
+	c:ellipse(470, 110, 190, 52, 4, fur)
+	c:ellipse(800, 118, 70, 46, -20, skin)
+	for i = 0, 3 do
+		c:pill(760 + i * 20, 150 + i * 4, 70, 22, 70, if i % 2 == 0 then skin else skinShade)
+	end
+	c:pill(853, 55, 160, 40, 80, skin)
+	-- bottom band: edge from (0, 413) to (W, 369)
+	c:rect(568, 691, 1400, 600, -2.26, cloth)
+	c:rect(80, 600, 260, 420, -2.26, navy)
+	c:pill(960, 520, 300, 96, 74, skin)
+	c:pill(990, 470, 120, 70, 60, skinShade)
+	-- thin dark lines along both edges
+	c:pill(556, 182, 1140, 5, 2.57, Color3.fromRGB(10, 10, 14))
+	c:pill(556, 391, 1140, 5, -2.26, Color3.fromRGB(10, 10, 14))
+	add(scene, c, "splitStrip")
+	-- part 3: horizontal blue speed streaks (a fist flying through the air)
+	c = Paint.canvas(1, 0, 0)
+	local sr = Util.rng(303)
+	for i = 1, 60 do
+		local y = Util.randRange(sr, -10, H + 10)
+		local len = Util.randRange(sr, 160, 560)
+		c:pill(Util.randRange(sr, -100, W + 100), y, len, Util.randRange(sr, 3, 12), Util.randRange(sr, -3, 3), if i % 3 == 0 then Color3.fromRGB(236, 242, 255) else Color3.fromRGB(120, 146, 222), Util.randRange(sr, 0.45, 0.8))
+	end
+	add(scene, c, "hstreaks")
+	-- part 3: white jagged impact flash at the centre of the frame
+	c = Paint.canvas(1, 0, 0)
+	for i = 0, 11 do
+		local a = i * 30 + (if i % 2 == 0 then 0 else 12)
+		local len = if i % 2 == 0 then 210 else 120
+		local rad = math.rad(a)
+		c:pill(556 + math.cos(rad) * len / 2, 313 + math.sin(rad) * len / 2, len, if i % 2 == 0 then 16 else 9, a, white, 0.05)
+	end
+	c:circle(556, 313, 42, white)
+	add(scene, c, "impactStar")
+
 	-- cracks spreading from the palm (centre of the frame), three stages
 	for stage = 1, 3 do
 		c = Paint.canvas(1, 0, 0)
