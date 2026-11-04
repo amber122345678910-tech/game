@@ -98,14 +98,14 @@ function Yuta.build(scene: Builder.Scene, rigName: string): Rig.RigDef
 		-- x, top y, z, length, width, roll
 		{ -0.4, 1.16, -0.47, 0.34, 0.26, -14 },
 		{ -0.22, 1.18, -0.51, 0.4, 0.24, -6 },
-		{ -0.04, 1.18, -0.53, 0.52, 0.2, 2 },
+		{ -0.04, 1.18, -0.53, 0.4, 0.14, 2 },
 		{ 0.13, 1.18, -0.52, 0.38, 0.24, 8 },
 		{ 0.3, 1.17, -0.49, 0.36, 0.24, 14 },
 		{ 0.45, 1.13, -0.42, 0.3, 0.2, 24 },
 	}
 	for i, b in bangs do
 		local turn = if i % 2 == 0 then 90 else -90
-		Builder.flex(k.add("Head", "Wedge", V(0.06, b[4], b[5]), C(b[1], b[2], b[3]) * R(8, 0, b[6]) * C(0, -b[4] / 2, 0) * R(0, 0, 180) * R(0, turn, 0), if i == 3 then "yHairHi" else "yHair", "hair", "Bang"), 7, V(0, -b[4] / 2, 0))
+		Builder.flex(k.add("Head", "Wedge", V(0.06, b[4], b[5]), C(b[1], b[2], b[3]) * R(8, 0, b[6]) * C(0, -b[4] / 2, 0) * R(0, 0, 180) * R(0, turn, 0), "yHair", "hair", "Bang"), 7, V(0, -b[4] / 2, 0))
 	end
 	-- locks over the temples and ears
 	for _, sx in { -1, 1 } do

@@ -202,7 +202,7 @@ local function dessertSet(scene: Builder.Scene): { [string]: Group }
 	part("Wall", "Block", V(140, 40, 1), C(-20, 18, 26), Color3.fromRGB(250, 238, 200))
 	for i = 0, 13 do
 		local x = -64 + i * 2.6 + (i % 3) * 0.5
-		part("Curtain", "Block", V(0.7 + (i % 2) * 0.6, 30, 0.2), C(x, 15, 25.4), Color3.fromRGB(255, 250, 228), "Neon")
+		part("Curtain", "Block", V(0.7 + (i % 2) * 0.6, 30, 0.2), C(x, 15, 25.4), Color3.fromRGB(252, 244, 214), "SmoothPlastic")
 	end
 
 	-- centre: the square pink cake with a macaron and a strawberry
@@ -258,8 +258,8 @@ local function dessertSet(scene: Builder.Scene): { [string]: Group }
 	part("ParfaitStem", "Cylinder", V(1.3, 0.34, 0.34), C(gx, 0.95, gz) * up, glass, "Glass")
 	for i = 0, 7 do
 		local f = i / 7
-		local p = disc("ParfaitGlass", gx, 1.75 + f * 2.8, gz, 0.7 + f * 2.5, 0.42, glass)
-		p.transparency = 0.55
+		local p = disc("ParfaitGlass", gx, 1.75 + f * 2.8, gz, 0.7 + f * 2.5, 0.42, Color3.fromRGB(196, 210, 232))
+		p.transparency = 0.7
 	end
 	disc("ParfaitLip", gx, 4.6, gz, 3.3, 0.08, Color3.fromRGB(240, 246, 255), "Glass")
 	local layers = {
@@ -1526,7 +1526,16 @@ local function fists(ctx: Timeline.Ctx)
 	if t < 40.1 then
 		local yb = ctx:rig("Yuta", yutaRoot(), punchPose(1))
 		local f = (yb.RightHand * C(0, -0.3, 0)).Position
-		cam(ctx, f + V(-2.2, 0.1, -0.7), f + V(0, 0, -0.45), 40, 0.12, 1)
+		-- side on to the forearm, so it crosses the frame and the fist
+		-- leads to the right
+		local dir = (f - yb.RightLowerArm.Position).Unit
+		local side = dir:Cross(V(0, 1, 0)).Unit
+		local look = -side
+		if look:Cross(V(0, 1, 0)):Dot(dir) < 0 then
+			side = -side
+		end
+		local mid = f - dir * 0.7
+		cam(ctx, mid + side * 4.2 + V(0, 0.2, 0), mid, 28, 0.12, 1)
 	else
 		local rb = ctx:rig("RyuLoose", C(RYU), punchPose(1))
 		fist(ctx, 1)
@@ -1585,7 +1594,7 @@ local function ryuRises(ctx: Timeline.Ctx)
 	bloodFace(ctx)
 	local k = Util.smoothstep(42.9, 43.95, t)
 	stonesAround(ctx, rp + V(0, 4.5, -1.6), 2.2, V(0, 0, 8), 40)
-	cam(ctx, rp + V(0.1, 3.3 + k * 2.2, -1.25), rp + V(0, 3.8 + k * 2.2, 0), 58, 0.1, 1)
+	cam(ctx, rp + V(0.3, 2.0 + k * 2.6, -3.3), rp + V(0, 3.5 + k * 2.2, 0), 56, 0.1, 1)
 	ctx:alpha("wind", 0.5)
 	ctx:gust(2.2)
 	grade(ctx, -0.04, 0.28, 0.08, Color3.fromRGB(196, 210, 255))
@@ -1744,13 +1753,14 @@ local function hood(ctx: Timeline.Ctx, head: CFrame, k: number)
 	if k <= 0 then
 		return
 	end
-	local base = head * C(0, 1.25 + 0.15 * k, 0.25)
+	local base = head * C(0, 0.95 + 0.25 * k, 0.1)
 	ctx:place(h.hood, base)
-	ctx:prop(h.hood, { s = V(1.9, 0.8 + 0.8 * k, 1.9) })
+	ctx:prop(h.hood, { s = V(1.8, 1.0 + 1.1 * k, 1.8) })
+	-- the white fur hem: a ring of tufts round the top
 	for i, p in h.hoodFur do
 		local a = i / #h.hoodFur * math.pi * 2
-		ctx:place(p, base * C(math.cos(a) * 0.8, 0.35 + 0.45 * k, math.sin(a) * 0.8) * CFrame.Angles(math.sin(a) * 0.7, 0, -math.cos(a) * 0.7))
-		ctx:prop(p, { s = V(0.4, 0.9, 0.4) })
+		ctx:place(p, base * C(math.cos(a) * 0.6, 0.55 + 0.5 * k, math.sin(a) * 0.6) * CFrame.Angles(math.sin(a) * 0.9, 0, -math.cos(a) * 0.9))
+		ctx:prop(p, { s = V(0.42, 0.8, 0.42), c = Color3.fromRGB(240, 240, 244) })
 	end
 end
 
@@ -1761,7 +1771,8 @@ local function hoodGrab(ctx: Timeline.Ctx)
 	local rb = ctx:rig("RyuLoose", C(RYU), Cast.alive({ UpperTorso = R(-24, 0, 0), Head = R(-16, 0, 0), RightUpperArm = R(10, 0, 20), LeftUpperArm = R(10, 0, -20) }, t))
 	local pull = Util.smoothstep(52.9, 53.4, t)
 	hood(ctx, rb.Head, 0.5 + pull * 0.5)
-	local grip = rb.Head * C(0, 1.4 + pull * 0.2, 0)
+	Cast.furLow(ctx, "RyuLoose", 1)
+	local grip = rb.Head * C(0, 1.3 + pull * 0.2, 0)
 	local yp: Rig.Pose = {
 		UpperTorso = R(-6, 0, 0),
 		RightUpperArm = R(110, 0, 20),
@@ -1779,8 +1790,9 @@ local function hoodGrab(ctx: Timeline.Ctx)
 		cam(ctx, face:PointToWorldSpace(V(-2.0, 0.05, -0.75)), face:PointToWorldSpace(V(0, 0.05, -0.3)), 32, 0, 1)
 		ctx:show("splitStrip")
 	else
+		-- Yuta's view: his two hands hauling the black cloth up, the fur on top
 		local g = grip.Position
-		cam(ctx, g + V(-2.4, -0.5, -1.4), g + V(0, -0.25, 0), 46, 0.05, 1)
+		cam(ctx, g + V(0.4, -0.5, -2.2), g + V(0, -0.35, 0), 46, 0.05, 1)
 	end
 	ctx:gust(0.8)
 	grade(ctx, -0.04, 0.26, 0.06, Color3.fromRGB(205, 218, 255))
@@ -1790,6 +1802,7 @@ end
 -- 55.0: Yuta's eye, calm, over his ringed left fist clenched in the cloth
 -- over Ryu's head; "Now we're done." (55.07-56.53, lips barely moving)
 local function done(ctx: Timeline.Ctx)
+	local h = h3(ctx)
 	local t = ctx.t
 	local yb = ctx:rig("Yuta", yutaRoot(), Cast.alive({
 		UpperTorso = R(-8, 0, 0),
@@ -1806,13 +1819,22 @@ local function done(ctx: Timeline.Ctx)
 	local hp = yb.Head * C(0, 0.55, 0)
 	local fistP = (yb.LeftHand * C(0, -0.3, 0)).Position
 	local d = (fistP - hp.Position).Unit
-	-- Ryu's hooded face right behind the fist
-	local rb = Common.rigAt(ctx, "RyuLoose", C(RYU), Cast.alive({ UpperTorso = R(-30, 0, 0), Head = R(-20, 0, 0) }, t), "Head", C(0, 0.75, -0.45), fistP + d * 0.3)
-	hood(ctx, rb.Head, 1)
+	-- Ryu's hooded head just beyond the fist: the black cloth gripped in the
+	-- fist, the white fur hem of the jacket on top of his head
+	local headC = fistP + d * 0.75
 	local left = -hp.RightVector
+	ctx:place(h.hood, Util.lookAt(fistP + d * 0.45, fistP + d * 2))
+	ctx:prop(h.hood, { s = V(1.2, 1.1, 1.3) })
+	for i, p in h.hoodFur do
+		local a = i / #h.hoodFur * math.pi * 2
+		local at = headC + left * math.cos(a) * 0.5 + d * math.sin(a) * 0.5 + V(0, 0.55, 0)
+		ctx:place(p, CFrame.new(at) * CFrame.Angles(math.sin(a) * 0.8, a, -math.cos(a) * 0.8))
+		ctx:prop(p, { s = V(0.45, 0.85, 0.45), c = Color3.fromRGB(240, 240, 244) })
+	end
+	-- beside his head, close to the fist, looking past it at Yuta's eye
 	local eye = hp:PointToWorldSpace(V(-0.22, 0.02, -0.5))
-	local camPos = fistP + d * 0.6 + left * 1.25 - V(0, 0.05, 0)
-	cam(ctx, camPos, eye:Lerp(fistP, 0.55), 44, 0, 1)
+	local camPos = headC + left * 1.0 - d * 0.35 + V(0, 0.1, 0)
+	cam(ctx, camPos, eye:Lerp(fistP, 0.5), 50, 0, 1)
 	ctx:focus((eye - camPos).Magnitude, 1)
 	ctx:wind(1.1)
 	grade(ctx, -0.06, 0.28, 0.05)
