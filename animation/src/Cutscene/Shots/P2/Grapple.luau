@@ -396,9 +396,18 @@ local function catchStage(ctx: Timeline.Ctx): ({ [string]: CFrame }, { [string]:
 	local rb, kb = rikaFistOn(ctx, "RyuBare", rr, Cast.alive(ryuSag, ctx.t))
 	local belly = (rb.UpperTorso * C(0, 0.45, -0.62)).Position
 	local y0 = C(Common.RYU + V(0.2, 0, -2.6)) * CFrame.Angles(0, math.rad(180), 0)
-	local b0 = ctx:rig("Yuta", y0, yutaCatch)
+	-- 58.3-58.8: the fingers tremble and dig in (a fast small shake of both
+	-- hands, the wrists bending into his stomach)
+	local pose = yutaCatch
+	local tr = Util.smoothstep(58.25, 58.35, ctx.t) * (1 - Util.smoothstep(58.75, 58.85, ctx.t))
+	if tr > 0 then
+		local a = math.sin(ctx.t * 70) * 3 * tr
+		local b = math.sin(ctx.t * 83 + 1) * 3 * tr
+		pose = Cast.add(Cast.add(pose, "LeftHand", R(a - 8 * tr, 0, b)), "RightHand", R(b - 8 * tr, 0, -a))
+	end
+	local b0 = ctx:rig("Yuta", y0, pose)
 	local mid = ((b0.LeftHand * C(0, -0.35, 0)).Position + (b0.RightHand * C(0, -0.35, 0)).Position) / 2
-	local yb = ctx:rig("Yuta", C(belly - mid) * y0, yutaCatch)
+	local yb = ctx:rig("Yuta", C(belly - mid) * y0, pose)
 	return rb, yb, kb, belly
 end
 
