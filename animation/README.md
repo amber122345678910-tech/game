@@ -25,7 +25,10 @@
 Звука нет: музыку и голоса накладываешь при монтаже. Английские субтитры совпадают по времени с оригиналом
 (выключаются клавишей `S`).
 
-Превью без Studio: [`preview/part1_preview.mp4`](preview/part1_preview.mp4) и [`preview/part2_preview.mp4`](preview/part2_preview.mp4). Это приблизительный рендер вне Roblox:
+Превью без Studio: [`preview/part1_preview.mp4`](preview/part1_preview.mp4), [`preview/part2_preview.mp4`](preview/part2_preview.mp4),
+[`preview/part3_preview.mp4`](preview/part3_preview.mp4) и все три части одним видео
+[`preview/full_preview.mp4`](preview/full_preview.mp4) (2:46, без повторов конца предыдущей части в начале частей 2 и 3).
+Это приблизительный рендер вне Roblox:
 свет, облака и материалы в Studio будут выглядеть немного иначе. Точный вид — в `.rbxl`.
 
 ## Раскадровка части 1
