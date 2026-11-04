@@ -8,6 +8,7 @@ local Builder = require(script.Parent.Parent.Builder)
 local Timeline = require(script.Parent.Parent.Timeline)
 local FX = require(script.Parent.Parent.FX)
 local Util = require(script.Parent.Parent.Util)
+local Paint = require(script.Parent.Parent.Paint)
 local Rig = require(script.Parent.Parent.Rig)
 local Cast = require(script.Parent.Cast)
 local Clash = require(script.Parent.Clash)
@@ -46,6 +47,8 @@ type P3 = {
 	stones: Group,
 	yBlood: Group,
 	lamp: Builder.PartSpec,
+	redBack: Builder.PartSpec,
+	redShards: FX.Burst,
 }
 
 local function h2(ctx: Timeline.Ctx): Common.H
@@ -62,6 +65,81 @@ local function rng(seed: number): Util.Rng
 	Util.rand(r)
 	Util.rand(r)
 	return r
+end
+
+---------------------------------------------------------------------------
+-- The backdrop of the black flash (reference 28.6-29.2): a black void torn
+-- by huge red bursts of cursed energy, ragged like flames and splashes,
+-- radiating from the two of them, with pink-white hot spots and red
+-- lightning (canvas px = 1/10 stud)
+---------------------------------------------------------------------------
+local RB_W, RB_H = 1600, 900
+local function redBackdrop(scene: Builder.Scene): Builder.PartSpec
+	local c = Paint.canvas(1, 0, 0)
+	c:box(-10, -10, RB_W + 10, RB_H + 10, Color3.fromRGB(6, 2, 4))
+	local r = Util.rng(2718)
+	Util.rand(r)
+	local cx, cy = 760, 470
+	local darkRed, red, hot = Color3.fromRGB(110, 8, 20), Color3.fromRGB(226, 26, 44), Color3.fromRGB(255, 210, 222)
+	-- a deep red glow round the middle
+	c:blob(cx, cy, 1100, 640, Color3.fromRGB(60, 4, 10), 0.4, 5)
+	-- big ragged tongues of energy radiating outwards, two layers
+	local function tongues(n: number, len0: number, len1: number, w0: number, col: Color3, curl: number)
+		for _ = 1, n do
+			local a = Util.randRange(r, 0, math.pi * 2)
+			local len = Util.randRange(r, len0, len1)
+			local start = Util.randRange(r, 60, 200)
+			local bend = Util.randRange(r, -curl, curl)
+			local pts: { { number } } = {}
+			local ws: { number } = {}
+			for k = 0, 4 do
+				local f = k / 4
+				local aa = a + bend * f * f
+				local d = start + len * f
+				table.insert(pts, { cx + math.cos(aa) * d, cy + math.sin(aa) * d * 0.72 })
+				table.insert(ws, w0 * (1 - f) ^ 1.3 + 2)
+			end
+			c:stroke(pts, ws, col, { minStep = 10, maxStep = 40 })
+		end
+	end
+	tongues(30, 380, 820, 120, darkRed, 0.7)
+	tongues(34, 220, 560, 70, red, 0.9)
+	-- big splashes towards the edges
+	for _ = 1, 12 do
+		local a = Util.randRange(r, 0, math.pi * 2)
+		local d = Util.randRange(r, 420, 760)
+		local x, y = cx + math.cos(a) * d, cy + math.sin(a) * d * 0.6
+		c:blob(x, y, Util.randRange(r, 160, 320), Util.randRange(r, 90, 180), red, 0.7, 3)
+		for _ = 1, 4 do
+			local b = a + Util.randRange(r, -0.8, 0.8)
+			local l = Util.randRange(r, 60, 180)
+			c:stroke({ { x, y }, { x + math.cos(b) * l, y + math.sin(b) * l } }, { 26, 2 }, red, { minStep = 8, maxStep = 30 })
+		end
+	end
+	-- red lightning
+	for _ = 1, 14 do
+		local x, y = Util.randRange(r, 0, RB_W), Util.randRange(r, 0, RB_H)
+		local pts: { { number } } = { { x, y } }
+		for _ = 1, 6 do
+			x += Util.randRange(r, -90, 90)
+			y += Util.randRange(r, -70, 70)
+			table.insert(pts, { x, y })
+		end
+		c:stroke(pts, 4, Color3.fromRGB(255, 60, 70), { minStep = 6, maxStep = 40 })
+	end
+	-- pink-white hot spots
+	for _ = 1, 16 do
+		local a = Util.randRange(r, 0, math.pi * 2)
+		local d = Util.randRange(r, 80, 640)
+		c:blob(cx + math.cos(a) * d, cy + math.sin(a) * d * 0.65, Util.randRange(r, 40, 110), Util.randRange(r, 30, 70), hot, 0.85, 3)
+	end
+	c:blob(cx, cy, 300, 200, Color3.fromRGB(255, 120, 140), 0.35, 4)
+	return Builder.part(scene, "P3Backdrop", V(RB_W / 10, RB_H / 10, 0.05), C(), Color3.new(1, 1, 1), {
+		fx = true,
+		castShadow = false,
+		name = "RedBackdrop",
+		gui = { face = "Front", canvas = Vector2.new(RB_W, RB_H), lightInfluence = 0, elems = c.elems },
+	})
 end
 
 ---------------------------------------------------------------------------
@@ -307,6 +385,8 @@ function Part3.build(scene: Builder.Scene)
 		stones = {},
 		yBlood = {},
 		lamp = Builder.fx(scene, "P3Lamp", "Ball", V(0.2, 0.2, 0.2), Color3.new(1, 1, 1), "SmoothPlastic", 1, "Lamp"),
+		redBack = redBackdrop(scene),
+		redShards = FX.burst(scene, "P3RedShards", Color3.fromRGB(236, 30, 50), 30, "Wedge", 84),
 	}
 	Builder.light(scene, "P3Lamp", "Point", h.lamp, Color3.fromRGB(255, 238, 214), 30)
 	for _, p in h.bigSmoke.parts do
@@ -318,9 +398,12 @@ function Part3.build(scene: Builder.Scene)
 	for _, p in h.blackBolts.segs do
 		p.material = "SmoothPlastic"
 	end
-	-- the red lightning is all red (no white-hot segments)
+	-- the red lightning and shards are all red (no white-hot segments)
 	for _, p in h.redBolts.segs do
 		p.color = red
+	end
+	for _, p in h.redShards.parts do
+		p.color = Color3.fromRGB(220, 24, 44)
 	end
 	for i = 1, 12 do
 		h.hoodFur[i] = Builder.fx(scene, "P3Hood", "Ellipsoid", V(0.3, 0.7, 0.3), pal.rFur, "Fabric", 0, "HoodFur")
@@ -1200,17 +1283,70 @@ local function blackFlash(ctx: Timeline.Ctx)
 			ctx:flash(WHITE, 0.9)
 		end
 	else
-		voidWall(ctx, back, V(0, 0, -1), Color3.fromRGB(196, 22, 40))
-		smokeAround(ctx, back + V(0, 4, -1), 1.4, 9, 900, 0.5)
-		FX.placeCore(ctx, h.redGlow, mid, 0.8 + math.sin(t * 30) * 0.15, 0.5)
-		local sharp = Util.smoothstep(28.2, 28.8, t)
-		cam(ctx, YUTA + V(-2.8, 4.6, -5.6), mid + V(0.8, 0.2, 0), 50, 0.12, 1 - sharp * 0.7)
-		ctx:grade({ brightness = -0.05, contrast = 0.35, saturation = 0.1, tint = Color3.fromRGB(255, 214, 220) })
-		-- the white flash fading through pink into the picture
-		local w = 1 - Util.smoothstep(27.6, 28.3, t)
-		if w > 0 then
-			ctx:flash(Color3.fromRGB(255, 238, 242), w)
+		-- 27.2: the black flash itself, from the front at the side: Yuta
+		-- (left) with his right fist cocked high and his left hand driven
+		-- into Ryu's chest, Ryu (right) grinning, both turned a little to us,
+		-- hanging in a black void torn by red bursts of energy
+		local B = RYU + V(0, 300, 0)
+		local rroot = C(B) * CFrame.Angles(0, math.rad(35), 0)
+		local rpose: Rig.Pose = {
+			UpperTorso = R(10, 0, 0),
+			Head = R(4, -18, 0),
+			RightUpperArm = R(24, 0, 44),
+			RightLowerArm = R(40, 0, 0),
+			LeftUpperArm = R(34, 0, -34),
+			LeftLowerArm = R(50, 0, 0),
+			LeftUpperLeg = R(16, 0, -6),
+			RightUpperLeg = R(-10, 0, 6),
+		}
+		local shove = math.sin(t * 23) * 1.2
+		local rb2 = ctx:rig("RyuLoose", rroot, Cast.alive(Cast.add(rpose, "UpperTorso", R(shove, 0, 0)), t))
+		local chest = (rb2.UpperTorso * C(0.1, 0.9, -0.6)).Position
+		local ypose: Rig.Pose = {
+			LowerTorso = R(-6, 0, 0),
+			UpperTorso = R(-10, -14, 0),
+			Head = R(-8, 12, 0),
+			RightUpperArm = R(96, 0, 56),
+			RightLowerArm = R(118, 0, 0),
+			RightHand = R(-20, 0, 0),
+			LeftUpperArm = R(84, 0, -4),
+			LeftLowerArm = R(8, 0, 0),
+			LeftHand = R(-60, 0, 0),
+			LeftUpperLeg = R(30, 0, -6),
+			LeftLowerLeg = R(-30, 0, 0),
+			RightUpperLeg = R(-20, 0, 6),
+		}
+		local yroot = C(B + V(0.3, 0, -3.2)) * CFrame.Angles(0, math.pi - math.rad(35), 0)
+		Common.rigAt(ctx, "Yuta", yroot, Cast.alive(ypose, t), "LeftHand", C(0, -0.3, -0.1), chest)
+		-- the painted backdrop far behind them, breathing slowly
+		local pulse = 0.5 * (1 + math.sin(t * 3.1) * 0.02)
+		local eye = B + V(-6.2, 4.4, -1.5)
+		local backAt = B + V(36, 4, -1.5)
+		ctx:place(h.redBack, Util.lookAt(backAt, eye) * CFrame.Angles(0, 0, math.sin(t * 0.7) * 0.03))
+		ctx:prop(h.redBack, { s = V(RB_W / 10 * pulse, RB_H / 10 * pulse, 0.05) })
+		-- red shards of energy flying past between us and them
+		FX.placeBurst(ctx, h.redShards, B + V(1.5, 2.2, -1.5), (t * 0.8) % 1.0, 18, 0.24, 1.0, V(0, 0.3, 0), 1.2, 0)
+		-- a hard red rim light from behind
+		ctx:place(h.lamp, C(B + V(5, 7, -1.5)))
+		ctx:light("P3Lamp", 6, Color3.fromRGB(255, 50, 70), 30)
+		local sharp = Util.smoothstep(28.3, 28.6, t)
+		cam(ctx, eye, B + V(0, 4.4, -1.5), 46, 0.12, 1)
+		Cast.expr(ctx, "ryu", "grin")
+		Cast.expr(ctx, "yuta", "grit")
+		bloodFace(ctx)
+		ctx:show("yuta:blood")
+		ctx:focus(if sharp < 1 then 0.6 + sharp * 7 else 8.2, 1)
+		ctx:grade({ brightness = -0.02, contrast = 0.4, saturation = 0.25, tint = Color3.fromRGB(255, 226, 230) })
+		-- the white flash fading through a pink blur into the picture
+		local w = 1 - Util.smoothstep(27.85, 28.3, t)
+		local pink = Util.smoothstep(27.9, 28.1, t) * (1 - Util.smoothstep(28.35, 28.6, t))
+		local a = math.max(w, pink * 0.55)
+		if a > 0.001 then
+			local f = w / math.max(1e-3, w + pink)
+			ctx:flash(Util.mix(Color3.fromRGB(255, 176, 196), Color3.fromRGB(255, 244, 246), f), a)
 		end
+		local _ = back
+		local _2 = mid
 	end
 	ctx:gust(2.2)
 	ctx:bloom(1.8)
