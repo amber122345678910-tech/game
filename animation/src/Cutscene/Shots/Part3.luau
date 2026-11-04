@@ -309,6 +309,10 @@ function Part3.build(scene: Builder.Scene)
 	for _, p in h.blackBolts.segs do
 		p.material = "SmoothPlastic"
 	end
+	-- the red lightning is all red (no white-hot segments)
+	for _, p in h.redBolts.segs do
+		p.color = red
+	end
 	for i = 1, 12 do
 		h.hoodFur[i] = Builder.fx(scene, "P3Hood", "Ellipsoid", V(0.3, 0.7, 0.3), pal.rFur, "Fabric", 0, "HoodFur")
 	end
@@ -485,7 +489,7 @@ local function armAcross(ctx: Timeline.Ctx, camPos: Vector3, focus: Vector3, s: 
 	local fwd = (focus - camPos).Unit
 	local right = fwd:Cross(V(0, 1, 0)).Unit
 	local target = focus - fwd * near + right * (s * 1.6 - 0.8) - V(0, drop, 0)
-	local root = CFrame.lookAt(target, target + right) * CFrame.new(0, 0, 3)
+	local root = Util.lookAt(target, target + right) * CFrame.new(0, 0, 3)
 	Common.rigAt(ctx, "RyuLoose", CFrame.new(root.Position.X, RYU.Y, root.Position.Z) * root.Rotation, punchR, "RightLowerArm", C(0, -0.5, 0), target)
 	fist(ctx, 1)
 end
@@ -915,7 +919,12 @@ local function kick(ctx: Timeline.Ctx)
 		end
 	elseif t < 16.233 then
 		-- under the chin: the upturned face, blood spraying off
-		cam(ctx, head.Position + V(2.3, -0.2, 0.5), head.Position + V(0, 0.05, -0.35), 34, 0.2, 1)
+		-- straight onto the upturned face (from above it, the fur stays below;
+		-- Yuta, who would stand in the way, is out of this close-up)
+		ctx:rig("Yuta", C(RYU + V(0, -400, 0)), yp)
+		local fc = rb.Head * C(0, 0.7, -0.45)
+		ctx:camera(shake(Util.lookAt(fc.Position + fc.LookVector * 2.3 + fc.RightVector * 0.3, fc.Position, fc.UpVector), t, 0.2, 16), 40)
+		ctx:focus(2.3, 1)
 	elseif t < 16.3 then
 		cam(ctx, rc + V(4.6, 2.4, -1.4), rc + V(0, 5.0, -1.0), 52, 0.2, 0.6)
 	else
@@ -1107,7 +1116,7 @@ end
 -- the void behind an effect: a black (or dark red) wall facing the camera
 local function voidWall(ctx: Timeline.Ctx, at: Vector3, normal: Vector3, col: Color3)
 	local h = h3(ctx)
-	ctx:place(h.void, CFrame.lookAt(at, at + normal))
+	ctx:place(h.void, Util.lookAt(at, at + normal))
 	ctx:prop(h.void, { s = V(600, 600, 1), c = col })
 end
 
@@ -1153,8 +1162,8 @@ local function blackFlash(ctx: Timeline.Ctx)
 				ri = FX.placeBolt(ctx, h.redBolts, ri, p0, p0 + V(Util.randRange(rr, -2, 2), Util.randRange(rr, -2, 2), 0), 4, 0.6, 0.2, i + 120, 18)
 			end
 		end
-		ctx:grade({ brightness = 0, contrast = 0.2, saturation = 0.2, tint = Color3.new(1, 1, 1) })
-		ctx:bloom(2)
+		ctx:grade({ brightness = -0.1, contrast = 0.3, saturation = 0.3, tint = Color3.fromRGB(255, 200, 205) })
+		ctx:bloom(0.4)
 		ctx:fog(0)
 		ctx:wind(0)
 		return
@@ -1348,7 +1357,7 @@ local function topSpin(ctx: Timeline.Ctx)
 	local d = V(math.cos(a), 0, math.sin(a))
 	local grip: Rig.Pose = { UpperTorso = R(16, 0, 0), Head = R(-10, 0, 0), RightUpperArm = R(80, 0, 0), RightLowerArm = R(30, 0, 0), LeftUpperArm = R(80, 0, 0), LeftLowerArm = R(30, 0, 0), LeftUpperLeg = R(20, 0, 0), RightUpperLeg = R(-20, 0, 0) }
 	local function face(p: Vector3, dir: Vector3): CFrame
-		return CFrame.lookAt(p, p + V(dir.X, 0, dir.Z))
+		return Util.lookAt(p, p + V(dir.X, 0, dir.Z))
 	end
 	ctx:rig("Yuta", face(c + d * 1.4, -d), Cast.alive(grip, t))
 	ctx:rig("RyuLoose", face(c - d * 1.4, d), Cast.alive(grip, t))
