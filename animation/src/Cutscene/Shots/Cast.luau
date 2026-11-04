@@ -104,6 +104,50 @@ function Cast.talk(ctx: Timeline.Ctx, who: string, base: string, open: string)
 	Cast.expr(ctx, who, if n > -0.2 then open else base)
 end
 
+-- A pointing hand: the index finger stays straight, the other three curl
+-- (the finger next to the thumb is the index: thumb on the -x side of the
+-- right hand, the +x side of the left)
+function Cast.point(ctx: Timeline.Ctx, rig: string, side: string)
+	local cache = ctx.scene.data.pointHands
+	if not cache then
+		cache = {}
+		ctx.scene.data.pointHands = cache
+	end
+	local key = rig .. side
+	type HandList = { hide: { Builder.PartSpec }, curl: Builder.PartSpec? }
+	local found: HandList? = cache[key]
+	local list: HandList
+	if found then
+		list = found
+	else
+		local hide: { Builder.PartSpec } = {}
+		local curlPart: Builder.PartSpec? = nil
+		local bone = side .. "Hand"
+		for _, p in ctx.scene.parts do
+			if p.rig == rig and p.bone == bone then
+				if p.name == "Finger" then
+					local x = p.cf.Position.X
+					local isIndex = if side == "Right" then x < -0.12 else x > 0.12
+					if not isIndex then
+						table.insert(hide, p)
+					end
+				elseif p.name == "Curl" then
+					curlPart = p
+				end
+			end
+		end
+		list = { hide = hide, curl = curlPart }
+		cache[key] = list
+	end
+	for _, p in list.hide do
+		ctx:prop(p, { t = 1 })
+	end
+	local curl = list.curl
+	if curl then
+		ctx:prop(curl, { t = 0 })
+	end
+end
+
 -- pose helpers ----------------------------------------------------------------
 function Cast.mix(a: Rig.Pose, b: Rig.Pose, t: number): Rig.Pose
 	return Rig.blend(a, b, math.clamp(t, 0, 1))

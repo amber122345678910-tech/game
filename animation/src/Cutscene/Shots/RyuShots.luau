@@ -116,30 +116,43 @@ local function grade(ctx: Timeline.Ctx, b: number, c: number, s: number, tint: C
 	ctx:grade({ brightness = b, contrast = c, saturation = s, tint = tint or Color3.fromRGB(232, 238, 255) })
 end
 
--- 7: low angle from the front, arm thrown up, cyan shards and pink lines
--- left arm thrown up (mirror of Cast.ryu.raise), seen from the front
-local raiseLeft: Rig.Pose = {
-	UpperTorso = R(-10, -10, 0),
-	Head = R(-14, 8, 0),
-	LeftUpperArm = R(165, 0, -18),
-	LeftLowerArm = R(14, 0, 0),
-	RightUpperArm = R(12, 0, 38),
-	RightLowerArm = R(34, 0, 0),
+-- 7: low angle from the front: Ryu points at Yuta, his left arm thrown out
+-- up and to the side with the index finger out (aiming the blast), the
+-- Granite Blast gathering in a blinding star on top of his head; cyan
+-- shards and pink streaks fly off it (reference 10.87-12.1)
+local pointAt: Rig.Pose = {
+	LowerTorso = R(0, -6, 0),
+	UpperTorso = R(4, 10, 0),
+	Head = R(-10, 14, 0),
+	LeftUpperArm = R(-14, 0, -146),
+	LeftLowerArm = R(0, 0, 0),
+	LeftHand = R(0, 0, 0),
+	RightUpperArm = R(-4, 0, 14),
+	RightLowerArm = R(26, 0, 0),
+	LeftUpperLeg = R(-6, 0, -6),
+	RightUpperLeg = R(8, 0, 6),
 }
 
 local function raise(ctx: Timeline.Ctx)
 	local h: H = ctx.scene.data.ryu
 	local root = rootAt(Field.RYU, -90)
-	local bones = ctx:rig("Ryu", root, Cast.alive(Cast.mix(Cast.ryu.point, raiseLeft, ctx.u * 3), ctx.t))
-	-- very low in front of him, looking up past his face at the raised hand
-	local cam = Util.lookAt(root:PointToWorldSpace(V(-1.4, 0.9, -5.4)), root:PointToWorldSpace(V(-0.9, 6.0, 0)))
+	local thrust = Util.smoothstep(10.867, 11.05, ctx.t)
+	-- the arm snaps out and recoils a little, then holds with small jolts
+	local jolt = math.exp(-math.max(0, ctx.t - 11.05) * 6) * math.sin(math.max(0, ctx.t - 11.05) * 30) * 6
+	local pose = Cast.add(Cast.mix(Cast.ryu.point, pointAt, thrust), "LeftUpperArm", R(0, 0, jolt))
+	local bones = ctx:rig("Ryu", root, Cast.alive(pose, ctx.t))
+	Cast.point(ctx, "Ryu", "Left")
+	-- very low in front of him, looking up past his face
+	local cam = Util.lookAt(root:PointToWorldSpace(V(-1.0, 1.0, -5.6)), root:PointToWorldSpace(V(-0.6, 6.2, 0)))
 	ctx:camera(Clash.shake(cam, ctx.t, 0.35), 62)
 	ctx:focus(5.6, 1)
 	Cast.expr(ctx, "ryu", "grin")
 	Cast.ryuAura(ctx, bones, 1, 6)
-	local hand = (bones.LeftHand * C(0, -0.6, 0)).Position
-	FX.placeBurst(ctx, h.shards, hand, ctx.lt % 0.8, 26, 0.7, 0.7, V(-0.4, 1, -0.2), 1.2, 6)
-	FX.placeCore(ctx, h.headGlow, hand, 0.7 + math.sin(ctx.t * 24) * 0.1, 0.9)
+	-- the charge on his head: a big flickering star with shards flying off
+	local top = chargePoint(bones) + bones.Head.UpVector * 0.5
+	charge(ctx, top, 1, bones.Head.Rotation, 4.2)
+	FX.placeBurst(ctx, h.shards, top, ctx.lt % 0.8, 26, 0.7, 0.7, V(0.4, 0.6, -0.2), 1.2, 6)
+	FX.placeCore(ctx, h.headGlow, top, 0.55 + math.sin(ctx.t * 24) * 0.08, 0.95)
 	ctx:light("RyuHand", 5, nil, 18)
 	ctx:alpha("streaks", 0.55)
 	ctx:bloom(1.8)

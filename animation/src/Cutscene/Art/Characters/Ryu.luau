@@ -133,6 +133,9 @@ function Ryu.build(scene: Builder.Scene, rigName: string, bare: boolean?, loose:
 			k.add(hand, "Block", V(0.1, 0.36, 0.12), C(fx, -0.58, -0.02) * R(-12, 0, (fi - 1.5) * -4), "rSkin", "skin", "Finger")
 		end
 		k.add(hand, "Block", V(0.11, 0.3, 0.12), C(sx * -0.26, -0.3, -0.1) * R(-25, 0, sx * -30), "rSkin", "skin", "Thumb")
+		-- curled middle, ring and little fingers (shown only when he points)
+		local curl = k.add(hand, "Ellipsoid", V(0.36, 0.24, 0.3), C(sx * 0.06, -0.47, -0.08), "rSkin", "skin", "Curl")
+		curl.transparency = 1
 	end
 
 	-- Legs --------------------------------------------------------------------
