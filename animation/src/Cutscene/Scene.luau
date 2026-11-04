@@ -15,6 +15,7 @@ local RyuShots = require(Shots.RyuShots)
 local YutaShots = require(Shots.YutaShots)
 local Part2 = require(Shots.Part2)
 local Part3 = require(Shots.Part3)
+local Part4 = require(Shots.Part4)
 
 local Scene = {}
 
@@ -74,6 +75,21 @@ Scene.SUBTITLES3 = {
 Scene.DURATION3 = 56.867
 Scene.RECAP3_FROM = 56.2
 Scene.RECAP3_LEN = 2.633
+-- Part 4: opens on the end of part 3 (t4 = t3 - 51.3); the "Now we're
+-- done." close-up holds on past the end of part 3 to 6.533. The reference's
+-- CapCut end card (44.7-46.8) is left out.
+Scene.SUBTITLES4 = {
+	{ t0 = 3.767, t1 = 5.233, text = "Now we're done." },
+	{ t0 = 8.767, t1 = 9.633, text = "What?!" },
+	{ t0 = 10.367, t1 = 11.967, text = "What is he after?!" },
+	{ t0 = 28.833, t1 = 31.433, text = "Was this mine?" },
+	{ t0 = 34.267, t1 = 35.6, text = "In that instant..." },
+	{ t0 = 35.633, t1 = 39.5, text = "he sent it sailing back to me using Uro's technique?" },
+	{ t0 = 42.667, t1 = 44.7, text = "Thank you." },
+} :: { Subtitle }
+Scene.DURATION4 = 44.7
+Scene.RECAP4_FROM = 51.3
+Scene.RECAP4_LEN = 5.567
 Scene.RECAP_FROM = 53.3 -- part 1 time shown at part 2's t = 0
 Scene.RECAP_LEN = 5.267
 
@@ -112,6 +128,26 @@ function Scene.build(styleId: string, part: number?): Builder.Scene
 		end
 		scene.data.duration = Scene.DURATION
 		scene.data.subtitles = Scene.SUBTITLES
+	elseif partId == 4 then
+		for _, m in { Clash, RyuShots, YutaShots } do
+			m.build(scene)
+		end
+		Part2.build(scene)
+		Part3.build(scene)
+		Part4.build(scene)
+		-- recap: the end of part 3 (its last shot runs on until part 4's own
+		-- shots start, Timeline.find keeps the last shot that has begun)
+		local a, b = Scene.RECAP4_FROM, Scene.RECAP4_FROM + Scene.RECAP4_LEN
+		for _, s in Part3.shots do
+			if s.t1 > a and s.t0 < b then
+				table.insert(shots, shifted(s, a, 0, Scene.RECAP4_LEN))
+			end
+		end
+		for _, s in Part4.shots do
+			table.insert(shots, s)
+		end
+		scene.data.duration = Scene.DURATION4
+		scene.data.subtitles = Scene.SUBTITLES4
 	elseif partId == 3 then
 		for _, m in { Clash, RyuShots, YutaShots } do
 			m.build(scene)

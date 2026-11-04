@@ -300,6 +300,50 @@ function Overlay2.build(scene: Builder.Scene)
 		c:pill(Util.randRange(sr, -100, W + 100), y, len, Util.randRange(sr, 3, 12), Util.randRange(sr, -3, 3), if i % 3 == 0 then Color3.fromRGB(236, 242, 255) else Color3.fromRGB(120, 146, 222), Util.randRange(sr, 0.45, 0.8))
 	end
 	add(scene, c, "hstreaks")
+
+	-- part 4 (17.6-18.9): a white cone of light rising on cyan, faint arcs
+	c = Paint.canvas(1, 0, 0)
+	local cyan = Color3.fromRGB(96, 232, 232)
+	c:box(-10, -10, W + 10, H + 10, cyan)
+	for i = 0, 5 do
+		local rad = 240 + i * 70
+		for k = 0, 9 do
+			local a = math.rad(200 + k * 14)
+			c:pill(556 + math.cos(a) * rad, 520 + math.sin(a) * rad * 0.55, 60, 4, math.deg(a) + 90, Color3.fromRGB(196, 250, 250), 0.55)
+		end
+	end
+	for y = 150, 626, 7 do
+		local f = (y - 150) / 476
+		c:rect(556, y + 3, 30 + f * 380, 8, 0, Color3.fromRGB(246, 255, 255))
+		c:rect(556, y + 3, 10 + f * 220, 8, 0, Color3.new(1, 1, 1))
+	end
+	add(scene, c, "p4cone")
+	-- part 4: pale smoke curling across the frame (in front of everything)
+	c = Paint.canvas(1, 0, 0)
+	local sm = Util.rng(404)
+	for i = 1, 9 do
+		local y0 = Util.randRange(sm, 40, H - 40)
+		local wave = {}
+		for k = 0, 6 do
+			table.insert(wave, { -60 + k * 205, y0 + math.sin(k * 1.3 + i) * Util.randRange(sm, 30, 90) })
+		end
+		c:stroke(wave, { 6, 26, 14, 30, 12, 24, 6 }, Color3.fromRGB(240, 238, 230), { minStep = 5, maxStep = 14 })
+		-- little curls hanging off the stream
+		for k = 1, 3 do
+			local x = Util.randRange(sm, 0, W)
+			local y = y0 + Util.randRange(sm, -60, 60)
+			c:stroke({ { x, y }, { x + 30, y - 24 }, { x + 52, y - 4 }, { x + 34, y + 14 } }, { 8, 10, 6, 2 }, Color3.fromRGB(240, 238, 230), { minStep = 4, maxStep = 10 })
+		end
+	end
+	add(scene, c, "p4smoke", 0.32)
+	-- part 4: black edges (the pillar of light, 12.6-14.6)
+	c = Paint.canvas(1, 0, 0)
+	for k = 0, 5 do
+		local w = 210 - k * 30
+		c:box(0, 0, w, H, Color3.new(0, 0, 0), 0.35 + k * 0.1)
+		c:box(W - w, 0, W, H, Color3.new(0, 0, 0), 0.35 + k * 0.1)
+	end
+	add(scene, c, "p4edges")
 	-- part 3: white jagged impact flash at the centre of the frame
 	c = Paint.canvas(1, 0, 0)
 	for i = 0, 11 do

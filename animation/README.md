@@ -1,12 +1,12 @@
-# Юта vs Рю — анимация в Roblox, части 1 и 2
+# Юта vs Рю — анимация в Roblox, части 1–4
 
-Части 1 (58.5 с) и 2 (59.2 с) ролика «Yuta vs. Ryu end fight scene» в выбранном стиле **«Кино»**:
+Части 1 (58.5 с), 2 (59.2 с), 3 (56.9 с) и 4 (44.7 с) ролика «Yuta vs. Ryu end fight scene» в выбранном стиле **«Кино»**:
 реалистичный свет, облака Roblox и густой туман над бетонной эстакадой в разрушенном городе, глубина резкости, неоновые эффекты с bloom.
 Все 38 планов повторяют раскадровку и тайминг оригинала (склейки найдены покадрово).
 
 ## Как посмотреть
 
-1. Скачай **`YutaVsRyu_Part1.rbxl`** (часть 1) или **`YutaVsRyu_Part2.rbxl`** (часть 2) из этой папки.
+1. Скачай **`YutaVsRyu_Part1.rbxl`** … **`YutaVsRyu_Part4.rbxl`** (части 1–4) из этой папки.
 2. Открой в **Roblox Studio** (File → Open from File).
 3. Нажми **Play (F5)**: сцена соберётся за пару секунд, и анимация запустится сама.
 
@@ -26,8 +26,8 @@
 (выключаются клавишей `S`).
 
 Превью без Studio: [`preview/part1_preview.mp4`](preview/part1_preview.mp4), [`preview/part2_preview.mp4`](preview/part2_preview.mp4),
-[`preview/part3_preview.mp4`](preview/part3_preview.mp4) и все три части одним видео
-[`preview/full_preview.mp4`](preview/full_preview.mp4) (2:46, без повторов конца предыдущей части в начале частей 2 и 3).
+[`preview/part3_preview.mp4`](preview/part3_preview.mp4), [`preview/part4_preview.mp4`](preview/part4_preview.mp4) и все четыре части
+одним видео [`preview/full_preview.mp4`](preview/full_preview.mp4) (3:25, без повторов конца предыдущей части в начале частей 2–4).
 Это приблизительный рендер вне Roblox:
 свет, облака и материалы в Studio будут выглядеть немного иначе. Точный вид — в `.rbxl`.
 

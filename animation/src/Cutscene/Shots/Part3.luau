@@ -55,6 +55,15 @@ local function h3(ctx: Timeline.Ctx): P3
 	return ctx.scene.data.p3
 end
 
+-- a random sequence per item: Park-Miller's first value barely changes
+-- between nearby small seeds, so the seed is spread and two values skipped
+local function rng(seed: number): Util.Rng
+	local r = Util.rng(seed * 7919 + 101)
+	Util.rand(r)
+	Util.rand(r)
+	return r
+end
+
 ---------------------------------------------------------------------------
 -- The dessert table, laid out as in the reference top view (+Z is "up" on
 -- screen): the pink cake in the centre, a teapot, a cup and a two-tier stand
@@ -533,7 +542,7 @@ end
 -- big slabs of the broken deck tilted every which way (floating a little)
 local function slabField(ctx: Timeline.Ctx, c: Vector3, radius: number, seed: number, float: number)
 	for i, p in h3(ctx).slabs do
-		local rr = Util.rng(seed + i * 13)
+		local rr = rng(seed + i * 13)
 		local a = Util.randRange(rr, 0, math.pi * 2)
 		local d = math.sqrt(Util.rand(rr)) * radius
 		local pos = c + V(math.cos(a) * d, Util.randRange(rr, -0.6, 0.8) + float * Util.rand(rr) * (1 + math.sin(ctx.t * 2 + i) * 0.1), math.sin(a) * d)
@@ -553,7 +562,7 @@ local function blackLightning(ctx: Timeline.Ctx, c: Vector3, radius: number, k: 
 	local h = h3(ctx)
 	local ri, bi = 1, 1
 	for i = 1, 12 do
-		local rr = Util.rng(seed + i * 5 + math.floor(ctx.t * 18))
+		local rr = rng(seed + i * 5 + math.floor(ctx.t * 18))
 		local d = V(Util.randRange(rr, -1, 1), Util.randRange(rr, -0.8, 1), Util.randRange(rr, -1, 1)).Unit
 		local a = c + d * Util.randRange(rr, 0.2, 0.9) * radius * 0.3
 		local b = c + d * Util.randRange(rr, 0.6, 1.3) * radius * k
@@ -1157,7 +1166,7 @@ local function blackFlash(ctx: Timeline.Ctx)
 			end
 		elseif t >= 26.33 then
 			for i = 1, 8 do
-				local rr = Util.rng(i * 17 + math.floor(t * 20))
+				local rr = rng(i * 17 + math.floor(t * 20))
 				local p0 = c + V(Util.randRange(rr, -7, 7), Util.randRange(rr, -4, 4), 0)
 				ri = FX.placeBolt(ctx, h.redBolts, ri, p0, p0 + V(Util.randRange(rr, -2, 2), Util.randRange(rr, -2, 2), 0), 4, 0.6, 0.2, i + 120, 18)
 			end
@@ -1362,7 +1371,7 @@ local function topSpin(ctx: Timeline.Ctx)
 	ctx:rig("Yuta", face(c + d * 1.4, -d), Cast.alive(grip, t))
 	ctx:rig("RyuLoose", face(c - d * 1.4, d), Cast.alive(grip, t))
 	for i, p in h.bigSmoke.parts do
-		local rr = Util.rng(1300 + i)
+		local rr = rng(1300 + i)
 		local pos = c + V(Util.randRange(rr, -7, 7), Util.randRange(rr, 10, 30), Util.randRange(rr, -6, 6))
 		local s = Util.randRange(rr, 1, 3.5)
 		ctx:place(p, C(pos) * CFrame.Angles(i, i, 0))

@@ -25,6 +25,11 @@ FaceRig.expr = {
 		growl = { "ryu:eyes:blank", "ryu:brows:angry", "ryu:mouth:talk" },
 		hit = { "ryu:eyes:narrow", "ryu:brows:raised", "ryu:mouth:talk" },
 		roar = { "ryu:eyes:blank", "ryu:brows:angry", "ryu:mouth:laugh" },
+		-- part 4
+		scream = { "ryu:eyes:shut", "ryu:brows:angry", "ryu:mouth:laugh" },
+		dazed = { "ryu:eyes:narrow", "ryu:brows:raised", "ryu:mouth:closed" },
+		dazedTalk = { "ryu:eyes:narrow", "ryu:brows:raised", "ryu:mouth:talk" },
+		content = { "ryu:eyes:narrow", "ryu:brows:raised", "ryu:mouth:grin" },
 		heh = { "ryu:eyes:wide", "ryu:brows:angry", "ryu:mouth:laugh" },
 	},
 	yuta = {
@@ -145,6 +150,26 @@ function FaceRig.ryu(c: Paint.Canvas, pal: { [string]: Color3 })
 	c:stroke({ { 64, 84 }, { 65, 91 } }, { 1.4, 0.6 }, blood)
 	c:circle(60, 74, 1.1, blood)
 	c:circle(26, 58, 0.9, blood)
+
+	-- part 4: scorched by his own blast: soot smudges and burnt patches
+	c:setGroup("ryu:burnt")
+	local soot, sootDeep = Color3.fromRGB(56, 32, 24), Color3.fromRGB(30, 16, 12)
+	c:stroke({ { 14, 28 }, { 30, 34 }, { 44, 30 } }, { 4, 7, 4 }, soot)
+	c:stroke({ { 56, 22 }, { 70, 18 }, { 86, 24 } }, { 3, 6, 3 }, soot)
+	c:stroke({ { 60, 60 }, { 72, 66 }, { 86, 62 } }, { 3, 6, 3 }, soot)
+	c:stroke({ { 16, 60 }, { 24, 70 }, { 22, 84 } }, { 3, 5, 2 }, sootDeep)
+	c:stroke({ { 66, 76 }, { 76, 88 } }, { 3, 2 }, sootDeep)
+	c:stroke({ { 36, 92 }, { 50, 96 }, { 62, 92 } }, { 2, 4, 2 }, soot)
+	c:circle(80, 44, 2.2, soot)
+	c:circle(20, 46, 1.8, sootDeep)
+	-- eyes squeezed shut (screaming in the light)
+	c:setGroup("ryu:eyes:shut")
+	for _, e in { { cx = 30, dir = -1 }, { cx = 70, dir = 1 } } do
+		local inner, outer = e.cx + e.dir * -10, e.cx + e.dir * 11
+		c:stroke({ { inner, 48 }, { e.cx, 51.5 }, { outer, 47 } }, { 1.4, 2.6, 1.2 }, line)
+		c:stroke({ { inner + e.dir * 2, 45 }, { e.cx, 46.5 }, { outer - e.dir * 2, 44 } }, { 0.4, 0.8, 0.4 }, deep)
+		c:stroke({ { inner + e.dir * 3, 54 }, { e.cx, 55 }, { outer - e.dir * 3, 53 } }, { 0.4, 0.8, 0.4 }, deep)
+	end
 	c:setGroup(nil)
 end
 
