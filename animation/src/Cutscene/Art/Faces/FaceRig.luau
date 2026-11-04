@@ -26,7 +26,7 @@ FaceRig.expr = {
 		hit = { "ryu:eyes:narrow", "ryu:brows:raised", "ryu:mouth:talk" },
 		roar = { "ryu:eyes:blank", "ryu:brows:angry", "ryu:mouth:laugh" },
 		-- part 4
-		scream = { "ryu:eyes:shut", "ryu:brows:angry", "ryu:mouth:laugh" },
+		scream = { "ryu:eyes:shut", "ryu:brows:angry", "ryu:mouth:scream" },
 		dazed = { "ryu:eyes:narrow", "ryu:brows:raised", "ryu:mouth:closed" },
 		dazedTalk = { "ryu:eyes:narrow", "ryu:brows:raised", "ryu:mouth:talk" },
 		content = { "ryu:eyes:narrow", "ryu:brows:raised", "ryu:mouth:grin" },
@@ -163,12 +163,32 @@ function FaceRig.ryu(c: Paint.Canvas, pal: { [string]: Color3 })
 	c:circle(80, 44, 2.2, soot)
 	c:circle(20, 46, 1.8, sootDeep)
 	-- eyes squeezed shut (screaming in the light)
+	-- a scream: the mouth wrenched wide open, corners pulled down, both rows
+	-- of teeth bared
+	c:setGroup("ryu:mouth:scream")
+	c:ellipse(50, 90, 14, 9.5, 0, mouthIn)
+	c:ellipse(50, 95, 7, 3, 0, tongue)
+	c:stroke({ { 39, 84 }, { 44, 82 }, { 50, 81.5 }, { 56, 82 }, { 61, 84 } }, { 1.4, 2.8, 3.2, 2.8, 1.4 }, teeth)
+	c:stroke({ { 42, 97.5 }, { 50, 99 }, { 58, 97.5 } }, { 1.2, 2.4, 1.2 }, teeth)
+	local ring: { { number } } = {}
+	for k = 0, 15 do
+		local a = k / 16 * math.pi * 2
+		table.insert(ring, { 50 + math.cos(a) * 14.4, 90 + math.sin(a) * 9.9 + (if math.cos(a) > 0.8 or math.cos(a) < -0.8 then 1.5 else 0) })
+	end
+	c:stroke(ring, 1.3, line, { closed = true })
+	c:stroke({ { 35, 92 }, { 33, 97 } }, { 0.8, 0.3 }, deep)
+	c:stroke({ { 65, 92 }, { 67, 97 } }, { 0.8, 0.3 }, deep)
+
+	-- squeezed shut in pain: the lids pressed into a hard line bent up in
+	-- the middle, deep creases fanning out from the outer corners
 	c:setGroup("ryu:eyes:shut")
 	for _, e in { { cx = 30, dir = -1 }, { cx = 70, dir = 1 } } do
-		local inner, outer = e.cx + e.dir * -10, e.cx + e.dir * 11
-		c:stroke({ { inner, 48 }, { e.cx, 51.5 }, { outer, 47 } }, { 1.4, 2.6, 1.2 }, line)
-		c:stroke({ { inner + e.dir * 2, 45 }, { e.cx, 46.5 }, { outer - e.dir * 2, 44 } }, { 0.4, 0.8, 0.4 }, deep)
-		c:stroke({ { inner + e.dir * 3, 54 }, { e.cx, 55 }, { outer - e.dir * 3, 53 } }, { 0.4, 0.8, 0.4 }, deep)
+		-- "><": two hard strokes meeting at the inner corner
+		local inner, outer = e.cx + e.dir * -9, e.cx + e.dir * 10
+		c:stroke({ { outer, 44.5 }, { e.cx, 47.5 }, { inner, 49.5 } }, { 1.2, 2.6, 1.4 }, line)
+		c:stroke({ { outer, 54.5 }, { e.cx, 51.5 }, { inner, 49.5 } }, { 1.2, 2.6, 1.4 }, line)
+		c:stroke({ { outer + e.dir * 2, 47 }, { outer + e.dir * 6, 46 } }, { 0.8, 0.3 }, deep)
+		c:stroke({ { outer + e.dir * 2, 52 }, { outer + e.dir * 6, 53.5 } }, { 0.8, 0.3 }, deep)
 	end
 	c:setGroup(nil)
 end

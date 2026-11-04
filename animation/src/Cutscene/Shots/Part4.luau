@@ -467,13 +467,12 @@ local function ryuEye(ctx: Timeline.Ctx)
 	local t = ctx.t
 	local rb = ctx:rig("RyuLoose", C(RYU), Cast.alive({ UpperTorso = R(2, 0, 0), Head = R(14, 0, 0) }, t))
 	Cast.expr(ctx, "ryu", "shock")
-	ctx:show("ryu:blood")
 	for _, p in h4(ctx).ryuLocks do
 		ctx:prop(p, { t = 1 })
 	end
 	local eye = (rb.Head * C(-0.17, 0.86, -0.56)).Position
 	local push = Util.smoothstep(10.533, 11.367, t)
-	cam(ctx, eye + rb.Head.LookVector * (1.1 - push * 0.15) - rb.Head.UpVector * 0.05, eye, 17, 0.01, 1)
+	cam(ctx, eye + rb.Head.LookVector * (1.1 - push * 0.15) - rb.Head.UpVector * 0.05, eye - rb.Head.UpVector * 0.07, 18, 0.01, 1)
 	ctx:place(h4(ctx).lamp, C(eye + V(0, 3, -2)))
 	ctx:light("P4Lamp", 2, Color3.fromRGB(200, 240, 255), 10)
 	grade(ctx, -0.08, 0.28, 0.05, Color3.fromRGB(196, 210, 255))
@@ -735,7 +734,7 @@ local function burntArm(ctx: Timeline.Ctx)
 	ctx:show("yuta:blood")
 	charredArm(ctx)
 	local arm = (yb.RightLowerArm * C(0, -0.45, 0)).Position
-	FX.placeBurst(ctx, h4(ctx).wisps, arm + V(0, 0.3, 0), (t * 0.7) % 1.4, 0.9, 0.22, 1.4, V(0, 1, 0), 0.35, -0.8)
+	puffs(ctx, arm + V(0, 0.9, 0), V(0.18, 0.7, 0.18), V(0, 1.2, 0), 0.16, Color3.fromRGB(96, 84, 80), 0.55, 5100)
 	cam(ctx, arm + V(-2.3, 0.6, 0.5), arm + V(0, 0.45, 0), 44, 0, 1)
 	ctx:wind(1.1)
 	grade(ctx, -0.02, 0.18, -0.05, Color3.fromRGB(226, 220, 214))
