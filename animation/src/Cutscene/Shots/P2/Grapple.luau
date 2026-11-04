@@ -88,21 +88,6 @@ local yutaFlung: Rig.Pose = {
 	RightLowerLeg = R(-30, 0, 0),
 }
 
-local ryuSlide: Rig.Pose = {
-	HumanoidRootPart = C(0, -0.5, 0),
-	LowerTorso = R(-8, 0, 0),
-	UpperTorso = R(18, 0, 0),
-	Head = R(-14, 0, 0),
-	RightUpperArm = R(30, 0, 40),
-	RightLowerArm = R(40, 0, 0),
-	LeftUpperArm = R(30, 0, -40),
-	LeftLowerArm = R(40, 0, 0),
-	LeftUpperLeg = R(10, 0, -32),
-	LeftLowerLeg = R(-20, 0, 8),
-	RightUpperLeg = R(-10, 0, 32),
-	RightLowerLeg = R(-14, 0, -8),
-}
-
 -- Yuta down on one knee, right arm raised
 local yutaKneel: Rig.Pose = {
 	HumanoidRootPart = C(0, -0.95, 0),
@@ -309,26 +294,72 @@ end
 
 -- from behind, low: Ryu skids back on the deck, Yuta far off on one knee,
 -- Rika's shadow falling over Ryu from above
+-- Ryu skidding back on his heels: bent far forward towards Yuta, a wide
+-- low stance, arms flung out to the sides (the fur cuffs)
+local ryuSkidPose: Rig.Pose = {
+	HumanoidRootPart = C(0, -0.9, 0),
+	LowerTorso = R(-38, 0, 0),
+	UpperTorso = R(-22, 0, 0),
+	Head = R(44, 0, 0),
+	RightUpperArm = R(34, 0, 58),
+	RightLowerArm = R(34, 0, 0),
+	RightHand = R(30, 0, 0),
+	LeftUpperArm = R(34, 0, -58),
+	LeftLowerArm = R(34, 0, 0),
+	LeftHand = R(30, 0, 0),
+	LeftUpperLeg = R(60, 0, -30),
+	LeftLowerLeg = R(-44, 0, 6),
+	LeftFoot = R(-10, 0, 0),
+	RightUpperLeg = R(30, 0, 30),
+	RightLowerLeg = R(-30, 0, -6),
+	RightFoot = R(-10, 0, 0),
+}
+
 local function ryuSkid(ctx: Timeline.Ctx)
 	ctx:wind(1.8)
-	ctx:gust(0.8 * math.exp(-ctx.lt * 1.5))
 	local hh = h(ctx)
+	local t = ctx.t
 	local lt = ctx.lt
-	local slide = 6 * (1 - math.exp(-lt * 1.6))
+	-- 50.067-51.133: low behind Ryu as he skids back towards us, bent far
+	-- forward, arms out, concrete spraying from his heels; Yuta small in
+	-- the distance on the right, down on one knee, his right arm raised.
+	-- The camera swoops in low (50.07-50.35), then backs off with him.
+	local slide = 7 * (1 - math.exp(-lt * 1.3))
 	local root = C(Common.RYU + V(0, 0, slide))
-	ctx:rig("RyuLoose", root, Cast.alive(ryuSlide, ctx.t))
+	local wobble = math.sin(t * 17) * 2
+	local rb = ctx:rig("RyuLoose", root, Cast.alive(Cast.add(ryuSkidPose, "UpperTorso", R(wobble, 0, wobble * 0.5)), t))
 	Cast.expr(ctx, "ryu", "grit")
-	ctx:rig("Yuta", Common.yutaRoot() * C(0, 0, 8), yutaKneel)
-	for i, foot in { V(-1.2, 0.3, 0.6), V(1.2, 0.3, 0.6) } do
-		FX.placeBurst(ctx, if i == 1 then hh.spray else hh.dust, root:PointToWorldSpace(foot), (lt + i * 0.17) % 0.45, 12, 0.5, 0.45, V(0, 0.8, 1), 0.8, 26)
-	end
-	local eye = Common.RYU + V(1.4, 1.3, 13)
-	ctx:camera(Clash.shake(Util.lookAt(eye, Common.RYU + V(0, 3.2, -8)), ctx.t, 0.12, 9), 50)
-	ctx:focus(13 - slide, 0.8)
-	if ctx.u > 0.7 then
-		local k = (ctx.u - 0.7) / 0.3
-		local kb = ctx:rig("Rika", C(Common.RYU + V(1.5, 14 - k * 6, slide + 2)), rikaSwing)
+	ctx:rig("Yuta", C(Common.RYU + V(5.5, 0, -24)) * CFrame.Angles(0, math.pi, 0), Cast.alive(yutaKneel, t))
+	if t < 51.133 then
+		ctx:gust(0.8 * math.exp(-lt * 1.5) + 0.4)
+		for i, foot in { "LeftFoot", "RightFoot" } do
+			local p = (rb[foot] * C(0, -0.3, 0.2)).Position
+			FX.placeBurst(ctx, if i == 1 then hh.spray else hh.dust, p, (lt + i * 0.17) % 0.45, 12, 0.5, 0.45, V(0, 0.8, 1), 0.8, 26)
+		end
+		local swoop = Util.smoothstep(50.067, 50.35, t)
+		local base = Common.RYU + V(0, 0, slide)
+		local eye = base + V(3.2 - swoop * 1.2, 4.5 - swoop * 4.0, 12 - swoop * 8.2)
+		local look = base + V(1.4, 2.4 - swoop * 0.2, -14)
+		ctx:camera(Clash.shake(Util.lookAt(eye, look), t, 0.12 + (if t < 50.35 then 0.6 else 0), 9), 56)
+		ctx:focus((Common.RYU + V(5.5, 2, -24) - eye).Magnitude, 0.5)
+		if t > 50.2 and t < 50.32 then
+			ctx:alpha("speed", 0.5)
+		end
+	else
+		-- 51.133: up past the back of Ryu's head at Rika looming over him,
+		-- her fist raised
+		local k = Util.smoothstep(51.133, 51.533, t)
+		-- Rika in front of him, facing him, bent over him
+		local kb = ctx:rig("Rika", C(Common.RYU + V(1.0, -1.5 - k * 1.5, slide - 6.5)) * CFrame.Angles(0, math.pi + math.rad(10), 0), Cast.alive(rikaSwing, t))
 		Common.rikaEye(ctx, kb)
+		local head = (rb.Head * C(0, 0.8, 0)).Position
+		local back = rb.UpperTorso.Position
+		local eye = back + V(0.9, -1.6, 4.6)
+		local face = (kb.Head * C(0, 1.0, -1.2)).Position
+		ctx:camera(Clash.shake(Util.lookAt(eye, face:Lerp(head, 0.3)), t, 0.1, 9), 62)
+		ctx:focus((face - eye).Magnitude, 0.6)
+		ctx:light("RikaMouth", 0.9, Color3.fromRGB(200, 212, 255), 22)
+		ctx:gust(0.6)
 	end
 	Common.grade(ctx, -0.04, 0.2, 0.05)
 	Common.sky(ctx, "low", 30)
