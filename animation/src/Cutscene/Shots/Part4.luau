@@ -12,6 +12,7 @@ local Builder = require(script.Parent.Parent.Builder)
 local Timeline = require(script.Parent.Parent.Timeline)
 local FX = require(script.Parent.Parent.FX)
 local Util = require(script.Parent.Parent.Util)
+local Paint = require(script.Parent.Parent.Paint)
 local Rig = require(script.Parent.Parent.Rig)
 local Cast = require(script.Parent.Cast)
 local Clash = require(script.Parent.Clash)
@@ -44,6 +45,7 @@ type H = {
 	backdrop: Builder.PartSpec,
 	lamp: Builder.PartSpec,
 	skyBeam: Builder.PartSpec,
+	skyPaint: Builder.PartSpec,
 	rocks: Group,
 	drops: Group,
 	puffs: Group,
@@ -114,9 +116,57 @@ local function cityView(scene: Builder.Scene)
 	seg(245, 1600)
 end
 
-local function skyView(scene: Builder.Scene)
+-- The sky straight up (reference 37.0-41.0): a deep saturated blue, darker
+-- in the middle, ringed by soft swirling streaks of white cloud, like
+-- looking up out of a funnel (canvas px = 1/10 stud, square so it can turn)
+local SKY_PX = 1600
+local function skyView(scene: Builder.Scene): Builder.PartSpec
+	local c = Paint.canvas(1, 0, 0)
+	local r = Util.rng(5150)
+	Util.rand(r)
+	local S = SKY_PX
+	local cx, cy = S / 2, S / 2
+	c:box(-10, -10, S + 10, S + 10, Color3.fromRGB(44, 98, 214))
+	-- lighter towards the edges, darker deep blue in the middle
+	for i = 0, 9 do
+		local f = i / 9
+		c:blob(cx, cy, S * (1.5 - f * 1.1), S * (1.5 - f * 1.1), Util.mix(Color3.fromRGB(110, 156, 236), Color3.fromRGB(28, 70, 190), f), 0.55, 2)
+	end
+	-- soft streaks of cloud swirling round the opening, three layers each
+	-- a streak bends along the ring: four short soft pills following the arc
+	local function wisp(a: number, rad: number, len: number, thick: number, alpha: number)
+		local span = len / rad
+		local drift = Util.randRange(r, -0.08, 0.08)
+		for k = 0, 3 do
+			local f = (k + 0.5) / 4
+			local aa = a + (f - 0.5) * span
+			local rr = rad * (1 + drift * (f - 0.5))
+			local x, y = cx + math.cos(aa) * rr, cy + math.sin(aa) * rr
+			local rot = math.deg(aa) + 90
+			local taper = math.sin(f * math.pi)
+			local l = len / 4 * 1.5
+			c:pill(x, y, l * 1.2, thick * 3.2 * taper + 4, rot, Color3.fromRGB(190, 210, 246), 1 - alpha * 0.18)
+			c:pill(x, y, l, thick * 1.6 * taper + 2, rot, Color3.fromRGB(220, 231, 252), 1 - alpha * 0.32)
+			c:pill(x, y, l * 0.8, thick * 0.6 * taper + 1, rot, Color3.fromRGB(246, 249, 255), 1 - alpha * 0.5)
+		end
+	end
+	for _ = 1, 70 do
+		local a = Util.randRange(r, 0, math.pi * 2)
+		local rad = Util.randRange(r, 520, 800)
+		wisp(a, rad, Util.randRange(r, 160, 420), Util.randRange(r, 10, 26), Util.randRange(r, 0.5, 1))
+	end
+	for _ = 1, 26 do
+		local a = Util.randRange(r, 0, math.pi * 2)
+		local rad = Util.randRange(r, 380, 520)
+		wisp(a, rad, Util.randRange(r, 80, 200), Util.randRange(r, 5, 12), Util.randRange(r, 0.3, 0.6))
+	end
 	Builder.model(scene, "P4Sky", false)
-	Builder.part(scene, "P4Sky", V(5000, 2, 5000), C(SKY + V(0, 1100, 0)), Color3.fromRGB(66, 106, 206), { material = "Neon", castShadow = false, name = "SkyPlate" })
+	return Builder.part(scene, "P4Sky", V(S / 10, S / 10, 0.05), C(), Color3.new(1, 1, 1), {
+		fx = true,
+		castShadow = false,
+		name = "SkyPaint",
+		gui = { face = "Front", canvas = Vector2.new(S, S), lightInfluence = 0, elems = c.elems },
+	})
 end
 
 function Part4.build(scene: Builder.Scene)
@@ -124,6 +174,7 @@ function Part4.build(scene: Builder.Scene)
 	local function fx(model: string, shape: string, col: Color3, mat: string, tr: number, name: string): Builder.PartSpec
 		return Builder.fx(scene, model, shape, V(1, 1, 1), col, mat, tr, name)
 	end
+	local skyPaint = skyView(scene)
 	local h: H = {
 		core = fx("P4Pillar", "Cylinder", Color3.fromRGB(246, 255, 255), "Neon", 0, "PillarCore"),
 		glow = fx("P4Pillar", "Cylinder", CYAN, "Neon", 0.4, "PillarGlow"),
@@ -131,6 +182,7 @@ function Part4.build(scene: Builder.Scene)
 		backdrop = fx("P4Backdrop", "Block", CYAN, "Neon", 0, "Backdrop"),
 		lamp = fx("P4Lamp", "Ball", WHITE, "SmoothPlastic", 1, "Lamp"),
 		skyBeam = fx("P4SkyBeam", "Cylinder", CYAN, "Neon", 0, "SkyBeam"),
+		skyPaint = skyPaint,
 		rocks = {},
 		drops = {},
 		puffs = {},
@@ -165,7 +217,6 @@ function Part4.build(scene: Builder.Scene)
 		h.clouds[i] = fx("P4Clouds", "Ellipsoid", Color3.fromRGB(236, 242, 252), "Neon", 0.2, "Cloud")
 	end
 	cityView(scene)
-	skyView(scene)
 	for _, p in scene.parts do
 		if p.rig == "RyuLoose" then
 			table.insert(h.ryuAll, p)
@@ -557,6 +608,7 @@ local function ryuScream(ctx: Timeline.Ctx)
 		LeftLowerArm = R(70, 0, 0),
 	}, t))
 	Cast.expr(ctx, "ryu", "scream")
+	Cast.furLow(ctx, "RyuLoose", 0.8)
 	local h = h4(ctx)
 	recolor(ctx, h.ryuSkin, Color3.fromRGB(70, 82, 130))
 	recolor(ctx, h.ryuDeep, Color3.fromRGB(44, 52, 96))
@@ -640,6 +692,7 @@ local function letGo(ctx: Timeline.Ctx)
 		LeftLowerArm = R(10, 0, 0),
 	}, t))
 	scorched(ctx)
+	Cast.furLow(ctx, "RyuLoose", 0.6)
 	Cast.expr(ctx, "ryu", "dazed")
 	local collar = (rb.UpperTorso * C(0, 1.35, -0.62)).Position
 	local yp: Rig.Pose = {
@@ -696,12 +749,15 @@ local function wasThisMine(ctx: Timeline.Ctx)
 	local t = ctx.t
 	local rb = ctx:rig("RyuLoose", C(RYU), Cast.alive({ UpperTorso = R(12, 0, 0), Head = R(58, -6, 0) }, t))
 	scorched(ctx)
+	Cast.furLow(ctx, "RyuLoose", 1)
 	local speaking = t >= 28.833 and t < 31.433
 	Cast.expr(ctx, "ryu", if speaking and Util.noise1(t * 5, 3) > 0.25 then "dazedTalk" else "dazed")
 	local head = rb.Head * C(0, 0.75, 0)
-	local mouth = (rb.Head * C(0, 0.45, -0.6)).Position
-	FX.placeBurst(ctx, h4(ctx).steam, mouth + rb.Head.LookVector * 0.45, (t * 0.6) % 1.8, 0.9, 0.22, 1.8, rb.Head.LookVector + V(0, 0.8, 0), 0.4, -0.4)
-	cam(ctx, head.Position + V(-1.7, 1.0, -2.3), head.Position + V(0, 0.1, -0.3), 36, 0, 1)
+	local mouth = (rb.Head * C(0, 0.42, -0.62)).Position
+	-- his breath: soft white puffs of steam rising from his open mouth
+	puffs(ctx, mouth + V(0, 0.4, 0) + rb.Head.LookVector * 0.15, V(0.14, 0.26, 0.14), V(0, 0.8, 0), 0.2, Color3.fromRGB(248, 248, 252), 0.3, 4900)
+	-- three-quarter from his left, the collar (pressed down) below the chin
+	cam(ctx, head.Position + V(-2.1, 0.9, -2.3), head.Position + V(0, 0.35, -0.3), 38, 0, 1)
 	ctx:wind(1.2)
 	grade(ctx, -0.02, 0.18, -0.05, Color3.fromRGB(222, 226, 240))
 	field(ctx, "low")
@@ -755,25 +811,20 @@ end
 local function skyWindow(ctx: Timeline.Ctx)
 	local h = h4(ctx)
 	local t = ctx.t
-	for i, p in h.clouds do
-		local rr = rng(4700 + i * 17)
-		local a = Util.randRange(rr, 0, math.pi * 2) + (t - 37) * 0.025
-		local d = Util.randRange(rr, 300, 540)
-		local hy = Util.randRange(rr, 320, 460)
-		local sz = Util.randRange(rr, 70, 140)
-		ctx:place(p, C(SKY + V(math.cos(a) * d, hy, math.sin(a) * d)) * CFrame.Angles(0, a, 0))
-		ctx:prop(p, { s = V(sz * 1.4, sz * 0.35, sz), c = Util.mix(Color3.fromRGB(214, 226, 250), Color3.fromRGB(150, 176, 230), Util.rand(rr) * 0.6), t = 0.35 + Util.rand(rr) * 0.3 })
-	end
+	local eye = SKY + V(0, 2, 0)
+	-- the painted sky above, the swirl turning slowly
+	ctx:place(h.skyPaint, Util.lookAt(SKY + V(0, 52, 0), eye, V(0, 0, 1)) * CFrame.Angles(0, 0, (t - 37) * 0.06))
+	-- the thin line of light fading out of the middle
 	local beam = Util.smoothstep(37.0, 38.2, t)
 	if beam < 1 then
-		ctx:place(h.skyBeam, C(SKY + V(12, 800, 30)) * CFrame.Angles(0, 0, math.pi / 2))
-		ctx:prop(h.skyBeam, { s = V(1500, 3, 3), t = 0.3 + beam * 0.7 })
+		ctx:place(h.skyBeam, C(SKY + V(1.5, 26, 3)) * CFrame.Angles(0, 0, math.pi / 2))
+		ctx:prop(h.skyBeam, { s = V(48, 0.35, 0.35), t = 0.3 + beam * 0.7 })
 	end
-	cam(ctx, SKY + V(0, 2, 0), SKY + V(0, 100, 0), 72, 0, 0, V(0, 0, 1))
+	cam(ctx, eye, SKY + V(0, 100, 0), 72, 0, 0, V(0, 0, 1))
 	ctx:fog(0)
 	ctx:wind(0)
-	ctx:bloom(0)
-	grade(ctx, 0, 0.05, 0, Color3.fromRGB(236, 240, 255))
+	ctx:bloom(0.3)
+	grade(ctx, 0, 0.08, 0.12, Color3.fromRGB(236, 240, 255))
 end
 
 -- 41.0: Ryu from the front, scorched, jacket hanging open: his head comes
@@ -793,6 +844,7 @@ local function thankYou(ctx: Timeline.Ctx)
 		LeftLowerArm = R(8, 0, 0),
 	}, t))
 	scorched(ctx)
+	Cast.furLow(ctx, "RyuLoose", 0.8 * (1 - down))
 	local speaking = t >= 42.667 and t < 44.45
 	local face = if down < 0.6 then "dazed" elseif speaking and Util.noise1(t * 7, 4) > 0 then "dazedTalk" else "content"
 	Cast.expr(ctx, "ryu", face)

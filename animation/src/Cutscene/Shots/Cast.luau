@@ -148,6 +148,32 @@ function Cast.point(ctx: Timeline.Ctx, rig: string, side: string)
 	end
 end
 
+-- Ryu's collar fur pressed down out of his face (k 0..1): when his head is
+-- thrown back the big shoulder tufts and the inner spikes would poke into
+-- his jaw and mouth, so they shrink and sink a little
+local FUR_BULK = { FurShoulder = true, FurFront = true, FurBack = true, FurUnder = true }
+function Cast.furLow(ctx: Timeline.Ctx, rig: string, k: number)
+	if k <= 0 then
+		return
+	end
+	local key = "furLow" .. rig
+	local list: { Builder.PartSpec }? = ctx.scene.data[key]
+	if not list then
+		local found: { Builder.PartSpec } = {}
+		for _, p in ctx.scene.parts do
+			if p.rig == rig and p.bone == "UpperTorso" and (FUR_BULK[p.name] or p.name == "FurSpike") then
+				table.insert(found, p)
+			end
+		end
+		ctx.scene.data[key] = found
+		list = found
+	end
+	for _, p in list :: { Builder.PartSpec } do
+		local sc = if p.name == "FurSpike" then 1 - 0.45 * k else 1 - 0.42 * k
+		ctx:prop(p, { s = p.size * sc })
+	end
+end
+
 -- pose helpers ----------------------------------------------------------------
 function Cast.mix(a: Rig.Pose, b: Rig.Pose, t: number): Rig.Pose
 	return Rig.blend(a, b, math.clamp(t, 0, 1))
