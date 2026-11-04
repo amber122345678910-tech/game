@@ -52,7 +52,7 @@ export type H = {
 function Common.build(scene: Builder.Scene)
 	local pal = scene.style.color
 	Uro.build(scene, "Uro")
-	Ryu.build(scene, "RyuBare", true)
+	Ryu.build(scene, "RyuBare", true, true)
 	local white = Color3.new(1, 1, 1)
 	local cyanHot = Util.mix(pal.eCyan, white, 0.55)
 	local h: H = {

@@ -29,14 +29,16 @@ Ryu.dims = {
 
 -- bare = true: the coat has slipped down to his waist (part 2, Rika's grab):
 -- bare muscular back and arms, the coat and its fur bunched around the hips
-function Ryu.build(scene: Builder.Scene, rigName: string, bare: boolean?): Rig.RigDef
+-- loose = true: the pompadour has come down (overheated from overuse, end of
+-- part 2 and part 3): long spiky black locks hanging round his face
+function Ryu.build(scene: Builder.Scene, rigName: string, bare: boolean?, loose: boolean?): Rig.RigDef
 	local def = Rig.humanoid(Ryu.dims)
 	Builder.rig(scene, rigName, def, rigName)
 	Builder.model(scene, rigName, scene.style.outline ~= nil)
 	local k = Builder.kit(scene, rigName, rigName)
 	if bare then
 		Ryu.buildBare(k)
-		Ryu.buildHead(scene, k, rigName)
+		Ryu.buildHead(scene, k, rigName, loose)
 		return def
 	end
 
@@ -116,7 +118,7 @@ function Ryu.build(scene: Builder.Scene, rigName: string, bare: boolean?): Rig.R
 		end
 	end
 
-	Ryu.buildHead(scene, k, rigName)
+	Ryu.buildHead(scene, k, rigName, loose)
 
 	-- Arms --------------------------------------------------------------------
 	for _, side in { "Left", "Right" } do
@@ -143,7 +145,7 @@ function Ryu.build(scene: Builder.Scene, rigName: string, bare: boolean?): Rig.R
 end
 
 -- Poses ---------------------------------------------------------------------
-function Ryu.buildHead(scene: Builder.Scene, k: Builder.Kit, rigName: string)
+function Ryu.buildHead(scene: Builder.Scene, k: Builder.Kit, rigName: string, loose: boolean?)
 	-- Head (face painted on the front) and pompadour --------------------------
 	local face = Paint.canvas(4.4, 0, 0)
 	FaceRig.ryu(face, scene.style.color)
@@ -156,6 +158,10 @@ function Ryu.buildHead(scene: Builder.Scene, k: Builder.Kit, rigName: string)
 		gui = { face = "Front", canvas = Vector2.new(440, 472), lightInfluence = scene.style.face.lightInfluence, elems = face.elems },
 	})
 	k.add("Head", "Block", V(0.98, 0.3, 1.0), C(0, 0.18, -0.02), "rSkin", "skin", "Jaw")
+	if loose then
+		Ryu.buildLooseHair(k)
+		return
+	end
 	k.add("Head", "Ellipsoid", V(1.3, 0.78, 1.42), C(0, 1.38, 0.08), "rHair", "hair", "HairTop")
 	k.add("Head", "Ellipsoid", V(1.22, 0.88, 1.05), C(0, 1.5, -0.5) * R(25, 0, 0), "rHair", "hair", "Pompadour")
 	k.add("Head", "Wedge", V(1.05, 0.5, 0.82), C(0, 1.72, -0.98) * R(-14, 180, 0), "rHair", "hair", "PompTip")
@@ -169,6 +175,49 @@ function Ryu.buildHead(scene: Builder.Scene, k: Builder.Kit, rigName: string)
 	-- loose strands falling over the forehead
 	for _, st in { { -0.22, 12 }, { 0.05, -6 }, { 0.28, -16 } } do
 		Builder.flex(k.add("Head", "Wedge", V(0.06, 0.5, 0.12), C(st[1], 1.06, -0.58) * R(0, 0, 180 + st[2]) * R(0, 90, 0), "rHair", "hair", "Strand"), 9, V(0, -0.25, 0))
+	end
+end
+
+-- Loose, wild hair: a messy cap and long tapered spiky locks falling over the
+-- forehead (down to the brows), over the ears to the jaw and down the nape,
+-- a few strands sticking out; every lock sways in the wind
+function Ryu.buildLooseHair(k: Builder.Kit)
+	k.add("Head", "Ellipsoid", V(1.3, 0.72, 1.42), C(0, 1.3, 0.08), "rHair", "hair", "HairTop")
+	k.add("Head", "Ellipsoid", V(1.22, 1.0, 0.5), C(0, 0.98, 0.52), "rHair", "hair", "HairBack")
+	for _, sx in { -1, 1 } do
+		k.add("Head", "Block", V(0.08, 0.3, 0.2), C(sx * 0.58, 0.7, 0.08), "rSkin", "skin", "Ear")
+	end
+	local function lock(x: number, y: number, z: number, pitch: number, roll: number, len: number, w: number, col: string)
+		-- hangs along -Y from (x, y, z); pitch > 0 swings the tip forward
+		Builder.flex(k.add("Head", "Ellipsoid", V(w, len, w * 0.75), C(x, y, z) * R(pitch, 0, roll) * C(0, -len * 0.46, 0), col, "hair", "Lock"), 9, V(0, len * 0.46, 0))
+	end
+	-- forehead: jagged locks ending at the brows, one longer between the eyes
+	local front = {
+		{ -0.44, 1.3, -0.5, 28, -22, 0.62, 0.2 },
+		{ -0.26, 1.36, -0.56, 24, -10, 0.7, 0.19 },
+		{ -0.08, 1.38, -0.6, 20, -2, 0.86, 0.17 },
+		{ 0.1, 1.38, -0.6, 22, 6, 0.74, 0.18 },
+		{ 0.28, 1.35, -0.56, 26, 14, 0.66, 0.19 },
+		{ 0.46, 1.28, -0.48, 30, 26, 0.58, 0.19 },
+	}
+	for i, f in front do
+		lock(f[1], f[2], f[3], f[4], f[5], f[6], f[7], if i % 3 == 0 then "rCoatHi" else "rHair")
+	end
+	-- sides: over the ears down to the jaw
+	for _, sx in { -1, 1 } do
+		lock(sx * 0.6, 1.28, -0.28, 10, sx * -12, 0.9, 0.22, "rHair")
+		lock(sx * 0.64, 1.24, 0.02, 4, sx * -16, 1.05, 0.24, "rHair")
+		lock(sx * 0.6, 1.22, 0.32, -8, sx * -22, 1.0, 0.24, "rHair")
+	end
+	-- nape: long locks down the back of the neck
+	for i = 0, 6 do
+		local x = -0.48 + i * 0.16
+		lock(x, 1.18, 0.56, -18 - (i % 2) * 10, x * -40, 1.1 + (i % 3) * 0.2, 0.22, "rHair")
+	end
+	-- spiky strands sticking out at the crown and sides
+	local spikes = { { -0.4, 1.58, 0.0, -140, 40 }, { 0.38, 1.6, 0.05, -144, -38 }, { 0.0, 1.66, 0.25, -120, 4 }, { -0.62, 1.4, 0.3, -110, 70 }, { 0.62, 1.42, 0.28, -112, -70 } }
+	for _, sp in spikes do
+		lock(sp[1], sp[2], sp[3], sp[4], sp[5], 0.62, 0.14, "rHair")
 	end
 end
 

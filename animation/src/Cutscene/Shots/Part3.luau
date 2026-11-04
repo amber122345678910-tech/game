@@ -44,80 +44,181 @@ end
 ---------------------------------------------------------------------------
 local function dessertSet(scene: Builder.Scene): { [string]: { Builder.PartSpec } }
 	Builder.model(scene, "P3Desserts", false)
-	local cream = Color3.fromRGB(248, 242, 230)
-	local plateCol = Color3.fromRGB(246, 246, 250)
-	local sponge = Color3.fromRGB(242, 206, 140)
-	local pink = Color3.fromRGB(240, 120, 160)
-	local berry = Color3.fromRGB(214, 30, 52)
-	local tea = Color3.fromRGB(120, 30, 30)
+	local cream = Color3.fromRGB(250, 244, 232)
+	local china = Color3.fromRGB(248, 248, 252)
+	local gold = Color3.fromRGB(214, 176, 92)
+	local silver = Color3.fromRGB(196, 200, 210)
+	local sponge = Color3.fromRGB(244, 210, 146)
+	local biscuit = Color3.fromRGB(206, 150, 86)
+	local pink = Color3.fromRGB(244, 128, 170)
+	local pinkDeep = Color3.fromRGB(220, 70, 120)
+	local berry = Color3.fromRGB(214, 28, 50)
+	local choc = Color3.fromRGB(92, 52, 34)
+	local tea = Color3.fromRGB(128, 26, 22)
+	local lime = Color3.fromRGB(186, 222, 120)
 	local vanish: { [string]: { Builder.PartSpec } } = { slice = {}, parfait = {}, pink = {} }
-	local function part(name: string, shape: string, size: Vector3, cf: CFrame, col: Color3, mat: string?, group: string?)
-		local p = Builder.part(scene, "P3Desserts", size, C(DESSERT) * cf, col, { shape = shape, material = mat or "SmoothPlastic", castShadow = true, name = name })
+	local up = CFrame.Angles(0, 0, math.pi / 2) -- cylinders stand upright
+	local function part(name: string, shape: string, size: Vector3, cf: CFrame, col: Color3, mat: string?, group: string?): Builder.PartSpec
+		local p = Builder.part(scene, "P3Desserts", size, C(DESSERT) * cf, col, { shape = shape, material = mat or "SmoothPlastic", castShadow = size.Magnitude > 1.2, name = name })
 		if group then
 			table.insert(vanish[group], p)
 		end
 		return p
 	end
-	local up = CFrame.Angles(0, 0, math.pi / 2) -- cylinders stand upright
-	-- table and back wall (soft, warm light)
-	part("Table", "Block", V(60, 1, 40), C(0, -0.5, 0), Color3.fromRGB(236, 226, 206))
-	part("Wall", "Block", V(60, 30, 1), C(0, 14, 16), Color3.fromRGB(246, 236, 200))
+	local function disc(name: string, x: number, y: number, z: number, d: number, h: number, col: Color3, mat: string?, group: string?)
+		return part(name, "Cylinder", V(h, d, d), C(x, y, z) * up, col, mat, group)
+	end
+	-- tablecloth and a soft back wall
+	part("Cloth", "Block", V(80, 1, 60), C(0, -0.5, 0), Color3.fromRGB(244, 238, 226), "Fabric")
+	part("Wall", "Block", V(80, 40, 1), C(0, 18, 22), Color3.fromRGB(248, 240, 214))
+	-- a round plate with a gold rim
 	local function plate(x: number, z: number, r: number)
-		part("Plate", "Cylinder", V(0.2, r * 2, r * 2), C(x, 0.1, z) * up, plateCol)
-		part("PlateRim", "Cylinder", V(0.12, r * 2.2, r * 2.2), C(x, 0.06, z) * up, Color3.fromRGB(230, 232, 238))
+		disc("PlateRim", x, 0.05, z, r * 2.12, 0.1, gold)
+		disc("Plate", x, 0.12, z, r * 2, 0.14, china)
+		disc("PlateWell", x, 0.17, z, r * 1.4, 0.06, Color3.fromRGB(240, 240, 246))
 	end
-	-- 1. the pink cake slice (centre front)
-	plate(0, 0, 3.4)
+	local function squarePlate(x: number, z: number, w: number, rot: number)
+		part("Napkin", "Block", V(w * 1.3, 0.04, w * 1.3), C(x, 0.02, z) * CFrame.Angles(0, math.rad(rot + 20), 0), lime, "Fabric")
+		part("SquarePlate", "Block", V(w, 0.14, w), C(x, 0.1, z) * CFrame.Angles(0, math.rad(rot), 0), china)
+	end
+	local function berryCluster(x: number, y: number, z: number, col: Color3, r: number)
+		for i = 0, 6 do
+			local a = i * 0.9
+			part("Drupe", "Ball", V(r, r, r), C(x + math.cos(a) * r * 0.5, y + (i % 2) * r * 0.4, z + math.sin(a) * r * 0.5), col)
+		end
+	end
+	local function cup(x: number, z: number)
+		disc("SaucerRim", x, 0.05, z, 3.2, 0.08, gold)
+		disc("Saucer", x, 0.1, z, 3.0, 0.12, china)
+		disc("CupFoot", x, 0.3, z, 1.3, 0.3, china)
+		disc("Cup", x, 0.95, z, 2.3, 1.0, china)
+		disc("CupLip", x, 1.47, z, 2.42, 0.06, gold)
+		disc("Tea", x, 1.4, z, 2.1, 0.06, tea)
+		part("Handle", "Ellipsoid", V(0.3, 0.8, 0.6), C(x + 1.25, 1.0, z), china)
+	end
+	local function petitFour(x: number, y: number, z: number, top: Color3, i: number)
+		part("PetitFour", "Block", V(0.7, 0.45, 0.7), C(x, y + 0.22, z) * CFrame.Angles(0, i * 0.7, 0), if i % 2 == 0 then sponge else choc)
+		part("Icing", "Block", V(0.72, 0.1, 0.72), C(x, y + 0.48, z) * CFrame.Angles(0, i * 0.7, 0), top)
+		part("Dot", "Ball", V(0.2, 0.2, 0.2), C(x, y + 0.6, z), if i % 3 == 0 then berry else gold)
+	end
+
+	-- 1. the pink cake slice (centre): biscuit, sponge, jelly, mousse, glaze,
+	-- a macaron, raspberries, blueberries, a chocolate plaque, a mint leaf
+	plate(0, 0, 3.6)
 	type Layer = { h: number, col: Color3 }
-	local pinkLayers: { Layer } = { { h = 0.5, col = sponge }, { h = 0.25, col = cream }, { h = 0.5, col = sponge }, { h = 0.25, col = pink } }
-	for i, l in pinkLayers do
-		local y = 0.2 + (i - 1) * 0.42
-		part("Slice", "Wedge", V(2.6, l.h, 3.4), C(0, y + l.h / 2, 0) * CFrame.Angles(0, math.rad(30), 0), l.col, nil, "pink")
+	local pinkLayers: { Layer } = { { h = 0.3, col = biscuit }, { h = 0.5, col = sponge }, { h = 0.2, col = berry }, { h = 0.7, col = pink }, { h = 0.12, col = pinkDeep } }
+	local y = 0.2
+	for _, l in pinkLayers do
+		part("Slice", "Block", V(2.2, l.h, 3.4), C(0, y + l.h / 2, 0) * CFrame.Angles(0, math.rad(30), 0), l.col, nil, "pink")
+		y += l.h
 	end
-	for i = 1, 5 do
-		part("Fruit", "Ball", V(0.55, 0.55, 0.55), C(-0.6 + (i % 3) * 0.6, 2.0, -0.9 + i * 0.35), if i % 2 == 0 then berry else Color3.fromRGB(150, 60, 160), nil, "pink")
+	disc("MacaronA", -0.3, y + 0.15, 0.4, 1.1, 0.26, pink, nil, "pink")
+	disc("MacaronCream", -0.3, y + 0.33, 0.4, 0.95, 0.12, cream, nil, "pink")
+	disc("MacaronB", -0.3, y + 0.5, 0.4, 1.1, 0.24, pink, nil, "pink")
+	berryCluster(0.5, y + 0.25, -0.5, berry, 0.26)
+	berryCluster(0.3, y + 0.25, 0.9, berry, 0.24)
+	part("Blueberry", "Ball", V(0.38, 0.36, 0.38), C(0.75, y + 0.2, 0.2), Color3.fromRGB(52, 40, 110))
+	part("Blueberry", "Ball", V(0.36, 0.34, 0.36), C(-0.7, y + 0.2, -0.6), Color3.fromRGB(70, 50, 130))
+	part("Plaque", "Block", V(0.05, 0.7, 0.9), C(-0.9, y + 0.4, -0.2) * CFrame.Angles(0, math.rad(30), math.rad(-15)), Color3.fromRGB(250, 246, 236))
+	part("Mint", "Ellipsoid", V(0.5, 0.06, 0.25), C(0.1, y + 0.35, -0.2) * CFrame.Angles(0, 0.6, 0.2), Color3.fromRGB(90, 170, 80))
+	for i = 1, 6 do
+		part("GoldFlake", "Ball", V(0.08, 0.04, 0.08), C(-0.6 + i * 0.22, y + 0.06, -1.0 + (i % 3) * 0.7), gold)
 	end
-	-- 2. the strawberry tart (left)
-	plate(-9, 2, 4)
-	part("TartBase", "Cylinder", V(1.0, 6.4, 6.4), C(-9, 0.7, 2) * up, Color3.fromRGB(222, 170, 100))
-	part("TartCream", "Cylinder", V(0.3, 5.8, 5.8), C(-9, 1.3, 2) * up, cream)
+
+	-- 2. the strawberry tart (right): crust, cream, glazed strawberries, piping
+	plate(10, 2, 4.4)
+	disc("TartCrust", 10, 0.65, 2, 7.0, 0.9, biscuit)
+	disc("TartRim", 10, 1.08, 2, 7.2, 0.14, Color3.fromRGB(196, 136, 74))
+	disc("TartCream", 10, 1.15, 2, 6.4, 0.2, cream)
 	local rr = Util.rng(31)
-	for i = 1, 26 do
+	for i = 1, 30 do
 		local a = i * 2.4
-		local d = math.sqrt(i / 26) * 2.6
-		part("Strawberry", "Ball", V(0.8, 0.7, 0.8), C(-9 + math.cos(a) * d, 1.65, 2 + math.sin(a) * d) * CFrame.Angles(0, Util.randRange(rr, 0, 6), 0), berry, "SmoothPlastic")
+		local d = math.sqrt(i / 30) * 2.7
+		local px, pz = 10 + math.cos(a) * d, 2 + math.sin(a) * d
+		part("Strawberry", "Ellipsoid", V(0.85, 0.75, 0.75), C(px, 1.55, pz) * CFrame.Angles(0, Util.randRange(rr, 0, 6), 0.3), berry)
+		part("Shine", "Ball", V(0.18, 0.1, 0.12), C(px - 0.15, 1.88, pz - 0.15), Color3.fromRGB(255, 200, 200))
 	end
-	for i = 0, 15 do
-		local a = i / 16 * math.pi * 2
-		part("CreamDot", "Ball", V(0.55, 0.45, 0.55), C(-9 + math.cos(a) * 3.05, 1.5, 2 + math.sin(a) * 3.05), cream)
+	for i = 0, 19 do
+		local a = i / 20 * math.pi * 2
+		part("Piping", "Ball", V(0.55, 0.5, 0.55), C(10 + math.cos(a) * 3.2, 1.4, 2 + math.sin(a) * 3.2), cream)
 	end
-	-- 3. tea cups and saucers
-	for _, c in { { 7, 3 }, { -4, 9 }, { 12, -5 } } do
-		plate(c[1], c[2], 2.2)
-		part("Cup", "Cylinder", V(1.6, 2.4, 2.4), C(c[1], 1.0, c[2]) * up, plateCol)
-		part("Tea", "Cylinder", V(0.1, 2.1, 2.1), C(c[1], 1.75, c[2]) * up, tea)
+
+	-- 3. a three-tier cake stand (upper left) with petit fours
+	part("StandPole", "Cylinder", V(6.4, 0.3, 0.3), C(-12, 3.2, -6) * up, silver, "Metal")
+	for t, tier in { { y = 0.4, r = 4.0 }, { y = 2.6, r = 3.2 }, { y = 4.8, r = 2.4 } } do
+		disc("TierRim", -12, tier.y - 0.04, -6, tier.r * 2.06, 0.08, gold)
+		disc("Tier", -12, tier.y, -6, tier.r * 2, 0.12, china)
+		local n = 7 - t
+		for i = 0, n - 1 do
+			local a = i / n * math.pi * 2 + t
+			petitFour(-12 + math.cos(a) * tier.r * 0.62, tier.y + 0.06, -6 + math.sin(a) * tier.r * 0.62, ({ pink, cream, choc, lime })[(i + t) % 4 + 1], i + t)
+		end
 	end
-	-- 4. the shortcake slice that disappears (right)
-	plate(10, 6, 3)
+	part("StandTop", "Ball", V(0.6, 0.6, 0.6), C(-12, 6.5, -6), silver, "Metal")
+
+	-- 4. tea service: cups, a teapot, a creamer, sugar
+	cup(-7, 6)
+	cup(5, -9)
+	cup(-3, 11)
+	part("TeapotBody", "Ellipsoid", V(4.2, 3.2, 3.6), C(-16, 1.8, 6), china)
+	part("TeapotLid", "Ellipsoid", V(2, 0.8, 2), C(-16, 3.4, 6), china)
+	part("TeapotKnob", "Ball", V(0.5, 0.5, 0.5), C(-16, 3.9, 6), silver, "Metal")
+	part("TeapotSpout", "Cylinder", V(2.2, 0.5, 0.5), C(-13.6, 2.2, 6) * CFrame.Angles(0, 0, math.rad(35)), china)
+	part("TeapotHandle", "Ellipsoid", V(0.4, 1.8, 1.0), C(-18.2, 2.0, 6), china)
+	part("Creamer", "Cylinder", V(1.6, 1.4, 1.4), C(-2, 0.8, 7.5) * up, china)
+	disc("SugarBowl", 3, 0.6, 9, 1.8, 1.0, china)
+	for i = 0, 3 do
+		part("Sugar", "Block", V(0.35, 0.35, 0.35), C(2.7 + (i % 2) * 0.4, 1.25, 8.8 + (i // 2) * 0.4), Color3.fromRGB(252, 252, 252))
+	end
+
+	-- 5. square plates on lime napkins: a chocolate cupcake, a mousse cup
+	squarePlate(7, -3.5, 3.4, 15)
+	disc("Cupcake", 6.3, 0.75, -3.8, 1.5, 1.1, choc)
+	part("CupcakeCream", "Ball", V(1.7, 1.2, 1.7), C(6.3, 1.6, -3.8), Color3.fromRGB(250, 222, 120))
+	part("CupcakeBerry", "Ball", V(0.4, 0.4, 0.4), C(6.3, 2.25, -3.8), berry)
+	disc("MousseCup", 7.8, 0.75, -3.0, 1.3, 1.1, Color3.fromRGB(230, 236, 246), "Glass")
+	disc("Mousse", 7.8, 0.9, -3.0, 1.2, 1.0, Color3.fromRGB(180, 110, 70))
+
+	-- 6. cutlery on a napkin
+	part("Napkin2", "Block", V(2.2, 0.04, 5), C(-4, 0.02, -8), lime, "Fabric")
+	part("Fork", "Block", V(0.22, 0.06, 3.6), C(-4.4, 0.08, -8), silver, "Metal")
+	for i = -1, 1 do
+		part("Prong", "Block", V(0.06, 0.05, 0.8), C(-4.4 + i * 0.1, 0.08, -10.1), silver, "Metal")
+	end
+	part("Spoon", "Block", V(0.2, 0.06, 3.0), C(-3.6, 0.08, -7.8), silver, "Metal")
+	part("SpoonBowl", "Ellipsoid", V(0.6, 0.12, 0.9), C(-3.6, 0.1, -9.6), silver, "Metal")
+
+	-- 7. the shortcake slice that disappears (front left)
+	plate(-7, -2, 3.0)
 	local shortLayers: { Layer } = { { h = 0.6, col = sponge }, { h = 0.3, col = cream }, { h = 0.6, col = sponge }, { h = 0.35, col = cream } }
-	for i, l in shortLayers do
-		local y = 0.2 + (i - 1) * 0.47
-		part("Shortcake", "Wedge", V(2.4, l.h, 3.0), C(10, y + l.h / 2, 6) * CFrame.Angles(0, math.rad(-20), 0), l.col, nil, "slice")
+	y = 0.2
+	for _, l in shortLayers do
+		part("Shortcake", "Wedge", V(2.4, l.h, 3.0), C(-7, y + l.h / 2, -2) * CFrame.Angles(0, math.rad(-20), 0), l.col, nil, "slice")
+		y += l.h
 	end
-	part("ShortBerry", "Ball", V(0.8, 0.9, 0.8), C(10, 2.4, 5.4), berry, nil, "slice")
-	-- 5. the parfait glass that empties
-	plate(-3, -6, 2)
-	part("Glass", "Cylinder", V(4.4, 2.2, 2.2), C(-3, 2.4, -6) * up, Color3.fromRGB(220, 235, 245), "Glass")
-	for i, col in { Color3.fromRGB(250, 236, 200), Color3.fromRGB(160, 100, 50), cream, Color3.fromRGB(250, 236, 200) } do
-		part("ParfaitLayer", "Cylinder", V(0.9, 1.9, 1.9), C(-3, 0.9 + i * 0.9, -6) * up, col, nil, "parfait")
+	part("ShortCream", "Ball", V(0.7, 0.5, 0.7), C(-7, y + 0.15, -2.6), cream, nil, "slice")
+	part("ShortBerry", "Ellipsoid", V(0.7, 0.9, 0.7), C(-7, y + 0.6, -2.6), berry, nil, "slice")
+
+	-- 8. the parfait glass that empties (back)
+	plate(1, 6, 2.2)
+	disc("GlassFoot", 1, 0.3, 6, 1.6, 0.2, Color3.fromRGB(226, 236, 246), "Glass")
+	part("GlassStem", "Cylinder", V(1.2, 0.3, 0.3), C(1, 0.9, 6) * up, Color3.fromRGB(226, 236, 246), "Glass")
+	disc("Glass", 1, 3.1, 6, 2.3, 3.4, Color3.fromRGB(220, 234, 246), "Glass")
+	for i, col in { Color3.fromRGB(250, 236, 200), Color3.fromRGB(160, 100, 50), cream, berry, Color3.fromRGB(250, 236, 200) } do
+		disc("ParfaitLayer", 1, 1.6 + i * 0.6, 6, 2.0, 0.6, col, nil, "parfait")
 	end
-	-- 6. cupcakes and macarons
-	for i, c in { { 4, -9 }, { 6.5, -11 }, { -11, -8 }, { -13, 9 } } do
-		part("Cupcake", "Cylinder", V(1.1, 1.8, 1.8), C(c[1], 0.6, c[2]) * up, Color3.fromRGB(150, 90, 50))
+	part("ParfaitTop", "Ball", V(1.6, 0.9, 1.6), C(1, 5.0, 6), cream, nil, "parfait")
+	part("ParfaitCherry", "Ball", V(0.5, 0.5, 0.5), C(1, 5.6, 6), berry, nil, "parfait")
+
+	-- 9. cupcakes and macarons (around)
+	for i, c in { { 14, -8 }, { 16.5, -10 }, { -15, -9 }, { -17, 11 } } do
+		disc("Cupcake", c[1], 0.6, c[2], 1.8, 1.1, if i % 2 == 0 then choc else biscuit)
 		part("Frosting", "Ball", V(1.9, 1.3, 1.9), C(c[1], 1.5, c[2]), if i % 2 == 0 then Color3.fromRGB(250, 220, 110) else Color3.fromRGB(250, 190, 210))
+		part("Sprinkle", "Ball", V(0.3, 0.3, 0.3), C(c[1], 2.15, c[2]), berry)
 	end
 	for i = 0, 5 do
-		part("Macaron", "Cylinder", V(0.6, 1.1, 1.1), C(14 + (i % 3) * 1.3, 0.35, 2 + (i // 3) * 1.4) * up, ({ pink, Color3.fromRGB(170, 220, 160), Color3.fromRGB(250, 220, 110) })[i % 3 + 1])
+		local col = ({ pink, Color3.fromRGB(170, 220, 160), Color3.fromRGB(250, 220, 110) })[i % 3 + 1]
+		disc("Macaron", 15 + (i % 3) * 1.3, 0.35, 4 + (i // 3) * 1.4, 1.1, 0.6, col)
 	end
 	return vanish
 end
@@ -225,7 +326,7 @@ end
 
 -- Rika over Ryu with her fist on his head, Yuta holding him (end of part 2)
 local function pinned(ctx: Timeline.Ctx): ({ [string]: CFrame }, { [string]: CFrame })
-	local rb = ctx:rig("Ryu", C(RYU), Cast.alive({ UpperTorso = R(10, 0, 0), Head = R(30, 0, 0), RightUpperArm = R(40, 0, 72), RightLowerArm = R(70, 0, 0), LeftUpperArm = R(40, 0, -72), LeftLowerArm = R(70, 0, 0) }, ctx.t))
+	local rb = ctx:rig("RyuLoose", C(RYU), Cast.alive({ UpperTorso = R(10, 0, 0), Head = R(30, 0, 0), RightUpperArm = R(40, 0, 72), RightLowerArm = R(70, 0, 0), LeftUpperArm = R(40, 0, -72), LeftLowerArm = R(70, 0, 0) }, ctx.t))
 	local top = (rb.Head * C(0, 2.2, 0)).Position
 	local pound: Rig.Pose = {
 		HumanoidRootPart = C(0, 1.6, 0),
@@ -278,7 +379,7 @@ end
 -- 6.533: Ryu's bowed head lifts: dark hair, then the bloody face, white eyes
 local function headUp(ctx: Timeline.Ctx)
 	local k = Util.smoothstep(0.15, 0.85, ctx.u)
-	local rb = ctx:rig("Ryu", C(RYU), Cast.alive({ UpperTorso = R(16 - k * 10, 0, 0), Head = R(40 - k * 46, Util.noise1(ctx.t * 3, 2) * 5, 0) }, ctx.t))
+	local rb = ctx:rig("RyuLoose", C(RYU), Cast.alive({ UpperTorso = R(16 - k * 10, 0, 0), Head = R(40 - k * 46, Util.noise1(ctx.t * 3, 2) * 5, 0) }, ctx.t))
 	Cast.expr(ctx, "ryu", "grit")
 	bloodFace(ctx, rb.Head, 1)
 	local head = rb.Head * C(0, 0.7, 0)
@@ -292,7 +393,7 @@ end
 
 -- 8.033: a blur of his arm, a white flash, his face with the fur
 local function flashes(ctx: Timeline.Ctx)
-	local rb = ctx:rig("Ryu", C(RYU), Cast.alive({ RightUpperArm = R(120, 0, 30), RightLowerArm = R(40, 0, 0), Head = R(-6, 14, 0) }, ctx.t))
+	local rb = ctx:rig("RyuLoose", C(RYU), Cast.alive({ RightUpperArm = R(120, 0, 30), RightLowerArm = R(40, 0, 0), Head = R(-6, 14, 0) }, ctx.t))
 	Cast.expr(ctx, "ryu", "grit")
 	bloodFace(ctx, rb.Head, 1)
 	local head = rb.Head * C(0, 0.7, 0)
@@ -310,7 +411,7 @@ end
 local function breakFree(ctx: Timeline.Ctx)
 	local hh, h = h2(ctx), h3(ctx)
 	local k = Util.smoothstep(0, 0.35, ctx.u)
-	local rb = ctx:rig("Ryu", C(RYU), Cast.alive(Cast.mix(guard, Cast.ryu.spread, k), ctx.t))
+	local rb = ctx:rig("RyuLoose", C(RYU), Cast.alive(Cast.mix(guard, Cast.ryu.spread, k), ctx.t))
 	Cast.expr(ctx, "ryu", "grit")
 	local caught: Rig.Pose = { HumanoidRootPart = C(0, 1.4, 0), UpperTorso = R(-30, 0, 0), Head = R(10, 0, 0), RightUpperArm = R(100, 0, 70), RightLowerArm = R(20, 0, 0), LeftUpperArm = R(100, 0, -70), LeftLowerArm = R(20, 0, 0), LeftUpperLeg = R(30, 0, 10), LeftLowerLeg = R(-40, 0, -30) }
 	local kb = ctx:rig("Rika", C(RYU + V(0, 1 + k * 2, 4.5)) * CFrame.Angles(math.rad(-k * 15), 0, 0), caught)
@@ -336,7 +437,7 @@ end
 
 -- 10.5: from the fur collar up to his bloody, grinning face
 local function grin(ctx: Timeline.Ctx)
-	local rb = ctx:rig("Ryu", C(RYU), Cast.alive(Cast.add(Cast.ryu.spread, "Head", R(-8 + Util.noise1(ctx.t * 2, 5) * 4, 20 - ctx.u * 14, 0)), ctx.t, 0.6))
+	local rb = ctx:rig("RyuLoose", C(RYU), Cast.alive(Cast.add(Cast.ryu.spread, "Head", R(-8 + Util.noise1(ctx.t * 2, 5) * 4, 20 - ctx.u * 14, 0)), ctx.t, 0.6))
 	Cast.expr(ctx, "ryu", "grin")
 	bloodFace(ctx, rb.Head, 1)
 	local head = rb.Head * C(0, 0.7, 0)
@@ -384,7 +485,7 @@ end
 -- 15.433: Ryu punches Yuta, who twists away
 local function grapple(ctx: Timeline.Ctx)
 	local k = punchK(ctx.t, 15.6, 1.2)
-	local rb = ctx:rig("Ryu", C(RYU) * CFrame.Angles(0, math.rad(10), 0), Cast.alive(punchPose(k), ctx.t))
+	local rb = ctx:rig("RyuLoose", C(RYU) * CFrame.Angles(0, math.rad(10), 0), Cast.alive(punchPose(k), ctx.t))
 	Cast.expr(ctx, "ryu", "grit")
 	bloodFace(ctx, rb.Head, 1)
 	local hit = Util.smoothstep(0.45, 0.6, (ctx.t - 15.6) / 1.2)
@@ -401,7 +502,7 @@ end
 -- 17.633: his arm reaching out, the open hand closing into a fist
 local function hand(ctx: Timeline.Ctx)
 	local k = Util.smoothstep(0.25, 0.75, ctx.u)
-	local rb = ctx:rig("Ryu", C(RYU), Cast.alive({ RightUpperArm = R(88, 0, 4), RightLowerArm = R(6, 0, 0), RightHand = R(-40 * k, 0, 0) }, ctx.t))
+	local rb = ctx:rig("RyuLoose", C(RYU), Cast.alive({ RightUpperArm = R(88, 0, 4), RightLowerArm = R(6, 0, 0), RightHand = R(-40 * k, 0, 0) }, ctx.t))
 	local wrist = (rb.RightHand * C(0, -0.3, 0)).Position
 	local eye = wrist + V(1.3, 0.45, 0.9)
 	ctx:camera(Clash.shake(Util.lookAt(eye, wrist + V(0, 0, -0.6)), ctx.t, 0.05, 6), 50)
@@ -442,7 +543,7 @@ end
 -- 23.033 / 38.667: from high above, two small figures trading blows
 local function topView(ctx: Timeline.Ctx)
 	local k = punchK(ctx.t, ctx.frame.t - ctx.lt + 0.15, 0.7)
-	ctx:rig("Ryu", C(RYU), Cast.alive(punchPose(k), ctx.t))
+	ctx:rig("RyuLoose", C(RYU), Cast.alive(punchPose(k), ctx.t))
 	ctx:rig("Yuta", C(YUTA) * CFrame.Angles(0, math.rad(180), 0), Cast.alive(punchPose(punchK(ctx.t, ctx.frame.t - ctx.lt + 0.45, 0.7)), ctx.t))
 	local mid = (RYU + YUTA) / 2
 	ctx:camera(Util.lookAt(mid + V(4, 46, 6), mid, V(0, 0, -1)) * CFrame.Angles(0, 0, math.rad(20)), 40)
@@ -457,7 +558,7 @@ local function exchange(ctx: Timeline.Ctx)
 	local kR = punchK(ctx.t, 24.8, 0.9)
 	local kY2 = punchK(ctx.t, 25.5, 0.8)
 	local yK = math.max(kY, kY2)
-	local rb = ctx:rig("Ryu", C(RYU), Cast.alive(Cast.mix(punchPose(kR), recoil, math.clamp(yK, 0, 1) * 0.6), ctx.t))
+	local rb = ctx:rig("RyuLoose", C(RYU), Cast.alive(Cast.mix(punchPose(kR), recoil, math.clamp(yK, 0, 1) * 0.6), ctx.t))
 	local yb = ctx:rig("Yuta", C(YUTA) * CFrame.Angles(0, math.rad(180), 0), Cast.alive(Cast.mix(punchPose(yK), recoil, math.clamp(kR, 0, 1) * 0.6), ctx.t))
 	Cast.expr(ctx, "ryu", "grit")
 	Cast.expr(ctx, "yuta", "shout")
@@ -482,7 +583,7 @@ local function blackFlash(ctx: Timeline.Ctx)
 	local h = h3(ctx)
 	local t = ctx.t
 	local kY = punchK(t, 26.6, 0.9)
-	local rb = ctx:rig("Ryu", C(RYU), Cast.alive(Cast.mix(guard, recoil, math.clamp(kY, 0, 1)), t))
+	local rb = ctx:rig("RyuLoose", C(RYU), Cast.alive(Cast.mix(guard, recoil, math.clamp(kY, 0, 1)), t))
 	local yb = ctx:rig("Yuta", C(YUTA) * CFrame.Angles(0, math.rad(180), 0), Cast.alive(punchPose(kY), t))
 	Cast.expr(ctx, "ryu", "grit")
 	Cast.expr(ctx, "yuta", "shout")
@@ -515,9 +616,16 @@ local function blackFlash(ctx: Timeline.Ctx)
 end
 
 -- the dessert table
-local function tableCam(ctx: Timeline.Ctx, at: Vector3, from: Vector3, fov: number)
-	ctx:camera(Util.lookAt(DESSERT + from, DESSERT + at), fov)
-	ctx:focus((from - at).Magnitude, 1)
+-- The dessert table turns slowly under the camera (as in the reference): the
+-- camera orbits the vertical axis through `at` by `spin` degrees a second
+local function tableCam(ctx: Timeline.Ctx, at: Vector3, from: Vector3, fov: number, spin: number?)
+	local a = math.rad((spin or 8) * ctx.lt)
+	local rot = CFrame.Angles(0, a, 0)
+	local rel = rot:VectorToWorldSpace(from - at)
+	local topDown = math.abs(rel.Unit.Y) > 0.95
+	local upv = if topDown then rot:VectorToWorldSpace(V(0, 0, 1)) else V(0, 1, 0)
+	ctx:camera(Util.lookAt(DESSERT + at + rel, DESSERT + at, upv), fov)
+	ctx:focus(rel.Magnitude, 1)
 	ctx:fog(0)
 	ctx:wind(0)
 	ctx:bloom(1.2)
@@ -526,9 +634,11 @@ end
 
 local function desserts(ctx: Timeline.Ctx)
 	if ctx.t < 30.7 then
-		tableCam(ctx, V(0, 1, 0), V(1.5 - ctx.lt * 0.4, 6.5, -5.5), 40)
+		-- the pink cake from above, turning
+		tableCam(ctx, V(0, 1.2, 0), V(0.05, 9.5 - ctx.lt * 0.6, 0.6), 44, 7)
 	else
-		tableCam(ctx, V(0, 0, 1), V(0.5, 34 - ctx.lt, -3), 50)
+		-- the whole table from above, turning
+		tableCam(ctx, V(-1, 0, 1), V(-1, 24 - ctx.lt * 0.8, 1.2), 52, 9)
 	end
 end
 
@@ -537,7 +647,7 @@ local function intercut(ctx: Timeline.Ctx)
 	if t < 33.9 or (t >= 35.2 and t < 35.667) then
 		-- a quick blow between them
 		local k = punchK(t, 33.17, 0.6)
-		ctx:rig("Ryu", C(RYU), Cast.alive(punchPose(k), t))
+		ctx:rig("RyuLoose", C(RYU), Cast.alive(punchPose(k), t))
 		ctx:rig("Yuta", C(YUTA) * CFrame.Angles(0, math.rad(180), 0), Cast.alive(Cast.mix(guard, recoil, math.clamp(k, 0, 1)), t))
 		Cast.expr(ctx, "ryu", "grit")
 		local eye = (RYU + YUTA) / 2 + V(5.5, 3.8, 0.6)
@@ -547,16 +657,16 @@ local function intercut(ctx: Timeline.Ctx)
 		grade(ctx, -0.04, 0.26, 0.05)
 		field(ctx)
 	elseif t < 35.2 then
-		tableCam(ctx, V(10, 1.2, 6), V(13, 3.2, 2), 34)
+		tableCam(ctx, V(-7, 1.2, -2), V(-4, 3.2, -6), 34, 12)
 	else
-		tableCam(ctx, V(-9, 1.4, 2), V(-6, 5, -2.5), 36)
+		tableCam(ctx, V(10, 1.4, 2), V(13, 5, -2.5), 36, 12)
 	end
 end
 
 local function wideFight(ctx: Timeline.Ctx)
 	local hh = h2(ctx)
 	local k = punchK(ctx.t, 36.85, 0.8)
-	ctx:rig("Ryu", C(RYU), Cast.alive(Cast.mix(guard, recoil, math.clamp(k, 0, 1)), ctx.t))
+	ctx:rig("RyuLoose", C(RYU), Cast.alive(Cast.mix(guard, recoil, math.clamp(k, 0, 1)), ctx.t))
 	ctx:rig("Yuta", C(YUTA) * CFrame.Angles(0, math.rad(180), 0), Cast.alive(punchPose(k), ctx.t))
 	FX.placeBurst(ctx, hh.debris, (RYU + YUTA) / 2, ctx.lt, 16, 0.8, 1, V(0, 1, 0), 1, 25)
 	local mid = (RYU + YUTA) / 2
@@ -568,13 +678,13 @@ local function wideFight(ctx: Timeline.Ctx)
 end
 
 local function tart(ctx: Timeline.Ctx)
-	tableCam(ctx, V(-9, 1, 2), V(-9, 10 - ctx.lt * 1.5, 1.2), 40)
+	tableCam(ctx, V(10, 1, 2), V(10.05, 12 - ctx.lt * 1.5, 2.3), 42, 10)
 end
 
 local function fistLines(ctx: Timeline.Ctx)
 	local ryuTurn = ctx.t > 40.1
 	local k = punchK(ctx.t, if ryuTurn then 40.0 else 39.4, 0.6)
-	local who = if ryuTurn then "Ryu" else "Yuta"
+	local who = if ryuTurn then "RyuLoose" else "Yuta"
 	local root = if ryuTurn then C(RYU) else C(YUTA) * CFrame.Angles(0, math.rad(180), 0)
 	local b = ctx:rig(who, root, punchPose(k))
 	local fist = (b.RightHand * C(0, -0.35, 0)).Position
@@ -595,20 +705,20 @@ local function vanish(ctx: Timeline.Ctx)
 			local gone = math.clamp(k * 4 - (4 - i), 0, 1)
 			ctx:prop(p, { s = V(p.size.X * (1 - gone), p.size.Y, p.size.Z), t = gone })
 		end
-		tableCam(ctx, V(-3, 2.4, -6), V(-3, 3.2, -11.5), 36)
+		tableCam(ctx, V(1, 2.8, 6), V(1, 3.6, 0.5), 36, 4)
 	else
 		local k = Util.smoothstep(41.6, 42.6, t)
 		for _, p in h.vanish.slice do
 			ctx:prop(p, { t = k })
 		end
-		tableCam(ctx, V(10, 1.0, 6), V(10, 3.0, 1.8), 36)
+		tableCam(ctx, V(-7, 1.0, -2), V(-7, 3.0, -6.2), 36, 4)
 	end
 end
 
 local function absHit(ctx: Timeline.Ctx)
 	local hh = h2(ctx)
 	local k = punchK(ctx.t, 42.7, 0.8)
-	local rb = ctx:rig("Ryu", C(RYU), Cast.alive(Cast.mix(Cast.ryu.spread, recoil, math.clamp(k, 0, 1) * 0.5), ctx.t))
+	local rb = ctx:rig("RyuLoose", C(RYU), Cast.alive(Cast.mix(Cast.ryu.spread, recoil, math.clamp(k, 0, 1) * 0.5), ctx.t))
 	local yb = ctx:rig("Yuta", C(YUTA) * CFrame.Angles(0, math.rad(180), 0), punchPose(k))
 	Cast.expr(ctx, "ryu", "grit")
 	local belly = (rb.UpperTorso * C(0, 0.5, -0.6)).Position
@@ -645,7 +755,7 @@ local function darkCupcakes(ctx: Timeline.Ctx)
 		Clash.void(ctx, Color3.new(0, 0, 0))
 		ctx:camera(C(Clash.O), 50)
 	else
-		tableCam(ctx, V(5, 1.2, -10), V(1, 3, -15), 40)
+		tableCam(ctx, V(6.3, 1.2, -3.8), V(3, 3, -8), 40, 6)
 		grade(ctx, -0.45, 0.25, -0.2)
 	end
 end
@@ -654,7 +764,7 @@ end
 local function facePunch(ctx: Timeline.Ctx)
 	local hh = h2(ctx)
 	local k = punchK(ctx.t, 45.7, 1.0)
-	local rb = ctx:rig("Ryu", C(RYU), Cast.alive(Cast.mix(guard, recoil, math.clamp(k, 0, 1)), ctx.t))
+	local rb = ctx:rig("RyuLoose", C(RYU), Cast.alive(Cast.mix(guard, recoil, math.clamp(k, 0, 1)), ctx.t))
 	ctx:rig("Yuta", C(YUTA) * CFrame.Angles(0, math.rad(180), 0), Cast.alive(punchPose(k), ctx.t))
 	Cast.expr(ctx, "ryu", "grit")
 	Cast.expr(ctx, "yuta", "glare")
@@ -673,7 +783,7 @@ end
 local function ryuWindup(ctx: Timeline.Ctx)
 	local k = Util.smoothstep(48.6, 49.5, ctx.t)
 	local pose = Cast.mix(Cast.add(guard, "Head", R(-10, 10, 0)), Cast.add(guard, "RightUpperArm", R(-40, 0, 30)), k)
-	local rb = ctx:rig("Ryu", C(RYU), Cast.alive(pose, ctx.t, 0.5))
+	local rb = ctx:rig("RyuLoose", C(RYU), Cast.alive(pose, ctx.t, 0.5))
 	Cast.expr(ctx, "ryu", if ctx.t < 48.667 then "grit" else "grin")
 	bloodFace(ctx, rb.Head, 1)
 	local head = rb.Head * C(0, 0.7, 0)
@@ -687,7 +797,7 @@ end
 
 local function ryuFist(ctx: Timeline.Ctx)
 	local k = punchK(ctx.t, 49.45, 0.8)
-	local rb = ctx:rig("Ryu", C(RYU), punchPose(k))
+	local rb = ctx:rig("RyuLoose", C(RYU), punchPose(k))
 	local fist = (rb.RightHand * C(0, -0.35, 0)).Position
 	ctx:camera(Clash.shake(Util.lookAt(fist + V(-2.2, 0.3, -1.6), fist), ctx.t, 0.3, 16), 50)
 	ctx:focus(2.6, 1)
@@ -723,7 +833,7 @@ end
 
 -- 52.867: Yuta's hands seize Ryu's jacket; 55.0 "Now we're done."
 local function seizePoses(ctx: Timeline.Ctx): ({ [string]: CFrame }, { [string]: CFrame })
-	local rb = ctx:rig("Ryu", C(RYU), Cast.alive({ UpperTorso = R(16, 0, 0), Head = R(20, 0, 0), RightUpperArm = R(10, 0, 20), LeftUpperArm = R(10, 0, -20) }, ctx.t))
+	local rb = ctx:rig("RyuLoose", C(RYU), Cast.alive({ UpperTorso = R(16, 0, 0), Head = R(20, 0, 0), RightUpperArm = R(10, 0, 20), LeftUpperArm = R(10, 0, -20) }, ctx.t))
 	local collar = (rb.UpperTorso * C(0, 1.4, -0.7)).Position
 	local grab: Rig.Pose = {
 		UpperTorso = R(10, 0, 0),
@@ -755,7 +865,9 @@ end
 
 local function done(ctx: Timeline.Ctx)
 	local _, yb = seizePoses(ctx)
-	Cast.expr(ctx, "yuta", "glare")
+	-- Yuta says it ("Now we're done.", 55.07-56.53)
+	local speaking = ctx.t >= 55.07 and ctx.t < 56.53
+	Cast.expr(ctx, "yuta", if speaking and Util.noise1(ctx.t * 7.5, 5) > -0.2 then "talk" else "glare")
 	local head = yb.Head * C(0, 0.55, 0)
 	local eye = head:PointToWorldSpace(V(0.4, -0.5, -2.4))
 	ctx:camera(Util.lookAt(eye, head.Position + V(0, -0.4, 0)), 48)

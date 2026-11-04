@@ -201,7 +201,7 @@ end
 
 -- the punch: Yuta at Ryu's chest, his fist buried in it
 local function punchStage(ctx: Timeline.Ctx): ({ [string]: CFrame }, { [string]: CFrame }, Vector3)
-	local rb = ctx:rig("Ryu", Common.ryuRoot(0), Cast.alive(ryuHit, ctx.t))
+	local rb = ctx:rig("RyuLoose", Common.ryuRoot(0), Cast.alive(ryuHit, ctx.t))
 	local chest = (rb.UpperTorso * C(0, 0.9, -0.62)).Position
 	local y0 = C(Common.RYU + V(0.4, 0, -3)) * CFrame.Angles(0, math.rad(180), 0)
 	local yb = Common.rigAt(ctx, "Yuta", y0, yutaPunch, "RightHand", C(0, -0.35, 0), chest)
@@ -266,7 +266,7 @@ local function strike(ctx: Timeline.Ctx)
 	local hh = h(ctx)
 	local lt = ctx.lt
 	local root = Common.ryuRoot(0)
-	local rb = ctx:rig("Ryu", root, Cast.alive(ryuStrike, ctx.t))
+	local rb = ctx:rig("RyuLoose", root, Cast.alive(ryuStrike, ctx.t))
 	Cast.expr(ctx, "ryu", "grit")
 	local fly = lt * 13
 	local yr = C(Common.RYU + V(0.6, 0.8 + math.sin(math.min(1, lt * 1.6) * math.pi) * 1.2, -2.8 - fly)) * CFrame.Angles(0, math.rad(180), 0) * CFrame.Angles(math.rad(lt * 70), 0, 0)
@@ -316,7 +316,7 @@ local function ryuSkid(ctx: Timeline.Ctx)
 	local lt = ctx.lt
 	local slide = 6 * (1 - math.exp(-lt * 1.6))
 	local root = C(Common.RYU + V(0, 0, slide))
-	ctx:rig("Ryu", root, Cast.alive(ryuSlide, ctx.t))
+	ctx:rig("RyuLoose", root, Cast.alive(ryuSlide, ctx.t))
 	Cast.expr(ctx, "ryu", "grit")
 	ctx:rig("Yuta", Common.yutaRoot() * C(0, 0, 8), yutaKneel)
 	for i, foot in { V(-1.2, 0.3, 0.6), V(1.2, 0.3, 0.6) } do
@@ -339,7 +339,7 @@ local function fistDown(ctx: Timeline.Ctx)
 	ctx:wind(1.4)
 	ctx:gust(2.0 * Util.smoothstep(0.55, 0.75, ctx.u))
 	local k = 1 - Util.smoothstep(0, 0.7, ctx.u)
-	local rb, kb = rikaFistOn(ctx, "Ryu", C(Common.RYU + V(0, 0, 6)), Cast.alive(ryuPinned, ctx.t), k * 2.5)
+	local rb, kb = rikaFistOn(ctx, "RyuLoose", C(Common.RYU + V(0, 0, 6)), Cast.alive(ryuPinned, ctx.t), k * 2.5)
 	Cast.expr(ctx, "ryu", "grit")
 	local eye = rb.UpperTorso:PointToWorldSpace(V(1.8, -0.8, -6))
 	ctx:camera(Clash.shake(Util.lookAt(eye, kb.RightHand.Position:Lerp(rb.Head.Position, 0.5)), ctx.t, 0.5, 18), 62)
@@ -363,7 +363,7 @@ end
 local function fistOnHead(ctx: Timeline.Ctx)
 	ctx:gust(1.4 * math.exp(-ctx.lt * 3))
 	local hh = h(ctx)
-	local rb = rikaFistOn(ctx, "Ryu", C(Common.RYU + V(0, 0, 6)), Cast.alive(ryuPinned, ctx.t))
+	local rb = rikaFistOn(ctx, "RyuLoose", C(Common.RYU + V(0, 0, 6)), Cast.alive(ryuPinned, ctx.t))
 	Cast.expr(ctx, "ryu", "grit")
 	bloodOn(ctx, rb.Head, 1)
 	local head = rb.Head * C(0, 0.7, 0)
@@ -377,7 +377,7 @@ end
 
 -- Rika's head looming over Ryu, her red eye, her fist on him
 local function rikaHead(ctx: Timeline.Ctx)
-	local rb, kb = rikaFistOn(ctx, "Ryu", C(Common.RYU + V(0, 0, 6)), Cast.alive(ryuPinned, ctx.t))
+	local rb, kb = rikaFistOn(ctx, "RyuLoose", C(Common.RYU + V(0, 0, 6)), Cast.alive(ryuPinned, ctx.t))
 	Cast.expr(ctx, "ryu", "grit")
 	bloodOn(ctx, rb.Head, 1)
 	local head = kb.Head

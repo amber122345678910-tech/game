@@ -23,6 +23,10 @@ function Cast.build(scene: Builder.Scene)
 	Ryu.build(scene, "Ryu")
 	Yuta.build(scene, "Yuta")
 	Rika.build(scene, "Rika")
+	-- from part 2's last minutes on his pompadour has come down
+	if (scene.data.part or 1) >= 2 then
+		Ryu.build(scene, "RyuLoose", false, true)
+	end
 	local pal = scene.style.color
 	-- invisible anchors riding on the bones: lights and particles of the auras
 	local function anchor(rig: string, bone: string, size: Vector3, cf: CFrame, name: string): Builder.PartSpec
