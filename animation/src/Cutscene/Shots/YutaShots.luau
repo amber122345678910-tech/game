@@ -30,6 +30,7 @@ type H = {
 	cyan2: FX.Beam,
 	pink: FX.Beam,
 	pinkCore: Builder.PartSpec,
+	whiteCore: Builder.PartSpec,
 	debris: FX.Burst,
 	sparks: FX.Burst,
 }
@@ -41,6 +42,7 @@ function YutaShots.build(scene: Builder.Scene)
 		cyan2 = FX.beam(scene, "YutaCyan2", pal.eCyan, false),
 		pink = FX.beam(scene, "RikaBeam", pal.ePink, false),
 		pinkCore = FX.core(scene, "RikaGlow", pal.ePink),
+		whiteCore = FX.core(scene, "YutaChargeCore", Color3.fromRGB(255, 240, 250)),
 		debris = FX.burst(scene, "Debris", pal.rubble, 26, "Block", 61),
 		sparks = FX.burst(scene, "PurpleSparks", pal.ePurple, 26, "Wedge", 62),
 	} :: H
@@ -57,16 +59,44 @@ local function grade(ctx: Timeline.Ctx, b: number, c: number, s: number, tint: C
 end
 
 -- 6: Yuta inside Rika's embrace, pink light, cyan streaks slicing past
+-- Yuta reaching up with his left hand (the ring hand) to the charge of his
+-- beam, his right hand open by his hip, leaning back a little in Rika's arms
+local reachLeft: Rig.Pose = {
+	LowerTorso = R(4, 8, 0),
+	UpperTorso = R(8, 22, 0),
+	Head = R(-8, 26, 0),
+	LeftUpperArm = R(138, 0, 8),
+	LeftLowerArm = R(4, 0, 0),
+	LeftHand = R(-24, 0, 0),
+	RightUpperArm = R(-8, 0, 20),
+	RightLowerArm = R(26, 0, 0),
+	RightHand = R(12, 0, 0),
+	LeftUpperLeg = R(20, 0, 0),
+	LeftLowerLeg = R(-30, 0, 0),
+	RightUpperLeg = R(-20, 0, 0),
+}
+
 local function embrace(ctx: Timeline.Ctx)
 	local h: H = ctx.scene.data.yuta
 	local root = C(YUTA) * CFrame.Angles(0, math.rad(90), 0)
-	local yb = ctx:rig("Yuta", root, Cast.alive(Cast.yuta.fire, ctx.t))
+	-- the arm comes up into the charge, then trembles holding it
+	local up = Util.smoothstep(9.6, 9.85, ctx.t)
+	local tremble = math.sin(ctx.t * 31) * 1.5
+	local pose = Cast.add(Cast.mix(Cast.yuta.fire, reachLeft, up), "LeftUpperArm", R(tremble, 0, tremble * 0.5))
+	local yb = ctx:rig("Yuta", root, Cast.alive(pose, ctx.t))
 	ctx:rig("Rika", root * C(0.4, 0, 3.4), Cast.alive(Cast.rika.embrace, ctx.t))
 	Cast.expr(ctx, "yuta", "focus")
 	local head = yb.Head * C(0, 0.6, 0)
-	local cam = Util.lookAt(head:PointToWorldSpace(V(-3.2, -0.6, -5.4)), head.Position + V(0, -0.8, 0))
-	ctx:camera(Clash.shake(cam * CFrame.Angles(0, 0, math.rad(-18)), ctx.t, 0.15), 58)
-	ctx:focus(6, 1)
+	local hand0 = (yb.LeftHand * C(0, -0.55, -0.15)).Position
+	local cam = Util.lookAt(yb.UpperTorso:PointToWorldSpace(V(-4.6, 1.2, -2.6)), head.Position:Lerp(hand0, 0.35) + V(0, -0.6, 0))
+	ctx:camera(Clash.shake(cam * CFrame.Angles(0, 0, math.rad(-18)), ctx.t, 0.15), 56)
+	ctx:focus(5, 1)
+	-- the charge: a pink-white star of energy in his raised left hand
+	local hand = (yb.LeftHand * C(0, -0.55, -0.15)).Position
+	local flick = 1 + math.sin(ctx.t * 29) * 0.1 + math.sin(ctx.t * 17 + 1) * 0.06
+	FX.placeCore(ctx, h.pinkCore, hand, 0.36 * flick * up, 0.8)
+	FX.placeCore(ctx, h.whiteCore, hand, 0.18 * flick * up, 1)
+	FX.placeBurst(ctx, h.sparks, hand, (ctx.lt * 0.9) % 0.7, 9, 0.18, 0.7, nil, nil, 0)
 	ctx:light("YutaAura", 2, nil, 14)
 	ctx:light("RikaMouth", 1.5, nil, 20)
 	ctx:emit("YutaGlints", 40)
