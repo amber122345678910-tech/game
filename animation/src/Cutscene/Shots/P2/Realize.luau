@@ -83,6 +83,8 @@ local function ryuProfile(ctx: Timeline.Ctx)
 	local trem = Util.noise1(ctx.t * 9, 3) * 1.5
 	local head = R(-14 - u * 7 + trem, -10 + u * 9, Util.noise1(ctx.t * 6, 4) * 1.2)
 	local bones = ctx:rig("Ryu", root, Cast.alive(Cast.add(Cast.ryu.spread, "Head", head), ctx.t))
+	-- the profile close-up: keep the big collar out of his face
+	Cast.furLow(ctx, "Ryu", 0.7)
 	Cast.expr(ctx, "ryu", "strain")
 	local hd = bones.Head * C(0, 0.75, 0)
 	local eye = hd:PointToWorldSpace(V(2.3 - u * 0.25, 0.1, -1.7))

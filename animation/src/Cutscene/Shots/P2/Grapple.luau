@@ -380,14 +380,13 @@ local function fistDown(ctx: Timeline.Ctx)
 	Common.sky(ctx, "wisps", 30)
 end
 
+-- blood running down his face from under Rika's fist: painted streaks on
+-- the face (the round drops read as polka dots)
 local function bloodOn(ctx: Timeline.Ctx, head: CFrame, k: number)
-	local hh = h(ctx)
-	local spots = { V(-0.12, 1.1, -0.6), V(0.18, 1.0, -0.62), V(0.05, 0.86, -0.64), V(-0.3, 0.95, -0.58), V(0.32, 0.8, -0.6), V(0.0, 0.7, -0.64), V(-0.16, 0.62, -0.63) }
-	for i, p in hh.rikaBlood do
-		ctx:place(p, head * C(spots[i]))
-		local sz = (0.1 + (i % 3) * 0.05) * k
-		ctx:prop(p, { s = V(sz, sz * 2.6, sz * 0.5) })
+	if k > 0.3 then
+		ctx:show("ryu:blood")
 	end
+	local _ = head
 end
 
 -- his face: the fist on his forehead, blood, teeth bared in pain
