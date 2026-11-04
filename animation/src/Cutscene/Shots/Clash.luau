@@ -270,10 +270,19 @@ end
 
 -- the explosion round the clash: jagged cream chunks, dark rubble, white
 -- lightning, teal smoke, the red girders of the deck behind; k 0..1
-local function explosion(ctx: Timeline.Ctx, age: number, k: number)
+local function explosion(ctx: Timeline.Ctx, age: number, k: number, colors: { Color3 }?)
 	local h: H = ctx.scene.data.clash
 	if k <= 0 then
 		return
+	end
+	if colors then
+		local n = #colors
+		for i, p in h.chunks.parts do
+			ctx:prop(p, { c = colors[(i - 1) % n + 1] })
+		end
+		for i, p in h.chunks2.parts do
+			ctx:prop(p, { c = colors[(i + 1) % n + 1] })
+		end
 	end
 	-- flat jagged pieces flying out in the picture plane, broad side to us
 	local function pieces(list: { Builder.PartSpec }, seed: number, speed: number, size: number, life: number, flat: boolean, cutoff: number)
@@ -306,6 +315,10 @@ local function explosion(ctx: Timeline.Ctx, age: number, k: number)
 	for i = 1, 5 do
 		local d = V(Util.randRange(r, -1, 1), Util.randRange(r, -0.7, 0.7), Util.randRange(r, -0.2, 0.6)).Unit
 		idx = FX.placeBolt(ctx, h.whiteBolts, idx, O + d * 4, O + d * Util.randRange(r, 22, 46) * k, 6, 0.16, 0.18, i + step, 16)
+	end
+	-- (the coloured bursts float in dark navy: no smoke, girders or ground)
+	if colors then
+		return
 	end
 	-- teal smoke billowing out round the light
 	for i, p in h.tealSmoke do
@@ -414,18 +427,29 @@ local function city(ctx: Timeline.Ctx)
 end
 
 -- 8 / 10: head-on radial clash, rays shooting at the camera
+-- the colours of the bursts (reference 12.1-15.2, 19.9-21.4): cyan, hot
+-- pink, yellow and white streaks flying out of the clash on dark navy
+local BURST_COLORS = {
+	Color3.fromRGB(60, 220, 255),
+	Color3.fromRGB(255, 70, 190),
+	Color3.fromRGB(255, 226, 90),
+	Color3.fromRGB(120, 150, 255),
+	Color3.fromRGB(255, 255, 255),
+}
+
 local function radial(ctx: Timeline.Ctx)
 	local h: H = ctx.scene.data.clash
-	void(ctx, Color3.fromRGB(8, 12, 40))
+	void(ctx, Color3.fromRGB(18, 28, 96))
 	local cam = Util.lookAt(O + V(0, 0, 38 - ctx.u * 8), O)
 	ctx:camera(shake(cam * CFrame.Angles(0, 0, ctx.t * 0.6), ctx.t, 0.9, 22), 75)
 	ctx:focus(30, 0)
-	clashCore(ctx, ctx.lt, 1, false, 1, 0.7)
-	FX.placeRays(ctx, h.rays, O, ctx.frame.camera.Rotation, 50, 0.9, 1, 16, V(0, 0, 1))
+	clashCore(ctx, ctx.lt, 0.75, false, 0.55, 0.7)
+	FX.placeRays(ctx, h.rays, O, ctx.frame.camera.Rotation, 50, 0.7, 0.8, 16, V(0, 0, 1))
+	explosion(ctx, ctx.lt, 1, BURST_COLORS)
 	local fl = math.max(0, math.sin(ctx.t * 9)) ^ 8
-	ctx:flash(Color3.new(1, 1, 1), fl * 0.5)
-	ctx:bloom(2.2)
-	grade(ctx, 0.25, 0.35)
+	ctx:flash(Color3.new(1, 1, 1), fl * 0.25)
+	ctx:bloom(1.3)
+	grade(ctx, 0.3, 0.5)
 end
 
 local function impact(ctx: Timeline.Ctx)
@@ -435,13 +459,14 @@ end
 
 -- 12: colour splashes filling the frame
 local function splashes(ctx: Timeline.Ctx)
-	void(ctx, Color3.fromRGB(20, 18, 50))
+	void(ctx, Color3.fromRGB(24, 26, 90))
 	local cam = Util.lookAt(O + V(10, 4, 26), O)
 	ctx:camera(shake(cam, ctx.t, 1.2, 25), 70)
 	ctx:focus(26, 0)
-	clashCore(ctx, ctx.lt + 0.3, 1, true, 1, 1.6)
-	ctx:bloom(2.4)
-	grade(ctx, 0.25, 0.4)
+	clashCore(ctx, ctx.lt + 0.3, 0.8, true, 0.6, 1.6)
+	explosion(ctx, ctx.lt + 0.3, 1, BURST_COLORS)
+	ctx:bloom(1.4)
+	grade(ctx, 0.3, 0.5)
 end
 
 local function speedLines(ctx: Timeline.Ctx)

@@ -222,14 +222,16 @@ local function grin(ctx: Timeline.Ctx)
 		pose = Cast.mix(pose, w, Util.smoothstep(26.42, 26.62, t))
 	end
 	local bones = ctx:rig("Ryu", root, pose)
+	-- once he looks back over his shoulder, keep the big collar out of his face
+	Cast.furLow(ctx, "Ryu", turn)
 	local head = bones.Head * C(0, 0.7, 0)
 	-- front-left and slightly low while he grins; as he turns away the camera
 	-- swings up behind his right shoulder, at head height, to catch the look back
 	local base = rootAt(Field.RYU, yaw0)
 	local eyeA = base:PointToWorldSpace(V(-1.2, 2.7, -5.0 + (t - 25.067) * 0.2))
-	local eyeC = root:PointToWorldSpace(V(2.6, 7.0, 3.0))
+	local eyeC = root:PointToWorldSpace(V(2.4, 7.8, 2.6))
 	local eye = eyeA:Lerp(eyeC, turn)
-	local cam = Util.lookAt(eye, head.Position + V(0, -0.7 + turn * 0.5, 0))
+	local cam = Util.lookAt(eye, head.Position + V(0, -0.7 + turn * 0.3, 0))
 	ctx:camera(Clash.shake(cam * CFrame.Angles(0, 0, math.rad(-6)), t, 0.06 + turn * (1 - turn) * 0.8, 10), 46)
 	ctx:focus((head.Position - eye).Magnitude, 1)
 	Cast.expr(ctx, "ryu", "grin")
