@@ -13,11 +13,36 @@ YutaEyes.X1 = 1170
 YutaEyes.Y0 = -14
 YutaEyes.Y1 = 301
 
+-- A hair strand painted three times, in groups `prefix`1..3: the root
+-- (first point) stays, the tip swings sideways by -amp, 0, +amp (the shot
+-- cycles through the groups so the hair sways in the wind)
+function YutaEyes.strand(c: Paint.Canvas, prefix: string, pts: { { number } }, w: { number } | number, col: Color3, amp: number, rootLast: boolean?)
+	local n = #pts
+	for k = 1, 3 do
+		local off = (k - 2) * amp
+		local q: { { number } } = {}
+		for i, pt in pts do
+			local f = (i - 1) / math.max(1, n - 1)
+			if rootLast then
+				f = 1 - f
+			end
+			local sw = off * f ^ 1.4
+			table.insert(q, { pt[1] + sw, pt[2] + math.abs(sw) * 0.15 })
+		end
+		c:setGroup(prefix .. k)
+		c:stroke(q, w, col)
+	end
+	c:setGroup(nil)
+end
+
 function YutaEyes.paint(c: Paint.Canvas, pal: { [string]: Color3 }, lw: number, soft: boolean?)
 	local skin, shade, deep = pal.skin, pal.skinShade, pal.skinDeep
 	local line, hair, hairHi = pal.line, pal.yHair, pal.yHairHi
 	local function L(w: number): number
 		return w * lw
+	end
+	local function strand(pts: { { number } }, w: { number } | number, col: Color3, amp: number)
+		YutaEyes.strand(c, "split:yHair", pts, w, col, amp)
 	end
 
 	-- 1. skin -------------------------------------------------------------------
@@ -91,11 +116,12 @@ function YutaEyes.paint(c: Paint.Canvas, pal: { [string]: Color3 }, lw: number, 
 	-- 3. far eye (screen left, foreshortened) --------------------------------------
 	c:stroke({ { 420, 82 }, { 423, 104 }, { 428, 136 } }, { 76, 80, 46 }, pal.sclera)
 	c:stroke({ { 392, 58 }, { 446, 66 } }, { 22, 16 }, pal.scleraShade)
-	c:ellipse(420, 87, 14, 25, 4, pal.yIrisDark)
-	c:ellipse(421, 89, 11, 21, 4, pal.yIris)
-	c:ellipse(422, 98, 8, 10, 4, pal.yIrisLight)
-	c:ellipse(420, 80, 6, 11, 4, pal.yIrisDark)
-	c:ellipse(415, 79, 7, 2.2, -14, pal.sclera)
+	c:ellipse(420, 90, 19, 33, 4, pal.yIrisDark)
+	c:ellipse(421, 92, 15, 28, 4, pal.yIris)
+	c:ellipse(422, 105, 11, 13, 4, pal.yIrisLight)
+	c:ellipse(420, 84, 8, 15, 4, pal.yIrisDark)
+	c:ellipse(414, 78, 9, 3, -14, pal.sclera)
+	c:circle(427, 112, 2.4, pal.sclera)
 	-- lids and lines
 	c:stroke({ { 378, 46 }, { 410, 42 }, { 446, 52 }, { 458, 70 } }, { L(13), L(12), L(8), L(3) }, line)
 	c:stroke({ { 451, 58 }, { 463, 90 }, { 466, 124 }, { 456, 156 } }, { L(1.4), L(2.2), L(2.2), L(1.2) }, line)
@@ -117,27 +143,27 @@ function YutaEyes.paint(c: Paint.Canvas, pal: { [string]: Color3 }, lw: number, 
 
 	-- 5. hair ---------------------------------------------------------------------
 	-- side lock along the left contour
-	c:stroke({ { 368, -14 }, { 370, 90 }, { 375, 190 }, { 381, 262 }, { 384, 292 } }, { 30, 28, 20, 8, 1 }, hair)
-	c:stroke({ { 366, 20 }, { 368, 140 } }, { 3, 1 }, hairHi)
+	strand({ { 368, -14 }, { 370, 90 }, { 375, 190 }, { 381, 262 }, { 384, 292 } }, { 30, 28, 20, 8, 1 }, hair, 9)
+	strand({ { 366, 20 }, { 368, 140 } }, { 3, 1 }, hairHi, 9)
 	-- loose strands over the sky
-	c:stroke({ { 302, -14 }, { 264, 48 }, { 232, 104 }, { 201, 152 } }, { 11, 9, 6, 1 }, hair)
-	c:stroke({ { 326, -14 }, { 304, 80 }, { 288, 170 }, { 272, 256 } }, { 13, 10, 7, 1 }, hair)
-	c:stroke({ { 348, -14 }, { 352, 58 }, { 356, 110 }, { 352, 142 } }, { 26, 24, 16, 2 }, hair)
-	c:stroke({ { 303, 4 }, { 268, 56 } }, { 2, 1 }, hairHi)
-	c:stroke({ { 347, 6 }, { 350, 70 } }, { 3, 1 }, hairHi)
+	strand({ { 302, -14 }, { 264, 48 }, { 232, 104 }, { 201, 152 } }, { 11, 9, 6, 1 }, hair, 9)
+	strand({ { 326, -14 }, { 304, 80 }, { 288, 170 }, { 272, 256 } }, { 13, 10, 7, 1 }, hair, 9)
+	strand({ { 348, -14 }, { 352, 58 }, { 356, 110 }, { 352, 142 } }, { 26, 24, 16, 2 }, hair, 9)
+	strand({ { 303, 4 }, { 268, 56 } }, { 2, 1 }, hairHi, 9)
+	strand({ { 347, 6 }, { 350, 70 } }, { 3, 1 }, hairHi, 9)
 	-- strands crossing the near eye
-	c:stroke({ { 791, -14 }, { 789, 80 }, { 785, 170 }, { 777, 222 } }, { 26, 22, 12, 1 }, hair)
-	c:stroke({ { 813, -14 }, { 816, 80 }, { 821, 150 } }, { 14, 10, 1 }, hair)
-	c:stroke({ { 790, 0 }, { 787, 110 } }, { 3, 1 }, hairHi)
+	strand({ { 791, -14 }, { 789, 80 }, { 785, 170 }, { 777, 222 } }, { 26, 22, 12, 1 }, hair, 9)
+	strand({ { 813, -14 }, { 816, 80 }, { 821, 150 } }, { 14, 10, 1 }, hair, 9)
+	strand({ { 790, 0 }, { 787, 110 } }, { 3, 1 }, hairHi, 9)
 	-- right hair mass
-	c:stroke({ { 900, -14 }, { 905, 140 }, { 899, 262 } }, { 24, 18, 2 }, hair)
-	c:stroke({ { 958, -14 }, { 972, 150 }, { 984, 292 } }, { 40, 30, 2 }, hair)
-	c:stroke({ { 1030, -14 }, { 1046, 160 }, { 1052, 296 } }, { 52, 40, 4 }, hair)
-	c:stroke({ { 1100, -14 }, { 1118, 200 }, { 1124, 296 } }, { 62, 50, 8 }, hair)
+	strand({ { 900, -14 }, { 905, 140 }, { 899, 262 } }, { 24, 18, 2 }, hair, 9)
+	strand({ { 958, -14 }, { 972, 150 }, { 984, 292 } }, { 40, 30, 2 }, hair, 9)
+	strand({ { 1030, -14 }, { 1046, 160 }, { 1052, 296 } }, { 52, 40, 4 }, hair, 9)
+	strand({ { 1100, -14 }, { 1118, 200 }, { 1124, 296 } }, { 62, 50, 8 }, hair, 9)
 	c:box(1140, -14, 1170, 296, hair)
-	c:stroke({ { 962, 0 }, { 975, 160 } }, { 3, 1 }, hairHi)
-	c:stroke({ { 1040, 0 }, { 1054, 180 } }, { 4, 1 }, hairHi)
-	c:stroke({ { 1108, 10 }, { 1124, 210 } }, { 4, 1 }, hairHi)
+	strand({ { 962, 0 }, { 975, 160 } }, { 3, 1 }, hairHi, 9)
+	strand({ { 1040, 0 }, { 1054, 180 } }, { 4, 1 }, hairHi, 9)
+	strand({ { 1108, 10 }, { 1124, 210 } }, { 4, 1 }, hairHi, 9)
 
 	-- soft (cinematic) light: hair shadow from the top, falloff to the right
 	if soft then

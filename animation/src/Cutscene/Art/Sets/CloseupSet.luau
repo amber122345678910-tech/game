@@ -30,6 +30,16 @@ local function plate(scene: Builder.Scene, name: string, depth: number, x0: numb
 	})
 end
 
+-- The hair on the painted eye panels sways: the strands are painted in three
+-- positions (groups split:yHair1..3 / split:rHair1..3) and the shot steps
+-- through them like anime drawings on twos, about 8 times a second
+local PHASES = { 1, 2, 3, 2 }
+function CloseupSet.hair(ctx: any)
+	local i = math.floor(ctx.t * 8)
+	ctx:show("split:yHair" .. PHASES[i % 4 + 1])
+	ctx:show("split:rHair" .. PHASES[(i + 1) % 4 + 1])
+end
+
 function CloseupSet.build(scene: Builder.Scene)
 	local st = scene.style
 	Builder.model(scene, "CloseupSet", false)

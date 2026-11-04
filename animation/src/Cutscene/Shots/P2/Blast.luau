@@ -8,6 +8,7 @@
 --  12.767 Yuta's face    15.800 comet           15.933 bending arc
 --  16.300 Ryu's glare    16.467 Ryu's eyes wide  17.033 the blast bends up
 local Timeline = require(script.Parent.Parent.Parent.Timeline)
+local CloseupSet = require(script.Parent.Parent.Parent.Art.Sets.CloseupSet)
 local FX = require(script.Parent.Parent.Parent.FX)
 local Util = require(script.Parent.Parent.Parent.Util)
 local Rig = require(script.Parent.Parent.Parent.Rig)
@@ -323,6 +324,7 @@ end
 -- Ryu's eyes in the painted close-up: a glare, then wide with shock
 local function ryuGlare(ctx: Timeline.Ctx)
 	Common.panelCamera(ctx, 430, 470, 300)
+	CloseupSet.hair(ctx)
 	ctx:show("split:ryuGlare")
 	ctx:flash(CYAN, 0.45)
 	Common.grade(ctx, 0.05, 0.2, 0.1, Color3.fromRGB(210, 240, 255))
@@ -330,6 +332,7 @@ end
 
 local function ryuEyes(ctx: Timeline.Ctx)
 	Common.panelCamera(ctx, 430, 470, 300 - ctx.u * 40)
+	CloseupSet.hair(ctx)
 	ctx:show("split:ryuShock")
 	ctx:flash(CYAN, 0.2 * (1 - ctx.u))
 	Common.grade(ctx, 0.05, 0.22, 0.05, Color3.fromRGB(215, 240, 255))

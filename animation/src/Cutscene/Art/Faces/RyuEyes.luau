@@ -3,6 +3,7 @@
 -- Face turned 3/4 to the right, glaring at Yuta: heavy brows, veins and
 -- wrinkles on the nose bridge, narrow eyes.
 local Paint = require(script.Parent.Parent.Parent.Paint)
+local YutaEyes = require(script.Parent.YutaEyes)
 
 local RyuEyes = {}
 
@@ -69,13 +70,14 @@ function RyuEyes.paint(c: Paint.Canvas, pal: { [string]: Color3 }, lw: number, s
 	c:stroke({ { 250, 488 }, { 320, 476 }, { 390, 466 }, { 436, 470 } }, { 14, 16, 16, 10 }, pal.scleraShade)
 	c:stroke({ { 380, 488 }, { 420, 486 }, { 440, 482 } }, { 40, 30, 10 }, pal.scleraShade)
 	-- iris (top part hidden under the lid)
-	c:ellipse(341, 486, 33, 30, 0, pal.rIrisDark)
-	c:ellipse(342, 488, 27, 25, 0, pal.rIris)
-	c:ellipse(344, 500, 18, 12, 0, pal.rIrisLight)
-	c:ellipse(342, 494, 15, 8, 0, pal.rIris)
-	c:ellipse(343, 480, 12, 12, 0, pal.rIrisDark)
-	c:ellipse(322, 497, 9, 4, -12, pal.sclera)
-	c:circle(357, 507, 2.5, pal.sclera)
+	c:ellipse(341, 487, 37, 33, 0, pal.rIrisDark)
+	c:ellipse(342, 489, 30, 27, 0, pal.rIris)
+	c:ellipse(344, 503, 20, 12, 0, pal.rIrisLight)
+	c:ellipse(342, 495, 16, 8, 0, pal.rIris)
+	c:ellipse(343, 484, 18, 17, 0, pal.rIrisDark)
+	c:ellipse(322, 498, 10, 4, -12, pal.sclera)
+	c:circle(357, 476, 5, pal.sclera)
+	c:circle(360, 508, 2.5, pal.sclera)
 	-- upper lid: carve the iris top with shadow, then the thick lid line
 	c:stroke({ { 200, 482 }, { 280, 462 }, { 340, 452 }, { 410, 440 }, { 452, 448 } }, { 18, 24, 26, 24, 14 }, shade)
 	c:stroke(
@@ -162,11 +164,11 @@ function RyuEyes.paint(c: Paint.Canvas, pal: { [string]: Color3 }, lw: number, s
 	c:setGroup(nil)
 
 	-- 6. hair strands crossing the forehead -------------------------------------------
-	c:stroke({ { 303, 307 }, { 284, 334 }, { 252, 380 }, { 203, 440 } }, { 12, 12, 9, 1 }, hair)
-	c:stroke({ { 84, 372 }, { 190, 343 }, { 262, 318 }, { 300, 307 } }, { 1, 6, 9, 10 }, hair)
-	c:stroke({ { 410, 307 }, { 396, 330 }, { 366, 356 } }, { 10, 7, 1 }, hair)
-	c:stroke({ { 470, 307 }, { 456, 322 } }, { 6, 1 }, hair)
-	c:stroke({ { 722, 307 }, { 736, 340 }, { 742, 372 } }, { 10, 8, 1 }, hair)
+	YutaEyes.strand(c, "split:rHair", { { 303, 307 }, { 284, 334 }, { 252, 380 }, { 203, 440 } }, { 12, 12, 9, 1 }, hair, 8)
+	YutaEyes.strand(c, "split:rHair", { { 84, 372 }, { 190, 343 }, { 262, 318 }, { 300, 307 } }, { 1, 6, 9, 10 }, hair, 8, true)
+	YutaEyes.strand(c, "split:rHair", { { 410, 307 }, { 396, 330 }, { 366, 356 } }, { 10, 7, 1 }, hair, 8)
+	YutaEyes.strand(c, "split:rHair", { { 470, 307 }, { 456, 322 } }, { 6, 1 }, hair, 8)
+	YutaEyes.strand(c, "split:rHair", { { 722, 307 }, { 736, 340 }, { 742, 372 } }, { 10, 8, 1 }, hair, 8)
 
 	-- 7. wrinkles, nose, contour lines ---------------------------------------------------
 	for _, s in

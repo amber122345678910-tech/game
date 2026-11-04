@@ -9,6 +9,7 @@
 --  42.900 Yuta's arm (blue line art)    43.600 Rika's bloody mouth
 --  44.700 "Thin Ice Breaker!"
 local Timeline = require(script.Parent.Parent.Parent.Timeline)
+local CloseupSet = require(script.Parent.Parent.Parent.Art.Sets.CloseupSet)
 local FX = require(script.Parent.Parent.Parent.FX)
 local Util = require(script.Parent.Parent.Parent.Util)
 local Rig = require(script.Parent.Parent.Parent.Rig)
@@ -170,6 +171,7 @@ end
 -- Ryu's near eye, wide with shock (painted close-up panel)
 local function ryuEye(ctx: Timeline.Ctx)
 	Common.panelCamera(ctx, 330 + ctx.u * 6, 488, 205 - ctx.u * 14)
+	CloseupSet.hair(ctx)
 	ctx:show("split:ryuShock")
 	ctx:flash(Color3.fromRGB(150, 225, 255), 0.18)
 	Common.grade(ctx, 0.04, 0.22, 0, Color3.fromRGB(215, 240, 255))

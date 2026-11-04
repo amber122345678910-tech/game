@@ -67,6 +67,7 @@ local function eyes(ctx: Timeline.Ctx)
 	ctx:channel("plateYuta", slideCF(Track.sample(yutaSlide, ctx.t)))
 	ctx:channel("plateRyu", slideCF(Track.sample(ryuSlide, ctx.t)))
 	ctx:show("divider")
+	CloseupSet.hair(ctx)
 	ctx:emit("SnowClose", 20)
 	-- 5.2 s on: both narrow their eyes into a glare (reference)
 	if ctx.t >= 5.2 then
