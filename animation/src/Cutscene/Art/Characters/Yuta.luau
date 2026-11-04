@@ -36,7 +36,7 @@ function Yuta.build(scene: Builder.Scene, rigName: string): Rig.RigDef
 	-- Hips: trousers, and the jacket's hem just over the hips
 	k.add("LowerTorso", "Block", V(1.34, 0.7, 0.82), C(0, 0.12, 0), "yPants", "cloth")
 	Builder.flex(k.add("LowerTorso", "Block", V(1.46, 0.42, 0.92), C(0, 0.3, 0), "yUniform", "cloth", "Hem"), 2.5, V(0, 0.21, 0))
-	k.add("LowerTorso", "Ellipsoid", V(0.5, 0.36, 0.1), C(-0.32, 0.3, -0.49) * R(0, 0, 12), "yBlood", "cloth", "BloodHem")
+	k.add("LowerTorso", "Ellipsoid", V(0.12, 0.3, 0.04), C(-0.36, 0.3, -0.49) * R(0, 0, 12), "yBlood", "cloth", "BloodHem")
 
 	-- Jacket, high collar, katana on the back
 	-- V-shaped torso: broad at the shoulders, narrow at the waist
@@ -50,7 +50,9 @@ function Yuta.build(scene: Builder.Scene, rigName: string): Rig.RigDef
 	end
 	-- blood soaked into the left shoulder, running down the chest, and on the belly
 	-- (thin stains lying on the cloth, so they never bulge out of it)
-	k.add("UpperTorso", "Ellipsoid", V(0.48, 0.72, 0.05), C(-0.64, 1.12, -0.49) * R(0, 0, -12), "yBlood", "cloth", "Blood")
+	k.add("UpperTorso", "Ellipsoid", V(0.3, 0.56, 0.05), C(-0.62, 1.16, -0.49) * R(0, 0, -24), "yBlood", "cloth", "Blood")
+	k.add("UpperTorso", "Ellipsoid", V(0.22, 0.34, 0.05), C(-0.5, 0.98, -0.492) * R(0, 0, 18), "yBloodDark", "cloth", "Blood")
+	k.add("UpperTorso", "Ellipsoid", V(0.36, 0.16, 0.05), C(-0.72, 1.36, -0.491) * R(0, 0, -8), "yBlood", "cloth", "Blood")
 	k.add("UpperTorso", "Ellipsoid", V(0.66, 0.05, 0.86), C(-0.84, 1.53, -0.02), "yBlood", "cloth", "Blood")
 	k.add("UpperTorso", "Ellipsoid", V(0.05, 0.6, 0.7), C(-1.18, 1.25, -0.05), "yBlood", "cloth", "Blood")
 	-- a thin run of blood down from the shoulder (no round spots)
@@ -79,7 +81,7 @@ function Yuta.build(scene: Builder.Scene, rigName: string): Rig.RigDef
 	-- skull, then many thin tapered locks: bangs falling over the forehead
 	-- (one between the eyes), locks over the temples and ears, a shaggy nape
 	-- and a few spiky ends sticking out at the crown and back.
-	k.add("Head", "Ellipsoid", V(1.2, 0.74, 1.26), C(0, 1.16, 0.05), "yHair", "hair", "HairTop")
+	k.add("Head", "Ellipsoid", V(1.26, 0.8, 1.32), C(0, 1.16, 0.05), "yHair", "hair", "HairTop")
 	k.add("Head", "Ellipsoid", V(1.16, 1.0, 0.62), C(0, 0.86, 0.36), "yHair", "hair", "HairBack")
 	for _, sx in { -1, 1 } do
 		k.add("Head", "Ellipsoid", V(0.24, 0.8, 0.8), C(sx * 0.54, 0.86, 0.08), "yHair", "hair", "HairSide")
@@ -116,20 +118,32 @@ function Yuta.build(scene: Builder.Scene, rigName: string): Rig.RigDef
 		local x = -0.4 + i * 0.16
 		lock(x, 0.86, 0.5, -22 - (i % 2) * 8, x * -30, 0, 0.5 + (i % 3) * 0.08, 0.18, "yHair", "NapeLock")
 	end
-	-- spiky ends at the crown and the back of the head
+	-- the spiky top layer: locks growing from the crown and lying forward
+	-- over the head (pitch ~100-115 points the tip forward), ending in
+	-- points above the fringe; then messy short spikes out at the back and
+	-- sides (no tall crest)
+	local top = {
+		{ -0.34, 1.42, 0.18, 74, 18, 0.62 },
+		{ -0.17, 1.48, 0.22, 78, 6, 0.7 },
+		{ 0.0, 1.5, 0.24, 80, 0, 0.74 },
+		{ 0.17, 1.48, 0.22, 78, -6, 0.68 },
+		{ 0.34, 1.42, 0.18, 74, -18, 0.6 },
+	}
+	for i, tp in top do
+		lock(tp[1], tp[2], tp[3], tp[4], tp[5], 0, tp[6], 0.2, if i % 3 == 0 then "yHairHi" else "yHair", "TopLock")
+	end
 	local spikes = {
-		{ -0.34, 1.42, 0.12, -150, 30, 0.5 },
-		{ -0.12, 1.5, 0.2, -160, 12, 0.56 },
-		{ 0.12, 1.5, 0.18, -158, -10, 0.54 },
-		{ 0.34, 1.42, 0.1, -148, -28, 0.48 },
-		{ -0.24, 1.36, 0.42, -130, 22, 0.5 },
-		{ 0.22, 1.38, 0.44, -128, -20, 0.5 },
-		{ 0, 1.3, 0.56, -112, 0, 0.48 },
-		{ -0.46, 1.22, 0.36, -120, 48, 0.42 },
-		{ 0.46, 1.22, 0.34, -122, -46, 0.42 },
+		{ -0.34, 1.32, 0.42, -64, 30, 0.44 },
+		{ -0.12, 1.36, 0.48, -70, 10, 0.48 },
+		{ 0.12, 1.36, 0.48, -70, -10, 0.48 },
+		{ 0.34, 1.32, 0.42, -64, -30, 0.44 },
+		{ -0.54, 1.16, 0.2, -30, 60, 0.36 },
+		{ 0.54, 1.16, 0.2, -30, -60, 0.36 },
+		{ -0.22, 1.12, 0.58, -48, 18, 0.42 },
+		{ 0.22, 1.12, 0.58, -48, -18, 0.42 },
 	}
 	for i, sp in spikes do
-		lock(sp[1], sp[2], sp[3], sp[4], sp[5], 0, sp[6] * 1.15, 0.15, if i % 4 == 1 then "yHairHi" else "yHair", "Spike")
+		lock(sp[1], sp[2], sp[3], sp[4], sp[5], 0, sp[6], 0.15, if i % 4 == 1 then "yHairHi" else "yHair", "Spike")
 	end
 
 	-- Arms

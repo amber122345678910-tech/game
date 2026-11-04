@@ -130,24 +130,34 @@ function Rika.build(scene: Builder.Scene, rigName: string): Rig.RigDef
 		bar("Head", V(sx * 0.7, 0.6, -1.52), V(sx * 0.86, 1.02, -1.26), 0.07, "kStripe", "GrinLine")
 		bar("Head", V(sx * 0.62, 1.0, -1.64), V(sx * 0.7, 1.4, -1.58), 0.05, "kStripe", "Crease")
 	end
-	-- the mouth: a huge open grin, gums, two rows of long fangs, a tongue
-	-- set back so the fangs stand in front of the dark mouth
-	E("Head", V(1.5, 1.25, 0.6), C(0, 0.45, -1.42) * R(-6, 0, 0), "kMouth", "Mouth")
-	E("Head", V(1.42, 0.16, 0.42), C(0, 0.98, -1.7), "kMouth", "Gum")
-	E("Head", V(1.36, 0.16, 0.4), C(0, -0.07, -1.62), "kMouth", "Gum")
-	E("Head", V(0.7, 0.2, 0.9), C(0, 0.06, -1.36), "kStripe", "Tongue")
-	local nT = 15
+	-- the mouth: a huge grin stretched from cheek to cheek, two packed rows
+	-- of tall bright teeth (a picket fence of fangs, the canines longest)
+	-- standing out in front of the dark throat, red gums, a black lip line
+	E("Head", V(1.62, 1.3, 0.6), C(0, 0.45, -1.42) * R(-6, 0, 0), "kMouth", "Mouth")
+	E("Head", V(1.2, 0.9, 0.5), C(0, 0.45, -1.36) * R(-6, 0, 0), "kEye", "Throat")
+	k.addColor("Head", "Ellipsoid", V(1.5, 0.12, 0.4), C(0, 1.0, -1.69), Color3.fromRGB(84, 26, 36), "body", "Gum")
+	k.addColor("Head", "Ellipsoid", V(1.44, 0.12, 0.38), C(0, -0.09, -1.61), Color3.fromRGB(84, 26, 36), "body", "Gum")
+	k.addColor("Head", "Ellipsoid", V(0.7, 0.18, 0.8), C(0, 0.04, -1.38), Color3.fromRGB(120, 30, 46), "body", "Tongue")
+	-- the lips: a thin black line round the grin
+	for _, row in { { y = 1.1, z = -1.74 }, { y = -0.19, z = -1.66 } } do
+		bar("Head", V(-0.78, row.y - 0.05, row.z + 0.22), V(0, row.y, row.z), 0.05, "kStripe", "Lip")
+		bar("Head", V(0, row.y, row.z), V(0.78, row.y - 0.05, row.z + 0.22), 0.05, "kStripe", "Lip")
+	end
+	local nT = 19
 	for i = 0, nT - 1 do
 		local f = (i - (nT - 1) / 2) / ((nT - 1) / 2) -- -1..1 across the mouth
-		local a = math.rad(f * 52)
-		local fang = if math.abs(math.abs(f) - 0.5) < 0.1 then 1.35 else 1.0 -- longer canines
-		local mid = (1 - math.abs(f) * 0.4) * fang
-		local x, z = math.sin(a) * 0.7, -1.86 + (1 - math.cos(a)) * 0.55
-		local turn = if i % 2 == 0 then 90 else -90
-		local up = 0.72 * mid
-		k.add("Head", "Wedge", V(0.06, up, 0.16), C(x, 1.0 - up / 2, z) * R(0, -math.deg(a), 0) * R(0, 0, 180) * R(0, turn, 0), "kTeeth", "body", "Fang")
-		local low = 0.62 * mid
-		k.add("Head", "Wedge", V(0.06, low, 0.15), C(x * 0.94, -0.12 + low / 2, z + 0.04) * R(0, -math.deg(a), 0) * R(0, turn, 0), "kTeeth", "body", "Fang")
+		local a = math.rad(f * 56)
+		local canine = math.abs(math.abs(f) - 0.45) < 0.08
+		local len = (if canine then 1.3 else 1.0) * (1 - math.abs(f) * 0.35)
+		local x, z = math.sin(a) * 0.76, -1.88 + (1 - math.cos(a)) * 0.6
+		local up = 0.62 * len
+		local tooth = k.add("Head", "Ellipsoid", V(0.11, up, 0.08), C(x, 0.98 - up / 2, z) * R(0, -math.deg(a), 0), "kTeeth", "body", "Fang")
+		local _ = tooth
+		-- a sharp tip at the bottom of each upper tooth
+		k.add("Head", "Wedge", V(0.05, 0.12 * len, 0.1), C(x, 0.98 - up - 0.03, z) * R(0, -math.deg(a), 0) * R(0, 0, 180) * R(0, 90, 0), "kTeeth", "body", "Fang")
+		local low = 0.54 * len
+		k.add("Head", "Ellipsoid", V(0.1, low, 0.075), C(x * 0.95, -0.12 + low / 2, z + 0.05) * R(0, -math.deg(a), 0), "kTeeth", "body", "Fang")
+		k.add("Head", "Wedge", V(0.05, 0.1 * len, 0.09), C(x * 0.95, -0.12 + low + 0.03, z + 0.05) * R(0, -math.deg(a), 0) * R(0, 90, 0), "kTeeth", "body", "Fang")
 	end
 
 	-- Hair: 24 thick strands swept back from the brow and crown, curling down,
