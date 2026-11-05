@@ -1,0 +1,126 @@
+{
+  "name": "StretchPop",
+  "tree": {
+    "$className": "DataModel",
+
+    "ReplicatedStorage": {
+      "$className": "ReplicatedStorage",
+      "Shared": {
+        "$path": "src/ReplicatedStorage/Shared"
+      },
+      "StretchPopNet": {
+        "$className": "Folder",
+        "SmashRequest": { "$className": "RemoteEvent" },
+        "SmashResult": { "$className": "RemoteEvent" },
+        "ObstacleSmashed": { "$className": "RemoteEvent" },
+        "GongStrike": { "$className": "RemoteEvent" },
+        "GongResult": { "$className": "RemoteEvent" },
+        "RebirthWave": { "$className": "RemoteEvent" },
+        "ControllerReset": { "$className": "RemoteEvent" },
+        "ArmVisual": { "$className": "RemoteEvent" },
+        "PeerArmVisual": { "$className": "RemoteEvent" }
+      }
+    },
+
+    "ServerScriptService": {
+      "$className": "ServerScriptService",
+      "Server": {
+        "$path": "src/ServerScriptService/Server"
+      }
+    },
+
+    "StarterPlayer": {
+      "$className": "StarterPlayer",
+      "$properties": {
+        "EnableMouseLockOption": false,
+        "CharacterWalkSpeed": 20,
+        "CameraMaxZoomDistance": 40
+      },
+      "StarterPlayerScripts": {
+        "$className": "StarterPlayerScripts",
+        "Client": {
+          "$path": "src/StarterPlayer/StarterPlayerScripts/Client"
+        }
+      }
+    },
+
+    "Players": {
+      "$className": "Players",
+      "$properties": {
+        "CharacterAutoLoads": false,
+        "RespawnTime": 2
+      }
+    },
+
+    "Workspace": {
+      "$className": "Workspace",
+      "$properties": {
+        "Gravity": 196.2,
+        "FallenPartsDestroyHeight": -500
+      },
+      "StretchPopSpawn": {
+        "$className": "SpawnLocation",
+        "$properties": {
+          "Anchored": true,
+          "Neutral": true,
+          "CanCollide": false,
+          "CanQuery": false,
+          "Transparency": 1,
+          "Duration": 0,
+          "Size": [12, 1, 12],
+          "CFrame": {
+            "CFrame": {
+              "position": [0, 8, 14],
+              "orientation": [[1, 0, 0], [0, 1, 0], [0, 0, 1]]
+            }
+          }
+        }
+      }
+    },
+
+    "Lighting": {
+      "$className": "Lighting",
+      "$properties": {
+        "Technology": "ShadowMap",
+        "ClockTime": 14.5,
+        "Brightness": 2.6,
+        "Ambient": [0.36, 0.38, 0.45],
+        "OutdoorAmbient": [0.55, 0.57, 0.66],
+        "EnvironmentDiffuseScale": 0.55,
+        "EnvironmentSpecularScale": 0.5,
+        "GlobalShadows": true,
+        "ShadowSoftness": 0.3
+      },
+      "Atmosphere": {
+        "$className": "Atmosphere",
+        "$properties": {
+          "Density": 0.26,
+          "Offset": 0.12,
+          "Color": [0.78, 0.86, 1.0],
+          "Decay": [0.55, 0.62, 0.92],
+          "Glare": 0.15,
+          "Haze": 1.1
+        }
+      },
+      "Bloom": {
+        "$className": "BloomEffect",
+        "$properties": {
+          "Intensity": 0.5,
+          "Size": 26,
+          "Threshold": 1.5
+        }
+      },
+      "ColorCorrection": {
+        "$className": "ColorCorrectionEffect",
+        "$properties": {
+          "Saturation": 0.18,
+          "Contrast": 0.08,
+          "Brightness": 0.02
+        }
+      },
+      "Sky": {
+        "$className": "Sky"
+      }
+    }
+  }
+}
