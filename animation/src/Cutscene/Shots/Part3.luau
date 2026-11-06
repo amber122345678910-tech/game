@@ -859,35 +859,48 @@ local function rikaHold(ctx: Timeline.Ctx)
 		LeftLowerLeg = R(-20, 0, 0),
 		RightUpperLeg = R(-14, 0, 0),
 	}, t), "LeftHand", C(0, -0.35, 0), belly)
+	-- Rika writhes as her body tears apart: she heaves and twists, her head
+	-- jerks down (3.35), snaps back with the burst of steam (3.6) and then
+	-- thrashes from side to side screaming; her free arm swings up and out,
+	-- the claw clenching and spreading; the arm on Ryu's head shudders
 	local open = Util.smoothstep(4.5, 6.3, t)
-	local lower = Util.smoothstep(3.4, 4.0, t)
+	local jerk = Util.smoothstep(3.3, 3.42, t) * (1 - Util.smoothstep(3.55, 3.7, t))
+	local snap = Util.smoothstep(3.55, 3.75, t)
+	local thrash = Util.smoothstep(4.0, 4.6, t)
+	local heave = math.sin((t - 2.633) * math.pi * 2 * 1.3)
+	local n1 = Util.noise1(t * 2.2, 71)
+	local n2 = Util.noise1(t * 3.1, 72)
+	local n3 = Util.noise1(t * 9, 73)
+	local swing = Util.smoothstep(3.9, 4.5, t) - 0.7 * Util.smoothstep(4.7, 5.4, t)
 	local loom: Rig.Pose = {
-		HumanoidRootPart = C(0, 1.5, 0),
-		LowerTorso = R(-30, 0, 0),
-		UpperTorso = R(-48, 0, 0),
-		Head = R(34 - lower * 14, 0, 0),
-		RightUpperArm = R(70, 0, 8),
-		RightLowerArm = R(12, 0, 0),
-		RightHand = R(30, 0, 0),
-		LeftUpperArm = R(14, 0, -58),
-		LeftLowerArm = R(70 - open * 30, 0, 0),
-		LeftHand = R(40 - open * 50, 0, 0),
-		LeftUpperLeg = R(30, 0, 10),
-		LeftLowerLeg = R(-30, 0, -14),
-		LeftFoot = R(-30, 0, -24),
+		HumanoidRootPart = C(0.3 * n1 * thrash, 1.5 + 0.25 * heave, 0),
+		LowerTorso = R(-30 + 4 * heave, 8 * n2 * thrash, 0),
+		UpperTorso = R(-48 + 7 * heave - 10 * snap + 8 * thrash * n1, 14 * n2 * thrash, 10 * n1 * thrash),
+		Head = R(34 - 18 * jerk - 30 * snap + 22 * thrash * n2 + 3 * n3, 22 * jerk + 34 * thrash * n1, -14 * jerk + 18 * thrash * n2),
+		RightUpperArm = R(70 + 3 * n3 + 4 * heave, 0, 8 + 3 * n3),
+		RightLowerArm = R(12 + 4 * n3, 0, 0),
+		RightHand = R(30 + 5 * n3, 0, 0),
+		LeftUpperArm = R(14 + 70 * swing + 12 * n2, 0, -58 - 34 * swing + 10 * n1),
+		LeftLowerArm = R(70 - open * 30 - 30 * swing + 14 * n3, 0, 0),
+		LeftHand = R(40 - open * 50 + 25 * math.max(0, Util.noise1(t * 6, 74)), 0, 0),
+		LeftUpperLeg = R(30 + 10 * heave, 0, 10 + 14 * n1),
+		LeftLowerLeg = R(-30 + 12 * n2, 0, -14),
+		LeftFoot = R(-30 + 16 * n1, 0, -24),
 	}
 	local top = (rb.Head * C(0, 1.25, 0)).Position
-	local kb = Common.rigAt(ctx, "Rika", C(RYU + V(2.5, 0, -6.5)) * CFrame.Angles(0, math.pi - 0.25, 0), Cast.alive(loom, t), "RightHand", C(0, -1.3, 0), top + V(0, 0.4, 0))
+	local kb = Common.rigAt(ctx, "Rika", C(RYU + V(2.5, 0, -6.5)) * CFrame.Angles(0, math.pi - 0.25, 0), loom, "RightHand", C(0, -1.3, 0), top + V(0, 0.4, 0))
+	Common.rikaEye(ctx, kb, 1)
+	ctx:gust(0.8 + 1.4 * thrash)
 	-- steam bursting from her jaws, billowing off to the right
 	local mouth = (kb.Head * C(0, 0.4, -1.9)).Position
 	if t > 3.55 then
-		FX.placeBurst(ctx, h.steam, mouth, (t - 3.55) % 1.4, 3.4, 1.2, 1.4, V(1, 0.35, 0.4), 0.5, -1.2)
+		FX.placeBurst(ctx, h.steam, mouth, (t - 3.55) % 1.4, 7, 2.8, 1.4, V(1, 0.3, 0.4), 0.5, -1.2)
 	end
 	-- the dark body tearing into black smoke
 	local tear = Util.smoothstep(4.0, 6.4, t)
-	smokeAround(ctx, kb.UpperTorso.Position + V(0, -1.0, -2.2), 0.35 + tear * 1.0, 2 + tear * 5, 700, 1.0)
-	local eye = RYU + V(5.6, 1.0, 13 + u * 1.5)
-	cam(ctx, eye, RYU + V(4.4, 8.4 + Util.smoothstep(2.633, 6.533, t) * 4.2, -3), 58, 0, 0.3)
+	smokeAround(ctx, kb.UpperTorso.Position + V(0, -1.0, -2.2), 0.5 + tear * 1.4, 2 + tear * 6, 700, 1.0)
+	local rise = Util.smoothstep(2.633, 6.533, t)
+	cam(ctx, RYU + V(5.0, 1.6, 21 + u * 1.2), RYU + V(3.2, 9.2 + rise * 3.6, -3), 35, 0.03 + 0.05 * thrash, 0.3)
 	ctx:wind(1.3)
 	grade(ctx, -0.04, 0.2, 0.05, Color3.fromRGB(200, 214, 245))
 	field(ctx, "low")
