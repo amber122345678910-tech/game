@@ -429,27 +429,67 @@ local function topDown(ctx: Timeline.Ctx)
 end
 
 -- 27: over the shoulder: lightning claw, Yuta sprinting in the distance
+-- 27 (36.87-39.93): close behind Ryu's left side, his left hand flung back
+-- at us like a claw, big in the foreground, his body beyond it with his
+-- back to us; the camera slides round behind him while the arm sinks, he
+-- leans forward and his head tracks Yuta, who runs low across the far
+-- side ahead and to his right; lightning streams out towards Yuta
 local function claw(ctx: Timeline.Ctx)
 	local h: H = ctx.scene.data.ryu
+	local t = ctx.t
+	local u = ctx.u
 	local root = rootAt(Field.RYU, -90)
-	local bones = ctx:rig("Ryu", root, Cast.alive(Cast.ryu.claw, ctx.t))
-	local yutaPos = root:PointToWorldSpace(V(-6 + ctx.u * 14, 0, -22))
-	ctx:rig("Yuta", C(yutaPos) * CFrame.Angles(0, math.rad(-90 - 90), 0), Cast.run(ctx.t * 2.4, 22))
+	-- Yuta ahead and to the right, coming on low, then rising
+	local yutaLocal = V(5 + u * 2, 0, -18 + u * 4)
+	local yutaPos = root:PointToWorldSpace(yutaLocal)
+	ctx:rig("Yuta", C(yutaPos) * CFrame.Angles(0, math.rad(-90 + 180 - 15), 0), Cast.run(t * 2.0, 40 - 20 * u))
 	Cast.expr(ctx, "yuta", "focus")
-	local cam = Util.lookAt(root:PointToWorldSpace(V(1.9, 5.4, 2.6)), root:PointToWorldSpace(V(-1.2, 3.2, -14)))
-	ctx:camera(Clash.shake(cam, ctx.t, 0.08, 8), 50)
-	ctx:focus(14, 1)
+	local thrust = Util.smoothstep(36.87, 37.12, t)
+	local sink = Util.smoothstep(37.35, 39.9, t)
+	local over = math.max(0, t - 37.12)
+	local jolt = math.exp(-over * 7) * math.sin(over * 26) * 6
+	local headYaw = math.deg(math.atan2(-yutaLocal.X, -yutaLocal.Z))
+	local pose: Rig.Pose = {
+		LowerTorso = R(-6 - 6 * sink, -6, 0),
+		UpperTorso = R(-10 - 10 * sink, -8, 0),
+		Head = R(4 + 4 * sink, headYaw + 10, 0),
+		-- the left arm flung back and out, the hand clawing at us; it sinks
+		LeftUpperArm = R(-40 * thrust + 25 * sink + jolt, 0, -20 - 45 * thrust + 25 * sink),
+		LeftLowerArm = R(30 + 20 * sink, 0, 0),
+		LeftHand = R(-40, 0, 0),
+		RightUpperArm = R(14, 0, 18),
+		RightLowerArm = R(40, 0, 0),
+		LeftUpperLeg = R(22, 0, -8),
+		LeftLowerLeg = R(-26, 0, 0),
+		RightUpperLeg = R(-14, 0, 8),
+		RightLowerLeg = R(-8, 0, 0),
+	}
+	local bones = ctx:rig("Ryu", root, Cast.alive(pose, t))
 	Cast.expr(ctx, "ryu", "glare")
-	local hand = (bones.RightHand * C(0, -0.5, 0)).Position
+	-- the camera slides from his left side round to behind him, rising a
+	-- little, and turns from his hand to Yuta
+	local orbit = Util.smoothstep(37.2, 39.7, t)
+	local phi = math.rad(112 + 84 * orbit)
+	local r = 3.2 + 2.6 * orbit
+	local center = root:PointToWorldSpace(V(-0.4, 4.4 + 0.9 * orbit, 0))
+	local eye = center + root:VectorToWorldSpace(V(-math.sin(phi), 0, -math.cos(phi))) * r
+	local hand = (bones.LeftHand * C(0, -0.45, 0)).Position
+	local look = hand:Lerp(root:PointToWorldSpace(V(5.5, 3.4, -15)), Util.smoothstep(37.4, 39.2, t))
+	ctx:camera(Clash.shake(Util.lookAt(eye, look), t, 0.1 + (1 - thrust) * 0.4, 9), 54)
+	ctx:focus((bones.UpperTorso.Position - eye).Magnitude, 0.7)
+	-- yellow and cyan lightning streaming past him towards Yuta
 	local idx = 1
+	local from = (bones.RightHand * C(0, -0.4, 0)).Position
 	for i = 1, 4 do
-		idx = FX.placeBolt(ctx, h.bolts, idx, hand, hand + root:VectorToWorldSpace(V(math.sin(i * 1.3) * 4, math.cos(i) * 2, -6 - i)), 7, 0.22, 0.05, i + 50, 14)
+		local tip = yutaPos + V(math.sin(i * 1.7) * 2.5, 2.5 + math.cos(i) * 1.5, 0)
+		idx = FX.placeBolt(ctx, h.bolts, idx, from, from:Lerp(tip, 0.5 + 0.12 * i), 8, 0.14, 0.05, i + 50, 14)
 	end
 	Cast.ryuAura(ctx, bones, 1, 6)
 	ctx:light("RyuHand", 4, nil, 14)
 	ctx:emit("RyuHandSparks", 60)
+	ctx:wind(1.6)
 	ctx:bloom(1.8)
-	grade(ctx, -0.02, 0.18, -0.1)
+	grade(ctx, -0.04, 0.2, -0.02, Color3.fromRGB(196, 216, 255))
 	sky(ctx, "low", 26)
 end
 
