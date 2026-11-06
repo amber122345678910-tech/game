@@ -10,6 +10,7 @@ local Layout = require(script.Parent.Parent.Parent.Layout)
 local Field = require(script.Parent.Parent.Field)
 local Ryu = require(script.Parent.Parent.Parent.Art.Characters.Ryu)
 local Uro = require(script.Parent.Parent.Parent.Art.Characters.Uro)
+local FlashArt = require(script.Parent.FlashArt)
 
 local Common = {}
 
@@ -47,11 +48,13 @@ export type H = {
 	rikaEye: Builder.PartSpec,
 	shell: FX.Burst,
 	uroArm: { upper: Builder.PartSpec, lower: Builder.PartSpec, band: Builder.PartSpec, hand: Builder.PartSpec },
+	uroHair: Uro.Hair,
 }
 
 function Common.build(scene: Builder.Scene)
 	local pal = scene.style.color
 	Uro.build(scene, "Uro")
+	local uroHair = Uro.hair(scene, "UroHair")
 	Ryu.build(scene, "RyuBare", true, true)
 	local white = Color3.new(1, 1, 1)
 	local cyanHot = Util.mix(pal.eCyan, white, 0.55)
@@ -79,6 +82,7 @@ function Common.build(scene: Builder.Scene)
 		smoke = FX.burst(scene, "P2Smoke", Color3.fromRGB(70, 66, 70), 16, "Ball", 70),
 		rikaEye = FX.core(scene, "P2RikaEye", Color3.fromRGB(255, 40, 52)),
 		shell = FX.burst(scene, "P2Shell", Color3.fromRGB(22, 22, 28), 34, "Wedge", 68),
+		uroHair = uroHair,
 		uroArm = {
 			upper = Builder.fx(scene, "P2UroArm", "Block", V(0.36, 1.0, 0.38), pal.skin, "SmoothPlastic", 0, "UroArm"),
 			lower = Builder.fx(scene, "P2UroArm", "Block", V(0.32, 0.9, 0.34), pal.skin, "SmoothPlastic", 0, "UroArm"),
@@ -108,41 +112,8 @@ function Common.build(scene: Builder.Scene)
 	for i = 1, 7 do
 		h.rikaBlood[i] = Builder.fx(scene, "P2RikaBlood", "Ball", V(1, 1, 1), pal.yBlood, "SmoothPlastic", 0, "Blood")
 	end
-	Common.buildFlashbackSet(scene)
+	FlashArt.build(scene, Common.FB)
 	scene.data.p2 = h
-end
-
--- Rooftops of a city at dusk for the flashback (static, far above the field)
-function Common.buildFlashbackSet(scene: Builder.Scene)
-	local pal = scene.style.color
-	local o = Common.FB
-	Builder.model(scene, "P2Flashback", false)
-	local sky = Color3.fromRGB(122, 112, 176)
-	-- a closed box of sky, darker towards the ground
-	for _, w in {
-		{ V(0, 60, -150), V(400, 260, 2) },
-		{ V(0, 60, 150), V(400, 260, 2) },
-		{ V(-150, 60, 0), V(2, 260, 400) },
-		{ V(150, 60, 0), V(2, 260, 400) },
-		{ V(0, 180, 0), V(400, 2, 400) },
-	} do
-		Builder.part(scene, "P2Flashback", w[2], C(o + w[1]), sky, { material = "SmoothPlastic", castShadow = false, name = "FbSky" })
-	end
-	Builder.part(scene, "P2Flashback", V(400, 2, 400), C(o + V(0, -41, 0)), Color3.fromRGB(46, 44, 70), { material = "Concrete", castShadow = false, name = "FbStreet" })
-	-- rooftops: the fight happens on the roof at the centre
-	local r = Util.rng(919)
-	Builder.part(scene, "P2Flashback", V(46, 40, 40), C(o + V(0, -20, 0)), Color3.fromRGB(150, 150, 170), { material = "Concrete", name = "FbRoof" })
-	Builder.part(scene, "P2Flashback", V(46, 1.2, 1), C(o + V(0, 0.6, -19.5)), Color3.fromRGB(90, 90, 110), { material = "Metal", name = "FbRail" })
-	for i = 1, 24 do
-		local a = i / 24 * math.pi * 2 + Util.randRange(r, -0.1, 0.1)
-		local d = Util.randRange(r, 45, 120)
-		local hgt = Util.randRange(r, 20, 75)
-		local w = Util.randRange(r, 14, 30)
-		local p = o + V(math.cos(a) * d, -40 + hgt / 2, math.sin(a) * d)
-		local col = Util.mix(Color3.fromRGB(70, 66, 104), Color3.fromRGB(118, 112, 150), Util.rand(r))
-		Builder.part(scene, "P2Flashback", V(w, hgt, w * Util.randRange(r, 0.7, 1.3)), C(p) * CFrame.Angles(0, Util.randRange(r, 0, 1.5), 0), col, { material = "Concrete", name = "FbBlock" })
-	end
-	local _ = pal
 end
 
 -- Ryu / Yuta roots for part 2 (Ryu looks down -Z at Yuta, Yuta looks +Z)

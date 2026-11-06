@@ -3,10 +3,8 @@
 --   p2star      white star flash on black (the Granite Blast fires)
 --   p2swirl     blue energy swirl
 --   p2crescent  white crescent of the blast front on black
---   fbLines     flashback line art: a huge eye and swirling lines
 --   orangeFlare red-orange flame tongues from the top (Ryu senses danger)
 --   eyeBlack    Ryu's eye alone in the dark, orange streaks
---   tibEye      "Thin Ice Breaker!": a giant white eye on black, bands, shards
 --   timer17 / timer09 / timer00   the countdown display
 --   crack1..3   cracks spreading from Yuta's palm on Ryu's chest
 local Builder = require(script.Parent.Parent.Parent.Builder)
@@ -201,7 +199,8 @@ function Overlay2.build(scene: Builder.Scene)
 		end
 		stroke(c, ln, ww, white)
 	end
-	add(scene, c, "fbLines", 0.8)
+	-- (no longer shown: the flashback art lives in P2/FlashArt; drawn only so
+	-- the random sequence of the layers after it stays the same)
 
 	-- red-orange flame tongues licking down from the top
 	c = Paint.canvas(1, 0, 0)
@@ -254,7 +253,7 @@ function Overlay2.build(scene: Builder.Scene)
 		local x, y = Util.randRange(r, 0, W), Util.randRange(r, 0, H)
 		c:poly({ { x, y }, { x + Util.randRange(r, 6, 18), y + Util.randRange(r, -4, 4) }, { x + Util.randRange(r, 0, 10), y + Util.randRange(r, 10, 26) } }, white, black)
 	end
-	add(scene, c, "tibEye")
+	-- (no longer shown, see above)
 
 	-- the countdown display
 	timer(scene, "timer17", "17", black, Color3.fromRGB(226, 228, 232), Color3.fromRGB(22, 23, 28))

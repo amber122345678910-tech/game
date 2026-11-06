@@ -47,6 +47,12 @@ FaceRig.expr = {
 		grit = { "yuta:eyes:wide", "yuta:brows:tense", "yuta:mouth:grit" },
 		cold = { "yuta:eyes:normal", "yuta:brows:tense", "yuta:mouth:closed" },
 	},
+	-- Uro (part 2 flashbacks; her face is painted in Art/Characters/Uro)
+	uro = {
+		calm = { "uro:eyes:open", "uro:mouth:closed" },
+		fierce = { "uro:eyes:open", "uro:mouth:open" },
+		pain = { "uro:eyes:shut", "uro:mouth:open" },
+	},
 }
 
 -- Ryu: sharp narrow eyes, heavy angled brows, wide grin / laugh
