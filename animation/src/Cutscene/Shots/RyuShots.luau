@@ -180,24 +180,64 @@ local function talk(ctx: Timeline.Ctx)
 end
 
 -- 17: standing on the cracked ice, crater ahead, arm out
+-- 17 (22.57-25.07): Ryu on the cracked ice facing the crater, seen from
+-- his right and a little behind (he stands at the left third facing right,
+-- the crater at the right): a loose, slightly hunched stance, knees a little
+-- bent, the near (right) hand bent forward at the waist, the other hanging,
+-- the head turned to the crater; fog and smoke drifting, wind streaks; it
+-- opens on a white blur shot through with cyan streaks
+local iceStance: Rig.Pose = {
+	HumanoidRootPart = C(0, -0.18, 0),
+	LowerTorso = R(-6, -6, 0),
+	UpperTorso = R(-10, -10, 0),
+	Head = R(2, 10, 0),
+	RightUpperArm = R(26, 0, 12),
+	RightLowerArm = R(72, 0, 0),
+	RightHand = R(-10, 0, 0),
+	LeftUpperArm = R(10, 0, -12),
+	LeftLowerArm = R(28, 0, 0),
+	LeftUpperLeg = R(-14, 0, -4),
+	LeftLowerLeg = R(-22, 0, 0),
+	LeftFoot = R(12, 0, 0),
+	RightUpperLeg = R(18, 0, 5),
+	RightLowerLeg = R(-14, 0, 0),
+}
+
 local function onIce(ctx: Timeline.Ctx)
-	local h: H = ctx.scene.data.ryu
+	local t = ctx.t
 	local dir = (Field.CRATER - Field.RYU)
 	local yaw = math.deg(math.atan2(-dir.X, -dir.Z))
 	local root = rootAt(Field.RYU, yaw)
-	local bones = ctx:rig("Ryu", root, Cast.alive(Cast.ryu.point, ctx.t))
-	local cam = Util.lookAt(root:PointToWorldSpace(V(5.5 - ctx.u * 0.8, 3.2, 8.5)), root:PointToWorldSpace(V(-1.5, 2.6, -8)))
-	ctx:camera(cam, 55)
-	ctx:focus(10, 1)
+	-- small living motion: weight shifting, the shoulders rising on a breath
+	local sway = math.sin(t * 1.3) * 1.5
+	local pose = Cast.add(Cast.add(iceStance, "LowerTorso", R(0, sway, 0)), "RightUpperArm", R(math.sin(t * 1.7) * 2, 0, 0))
+	local bones = ctx:rig("Ryu", root, Cast.alive(pose, t))
+	local drift = ctx.u * 0.6
+	-- from further off with a long lens, so the crater behind him looms
+	local eye = root:PointToWorldSpace(V(13 - drift, 4.2, 9))
+	local look = root:PointToWorldSpace(V(-3.2, 3.9, -14))
+	ctx:camera(Clash.shake(Util.lookAt(eye, look), t, 0.05, 4), 36)
+	ctx:focus((bones.UpperTorso.Position - eye).Magnitude, 0.8)
 	Cast.expr(ctx, "ryu", "glare")
-	Cast.ryuAura(ctx, bones, 0.5, 3)
-	local hand = (bones.RightHand * C(0, -0.7, 0)).Position
-	if ctx.lt > 0.4 and ctx.lt < 0.9 then
-		local k = 1 - math.abs(ctx.lt - 0.65) / 0.25
-		FX.placeBeam(ctx, h.beam, hand, hand + root.LookVector * 60 + V(0, -2, 0), 0.4, k)
+	-- a few cyan sparks crackling round his head
+	Cast.ryuAura(ctx, bones, 0.35, 2)
+	-- the opening blur: white smoke with cyan streaks wiping across
+	local blur = 1 - Util.smoothstep(22.6, 22.85, t)
+	if blur > 0 then
+		ctx:flash(Color3.fromRGB(226, 234, 248), 0.85 * blur)
+		ctx:alpha("streaks", 0)
 	end
-	grade(ctx, 0, 0.12, -0.18)
-	sky(ctx, "low", 22)
+	ctx:alpha("wind", 0.55)
+	ctx:wind(1.8)
+	ctx:gust(0.4 + 0.3 * math.max(0, math.sin(t * 2.3)))
+	ctx:fog(2.1)
+	grade(ctx, 0.1, 0.1, -0.12, Color3.fromRGB(218, 228, 252))
+	-- thick fog and drifting smoke: a heavy bank behind, wisps in front
+	Field.snow(ctx, 120)
+	-- clouds of white smoke rolling over the crater, a low bank on the ground
+	Field.mist(ctx, "low", 24, 0, -0.1)
+	Field.mist(ctx, "wisps", 32, 0, 0.14)
+	Field.mist(ctx, "heavy", 75, 0, 0.2)
 end
 
 -- 18: front, low angle, grinning, lightning on the arm, wind
