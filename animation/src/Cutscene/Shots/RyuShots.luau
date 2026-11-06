@@ -311,7 +311,19 @@ end
 local function backView(ctx: Timeline.Ctx)
 	local h: H = ctx.scene.data.ryu
 	local root = rootAt(Field.RYU, -90)
-	local bones = ctx:rig("Ryu", root, Cast.alive(Cast.add(Cast.ryu.spread, "LeftUpperArm", R(0, 0, 45)), ctx.t))
+	-- standing straight, arms hanging by his sides a little away from the
+	-- body, the fur cuffs at his hips (reference 27.5-29.8)
+	local stand: Rig.Pose = {
+		UpperTorso = R(-2, 0, 0),
+		Head = R(2, 0, 0),
+		LeftUpperArm = R(4, 0, -16),
+		LeftLowerArm = R(12, 0, -6),
+		RightUpperArm = R(4, 0, 16),
+		RightLowerArm = R(12, 0, 6),
+		LeftUpperLeg = R(0, 0, -6),
+		RightUpperLeg = R(0, 0, 6),
+	}
+	local bones = ctx:rig("Ryu", root, Cast.alive(stand, ctx.t))
 	local cam = Util.lookAt(root:PointToWorldSpace(V(0.6, 3.4, 12 - ctx.u * 1.5)), root:PointToWorldSpace(V(0.4, 3.2, -10)))
 	ctx:camera(cam, 50)
 	ctx:focus(12, 1)
