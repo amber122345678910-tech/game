@@ -9,6 +9,7 @@ local roblox = H.roblox
 local Instance, Vector3, CFrame, Enum = roblox.Instance, roblox.Vector3, roblox.CFrame, roblox.Enum
 
 local PhysicsConfig = H.require("ReplicatedStorage.Shared.Config.PhysicsConfig")
+local SoundConfig = H.require("ReplicatedStorage.Shared.Config.SoundConfig")
 local StretchPhysics = H.require("ReplicatedStorage.Shared.Physics.StretchPhysics")
 local KineticVFX = H.require("StarterPlayer.StarterPlayerScripts.Client.Effects.KineticVFX")
 local Controller = H.require("StarterPlayer.StarterPlayerScripts.Client.Controllers.ElasticSlingshotController")
@@ -89,6 +90,9 @@ function camera:IsMouseFree()
 	return camera.Free
 end
 function camera:SnapBehind(_look) end
+function camera:SetMouseFree(free)
+	camera.Free = free
+end
 local function aimAt(point: any)
 	camera.Origin = root.CFrame.Position + Vector3.new(1.5, 3, 10)
 	camera.Direction = (point - camera.Origin).Unit
@@ -469,6 +473,364 @@ H.test("KineticLevelClient: rebirth wave + gong verdict + others' smash VFX", fu
 	)
 	frames(240)
 	H.check(disc.Parent == mutable, "gong untouched")
+end)
+
+-- ── Шаг 3: HUD и звук ──────────────────────────────────────────────────────
+local playerGui = Instance.new("PlayerGui")
+playerGui.Parent = player
+workspace.CurrentCamera.ViewportSize = roblox.Vector2.new(1600, 900)
+local UserInputService = game:GetService("UserInputService")
+UserInputService.MouseIconEnabled = false
+UserInputService.GamepadEnabled = false
+character, root, humanoid = Engine.buildCharacter(player, CFrame.new(0, 3, 0))
+slingshot:BindCharacter(character)
+local HUD = H.require("StarterPlayer.StarterPlayerScripts.Client.Controllers.StretchHUDController")
+local Audio = H.require("StarterPlayer.StarterPlayerScripts.Client.Controllers.StretchAudioController")
+local hud = HUD.new(slingshot, camera :: any)
+hud:Start()
+local audio = Audio.new(slingshot, camera :: any, hud)
+audio:Start()
+frames(2)
+
+local function countLit(): number
+	local lit = 0
+	for _, segment in hud.Segments do
+		if segment.Lit then
+			lit += 1
+		end
+	end
+	return lit
+end
+
+H.suite("Client · spring cartoon HUD")
+H.test("whole UI is built in code: FredokaOne, thick UIStroke, juicy UIGradient", function()
+	local gui = playerGui:FindFirstChild("StretchPopHUD")
+	H.check(gui and gui:IsA("ScreenGui") and gui.ResetOnSpawn == false and gui.IgnoreGuiInset, "screen gui")
+	H.check(#hud.Segments == 32, "tension ring segments")
+	local strokes, gradients, texts = 0, 0, 0
+	for _, descendant in gui:GetDescendants() do
+		if descendant:IsA("UIStroke") then
+			strokes += 1
+		elseif descendant:IsA("UIGradient") then
+			gradients += 1
+		elseif descendant:IsA("TextLabel") or descendant:IsA("TextButton") then
+			texts += 1
+			H.check(descendant.Font == Enum.Font.FredokaOne, "font of " .. descendant:GetFullName())
+		end
+	end
+	H.check(strokes > 40 and gradients > 20 and texts > 20, string.format("strokes=%d gradients=%d texts=%d", strokes, gradients, texts))
+	H.near(hud.RootScale.Scale, 1, 1e-6, "UIScale at 900px")
+	workspace.CurrentCamera.ViewportSize = roblox.Vector2.new(1280, 720)
+	frames(1)
+	H.near(hud.RootScale.Scale, 0.8, 1e-6, "UIScale at 720px")
+	workspace.CurrentCamera.ViewportSize = roblox.Vector2.new(1600, 900)
+	frames(1)
+end)
+H.test("tension ring fills from TensionChanged, jitters at 100%, empties on release", function()
+	slingshot.Signals.TensionChanged:Fire(1)
+	frames(45)
+	H.check(countLit() == 32, "all lit: " .. countLit())
+	local jitter = 0
+	for _ = 1, 20 do
+		frames(1)
+		local position = hud.Reticle.Position
+		jitter = math.max(jitter, math.abs(position.X.Offset), math.abs(position.Y.Offset))
+	end
+	H.check(jitter > 0.3, "reticle shakes at full tension: " .. jitter)
+	slingshot.Signals.TensionChanged:Fire(0.5)
+	frames(45)
+	H.check(countLit() >= 14 and countLit() <= 18, "half tension ≈ half ring: " .. countLit())
+	slingshot.Signals.TensionChanged:Fire(0)
+	frames(60)
+	H.check(countLit() == 0, "ring empty: " .. countLit())
+end)
+H.test("speedometer springs to the real speed; 260+ turns on neon and flames", function()
+	launchFrom(Vector3.new(0, 150, 100), Vector3.new(320, 0, 0))
+	frames(30)
+	local shown = tonumber(hud.SpeedText.Text) or 0
+	H.check(shown > PhysicsConfig.SupersonicSpeed, "speed shown: " .. hud.SpeedText.Text)
+	H.check(hud.Neon and hud.SupersonicLabel.Visible and hud.FlameHolder.Visible, "neon + SUPERSONIC + flames")
+	H.check(hud.NeedlePivot.Rotation > 300, "needle swung: " .. hud.NeedlePivot.Rotation)
+	slingshot:HardReset(CFrame.new(0, 3, 0))
+	frames(120)
+	H.check(not hud.Neon and not hud.FlameHolder.Visible, "neon off when stopped")
+	H.check(hud.NeedlePivot.Rotation < 200, "needle back: " .. hud.NeedlePivot.Rotation)
+end)
+H.test("combo counter pops on every hit and hides after reset", function()
+	slingshot.Combo = 3
+	frames(90)
+	H.check(hud.ComboText.Text == "x3" and hud.Combo.Visible, "combo x3 visible")
+	local settled = hud.ComboScale.Scale
+	H.check(math.abs(settled - 1) < 0.05, "settled scale " .. settled)
+	slingshot.Combo = 4
+	local peak = settled
+	for _ = 1, 12 do
+		frames(1)
+		peak = math.max(peak, hud.ComboScale.Scale)
+	end
+	H.check(hud.ComboText.Text == "x4" and peak > settled + 0.08, string.format("pop on hit: %.3f → %.3f", settled, peak))
+	frames(90)
+	H.check(math.abs(hud.ComboScale.Scale - 1) < 0.05, "spring settles back")
+	slingshot.Combo = 0
+	frames(90)
+	H.check(not hud.Combo.Visible, "hidden after reset")
+end)
+H.test("3D popups of speed and loot fly on a parabola and expire", function()
+	local folder = playerGui:FindFirstChild("StretchPopPopups")
+	slingshot.Signals.Smashed:Fire("Wall", 187.4, Vector3.new(0, 10, -50))
+	slingshot.Signals.LootGained:Fire(40)
+	frames(1)
+	local texts = {}
+	for _, gui in folder:GetChildren() do
+		table.insert(texts, gui:FindFirstChild("Text").Text)
+	end
+	H.check(table.find(texts, "187!") ~= nil and table.find(texts, "+40") ~= nil, "popups: " .. table.concat(texts, ", "))
+	local popup = nil
+	for _, candidate in hud.Popups do
+		if candidate.Label.Text == "187!" then
+			popup = candidate
+		end
+	end
+	H.check(popup ~= nil, "speed popup tracked")
+	local y0 = popup.Attachment.WorldCFrame.Position.Y
+	frames(15)
+	local y1 = popup.Attachment.WorldCFrame.Position.Y
+	frames(15)
+	local y2 = popup.Attachment.WorldCFrame.Position.Y
+	H.check(y1 > y0 and (y2 - y1) < (y1 - y0), "rises, then gravity bends the path")
+	frames(90)
+	H.check(#folder:GetChildren() == 0 and #hud.Popups == 0, "expired")
+end)
+H.test("gong failure banner says exactly what was missing", function()
+	Engine.remote("GongResult").OnClientEvent:Fire(false, "too_slow", 140, 2, 112, 1)
+	frames(20)
+	local subtitle = hud.Banner.Subtitle.Text
+	H.check(hud.Banner.Root.Visible, "banner visible")
+	H.check(string.find(subtitle, "+28", 1, true) ~= nil and string.find(subtitle, "+1 комбо", 1, true) ~= nil, "deficits: " .. subtitle)
+	frames(260)
+	H.check(not hud.Banner.Root.Visible, "banner hides")
+end)
+H.test("rebirth banner celebrates the new tier", function()
+	Engine.remote("RebirthWave").OnClientEvent:Fire({
+		Slot = 1,
+		OwnerUserId = player.UserId,
+		Tier = 1,
+		LaneOrigin = CFrame.new(),
+		OriginZ = -800,
+		EndZ = 66,
+		Speed = 420,
+		StartServerTime = Engine.time + 0.2,
+		LaneWidth = 92,
+	})
+	frames(10)
+	H.check(hud.Banner.Title.Text == "REBIRTH!", "title")
+	H.check(string.find(hud.Banner.Subtitle.Text, "Golden", 1, true) ~= nil, "subtitle: " .. hud.Banner.Subtitle.Text)
+	H.check(hud.Banner.Rays.Visible, "celebration rays")
+	frames(300)
+end)
+H.test("Tab opens the springy panel, frees the cursor, asks for ProfileSync", function()
+	local count = #Engine.remoteLog
+	H.check(input("StretchPop_TogglePanel", Enum.UserInputState.Begin) == Enum.ContextActionResult.Sink, "Tab sunk")
+	frames(5)
+	local early = hud.PanelScale.Scale
+	frames(40)
+	H.check(hud.PanelOpen and hud.Panel.Visible and camera.Free, "open + cursor free")
+	H.check(early < hud.PanelScale.Scale + 0.3 and math.abs(hud.PanelScale.Scale - 1) < 0.05, "spring settles at 1")
+	H.check(UserInputService.MouseIconEnabled, "system cursor visible for clicking")
+	local requested = false
+	for index = count + 1, #Engine.remoteLog do
+		if Engine.remoteLog[index].Remote == "ProfileSync" then
+			requested = true
+		end
+	end
+	H.check(requested, "ProfileSync requested")
+	H.check(input("StretchPop_LeftArm", Enum.UserInputState.Begin) == Enum.ContextActionResult.Pass, "LMB goes to UI, not the arm")
+	input("StretchPop_LeftArm", Enum.UserInputState.End)
+end)
+H.test("stat card: Derive preview, poor click refused locally, rich click upgrades via server", function()
+	player:SetAttribute("Coins", 0)
+	player:SetAttribute("Stat_Elasticity", 0)
+	frames(2)
+	local card = hud.StatCards.Elasticity
+	H.check(string.find(card.Preview.Text, "→", 1, true) ~= nil, "preview: " .. card.Preview.Text)
+	local count = #Engine.remoteLog
+	Engine.signalFor(card.Button, "Activated"):Fire()
+	H.check(#Engine.remoteLog == count, "no request without coins")
+	H.check(card.Message.Visible and string.find(card.Message.Text, "монет", 1, true) ~= nil, "refusal: " .. card.Message.Text)
+	player:SetAttribute("Coins", 1000)
+	frames(2)
+	Engine.signalFor(card.Button, "Activated"):Fire()
+	local request = Engine.findLog("UpgradeStat", function(entry)
+		return entry.Kind == "FireServer"
+	end)
+	H.check(request ~= nil and request.Args[1] == "Elasticity", "UpgradeStat sent")
+	H.check(card.Cost.Text == "...", "pending state")
+	player:SetAttribute("Stat_Elasticity", 1)
+	player:SetAttribute("Coins", 970)
+	Engine.remote("UpgradeStat").OnClientEvent:Fire("Elasticity", true, "upgraded", 1, 970)
+	frames(3)
+	H.check(string.find(card.Message.Text, "1", 1, true) ~= nil and card.Level.Text == "Lv 1", "upgraded: " .. card.Level.Text)
+end)
+H.test("glove shop: expensive refused, buy request, confirmed purchase shows equipped", function()
+	local card = hud.GloveCards.VoidFist
+	player:SetAttribute("Coins", 10)
+	frames(2)
+	Engine.signalFor(card.Button, "Activated"):Fire()
+	H.check(card.Message.Visible, "too expensive locally")
+	player:SetAttribute("Coins", 300000)
+	frames(2)
+	Engine.signalFor(card.Button, "Activated"):Fire()
+	local request = Engine.findLog("GloveAction", function(entry)
+		return entry.Kind == "FireServer"
+	end)
+	H.check(request ~= nil and request.Args[1] == "Buy" and request.Args[2] == "VoidFist", "buy request")
+	Engine.remote("GloveAction").OnClientEvent:Fire("Buy", "VoidFist", true, "bought")
+	player:SetAttribute("Glove", "VoidFist")
+	hud.PanelDirty = true
+	frames(3)
+	H.check(card.Button.Text == "НАДЕТО", "equipped: " .. card.Button.Text)
+	H.check(hud.GloveCards.Rubber.Button.Text == "НАДЕТЬ", "owned classic offers equip: " .. hud.GloveCards.Rubber.Button.Text)
+	Engine.signalFor(hud.GloveCards.Rubber.Button, "Activated"):Fire()
+	local equip = Engine.findLog("GloveAction", function(entry)
+		return entry.Kind == "FireServer"
+	end)
+	H.check(equip.Args[1] == "Equip" and equip.Args[2] == "Rubber", "equip request")
+end)
+H.test("records arrive via ProfileSync; Tab closes the panel and relocks the cursor", function()
+	Engine.remote("ProfileSync").OnClientEvent:Fire({
+		Coins = 300000,
+		Stats = { Elasticity = 1, SpringPower = 0, SmashMass = 0 },
+		OwnedGloves = { "Rubber", "VoidFist" },
+		EquippedGlove = "VoidFist",
+		Records = { TopSpeed = 312.4, LongestCombo = 14, WallsSmashed = 120, ChestsOpened = 33, LootEarned = 9999 },
+		Locations = {},
+		ActiveLocation = "Meadows",
+		TotalRebirths = 2,
+		DataOffline = true,
+		ServerTime = 0,
+	})
+	frames(2)
+	H.check(string.find(hud.RecordsText.Text, "312", 1, true) ~= nil and string.find(hud.RecordsText.Text, "14", 1, true) ~= nil, "records: " .. hud.RecordsText.Text)
+	H.check(hud.OfflineText.Text ~= "", "offline notice")
+	input("StretchPop_TogglePanel", Enum.UserInputState.Begin)
+	frames(120)
+	H.check(not hud.PanelOpen and not hud.Panel.Visible and not camera.Free, "closed + cursor locked")
+	H.check(UserInputService.MouseIconEnabled == false, "own reticle instead of system cursor")
+end)
+
+H.suite("Client · procedural audio")
+H.test("audio graph: voices per SoundConfig slot, groups, Reverb + Echo on resonance", function()
+	local soundService = game:GetService("SoundService")
+	local folder = soundService:FindFirstChild("StretchPopAudio")
+	local voices = 0
+	for _, def in SoundConfig.Sounds do
+		voices += if def.Looped then 1 else def.Voices
+	end
+	H.check(folder and #folder:GetChildren() == voices, "voices: " .. (if folder then #folder:GetChildren() else -1) .. " / " .. voices)
+	local resonance = soundService:FindFirstChild("StretchPop_Resonance")
+	H.check(resonance and resonance:FindFirstChildOfClass("ReverbSoundEffect") and resonance:FindFirstChildOfClass("EchoSoundEffect"), "reverb + echo")
+	H.check(audio.StretchLoop.Sound.Looped and audio.StretchLoop.Equalizer ~= nil, "stretch loop with EQ filter")
+	for _, sound in folder:GetChildren() do
+		H.check(string.sub(sound.SoundId, 1, 9) == "rbxasset:" or string.sub(sound.SoundId, 1, 13) == "rbxassetid://", "asset id " .. sound.SoundId)
+	end
+end)
+H.test("tension drives rubber loop pitch / volume / EQ and granular creaks", function()
+	slingshot:HardReset(CFrame.new(0, 3, 0))
+	humanoid.FloorMaterial = Enum.Material.Plastic
+	frames(2)
+	slingshot:EnterCustom("Charge", Vector3.zero)
+	local logIndex = #Engine.soundLog
+	slingshot.Signals.TensionChanged:Fire(1)
+	frames(60)
+	local loop = audio.StretchLoop
+	H.check(loop.Playing and Engine.isPlaying(loop.Sound), "loop playing")
+	H.near(loop.Sound.PlaybackSpeed, SoundConfig.Sounds.StretchLoop.Pitch * SoundConfig.Tension.PitchMax, 0.03, "pitch at full tension")
+	H.check(loop.Equalizer.HighGain > -2, "filter opened: " .. loop.Equalizer.HighGain)
+	H.check(#Engine.soundsSince(logIndex, "Creak") >= 12, "granular creaks: " .. #Engine.soundsSince(logIndex, "Creak"))
+	slingshot.Signals.TensionChanged:Fire(0.3)
+	frames(60)
+	H.check(loop.Sound.PlaybackSpeed < SoundConfig.Tension.PitchMax * 0.9, "pitch drops with tension")
+	slingshot.Signals.TensionChanged:Fire(0)
+	frames(90)
+	H.check(not loop.Playing and not Engine.isPlaying(loop.Sound), "loop stops")
+	slingshot:HardReset(CFrame.new(0, 3, 0))
+end)
+H.test("launch snap, then wind louder and higher with speed", function()
+	local logIndex = #Engine.soundLog
+	slingshot.Signals.Launched:Fire(220, Vector3.new(0, 0, -220))
+	H.check(#Engine.soundsSince(logIndex, "Snap") == 1, "snap")
+	launchFrom(Vector3.new(0, 300, 100), Vector3.new(150, 0, 0))
+	frames(40)
+	local slowPitch = audio.WindLoop.Sound.PlaybackSpeed
+	local slowVolume = audio.WindLoop.Sound.Volume
+	H.check(audio.WindLoop.Playing and slowVolume > 0, "wind on in flight")
+	slingshot:HardReset(CFrame.new(0, 3, 0))
+	frames(2)
+	launchFrom(Vector3.new(0, 300, 100), Vector3.new(400, 0, 0))
+	frames(40)
+	H.check(audio.WindLoop.Sound.PlaybackSpeed > slowPitch * 1.3, "higher pitch")
+	H.check(audio.WindLoop.Sound.Volume > slowVolume * 1.5, "louder")
+	slingshot:HardReset(CFrame.new(0, 3, 0))
+	frames(150)
+	H.check(not audio.WindLoop.Playing, "wind fades out on the ground")
+end)
+H.test("bounce notes climb the major pentatonic with the combo", function()
+	local logIndex = #Engine.soundLog
+	for combo = 1, 6 do
+		slingshot.Signals.Bounced:Fire(combo, 260, Vector3.zero)
+	end
+	local notes = Engine.soundsSince(logIndex, "Bounce")
+	H.check(#notes == 6, "notes: " .. #notes)
+	local semitones = { 0, 2, 4, 7, 9, 12 }
+	local base = notes[1].Speed
+	for index, entry in notes do
+		local expected = 2 ^ (semitones[index] / 12)
+		H.check(math.abs(entry.Speed / base / expected - 1) < 0.045, string.format("note %d ratio %.3f vs %.3f", index, entry.Speed / base, expected))
+	end
+end)
+H.test("gong: deep hit in the reverb group, success strums a major chord", function()
+	local logIndex = #Engine.soundLog
+	slingshot.Signals.GongStruck:Fire(220, 3)
+	local hits = Engine.soundsSince(logIndex, "Gong")
+	H.check(#hits == 2 and hits[1].Group == "StretchPop_Resonance", "gong + layer through resonance")
+	H.check(hits[1].Speed < 0.6, "deep: " .. hits[1].Speed)
+	Engine.remote("GongResult").OnClientEvent:Fire(true, "rebirth", 140, 2, 220, 3)
+	frames(20)
+	local all = Engine.soundsSince(logIndex, "Gong")
+	H.check(#all >= 2 + #SoundConfig.GongChord, "chord notes: " .. #all)
+end)
+H.test("rebirth wave: pitch sweep rises across the whole wave, finale arpeggio", function()
+	local logIndex = #Engine.soundLog
+	Engine.remote("RebirthWave").OnClientEvent:Fire({
+		Slot = 1,
+		OwnerUserId = player.UserId,
+		Tier = 2,
+		LaneOrigin = CFrame.new(),
+		OriginZ = -800,
+		EndZ = 66,
+		Speed = 420,
+		StartServerTime = Engine.time + 0.3,
+		LaneWidth = 92,
+	})
+	frames(30)
+	local sweep = audio.Sweeps[1]
+	H.check(sweep ~= nil and sweep.Started, "sweep started")
+	local first = sweep.Voice.Sound.PlaybackSpeed
+	frames(60)
+	H.check(sweep.Voice.Sound.PlaybackSpeed > first, "pitch rises")
+	frames(200)
+	H.check(#audio.Sweeps == 0, "sweep finished")
+	H.check(#Engine.soundsSince(logIndex, "Coin") >= 8, "finale arpeggio")
+end)
+H.test("UI sounds follow HUD signals (click, purchase arpeggio, error)", function()
+	local logIndex = #Engine.soundLog
+	hud.Signals.UiClick:Fire()
+	hud.Signals.Purchase:Fire(true, "upgraded")
+	hud.Signals.Purchase:Fire(false, "not_enough_coins")
+	frames(30)
+	H.check(#Engine.soundsSince(logIndex, "UiClick") == 1, "click")
+	H.check(#Engine.soundsSince(logIndex, "Coin") >= #SoundConfig.Arpeggio, "arpeggio")
+	H.check(#Engine.soundsSince(logIndex, "UiError") == 1, "error buzz")
 end)
 
 H.test("no runtime errors inside VFX effects or signals", function()

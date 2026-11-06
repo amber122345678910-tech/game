@@ -1,7 +1,8 @@
 --!strict
 -- STRETCH-POP · Камера «из-за плеча» с захваченной мышью.
 -- Нужна потому, что ПКМ занята правой рукой: стандартная камера Roblox вращается по ПКМ.
--- • Мышь в центре (крестик), ALT — освободить курсор (для будущего меню прокачки).
+-- • Мышь в центре (крестик рисует HUD). SetMouseFree освобождает курсор — так HUD открывает
+--   панель прокачки по Tab / Alt / кнопке, не споря с камерой за клавиши.
 -- • Дистанция и FOV пружинят от скорости полёта (Hooke-пружины), тряска по модели trauma².
 -- • Столкновение камеры со стенами через Spherecast; другие игроки и обломки игнорируются группой.
 
@@ -125,6 +126,12 @@ function ShoulderCamera.IsMouseFree(self: ShoulderCamera): boolean
 	return self.MouseFree
 end
 
+-- Освободить (true) или снова захватить (false) курсор. Пока курсор свободен, камера не крутится,
+-- а клики ЛКМ/ПКМ уходят в интерфейс (контроллер рогатки пропускает их).
+function ShoulderCamera.SetMouseFree(self: ShoulderCamera, free: boolean)
+	self.MouseFree = free
+end
+
 -- Развернуть камеру за спину по направлению взгляда персонажа (спавн, телепорт).
 function ShoulderCamera.SnapBehind(self: ShoulderCamera, lookVector: Vector3)
 	local flat = Vector3.new(lookVector.X, 0, lookVector.Z)
@@ -165,7 +172,7 @@ function ShoulderCamera.Update(self: ShoulderCamera, dt: number)
 		self.Pitch -= delta.Y * MOUSE_RADIANS_PER_PIXEL * sensitivity
 	end
 	local stick = self.GamepadLook
-	if stick.Magnitude > GAMEPAD_DEADZONE then
+	if not free and stick.Magnitude > GAMEPAD_DEADZONE then
 		self.Yaw -= stick.X * GAMEPAD_YAW_RATE * dt
 		self.Pitch += stick.Y * GAMEPAD_PITCH_RATE * dt
 	end
@@ -242,17 +249,6 @@ function ShoulderCamera.Start(self: ShoulderCamera)
 		UserInputService.InputChanged:Connect(function(input: InputObject)
 			if input.KeyCode == Enum.KeyCode.Thumbstick2 then
 				self.GamepadLook = Vector2.new(input.Position.X, input.Position.Y)
-			end
-		end)
-	)
-	table.insert(
-		self.Connections,
-		UserInputService.InputBegan:Connect(function(input: InputObject, processed: boolean)
-			if processed then
-				return
-			end
-			if input.KeyCode == Enum.KeyCode.LeftAlt or input.KeyCode == Enum.KeyCode.RightAlt then
-				self.MouseFree = not self.MouseFree
 			end
 		end)
 	)

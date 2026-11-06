@@ -410,5 +410,61 @@ for tier = 0, 3 do
 	end)
 end
 
+-- ── SoundConfig ────────────────────────────────────────────────────────────
+local SoundConfig = H.require("ReplicatedStorage.Shared.Config.SoundConfig")
+H.suite("SoundConfig")
+H.test("every slot: asset id, sane volume / pitch / voices, known group", function()
+	local groups = { Sfx = true, Resonance = true, Ui = true }
+	local count = 0
+	for name, def in SoundConfig.Sounds do
+		count += 1
+		local id = def.Id
+		H.check(string.sub(id, 1, 11) == "rbxasset://" or string.sub(id, 1, 13) == "rbxassetid://", name .. " id " .. id)
+		H.check(def.Volume > 0 and def.Volume <= 10, name .. " volume")
+		H.check(def.Pitch > 0 and def.Pitch <= 4, name .. " pitch")
+		H.check(def.Voices >= 1 and def.Voices <= 16, name .. " voices")
+		H.check(groups[def.Group] == true, name .. " group")
+	end
+	H.check(count >= 15, "slots: " .. count)
+	H.check(SoundConfig.Sounds.StretchLoop.Looped and SoundConfig.Sounds.WindLoop.Looped, "loops are looped")
+	for _, key in { "Snap", "Bounce", "Smash", "Gong", "WaveSweep", "Creak", "UiClick" } do
+		H.check(SoundConfig.Sounds[key] ~= nil and not SoundConfig.Sounds[key].Looped, key .. " one-shot present")
+	end
+	H.check(SoundConfig.Sounds.Gong.Group == "Resonance" and SoundConfig.Sounds.WaveSweep.Group == "Resonance", "gong & wave go through reverb")
+end)
+H.test("major pentatonic steps climb by octaves and cap at the top octave", function()
+	local expected = { 0, 2, 4, 7, 9, 12, 14, 16, 19, 21, 24, 26, 28, 31, 33 }
+	for index, semitones in expected do
+		H.check(SoundConfig.PentatonicSemitones(index - 1) == semitones, string.format("step %d → %d", index - 1, SoundConfig.PentatonicSemitones(index - 1)))
+	end
+	for step = 15, 40 do
+		local value = SoundConfig.PentatonicSemitones(step)
+		H.check(value >= 12 * SoundConfig.PentatonicOctaves and value <= 12 * SoundConfig.PentatonicOctaves + 9, "capped at step " .. step)
+	end
+	H.near(SoundConfig.SemitoneRatio(12), 2, 1e-12, "octave = x2")
+	H.near(SoundConfig.SemitoneRatio(7), 1.498307, 1e-5, "fifth")
+end)
+
+-- ── Экономика прокачки ─────────────────────────────────────────────────────
+H.suite("Progression economy")
+H.test("upgrade cost starts at BaseCost, is an integer and strictly grows", function()
+	H.check(StretchPhysics.UpgradeCost(0) == PhysicsConfig.StatUpgrade.BaseCost, "base cost")
+	local previous = 0
+	for level = 0, PhysicsConfig.StatUpgrade.MaxLevel - 1 do
+		local cost = StretchPhysics.UpgradeCost(level)
+		H.check(cost == math.floor(cost) and cost > previous, "level " .. level .. " cost " .. cost)
+		previous = cost
+	end
+end)
+H.test("each stat level visibly improves its parameter (shop preview is never flat)", function()
+	for level = 0, PhysicsConfig.StatUpgrade.MaxLevel - 1 do
+		local now = StretchPhysics.Derive({ Elasticity = level, SpringPower = level, SmashMass = level }, "Rubber")
+		local nextLevel = StretchPhysics.Derive({ Elasticity = level + 1, SpringPower = level + 1, SmashMass = level + 1 }, "Rubber")
+		local improves = nextLevel.MaxStretch > now.MaxStretch or nextLevel.GrabRange > now.GrabRange
+		H.check(improves or now.MaxStretch >= PhysicsConfig.MaxStretch.Max, "elasticity flat at " .. level)
+		H.check(nextLevel.ImpactMass > now.ImpactMass or now.ImpactMass >= PhysicsConfig.ImpactMass.Max, "mass flat at " .. level)
+	end
+end)
+
 local ok = H.summary()
 process.exit(if ok then 0 else 1)

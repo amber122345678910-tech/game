@@ -46,15 +46,29 @@ scriptOk("StarterPlayer.StarterPlayerScripts.Client.Controllers.ElasticSlingshot
 scriptOk("StarterPlayer.StarterPlayerScripts.Client.Controllers.ShoulderCameraController", "ModuleScript")
 scriptOk("StarterPlayer.StarterPlayerScripts.Client.Controllers.KineticLevelClient", "ModuleScript")
 scriptOk("StarterPlayer.StarterPlayerScripts.Client.Effects.KineticVFX", "ModuleScript")
-for _, name in { "Types", "Net", "Config.PhysicsConfig", "Config.LevelConfig", "Config.GloveConfig", "Math.Bezier", "Math.Spring", "Physics.StretchPhysics", "Util.Signal", "Data.ProfileTemplate" } do
+scriptOk("StarterPlayer.StarterPlayerScripts.Client.Controllers.StretchHUDController", "ModuleScript")
+scriptOk("StarterPlayer.StarterPlayerScripts.Client.Controllers.StretchAudioController", "ModuleScript")
+scriptOk("ServerScriptService.Server.Services.ProgressionService", "ModuleScript")
+for _, name in { "Types", "Net", "Config.PhysicsConfig", "Config.LevelConfig", "Config.GloveConfig", "Config.SoundConfig", "Math.Bezier", "Math.Spring", "Physics.StretchPhysics", "Util.Signal", "Data.ProfileTemplate" } do
 	scriptOk("ReplicatedStorage.Shared." .. name, "ModuleScript")
 end
 
-print("▶ remotes")
-for _, name in { "SmashRequest", "SmashResult", "ObstacleSmashed", "GongStrike", "GongResult", "RebirthWave", "ControllerReset", "ArmVisual", "PeerArmVisual" } do
+print("▶ remotes (каждый, на который ссылается Shared/Net.luau)")
+local netSource = fs.readFile("src/ReplicatedStorage/Shared/Net.luau")
+local referenced = 0
+for name in string.gmatch(netSource, 'remote%("(%w+)"%)') do
+	referenced += 1
 	local remote = find("ReplicatedStorage.StretchPopNet." .. name)
 	expect(remote ~= nil and remote.ClassName == "RemoteEvent", "RemoteEvent " .. name)
 end
+expect(referenced >= 12, "Net.luau references " .. referenced .. " remotes")
+
+print("▶ client entry wires HUD + audio, server entry wires progression")
+local clientMain = find("StarterPlayer.StarterPlayerScripts.Client.Main")
+expect(clientMain and string.find(clientMain.Source, "StretchHUDController.new(slingshot, camera)", 1, true), "HUD gets slingshot + camera")
+expect(clientMain and string.find(clientMain.Source, "StretchAudioController.new(slingshot, camera, hud)", 1, true), "audio gets slingshot + camera (+ hud)")
+local serverMain = find("ServerScriptService.Server.Main")
+expect(serverMain and string.find(serverMain.Source, "ProgressionService.Init()", 1, true), "ProgressionService initialised")
 
 print("▶ settings")
 local playersService = find("Players")

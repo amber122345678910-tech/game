@@ -298,6 +298,50 @@ roblox.implementMethod("CollectionService", "GetInstanceRemovedSignal", function
 	return signalFor(self, "Removed:" .. tag)
 end)
 
+-- Кнопки интерфейса: Activated/MouseButton1Click — сигналы, которые тест «нажимает» сам
+for _, name in { "Activated", "MouseButton1Click" } do
+	roblox.implementProperty("GuiButton", name, function(self)
+		return signalFor(self, name)
+	end)
+end
+
+-- Звук: журнал проигрываний + состояние «играет»
+Engine.soundLog = {} :: { any }
+local playing = setmetatable({}, { __mode = "k" })
+roblox.implementMethod("Sound", "Play", function(self)
+	playing[self] = true
+	table.insert(Engine.soundLog, {
+		Name = self.Name,
+		Speed = self.PlaybackSpeed,
+		Volume = self.Volume,
+		Group = if self.SoundGroup then self.SoundGroup.Name else nil,
+		Time = Engine.time,
+		Sound = self,
+	})
+end)
+roblox.implementMethod("Sound", "Stop", function(self)
+	playing[self] = nil
+end)
+roblox.implementMethod("Sound", "Pause", function(self)
+	playing[self] = nil
+end)
+roblox.implementMethod("Sound", "Resume", function(self)
+	playing[self] = true
+end)
+function Engine.isPlaying(sound: any): boolean
+	return playing[sound] == true
+end
+function Engine.soundsSince(index: number, prefix: string): { any }
+	local list = {}
+	for position = index + 1, #Engine.soundLog do
+		local entry = Engine.soundLog[position]
+		if string.sub(entry.Name, 1, #prefix) == prefix then
+			table.insert(list, entry)
+		end
+	end
+	return list
+end
+
 roblox.implementMethod("ParticleEmitter", "Emit", function(self, count)
 	Engine.emitted = (Engine.emitted or 0) + (count or 1)
 end)

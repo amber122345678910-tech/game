@@ -155,25 +155,24 @@ client.Name = "Client"
 client.Parent = starterPlayerScripts
 mirror("src/StarterPlayer/StarterPlayerScripts/Client", client)
 
--- Сетевые события, как в default.project.json
+-- Сетевые события берём прямо из default.project.json — единственный источник правды
+local serde = require("@lune/serde")
+local project = serde.decode("json", fs.readFile("default.project.json"))
+local netSpec = project.tree.ReplicatedStorage.StretchPopNet
 local net = roblox.Instance.new("Folder")
 net.Name = "StretchPopNet"
-for _, remoteName in {
-	"SmashRequest",
-	"SmashResult",
-	"ObstacleSmashed",
-	"GongStrike",
-	"GongResult",
-	"RebirthWave",
-	"ControllerReset",
-	"ArmVisual",
-	"PeerArmVisual",
-} do
-	local remote = roblox.Instance.new("RemoteEvent")
-	remote.Name = remoteName
-	remote.Parent = net
+local remoteNames = {}
+for remoteName, spec in netSpec do
+	if type(spec) == "table" and spec["$className"] then
+		table.insert(remoteNames, remoteName)
+		local remote = roblox.Instance.new(spec["$className"])
+		remote.Name = remoteName
+		remote.Parent = net
+	end
 end
+table.sort(remoteNames)
 net.Parent = replicatedStorage
+Harness.remoteNames = remoteNames
 
 Harness.game = game
 Harness.workspace = workspaceInstance

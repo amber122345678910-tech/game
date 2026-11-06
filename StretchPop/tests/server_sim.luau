@@ -14,6 +14,9 @@ local Replication = H.require("ServerScriptService.Server.Services.StretchReplic
 local LevelConfig = H.require("ReplicatedStorage.Shared.Config.LevelConfig")
 local LevelBuilder = H.require("ServerScriptService.Server.Level.LevelBuilder")
 local StretchPhysics = H.require("ReplicatedStorage.Shared.Physics.StretchPhysics")
+local PhysicsConfig = H.require("ReplicatedStorage.Shared.Config.PhysicsConfig")
+local GloveConfig = H.require("ReplicatedStorage.Shared.Config.GloveConfig")
+local Progression = H.require("ServerScriptService.Server.Services.ProgressionService")
 
 local game = Engine.game
 local workspace = Engine.workspace
@@ -34,6 +37,7 @@ end
 
 PlayerDataService.Init()
 Kinetic.Init()
+Progression.Init()
 Replication.Init()
 
 local player = roblox.Instance.new("Player")
@@ -223,6 +227,139 @@ H.test("fast zig-zag (server sees bounces) + gong hit → Rebirth, tier 1, wave,
 		return entry.Time > info.StartServerTime - LevelConfig.Rebirth.StartDelay
 	end)
 	H.check(reset ~= nil, "player teleported back to start for the wave")
+end)
+
+H.suite("Server · progression (stats, gloves, sync)")
+local function setCoins(amount: number)
+	PlayerDataService.Update(player, function(profile)
+		profile.Coins = amount
+	end)
+end
+local function lastReply(remote: string): any
+	return Engine.findLog(remote, function(entry)
+		return entry.Kind == "FireClient" and entry.Player == player
+	end)
+end
+local function upgrade(stat: any)
+	Engine.remote("UpgradeStat").OnServerEvent:Fire(player, stat)
+end
+local function glove(action: any, gloveId: any)
+	Engine.remote("GloveAction").OnServerEvent:Fire(player, action, gloveId)
+end
+
+H.test("profile snapshot was pushed on join with owned gloves and records", function()
+	local sync = Engine.remoteLog[1]
+	for _, entry in Engine.remoteLog do
+		if entry.Remote == "ProfileSync" then
+			sync = entry
+			break
+		end
+	end
+	H.check(sync and sync.Remote == "ProfileSync", "snapshot sent on join")
+	local snapshot = sync.Args[1]
+	H.check(table.find(snapshot.OwnedGloves, "Rubber") ~= nil and snapshot.EquippedGlove == "Rubber", "default glove")
+	H.check(snapshot.Records ~= nil and snapshot.Stats ~= nil and snapshot.DataOffline == true, "records / stats / offline flag")
+end)
+H.test("upgrade: rejected without coins, accepted at exact cost, attributes replicate", function()
+	steps(120)
+	setCoins(0)
+	upgrade("Elasticity")
+	local reply = lastReply("UpgradeStat")
+	H.check(reply.Args[1] == "Elasticity" and reply.Args[2] == false and reply.Args[3] == "not_enough_coins", "reason " .. tostring(reply.Args[3]))
+	local level = player:GetAttribute("Stat_Elasticity")
+	local cost = StretchPhysics.UpgradeCost(level)
+	setCoins(cost)
+	upgrade("Elasticity")
+	reply = lastReply("UpgradeStat")
+	H.check(reply.Args[2] == true and reply.Args[4] == level + 1, "accepted to level " .. tostring(reply.Args[4]))
+	H.check(player:GetAttribute("Stat_Elasticity") == level + 1, "stat attribute replicated")
+	H.check(player:GetAttribute("Coins") == 0 and reply.Args[5] == 0, "exact cost charged")
+end)
+H.test("max level is enforced server-side", function()
+	PlayerDataService.Update(player, function(profile)
+		profile.Stats.SmashMass = PhysicsConfig.StatUpgrade.MaxLevel
+		profile.Coins = 1e9
+	end)
+	upgrade("SmashMass")
+	local reply = lastReply("UpgradeStat")
+	H.check(reply.Args[2] == false and reply.Args[3] == "max_level", "reason " .. tostring(reply.Args[3]))
+	H.check(player:GetAttribute("Stat_SmashMass") == PhysicsConfig.StatUpgrade.MaxLevel, "not exceeded")
+end)
+H.test("junk is ignored; a 40-request burst is capped and never double-spends", function()
+	local count = #Engine.remoteLog
+	upgrade("Charisma")
+	upgrade(42)
+	upgrade(nil)
+	glove("Hack", "Rubber")
+	glove("Buy", string.rep("x", 100))
+	H.check(#Engine.remoteLog == count, "junk produced replies")
+	PlayerDataService.Update(player, function(profile)
+		profile.Stats.SpringPower = 0
+		profile.Coins = 1e9
+	end)
+	steps(120) -- корзина токенов полна
+	local before = player:GetAttribute("Stat_SpringPower")
+	local logStart = #Engine.remoteLog
+	for _ = 1, 40 do
+		upgrade("SpringPower")
+	end
+	local after = player:GetAttribute("Stat_SpringPower")
+	local gained = after - before
+	H.check(gained >= 9 and gained <= 10, "burst should be capped at the bucket size, gained " .. gained)
+	local spent = 0
+	for level = before, after - 1 do
+		spent += StretchPhysics.UpgradeCost(level)
+	end
+	-- сверяем с профилем: атрибуты Lune хранят float32 (в Roblox — double), на 1e9 они округляются
+	local profileCoins = PlayerDataService.Get(player).Coins
+	H.check(profileCoins == 1e9 - spent, string.format("coins match accepted upgrades exactly: %d vs %d", profileCoins, 1e9 - spent))
+	local limitedReplies = 0
+	for index = logStart + 1, #Engine.remoteLog do
+		local entry = Engine.remoteLog[index]
+		if entry.Remote == "UpgradeStat" and entry.Args[3] == "rate_limited" then
+			limitedReplies += 1
+		end
+	end
+	H.check(limitedReplies <= 1, "flood replies are throttled: " .. limitedReplies)
+end)
+H.test("gloves: unknown / too expensive / buy auto-equips / already owned / not owned / equip", function()
+	steps(120)
+	setCoins(0)
+	glove("Buy", "NopeGlove")
+	H.check(lastReply("GloveAction").Args[4] == "unknown_glove", "unknown")
+	glove("Buy", "GoldenGrip")
+	H.check(lastReply("GloveAction").Args[4] == "not_enough_coins", "too expensive")
+	setCoins(GloveConfig.Gloves.GoldenGrip.Price)
+	glove("Buy", "GoldenGrip")
+	local reply = lastReply("GloveAction")
+	H.check(reply.Args[3] == true and reply.Args[4] == "bought", "bought")
+	H.check(player:GetAttribute("Glove") == "GoldenGrip" and player:GetAttribute("Coins") == 0, "auto-equipped, paid")
+	glove("Buy", "GoldenGrip")
+	H.check(lastReply("GloveAction").Args[4] == "already_owned", "no double buy")
+	glove("Equip", "VoidFist")
+	H.check(lastReply("GloveAction").Args[4] == "not_owned", "cannot equip unowned")
+	glove("Equip", "Rubber")
+	reply = lastReply("GloveAction")
+	H.check(reply.Args[3] == true and player:GetAttribute("Glove") == "Rubber", "equip owned")
+end)
+H.test("ProfileSync: request returns fresh snapshot, repeats are debounced into one", function()
+	steps(120)
+	Engine.remote("ProfileSync").OnServerEvent:Fire(player)
+	local sync = lastReply("ProfileSync")
+	local owned = sync.Args[1].OwnedGloves
+	H.check(table.find(owned, "GoldenGrip") ~= nil and table.find(owned, "Rubber") ~= nil, "owned gloves synced")
+	local before = #Engine.remoteLog
+	Engine.remote("ProfileSync").OnServerEvent:Fire(player)
+	Engine.remote("ProfileSync").OnServerEvent:Fire(player)
+	H.check(#Engine.remoteLog == before, "rapid repeats are not answered immediately")
+	steps(40)
+	local delivered = 0
+	for index = before + 1, #Engine.remoteLog do
+		if Engine.remoteLog[index].Remote == "ProfileSync" then
+			delivered += 1
+		end
+	end
+	H.check(delivered == 1, "exactly one coalesced snapshot, got " .. delivered)
 end)
 
 H.suite("Server · world rules")

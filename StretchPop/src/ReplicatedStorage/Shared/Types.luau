@@ -59,6 +59,23 @@ export type SmashSnapshot = {
 	Kind: string,
 }
 
+-- Снимок профиля для клиента (ProfileSync): то, чего нет в атрибутах Player —
+-- список купленных перчаток, рекорды и прогресс всех локаций.
+export type ProfileSnapshot = {
+	Coins: number,
+	Stats: PhysicalStats,
+	OwnedGloves: { string },
+	EquippedGlove: string,
+	Records: LifetimeRecords,
+	Locations: { [string]: LocationProgress },
+	ActiveLocation: string,
+	TotalRebirths: number,
+	DataOffline: boolean,
+	ServerTime: number,
+}
+
+export type GloveActionKind = "Buy" | "Equip"
+
 -- Описание волны перерождения, рассылаемое всем клиентам.
 export type RebirthWaveInfo = {
 	Slot: number,

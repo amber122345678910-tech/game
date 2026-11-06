@@ -508,7 +508,7 @@ local START_SIGN_TEXT = "ЛКМ / ПКМ — выстрелить левой / �
 	.. "Держи на земле — натянуть рогатку, отпусти — ПОЛЁТ\n"
 	.. "Держи в воздухе — резинка тянет к точке\n"
 	.. "ПРОБЕЛ в полёте — пружинный шар (рикошеты)\n"
-	.. "Бей стены и сундуки на скорости • ALT — курсор"
+	.. "Бей стены и сундуки на скорости • TAB / ALT — прокачка"
 
 function LevelBuilder.BuildPiece(spec: PieceSpec, context: BuildContext, parent: Instance): BasePart
 	local part = makePart(spec.Kind, spec.Shape, spec.Size, context.Origin * spec.LocalCFrame, lookFor(spec.Kind, context.Theme, nil))

@@ -6,6 +6,9 @@
 --   SmashRequest(obstacleId: string, impactVelocity: Vector3, impactPoint: Vector3, impactSpeed: number, combo: number)
 --   GongStrike(laneSlot: number, impactVelocity: Vector3, impactSpeed: number, combo: number)
 --   ArmVisual(side: "Left"|"Right"|"Ball", active: boolean, point: Vector3?)
+--   UpgradeStat(stat: StatName)                          — купить следующий уровень стата
+--   GloveAction(action: "Buy"|"Equip", gloveId: string)  — купить / надеть перчатку
+--   ProfileSync()                                         — запросить свежий снимок профиля
 -- Сервер → Клиент
 --   SmashResult(obstacleId: string, accepted: boolean, loot: number, reason: string?)
 --   ObstacleSmashed(smasherUserId: number, slot: number, obstacleId: string, snapshot: SmashSnapshot, point: Vector3, velocity: Vector3)
@@ -13,6 +16,9 @@
 --   RebirthWave(info: RebirthWaveInfo)
 --   ControllerReset(target: CFrame?)
 --   PeerArmVisual(player: Player, side: string, active: boolean, point: Vector3?)
+--   UpgradeStat(stat: string, accepted: boolean, reason: string, level: number, coins: number)
+--   GloveAction(action: string, gloveId: string, accepted: boolean, reason: string)
+--   ProfileSync(snapshot: ProfileSnapshot)                — купленные перчатки, рекорды, прогресс локаций
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
@@ -36,6 +42,9 @@ local Net = {
 	ControllerReset = remote("ControllerReset"),
 	ArmVisual = remote("ArmVisual"),
 	PeerArmVisual = remote("PeerArmVisual"),
+	UpgradeStat = remote("UpgradeStat"),
+	GloveAction = remote("GloveAction"),
+	ProfileSync = remote("ProfileSync"),
 }
 
 return Net

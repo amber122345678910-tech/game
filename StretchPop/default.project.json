@@ -18,7 +18,10 @@
         "RebirthWave": { "$className": "RemoteEvent" },
         "ControllerReset": { "$className": "RemoteEvent" },
         "ArmVisual": { "$className": "RemoteEvent" },
-        "PeerArmVisual": { "$className": "RemoteEvent" }
+        "PeerArmVisual": { "$className": "RemoteEvent" },
+        "UpgradeStat": { "$className": "RemoteEvent" },
+        "GloveAction": { "$className": "RemoteEvent" },
+        "ProfileSync": { "$className": "RemoteEvent" }
       }
     },
 
