@@ -1163,12 +1163,12 @@ local kickStance: Rig.Pose = {
 -- clenched at his belt, the left arm flung out behind
 local kickStruck: Rig.Pose = {
 	LowerTorso = R(4, 0, 0),
-	UpperTorso = R(0, -10, 0),
+	UpperTorso = R(0, 8, 0),
 	-- (the head pivots on the top of the neck, not its base: shifted forward
 	-- and up, so it tips back above the shoulders instead of behind them)
 	Head = C(0, 0.06, -0.16) * R(20, 8, 8),
-	RightUpperArm = R(-10, 0, 16),
-	RightLowerArm = R(60, 0, 0),
+	RightUpperArm = R(-20, 0, 45),
+	RightLowerArm = R(95, 0, 0),
 	LeftUpperArm = R(-26, 0, -8),
 	LeftLowerArm = R(30, 0, 0),
 	LeftUpperLeg = R(18, 0, -8),
@@ -1193,7 +1193,10 @@ local function kick(ctx: Timeline.Ctx)
 	-- belt, left arm flung back; afterwards only breathing and the wind
 	local back = if dt > 0 then Util.smoothstep(0, 0.1, dt) else 0
 	local rpose = hitPose(Cast.mix(charging, kickStruck, back), dt, 6, 6, 6)
-	local rb = ctx:rig("RyuLoose", C(rc), Cast.alive(rpose, t))
+	-- struck, his whole body twists round towards Yuta (on his left), so the
+	-- low camera sees him three-quarter on, not square on
+	local twist = Util.smoothstep(hit - 0.05, hit + 0.18, t)
+	local rb = ctx:rig("RyuLoose", C(rc) * CFrame.Angles(0, math.rad(40 * twist), 0), Cast.alive(rpose, t))
 	if dt > 0 and t < 16.233 then
 		Cast.expr(ctx, "ryu", "grit")
 	elseif dt > 0 then
@@ -1263,11 +1266,11 @@ local function kick(ctx: Timeline.Ctx)
 		ctx:focus(2.3, 1)
 	elseif t < 16.3 then
 		-- low in front, a little closer: the head thrown back, the leg up
-		cam(ctx, rc + V(0.5, 1.4, -6.4), rc + V(-0.9, 4.3, 0), 32, 0.2, 0.6)
+		cam(ctx, rc + V(0.5, 1.8, -7.0), rc + V(-0.8, 4.7, 0), 36, 0.2, 0.6)
 	else
 		-- from below in front: the frozen moment, the camera drifting a touch
 		local drift = (t - 16.3) * 0.1
-		cam(ctx, rc + V(0.6, 2.6, -7.5) + V(-drift, 0, 0), rc + V(-0.9, 4.2, 0), 28, 0.03, 0.4) -- HOLDCAM
+		cam(ctx, rc + V(0.6, 2.6, -8.2) + V(-drift, 0, 0), rc + V(-0.8, 4.6, 0), 32, 0.03, 0.4) -- HOLDCAM
 	end
 	-- a soft key light by the camera, so they read bright against the sky
 	FlashArt.key(ctx, V(0.6, 1.2, 0.8), 1.1, Color3.fromRGB(240, 244, 255), 30)
