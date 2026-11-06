@@ -1163,10 +1163,10 @@ local kickStance: Rig.Pose = {
 -- clenched at his belt, the left arm flung out behind
 local kickStruck: Rig.Pose = {
 	LowerTorso = R(4, 0, 0),
-	UpperTorso = R(8, -10, 0),
+	UpperTorso = R(0, -10, 0),
 	-- (the head pivots on the top of the neck, not its base: shifted forward
 	-- and up, so it tips back above the shoulders instead of behind them)
-	Head = C(0, 0.12, -0.32) * R(46, 8, 10),
+	Head = C(0, 0.06, -0.16) * R(20, 8, 8),
 	RightUpperArm = R(-10, 0, 16),
 	RightLowerArm = R(60, 0, 0),
 	LeftUpperArm = R(-26, 0, -8),
@@ -1192,9 +1192,18 @@ local function kick(ctx: Timeline.Ctx)
 	-- struck: the head snaps back (overshoot), chest out, right fist at the
 	-- belt, left arm flung back; afterwards only breathing and the wind
 	local back = if dt > 0 then Util.smoothstep(0, 0.1, dt) else 0
-	local rpose = hitPose(Cast.mix(charging, kickStruck, back), dt, 6, 10, 6)
+	local rpose = hitPose(Cast.mix(charging, kickStruck, back), dt, 6, 6, 6)
 	local rb = ctx:rig("RyuLoose", C(rc), Cast.alive(rpose, t))
-	Cast.expr(ctx, "ryu", if dt > 0 then "grit" else "roar")
+	if dt > 0 and t < 16.233 then
+		Cast.expr(ctx, "ryu", "grit")
+	elseif dt > 0 then
+		-- knocked back: eyes screwed shut, jaw clamped (not staring at us)
+		ctx:show("ryu:eyes:shut")
+		ctx:show("ryu:brows:angry")
+		ctx:show("ryu:mouth:closed")
+	else
+		Cast.expr(ctx, "ryu", "roar")
+	end
 	bloodFace(ctx)
 	if dt > 0 then
 		fist(ctx, 1)
@@ -1258,7 +1267,7 @@ local function kick(ctx: Timeline.Ctx)
 	else
 		-- from below in front: the frozen moment, the camera drifting a touch
 		local drift = (t - 16.3) * 0.1
-		cam(ctx, rc + V(0.6, 1.6, -7.5) + V(-drift, 0, 0), rc + V(-0.9, 4.15, 0), 28, 0.03, 0.4) -- HOLDCAM
+		cam(ctx, rc + V(0.6, 2.6, -7.5) + V(-drift, 0, 0), rc + V(-0.9, 4.2, 0), 28, 0.03, 0.4) -- HOLDCAM
 	end
 	-- a soft key light by the camera, so they read bright against the sky
 	FlashArt.key(ctx, V(0.6, 1.2, 0.8), 1.1, Color3.fromRGB(240, 244, 255), 30)
