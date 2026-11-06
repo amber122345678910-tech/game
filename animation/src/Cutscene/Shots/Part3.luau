@@ -13,6 +13,7 @@ local Rig = require(script.Parent.Parent.Rig)
 local Cast = require(script.Parent.Cast)
 local Clash = require(script.Parent.Clash)
 local Common = require(script.Parent.P2.Common)
+local FlashArt = require(script.Parent.P2.FlashArt)
 
 local Part3 = {}
 
@@ -46,9 +47,11 @@ type P3 = {
 	slabs: Group,
 	stones: Group,
 	yBlood: Group,
+	streaks: Group,
 	lamp: Builder.PartSpec,
 	redBack: Builder.PartSpec,
 	redShards: FX.Burst,
+	speed: Builder.PartSpec,
 }
 
 local function h2(ctx: Timeline.Ctx): Common.H
@@ -65,6 +68,37 @@ local function rng(seed: number): Util.Rng
 	Util.rand(r)
 	Util.rand(r)
 	return r
+end
+
+---------------------------------------------------------------------------
+-- The blur behind a flying fist (reference 39.5-40.7): deep blue streaked
+-- with long horizontal lines of lighter blue and white, three views wide so
+-- it can stream past the whole shot (canvas px = 1/10 stud)
+---------------------------------------------------------------------------
+local SP_W, SP_H = 2400, 600
+local function speedPlate(scene: Builder.Scene): Builder.PartSpec
+	local c = Paint.canvas(1, 0, 0)
+	local r = Util.rng(3141)
+	Util.rand(r)
+	c:box(-10, -10, SP_W + 10, SP_H + 10, Color3.fromRGB(30, 46, 104))
+	c:grad(-10, -10, SP_W + 10, SP_H + 10, { color = ColorSequence.new(Color3.fromRGB(58, 80, 150), Color3.fromRGB(24, 36, 86)), rotation = 90 })
+	for _ = 1, 240 do
+		local y = Util.randRange(r, 0, SP_H)
+		local x = Util.randRange(r, -200, SP_W + 200)
+		local len = Util.randRange(r, 120, 900)
+		local th = Util.randRange(r, 2, 16)
+		local f = Util.rand(r)
+		local col = if f < 0.15 then Color3.fromRGB(236, 242, 255) elseif f < 0.55 then Color3.fromRGB(120, 150, 214) else Color3.fromRGB(70, 96, 170)
+		c:pill(x, y, len, th, Util.randRange(r, -1.5, 1.5), col, Util.randRange(r, 0.1, 0.6))
+	end
+	Builder.model(scene, "P3Speed", false)
+	return Builder.part(scene, "P3Speed", V(SP_W / 10, SP_H / 10, 0.05), C(), Color3.new(1, 1, 1), {
+		fx = true,
+		castShadow = false,
+		transparency = 1,
+		name = "SpeedPlate",
+		gui = { face = "Front", canvas = Vector2.new(SP_W, SP_H), lightInfluence = 0, elems = c.elems },
+	})
 end
 
 ---------------------------------------------------------------------------
@@ -384,8 +418,10 @@ function Part3.build(scene: Builder.Scene)
 		slabs = {},
 		stones = {},
 		yBlood = {},
+		streaks = {},
 		lamp = Builder.fx(scene, "P3Lamp", "Ball", V(0.2, 0.2, 0.2), Color3.new(1, 1, 1), "SmoothPlastic", 1, "Lamp"),
 		redBack = redBackdrop(scene),
+		speed = speedPlate(scene),
 		redShards = FX.burst(scene, "P3RedShards", Color3.fromRGB(236, 30, 50), 30, "Wedge", 84),
 	}
 	Builder.light(scene, "P3Lamp", "Point", h.lamp, Color3.fromRGB(255, 238, 214), 30)
@@ -421,6 +457,10 @@ function Part3.build(scene: Builder.Scene)
 	end
 	for i = 1, 6 do
 		h.yBlood[i] = Builder.fx(scene, "P3YBlood", "Ellipsoid", V(1, 1, 1), Color3.fromRGB(140, 14, 24), "SmoothPlastic", 0, "Blood")
+	end
+	for i = 1, 16 do
+		h.streaks[i] = Builder.fx(scene, "P3Streaks", "Ellipsoid", V(1, 1, 1), if i % 3 == 0 then Color3.fromRGB(100, 8, 18) else Color3.fromRGB(168, 18, 30), "SmoothPlastic", 0, "BloodStreak")
+		h.streaks[i].castShadow = false
 	end
 	for _, p in scene.parts do
 		if p.rig == "Rika" then
@@ -623,15 +663,41 @@ local function stonesAround(ctx: Timeline.Ctx, c: Vector3, spread: number, flow:
 end
 
 -- big slabs of the broken deck tilted every which way (floating a little)
-local function slabField(ctx: Timeline.Ctx, c: Vector3, radius: number, seed: number, float: number)
+local function slabField(ctx: Timeline.Ctx, c: Vector3, radius: number, seed: number, float: number, broken: number?)
+	local b = broken or 1
 	for i, p in h3(ctx).slabs do
 		local rr = rng(seed + i * 13)
 		local a = Util.randRange(rr, 0, math.pi * 2)
 		local d = math.sqrt(Util.rand(rr)) * radius
-		local pos = c + V(math.cos(a) * d, Util.randRange(rr, -0.6, 0.8) + float * Util.rand(rr) * (1 + math.sin(ctx.t * 2 + i) * 0.1), math.sin(a) * d)
+		local y = Util.randRange(rr, -0.6, 0.8) + float * Util.rand(rr) * (1 + math.sin(ctx.t * 2 + i) * 0.1)
+		local pos = c + V(math.cos(a) * d, Util.lerp(-0.45, y, b), math.sin(a) * d)
 		local w = Util.randRange(rr, 3, 7)
-		ctx:place(p, C(pos) * CFrame.Angles(Util.randRange(rr, -0.6, 0.6), a, Util.randRange(rr, -0.5, 0.5)))
+		ctx:place(p, C(pos) * CFrame.Angles(Util.randRange(rr, -0.6, 0.6) * b, a, Util.randRange(rr, -0.5, 0.5) * b))
 		ctx:prop(p, { s = V(w, Util.randRange(rr, 0.7, 1.4), w * Util.randRange(rr, 0.6, 1.1)) })
+	end
+end
+
+-- blood flung off in streaks (not round drops): each drop stretched along
+-- its flight, thinning as it flies; `dir` the main direction, age seconds
+local function bloodStreaks(ctx: Timeline.Ctx, origin: Vector3, dir: Vector3, age: number, seed: number)
+	if age < 0 or age > 2.4 then
+		return
+	end
+	local d0 = dir.Unit
+	for i, p in h3(ctx).streaks do
+		local rr = rng(seed * 31 + i)
+		local spread = V(Util.randRange(rr, -1, 1), Util.randRange(rr, -1, 1), Util.randRange(rr, -1, 1)) * 0.55
+		local v = (d0 + spread).Unit * Util.randRange(rr, 4, 9)
+		local life = Util.randRange(rr, 0.8, 2.2)
+		if age < life then
+			local slow = (1 - math.exp(-age * 2.2)) / 2.2
+			local pos = origin + v * slow + V(0, -1.6 * age * age, 0)
+			local vel = v * math.exp(-age * 2.2) + V(0, -3.2 * age, 0)
+			local len = math.clamp(vel.Magnitude * 0.07, 0.12, 0.7) * (1 - age / life * 0.5)
+			local w = Util.randRange(rr, 0.05, 0.11) * (1 - age / life * 0.6)
+			ctx:place(p, FX.along(pos, pos + vel.Unit * len))
+			ctx:prop(p, { s = V(len, w, w) })
+		end
 	end
 end
 
@@ -960,71 +1026,121 @@ end
 -- and his head is thrown back; 16.1 his upturned bloody face from below,
 -- blood spraying; 16.233 the leg straight up; 16.3 low angle, frozen: head
 -- back, hair up, Yuta's leg vertical, his hand on Ryu's chest, blood rising
+-- feet planted for the blow (the run ends in this)
+local kickStance: Rig.Pose = {
+	LowerTorso = R(-6, 0, 0),
+	UpperTorso = R(-8, 0, 0),
+	LeftUpperLeg = R(30, 0, -8),
+	LeftLowerLeg = R(-34, 0, 0),
+	RightUpperLeg = R(-22, 0, 8),
+	RightLowerLeg = R(-12, 0, 0),
+}
+-- kicked under the chin: head thrown back, chest out, the right fist
+-- clenched at his belt, the left arm flung out behind
+local kickStruck: Rig.Pose = {
+	LowerTorso = R(4, 0, 0),
+	UpperTorso = R(8, -10, 0),
+	-- (the head pivots on the top of the neck, not its base: shifted forward
+	-- and up, so it tips back above the shoulders instead of behind them)
+	Head = C(0, 0.12, -0.32) * R(46, 8, 10),
+	RightUpperArm = R(-10, 0, 16),
+	RightLowerArm = R(60, 0, 0),
+	LeftUpperArm = R(-26, 0, -8),
+	LeftLowerArm = R(30, 0, 0),
+	LeftUpperLeg = R(18, 0, -8),
+	LeftLowerLeg = R(-22, 0, 0),
+	RightUpperLeg = R(-12, 0, 8),
+	RightLowerLeg = R(-10, 0, 0),
+}
+
 local function kick(ctx: Timeline.Ctx)
-	local hh = h2(ctx)
 	local t = ctx.t
 	local hit = 15.98
 	local dt = t - hit
+	-- the charge: the last running steps at Yuta; the run stops and the feet
+	-- plant just before the blow (no running on the spot afterwards)
 	local charge = math.max(0, hit - 0.1 - t)
 	local rc = RYU + V(0, 0, -1.0 + charge * 3)
-	local back = if dt > 0 then Util.smoothstep(0, 0.1, dt) else 0
+	local plant = Util.smoothstep(hit - 0.22, hit - 0.04, t)
+	local legs = Cast.mix(Cast.run(math.min(t, hit - 0.12) * 2.5, 18), kickStance, plant)
 	local swing = Util.smoothstep(15.6, 15.78, t)
-	local base = Cast.mix(Cast.mix(guard, Cast.run(t * 2.5, 18), 0.4), mirror(punchR), swing * (1 - back))
-	local rpose = Cast.add(Cast.add(Cast.add(base, "Head", R(62 * back, 0, 10 * back)), "UpperTorso", R(16 * back, 0, 0)), "RightUpperArm", R(-30 * back, 0, 20 * back))
+	local charging = Cast.mix(Cast.mix(guard, legs, 0.75), mirror(punchR), swing)
+	-- struck: the head snaps back (overshoot), chest out, right fist at the
+	-- belt, left arm flung back; afterwards only breathing and the wind
+	local back = if dt > 0 then Util.smoothstep(0, 0.1, dt) else 0
+	local rpose = hitPose(Cast.mix(charging, kickStruck, back), dt, 6, 10, 6)
 	local rb = ctx:rig("RyuLoose", C(rc), Cast.alive(rpose, t))
 	Cast.expr(ctx, "ryu", if dt > 0 then "grit" else "roar")
 	bloodFace(ctx)
-	local chin = (rb.Head * C(0, 0.12, -0.45)).Position
-	local kickK = Util.smoothstep(hit - 0.1, hit, t)
-	local yp: Rig.Pose = {
-		LowerTorso = R(20 * kickK, 0, 0),
-		UpperTorso = R(14 * kickK - 6, 0, 0),
-		Head = R(-16 * kickK, 0, 0),
-		RightUpperLeg = R(10 + 145 * kickK, 0, 4),
-		RightLowerLeg = R(-60 + 56 * kickK, 0, 0),
-		RightFoot = R(-30 * kickK, 0, 0),
-		LeftUpperLeg = R(-10 * kickK, 0, 0),
-		LeftLowerLeg = R(-14, 0, 0),
-		LeftUpperArm = R(40 + 45 * kickK, 0, -10),
-		LeftLowerArm = R(40 - 34 * kickK, 0, 0),
-		RightUpperArm = R(150 - 170 * kickK, 0, 30 + 20 * kickK),
-		RightLowerArm = R(40, 0, 0),
-	}
-	local yroot = C(rc + V(0.3, 0, -2.0)) * CFrame.Angles(0, math.pi, 0)
-	local yb = ctx:rig("Yuta", yroot, Cast.alive(yp, t))
 	if dt > 0 then
-		FX.placeBurst(ctx, hh.blood, chin, dt * 0.5, 7, 0.2, 2.4, V(0.2, 1, 0.1), 0.6, 2)
+		fist(ctx, 1)
+	end
+	local chin = (rb.Head * C(0, 0.12, -0.45)).Position
+	-- Yuta stands in front of him as he comes; for the kick he steps to Ryu's
+	-- left and turns side-on, his far (right) leg swinging straight up past
+	-- Ryu's chin, his left arm across Ryu's stomach. A fixed spot: no sliding
+	local kickK = Util.smoothstep(hit - 0.14, hit, t)
+	-- (a high kick: the torso leans right back, away from the rising leg)
+	local yp: Rig.Pose = {
+		LowerTorso = R(6 * kickK, 0, 0),
+		UpperTorso = R(40 * kickK - 4, 0, -6 * kickK),
+		Head = R(-28 * kickK, 0, 10 * kickK),
+		RightUpperLeg = R(20 + 150 * kickK, 0, 0),
+		RightLowerLeg = R(-70 + 68 * kickK, 0, 0),
+		RightFoot = R(-24 * kickK, 0, 0),
+		LeftUpperLeg = R(-8 * kickK, 0, -4),
+		LeftLowerLeg = R(-14, 0, 0),
+		LeftUpperArm = R(30 - 14 * kickK, 0, 40 * kickK),
+		LeftLowerArm = R(40 - 30 * kickK, 0, 0),
+		RightUpperArm = R(150 - 110 * kickK, 0, 30 + 30 * kickK),
+		RightLowerArm = R(40 + 30 * kickK, 0, 0),
+	}
+	local step = Util.smoothstep(hit - 0.3, hit - 0.02, t)
+	local yA = RYU + V(-0.4, 0, -3.1)
+	local yB = RYU + V(-2.25, 1.4 * kickK, -1.45)
+	local ypos = yA:Lerp(yB, step)
+	local ydir = V(0, 0, 1):Lerp(V(1, 0, -0.3).Unit, step)
+	local yroot = Util.lookAt(ypos, ypos + ydir)
+	local yb = ctx:rig("Yuta", yroot, Cast.alive(yp, t))
+	Cast.expr(ctx, "yuta", "cold")
+	if dt > 0 then
+		bloodStreaks(ctx, chin + V(0, 0.1, -0.1), V(0.35, 1, -0.2), dt, 11)
 	end
 	local head = rb.Head * C(0, 0.75, 0)
 	if t < 15.6 then
-		-- over Yuta's shoulder
+		-- over Yuta's right shoulder: his head big on the right, Ryu charging
 		local yh = (yb.Head * C(0, 0.6, 0)).Position
-		cam(ctx, yh + V(2.2, 0.4, -4.4), head.Position + V(-0.6, -1.0, 0), 48, 0.1, 1)
+		cam(ctx, yh + V(1.0, 0.3, -3.4), head.Position + V(0.6, -1.2, 0), 44, 0.1, 1)
 	elseif t < 16.1 then
 		-- whipping round him: face, fist, fur, the hit
 		local a = math.rad(70 + 40 * Util.smoothstep(15.6, 16.05, t))
 		local r = 5
 		local eye = head.Position + V(math.sin(a) * r, -0.6, -math.cos(a) * r)
 		cam(ctx, eye, head.Position + V(0, -0.8, -0.6), 50, if dt > 0 then 0.8 else 0.3, 0.8)
-		if dt > 0 and dt < 0.06 then
-			ctx:flash(WHITE, 0.6)
+		if dt > 0 and dt < 0.08 then
+			ctx:flash(WHITE, 0.25)
+			ctx:alpha("fbSmear", 0.7)
 		end
 	elseif t < 16.233 then
-		-- under the chin: the upturned face, blood spraying off
-		-- straight onto the upturned face (from above it, the fur stays below;
-		-- Yuta, who would stand in the way, is out of this close-up)
+		-- under the chin: the upturned face, blood spraying off (Yuta, who
+		-- would stand in the way, is out of this close-up)
 		ctx:rig("Yuta", C(RYU + V(0, -400, 0)), yp)
 		local fc = rb.Head * C(0, 0.7, -0.45)
 		ctx:camera(shake(Util.lookAt(fc.Position + fc.LookVector * 2.3 + fc.RightVector * 0.3, fc.Position, fc.UpVector), t, 0.2, 16), 40)
 		ctx:focus(2.3, 1)
 	elseif t < 16.3 then
-		cam(ctx, rc + V(4.6, 2.4, -1.4), rc + V(0, 5.0, -1.0), 52, 0.2, 0.6)
+		-- low in front, a little closer: the head thrown back, the leg up
+		cam(ctx, rc + V(0.5, 1.4, -6.4), rc + V(-0.9, 4.3, 0), 32, 0.2, 0.6)
 	else
-		cam(ctx, rc + V(3.6, 1.2, -3.4), rc + V(0, 4.4, -0.6), 54, 0.04, 0.4)
+		-- from below in front: the frozen moment, the camera drifting a touch
+		local drift = (t - 16.3) * 0.1
+		cam(ctx, rc + V(0.6, 1.6, -7.5) + V(-drift, 0, 0), rc + V(-0.9, 4.15, 0), 28, 0.03, 0.4) -- HOLDCAM
 	end
+	-- a soft key light by the camera, so they read bright against the sky
+	FlashArt.key(ctx, V(0.6, 1.2, 0.8), 1.1, Color3.fromRGB(240, 244, 255), 30)
 	ctx:gust(if dt > 0 then 2.4 * math.exp(-dt * 1.5) + 0.4 else 1.0)
 	ctx:wind(1.5)
-	grade(ctx, -0.02, 0.26, 0.06, Color3.fromRGB(205, 218, 255))
+	grade(ctx, 0.02, 0.22, 0.12, Color3.fromRGB(214, 226, 255))
 	field(ctx)
 end
 
@@ -1440,48 +1556,89 @@ end
 -- leaping in, Ryu (right) low and coiled; pillars of white air at the edges
 local function rubble(ctx: Timeline.Ctx)
 	local h = h3(ctx)
+	local hh = h2(ctx)
 	local t = ctx.t
 	local center = RYU + V(0, 0, -2.5)
-	slabField(ctx, center + V(-1, 0, 0), 12, 500, 1.4)
-	local k = Util.smoothstep(36.8, 37.0, t)
-	local ypose: Rig.Pose = {
-		HumanoidRootPart = C(0, 1.2, 0),
-		UpperTorso = R(-10, 0, 0),
-		RightUpperArm = R(150, 0, 30),
-		RightLowerArm = R(30, 0, 0),
-		LeftUpperArm = R(40, 0, -40),
-		LeftLowerArm = R(60, 0, 0),
-		LeftUpperLeg = R(70, 0, 0),
-		LeftLowerLeg = R(-30, 0, 0),
-		RightUpperLeg = R(-30, 0, 0),
-		RightLowerLeg = R(-60, 0, 0),
-	}
-	local rpose: Rig.Pose = {
-		HumanoidRootPart = C(0, -0.9, 0),
-		LowerTorso = R(-30, 0, 0),
-		UpperTorso = R(-30, 0, 0),
-		Head = R(20, 0, 0),
-		RightUpperArm = R(-50, 0, 30),
-		RightLowerArm = R(20, 0, 0),
-		LeftUpperArm = R(40, 0, -20),
+	local hit = 36.95
+	local dt = t - hit
+	-- the deck is whole until Ryu's fist comes down; then it bursts into
+	-- tilted slabs that go on rising slowly
+	local broken = Util.smoothstep(hit, hit + 0.12, t)
+	slabField(ctx, center + V(-1, 0, 0), 12, 500, 1.4 + math.max(0, dt) * 0.5, broken)
+	-- Ryu (right) dives at the ground and drives his left fist into it, the
+	-- right arm flung up behind him; then he stays crouched over the fist
+	local dive = Util.smoothstep(36.8, hit, t)
+	local air: Rig.Pose = {
+		HumanoidRootPart = C(0, 0.9, 0),
+		LowerTorso = R(-20, 0, 0),
+		UpperTorso = R(-24, 0, 0),
+		Head = R(10, 0, 0),
+		LeftUpperArm = R(170, 0, -10),
 		LeftLowerArm = R(30, 0, 0),
-		LeftUpperLeg = R(80, 0, 0),
-		LeftLowerLeg = R(-100, 0, 0),
-		RightUpperLeg = R(10, 0, 0),
-		RightLowerLeg = R(-90, 0, 0),
+		RightUpperArm = R(-40, 0, 30),
+		RightLowerArm = R(40, 0, 0),
+		LeftUpperLeg = R(40, 0, -6),
+		LeftLowerLeg = R(-70, 0, 0),
+		RightUpperLeg = R(-30, 0, 6),
+		RightLowerLeg = R(-50, 0, 0),
 	}
-	local drift = (t - 37.0) * 0.6
-	ctx:rig("Yuta", C(center + V(0, 0.4, -4.5 + drift + (1 - k) * -6)) * CFrame.Angles(0, math.pi, 0), Cast.alive(ypose, t))
-	ctx:rig("RyuLoose", C(center + V(0, 0.2, 2.6 - drift + (1 - k) * 6)), Cast.alive(rpose, t))
+	local smash: Rig.Pose = {
+		HumanoidRootPart = C(0, -1.0, 0),
+		LowerTorso = R(-38, 0, 0),
+		UpperTorso = R(-34, 0, 0),
+		Head = R(14, 0, 0),
+		LeftUpperArm = R(112, 0, -6),
+		LeftLowerArm = R(6, 0, 0),
+		RightUpperArm = R(-70, 0, 36),
+		RightLowerArm = R(30, 0, 0),
+		LeftUpperLeg = R(84, 0, -8),
+		LeftLowerLeg = R(-104, 0, 0),
+		RightUpperLeg = R(-14, 0, 10),
+		RightLowerLeg = R(-62, 0, 0),
+	}
+	local rpose = if t < hit then Cast.mix(air, smash, dive * dive * 0.35) else Cast.mix(smash, air, 0)
+	local settle = if dt > 0 then math.exp(-dt * 7) * math.sin(dt * 30) * 0.12 else 0
+	local rp = center + V(0, settle + 0.9 * broken, 2.4)
+	local rb = ctx:rig("RyuLoose", C(rp) * CFrame.Angles(0, 0, 0), Cast.alive(rpose, t))
+	local fistAt = (rb.LeftHand * C(0, -0.35, 0)).Position
+	-- Yuta (left) springs back away from the blast: up and away, knee up
+	local leap = Util.smoothstep(hit - 0.05, hit + 0.5, t)
+	local ypose: Rig.Pose = {
+		HumanoidRootPart = C(0, 0.4 + 1.0 * leap, 0),
+		LowerTorso = R(8, 0, 0),
+		UpperTorso = R(4, 0, 0),
+		Head = R(-12, 0, 0),
+		RightUpperArm = R(110, 0, 30),
+		RightLowerArm = R(60, 0, 0),
+		LeftUpperArm = R(30, 0, -50),
+		LeftLowerArm = R(70, 0, 0),
+		LeftUpperLeg = R(80, 0, -6),
+		LeftLowerLeg = R(-90, 0, 0),
+		RightUpperLeg = R(10, 0, 6),
+		RightLowerLeg = R(-70, 0, 0),
+	}
+	local yp = center + V(0, 0.2 + 0.6 * broken, -4.3 - 1.2 * leap - math.max(0, dt) * 0.4)
+	ctx:rig("Yuta", C(yp) * CFrame.Angles(0, math.pi, 0), Cast.alive(ypose, t))
+	-- the blow: a flash at the fist, dust and chips flung up, columns of air
+	if dt > 0 then
+		flashAt(ctx, fistAt + V(0, 0.2, 0), 0.8, 1 - Util.smoothstep(0, 0.12, dt))
+		FX.placeBurst(ctx, hh.dust, fistAt, dt, 9, 1.4, 1.4, V(0, 1, 0), 1.2, 1)
+		FX.placeBurst(ctx, hh.debris, fistAt, dt, 12, 0.35, 1.6, V(0, 1, 0), 0.9, 6)
+	end
+	local cols = Util.smoothstep(hit, hit + 0.15, t)
 	for i, col in h.columns do
 		local sz = if i == 1 then -1 else 1
 		local base = center + V(4, 0, sz * 13)
 		ctx:place(col, C(base + V(0, 10, 0)) * CFrame.Angles(math.rad(sz * 18), 0, math.pi / 2))
-		ctx:prop(col, { s = V(26, 2.4, 2.4), t = 0.45 })
+		ctx:prop(col, { s = V(26 * cols, 2.4, 2.4), t = 1 - 0.55 * cols })
 	end
-	cam(ctx, center + V(-17, 2.6, 0), center + V(0, 3.4, 0), 52, if t < 37.0 then 0.6 else 0.06, 0.4)
-	ctx:gust(1.6)
-	grade(ctx, -0.04, 0.24, 0.05, Color3.fromRGB(196, 210, 255))
+	if t < 36.95 and t > 36.86 then
+		ctx:alpha("fbSmear", 0.6)
+	end
+	cam(ctx, center + V(-13, 5.6, 0.4), center + V(0, 2.8, -0.2), 46, if dt > 0 and dt < 0.3 then 0.5 else 0.06, 0.4)
+	FlashArt.key(ctx, V(0.5, 2, 1), 2.2, Color3.fromRGB(236, 242, 255), 60)
+	ctx:gust(if dt > 0 then 2.2 * math.exp(-dt * 2) + 0.6 else 1.2)
+	grade(ctx, -0.02, 0.24, 0.08, Color3.fromRGB(200, 214, 255))
 	field(ctx, "low")
 end
 
@@ -1489,7 +1646,8 @@ end
 -- fruit to the whole tart on its plate
 local function tartTop(ctx: Timeline.Ctx)
 	local k = Util.smoothstep(37.8, 38.667, ctx.t)
-	tableCam(ctx, V(-11, 1.4, 9), V(-11, 3.4 + k * 8, 9.02), 44, -20 + k * 12)
+	-- turning steadily (about 150 degrees over the shot) while pulling back
+	tableCam(ctx, V(-11, 1.4, 9), V(-11, 3.4 + k * 8, 9.02), 44, -20 + (ctx.t - 37.8) * 170)
 end
 
 -- 38.667: from high above: the two locked together, spinning round each
@@ -1498,7 +1656,7 @@ local function topSpin(ctx: Timeline.Ctx)
 	local h = h3(ctx)
 	local t = ctx.t
 	local c = RYU + V(0, 0, -1.6)
-	local a = math.rad(270 + (t - 38.736) * 515)
+	local a = math.rad(270 + (t - 38.736) * 300)
 	local d = V(math.cos(a), 0, math.sin(a))
 	local grip: Rig.Pose = { UpperTorso = R(16, 0, 0), Head = R(-10, 0, 0), RightUpperArm = R(80, 0, 0), RightLowerArm = R(30, 0, 0), LeftUpperArm = R(80, 0, 0), LeftLowerArm = R(30, 0, 0), LeftUpperLeg = R(20, 0, 0), RightUpperLeg = R(-20, 0, 0) }
 	local function face(p: Vector3, dir: Vector3): CFrame
@@ -1508,14 +1666,19 @@ local function topSpin(ctx: Timeline.Ctx)
 	ctx:rig("RyuLoose", face(c - d * 1.4, d), Cast.alive(grip, t))
 	for i, p in h.bigSmoke.parts do
 		local rr = rng(1300 + i)
-		local pos = c + V(Util.randRange(rr, -7, 7), Util.randRange(rr, 10, 30), Util.randRange(rr, -6, 6))
-		local s = Util.randRange(rr, 1, 3.5)
+		local a2 = Util.randRange(rr, 0, math.pi * 2)
+		local d2 = Util.randRange(rr, 4, 9)
+		local pos = c + V(math.cos(a2) * d2, Util.randRange(rr, 8, 26), math.sin(a2) * d2)
+		local s = Util.randRange(rr, 0.8, 2.4)
 		ctx:place(p, C(pos) * CFrame.Angles(i, i, 0))
-		ctx:prop(p, { s = V(s, s * 0.8, s), t = 0.25 })
+		ctx:prop(p, { s = V(s, s * 0.8, s), t = 0.55, c = Color3.fromRGB(70, 86, 140) })
 	end
-	cam(ctx, c + V(0, 46, 0.01), c, 30, 0, 1, V(1, 0, 0))
+	-- the camera rolls too, so the cracked ground and the debris turn with them
+	local roll = math.rad(-(t - 38.667) * 250)
+	cam(ctx, c + V(0, 46, 0.01), c, 22, 0, 1, V(math.cos(roll), 0, math.sin(roll)))
 	ctx:focus(46, 1)
-	grade(ctx, -0.12, 0.24, 0.1, Color3.fromRGB(176, 196, 255))
+	FlashArt.key(ctx, V(0, 0, 30), 3, Color3.fromRGB(236, 242, 255), 30)
+	grade(ctx, 0.02, 0.2, 0.18, Color3.fromRGB(190, 206, 255))
 	ctx:fog(0.5)
 end
 
@@ -1523,9 +1686,20 @@ end
 -- 40.1: Ryu's fist (fur cuff) driving left
 local function fists(ctx: Timeline.Ctx)
 	local t = ctx.t
-	if t < 40.1 then
-		local yb = ctx:rig("Yuta", yutaRoot(), punchPose(1))
-		local f = (yb.RightHand * C(0, -0.3, 0)).Position
+	local h = h3(ctx)
+	local first = t < 40.1
+	local t0 = if first then 39.5 else 40.1
+	local u = (t - t0) / (if first then 0.6 else 0.633)
+	-- the whole body flies along with the blow: the fist leads, the camera
+	-- rides alongside it and the world streams past behind
+	local travel = (t - t0) * 30
+	local thrust = Util.smoothstep(0, 0.25, u)
+	local f: Vector3
+	local camCF: CFrame
+	if first then
+		local root = yutaRoot() * C(0, 14, -travel)
+		local yb = ctx:rig("Yuta", root, Cast.mix(punchPose(-0.2), punchPose(1), thrust))
+		f = (yb.RightHand * C(0, -0.3, 0)).Position
 		-- side on to the forearm, so it crosses the frame and the fist
 		-- leads to the right
 		local dir = (f - yb.RightLowerArm.Position).Unit
@@ -1534,18 +1708,35 @@ local function fists(ctx: Timeline.Ctx)
 		if look:Cross(V(0, 1, 0)):Dot(dir) < 0 then
 			side = -side
 		end
-		local mid = f - dir * 0.7
-		cam(ctx, mid + side * 4.2 + V(0, 0.2, 0), mid, 28, 0.12, 1)
+		local mid = f - dir * (0.7 + 0.15 * (1 - thrust))
+		camCF = Util.lookAt(mid + side * 4.2 + V(0, 0.2, 0), mid)
 	else
-		local rb = ctx:rig("RyuLoose", C(RYU), punchPose(1))
+		local root = C(RYU) * C(0, 14, -travel) * CFrame.Angles(0, math.rad(4 * math.sin(u * 6)), 0)
+		local rb = ctx:rig("RyuLoose", root, Cast.mix(punchPose(-0.2), punchPose(1), thrust))
 		fist(ctx, 1)
-		local f = (rb.RightHand * C(0, -0.35, 0)).Position
-		cam(ctx, f + V(-2.2, -0.2, 0.7), f + V(0, 0, 0.45), 40, 0.12, 1)
+		f = (rb.RightHand * C(0, -0.35, 0)).Position
+		camCF = Util.lookAt(f + V(-2.2, -0.2, 0.7), f + V(0, 0, 0.45))
 	end
-	ctx:alpha("hstreaks", 1)
+	ctx:camera(shake(camCF, t, 0.1, 16), if first then 28 else 40)
+	ctx:focus(4, 1)
+	-- the blur behind, streaming the opposite way to the fist
+	local fov = if first then 28 else 40
+	local dist = 12
+	local vh = 2 * dist * math.tan(math.rad(fov) / 2) * 1.25
+	local vw = vh * 16 / 9
+	local pw = vw * 3
+	local slide = (0.9 - 1.8 * u) * vw * (if first then 1 else -1)
+	local cf = ctx.frame.camera
+	local pos = cf.Position + cf.LookVector * dist + cf.RightVector * slide
+	ctx:place(h.speed, Util.lookAt(pos, pos - cf.LookVector, cf.UpVector))
+	ctx:prop(h.speed, { s = V(pw, vh, 0.05) })
+	Common.streamers(ctx, h2(ctx).streamers, f + cf.LookVector * 4, cf.RightVector * (if first then -1 else 1), 3.0, 4.5, 260, 0.9)
+	FlashArt.key(ctx, V(0.5, 1.5, 1), 0.9, Color3.fromRGB(236, 242, 255), 20)
+	ctx:alpha("hstreaks", 0.6)
 	ctx:gust(2.4)
-	grade(ctx, -0.04, 0.26, 0.08, Color3.fromRGB(200, 214, 255))
-	field(ctx)
+	ctx:wind(3)
+	grade(ctx, -0.02, 0.24, 0.1, Color3.fromRGB(206, 218, 255))
+	ctx:fog(0)
 end
 
 -- 40.733: the parfait from the side: its layers vanish from the top down
