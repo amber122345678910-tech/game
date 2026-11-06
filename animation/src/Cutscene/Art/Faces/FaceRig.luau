@@ -46,6 +46,8 @@ FaceRig.expr = {
 		shadow = { "yuta:eyes:shadow", "yuta:mouth:grit" },
 		grit = { "yuta:eyes:wide", "yuta:brows:tense", "yuta:mouth:grit" },
 		cold = { "yuta:eyes:normal", "yuta:brows:tense", "yuta:mouth:closed" },
+		-- staring at his own cramping hand, lips parted
+		lookHand = { "yuta:eyes:wideL", "yuta:brows:tense", "yuta:mouth:grit" },
 	},
 	-- Uro (part 2 flashbacks; her face is painted in Art/Characters/Uro)
 	uro = {
@@ -207,17 +209,19 @@ function FaceRig.yuta(c: Paint.Canvas, pal: { [string]: Color3 })
 	c:stroke({ { 50, 54 }, { 51, 64 }, { 53, 69 } }, { 0.5, 1.0, 0.8 }, line)
 	c:stroke({ { 47, 71 }, { 52, 71.6 } }, { 0.6, 0.9 }, line)
 
-	local function eye(cx: number, dir: number, h: number, g: string)
+	-- gx, gy: where the irises look (face units; -x = the viewer's left)
+	local function eye(cx: number, dir: number, h: number, g: string, gx: number?, gy: number?)
 		c:setGroup(g)
 		local inner, outer = cx + dir * -10, cx + dir * 11
+		local ix, iy = cx - dir * 1 + (gx or 0), gy or 0
 		c:stroke({ { inner, 51 }, { cx, 50.5 }, { outer, 49.5 } }, { h * 0.7, h, h * 0.55 }, white)
 		c:stroke({ { inner + dir * -1, 47 }, { cx, 45.5 }, { outer, 47 } }, { h * 0.3, h * 0.35, h * 0.2 }, pal.scleraShade)
-		c:ellipse(cx - dir * 1, 51, 5.4, math.min(6.6, h * 0.62), 0, pal.yIrisDark)
-		c:ellipse(cx - dir * 1, 51.8, 4.3, math.min(5.4, h * 0.5), 0, pal.yIris)
-		c:ellipse(cx - dir * 1, 53.6, 3, math.min(2.8, h * 0.28), 0, pal.yIrisLight)
-		c:circle(cx - dir * 1, 50.6, 1.8, pal.yIrisDark)
-		c:circle(cx + dir * 0.6, 49, 1.3, white)
-		c:circle(cx - dir * 2.6, 54, 0.6, white)
+		c:ellipse(ix, 51 + iy, 5.4, math.min(6.6, h * 0.62), 0, pal.yIrisDark)
+		c:ellipse(ix, 51.8 + iy, 4.3, math.min(5.4, h * 0.5), 0, pal.yIris)
+		c:ellipse(ix, 53.6 + iy, 3, math.min(2.8, h * 0.28), 0, pal.yIrisLight)
+		c:circle(ix, 50.6 + iy, 1.8, pal.yIrisDark)
+		c:circle(ix + dir * 1.6, 49 + iy, 1.3, white)
+		c:circle(ix - dir * 1.6, 54 + iy, 0.6, white)
 		local top = 51 - h * 0.55
 		c:stroke({ { inner + dir * -1, top + 2 }, { cx, top }, { outer + dir * 1, top + 1.2 } }, { 1.8, 2.6, 1.4 }, line)
 		c:stroke({ { outer, top + 1.2 }, { outer + dir * 2.5, top + 0.5 } }, { 1, 0.4 }, line)
@@ -231,6 +235,9 @@ function FaceRig.yuta(c: Paint.Canvas, pal: { [string]: Color3 })
 		eye(30, -1, v.h, g)
 		eye(70, 1, v.h, g)
 	end
+	-- wide, looking off to the viewer's left and up (at his raised hand)
+	eye(30, -1, 13, "yuta:eyes:wideL", -5.2, -2)
+	eye(70, 1, 13, "yuta:eyes:wideL", -5.2, -2)
 	c:setGroup("yuta:brows:calm")
 	c:stroke({ { 42, 39 }, { 31, 36.5 }, { 19, 38 } }, { 2.2, 2.4, 1 }, pal.yHair)
 	c:stroke({ { 58, 39 }, { 69, 36.5 }, { 81, 38 } }, { 2.2, 2.4, 1 }, pal.yHair)

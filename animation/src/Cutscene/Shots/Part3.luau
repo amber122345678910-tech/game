@@ -48,6 +48,9 @@ type P3 = {
 	stones: Group,
 	yBlood: Group,
 	streaks: Group,
+	yHand: Group,
+	yHandRig: Group,
+	yCollar: Group,
 	lamp: Builder.PartSpec,
 	redBack: Builder.PartSpec,
 	redShards: FX.Burst,
@@ -419,6 +422,9 @@ function Part3.build(scene: Builder.Scene)
 		stones = {},
 		yBlood = {},
 		streaks = {},
+		yHand = {},
+		yHandRig = {},
+		yCollar = {},
 		lamp = Builder.fx(scene, "P3Lamp", "Ball", V(0.2, 0.2, 0.2), Color3.new(1, 1, 1), "SmoothPlastic", 1, "Lamp"),
 		redBack = redBackdrop(scene),
 		speed = speedPlate(scene),
@@ -458,11 +464,35 @@ function Part3.build(scene: Builder.Scene)
 	for i = 1, 6 do
 		h.yBlood[i] = Builder.fx(scene, "P3YBlood", "Ellipsoid", V(1, 1, 1), Color3.fromRGB(140, 14, 24), "SmoothPlastic", 0, "Blood")
 	end
+	-- Yuta's right hand for the close-up at 14.1: palm, four fingers in three
+	-- joints, a thumb in two, bruises round the wrist (the rig's own flat
+	-- hand is hidden in that shot)
+	local function handPart(shape: string, col: Color3, name: string)
+		local q = Builder.fx(scene, "P3YHand", shape, V(1, 1, 1), col, "SmoothPlastic", 0, name)
+		q.castShadow = false
+		table.insert(h.yHand, q)
+	end
+	handPart("Block", pal.skin, "Palm") -- 1
+	for _ = 1, 4 do
+		for _ = 1, 3 do
+			handPart("Block", pal.skin, "Finger")
+		end
+	end -- 2..13
+	handPart("Block", pal.skin, "Thumb")
+	handPart("Block", pal.skin, "Thumb") -- 14..15
+	for i = 1, 4 do
+		handPart("Block", if i % 2 == 0 then Color3.fromRGB(184, 142, 156) else Color3.fromRGB(198, 160, 168), "Bruise")
+	end -- 16..19
 	for i = 1, 16 do
 		h.streaks[i] = Builder.fx(scene, "P3Streaks", "Ellipsoid", V(1, 1, 1), if i % 3 == 0 then Color3.fromRGB(100, 8, 18) else Color3.fromRGB(168, 18, 30), "SmoothPlastic", 0, "BloodStreak")
 		h.streaks[i].castShadow = false
 	end
 	for _, p in scene.parts do
+		if p.rig == "Yuta" and p.bone == "RightHand" then
+			table.insert(h.yHandRig, p)
+		elseif p.rig == "Yuta" and p.name == "CollarPanel" then
+			table.insert(h.yCollar, p)
+		end
 		if p.rig == "Rika" then
 			table.insert(h.rikaParts, p)
 		elseif p.rig == "RyuLoose" and p.bone == "RightHand" and (p.name == "Finger" or p.name == "Thumb") then
@@ -699,6 +729,79 @@ local function bloodStreaks(ctx: Timeline.Ctx, origin: Vector3, dir: Vector3, ag
 			ctx:prop(p, { s = V(len, w, w) })
 		end
 	end
+end
+
+-- how far a finger is clenched (0 open .. 1 tight) in a cramp: a slow
+-- clench and release plus quick irregular twitches, different per finger
+local function cramp(t: number, f: number): number
+	local slow = 0.5 + 0.35 * Util.noise1(t * 2.4 + f * 1.7, 40 + f)
+	local twitch = 0.28 * Util.noise1(t * 13 + f * 3.1, 50 + f) + 0.14 * Util.noise1(t * 29 + f * 1.3, 60 + f)
+	return math.clamp(slow + twitch, 0, 1)
+end
+
+-- Yuta's right hand as a clawed, cramping hand on the hand bone `hb`
+-- (fingers along -Y, curling towards +Z), bruises on the wrist
+local function crampHand(ctx: Timeline.Ctx, hb: CFrame, forearm: CFrame, t: number)
+	local h = h3(ctx)
+	for _, p in h.yHandRig do
+		ctx:prop(p, { t = 1 })
+	end
+	local q = h.yHand
+	local function put(i: number, cf: CFrame, size: Vector3)
+		ctx:place(q[i], cf)
+		ctx:prop(q[i], { s = size })
+	end
+	local palm = hb * C(0, -0.2, 0) * CFrame.Angles(math.rad(-8 * cramp(t, 4)), 0, 0)
+	put(1, palm, V(0.42, 0.36, 0.2))
+	for f = 0, 3 do
+		local c = cramp(t, f)
+		local spread = math.rad((f - 1.5) * (6 + 10 * (1 - c)))
+		local cf = palm * C((f - 1.5) * 0.1, -0.18, 0) * CFrame.Angles(math.rad(-(12 + 36 * c)), 0, spread)
+		local lens = if f == 0 or f == 3 then { 0.14, 0.1, 0.09 } else { 0.16, 0.12, 0.1 }
+		for s, len in lens do
+			put(2 + f * 3 + s - 1, cf * C(0, -len / 2, 0), V(0.088 - s * 0.006, len + 0.03, 0.094 - s * 0.006))
+			cf = cf * C(0, -len, 0) * CFrame.Angles(math.rad(-(16 + 52 * c) * (if s == 2 then 1.2 else 1)), 0, 0)
+		end
+	end
+	-- the thumb on the -x side of the right hand, folding in with the cramp
+	local tc = cramp(t, 5)
+	local th = palm * C(-0.2, -0.02, -0.04) * CFrame.Angles(math.rad(-20 * tc), 0, math.rad(-40 + 25 * tc))
+	put(14, th * C(0, -0.08, 0), V(0.1, 0.18, 0.1))
+	th = th * C(0, -0.16, 0) * CFrame.Angles(math.rad(-30 * tc), 0, 0)
+	put(15, th * C(0, -0.07, 0), V(0.09, 0.15, 0.09))
+	-- bruises: dark bands round the wrist and a long smudge up the forearm
+	-- (each just wider than the arm, so it shows as a stain on the skin)
+	put(16, forearm * C(0, -0.84, 0), V(0.415, 0.14, 0.435))
+	put(17, forearm * C(0.05, -0.7, -0.012), V(0.32, 0.16, 0.44))
+	put(18, forearm * C(-0.06, -0.56, 0.012), V(0.3, 0.2, 0.44))
+	put(19, forearm * C(0.04, -0.4, -0.012), V(0.26, 0.12, 0.44))
+end
+
+-- the front of Yuta's tall collar folded down out of a close-up of his face
+local function collarOpen(ctx: Timeline.Ctx)
+	for _, p in h3(ctx).yCollar do
+		local z = p.cf.Position.Z
+		if z < -0.3 then
+			ctx:prop(p, { t = 1 })
+		elseif z < 0 then
+			ctx:prop(p, { s = V(p.size.X, p.size.Y * 0.5, p.size.Z) })
+		end
+	end
+end
+
+-- the painted speed blur streaming past behind a flying fist: placed in front
+-- of the camera, sliding across the view (dir +1 = to the left, -1 = right)
+local function speedBlur(ctx: Timeline.Ctx, fov: number, u: number, dir: number, f: Vector3)
+	local h = h3(ctx)
+	local dist = 12
+	local vh = 2 * dist * math.tan(math.rad(fov) / 2) * 1.25
+	local vw = vh * 16 / 9
+	local slide = (0.9 - 1.8 * u) * vw * dir
+	local cf = ctx.frame.camera
+	local pos = cf.Position + cf.LookVector * dist + cf.RightVector * slide
+	ctx:place(h.speed, Util.lookAt(pos, pos - cf.LookVector, cf.UpVector))
+	ctx:prop(h.speed, { s = V(vw * 3, vh, 0.05) })
+	Common.streamers(ctx, h2(ctx).streamers, f + cf.LookVector * 4, cf.RightVector * -dir, 3.0, 4.5, 260, 0.9)
 end
 
 -- a white flash of light at a point
@@ -1002,19 +1105,27 @@ end
 -- curled; eyes wide, mouth a little open, brows knit
 local function yutaHand(ctx: Timeline.Ctx)
 	local t = ctx.t
-	local tremble = Util.noise1(t * 9, 4) * 2
+	-- the arm trembles, the hand jerks with the cramp; he stares at it, and
+	-- at 14.9 his eyes go to Ryu (at us)
+	local shk = Util.noise1(t * 11, 4) * 1.8 + Util.noise1(t * 23, 7) * 0.9
+	local jerk = Util.noise1(t * 6, 9) * 4
+	local look = Util.smoothstep(14.85, 15.0, t)
 	local yb = ctx:rig("Yuta", yutaRoot(), Cast.alive({
 		UpperTorso = R(-4, 6, 0),
-		Head = R(-4, 8, 0),
-		RightUpperArm = R(30 + tremble, 0, 72),
-		RightLowerArm = R(0, 0, 112),
-		RightHand = R(-20 + tremble, 0, 0),
+		Head = R(-2 + 2 * look, 12 - 6 * look, 0),
+		RightUpperArm = R(80 + shk, 0, 22 + shk * 0.5),
+		RightLowerArm = R(80 + shk * 0.8, 0, 0),
+		RightHand = R(-10 + jerk, shk, -20 + jerk * 0.5),
 	}, t))
-	Cast.expr(ctx, "yuta", "gasp")
+	Cast.expr(ctx, "yuta", if look < 0.5 then "lookHand" else "grit")
+	collarOpen(ctx)
+	crampHand(ctx, yb.RightHand, yb.RightLowerArm, t)
 	local head = yb.Head * C(0, 0.55, 0)
 	local side = yutaRoot():VectorToWorldSpace(V(1, 0, 0))
-	local eye = (yutaRoot() * C(0.4, 4.75, -4.4)).Position
-	cam(ctx, eye, head.Position + side * 0.45 + V(0, -0.15, 0), 40, 0, 1)
+	-- 14.133-14.25 the camera slides in from the hand to the face
+	local slide = 1 - Util.smoothstep(14.133, 14.3, t)
+	local eye = (yutaRoot() * C(0.55 + 0.6 * slide, 4.9, -3.6)).Position
+	cam(ctx, eye, head.Position + side * (0.55 + 0.4 * slide) + V(0, 0.05, 0), 40, 0.02, 1)
 	ctx:wind(1.3)
 	grade(ctx, 0.02, 0.22, 0.06, Color3.fromRGB(214, 224, 255))
 	field(ctx)
@@ -1686,7 +1797,6 @@ end
 -- 40.1: Ryu's fist (fur cuff) driving left
 local function fists(ctx: Timeline.Ctx)
 	local t = ctx.t
-	local h = h3(ctx)
 	local first = t < 40.1
 	local t0 = if first then 39.5 else 40.1
 	local u = (t - t0) / (if first then 0.6 else 0.633)
@@ -1720,17 +1830,7 @@ local function fists(ctx: Timeline.Ctx)
 	ctx:camera(shake(camCF, t, 0.1, 16), if first then 28 else 40)
 	ctx:focus(4, 1)
 	-- the blur behind, streaming the opposite way to the fist
-	local fov = if first then 28 else 40
-	local dist = 12
-	local vh = 2 * dist * math.tan(math.rad(fov) / 2) * 1.25
-	local vw = vh * 16 / 9
-	local pw = vw * 3
-	local slide = (0.9 - 1.8 * u) * vw * (if first then 1 else -1)
-	local cf = ctx.frame.camera
-	local pos = cf.Position + cf.LookVector * dist + cf.RightVector * slide
-	ctx:place(h.speed, Util.lookAt(pos, pos - cf.LookVector, cf.UpVector))
-	ctx:prop(h.speed, { s = V(pw, vh, 0.05) })
-	Common.streamers(ctx, h2(ctx).streamers, f + cf.LookVector * 4, cf.RightVector * (if first then -1 else 1), 3.0, 4.5, 260, 0.9)
+	speedBlur(ctx, if first then 28 else 40, u, if first then 1 else -1, f)
 	FlashArt.key(ctx, V(0.5, 1.5, 1), 0.9, Color3.fromRGB(236, 242, 255), 20)
 	ctx:alpha("hstreaks", 0.6)
 	ctx:gust(2.4)
@@ -1887,19 +1987,36 @@ end
 -- left through blue speed lines
 local function ryuFist2(ctx: Timeline.Ctx)
 	local t = ctx.t
-	local rb = ctx:rig("RyuLoose", C(RYU), Cast.add(punchPose(1), "RightUpperArm", R(-12, 0, 0)))
+	local u = (t - 49.6) / 1.0
+	-- the whole body flies with the blow: the camera rides alongside the fist
+	-- and the speed blur streams past behind (as at 40.1)
+	local travel = (t - 49.6) * 30
+	local thrust = Util.smoothstep(0.05, 0.3, u)
+	local root = C(RYU) * C(0, 14, -travel) * CFrame.Angles(0, math.rad(3 * math.sin(u * 7)), 0)
+	local pose = Cast.add(Cast.mix(punchPose(-0.2), punchPose(1), thrust), "RightUpperArm", R(-12 + 3 * math.sin(t * 17), 0, 0))
+	local rb = ctx:rig("RyuLoose", root, pose)
 	fist(ctx, 1)
 	local f = (rb.RightHand * C(0, -0.35, 0)).Position
+	local camCF: CFrame
+	local fov = 42
 	if t < 49.75 then
+		-- his black sleeve smearing past right in front of the lens
 		local fa = (rb.RightLowerArm * C(0, -0.4, 0)).Position
-		cam(ctx, fa + V(-1.0, 0.1, -0.4), fa + V(0, 0, 0.5), 50, 0.4, 0.3)
+		camCF = Util.lookAt(fa + V(-1.0, 0.1, -0.4), fa + V(0, 0, 0.5))
+		fov = 50
+		ctx:alpha("fbSmear", 0.5)
 	else
-		cam(ctx, f + V(-1.7, -0.3, -0.2), f + V(0, 0, 0.45), 42, 0.1, 1)
+		camCF = Util.lookAt(f + V(-1.9, -0.25, -0.1), f + V(0, 0, 0.5))
 	end
-	ctx:alpha("hstreaks", 1)
+	ctx:camera(shake(camCF, t, 0.1, 16), fov)
+	ctx:focus(2, 1)
+	speedBlur(ctx, fov, u, -1, f)
+	FlashArt.key(ctx, V(0.5, 1.5, 1), 0.9, Color3.fromRGB(236, 242, 255), 20)
+	ctx:alpha("hstreaks", 0.6)
 	ctx:gust(2.4)
-	grade(ctx, -0.04, 0.26, 0.08, Color3.fromRGB(200, 214, 255))
-	field(ctx)
+	ctx:wind(3)
+	grade(ctx, -0.02, 0.24, 0.1, Color3.fromRGB(206, 218, 255))
+	ctx:fog(0)
 end
 
 -- 50.6: Yuta calm in the middle of radial speed lines, Ryu's fist coming at
