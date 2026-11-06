@@ -243,23 +243,39 @@ end
 -- 18: front, low angle, grinning, lightning on the arm, wind
 local function grin(ctx: Timeline.Ctx)
 	-- 25.07-26.30 grinning into the camera while cyan energy whips past;
-	-- 26.30-26.60 he spins away; then walks off, looking back over his right
-	-- shoulder with the same grin (reference 25-27.5 s)
+	-- 26.30-26.80 he turns away with ONE step towards Yuta, then stands still,
+	-- looking back over his right shoulder with the same grin (reference
+	-- 25-27.5 s: no walking, no swaying)
 	local h: H = ctx.scene.data.ryu
 	local t = ctx.t
 	local turn = Util.smoothstep(26.3, 26.62, t)
-	local walkT = math.max(0, t - 26.42)
+	local step = Util.smoothstep(26.36, 26.8, t)
 	local yaw0 = -60
 	local yaw = yaw0 + turn * 150
 	local fwd = CFrame.Angles(0, math.rad(yaw), 0).LookVector
-	local pos = Field.RYU + fwd * (walkT * 3.2)
+	local pos = Field.RYU + fwd * (step * 1.1)
 	local root = C(pos) * CFrame.Angles(0, math.rad(yaw), 0)
 	local pose = Cast.alive(Cast.add(Cast.ryu.spread, "RightUpperArm", R(-40, 0, -30)), t)
-	if walkT > 0 then
-		local w = Cast.walk(walkT * 1.25)
-		w.UpperTorso = (w.UpperTorso or CFrame.new()) * R(0, -38 * turn, 0)
-		w.Head = R(-4, -84 * turn, 4)
-		pose = Cast.mix(pose, w, Util.smoothstep(26.42, 26.62, t))
+	if turn > 0 then
+		-- the single stride: the left leg swings forward and plants, the body
+		-- dips a little and settles; the torso twists back, the head looks
+		-- back over the right shoulder
+		local swing = math.sin(step * math.pi)
+		local stand: Rig.Pose = {
+			HumanoidRootPart = C(0, -0.05 * swing, 0),
+			LowerTorso = R(-3, 0, 0),
+			UpperTorso = R(2, -38, 0),
+			Head = R(-4, -84, 4),
+			LeftUpperArm = R(-6 + 10 * swing, 0, -10),
+			LeftLowerArm = R(18, 0, 0),
+			RightUpperArm = R(8 - 10 * swing, 0, 10),
+			RightLowerArm = R(18, 0, 0),
+			LeftUpperLeg = R(18 * step + 16 * swing, 0, -3),
+			LeftLowerLeg = R(-34 * swing - 4, 0, 0),
+			RightUpperLeg = R(-10 * step, 0, 3),
+			RightLowerLeg = R(-6 - 8 * swing, 0, 0),
+		}
+		pose = Cast.mix(pose, Cast.alive(stand, t), turn)
 	end
 	local bones = ctx:rig("Ryu", root, pose)
 	-- once he looks back over his shoulder, keep the big collar out of his face
@@ -269,9 +285,11 @@ local function grin(ctx: Timeline.Ctx)
 	-- swings up behind his right shoulder, at head height, to catch the look back
 	local base = rootAt(Field.RYU, yaw0)
 	local eyeA = base:PointToWorldSpace(V(-1.2, 2.7, -5.0 + (t - 25.067) * 0.2))
-	local eyeC = root:PointToWorldSpace(V(2.4, 7.8, 2.6))
+	-- (after the turn: low behind his right shoulder looking up at the face
+	-- turned back over it, as in the reference)
+	local eyeC = root:PointToWorldSpace(V(3.4, 5.3, 2.4))
 	local eye = eyeA:Lerp(eyeC, turn)
-	local cam = Util.lookAt(eye, head.Position + V(0, -0.7 + turn * 0.3, 0))
+	local cam = Util.lookAt(eye, head.Position + V(0, -0.7 + turn * 0.45, 0))
 	ctx:camera(Clash.shake(cam * CFrame.Angles(0, 0, math.rad(-6)), t, 0.06 + turn * (1 - turn) * 0.8, 10), 46)
 	ctx:focus((head.Position - eye).Magnitude, 1)
 	Cast.expr(ctx, "ryu", "grin")
@@ -283,7 +301,7 @@ local function grin(ctx: Timeline.Ctx)
 			idx = FX.placeBolt(ctx, h.bolts, idx, shoulder, hand + V(math.sin(i) * 0.5, math.cos(i) * 0.4, 0), 6, 0.18, 0.06, i + 30, 16)
 		end
 	end
-	Cast.ryuAura(ctx, bones, 0.8 * (1 - turn * 0.6), 4)
+	Cast.ryuAura(ctx, bones, 0.8 * (1 - Util.smoothstep(26.45, 26.9, t)), 4)
 	ctx:alpha("wind", 0.8)
 	grade(ctx, 0.02, 0.16, -0.1)
 	sky(ctx)
