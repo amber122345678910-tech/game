@@ -8,6 +8,7 @@ local Types = require(Shared.Types)
 local GloveConfig = require(Shared.Config.GloveConfig)
 local LevelConfig = require(Shared.Config.LevelConfig)
 local PhysicsConfig = require(Shared.Config.PhysicsConfig)
+local BuddyConfig = require(Shared.Config.BuddyConfig)
 
 local DATA_VERSION = 1
 local MAX_NUMBER = 1e15
@@ -33,10 +34,19 @@ function ProfileTemplate.Create(nowUnix: number): Types.PlayerProfile
 			Owned = { [GloveConfig.DefaultGlove] = true },
 			Equipped = GloveConfig.DefaultGlove,
 		},
+		Buddies = { Inventory = {}, Equipped = {}, NextUid = 1 },
 		Locations = { [LevelConfig.DefaultLocation] = newLocation() },
 		ActiveLocation = LevelConfig.DefaultLocation,
 		TotalRebirths = 0,
-		Records = { TopSpeed = 0, LongestCombo = 0, WallsSmashed = 0, ChestsOpened = 0, LootEarned = 0 },
+		Records = {
+			TopSpeed = 0,
+			LongestCombo = 0,
+			WallsSmashed = 0,
+			ChestsOpened = 0,
+			LootEarned = 0,
+			CapsulesOpened = 0,
+			PinatasPopped = 0,
+		},
 		FirstJoinUnix = nowUnix,
 		LastJoinUnix = nowUnix,
 		PlaySeconds = 0,
@@ -122,6 +132,49 @@ function ProfileTemplate.Sanitize(raw: any, nowUnix: number): Types.PlayerProfil
 		profile.Records.WallsSmashed = readNumber(records.WallsSmashed, 0, 0, MAX_NUMBER, true)
 		profile.Records.ChestsOpened = readNumber(records.ChestsOpened, 0, 0, MAX_NUMBER, true)
 		profile.Records.LootEarned = readNumber(records.LootEarned, 0, 0, MAX_NUMBER, true)
+		profile.Records.CapsulesOpened = readNumber(records.CapsulesOpened, 0, 0, MAX_NUMBER, true)
+		profile.Records.PinatasPopped = readNumber(records.PinatasPopped, 0, 0, MAX_NUMBER, true)
+	end
+
+	-- Бадди: только известные id/мутации, потолок инвентаря, экипировка — существующие уникальные uid
+	local buddies = raw.Buddies
+	if type(buddies) == "table" then
+		local inventory = buddies.Inventory
+		local count = 0
+		local highest = 0
+		if type(inventory) == "table" then
+			for uid, entry in inventory do
+				if count >= BuddyConfig.MaxInventory then
+					break
+				end
+				if type(uid) == "string" and #uid <= 16 and type(entry) == "table" and type(entry.BuddyId) == "string" then
+					local mutation = BuddyConfig.ToMutation(entry.Mutation)
+					if BuddyConfig.Get(entry.BuddyId) and mutation then
+						profile.Buddies.Inventory[uid] = {
+							BuddyId = entry.BuddyId,
+							Mutation = mutation,
+							Obtained = readNumber(entry.Obtained, nowUnix, 0, MAX_NUMBER, true),
+						}
+						count += 1
+						local numeric = tonumber(string.match(uid, "^b(%d+)$"))
+						if numeric and numeric > highest then
+							highest = numeric
+						end
+					end
+				end
+			end
+		end
+		local equipped = buddies.Equipped
+		if type(equipped) == "table" then
+			local seen: { [string]: boolean } = {}
+			for _, uid in equipped do
+				if type(uid) == "string" and profile.Buddies.Inventory[uid] and not seen[uid] and #profile.Buddies.Equipped < BuddyConfig.MaxEquipped then
+					seen[uid] = true
+					table.insert(profile.Buddies.Equipped, uid)
+				end
+			end
+		end
+		profile.Buddies.NextUid = math.max(readNumber(buddies.NextUid, 1, 1, MAX_NUMBER, true), highest + 1)
 	end
 
 	return profile
@@ -135,6 +188,18 @@ function ProfileTemplate.GetLocation(profile: Types.PlayerProfile, locationId: s
 		profile.Locations[locationId] = progress
 	end
 	return progress
+end
+
+-- Экипированные бадди профиля в формате для StretchPhysics.Derive / атрибута EquippedBuddies
+function ProfileTemplate.EquippedBuddies(profile: Types.PlayerProfile): { BuddyConfig.EquippedBuddy }
+	local result: { BuddyConfig.EquippedBuddy } = {}
+	for _, uid in profile.Buddies.Equipped do
+		local instance = profile.Buddies.Inventory[uid]
+		if instance then
+			table.insert(result, { BuddyId = instance.BuddyId, Mutation = instance.Mutation })
+		end
+	end
+	return result
 end
 
 function ProfileTemplate.DeepCopy<T>(value: T): T

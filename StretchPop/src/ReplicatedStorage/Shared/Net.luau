@@ -9,6 +9,9 @@
 --   UpgradeStat(stat: StatName)                          — купить следующий уровень стата
 --   GloveAction(action: "Buy"|"Equip", gloveId: string)  — купить / надеть перчатку
 --   ProfileSync()                                         — запросить свежий снимок профиля
+--   HatchCapsule(capsuleId: string)                       — открыть гача-капсулу за монеты
+--   BuddyAction(action: "Equip"|"Unequip"|"Release"|"Craft", a: string, b: string?) — uid или (buddyId, mutation) для Craft
+--   TeleportRequest(target: "Start"|"Hub")                — док «На старт» / «В хаб»
 -- Сервер → Клиент
 --   SmashResult(obstacleId: string, accepted: boolean, loot: number, reason: string?)
 --   ObstacleSmashed(smasherUserId: number, slot: number, obstacleId: string, snapshot: SmashSnapshot, point: Vector3, velocity: Vector3)
@@ -18,7 +21,10 @@
 --   PeerArmVisual(player: Player, side: string, active: boolean, point: Vector3?)
 --   UpgradeStat(stat: string, accepted: boolean, reason: string, level: number, coins: number)
 --   GloveAction(action: string, gloveId: string, accepted: boolean, reason: string)
---   ProfileSync(snapshot: ProfileSnapshot)                — купленные перчатки, рекорды, прогресс локаций
+--   ProfileSync(snapshot: ProfileSnapshot)                — купленные перчатки, бадди, рекорды, прогресс локаций
+--   HatchCapsule(capsuleId, accepted, reason, buddy: BuddySnapshot?) — результат для анимации вылупления
+--   BuddyAction(action, accepted, reason, uid: string?)
+--   TeleportRequest(target, accepted)
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
@@ -45,6 +51,9 @@ local Net = {
 	UpgradeStat = remote("UpgradeStat"),
 	GloveAction = remote("GloveAction"),
 	ProfileSync = remote("ProfileSync"),
+	HatchCapsule = remote("HatchCapsule"),
+	BuddyAction = remote("BuddyAction"),
+	TeleportRequest = remote("TeleportRequest"),
 }
 
 return Net

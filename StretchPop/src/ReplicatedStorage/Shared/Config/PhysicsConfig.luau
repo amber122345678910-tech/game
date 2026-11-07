@@ -91,6 +91,9 @@ local PhysicsConfig = {
 		Bouncy = "StretchBouncy",
 		GrabPoint = "StretchGrabPoint",
 		Gong = "StretchGong",
+		BoostRing = "StretchBoostRing",
+		Pinata = "StretchPinata",
+		CapsuleMachine = "StretchCapsuleMachine",
 	},
 
 	-- Прокачка статов (меню — следующий шаг, цены нужны серверу уже сейчас)

@@ -21,7 +21,10 @@
         "PeerArmVisual": { "$className": "RemoteEvent" },
         "UpgradeStat": { "$className": "RemoteEvent" },
         "GloveAction": { "$className": "RemoteEvent" },
-        "ProfileSync": { "$className": "RemoteEvent" }
+        "ProfileSync": { "$className": "RemoteEvent" },
+        "HatchCapsule": { "$className": "RemoteEvent" },
+        "BuddyAction": { "$className": "RemoteEvent" },
+        "TeleportRequest": { "$className": "RemoteEvent" }
       }
     },
 
@@ -73,7 +76,7 @@
           "Size": [12, 1, 12],
           "CFrame": {
             "CFrame": {
-              "position": [0, 8, 14],
+              "position": [0, 8, 40],
               "orientation": [[1, 0, 0], [0, 1, 0], [0, 0, 1]]
             }
           }

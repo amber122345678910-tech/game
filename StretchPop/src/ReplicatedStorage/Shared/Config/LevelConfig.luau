@@ -20,6 +20,15 @@ export type Theme = {
 	Gong: MaterialColor,
 	GongFrame: MaterialColor,
 	Walls: { [string]: MaterialColor },
+	Rock: MaterialColor,
+	RockDark: MaterialColor,
+	Girder: MaterialColor,
+	Chevron: MaterialColor,
+	Trunk: MaterialColor,
+	Leaves: MaterialColor,
+	Cloud: MaterialColor,
+	Bridge: MaterialColor,
+	GateNeon: Color3,
 	Wave: Color3,
 	Tint: Color3,
 	SignText: Color3,
@@ -50,6 +59,11 @@ local GLASS = Enum.Material.Glass
 local WOOD = Enum.Material.WoodPlanks
 local METAL = Enum.Material.Metal
 local SLATE = Enum.Material.Slate
+local ROCK = Enum.Material.Rock
+local WOOD_SOLID = Enum.Material.Wood
+local SANDSTONE = Enum.Material.Sandstone
+local BASALT = Enum.Material.Basalt
+local DIAMOND = Enum.Material.DiamondPlate
 
 local Themes: { Theme } = {
 	{
@@ -71,6 +85,15 @@ local Themes: { Theme } = {
 			Hard = mc(150, 160, 180, METAL),
 			Titan = mc(132, 98, 255, SP),
 		},
+		Rock = mc(150, 120, 92, SLATE),
+		RockDark = mc(104, 86, 70, ROCK),
+		Girder = mc(96, 106, 128, METAL),
+		Chevron = mc(255, 255, 255, NEON),
+		Trunk = mc(140, 96, 60, WOOD_SOLID),
+		Leaves = mc(110, 214, 92, SP),
+		Cloud = mc(255, 255, 255, SP),
+		Bridge = mc(196, 146, 94, WOOD),
+		GateNeon = Color3.fromRGB(80, 220, 255),
 		Wave = Color3.fromRGB(255, 255, 255),
 		Tint = Color3.fromRGB(255, 255, 255),
 		SignText = Color3.fromRGB(255, 255, 255),
@@ -95,6 +118,15 @@ local Themes: { Theme } = {
 			Hard = mc(222, 166, 40, FOIL),
 			Titan = mc(255, 246, 190, NEON),
 		},
+		Rock = mc(204, 160, 96, SANDSTONE),
+		RockDark = mc(150, 110, 60, SANDSTONE),
+		Girder = mc(214, 170, 64, FOIL),
+		Chevron = mc(255, 238, 150, NEON),
+		Trunk = mc(160, 112, 52, WOOD_SOLID),
+		Leaves = mc(255, 196, 70, SP),
+		Cloud = mc(255, 246, 222, SP),
+		Bridge = mc(232, 192, 112, WOOD),
+		GateNeon = Color3.fromRGB(255, 214, 64),
 		Wave = Color3.fromRGB(255, 220, 80),
 		Tint = Color3.fromRGB(255, 244, 222),
 		SignText = Color3.fromRGB(255, 248, 220),
@@ -119,6 +151,15 @@ local Themes: { Theme } = {
 			Hard = mc(36, 150, 132, SP),
 			Titan = mc(220, 255, 60, NEON),
 		},
+		Rock = mc(62, 68, 92, SLATE),
+		RockDark = mc(34, 38, 56, SLATE),
+		Girder = mc(44, 48, 66, DIAMOND),
+		Chevron = mc(60, 255, 160, NEON),
+		Trunk = mc(60, 64, 82, METAL),
+		Leaves = mc(70, 232, 160, GLASS),
+		Cloud = mc(210, 255, 240, SP),
+		Bridge = mc(52, 58, 78, DIAMOND),
+		GateNeon = Color3.fromRGB(60, 255, 160),
 		Wave = Color3.fromRGB(60, 255, 160),
 		Tint = Color3.fromRGB(224, 255, 240),
 		SignText = Color3.fromRGB(200, 255, 220),
@@ -143,6 +184,15 @@ local Themes: { Theme } = {
 			Hard = mc(50, 30, 92, SLATE),
 			Titan = mc(255, 80, 220, NEON),
 		},
+		Rock = mc(48, 32, 72, BASALT),
+		RockDark = mc(24, 14, 40, BASALT),
+		Girder = mc(34, 22, 54, METAL),
+		Chevron = mc(222, 112, 255, NEON),
+		Trunk = mc(62, 42, 84, WOOD_SOLID),
+		Leaves = mc(172, 82, 240, SP),
+		Cloud = mc(150, 120, 200, SP),
+		Bridge = mc(62, 42, 92, WOOD),
+		GateNeon = Color3.fromRGB(230, 110, 255),
 		Wave = Color3.fromRGB(200, 80, 255),
 		Tint = Color3.fromRGB(236, 224, 255),
 		SignText = Color3.fromRGB(240, 210, 255),
@@ -156,11 +206,18 @@ local LevelConfig = {
 		Meadows = { DisplayName = "Bouncy Meadows", Seed = 7341 },
 	} :: { [string]: { DisplayName: string, Seed: number } },
 
-	-- Геометрия полосы (локальные координаты: старт в (0,0,0), полоса уходит в −Z)
+	-- Геометрия полосы (локальные координаты: старт в (0,0,0), полоса уходит в −Z).
+	-- Полосы расходятся веером от хаба Sky Plaza: хаб в центре, позади стартовых площадок.
 	LaneWidth = 92,
-	SlotSpacing = 210,
-	MaxSlots = 16,
-	WorldOrigin = Vector3.new(0, 0, 0),
+	MaxSlots = 9,
+	Hub = {
+		Center = Vector3.new(0, 0, 0),
+		Radius = 150,
+		TerraceRadius = 54,
+		SpawnRadius = 112,
+		LaneStartRadius = 330, -- центр стартовой площадки полосы от центра хаба
+		FanStepDegrees = 20,
+	},
 	StartPadSize = Vector3.new(72, 6, 72),
 	BaseLength = 760,
 	LengthPerTier = 110,
@@ -177,6 +234,24 @@ local LevelConfig = {
 		RequiredSpeed = 45,
 		Loot = 40,
 		Size = Vector3.new(7, 5.5, 5),
+	},
+	-- Золотая пиньята: плывёт поперёк полосы, огромный лут
+	Pinata = {
+		RequiredSpeed = 75,
+		Loot = 600,
+		Size = Vector3.new(6, 6, 6),
+		AmplitudeMin = 22,
+		AmplitudeMax = 32,
+		FrequencyMin = 0.12,
+		FrequencyMax = 0.2,
+	},
+	-- Кольцо ускорения: пролёт = +скорость и +комбо (сервер сам видит пролёт по сэмплам)
+	BoostRing = {
+		Speed = 120,
+		Combo = 2,
+		Radius = 9,
+		Cooldown = 1.2,
+		Spacing = 170,
 	},
 
 	-- Рост сложности/лута с каждым перерождением
@@ -223,8 +298,34 @@ function LevelConfig.LaneLength(tier: number): number
 	return math.min(LevelConfig.BaseLength + LevelConfig.LengthPerTier * math.max(tier, 0), LevelConfig.MaxLength)
 end
 
+-- Угол полосы в веере: слот 1 по центру, дальше поочерёдно вправо/влево (0, +20, −20, +40, …)
+function LevelConfig.SlotAngle(slot: number): number
+	local index = math.max(math.floor(slot) - 1, 0)
+	if index == 0 then
+		return 0
+	end
+	local ring = math.ceil(index / 2)
+	local sign = if index % 2 == 1 then 1 else -1
+	return sign * ring * LevelConfig.Hub.FanStepDegrees
+end
+
+-- Направление «вперёд» полосы в мире (локальная −Z)
+function LevelConfig.SlotDirection(slot: number): Vector3
+	local angle = math.rad(LevelConfig.SlotAngle(slot))
+	return Vector3.new(math.sin(angle), 0, -math.cos(angle))
+end
+
 function LevelConfig.SlotOrigin(slot: number): CFrame
-	return CFrame.new(LevelConfig.WorldOrigin + Vector3.new((slot - 1) * LevelConfig.SlotSpacing, 0, 0))
+	local direction = LevelConfig.SlotDirection(slot)
+	local position = LevelConfig.Hub.Center + direction * LevelConfig.Hub.LaneStartRadius
+	return CFrame.lookAt(position, position + direction)
+end
+
+-- Точка появления на хабе: на дорожке к своей полосе, лицом к ней
+function LevelConfig.HubSpawn(slot: number): CFrame
+	local direction = LevelConfig.SlotDirection(slot)
+	local position = LevelConfig.Hub.Center + direction * LevelConfig.Hub.SpawnRadius + Vector3.new(0, 4.5, 0)
+	return CFrame.lookAt(position, position + direction)
 end
 
 function LevelConfig.TierName(tier: number): string

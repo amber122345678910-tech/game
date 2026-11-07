@@ -14,6 +14,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Shared = ReplicatedStorage.Shared
 local Types = require(Shared.Types)
 local ProfileTemplate = require(Shared.Data.ProfileTemplate)
+local BuddyConfig = require(Shared.Config.BuddyConfig)
 local Signal = require(Shared.Util.Signal)
 
 local STORE_NAME = "StretchPop_Profiles_v1"
@@ -98,6 +99,8 @@ local function syncReplicatedState(session: Session)
 	player:SetAttribute("LocationRebirths", location.Rebirths)
 	player:SetAttribute("TotalRebirths", profile.TotalRebirths)
 	player:SetAttribute("TopSpeed", math.floor(profile.Records.TopSpeed))
+	-- бадди за плечами видят все клиенты; множители этого же списка входят в StretchPhysics.Derive
+	player:SetAttribute("EquippedBuddies", BuddyConfig.EncodeEquipped(ProfileTemplate.EquippedBuddies(profile)))
 	player:SetAttribute("DataOffline", session.Offline)
 	session.CoinsValue.Value = math.min(profile.Coins, 2 ^ 53)
 	session.RebirthsValue.Value = profile.TotalRebirths

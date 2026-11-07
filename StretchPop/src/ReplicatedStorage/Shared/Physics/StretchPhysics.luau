@@ -7,6 +7,7 @@ local Shared = script.Parent.Parent
 local Types = require(Shared.Types)
 local PhysicsConfig = require(Shared.Config.PhysicsConfig)
 local GloveConfig = require(Shared.Config.GloveConfig)
+local BuddyConfig = require(Shared.Config.BuddyConfig)
 
 export type StretchParams = {
 	Stiffness: number, -- k одной резинки на земле (рогатка)
@@ -16,6 +17,7 @@ export type StretchParams = {
 	ImpactMass: number, -- m в E = ½mv²
 	FlightMass: number,
 	Restitution: number, -- упругость пружинного шара
+	CoinMultiplier: number, -- множитель лута от экипированных бадди
 }
 
 export type Band = {
@@ -29,17 +31,21 @@ local function curve(statCurve: PhysicsConfig.StatCurve, level: number): number
 	return math.min(statCurve.Base + statCurve.PerLevel * math.max(level, 0), statCurve.Max)
 end
 
-function StretchPhysics.Derive(stats: Types.PhysicalStats, gloveId: string?): StretchParams
+-- buddies — экипированные компаньоны: их множители входят в жёсткость, ударную массу и лут
+-- одинаково на клиенте (предсказание) и сервере (валидация и начисление).
+function StretchPhysics.Derive(stats: Types.PhysicalStats, gloveId: string?, buddies: { BuddyConfig.EquippedBuddy }?): StretchParams
 	local glove = GloveConfig.Get(gloveId)
-	local stiffness = curve(PhysicsConfig.Stiffness, stats.SpringPower)
+	local coinMultiplier, impactMultiplier, springMultiplier = BuddyConfig.Multipliers(buddies)
+	local stiffness = curve(PhysicsConfig.Stiffness, stats.SpringPower) * springMultiplier
 	return {
 		Stiffness = stiffness,
 		AirStiffness = stiffness * PhysicsConfig.AirStiffnessScale,
 		MaxStretch = curve(PhysicsConfig.MaxStretch, stats.Elasticity),
 		GrabRange = curve(PhysicsConfig.GrabRange, stats.Elasticity),
-		ImpactMass = curve(PhysicsConfig.ImpactMass, stats.SmashMass) * (1 + glove.ImpactMassBonus),
+		ImpactMass = curve(PhysicsConfig.ImpactMass, stats.SmashMass) * (1 + glove.ImpactMassBonus) * impactMultiplier,
 		FlightMass = PhysicsConfig.FlightMass,
 		Restitution = curve(PhysicsConfig.Restitution, stats.SpringPower),
+		CoinMultiplier = coinMultiplier,
 	}
 end
 

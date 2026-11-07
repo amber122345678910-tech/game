@@ -27,6 +27,9 @@ local PhysicsConfig = require(Shared.Config.PhysicsConfig)
 local LevelConfig = require(Shared.Config.LevelConfig)
 local StretchPhysics = require(Shared.Physics.StretchPhysics)
 local Net = require(Shared.Net)
+local Signal = require(Shared.Util.Signal)
+local ProfileTemplate = require(Shared.Data.ProfileTemplate)
+local PinataMotion = require(Shared.Physics.PinataMotion)
 
 local Server = script.Parent.Parent
 local PlayerDataService = require(Server.Services.PlayerDataService)
@@ -58,11 +61,23 @@ type Tracker = {
 	Tokens: number,
 	TokensAt: number,
 	LastGongAt: number,
+	RunBoosts: number, -- пролёты колец ускорения за забег (каждое даёт +BoostRing.Combo к комбо)
+	RingCooldowns: { [string]: number },
+	LastTeleportAt: number,
+}
+
+type WorldRing = {
+	Id: string,
+	Center: Vector3,
+	Normal: Vector3,
+	Radius: number,
 }
 
 type LaneState = {
 	Slot: number,
 	Owner: Player,
+	OwnerName: string,
+	Rings: { WorldRing },
 	Origin: CFrame,
 	Handles: LevelBuilder.LaneHandles,
 	Layout: LevelBuilder.LaneLayout,
@@ -104,7 +119,12 @@ type Job = {
 
 type Verdict = "Accept" | "Reject" | "Wait"
 
-local KineticLevelAndRebirthService = {}
+local KineticLevelAndRebirthService = {
+	-- (slot, владелец или nil) — полоса появилась/исчезла: хаб открывает проход и пишет ник
+	LaneChanged = Signal.new() :: Signal.Signal<number, Player?>,
+	-- (игрок, новый тир) — засчитан удар в Гонг Эволюции
+	Rebirthed = Signal.new() :: Signal.Signal<Player, number>,
+}
 
 local world: Folder
 local lanesFolder: Folder
@@ -181,6 +201,9 @@ local function newTracker(): Tracker
 		Tokens = Validation.SmashTokenBurst,
 		TokensAt = now,
 		LastGongAt = 0,
+		RunBoosts = 0,
+		RingCooldowns = {},
+		LastTeleportAt = 0,
 	}
 end
 
@@ -209,6 +232,7 @@ local function resetTracker(tracker: Tracker, position: Vector3?, ignoreFor: num
 	tracker.SlowSince = nil
 	tracker.Turns = 0
 	tracker.RunSmashes = 0
+	tracker.RunBoosts = 0
 	if position then
 		pushSample(tracker, now, position)
 	end
@@ -283,7 +307,17 @@ local function currentParams(player: Player): StretchPhysics.StretchParams?
 	if profile == nil then
 		return nil
 	end
-	return StretchPhysics.Derive(profile.Stats, profile.Gloves.Equipped)
+	return StretchPhysics.Derive(profile.Stats, profile.Gloves.Equipped, ProfileTemplate.EquippedBuddies(profile))
+end
+
+-- Кольца полосы в мировых координатах (плоскость кольца ⟂ оси полосы)
+local function worldRings(origin: CFrame, layout: LevelBuilder.LaneLayout): { WorldRing }
+	local rings: { WorldRing } = {}
+	for _, ring in layout.Rings do
+		local cframe = origin * ring.LocalCFrame
+		table.insert(rings, { Id = ring.Id, Center = cframe.Position, Normal = cframe.LookVector, Radius = ring.Radius })
+	end
+	return rings
 end
 
 -- ── Телепорты (всегда через клиента-владельца физики + страховка сервером) ──
@@ -374,6 +408,23 @@ local function updateTracker(player: Player, tracker: Tracker, now: number)
 
 	tracker.LastTrusted = root.CFrame
 
+	-- Пролёт колец ускорения сервер видит сам: отрезок между сэмплами пересекает плоскость кольца
+	local lane = lanesByPlayer[player]
+	if lane and tracker.Count >= 2 then
+		local previous = sampleAt(tracker, 1).P
+		for _, ring in lane.Rings do
+			local before = (previous - ring.Center):Dot(ring.Normal)
+			local after = (position - ring.Center):Dot(ring.Normal)
+			if before * after < 0 then
+				local hit = previous:Lerp(position, before / (before - after))
+				if (hit - ring.Center).Magnitude <= ring.Radius * 1.35 and now >= (tracker.RingCooldowns[ring.Id] or 0) then
+					tracker.RingCooldowns[ring.Id] = now + LevelConfig.BoostRing.Cooldown
+					tracker.RunBoosts += 1
+				end
+			end
+		end
+	end
+
 	if speed > Validation.TurnMinSpeed then
 		local direction = delta / distance
 		if
@@ -395,6 +446,7 @@ local function updateTracker(player: Player, tracker: Tracker, now: number)
 		elseif now - slowSince > Validation.RestTime then
 			tracker.Turns = 0
 			tracker.RunSmashes = 0
+			tracker.RunBoosts = 0
 			tracker.LastDirSpeed = 0
 		end
 	else
@@ -417,6 +469,11 @@ end
 
 -- ── Полосы ──────────────────────────────────────────────────────────────────
 
+local function bestSpeedOf(player: Player, locationId: string): number
+	local profile = PlayerDataService.Get(player)
+	return if profile then ProfileTemplate.GetLocation(profile, locationId).BestSpeed else 0
+end
+
 local function buildContext(lane: LaneState, tier: number): LevelBuilder.BuildContext
 	return {
 		Origin = lane.Origin,
@@ -424,6 +481,8 @@ local function buildContext(lane: LaneState, tier: number): LevelBuilder.BuildCo
 		Slot = lane.Slot,
 		Tier = tier,
 		OwnerUserId = lane.Owner.UserId,
+		OwnerName = lane.OwnerName,
+		BestSpeed = bestSpeedOf(lane.Owner, lane.LocationId),
 	}
 end
 
@@ -452,20 +511,26 @@ local function createLaneFor(player: Player, profile: Types.PlayerProfile): Lane
 		return nil
 	end
 	local locationId = profile.ActiveLocation
-	local tier = PlayerDataService.GetLocation(profile, locationId).Tier
+	local progress = PlayerDataService.GetLocation(profile, locationId)
+	local tier = progress.Tier
 	local layout = LevelBuilder.GenerateLayout(locationId, tier)
 	local origin = LevelConfig.SlotOrigin(slot)
+	local ownerName = player.DisplayName ~= "" and player.DisplayName or player.Name
 	local context: LevelBuilder.BuildContext = {
 		Origin = origin,
 		Theme = LevelConfig.GetTheme(tier),
 		Slot = slot,
 		Tier = tier,
 		OwnerUserId = player.UserId,
+		OwnerName = ownerName,
+		BestSpeed = progress.BestSpeed,
 	}
 	local handles = LevelBuilder.CreateLane(layout, context, lanesFolder)
 	local lane: LaneState = {
 		Slot = slot,
 		Owner = player,
+		OwnerName = ownerName,
+		Rings = worldRings(origin, layout),
 		Origin = origin,
 		Handles = handles,
 		Layout = layout,
@@ -486,6 +551,7 @@ local function createLaneFor(player: Player, profile: Types.PlayerProfile): Lane
 	lanesBySlot[slot] = lane
 	lanesByPlayer[player] = lane
 	player:SetAttribute("LaneSlot", slot)
+	KineticLevelAndRebirthService.LaneChanged:Fire(slot, player)
 	return lane
 end
 
@@ -498,6 +564,7 @@ local function destroyLane(lane: LaneState)
 	lane.Handles.Model:Destroy()
 	if lanesBySlot[lane.Slot] == lane then
 		lanesBySlot[lane.Slot] = nil
+		KineticLevelAndRebirthService.LaneChanged:Fire(lane.Slot, nil)
 	end
 	if lanesByPlayer[lane.Owner] == lane then
 		lanesByPlayer[lane.Owner] = nil
@@ -542,7 +609,13 @@ local function evaluateSmash(request: PendingRequest, tracker: Tracker, now: num
 		return "Wait", "speed_unverified"
 	end
 	local reach = Validation.DistanceBase + observed * Validation.DistanceLatency
-	local distance = minRecentDistance(tracker, now, Validation.ObservedWindow, record.Part.CFrame, record.Part.Size)
+	-- пиньята плывёт поперёк полосы: проверяем расстояние до всего её «коридора» движения
+	local checkSize = record.Part.Size
+	local motion = record.Spec.Motion
+	if motion then
+		checkSize = PinataMotion.SweepSize(checkSize, motion)
+	end
+	local distance = minRecentDistance(tracker, now, Validation.ObservedWindow, record.Part.CFrame, checkSize)
 	if distance > reach then
 		return "Wait", "too_far"
 	end
@@ -560,14 +633,18 @@ local function applySmash(request: PendingRequest, tracker: Tracker)
 	record.Part.Parent = brokenStorage
 	tracker.RunSmashes += 1
 
-	local loot = record.Spec.Loot
-	local isChest = record.Spec.Kind == "Chest"
+	-- лут × множитель экипированных бадди (та же формула, что у клиента в StretchPhysics.Derive)
+	local params = currentParams(request.Player)
+	local loot = math.max(1, math.floor(record.Spec.Loot * (if params then params.CoinMultiplier else 1) + 0.5))
+	local kind = record.Spec.Kind
 	local speed = request.ClaimedSpeed
 	PlayerDataService.Update(request.Player, function(profile)
 		profile.Coins += loot
 		profile.Records.LootEarned += loot
-		if isChest then
+		if kind == "Chest" then
 			profile.Records.ChestsOpened += 1
+		elseif kind == "Pinata" then
+			profile.Records.PinatasPopped += 1
 		else
 			profile.Records.WallsSmashed += 1
 		end
@@ -621,7 +698,7 @@ local function evaluateGong(request: PendingRequest, tracker: Tracker, now: numb
 	if claimed > observed * Validation.SpeedSlack + Validation.SpeedFlat then
 		return "Wait", "speed_unverified"
 	end
-	if request.Combo > tracker.Turns + tracker.RunSmashes + Validation.ComboSlack then
+	if request.Combo > tracker.Turns + tracker.RunSmashes + LevelConfig.BoostRing.Combo * tracker.RunBoosts + Validation.ComboSlack then
 		return "Wait", "combo_unverified"
 	end
 	local reach = Validation.DistanceBase + 10 + observed * Validation.DistanceLatency
@@ -631,12 +708,17 @@ local function evaluateGong(request: PendingRequest, tracker: Tracker, now: numb
 	return "Accept", "ok"
 end
 
-local function partLocalZ(lane: LaneState, part: BasePart): number
-	local stored = part:GetAttribute("LocalZ")
+local function partLocalZ(lane: LaneState, instance: Instance): number
+	local stored = instance:GetAttribute("LocalZ")
 	if typeof(stored) == "number" then
 		return stored
 	end
-	return lane.Origin:PointToObjectSpace(part.Position).Z
+	if instance:IsA("BasePart") then
+		return lane.Origin:PointToObjectSpace(instance.Position).Z
+	elseif instance:IsA("Model") then
+		return lane.Origin:PointToObjectSpace(instance:GetPivot().Position).Z
+	end
+	return 0
 end
 
 local function runMutationWave(lane: LaneState, newTier: number)
@@ -647,6 +729,7 @@ local function runMutationWave(lane: LaneState, newTier: number)
 	local generation = lane.Generation
 	lane.Tier = newTier
 	lane.Layout = newLayout
+	lane.Rings = worldRings(lane.Origin, newLayout)
 
 	local rebirth = LevelConfig.Rebirth
 	local now = os.clock()
@@ -683,11 +766,11 @@ local function runMutationWave(lane: LaneState, newTier: number)
 
 	-- Снос старых деталей в момент прохода фронта
 	for _, child in lane.Handles.Mutable:GetChildren() do
-		if child:IsA("BasePart") then
-			local part = child
-			schedule(timeAt(partLocalZ(lane, part)), function()
+		if child:IsA("BasePart") or child:IsA("Model") then
+			local instance = child
+			schedule(timeAt(partLocalZ(lane, instance)), function()
 				if lane.Alive and lane.Generation == generation then
-					part:Destroy()
+					instance:Destroy()
 				end
 			end)
 		end
@@ -728,8 +811,12 @@ local function runMutationWave(lane: LaneState, newTier: number)
 	-- Финал волны: перекраска старта, атрибут тира полосы
 	schedule(waveStart + duration, function()
 		if lane.Alive and lane.Generation == generation then
-			LevelBuilder.ApplyTheme(lane.Handles.StartPad, context.Theme)
-			LevelBuilder.ApplyTheme(lane.Handles.StartSign, context.Theme)
+			for _, child in lane.Handles.Static:GetChildren() do
+				if child:IsA("BasePart") then
+					LevelBuilder.ApplyTheme(child, context.Theme)
+				end
+			end
+			LevelBuilder.RefreshGateSign(lane.Handles.GateSign, LevelBuilder.GateSignText(lane.OwnerName, newTier, bestSpeedOf(player, lane.LocationId)), context.Theme)
 			lane.Handles.Model:SetAttribute("Tier", newTier)
 		end
 	end)
@@ -739,7 +826,8 @@ local function applyGong(request: PendingRequest, tracker: Tracker)
 	local lane = request.Lane
 	local player = request.Player
 	local newTier = lane.Tier + 1
-	local bonus = math.floor(LevelConfig.RebirthBonus * LevelConfig.LootMultiplier(newTier) + 0.5)
+	local params = currentParams(player)
+	local bonus = math.floor(LevelConfig.RebirthBonus * LevelConfig.LootMultiplier(newTier) * (if params then params.CoinMultiplier else 1) + 0.5)
 	local speed = request.ClaimedSpeed
 	local combo = request.Combo
 	tracker.LastGongAt = os.clock()
@@ -760,6 +848,7 @@ local function applyGong(request: PendingRequest, tracker: Tracker)
 	local needSpeed, needCombo = LevelConfig.GongRequirement(newTier - 1)
 	Net.GongResult:FireClient(player, true, "rebirth", needSpeed, needCombo, speed, combo)
 	runMutationWave(lane, newTier)
+	KineticLevelAndRebirthService.Rebirthed:Fire(player, newTier)
 end
 
 local function rejectRequest(request: PendingRequest, reason: string)
@@ -908,6 +997,27 @@ local function onGongStrike(player: Player, slot: unknown, impactVelocity: unkno
 	})
 end
 
+local TELEPORT_COOLDOWN = 1.5
+
+local function onTeleportRequest(player: Player, target: unknown)
+	if target ~= "Start" and target ~= "Hub" then
+		return
+	end
+	local tracker = trackers[player]
+	local lane = lanesByPlayer[player]
+	if tracker == nil or lane == nil then
+		return
+	end
+	local now = os.clock()
+	if now - tracker.LastTeleportAt < TELEPORT_COOLDOWN then
+		Net.TeleportRequest:FireClient(player, target, false)
+		return
+	end
+	tracker.LastTeleportAt = now
+	teleportPlayer(player, if target == "Start" then LevelBuilder.StartCFrame(lane.Slot) else LevelBuilder.HubSpawnCFrame(lane.Slot))
+	Net.TeleportRequest:FireClient(player, target, true)
+end
+
 -- ── Персонажи ───────────────────────────────────────────────────────────────
 
 local function assignCollisionGroup(instance: Instance)
@@ -953,7 +1063,8 @@ local function onCharacterAdded(player: Player, character: Model)
 	local root = character:WaitForChild("HumanoidRootPart", 10)
 	local lane = lanesByPlayer[player]
 	if root and lane and player.Character == character then
-		local start = LevelBuilder.StartCFrame(lane.Slot)
+		-- появляемся на хабе Sky Plaza, на дорожке к своей полосе
+		local start = LevelBuilder.HubSpawnCFrame(lane.Slot)
 		character:PivotTo(start)
 		-- Клиент-владелец физики ставит персонажа сам; сервер перепроверит через 0.35 с
 		teleportPlayer(player, start)
@@ -1024,6 +1135,10 @@ function KineticLevelAndRebirthService.GetObservedSpeed(player: Player): number
 	return recentMaxSpeed(tracker, os.clock(), 0.3)
 end
 
+function KineticLevelAndRebirthService.GetWorldFolder(): Folder
+	return world
+end
+
 function KineticLevelAndRebirthService.GetLaneTier(player: Player): number?
 	local lane = lanesByPlayer[player]
 	return if lane then lane.Tier else nil
@@ -1053,6 +1168,16 @@ function KineticLevelAndRebirthService.Init()
 
 	Net.SmashRequest.OnServerEvent:Connect(onSmashRequest)
 	Net.GongStrike.OnServerEvent:Connect(onGongStrike)
+	Net.TeleportRequest.OnServerEvent:Connect(onTeleportRequest)
+
+	-- Вывеска владельца на воротах полосы: ник • тир • рекорд скорости
+	PlayerDataService.ProfileChanged:Connect(function(player: Player, profile: Types.PlayerProfile)
+		local lane = lanesByPlayer[player]
+		if lane then
+			local best = ProfileTemplate.GetLocation(profile, lane.LocationId).BestSpeed
+			LevelBuilder.UpdateGateSign(lane.Handles.GateSign, LevelBuilder.GateSignText(lane.OwnerName, lane.Tier, best))
+		end
+	end)
 
 	Players.PlayerAdded:Connect(function(player)
 		task.spawn(onPlayerAdded, player)
